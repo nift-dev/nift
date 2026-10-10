@@ -1,0 +1,1160 @@
+﻿2026-10-10T08:37:16.4169131Z Current runner version: '2.337.0'
+2026-10-10T08:37:16.4203322Z ##[group]Runner Image Provisioner
+2026-10-10T08:37:16.4204184Z Hosted Compute Agent
+2026-10-10T08:37:16.4204729Z Version: 20260901.588
+2026-10-10T08:37:16.4205364Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+2026-10-10T08:37:16.4206065Z Build Date: 2026-09-01T19:56:44Z
+2026-10-10T08:37:16.4206704Z Worker ID: {34d1535c-61b7-4156-b5c7-f105fda414c4}
+2026-10-10T08:37:16.4207410Z Azure Region: eastus
+2026-10-10T08:37:16.4207923Z ##[endgroup]
+2026-10-10T08:37:16.4209513Z ##[group]Operating System
+2026-10-10T08:37:16.4210136Z Microsoft Windows Server 2025
+2026-10-10T08:37:16.4210699Z 10.0.26100
+2026-10-10T08:37:16.4211188Z Datacenter
+2026-10-10T08:37:16.4211659Z ##[endgroup]
+2026-10-10T08:37:16.4212154Z ##[group]Runner Image
+2026-10-10T08:37:16.4212733Z Image: windows-2025-vs2026
+2026-10-10T08:37:16.4213270Z Version: 20260925.250.1
+2026-10-10T08:37:16.4214731Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260925.250/images/windows/Windows2025-VS2026-Readme.md
+2026-10-10T08:37:16.4216338Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260925.250
+2026-10-10T08:37:16.4217274Z ##[endgroup]
+2026-10-10T08:37:16.4218825Z ##[group]GITHUB_TOKEN Permissions
+2026-10-10T08:37:16.4220656Z Contents: read
+2026-10-10T08:37:16.4221219Z Metadata: read
+2026-10-10T08:37:16.4221776Z ##[endgroup]
+2026-10-10T08:37:16.4223840Z Secret source: Actions
+2026-10-10T08:37:16.4224814Z Cache mode: write
+2026-10-10T08:37:16.4225514Z Prepare workflow directory
+2026-10-10T08:37:16.4628634Z Prepare all required actions
+2026-10-10T08:37:16.4696042Z Getting action download info
+2026-10-10T08:37:16.6381075Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-10-10T08:37:16.7747000Z Download action repository 'actions/setup-python@v6' (SHA:ece7cb06caefa5fff74198d8649806c4678c61a1)
+2026-10-10T08:37:16.9249364Z Download action repository 'msys2/setup-msys2@v2' (SHA:ec48f7c5447b3140e2b088413ae3a55687bccb6e)
+2026-10-10T08:37:17.2386662Z Complete job name: windows v4.4/v4.5 portable surface
+2026-10-10T08:37:17.4118736Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:17.4119838Z with:
+2026-10-10T08:37:17.4120287Z   path: nift
+2026-10-10T08:37:17.4120749Z   repository: nift-dev/nift
+2026-10-10T08:37:17.4124665Z   token: ***
+2026-10-10T08:37:17.4125116Z   ssh-strict: true
+2026-10-10T08:37:17.4125578Z   ssh-user: git
+2026-10-10T08:37:17.4126047Z   persist-credentials: true
+2026-10-10T08:37:17.4126976Z   clean: true
+2026-10-10T08:37:17.4127485Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:17.4128037Z   fetch-depth: 1
+2026-10-10T08:37:17.4128494Z   fetch-tags: false
+2026-10-10T08:37:17.4128958Z   show-progress: true
+2026-10-10T08:37:17.4129431Z   lfs: false
+2026-10-10T08:37:17.4129864Z   submodules: false
+2026-10-10T08:37:17.4130331Z   set-safe-directory: true
+2026-10-10T08:37:17.4130873Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:17.4131738Z ##[endgroup]
+2026-10-10T08:37:17.5660221Z Syncing repository: nift-dev/nift
+2026-10-10T08:37:17.5662975Z ##[group]Getting Git version info
+2026-10-10T08:37:17.5664071Z Working directory is 'D:\a\nift\nift\nift'
+2026-10-10T08:37:17.6661974Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:18.0369403Z git version 2.55.0.windows.5
+2026-10-10T08:37:18.0413871Z ##[endgroup]
+2026-10-10T08:37:18.0433919Z Temporarily overriding HOME='D:\a\_temp\d59b840f-eae7-4303-b17e-188c8426667b' before making global git config changes
+2026-10-10T08:37:18.0436304Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:18.0444553Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift
+2026-10-10T08:37:18.1119496Z ##[group]Initializing the repository
+2026-10-10T08:37:18.1128392Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift
+2026-10-10T08:37:18.1995591Z Initialized empty Git repository in D:/a/nift/nift/nift/.git/
+2026-10-10T08:37:18.2038618Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-dev/nift
+2026-10-10T08:37:18.2676666Z ##[endgroup]
+2026-10-10T08:37:18.2678372Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:18.2685244Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:18.2984236Z ##[endgroup]
+2026-10-10T08:37:18.2986644Z ##[group]Setting up auth
+2026-10-10T08:37:18.2996766Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:18.3291419Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:19.7585538Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:19.7900490Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:20.3375242Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:20.3666720Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:20.8980867Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:20.9291616Z ##[endgroup]
+2026-10-10T08:37:20.9292493Z ##[group]Fetching the repository
+2026-10-10T08:37:20.9305508Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +bb7c95a531d35670352dfa412ec535e9dbdae1cd:refs/remotes/origin/main
+2026-10-10T08:37:23.1372825Z From https://github.com/nift-dev/nift
+2026-10-10T08:37:23.1377183Z  * [new ref]         bb7c95a531d35670352dfa412ec535e9dbdae1cd -> origin/main
+2026-10-10T08:37:23.1413022Z ##[endgroup]
+2026-10-10T08:37:23.1413722Z ##[group]Determining the checkout info
+2026-10-10T08:37:23.1417004Z ##[endgroup]
+2026-10-10T08:37:23.1425800Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:23.1869300Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:23.2191390Z ##[group]Checking out the ref
+2026-10-10T08:37:23.2201132Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B main refs/remotes/origin/main
+2026-10-10T08:37:24.2731761Z Updating files:  69% (2443/3536)
+2026-10-10T08:37:24.2825320Z Updating files:  70% (2476/3536)
+2026-10-10T08:37:24.2940870Z Updating files:  71% (2511/3536)
+2026-10-10T08:37:24.3048370Z Updating files:  72% (2546/3536)
+2026-10-10T08:37:24.3139775Z Updating files:  73% (2582/3536)
+2026-10-10T08:37:24.3220203Z Updating files:  74% (2617/3536)
+2026-10-10T08:37:24.3315154Z Updating files:  75% (2652/3536)
+2026-10-10T08:37:24.3400638Z Updating files:  76% (2688/3536)
+2026-10-10T08:37:24.3492535Z Updating files:  77% (2723/3536)
+2026-10-10T08:37:24.3582080Z Updating files:  78% (2759/3536)
+2026-10-10T08:37:24.3673291Z Updating files:  79% (2794/3536)
+2026-10-10T08:37:24.3786230Z Updating files:  80% (2829/3536)
+2026-10-10T08:37:24.3856382Z Updating files:  81% (2865/3536)
+2026-10-10T08:37:24.3935891Z Updating files:  82% (2900/3536)
+2026-10-10T08:37:24.4014230Z Updating files:  83% (2935/3536)
+2026-10-10T08:37:24.4092735Z Updating files:  84% (2971/3536)
+2026-10-10T08:37:24.4171763Z Updating files:  85% (3006/3536)
+2026-10-10T08:37:24.4346934Z Updating files:  86% (3041/3536)
+2026-10-10T08:37:24.4474274Z Updating files:  87% (3077/3536)
+2026-10-10T08:37:24.4570864Z Updating files:  88% (3112/3536)
+2026-10-10T08:37:24.4678987Z Updating files:  89% (3148/3536)
+2026-10-10T08:37:24.4780491Z Updating files:  90% (3183/3536)
+2026-10-10T08:37:24.4879005Z Updating files:  91% (3218/3536)
+2026-10-10T08:37:24.4982539Z Updating files:  92% (3254/3536)
+2026-10-10T08:37:24.5061872Z Updating files:  93% (3289/3536)
+2026-10-10T08:37:24.5140707Z Updating files:  94% (3324/3536)
+2026-10-10T08:37:24.5224476Z Updating files:  95% (3360/3536)
+2026-10-10T08:37:24.5304804Z Updating files:  96% (3395/3536)
+2026-10-10T08:37:24.5389002Z Updating files:  97% (3430/3536)
+2026-10-10T08:37:24.5463536Z Updating files:  98% (3466/3536)
+2026-10-10T08:37:24.5539722Z Updating files:  99% (3501/3536)
+2026-10-10T08:37:24.5540432Z Updating files: 100% (3536/3536)
+2026-10-10T08:37:24.5540925Z Updating files: 100% (3536/3536), done.
+2026-10-10T08:37:24.5711188Z Switched to a new branch 'main'
+2026-10-10T08:37:24.5779545Z branch 'main' set up to track 'origin/main'.
+2026-10-10T08:37:24.5909811Z ##[endgroup]
+2026-10-10T08:37:24.6321707Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:24.6580078Z bb7c95a531d35670352dfa412ec535e9dbdae1cd
+2026-10-10T08:37:24.7105995Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:24.7106479Z with:
+2026-10-10T08:37:24.7106810Z   repository: nift-packages/sqlite
+2026-10-10T08:37:24.7107286Z   ref: e2f6e192f5a72e8220567952170fc814566aa400
+2026-10-10T08:37:24.7107788Z   path: nift-packages/sqlite
+2026-10-10T08:37:24.7112380Z   token: ***
+2026-10-10T08:37:24.7112691Z   ssh-strict: true
+2026-10-10T08:37:24.7113010Z   ssh-user: git
+2026-10-10T08:37:24.7113342Z   persist-credentials: true
+2026-10-10T08:37:24.7113714Z   clean: true
+2026-10-10T08:37:24.7114048Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:24.7114463Z   fetch-depth: 1
+2026-10-10T08:37:24.7114782Z   fetch-tags: false
+2026-10-10T08:37:24.7115110Z   show-progress: true
+2026-10-10T08:37:24.7115437Z   lfs: false
+2026-10-10T08:37:24.7115729Z   submodules: false
+2026-10-10T08:37:24.7116091Z   set-safe-directory: true
+2026-10-10T08:37:24.7116487Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:24.7116894Z ##[endgroup]
+2026-10-10T08:37:24.8237134Z Syncing repository: nift-packages/sqlite
+2026-10-10T08:37:24.8245503Z ##[group]Getting Git version info
+2026-10-10T08:37:24.8246328Z Working directory is 'D:\a\nift\nift\nift-packages\sqlite'
+2026-10-10T08:37:24.9068380Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:24.9330724Z git version 2.55.0.windows.5
+2026-10-10T08:37:24.9370024Z ##[endgroup]
+2026-10-10T08:37:24.9387880Z Temporarily overriding HOME='D:\a\_temp\0d212c39-f477-4c6d-94df-55ad70322112' before making global git config changes
+2026-10-10T08:37:24.9388626Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:24.9398571Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\sqlite
+2026-10-10T08:37:24.9690881Z ##[group]Initializing the repository
+2026-10-10T08:37:24.9701906Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\sqlite
+2026-10-10T08:37:25.0054156Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/sqlite/.git/
+2026-10-10T08:37:25.0096688Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/sqlite
+2026-10-10T08:37:25.0403702Z ##[endgroup]
+2026-10-10T08:37:25.0404358Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:25.0416706Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:25.0734350Z ##[endgroup]
+2026-10-10T08:37:25.0734961Z ##[group]Setting up auth
+2026-10-10T08:37:25.0746107Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:25.1427128Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:25.7080437Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:25.7368893Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:26.2809913Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:26.3101221Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:26.8339023Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:26.8633790Z ##[endgroup]
+2026-10-10T08:37:26.8634202Z ##[group]Fetching the repository
+2026-10-10T08:37:26.8649287Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin e2f6e192f5a72e8220567952170fc814566aa400
+2026-10-10T08:37:27.1020352Z From https://github.com/nift-packages/sqlite
+2026-10-10T08:37:27.1020838Z  * branch            e2f6e192f5a72e8220567952170fc814566aa400 -> FETCH_HEAD
+2026-10-10T08:37:27.1051424Z ##[endgroup]
+2026-10-10T08:37:27.1051843Z ##[group]Determining the checkout info
+2026-10-10T08:37:27.1054363Z ##[endgroup]
+2026-10-10T08:37:27.1063929Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:27.1382957Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:27.1664021Z ##[group]Checking out the ref
+2026-10-10T08:37:27.1673118Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force e2f6e192f5a72e8220567952170fc814566aa400
+2026-10-10T08:37:27.2045633Z Note: switching to 'e2f6e192f5a72e8220567952170fc814566aa400'.
+2026-10-10T08:37:27.2046115Z 
+2026-10-10T08:37:27.2046377Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:27.2046964Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:27.2047536Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:27.2048249Z 
+2026-10-10T08:37:27.2048494Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:27.2049063Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:27.2049396Z 
+2026-10-10T08:37:27.2049546Z   git switch -c <new-branch-name>
+2026-10-10T08:37:27.2049772Z 
+2026-10-10T08:37:27.2049888Z Or undo this operation with:
+2026-10-10T08:37:27.2050091Z 
+2026-10-10T08:37:27.2050192Z   git switch -
+2026-10-10T08:37:27.2050334Z 
+2026-10-10T08:37:27.2050606Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:27.2051021Z 
+2026-10-10T08:37:27.2051215Z HEAD is now at e2f6e19 refactor: encapsulate SQLite helpers
+2026-10-10T08:37:27.2101618Z ##[endgroup]
+2026-10-10T08:37:27.2419703Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:27.2687092Z e2f6e192f5a72e8220567952170fc814566aa400
+2026-10-10T08:37:27.3073463Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:27.3073789Z with:
+2026-10-10T08:37:27.3073990Z   repository: nift-packages/curl
+2026-10-10T08:37:27.3074273Z   ref: d3c7a29301cb6516cc8cac0ee8d10e903c4c728c
+2026-10-10T08:37:27.3074572Z   path: nift-packages/curl
+2026-10-10T08:37:27.3077013Z   token: ***
+2026-10-10T08:37:27.3077202Z   ssh-strict: true
+2026-10-10T08:37:27.3077390Z   ssh-user: git
+2026-10-10T08:37:27.3077585Z   persist-credentials: true
+2026-10-10T08:37:27.3077805Z   clean: true
+2026-10-10T08:37:27.3078009Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:27.3078246Z   fetch-depth: 1
+2026-10-10T08:37:27.3078427Z   fetch-tags: false
+2026-10-10T08:37:27.3078832Z   show-progress: true
+2026-10-10T08:37:27.3079023Z   lfs: false
+2026-10-10T08:37:27.3079191Z   submodules: false
+2026-10-10T08:37:27.3079385Z   set-safe-directory: true
+2026-10-10T08:37:27.3079618Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:27.3079853Z ##[endgroup]
+2026-10-10T08:37:27.4159926Z Syncing repository: nift-packages/curl
+2026-10-10T08:37:27.4167996Z ##[group]Getting Git version info
+2026-10-10T08:37:27.4168570Z Working directory is 'D:\a\nift\nift\nift-packages\curl'
+2026-10-10T08:37:27.5237670Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:27.5607664Z git version 2.55.0.windows.5
+2026-10-10T08:37:27.5654758Z ##[endgroup]
+2026-10-10T08:37:27.5676722Z Temporarily overriding HOME='D:\a\_temp\75d2d308-e0a5-41fe-a0d1-be547b4b36da' before making global git config changes
+2026-10-10T08:37:27.5677994Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:27.5688238Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\curl
+2026-10-10T08:37:27.6003461Z ##[group]Initializing the repository
+2026-10-10T08:37:27.6013149Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\curl
+2026-10-10T08:37:27.6395579Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/curl/.git/
+2026-10-10T08:37:27.6442519Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/curl
+2026-10-10T08:37:27.6758298Z ##[endgroup]
+2026-10-10T08:37:27.6758713Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:27.6768214Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:27.7046548Z ##[endgroup]
+2026-10-10T08:37:27.7046955Z ##[group]Setting up auth
+2026-10-10T08:37:27.7059032Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:27.7352779Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:28.2814543Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:28.3109923Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:28.8158388Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:28.8446704Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:29.3746952Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:29.4039875Z ##[endgroup]
+2026-10-10T08:37:29.4040771Z ##[group]Fetching the repository
+2026-10-10T08:37:29.4054362Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin d3c7a29301cb6516cc8cac0ee8d10e903c4c728c
+2026-10-10T08:37:29.6463334Z From https://github.com/nift-packages/curl
+2026-10-10T08:37:29.6464396Z  * branch            d3c7a29301cb6516cc8cac0ee8d10e903c4c728c -> FETCH_HEAD
+2026-10-10T08:37:29.6496758Z ##[endgroup]
+2026-10-10T08:37:29.6497354Z ##[group]Determining the checkout info
+2026-10-10T08:37:29.6499335Z ##[endgroup]
+2026-10-10T08:37:29.6508968Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:29.6850079Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:29.7128693Z ##[group]Checking out the ref
+2026-10-10T08:37:29.7136990Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force d3c7a29301cb6516cc8cac0ee8d10e903c4c728c
+2026-10-10T08:37:29.7508808Z Note: switching to 'd3c7a29301cb6516cc8cac0ee8d10e903c4c728c'.
+2026-10-10T08:37:29.7509707Z 
+2026-10-10T08:37:29.7510419Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:29.7510956Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:29.7511437Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:29.7511725Z 
+2026-10-10T08:37:29.7511905Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:29.7512342Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:29.7512602Z 
+2026-10-10T08:37:29.7512704Z   git switch -c <new-branch-name>
+2026-10-10T08:37:29.7512871Z 
+2026-10-10T08:37:29.7512967Z Or undo this operation with:
+2026-10-10T08:37:29.7513117Z 
+2026-10-10T08:37:29.7513197Z   git switch -
+2026-10-10T08:37:29.7513325Z 
+2026-10-10T08:37:29.7513537Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:29.7513850Z 
+2026-10-10T08:37:29.7514009Z HEAD is now at d3c7a29 fix: parse curl status output portably
+2026-10-10T08:37:29.7565718Z ##[endgroup]
+2026-10-10T08:37:29.7877749Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:29.8129987Z d3c7a29301cb6516cc8cac0ee8d10e903c4c728c
+2026-10-10T08:37:29.8493145Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:29.8493448Z with:
+2026-10-10T08:37:29.8493659Z   repository: nift-packages/postgres
+2026-10-10T08:37:29.8493951Z   ref: 42873336b721a69d4132541523c05b816ba489eb
+2026-10-10T08:37:29.8494234Z   path: nift-packages/postgres
+2026-10-10T08:37:29.8496675Z   token: ***
+2026-10-10T08:37:29.8496874Z   ssh-strict: true
+2026-10-10T08:37:29.8497073Z   ssh-user: git
+2026-10-10T08:37:29.8497271Z   persist-credentials: true
+2026-10-10T08:37:29.8497490Z   clean: true
+2026-10-10T08:37:29.8497710Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:29.8497951Z   fetch-depth: 1
+2026-10-10T08:37:29.8498146Z   fetch-tags: false
+2026-10-10T08:37:29.8498349Z   show-progress: true
+2026-10-10T08:37:29.8498558Z   lfs: false
+2026-10-10T08:37:29.8498756Z   submodules: false
+2026-10-10T08:37:29.8498959Z   set-safe-directory: true
+2026-10-10T08:37:29.8499190Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:29.8499429Z ##[endgroup]
+2026-10-10T08:37:29.9586472Z Syncing repository: nift-packages/postgres
+2026-10-10T08:37:29.9594979Z ##[group]Getting Git version info
+2026-10-10T08:37:29.9595584Z Working directory is 'D:\a\nift\nift\nift-packages\postgres'
+2026-10-10T08:37:30.0547648Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:30.0833853Z git version 2.55.0.windows.5
+2026-10-10T08:37:30.0881677Z ##[endgroup]
+2026-10-10T08:37:30.0901619Z Temporarily overriding HOME='D:\a\_temp\ec044216-521d-4b8d-8d5d-11d4db519b9c' before making global git config changes
+2026-10-10T08:37:30.0902790Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:30.0913977Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\postgres
+2026-10-10T08:37:30.1279014Z ##[group]Initializing the repository
+2026-10-10T08:37:30.1288361Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\postgres
+2026-10-10T08:37:30.1663874Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/postgres/.git/
+2026-10-10T08:37:30.1767606Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/postgres
+2026-10-10T08:37:30.2176151Z ##[endgroup]
+2026-10-10T08:37:30.2177020Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:30.2188046Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:30.2552480Z ##[endgroup]
+2026-10-10T08:37:30.2553264Z ##[group]Setting up auth
+2026-10-10T08:37:30.2569263Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:30.2923366Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:30.8348558Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:30.8658711Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:31.4366042Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:31.4674074Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:32.0331168Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:32.0640130Z ##[endgroup]
+2026-10-10T08:37:32.0640754Z ##[group]Fetching the repository
+2026-10-10T08:37:32.0655913Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 42873336b721a69d4132541523c05b816ba489eb
+2026-10-10T08:37:32.2836586Z From https://github.com/nift-packages/postgres
+2026-10-10T08:37:32.2837484Z  * branch            42873336b721a69d4132541523c05b816ba489eb -> FETCH_HEAD
+2026-10-10T08:37:32.2870744Z ##[endgroup]
+2026-10-10T08:37:32.2871351Z ##[group]Determining the checkout info
+2026-10-10T08:37:32.2874832Z ##[endgroup]
+2026-10-10T08:37:32.2884866Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:32.3253061Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:32.3551231Z ##[group]Checking out the ref
+2026-10-10T08:37:32.3560590Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 42873336b721a69d4132541523c05b816ba489eb
+2026-10-10T08:37:32.3950599Z Note: switching to '42873336b721a69d4132541523c05b816ba489eb'.
+2026-10-10T08:37:32.3951311Z 
+2026-10-10T08:37:32.3951840Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:32.3952839Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:32.3953797Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:32.3954436Z 
+2026-10-10T08:37:32.3954883Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:32.3955782Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:32.3956366Z 
+2026-10-10T08:37:32.3956663Z   git switch -c <new-branch-name>
+2026-10-10T08:37:32.3957102Z 
+2026-10-10T08:37:32.3957387Z Or undo this operation with:
+2026-10-10T08:37:32.3957793Z 
+2026-10-10T08:37:32.3958052Z   git switch -
+2026-10-10T08:37:32.3958384Z 
+2026-10-10T08:37:32.3958875Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:32.3959547Z 
+2026-10-10T08:37:32.3960432Z HEAD is now at 4287333 Submit one atomic BEGIN...COMMIT transaction; conservative SQL-aware parameter binder
+2026-10-10T08:37:32.4021087Z ##[endgroup]
+2026-10-10T08:37:32.4417765Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:32.4717748Z 42873336b721a69d4132541523c05b816ba489eb
+2026-10-10T08:37:32.5156731Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:32.5157055Z with:
+2026-10-10T08:37:32.5157257Z   repository: nift-packages/mysql
+2026-10-10T08:37:32.5157540Z   ref: 4526f3794bac2ad8b6d80d087d0abab974eed38c
+2026-10-10T08:37:32.5157834Z   path: nift-packages/mysql
+2026-10-10T08:37:32.5161091Z   token: ***
+2026-10-10T08:37:32.5161554Z   ssh-strict: true
+2026-10-10T08:37:32.5161748Z   ssh-user: git
+2026-10-10T08:37:32.5161946Z   persist-credentials: true
+2026-10-10T08:37:32.5162162Z   clean: true
+2026-10-10T08:37:32.5162455Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:32.5162760Z   fetch-depth: 1
+2026-10-10T08:37:32.5162943Z   fetch-tags: false
+2026-10-10T08:37:32.5163139Z   show-progress: true
+2026-10-10T08:37:32.5163330Z   lfs: false
+2026-10-10T08:37:32.5163501Z   submodules: false
+2026-10-10T08:37:32.5163695Z   set-safe-directory: true
+2026-10-10T08:37:32.5163930Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:32.5164166Z ##[endgroup]
+2026-10-10T08:37:32.6428940Z Syncing repository: nift-packages/mysql
+2026-10-10T08:37:32.6437589Z ##[group]Getting Git version info
+2026-10-10T08:37:32.6438285Z Working directory is 'D:\a\nift\nift\nift-packages\mysql'
+2026-10-10T08:37:32.7545916Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:32.7864183Z git version 2.55.0.windows.5
+2026-10-10T08:37:32.7914280Z ##[endgroup]
+2026-10-10T08:37:32.7934780Z Temporarily overriding HOME='D:\a\_temp\b61ae856-8fef-44eb-90fc-d586eaef4642' before making global git config changes
+2026-10-10T08:37:32.7936029Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:32.7946594Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\mysql
+2026-10-10T08:37:32.8240540Z ##[group]Initializing the repository
+2026-10-10T08:37:32.8250754Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\mysql
+2026-10-10T08:37:32.8626306Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/mysql/.git/
+2026-10-10T08:37:32.8668927Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/mysql
+2026-10-10T08:37:32.8997954Z ##[endgroup]
+2026-10-10T08:37:32.8998578Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:32.9010987Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:32.9338416Z ##[endgroup]
+2026-10-10T08:37:32.9339218Z ##[group]Setting up auth
+2026-10-10T08:37:32.9352813Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:32.9796688Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:33.5308798Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:33.5600244Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:34.0722985Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:34.1022743Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:34.6270519Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:34.6566835Z ##[endgroup]
+2026-10-10T08:37:34.6567836Z ##[group]Fetching the repository
+2026-10-10T08:37:34.6581487Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 4526f3794bac2ad8b6d80d087d0abab974eed38c
+2026-10-10T08:37:34.8986354Z From https://github.com/nift-packages/mysql
+2026-10-10T08:37:34.8986816Z  * branch            4526f3794bac2ad8b6d80d087d0abab974eed38c -> FETCH_HEAD
+2026-10-10T08:37:34.9016018Z ##[endgroup]
+2026-10-10T08:37:34.9016420Z ##[group]Determining the checkout info
+2026-10-10T08:37:34.9018904Z ##[endgroup]
+2026-10-10T08:37:34.9027725Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:34.9341070Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:34.9618815Z ##[group]Checking out the ref
+2026-10-10T08:37:34.9626845Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 4526f3794bac2ad8b6d80d087d0abab974eed38c
+2026-10-10T08:37:34.9983802Z Note: switching to '4526f3794bac2ad8b6d80d087d0abab974eed38c'.
+2026-10-10T08:37:34.9984559Z 
+2026-10-10T08:37:34.9984841Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:34.9985395Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:34.9985995Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:34.9986333Z 
+2026-10-10T08:37:34.9986553Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:34.9987094Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:34.9987401Z 
+2026-10-10T08:37:34.9987516Z   git switch -c <new-branch-name>
+2026-10-10T08:37:34.9987717Z 
+2026-10-10T08:37:34.9987821Z Or undo this operation with:
+2026-10-10T08:37:34.9988005Z 
+2026-10-10T08:37:34.9988092Z   git switch -
+2026-10-10T08:37:34.9988229Z 
+2026-10-10T08:37:34.9988475Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:34.9988854Z 
+2026-10-10T08:37:34.9989502Z HEAD is now at 4526f37 Submit one atomic BEGIN...COMMIT transaction; conservative SQL-aware parameter binder
+2026-10-10T08:37:35.0039171Z ##[endgroup]
+2026-10-10T08:37:35.0342452Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:35.0597203Z 4526f3794bac2ad8b6d80d087d0abab974eed38c
+2026-10-10T08:37:35.0968729Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:35.0969046Z with:
+2026-10-10T08:37:35.0969253Z   repository: nift-packages/redis
+2026-10-10T08:37:35.0969561Z   ref: 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+2026-10-10T08:37:35.0969856Z   path: nift-packages/redis
+2026-10-10T08:37:35.0972282Z   token: ***
+2026-10-10T08:37:35.0972476Z   ssh-strict: true
+2026-10-10T08:37:35.0972664Z   ssh-user: git
+2026-10-10T08:37:35.0972862Z   persist-credentials: true
+2026-10-10T08:37:35.0973081Z   clean: true
+2026-10-10T08:37:35.0973280Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:35.0973523Z   fetch-depth: 1
+2026-10-10T08:37:35.0973707Z   fetch-tags: false
+2026-10-10T08:37:35.0973896Z   show-progress: true
+2026-10-10T08:37:35.0974085Z   lfs: false
+2026-10-10T08:37:35.0974256Z   submodules: false
+2026-10-10T08:37:35.0974445Z   set-safe-directory: true
+2026-10-10T08:37:35.0974685Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:35.0974914Z ##[endgroup]
+2026-10-10T08:37:35.2114646Z Syncing repository: nift-packages/redis
+2026-10-10T08:37:35.2126144Z ##[group]Getting Git version info
+2026-10-10T08:37:35.2126789Z Working directory is 'D:\a\nift\nift\nift-packages\redis'
+2026-10-10T08:37:35.3044411Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:35.3312618Z git version 2.55.0.windows.5
+2026-10-10T08:37:35.3353361Z ##[endgroup]
+2026-10-10T08:37:35.3370609Z Temporarily overriding HOME='D:\a\_temp\73de0796-ba5b-4334-a208-2f1cb207dd2f' before making global git config changes
+2026-10-10T08:37:35.3371344Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:35.3380861Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\redis
+2026-10-10T08:37:35.3666230Z ##[group]Initializing the repository
+2026-10-10T08:37:35.3674938Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\redis
+2026-10-10T08:37:35.4017534Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/redis/.git/
+2026-10-10T08:37:35.4057200Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/redis
+2026-10-10T08:37:35.4352134Z ##[endgroup]
+2026-10-10T08:37:35.4352558Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:35.4361607Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:35.4639712Z ##[endgroup]
+2026-10-10T08:37:35.4640079Z ##[group]Setting up auth
+2026-10-10T08:37:35.4651430Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:35.4937484Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:36.0350019Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:36.0634176Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:36.5912956Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:36.6205897Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:37.1297719Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:37.1592441Z ##[endgroup]
+2026-10-10T08:37:37.1592908Z ##[group]Fetching the repository
+2026-10-10T08:37:37.1606694Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+2026-10-10T08:37:37.4059930Z From https://github.com/nift-packages/redis
+2026-10-10T08:37:37.4060887Z  * branch            7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978 -> FETCH_HEAD
+2026-10-10T08:37:37.4091867Z ##[endgroup]
+2026-10-10T08:37:37.4092593Z ##[group]Determining the checkout info
+2026-10-10T08:37:37.4095058Z ##[endgroup]
+2026-10-10T08:37:37.4104222Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:37.4426931Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:37.4706773Z ##[group]Checking out the ref
+2026-10-10T08:37:37.4714818Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+2026-10-10T08:37:37.5077414Z Note: switching to '7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978'.
+2026-10-10T08:37:37.5077967Z 
+2026-10-10T08:37:37.5078357Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:37.5079239Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:37.5080143Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:37.5080666Z 
+2026-10-10T08:37:37.5081012Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:37.5081822Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:37.5082309Z 
+2026-10-10T08:37:37.5082491Z   git switch -c <new-branch-name>
+2026-10-10T08:37:37.5082866Z 
+2026-10-10T08:37:37.5083048Z Or undo this operation with:
+2026-10-10T08:37:37.5083338Z 
+2026-10-10T08:37:37.5083472Z   git switch -
+2026-10-10T08:37:37.5083681Z 
+2026-10-10T08:37:37.5084049Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:37.5084622Z 
+2026-10-10T08:37:37.5085185Z HEAD is now at 7719fa8 Use array concatenation for command argument construction (removes manual copy loop)
+2026-10-10T08:37:37.5136032Z ##[endgroup]
+2026-10-10T08:37:37.5439781Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:37.5695655Z 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+2026-10-10T08:37:37.6114660Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:37.6114972Z with:
+2026-10-10T08:37:37.6115175Z   repository: nift-packages/vips
+2026-10-10T08:37:37.6115459Z   ref: 735b9965d6d6c365b4195f0454ded31e577dc5f1
+2026-10-10T08:37:37.6115737Z   path: nift-packages/vips
+2026-10-10T08:37:37.6118128Z   token: ***
+2026-10-10T08:37:37.6118315Z   ssh-strict: true
+2026-10-10T08:37:37.6118504Z   ssh-user: git
+2026-10-10T08:37:37.6118703Z   persist-credentials: true
+2026-10-10T08:37:37.6118926Z   clean: true
+2026-10-10T08:37:37.6119123Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:37.6119360Z   fetch-depth: 1
+2026-10-10T08:37:37.6119541Z   fetch-tags: false
+2026-10-10T08:37:37.6119735Z   show-progress: true
+2026-10-10T08:37:37.6119927Z   lfs: false
+2026-10-10T08:37:37.6120100Z   submodules: false
+2026-10-10T08:37:37.6120297Z   set-safe-directory: true
+2026-10-10T08:37:37.6120530Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:37.6120776Z ##[endgroup]
+2026-10-10T08:37:37.7197655Z Syncing repository: nift-packages/vips
+2026-10-10T08:37:37.7205558Z ##[group]Getting Git version info
+2026-10-10T08:37:37.7206323Z Working directory is 'D:\a\nift\nift\nift-packages\vips'
+2026-10-10T08:37:37.8047351Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:37.8326798Z git version 2.55.0.windows.5
+2026-10-10T08:37:37.8373148Z ##[endgroup]
+2026-10-10T08:37:37.8394938Z Temporarily overriding HOME='D:\a\_temp\7a57a939-8785-46f4-8fe5-0ad3ec400ebf' before making global git config changes
+2026-10-10T08:37:37.8396219Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:37.8406508Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\vips
+2026-10-10T08:37:37.8765391Z ##[group]Initializing the repository
+2026-10-10T08:37:37.8777519Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\vips
+2026-10-10T08:37:37.9201323Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/vips/.git/
+2026-10-10T08:37:37.9243491Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/vips
+2026-10-10T08:37:37.9540305Z ##[endgroup]
+2026-10-10T08:37:37.9540702Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:37.9549877Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:37.9826691Z ##[endgroup]
+2026-10-10T08:37:37.9827057Z ##[group]Setting up auth
+2026-10-10T08:37:37.9839123Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:38.0118689Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:38.5354990Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:38.5694520Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:39.0715616Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:39.1006032Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:39.6328586Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:39.6668597Z ##[endgroup]
+2026-10-10T08:37:39.6669006Z ##[group]Fetching the repository
+2026-10-10T08:37:39.6683093Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 735b9965d6d6c365b4195f0454ded31e577dc5f1
+2026-10-10T08:37:39.8937791Z From https://github.com/nift-packages/vips
+2026-10-10T08:37:39.8938289Z  * branch            735b9965d6d6c365b4195f0454ded31e577dc5f1 -> FETCH_HEAD
+2026-10-10T08:37:39.8968642Z ##[endgroup]
+2026-10-10T08:37:39.8969642Z ##[group]Determining the checkout info
+2026-10-10T08:37:39.8972068Z ##[endgroup]
+2026-10-10T08:37:39.8981771Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:39.9306250Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:39.9587034Z ##[group]Checking out the ref
+2026-10-10T08:37:39.9595110Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 735b9965d6d6c365b4195f0454ded31e577dc5f1
+2026-10-10T08:37:39.9953350Z Note: switching to '735b9965d6d6c365b4195f0454ded31e577dc5f1'.
+2026-10-10T08:37:39.9953901Z 
+2026-10-10T08:37:39.9954288Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:39.9955631Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:39.9956509Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:39.9957021Z 
+2026-10-10T08:37:39.9957358Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:39.9958168Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:39.9958645Z 
+2026-10-10T08:37:39.9958818Z   git switch -c <new-branch-name>
+2026-10-10T08:37:39.9959134Z 
+2026-10-10T08:37:39.9959295Z Or undo this operation with:
+2026-10-10T08:37:39.9959579Z 
+2026-10-10T08:37:39.9959718Z   git switch -
+2026-10-10T08:37:39.9959930Z 
+2026-10-10T08:37:39.9960309Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:39.9960867Z 
+2026-10-10T08:37:39.9961109Z HEAD is now at 735b996 Indent multiline header comments
+2026-10-10T08:37:40.0012623Z ##[endgroup]
+2026-10-10T08:37:40.0317937Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:40.0569815Z 735b9965d6d6c365b4195f0454ded31e577dc5f1
+2026-10-10T08:37:40.0980080Z ##[group]Run actions/checkout@v5
+2026-10-10T08:37:40.0980556Z with:
+2026-10-10T08:37:40.0980891Z   repository: nift-packages/imagemagick
+2026-10-10T08:37:40.0981398Z   ref: dda5437fb20ca92045cea901323c2bd2399f38a8
+2026-10-10T08:37:40.0981908Z   path: nift-packages/imagemagick
+2026-10-10T08:37:40.0986758Z   token: ***
+2026-10-10T08:37:40.0987078Z   ssh-strict: true
+2026-10-10T08:37:40.0987395Z   ssh-user: git
+2026-10-10T08:37:40.0987727Z   persist-credentials: true
+2026-10-10T08:37:40.0988104Z   clean: true
+2026-10-10T08:37:40.0988446Z   sparse-checkout-cone-mode: true
+2026-10-10T08:37:40.0988856Z   fetch-depth: 1
+2026-10-10T08:37:40.0989166Z   fetch-tags: false
+2026-10-10T08:37:40.0989492Z   show-progress: true
+2026-10-10T08:37:40.0989815Z   lfs: false
+2026-10-10T08:37:40.0990133Z   submodules: false
+2026-10-10T08:37:40.0990464Z   set-safe-directory: true
+2026-10-10T08:37:40.0990863Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:37:40.0991279Z ##[endgroup]
+2026-10-10T08:37:40.2141231Z Syncing repository: nift-packages/imagemagick
+2026-10-10T08:37:40.2152829Z ##[group]Getting Git version info
+2026-10-10T08:37:40.2153740Z Working directory is 'D:\a\nift\nift\nift-packages\imagemagick'
+2026-10-10T08:37:40.3001605Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:37:40.3268293Z git version 2.55.0.windows.5
+2026-10-10T08:37:40.3308726Z ##[endgroup]
+2026-10-10T08:37:40.3328177Z Temporarily overriding HOME='D:\a\_temp\a975678e-d146-475b-8d5c-7df06f415109' before making global git config changes
+2026-10-10T08:37:40.3329381Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:37:40.3338850Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\imagemagick
+2026-10-10T08:37:40.3624921Z ##[group]Initializing the repository
+2026-10-10T08:37:40.3634546Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift\nift-packages\imagemagick
+2026-10-10T08:37:40.3974759Z Initialized empty Git repository in D:/a/nift/nift/nift-packages/imagemagick/.git/
+2026-10-10T08:37:40.4013491Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-packages/imagemagick
+2026-10-10T08:37:40.4314780Z ##[endgroup]
+2026-10-10T08:37:40.4315184Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:37:40.4324962Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:37:40.4601360Z ##[endgroup]
+2026-10-10T08:37:40.4601723Z ##[group]Setting up auth
+2026-10-10T08:37:40.4613029Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:37:40.4959315Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:37:41.0147302Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:37:41.0433610Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:37:41.5673016Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:37:41.5956907Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:37:42.1256419Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:37:42.1547569Z ##[endgroup]
+2026-10-10T08:37:42.1547981Z ##[group]Fetching the repository
+2026-10-10T08:37:42.1561933Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin dda5437fb20ca92045cea901323c2bd2399f38a8
+2026-10-10T08:37:42.3703481Z From https://github.com/nift-packages/imagemagick
+2026-10-10T08:37:42.3703986Z  * branch            dda5437fb20ca92045cea901323c2bd2399f38a8 -> FETCH_HEAD
+2026-10-10T08:37:42.3734027Z ##[endgroup]
+2026-10-10T08:37:42.3734581Z ##[group]Determining the checkout info
+2026-10-10T08:37:42.3736935Z ##[endgroup]
+2026-10-10T08:37:42.3746767Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:37:42.4064084Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:37:42.4347358Z ##[group]Checking out the ref
+2026-10-10T08:37:42.4356527Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force dda5437fb20ca92045cea901323c2bd2399f38a8
+2026-10-10T08:37:42.4719641Z Note: switching to 'dda5437fb20ca92045cea901323c2bd2399f38a8'.
+2026-10-10T08:37:42.4720122Z 
+2026-10-10T08:37:42.4720471Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-10T08:37:42.4721120Z changes and commit them, and you can discard any commits you make in this
+2026-10-10T08:37:42.4721661Z state without impacting any branches by switching back to a branch.
+2026-10-10T08:37:42.4722034Z 
+2026-10-10T08:37:42.4722236Z If you want to create a new branch to retain commits you create, you may
+2026-10-10T08:37:42.4722732Z do so (now or later) by using -c with the switch command. Example:
+2026-10-10T08:37:42.4723025Z 
+2026-10-10T08:37:42.4723135Z   git switch -c <new-branch-name>
+2026-10-10T08:37:42.4723320Z 
+2026-10-10T08:37:42.4723422Z Or undo this operation with:
+2026-10-10T08:37:42.4723589Z 
+2026-10-10T08:37:42.4723677Z   git switch -
+2026-10-10T08:37:42.4723808Z 
+2026-10-10T08:37:42.4724317Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-10T08:37:42.4724674Z 
+2026-10-10T08:37:42.4724822Z HEAD is now at dda5437 Indent multiline header comments
+2026-10-10T08:37:42.4774759Z ##[endgroup]
+2026-10-10T08:37:42.5077922Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:37:42.5332011Z dda5437fb20ca92045cea901323c2bd2399f38a8
+2026-10-10T08:37:42.5707120Z ##[group]Run actions/setup-python@v6
+2026-10-10T08:37:42.5707458Z with:
+2026-10-10T08:37:42.5707651Z   python-version: 3.x
+2026-10-10T08:37:42.5707869Z   check-latest: false
+2026-10-10T08:37:42.5710259Z   token: ***
+2026-10-10T08:37:42.5710461Z   update-environment: true
+2026-10-10T08:37:42.5710698Z   allow-prereleases: false
+2026-10-10T08:37:42.5710925Z   freethreaded: false
+2026-10-10T08:37:42.5711120Z ##[endgroup]
+2026-10-10T08:37:42.7336558Z ##[group]Installed versions
+2026-10-10T08:37:42.7537565Z Successfully set up CPython (3.14.7)
+2026-10-10T08:37:42.7538293Z ##[endgroup]
+2026-10-10T08:37:42.7827938Z ##[group]Run msys2/setup-msys2@v2
+2026-10-10T08:37:42.7828258Z with:
+2026-10-10T08:37:42.7828439Z   msystem: UCRT64
+2026-10-10T08:37:42.7828632Z   update: true
+2026-10-10T08:37:42.7828952Z   install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
+2026-10-10T08:37:42.7829342Z   path-type: minimal
+2026-10-10T08:37:42.7829544Z   release: true
+2026-10-10T08:37:42.7829758Z   platform-check-severity: fatal
+2026-10-10T08:37:42.7829992Z   cache: true
+2026-10-10T08:37:42.7830157Z env:
+2026-10-10T08:37:42.7830413Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:37:42.7830886Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.14.7\x64/lib/pkgconfig
+2026-10-10T08:37:42.7831337Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:37:42.7831756Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:37:42.7832159Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:37:42.7832529Z ##[endgroup]
+2026-10-10T08:37:42.9317467Z ##[group]Downloading MSYS2...
+2026-10-10T08:37:43.4250049Z ##[endgroup]
+2026-10-10T08:37:43.4250443Z ##[group]Extracting MSYS2...
+2026-10-10T08:37:43.4266481Z [command]C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe -y
+2026-10-10T08:37:43.5939416Z 
+2026-10-10T08:37:43.5940528Z 7-Zip SFX 26.02 ZS v1.5.7 R1 (x64) : Copyright (c) 1999- Igor Pavlov, 2016- Tino Reichardt, 2022- Sergey G. Brester : 2026-06-27
+2026-10-10T08:37:43.5941357Z 
+2026-10-10T08:37:43.5943185Z Extracting archive: C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe
+2026-10-10T08:37:43.5944136Z --
+2026-10-10T08:37:43.5944800Z Path = C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe
+2026-10-10T08:37:43.5945380Z Type = 7z
+2026-10-10T08:37:43.5945509Z 
+2026-10-10T08:37:43.7862957Z   0%
+2026-10-10T08:37:43.7863693Z     
+2026-10-10T08:37:43.9888963Z   0% 633 - msys64\var\lib\pacman\local\libgettextpo-0.22.5-1
+2026-10-10T08:37:43.9889734Z                                                             
+2026-10-10T08:37:44.1929097Z   1% 1166 - msys64\usr\lib\terminfo\61\att4415-w-rv
+2026-10-10T08:37:44.1929734Z                                                    
+2026-10-10T08:37:44.3963267Z   1% 1685 - msys64\usr\lib\terminfo\64\dku7003-dumb
+2026-10-10T08:37:44.3963864Z                                                    
+2026-10-10T08:37:44.5988851Z   1% 2216 - msys64\usr\lib\terminfo\6d\minix-old-am
+2026-10-10T08:37:44.5989496Z                                                    
+2026-10-10T08:37:44.8015061Z   1% 2563 - msys64\usr\lib\terminfo\70\pccons
+2026-10-10T08:37:44.8015654Z                                              
+2026-10-10T08:37:45.0056072Z   1% 3086 - msys64\usr\lib\terminfo\74\tvi920b-vb-mc
+2026-10-10T08:37:45.0056665Z                                                     
+2026-10-10T08:37:45.2095909Z   2% 3619 - msys64\usr\lib\terminfo\78\xterm+256color
+2026-10-10T08:37:45.2096937Z                                                      
+2026-10-10T08:37:45.4114105Z   2% 4130 - msys64\usr\share\bash-completion\completions-core\htpasswd.bash
+2026-10-10T08:37:45.4115077Z                                                                            
+2026-10-10T08:37:45.6159791Z   3% 4651 - msys64\usr\share\bash-completion\completions-fallback\atmos.bash
+2026-10-10T08:37:45.6160656Z                                                                             
+2026-10-10T08:37:45.8177318Z   6% 5154 - msys64\usr\share\doc\xz\api\container_8h.js
+2026-10-10T08:37:45.8177978Z                                                        
+2026-10-10T08:37:46.0239999Z  13% 5575 - msys64\usr\share\locale\el\LC_MESSAGES\pacman.mo
+2026-10-10T08:37:46.0240570Z                                                             
+2026-10-10T08:37:46.2238787Z  21% 5890 - msys64\usr\share\locale\kk\LC_MESSAGES\coreutils.mo
+2026-10-10T08:37:46.2239514Z                                                                
+2026-10-10T08:37:46.4275274Z  26% 6054 - msys64\usr\share\locale\pt_BR\LC_MESSAGES\pacman.mo
+2026-10-10T08:37:46.4275930Z                                                                
+2026-10-10T08:37:46.6312437Z  35% 6436 - msys64\usr\share\man\de\man1\lzegrep.1.gz
+2026-10-10T08:37:46.6313205Z                                                      
+2026-10-10T08:37:46.8329986Z  36% 6947 - msys64\usr\share\man\man1\ulimit.1.gz
+2026-10-10T08:37:46.8330898Z                                                  
+2026-10-10T08:37:47.0371062Z  36% 7455 - msys64\usr\share\man\man3\CURLOPT_SOCKS5_GSSAPI_SERVICE.3.gz
+2026-10-10T08:37:47.0371912Z                                                                         
+2026-10-10T08:37:47.2392384Z  37% 7976 - msys64\usr\share\man\man3\item_visible.3x.gz
+2026-10-10T08:37:47.2393019Z                                                         
+2026-10-10T08:37:47.4442550Z  38% 8483 - msys64\usr\share\man\man3\set_fieldtype_choice.3x.gz
+2026-10-10T08:37:47.4443103Z                                                                 
+2026-10-10T08:37:47.6457988Z  39% 8972 - msys64\usr\share\mintty\themes\flat-ui
+2026-10-10T08:37:47.6458813Z                                                   
+2026-10-10T08:37:47.8492728Z  44% 9049 - msys64\usr\share\readline\rl-callbacktest.c
+2026-10-10T08:37:47.8493221Z                                                        
+2026-10-10T08:37:48.0513387Z  44% 9565 - msys64\usr\share\terminfo\63\citoh-8lpi
+2026-10-10T08:37:48.0513869Z                                                    
+2026-10-10T08:37:48.2552346Z  44% 10090 - msys64\usr\share\terminfo\68\hft-c-old
+2026-10-10T08:37:48.2553293Z                                                    
+2026-10-10T08:37:48.4593577Z  45% 10620 - msys64\usr\share\terminfo\6e\nsterm-m-s-7
+2026-10-10T08:37:48.4594828Z                                                       
+2026-10-10T08:37:48.6610903Z  45% 11144 - msys64\usr\share\terminfo\74\terminet1200
+2026-10-10T08:37:48.6611372Z                                                       
+2026-10-10T08:37:48.8649286Z  45% 11666 - msys64\usr\share\terminfo\77\wyse150-25-w
+2026-10-10T08:37:48.8650206Z                                                       
+2026-10-10T08:37:49.0684237Z  46% 12194 - msys64\usr\share\zoneinfo\Antarctica\Mawson
+2026-10-10T08:37:49.0684933Z                                                         
+2026-10-10T08:37:49.2719708Z  46% 12478 - msys64\usr\share\zoneinfo\Indian\Mayotte
+2026-10-10T08:37:49.2720137Z                                                      
+2026-10-10T08:37:49.4739344Z  46% 12986 - msys64\usr\share\zoneinfo\posix\Europe\Gibraltar
+2026-10-10T08:37:49.4739883Z                                                              
+2026-10-10T08:37:49.6778908Z  46% 13478 - msys64\usr\share\zoneinfo\right\Asia\Yekaterinburg
+2026-10-10T08:37:49.6779453Z                                                                
+2026-10-10T08:37:49.8924193Z  47% 13997 - msys64\var\lib\pacman\local\nettle-4.0-1\desc
+2026-10-10T08:37:49.8925448Z                                                           
+2026-10-10T08:37:50.0839330Z  63% 14287 - msys64\usr\bin\msys-crypto-3.dll
+2026-10-10T08:37:50.0839931Z                                              
+2026-10-10T08:37:50.1936325Z  84% 14398 - msys64\usr\bin\script.exe
+2026-10-10T08:37:50.1936904Z                                       
+2026-10-10T08:37:50.1937349Z Everything is Ok
+2026-10-10T08:37:50.1959188Z ##[endgroup]
+2026-10-10T08:37:50.1959753Z ##[group]Disable Key Refresh...
+2026-10-10T08:37:50.1976825Z ##[endgroup]
+2026-10-10T08:37:50.1993137Z ##[group]Restoring package cache...
+2026-10-10T08:37:50.4185886Z Cache hit for restore-key: msys2-pkgs-upd:true-conf:01db0f78-files:0f3cf70adec06c1e978e748f850fedb93ea261990a61653a16cb64c29c15c783
+2026-10-10T08:37:51.1236494Z Received 100665942 of 100665942 (100.0%), 141.8 MBs/sec
+2026-10-10T08:37:51.1241149Z Cache Size: ~96 MB (100665942 B)
+2026-10-10T08:37:51.1362720Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/ada09b7b-cb65-4f5e-878f-7fb36c2d79f2/cache.tzst -P -C D:/a/nift/nift --force-local --use-compress-program "zstd -d"
+2026-10-10T08:37:51.4471402Z Cache restored successfully
+2026-10-10T08:37:51.4526634Z Cache restore for msys2-pkgs-upd:true-conf:01db0f78, got msys2-pkgs-upd:true-conf:01db0f78-files:0f3cf70adec06c1e978e748f850fedb93ea261990a61653a16cb64c29c15c783
+2026-10-10T08:37:51.4529123Z Cache restore for msys2-pkgs-upd:true-conf:01db0f78, got msys2-pkgs-upd:true-conf:01db0f78-files:0f3cf70adec06c1e978e748f850fedb93ea261990a61653a16cb64c29c15c783
+2026-10-10T08:37:51.4530808Z ##[endgroup]
+2026-10-10T08:37:51.4531772Z ##[group]Starting MSYS2 for the first time...
+2026-10-10T08:37:51.5907633Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'uname' '-a'"
+2026-10-10T08:37:51.6634223Z [1;32mMSYS2 is starting for the first time. Executing the initial setup.[1;0m
+2026-10-10T08:37:51.7650105Z Copying skeleton files.
+2026-10-10T08:37:51.7651017Z These files are for the users to personalise their msys2 experience.
+2026-10-10T08:37:51.7651574Z 
+2026-10-10T08:37:51.7651847Z They will never be overwritten nor automatically updated.
+2026-10-10T08:37:51.7652277Z 
+2026-10-10T08:37:51.8182347Z './.bashrc' -> '/home/runneradmin/.bashrc'
+2026-10-10T08:37:51.8358170Z './.bash_profile' -> '/home/runneradmin/.bash_profile'
+2026-10-10T08:37:51.8528874Z './.profile' -> '/home/runneradmin/.profile'
+2026-10-10T08:37:51.9131026Z 'C:\Windows\system32\drivers\etc\hosts' -> '/etc/hosts'
+2026-10-10T08:37:51.9657746Z 'C:\Windows\system32\drivers\etc\protocol' -> '/etc/protocols'
+2026-10-10T08:37:52.0186985Z 'C:\Windows\system32\drivers\etc\services' -> '/etc/services'
+2026-10-10T08:37:52.0716092Z 'C:\Windows\system32\drivers\etc\networks' -> '/etc/networks'
+2026-10-10T08:37:52.2654088Z gpg: /etc/pacman.d/gnupg/trustdb.gpg: trustdb created
+2026-10-10T08:37:52.2738009Z gpg: no ultimately trusted keys found
+2026-10-10T08:37:52.5721849Z gpg: starting migration from earlier GnuPG versions
+2026-10-10T08:37:52.6307535Z gpg: porting secret keys from '/etc/pacman.d/gnupg/secring.gpg' to gpg-agent
+2026-10-10T08:37:52.6311094Z gpg: migration succeeded
+2026-10-10T08:37:52.6647736Z ==> Generating pacman master key. This may take some time.
+2026-10-10T08:37:52.6851421Z gpg: Generating pacman keyring master key...
+2026-10-10T08:37:53.5286368Z gpg: directory '/etc/pacman.d/gnupg/openpgp-revocs.d' created
+2026-10-10T08:37:53.5535242Z gpg: revocation certificate stored as '/etc/pacman.d/gnupg/openpgp-revocs.d/2764F34F053240B1659F42EECD504BB8F4E45BB1.rev'
+2026-10-10T08:37:53.5536455Z gpg: Done
+2026-10-10T08:37:53.5718707Z ==> Updating trust database...
+2026-10-10T08:37:53.6141039Z gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+2026-10-10T08:37:53.6141799Z gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+2026-10-10T08:37:53.7469001Z ==> Appending keys from msys2.gpg...
+2026-10-10T08:37:54.3537069Z ==> Locally signing trusted keys in keyring...
+2026-10-10T08:37:54.9476303Z   -> Locally signed 5 keys.
+2026-10-10T08:37:54.9636398Z ==> Importing owner trust values...
+2026-10-10T08:37:54.9835742Z gpg: setting ownertrust to 4
+2026-10-10T08:37:54.9836226Z gpg: setting ownertrust to 4
+2026-10-10T08:37:54.9836655Z gpg: setting ownertrust to 4
+2026-10-10T08:37:54.9837005Z gpg: setting ownertrust to 4
+2026-10-10T08:37:54.9837271Z gpg: setting ownertrust to 4
+2026-10-10T08:37:55.0128534Z ==> Disabling revoked keys in keyring...
+2026-10-10T08:37:55.2901564Z   -> Disabled 4 keys.
+2026-10-10T08:37:55.3056433Z ==> Updating trust database...
+2026-10-10T08:37:55.3481541Z gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+2026-10-10T08:37:55.3512861Z gpg: depth: 0  valid:   1  signed:   5  trust: 0-, 0q, 0n, 0m, 0f, 1u
+2026-10-10T08:37:55.3555678Z gpg: depth: 1  valid:   5  signed:   7  trust: 0-, 0q, 0n, 5m, 0f, 0u
+2026-10-10T08:37:55.3570596Z gpg: depth: 2  valid:   4  signed:   2  trust: 4-, 0q, 0n, 0m, 0f, 0u
+2026-10-10T08:37:55.3574749Z gpg: next trustdb check due at 2027-02-10
+2026-10-10T08:37:55.3979006Z pacman-key (pacman) 6.1.0
+2026-10-10T08:37:55.3979551Z Copyright (c) 2010-2024 Pacman Development Team <pacman-dev@lists.archlinux.org>.
+2026-10-10T08:37:55.4139537Z 
+2026-10-10T08:37:55.4140284Z This is free software; see the source for copying conditions.
+2026-10-10T08:37:55.4141184Z There is NO WARRANTY, to the extent permitted by law.
+2026-10-10T08:37:55.6366036Z [1;32mInitial setup complete. MSYS2 is now ready to use.[1;0m
+2026-10-10T08:37:55.6558848Z MINGW64_NT-10.0-26100 runnervmfi6oq 3.6.10-c770e1b9.x86_64 2026-09-26 06:38 UTC x86_64 Msys
+2026-10-10T08:37:55.6608148Z ##[endgroup]
+2026-10-10T08:37:55.6608615Z ##[group]Disable CheckSpace...
+2026-10-10T08:37:55.7469744Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'sed' '-i' 's/^CheckSpace/#CheckSpace/g' '/etc/pacman.conf'"
+2026-10-10T08:37:55.9599069Z ##[endgroup]
+2026-10-10T08:37:55.9599561Z ##[group]Updating packages...
+2026-10-10T08:37:56.0547471Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Syuu' '--overwrite' '*'"
+2026-10-10T08:37:56.8241048Z :: Synchronizing package databases...
+2026-10-10T08:37:57.9979446Z  clangarm64 downloading...
+2026-10-10T08:37:57.9980058Z  mingw32 downloading...
+2026-10-10T08:37:57.9980595Z  mingw64 downloading...
+2026-10-10T08:37:57.9981094Z  ucrt64 downloading...
+2026-10-10T08:37:57.9981577Z  clang64 downloading...
+2026-10-10T08:37:57.9981995Z  msys downloading...
+2026-10-10T08:37:58.5122869Z :: Starting core system upgrade...
+2026-10-10T08:37:58.6864845Z warning: terminate other MSYS2 programs before proceeding
+2026-10-10T08:37:58.6865608Z resolving dependencies...
+2026-10-10T08:37:58.6865970Z looking for conflicting packages...
+2026-10-10T08:37:58.6980813Z 
+2026-10-10T08:37:58.6981152Z Packages (1) msys2-runtime-3.6.10-6
+2026-10-10T08:37:58.6981496Z 
+2026-10-10T08:37:58.6981635Z Total Installed Size:  6.31 MiB
+2026-10-10T08:37:58.6982046Z Net Upgrade Size:      0.00 MiB
+2026-10-10T08:37:58.6982275Z 
+2026-10-10T08:37:58.6984802Z :: Proceed with installation? [Y/n] 
+2026-10-10T08:37:58.6985304Z checking keyring...
+2026-10-10T08:37:58.7517978Z checking package integrity...
+2026-10-10T08:37:58.9114509Z loading package files...
+2026-10-10T08:37:58.9137833Z checking for file conflicts...
+2026-10-10T08:37:58.9138384Z :: Processing package changes...
+2026-10-10T08:37:58.9138860Z upgrading msys2-runtime...
+2026-10-10T08:37:59.0884918Z :: To complete this update all MSYS2 processes including this terminal will be closed. Confirm to proceed [Y/n] 
+2026-10-10T08:37:59.4316166Z ##[endgroup]
+2026-10-10T08:37:59.4316570Z ##[group]Killing remaining tasks...
+2026-10-10T08:37:59.5170885Z [command]C:\Windows\system32\taskkill.exe /F /FI "MODULES eq msys-2.0.dll"
+2026-10-10T08:37:59.6329248Z 
+2026-10-10T08:37:59.6329798Z INFO: No tasks running with the specified criteria.
+2026-10-10T08:37:59.6366889Z ##[endgroup]
+2026-10-10T08:37:59.6368760Z ##[group]Final system upgrade...
+2026-10-10T08:37:59.7210582Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Syuu' '--overwrite' '*'"
+2026-10-10T08:38:00.4909414Z :: Synchronizing package databases...
+2026-10-10T08:38:01.2079348Z  clangarm64 downloading...
+2026-10-10T08:38:01.2079757Z  mingw32 downloading...
+2026-10-10T08:38:01.2080088Z  mingw64 downloading...
+2026-10-10T08:38:01.2080397Z  ucrt64 downloading...
+2026-10-10T08:38:01.2080700Z  clang64 downloading...
+2026-10-10T08:38:01.2081007Z  msys downloading...
+2026-10-10T08:38:01.7040078Z :: Starting core system upgrade...
+2026-10-10T08:38:01.8796476Z  there is nothing to do
+2026-10-10T08:38:01.8796916Z :: Starting full system upgrade...
+2026-10-10T08:38:01.9045926Z resolving dependencies...
+2026-10-10T08:38:01.9152067Z looking for conflicting packages...
+2026-10-10T08:38:01.9173901Z 
+2026-10-10T08:38:01.9174813Z Packages (5) libexpat-2.9.0-1  libopenssl-3.6.5-1  libpcre2_8-10.49-1  openssl-3.6.5-1  tzcode-2026e-1
+2026-10-10T08:38:01.9175382Z 
+2026-10-10T08:38:01.9175511Z Total Installed Size:  9.36 MiB
+2026-10-10T08:38:01.9175832Z Net Upgrade Size:      0.01 MiB
+2026-10-10T08:38:01.9176036Z 
+2026-10-10T08:38:01.9184145Z :: Proceed with installation? [Y/n] 
+2026-10-10T08:38:01.9184498Z checking keyring...
+2026-10-10T08:38:01.9679436Z checking package integrity...
+2026-10-10T08:38:02.5725126Z loading package files...
+2026-10-10T08:38:02.5965375Z checking for file conflicts...
+2026-10-10T08:38:02.6006632Z :: Processing package changes...
+2026-10-10T08:38:02.6007560Z upgrading libexpat...
+2026-10-10T08:38:02.6078641Z upgrading libopenssl...
+2026-10-10T08:38:02.6361172Z upgrading libpcre2_8...
+2026-10-10T08:38:02.6418109Z upgrading openssl...
+2026-10-10T08:38:02.7682076Z upgrading tzcode...
+2026-10-10T08:38:05.1065968Z ##[endgroup]
+2026-10-10T08:38:05.1066434Z ##[group]Installing additional packages through pacman...
+2026-10-10T08:38:05.1912821Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-S' '--needed' '--overwrite' '*' 'make' 'mingw-w64-ucrt-x86_64-gcc' 'mingw-w64-ucrt-x86_64-winpthreads'"
+2026-10-10T08:38:06.1263195Z resolving dependencies...
+2026-10-10T08:38:06.1379445Z looking for conflicting packages...
+2026-10-10T08:38:06.1409294Z 
+2026-10-10T08:38:06.1414669Z Packages (20) mingw-w64-ucrt-x86_64-binutils-2.47-4  mingw-w64-ucrt-x86_64-cc-libs-16.2.0-5  mingw-w64-ucrt-x86_64-crt-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-gettext-runtime-1.0-1  mingw-w64-ucrt-x86_64-gmp-6.3.0-2  mingw-w64-ucrt-x86_64-headers-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-isl-0.28-1  mingw-w64-ucrt-x86_64-libgcc-16.2.0-5  mingw-w64-ucrt-x86_64-libiconv-1.19-1  mingw-w64-ucrt-x86_64-libstdc++-16.2.0-5  mingw-w64-ucrt-x86_64-libwinpthread-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-mpc-1.4.1-1  mingw-w64-ucrt-x86_64-mpfr-4.2.2-3  mingw-w64-ucrt-x86_64-tzdata-2026e-1  mingw-w64-ucrt-x86_64-windows-default-manifest-20260815-1  mingw-w64-ucrt-x86_64-zlib-1.3.2-2  mingw-w64-ucrt-x86_64-zstd-1.5.7-2  make-4.4.1-3  mingw-w64-ucrt-x86_64-gcc-16.2.0-5  mingw-w64-ucrt-x86_64-winpthreads-14.0.0.r426.g4564ee4b5-1
+2026-10-10T08:38:06.1420415Z 
+2026-10-10T08:38:06.1420596Z Total Installed Size:  473.05 MiB
+2026-10-10T08:38:06.1420911Z 
+2026-10-10T08:38:06.1448781Z :: Proceed with installation? [Y/n] 
+2026-10-10T08:38:06.1449229Z checking keyring...
+2026-10-10T08:38:06.1942751Z checking package integrity...
+2026-10-10T08:38:10.0060058Z loading package files...
+2026-10-10T08:38:10.0627572Z checking for file conflicts...
+2026-10-10T08:38:10.3528426Z :: Processing package changes...
+2026-10-10T08:38:10.3528942Z installing make...
+2026-10-10T08:38:10.3911499Z installing mingw-w64-ucrt-x86_64-libwinpthread...
+2026-10-10T08:38:10.3968230Z installing mingw-w64-ucrt-x86_64-libgcc...
+2026-10-10T08:38:10.4027013Z installing mingw-w64-ucrt-x86_64-tzdata...
+2026-10-10T08:38:12.3479997Z installing mingw-w64-ucrt-x86_64-libstdc++...
+2026-10-10T08:38:12.3594819Z installing mingw-w64-ucrt-x86_64-cc-libs...
+2026-10-10T08:38:12.3619720Z installing mingw-w64-ucrt-x86_64-libiconv...
+2026-10-10T08:38:12.3898152Z installing mingw-w64-ucrt-x86_64-gettext-runtime...
+2026-10-10T08:38:12.5480959Z installing mingw-w64-ucrt-x86_64-zlib...
+2026-10-10T08:38:12.5577385Z installing mingw-w64-ucrt-x86_64-zstd...
+2026-10-10T08:38:12.5792125Z installing mingw-w64-ucrt-x86_64-binutils...
+2026-10-10T08:38:12.8204705Z installing mingw-w64-ucrt-x86_64-headers...
+2026-10-10T08:38:14.2728259Z installing mingw-w64-ucrt-x86_64-crt...
+2026-10-10T08:38:15.0755917Z installing mingw-w64-ucrt-x86_64-gmp...
+2026-10-10T08:38:15.0922855Z installing mingw-w64-ucrt-x86_64-isl...
+2026-10-10T08:38:15.1664921Z installing mingw-w64-ucrt-x86_64-mpfr...
+2026-10-10T08:38:15.1913866Z installing mingw-w64-ucrt-x86_64-mpc...
+2026-10-10T08:38:15.1991022Z installing mingw-w64-ucrt-x86_64-windows-default-manifest...
+2026-10-10T08:38:15.2032328Z installing mingw-w64-ucrt-x86_64-winpthreads...
+2026-10-10T08:38:15.2178016Z installing mingw-w64-ucrt-x86_64-gcc...
+2026-10-10T08:38:16.6435686Z Optional dependencies for mingw-w64-ucrt-x86_64-gcc
+2026-10-10T08:38:16.6436394Z     mingw-w64-ucrt-x86_64-libatomic
+2026-10-10T08:38:16.6436892Z     mingw-w64-ucrt-x86_64-libgomp: OpenMP
+2026-10-10T08:38:16.6437446Z     mingw-w64-ucrt-x86_64-libquadmath: Quad Math
+2026-10-10T08:38:16.6477735Z :: Running post-transaction hooks...
+2026-10-10T08:38:16.6478135Z (1/1) Updating the info directory file...
+2026-10-10T08:38:16.9710341Z ##[endgroup]
+2026-10-10T08:38:16.9710760Z ##[group]Saving package cache...
+2026-10-10T08:38:17.1931562Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'paccache' '-r' '-f' '-u' '-k0'"
+2026-10-10T08:38:18.3961887Z ==> no candidate packages found for pruning
+2026-10-10T08:38:18.5162150Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'paccache' '-r' '-f' '-k1'"
+2026-10-10T08:38:18.8440830Z ==> no candidate packages found for pruning
+2026-10-10T08:38:19.1723508Z Cache unchanged, skipping save for msys2-pkgs-upd:true-conf:01db0f78-files:0f3cf70adec06c1e978e748f850fedb93ea261990a61653a16cb64c29c15c783
+2026-10-10T08:38:19.2660256Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Scc'"
+2026-10-10T08:38:20.0563342Z 
+2026-10-10T08:38:20.0563850Z Cache directory: /var/cache/pacman/pkg/
+2026-10-10T08:38:20.0776789Z :: Do you want to remove ALL files from cache? [Y/n] 
+2026-10-10T08:38:20.0780878Z removing all files from cache...
+2026-10-10T08:38:20.0781182Z 
+2026-10-10T08:38:20.0781317Z Database directory: /var/lib/pacman/
+2026-10-10T08:38:20.0798675Z :: Do you want to remove unused repositories? [Y/n] 
+2026-10-10T08:38:20.0800132Z removing unused sync repositories...
+2026-10-10T08:38:20.0866134Z ##[endgroup]
+2026-10-10T08:38:20.1252057Z ##[group]Run make -C nift -j2
+2026-10-10T08:38:20.1252502Z [36;1mmake -C nift -j2[0m
+2026-10-10T08:38:20.1256729Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+2026-10-10T08:38:20.1257136Z env:
+2026-10-10T08:38:20.1257540Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:38:20.1258117Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.14.7\x64/lib/pkgconfig
+2026-10-10T08:38:20.1258686Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:38:20.1259190Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:38:20.1259703Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:38:20.1260103Z   MSYSTEM: UCRT64
+2026-10-10T08:38:20.1260335Z ##[endgroup]
+2026-10-10T08:38:20.3684044Z make: Entering directory '/d/a/nift/nift/nift'
+2026-10-10T08:38:21.5990105Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/nift.cpp -o src/nift.o
+2026-10-10T08:38:21.6098068Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectOwnership.cpp -o src/ProjectOwnership.o
+2026-10-10T08:38:21.7761568Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/PackageTransaction.cpp -o src/PackageTransaction.o
+2026-10-10T08:38:23.8562951Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/CLI.cpp -o src/CLI.o
+2026-10-10T08:38:31.1401646Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Process.cpp -o src/Process.o
+2026-10-10T08:38:36.3546917Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JobControl.cpp -o src/JobControl.o
+2026-10-10T08:38:37.3493161Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/RuntimeValue.cpp -o src/RuntimeValue.o
+2026-10-10T08:38:41.4018906Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Value.cpp -o src/Value.o
+2026-10-10T08:38:42.5008118Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/FileSystem.cpp -o src/FileSystem.o
+2026-10-10T08:38:46.5398421Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonFile.cpp -o src/JsonFile.o
+2026-10-10T08:38:48.7467348Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+2026-10-10T08:38:49.7029883Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c minifypp/src/Minify.cpp -o minifypp/src/Minify.o
+2026-10-10T08:38:55.1855845Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/Markup.cpp -o markuppp/src/Markup.o
+2026-10-10T08:38:57.8285212Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/AsciiDoc.cpp -o markuppp/src/AsciiDoc.o
+2026-10-10T08:39:01.4150864Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/ReStructuredText.cpp -o markuppp/src/ReStructuredText.o
+2026-10-10T08:39:02.2131266Z /bin/sh: line 1: cmp: command not found
+2026-10-10T08:39:02.2354312Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectInfo.cpp -o src/ProjectInfo.o
+2026-10-10T08:39:05.4662309Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectRead.cpp -o src/ProjectRead.o
+2026-10-10T08:39:11.8841291Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectState.cpp -o src/ProjectState.o
+2026-10-10T08:39:18.2610747Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/WatchList.cpp -o src/WatchList.o
+2026-10-10T08:39:18.5415204Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/BuildProgress.cpp -o src/BuildProgress.o
+2026-10-10T08:39:20.5176726Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Automation.cpp -o src/Automation.o
+2026-10-10T08:39:23.6216866Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Hooks.cpp -o src/Hooks.o
+2026-10-10T08:39:23.6356443Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Ast.cpp -o src/Ast.o
+2026-10-10T08:39:28.9044664Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/blocks.c -o markuppp/vendor/cmark/blocks.o
+2026-10-10T08:39:29.3561240Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/buffer.c -o markuppp/vendor/cmark/buffer.o
+2026-10-10T08:39:29.5409657Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark.c -o markuppp/vendor/cmark/cmark.o
+2026-10-10T08:39:29.6544337Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark_ctype.c -o markuppp/vendor/cmark/cmark_ctype.o
+2026-10-10T08:39:29.7425626Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_href_e.c -o markuppp/vendor/cmark/houdini_href_e.o
+2026-10-10T08:39:29.8536244Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_e.c -o markuppp/vendor/cmark/houdini_html_e.o
+2026-10-10T08:39:29.9743552Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_u.c -o markuppp/vendor/cmark/houdini_html_u.o
+2026-10-10T08:39:30.1369190Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/html.c -o markuppp/vendor/cmark/html.o
+2026-10-10T08:39:30.3157739Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/inlines.c -o markuppp/vendor/cmark/inlines.o
+2026-10-10T08:39:30.9296055Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/iterator.c -o markuppp/vendor/cmark/iterator.o
+2026-10-10T08:39:31.0860759Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/node.c -o markuppp/vendor/cmark/node.o
+2026-10-10T08:39:31.3608706Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/references.c -o markuppp/vendor/cmark/references.o
+2026-10-10T08:39:31.5026132Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/render.c -o markuppp/vendor/cmark/render.o
+2026-10-10T08:39:31.6709768Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/scanners.c -o markuppp/vendor/cmark/scanners.o
+2026-10-10T08:39:32.8037789Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/utf8.c -o markuppp/vendor/cmark/utf8.o
+2026-10-10T08:39:33.1476862Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+2026-10-10T08:39:35.2779735Z BUILD vendored libffi (x86_64-w64-mingw32-cc)
+2026-10-10T08:40:28.1759052Z BUILD vendored libffi: done (52s)
+2026-10-10T08:40:28.1782599Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Parser.cpp -o src/Parser.o
+2026-10-10T08:40:28.1948001Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserAsyncPool.cpp -o src/ParserAsyncPool.o
+2026-10-10T08:40:28.9143179Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserExpression.cpp -o src/ParserExpression.o
+2026-10-10T08:40:41.3785737Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserHelpers.cpp -o src/ParserHelpers.o
+2026-10-10T08:40:49.2063741Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserScript.cpp -o src/ParserScript.o
+2026-10-10T08:41:01.9008920Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserTemplate.cpp -o src/ParserTemplate.o
+2026-10-10T08:41:19.6135465Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o nift.exe
+2026-10-10T08:41:19.9774401Z make: Leaving directory '/d/a/nift/nift/nift'
+2026-10-10T08:41:20.0011078Z ##[group]Run make -C nift test-v44-execution-shell test-v44-language-foundation
+2026-10-10T08:41:20.0012187Z [36;1mmake -C nift test-v44-execution-shell test-v44-language-foundation[0m
+2026-10-10T08:41:20.0014972Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+2026-10-10T08:41:20.0015316Z env:
+2026-10-10T08:41:20.0015649Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:41:20.0016174Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.14.7\x64/lib/pkgconfig
+2026-10-10T08:41:20.0016712Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:41:20.0017177Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:41:20.0017636Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.14.7\x64
+2026-10-10T08:41:20.0018051Z   MSYSTEM: UCRT64
+2026-10-10T08:41:20.0018319Z ##[endgroup]
+2026-10-10T08:41:20.2288882Z make: Entering directory '/d/a/nift/nift/nift'
+2026-10-10T08:41:21.4718899Z /bin/sh: line 1: cmp: command not found
+2026-10-10T08:41:21.5005254Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+2026-10-10T08:41:22.0342229Z NIFT="/d/a/nift/nift/nift/nift.exe" tests/v44_execution_shell_smoke.sh
+2026-10-10T08:41:22.1062656Z MARK exec-shell start
+2026-10-10T08:41:22.2605463Z MARK after run.f
+2026-10-10T08:41:22.3423257Z shell pipeline: error: redirection/stdio setup failed for 'tr' at stage 1 (error 2)
+2026-10-10T08:41:22.3424677Z /usr/bin/cat: /tmp/tmp.Tr0u2YtZe0/out: No such file or directory
+2026-10-10T08:41:22.3714907Z make: *** [Makefile:1501: test-v44-execution-shell] Error 1
+2026-10-10T08:41:22.3717022Z make: Leaving directory '/d/a/nift/nift/nift'
+2026-10-10T08:41:22.3781816Z ##[error]Process completed with exit code 2.
+2026-10-10T08:41:22.4093100Z Post job cleanup.
+2026-10-10T08:41:22.6194912Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:22.6478752Z git version 2.55.0.windows.5
+2026-10-10T08:41:22.6543611Z Temporarily overriding HOME='D:\a\_temp\940b5ee2-04a6-4cf8-80d9-7aea87a8c894' before making global git config changes
+2026-10-10T08:41:22.6544763Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:22.6555238Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\imagemagick
+2026-10-10T08:41:22.6848727Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:22.7138787Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:23.2417258Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:23.2666989Z http.https://github.com/.extraheader
+2026-10-10T08:41:23.2708062Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:23.3002612Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:23.8461753Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:23.8769433Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:24.5081076Z Post job cleanup.
+2026-10-10T08:41:24.7406877Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:24.7695760Z git version 2.55.0.windows.5
+2026-10-10T08:41:24.7774307Z Temporarily overriding HOME='D:\a\_temp\f7b66c03-8590-4e98-a55c-cbdf48df0fb4' before making global git config changes
+2026-10-10T08:41:24.7775875Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:24.7786563Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\vips
+2026-10-10T08:41:24.8123296Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:24.8498042Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:25.4234619Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:25.4493576Z http.https://github.com/.extraheader
+2026-10-10T08:41:25.4534811Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:25.4827053Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:26.5422119Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:26.5718183Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:32.7609064Z Post job cleanup.
+2026-10-10T08:41:33.0160343Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:33.0612677Z git version 2.55.0.windows.5
+2026-10-10T08:41:33.0696970Z Temporarily overriding HOME='D:\a\_temp\12d1dd9c-4b38-440b-9ffe-eb59f6540cab' before making global git config changes
+2026-10-10T08:41:33.0700773Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:33.0713004Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\redis
+2026-10-10T08:41:33.1062877Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:33.1424568Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:33.7888753Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:33.8228121Z http.https://github.com/.extraheader
+2026-10-10T08:41:33.8277854Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:33.8653862Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:34.4956097Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:34.5313894Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:35.1413049Z Post job cleanup.
+2026-10-10T08:41:35.3871044Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:35.4188938Z git version 2.55.0.windows.5
+2026-10-10T08:41:35.4255604Z Temporarily overriding HOME='D:\a\_temp\957dc15d-454e-4ae6-b8d6-9a5015df0b09' before making global git config changes
+2026-10-10T08:41:35.4256957Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:35.4267132Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\mysql
+2026-10-10T08:41:35.4607355Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:35.4992185Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:36.1487200Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:36.1744737Z http.https://github.com/.extraheader
+2026-10-10T08:41:36.1787562Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:36.2171898Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:36.8723749Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:36.9122401Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:37.6276160Z Post job cleanup.
+2026-10-10T08:41:37.8646368Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:37.8969612Z git version 2.55.0.windows.5
+2026-10-10T08:41:37.9043716Z Temporarily overriding HOME='D:\a\_temp\48765976-d77a-4c89-a539-ef63bb9ee0d1' before making global git config changes
+2026-10-10T08:41:37.9047498Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:37.9059868Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\postgres
+2026-10-10T08:41:37.9448048Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:37.9852793Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:38.5526015Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:38.5820882Z http.https://github.com/.extraheader
+2026-10-10T08:41:38.5866075Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:38.6205350Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:39.2112601Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:39.2493880Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:39.9054475Z Post job cleanup.
+2026-10-10T08:41:40.1562999Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:40.1952657Z git version 2.55.0.windows.5
+2026-10-10T08:41:40.2032462Z Temporarily overriding HOME='D:\a\_temp\5416da3e-0ffd-42e0-9ca6-d9d7a502c26b' before making global git config changes
+2026-10-10T08:41:40.2033765Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:40.2045450Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\curl
+2026-10-10T08:41:40.2426656Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:40.2795641Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:40.8700230Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:40.8993408Z http.https://github.com/.extraheader
+2026-10-10T08:41:40.9040959Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:40.9393636Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:41.7694716Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:41.8044424Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:42.4414915Z Post job cleanup.
+2026-10-10T08:41:42.6818926Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:42.7171986Z git version 2.55.0.windows.5
+2026-10-10T08:41:42.7235448Z Temporarily overriding HOME='D:\a\_temp\3480b16d-1aa4-4382-a5f0-5bf076ec4f3d' before making global git config changes
+2026-10-10T08:41:42.7236798Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:42.7246357Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift-packages\sqlite
+2026-10-10T08:41:42.7623625Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:42.8628443Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:43.5170140Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:43.5469664Z http.https://github.com/.extraheader
+2026-10-10T08:41:43.5514127Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:43.5820536Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:44.1680464Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:44.1997168Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:44.8117797Z Post job cleanup.
+2026-10-10T08:41:45.0706033Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:41:45.0990239Z git version 2.55.0.windows.5
+2026-10-10T08:41:45.1064445Z Temporarily overriding HOME='D:\a\_temp\0459bce2-8f0b-4c0a-aee5-b446d6ecb47d' before making global git config changes
+2026-10-10T08:41:45.1065807Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:41:45.1075325Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift\nift
+2026-10-10T08:41:45.1470264Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:41:45.1826209Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:41:45.7371834Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:41:45.7647483Z http.https://github.com/.extraheader
+2026-10-10T08:41:45.7689413Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:41:45.8023805Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:41:46.3886038Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:41:46.4213522Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:41:46.9960777Z Cleaning up orphan processes

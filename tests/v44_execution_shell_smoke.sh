@@ -2,6 +2,12 @@
 set -euo pipefail
 NIFT=${NIFT:-./nift}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+# Paths written into shell stdin bypass MSYS argv conversion. Native Windows
+# Nift needs native paths; retain the POSIX path for bash and PATH construction.
+command_t=$t
+case "$(uname -s)" in
+MINGW*|MSYS*) command_t=$(cygpath -am "$t") ;;
+esac
 echo "MARK exec-shell start"
 cat >"$t/run.f" <<'F'
 r := run("sh", "-c", "printf out; printf err >&2; exit 3")
@@ -37,16 +43,18 @@ MINGW*|MSYS*) ;;
   ;;
 esac
 echo "MARK after run.f"
-shell_out=$(printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" 2>&1 || true)
+shell_out=$(printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$command_t" "$command_t" | "$NIFT" 2>&1 || true)
 grep -q HELLO <<<"$shell_out" || { echo "shell pipeline: $shell_out" >&2; exit 1; }
+grep -q HELLO "$t/out" || { echo "pipeline redirect file missing or incorrect" >&2; exit 1; }
 echo "MARK after pipeline"
 echo "MARK assign"
 # Shell assignment statements must route to the Nift statement engine, and
 # adjacent fd-redirects (2>) must not become a literal argument.
 assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" 2>&1 || true)
 grep -qE '(^| )7$' <<<"$assign_out" || { echo "assign: $assign_out" >&2; exit 1; }
-err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" 2>&1 || true)
+err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$command_t" "$command_t" | "$NIFT" 2>&1 || true)
 grep -q '^err$' <<<"$err_out" || { echo "err-redirect: $err_out" >&2; exit 1; }
+test -s "$t/err.txt" || { echo "stderr redirect file missing or empty" >&2; exit 1; }
 echo "MARK interp"
 # $[...] interpolation in command arguments and ; command separation.
 interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" 2>/dev/null || true)
