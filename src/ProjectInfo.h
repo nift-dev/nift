@@ -149,7 +149,8 @@ private:
     bool is_tracked_output(const std::filesystem::path& path) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
     bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
-    bool metadata_path_is_safe(const std::filesystem::path& path) const;
+    // Inputs are lexically normalized within one consumer dirty-check.
+    bool metadata_path_is_safe(const std::filesystem::path& normalized, const std::filesystem::path& normalized_root) const;
     std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
     void invalidate_output_caches(const std::filesystem::path& path);

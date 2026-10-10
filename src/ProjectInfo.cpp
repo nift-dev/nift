@@ -524,9 +524,9 @@ void ProjectInfo::refresh_hash_once(const fs::path& dependency) {
     filesystem::write_stored_hash(root, normalized);
 }
 
-bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
-    const fs::path normalized_root = root.lexically_normal();
-    const fs::path normalized = path.lexically_normal();
+bool ProjectInfo::metadata_path_is_safe(const fs::path& normalized, const fs::path& normalized_root) const {
+    // Both are normalized by this consumer check before reaching this helper.
+    // Retain lexical identity only; leaf and physical safety still observe disk.
     const fs::path lexical = normalized.lexically_relative(normalized_root);
     if (lexical.empty()) {
         if (normalized != normalized_root) return false;
@@ -667,6 +667,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         document["minify-version"].num != expected_minify_version)
         reasons.push_back("minifier version changed");
 
+    const fs::path normalized_root = root.lexically_normal();
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
             reasons.push_back("page build metadata has an invalid dependency");
@@ -674,7 +675,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         }
 
         const fs::path dependency = (root / value.string).lexically_normal();
-        if (!metadata_path_is_safe(dependency)) {
+        if (!metadata_path_is_safe(dependency, normalized_root)) {
             reasons.push_back("page build metadata has an invalid dependency");
             continue;
         }
@@ -724,7 +725,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             continue;
         }
         const fs::path requirement = (root / value.string).lexically_normal();
-        if (!metadata_path_is_safe(requirement)) {
+        if (!metadata_path_is_safe(requirement, normalized_root)) {
             reasons.push_back("page build metadata has an invalid requirement");
             continue;
         }

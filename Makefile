@@ -2009,3 +2009,9 @@ test-dependency-status: $(TARGET) src/FileSystem.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/dependency_status.cpp src/FileSystem.o -o $(TEST_DIR)/dependency-status-test$(EXEEXT)
 	$(TEST_DIR)/dependency-status-test$(EXEEXT) $(TEST_DIR)/dependency-status-fixture
 	$(PYTHON) tests/dependency_status.py --nift ./$(TARGET) --output $(TEST_DIR)/dependency-status-contracts.json
+
+.PHONY: test-dependency-path-identity
+test: test-dependency-path-identity
+test-dependency-path-identity: $(TARGET)
+	@mkdir -p $(TEST_DIR)
+	$(PYTHON) tests/dependency_path_identity.py --nift ./$(TARGET) --output $(TEST_DIR)/dependency-path-identity.json
