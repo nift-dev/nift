@@ -1,0 +1,265 @@
+{
+  "pass_": true,
+  "platform": "posix",
+  "cases": [
+    {
+      "case": [],
+      "returncode": 0,
+      "stdout": "process contracts PASS\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS temp 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS temp 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS pipe 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS pipe 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "spawn",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS spawn 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "spawn",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS spawn 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "spawn",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS spawn 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp-open",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS temp-open 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp-open",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS temp-open 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "capture-out",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS capture-out 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "capture-err",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS capture-err 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "capture-err",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS capture-err 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "capture-err",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS capture-err 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "3"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 3\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "4"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 4\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "5"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 5\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "6"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 6\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "7"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 7\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "duplicate",
+        "8"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS duplicate 8\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-init",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-init 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-init",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-init 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-init",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-init 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-update",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-update 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-update",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-update 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "attributes-update",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "control handles stages=1 iteration=0: 85 -> 87\ncontrol handles stages=1 iteration=1: 87 -> 87\ncontrol handles stages=1 iteration=2: 87 -> 87\ncontrol handles stages=3 iteration=0: 87 -> 88\ncontrol handles stages=3 iteration=1: 88 -> 88\ncontrol handles stages=3 iteration=2: 88 -> 88\nPASS attributes-update 2\n",
+      "stderr": ""
+    }
+  ],
+  "elapsed_seconds": 3.028793300000018
+}

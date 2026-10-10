@@ -1,0 +1,126 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "iteration": 0,
+      "exit_code": 0
+    },
+    {
+      "iteration": 1,
+      "exit_code": 0
+    },
+    {
+      "iteration": 2,
+      "exit_code": 0
+    },
+    {
+      "iteration": 3,
+      "exit_code": 0
+    },
+    {
+      "iteration": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 5,
+      "exit_code": 0
+    },
+    {
+      "iteration": 6,
+      "exit_code": 0
+    },
+    {
+      "iteration": 7,
+      "exit_code": 0
+    },
+    {
+      "iteration": 8,
+      "exit_code": 0
+    },
+    {
+      "iteration": 9,
+      "exit_code": 0
+    },
+    {
+      "iteration": 10,
+      "exit_code": 0
+    },
+    {
+      "iteration": 11,
+      "exit_code": 0
+    },
+    {
+      "iteration": 12,
+      "exit_code": 0
+    },
+    {
+      "iteration": 13,
+      "exit_code": 0
+    },
+    {
+      "iteration": 14,
+      "exit_code": 0
+    },
+    {
+      "iteration": 15,
+      "exit_code": 0
+    },
+    {
+      "iteration": 16,
+      "exit_code": 0
+    },
+    {
+      "iteration": 17,
+      "exit_code": 0
+    },
+    {
+      "iteration": 18,
+      "exit_code": 0
+    },
+    {
+      "iteration": 19,
+      "exit_code": 0
+    },
+    {
+      "iteration": 20,
+      "exit_code": 0
+    },
+    {
+      "iteration": 21,
+      "exit_code": 0
+    },
+    {
+      "iteration": 22,
+      "exit_code": 0
+    },
+    {
+      "iteration": 23,
+      "exit_code": 0
+    },
+    {
+      "iteration": 24,
+      "exit_code": 0
+    },
+    {
+      "iteration": 25,
+      "exit_code": 0
+    },
+    {
+      "iteration": 26,
+      "exit_code": 0
+    },
+    {
+      "iteration": 27,
+      "exit_code": 0
+    },
+    {
+      "iteration": 28,
+      "exit_code": 0
+    },
+    {
+      "iteration": 29,
+      "exit_code": 0
+    }
+  ],
+  "note": "Earlier hosted f541071 target assertion failed without detail; exact local target contract and 30 repetitions checked, no production change."
+}

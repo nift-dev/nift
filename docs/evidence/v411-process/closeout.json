@@ -1,0 +1,125 @@
+{
+  "title": "NIFT v4.11 \u2014 PROCESS HARDENING CLOSEOUT",
+  "status": "PROCESS HARDENING CLOSED",
+  "repository": {
+    "synced": true,
+    "tracked_clean": true,
+    "untracked": "Preserved historical campaign evidence and the byte-exact original draft patch remain untracked; no deletion to make status clean.",
+    "clean": false,
+    "validation_checkpoint_head": "0b642c8f6796a1cb528f1e0b4b6f9a0ff1139735",
+    "origin_main_at_validation_checkpoint": "0b642c8f6796a1cb528f1e0b4b6f9a0ff1139735",
+    "evidence_commit": "This report is committed after its validation checkpoint; the final response records the evidence commit HEAD and origin/main equality."
+  },
+  "incremental_baseline": {
+    "production_unchanged": true,
+    "matrix": "27 cases, zero contractual failures",
+    "final_smoke": "243 operations, 534 builds, 243 clean oracles PASS",
+    "hash_boundary": "64-bit FNV-1a decimal change detectors for trusted projects; not cryptographic integrity/security hashes",
+    "accepted_sequence": "55e32b0,7d5987c,bac2545,9d2f959,a1be4c0,db2c090,54a29b7,ce30fcd,9afaf4d"
+  },
+  "POSIX": {
+    "multithreaded_fork_reachable": true,
+    "unsafe_child_allocations_env": "removed",
+    "environment": "parent prepared; Nift-owned env writer lock; external/FFI writers require host serialization",
+    "PATH_ENOEXEC": "parent prepared; relative PATH/cwd and shell fallback tested",
+    "capture_partial_setup": "PASS",
+    "partial_pipeline": "PASS pipe/fork stages, blocked children killed/reaped, no zombie/fd/temp residue",
+    "job_control": "PASS process-group kill and direct-child reaping; no partially registered job",
+    "CLOEXEC": "pipe and capture temp descriptors protected; portable setup-through-fork lock among Nift launches",
+    "dup2": "checked; EINTR retry; setup failure126; deterministic input/output/error tests PASS",
+    "mutations": "5/5 caught"
+  },
+  "Windows": {
+    "environment": "child-only case-insensitive Unicode block; parent mutation removed",
+    "handles": "PASS native explicit handle list and inheritable sentinel exclusion",
+    "capture": "PASS native MSYS sh stderr and shared GENERIC_WRITE capture file object, duplicated per child",
+    "failure_cleanup": "PASS all setup stages; ten repetitions per fault, prior children terminated/waited, no temp residue or failure-specific handle growth",
+    "handle_controls": "First successful single launch +2 handles, first successful pipeline +1; subsequent matching controls stable. Every failure repetition strictly stable. Cold initialization growth was not failure-specific.",
+    "Unicode": "PASS native Unicode executable, cwd, environment, TMP/TEMP capture paths",
+    "native_report_interpretation": "Python runs under MSYS and reports platform=posix; the compiled executable uses the native Windows backend (30 cases, Windows handle controls)."
+  },
+  "local": {
+    "make_test": "PASS",
+    "NRS": "94/94 PASS against final rebuilt checkpoint binary; final-nrs-current.txt",
+    "PRS": "12/12 PASS against final rebuilt checkpoint binary; final-prs-current.txt",
+    "shell_job_runtime_engine": "PASS",
+    "process_contracts": "19 cases PASS",
+    "process_mutations": "5/5 PASS",
+    "focused_sanitizers": "Final ASan/UBSan/integrated LSan PASS 19 cases",
+    "full_sanitizer_profiles": "PASS make test-sanitize test-sanitize-lifetime test-v45-concurrency-sanitize",
+    "final_checkpoint_aggregate": "PASS make test + shell/job/runtime/engine concurrency at 0b642c8, final-tests-current.txt",
+    "binary_sha256": "c0357ab201589cba256741e1964c39ede78c06b50a3f7e158c1d4a944d8bdfdd"
+  },
+  "NRS_correction": {
+    "commit": "6da99128a5ea053551fe952a4994a390a38d0258",
+    "reason": "Legacy assertion corrupted global hash. Conditional test now corrupts the historical consumer snapshot when present, retains old global behavior on older binaries."
+  },
+  "intentional_differences": {
+    "missing_executable": "POSIX forked child127; Windows CreateProcess error without launch",
+    "signals": "POSIX128+signal; Windows DWORD exit",
+    "interactive_jobs": "POSIX supported; Windows unsupported"
+  },
+  "commits": [
+    "f541071c24530095c4c5aa5a8fe3378627364daa fix: harden POSIX process launch and failure cleanup",
+    "735544fc3f07ea5d950e97c6aa10d57c71e9920f fix: isolate Windows child process environment and handles",
+    "619318b1e90fc2dc6885e3c1d2d0b9683c1f5e76 test: certify Windows Unicode temp and repeated failure cleanup",
+    "12660295015a3109f2c0b29a06d496eb0d4aa7fd test: compare child cwd identity across platform aliases",
+    "9640b13880313378fd2cf2909ae29d4dfa7c98ea test: record native process controls and failure handle stability",
+    "24a0edb5ddf6a8a1253c6dc5557c91cb5a53a936 test: compare failure handles against successful pipeline controls",
+    "bb7c95a531d35670352dfa412ec535e9dbdae1cd fix: share write-capable Windows stderr capture handles",
+    "0b642c8f6796a1cb528f1e0b4b6f9a0ff1139735 test: use native Windows paths for shell redirect contracts"
+  ],
+  "nightly_deep_recommendation": "Keep workflow_dispatch/manual-only. Run before each release candidate and after substantial parser/runtime/FFI/process changes; optionally weekly during active stabilization. Do not add scheduling or workflow hygiene changes in this campaign.",
+  "frozen_benchmarks_Jsonic_release_tags": "UNCHANGED",
+  "recommendation": "PROCESS HARDENING CLOSED; READY FOR NEXT v4.11 PRIORITY; STOP",
+  "development_failures": [
+    "Native macOS cwd test compared path spelling; /var and /private/var identify same directory. Changed assertion to filesystem identity, preserving actual cwd requirement.",
+    "Native Windows cold-start handle-count mismatch: matching successful single/pipeline controls showed same initialization growth. Subsequent controls and all ten repetitions per fault stable.",
+    "Full Windows shell wall bad stderr exposed FILE_APPEND_DATA compatibility; share one GENERIC_WRITE capture file object and add MSYS sh regression.",
+    "Fail-closed redirects exposed shell fixture passing MSYS /tmp paths through stdin, without argv translation. Converted only serialized command paths with cygpath; added actual redirect-file assertions. Local and native Linux/macOS/Windows full walls PASS."
+  ],
+  "hosted_partial": {
+    "process": "Linux19/macOS19/Windows30 PASS",
+    "workflow": "https://github.com/nift-dev/nift/actions/runs/38038408869",
+    "checkpoint": "https://github.com/nift-dev/nift/actions/runs/38038408828 (PASS)",
+    "shell_runtime": "PASS Linux/macOS/Windows https://github.com/nift-dev/nift/actions/runs/38039057855"
+  },
+  "certified_production_source_head": "bb7c95a531d35670352dfa412ec535e9dbdae1cd",
+  "hosted": {
+    "process_contracts": {
+      "result": "PASS Linux19/macOS19/Windows30",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38038408869"
+    },
+    "checkpoint_equivalence": {
+      "result": "PASS Linux/macOS/Windows",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38038408828"
+    },
+    "shell_runtime": {
+      "result": "PASS Linux/macOS/Windows",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38039057855"
+    },
+    "packaging": {
+      "result": "PASS six jobs, build-only/non-publishing",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38038408859"
+    },
+    "bindings_aggregate": {
+      "result": "PASS all jobs, serial test-bindings, parallel test-all, non-destructive boundary proof",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38039057860",
+      "checkpoint": "0b642c8f6796a1cb528f1e0b4b6f9a0ff1139735"
+    },
+    "other_relevant_walls": {
+      "init": "38038408840 PASS",
+      "performance": "38038408857 PASS",
+      "bytes": "38038408878 PASS",
+      "diagnostic": "38039057858 PASS",
+      "vendored_libffi": "38037268158 PASS (unchanged relevant inputs)"
+    }
+  },
+  "blockers": "NONE",
+  "superseded_hosted_failures": [
+    "38035905288: transient Linux target-wall assertion; local 30 repetitions and later native full wall PASS",
+    "38037268148: append-only Windows stderr/MSYS incompatibility; fixed bb7c95a, passing full wall38039057855",
+    "38038408884: native Windows redirect-path fixture; fixed0b642c8, passing full wall38039057855",
+    "Intermediate process/checkpoint failures are preserved with diagnostics; cwd identity and successful-control initialization corrections validated by final native reports."
+  ]
+}
