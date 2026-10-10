@@ -41,15 +41,15 @@ test -f public/blog.html -a -f public/blog-2.html -a -f public/blog-3.html
 cat > .nift/tracked.json <<'JSON'
 {"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":3}}]}
 JSON
-# CP3 direct writes: the output and .info.json are in-place writes, so the
-# observable order is the data-write sequence (-y decodes fd -> path).
-strace -f -y -e trace=write,unlink,unlinkat -o trace.txt "$NIFT_BIN" build --all >/dev/null 2>&1
+# Outputs are direct writes; certification metadata is atomically replaced.
+# Observe the final metadata rename after output writes and stale cleanup.
+strace -f -y -e trace=write,unlink,unlinkat,rename,renameat,renameat2 -o trace.txt "$NIFT_BIN" build --all >/dev/null 2>&1
 
 # Sequence of blog-related data writes/removals in syscall order.
-grep -E 'write\(|unlink(\(|at\()' trace.txt | grep 'blog' > ops.txt
+grep -E 'write\(|unlink(\(|at\()|rename' trace.txt | grep 'blog' > ops.txt
 output_seq=$(grep -nE 'blog\.html' ops.txt | grep -v 'blog-[0-9]' | tail -1 | cut -d: -f1)
 stale_seq=$(grep -nE 'blog-3\.html' ops.txt | tail -1 | cut -d: -f1)
-info_seq=$(grep -nE 'blog\.info\.json' ops.txt | tail -1 | cut -d: -f1)
+info_seq=$(grep -nE 'rename.*blog\.info\.json' ops.txt | tail -1 | cut -d: -f1)
 
 for v in output_seq stale_seq info_seq; do
     [ -n "${!v}" ] || { echo "FAIL: pagination ordering trace missing $v" >&2; exit 1; }

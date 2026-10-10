@@ -894,7 +894,8 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     }
     output += "\n  }\n}\n";
 
-    return filesystem::write_direct_file(info_path(info), output);
+    // Certification metadata uses the existing atomic readonly replacement.
+    return filesystem::write_readonly_file(info_path(info), output);
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error) {
