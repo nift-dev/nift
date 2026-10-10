@@ -1,0 +1,262 @@
+[
+  {
+    "size": 100,
+    "warmup": true,
+    "wall_ms": 8.63865902647376,
+    "stages_ms": {
+      "tracking": 0.979044,
+      "open": 1.11469,
+      "dirty_scan": 4.75693,
+      "build_many": 0.31241,
+      "build_all": 5.13251
+    },
+    "dag": "BUILD_DAG nodes=115 edges=215 peak_ready=102 peak_active=2 blocked=0 wakeups=2 lock_wait_ns=3086 plan_ns=21014"
+  },
+  {
+    "size": 100,
+    "warmup": true,
+    "wall_ms": 7.762491935864091,
+    "stages_ms": {
+      "tracking": 0.938946,
+      "open": 1.04972,
+      "dirty_scan": 4.53483,
+      "build_many": 0.300506,
+      "build_all": 4.8826
+    },
+    "dag": "BUILD_DAG nodes=115 edges=215 peak_ready=102 peak_active=2 blocked=0 wakeups=1 lock_wait_ns=3739 plan_ns=25385"
+  },
+  {
+    "size": 100,
+    "warmup": false,
+    "wall_ms": 7.590515073388815,
+    "stages_ms": {
+      "tracking": 0.993469,
+      "open": 1.0861,
+      "dirty_scan": 4.65017,
+      "build_many": 0.261269,
+      "build_all": 4.94895
+    },
+    "dag": "BUILD_DAG nodes=115 edges=215 peak_ready=102 peak_active=2 blocked=0 wakeups=0 lock_wait_ns=7179 plan_ns=20351"
+  },
+  {
+    "size": 100,
+    "warmup": false,
+    "wall_ms": 7.95108312740922,
+    "stages_ms": {
+      "tracking": 1.01004,
+      "open": 1.10242,
+      "dirty_scan": 4.82351,
+      "build_many": 0.318614,
+      "build_all": 5.19894
+    },
+    "dag": "BUILD_DAG nodes=115 edges=215 peak_ready=102 peak_active=1 blocked=0 wakeups=0 lock_wait_ns=2792 plan_ns=22678"
+  },
+  {
+    "size": 100,
+    "warmup": false,
+    "wall_ms": 8.082621032372117,
+    "stages_ms": {
+      "tracking": 1.0557,
+      "open": 1.16625,
+      "dirty_scan": 4.78271,
+      "build_many": 0.296593,
+      "build_all": 5.13044
+    },
+    "dag": "BUILD_DAG nodes=115 edges=215 peak_ready=102 peak_active=2 blocked=0 wakeups=2 lock_wait_ns=10919 plan_ns=19766"
+  },
+  {
+    "size": 1000,
+    "warmup": true,
+    "wall_ms": 59.21092093922198,
+    "stages_ms": {
+      "tracking": 8.53762,
+      "open": 8.73431,
+      "dirty_scan": 46.1995,
+      "build_many": 1.26106,
+      "build_all": 47.5599
+    },
+    "dag": "BUILD_DAG nodes=1015 edges=2015 peak_ready=1002 peak_active=4 blocked=0 wakeups=5 lock_wait_ns=405905 plan_ns=207042"
+  },
+  {
+    "size": 1000,
+    "warmup": true,
+    "wall_ms": 60.68983091972768,
+    "stages_ms": {
+      "tracking": 9.57746,
+      "open": 9.73737,
+      "dirty_scan": 46.8297,
+      "build_many": 1.25247,
+      "build_all": 48.1906
+    },
+    "dag": "BUILD_DAG nodes=1015 edges=2015 peak_ready=1002 peak_active=4 blocked=0 wakeups=3 lock_wait_ns=360223 plan_ns=192707"
+  },
+  {
+    "size": 1000,
+    "warmup": false,
+    "wall_ms": 59.27300779148936,
+    "stages_ms": {
+      "tracking": 9.30932,
+      "open": 9.46535,
+      "dirty_scan": 45.5997,
+      "build_many": 1.25312,
+      "build_all": 46.9802
+    },
+    "dag": "BUILD_DAG nodes=1015 edges=2015 peak_ready=1002 peak_active=4 blocked=0 wakeups=2 lock_wait_ns=425829 plan_ns=182671"
+  },
+  {
+    "size": 1000,
+    "warmup": false,
+    "wall_ms": 57.39593203179538,
+    "stages_ms": {
+      "tracking": 8.98851,
+      "open": 9.15252,
+      "dirty_scan": 44.1749,
+      "build_many": 1.21808,
+      "build_all": 45.4928
+    },
+    "dag": "BUILD_DAG nodes=1015 edges=2015 peak_ready=1002 peak_active=4 blocked=0 wakeups=4 lock_wait_ns=401454 plan_ns=179765"
+  },
+  {
+    "size": 1000,
+    "warmup": false,
+    "wall_ms": 59.556740801781416,
+    "stages_ms": {
+      "tracking": 9.14704,
+      "open": 9.28134,
+      "dirty_scan": 46.2977,
+      "build_many": 1.29149,
+      "build_all": 47.699
+    },
+    "dag": "BUILD_DAG nodes=1015 edges=2015 peak_ready=1002 peak_active=4 blocked=0 wakeups=2 lock_wait_ns=449954 plan_ns=190579"
+  },
+  {
+    "size": 5000,
+    "warmup": true,
+    "wall_ms": 303.441725904122,
+    "stages_ms": {
+      "tracking": 49.9986,
+      "open": 50.2483,
+      "dirty_scan": 244.383,
+      "build_many": 5.13543,
+      "build_all": 249.673
+    },
+    "dag": "BUILD_DAG nodes=5015 edges=10015 peak_ready=5002 peak_active=4 blocked=0 wakeups=3 lock_wait_ns=1905574 plan_ns=899634"
+  },
+  {
+    "size": 5000,
+    "warmup": true,
+    "wall_ms": 283.97222189232707,
+    "stages_ms": {
+      "tracking": 44.8662,
+      "open": 45.0345,
+      "dirty_scan": 229.746,
+      "build_many": 5.35967,
+      "build_all": 235.236
+    },
+    "dag": "BUILD_DAG nodes=5015 edges=10015 peak_ready=5002 peak_active=4 blocked=0 wakeups=2 lock_wait_ns=1959633 plan_ns=1050715"
+  },
+  {
+    "size": 5000,
+    "warmup": false,
+    "wall_ms": 283.3357350900769,
+    "stages_ms": {
+      "tracking": 44.1505,
+      "open": 44.3207,
+      "dirty_scan": 230.386,
+      "build_many": 5.05606,
+      "build_all": 235.569
+    },
+    "dag": "BUILD_DAG nodes=5015 edges=10015 peak_ready=5002 peak_active=4 blocked=0 wakeups=2 lock_wait_ns=1766074 plan_ns=951343"
+  },
+  {
+    "size": 5000,
+    "warmup": false,
+    "wall_ms": 284.60197895765305,
+    "stages_ms": {
+      "tracking": 45.0286,
+      "open": 45.2083,
+      "dirty_scan": 230.517,
+      "build_many": 5.14048,
+      "build_all": 235.796
+    },
+    "dag": "BUILD_DAG nodes=5015 edges=10015 peak_ready=5002 peak_active=4 blocked=0 wakeups=1 lock_wait_ns=1530128 plan_ns=1023084"
+  },
+  {
+    "size": 5000,
+    "warmup": false,
+    "wall_ms": 284.5155338291079,
+    "stages_ms": {
+      "tracking": 44.9098,
+      "open": 45.0928,
+      "dirty_scan": 231.288,
+      "build_many": 4.74443,
+      "build_all": 236.146
+    },
+    "dag": "BUILD_DAG nodes=5015 edges=10015 peak_ready=5002 peak_active=4 blocked=0 wakeups=3 lock_wait_ns=1811869 plan_ns=932216"
+  },
+  {
+    "size": 10000,
+    "warmup": true,
+    "wall_ms": 565.5744860414416,
+    "stages_ms": {
+      "tracking": 90.1362,
+      "open": 90.3639,
+      "dirty_scan": 460.862,
+      "build_many": 9.71001,
+      "build_all": 470.715
+    },
+    "dag": "BUILD_DAG nodes=10015 edges=20015 peak_ready=10002 peak_active=4 blocked=0 wakeups=3 lock_wait_ns=3573752 plan_ns=1803797"
+  },
+  {
+    "size": 10000,
+    "warmup": true,
+    "wall_ms": 568.4236439410597,
+    "stages_ms": {
+      "tracking": 91.1524,
+      "open": 91.315,
+      "dirty_scan": 462.688,
+      "build_many": 9.5892,
+      "build_all": 472.407
+    },
+    "dag": "BUILD_DAG nodes=10015 edges=20015 peak_ready=10002 peak_active=4 blocked=0 wakeups=3 lock_wait_ns=3401938 plan_ns=1851279"
+  },
+  {
+    "size": 10000,
+    "warmup": false,
+    "wall_ms": 567.5435999874026,
+    "stages_ms": {
+      "tracking": 91.5801,
+      "open": 91.7532,
+      "dirty_scan": 460.825,
+      "build_many": 10.261,
+      "build_all": 471.22
+    },
+    "dag": "BUILD_DAG nodes=10015 edges=20015 peak_ready=10002 peak_active=4 blocked=0 wakeups=0 lock_wait_ns=3347705 plan_ns=2093926"
+  },
+  {
+    "size": 10000,
+    "warmup": false,
+    "wall_ms": 569.532762048766,
+    "stages_ms": {
+      "tracking": 92.3589,
+      "open": 92.536,
+      "dirty_scan": 462.55,
+      "build_many": 9.953,
+      "build_all": 472.638
+    },
+    "dag": "BUILD_DAG nodes=10015 edges=20015 peak_ready=10002 peak_active=4 blocked=0 wakeups=0 lock_wait_ns=3422678 plan_ns=1990608"
+  },
+  {
+    "size": 10000,
+    "warmup": false,
+    "wall_ms": 578.8504988886416,
+    "stages_ms": {
+      "tracking": 92.6258,
+      "open": 92.8077,
+      "dirty_scan": 470.657,
+      "build_many": 10.3129,
+      "build_all": 481.111
+    },
+    "dag": "BUILD_DAG nodes=10015 edges=20015 peak_ready=10002 peak_active=4 blocked=0 wakeups=4 lock_wait_ns=3580866 plan_ns=2165580"
+  }
+]

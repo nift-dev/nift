@@ -1,0 +1,224 @@
+diff --git a/Makefile b/Makefile
+index bb2055d..2731262 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2000,3 +2000,12 @@ test-consumer-snapshots: $(TARGET)
+ 	mkdir -p .build
+ 	python3 tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json
+ 	python3 tests/consumer_dependency_snapshots.py --nift ./$(TARGET) --output .build/consumer-snapshot-contracts.json
++
++# One-comparison following status: native precision, errors and mutation boundaries.
++.PHONY: test-dependency-status
++test: test-dependency-status
++test-dependency-status: $(TARGET) src/FileSystem.o
++	@mkdir -p $(TEST_DIR)
++	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/dependency_status.cpp src/FileSystem.o -o $(TEST_DIR)/dependency-status-test$(EXEEXT)
++	$(TEST_DIR)/dependency-status-test$(EXEEXT) $(TEST_DIR)/dependency-status-fixture
++	$(PYTHON) tests/dependency_status.py --nift ./$(TARGET) --output $(TEST_DIR)/dependency-status-contracts.json
+diff --git a/scripts/consumer_snapshot_mutations.py b/scripts/consumer_snapshot_mutations.py
+index 8645f9a..9775de2 100644
+--- a/scripts/consumer_snapshot_mutations.py
++++ b/scripts/consumer_snapshot_mutations.py
+@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='nift-v411-mutants-') as td:
+    plan=run(['make','-n','-W','src/'+filename]);assert plan.returncode==0,plan.stderr
+    lines=plan.stdout.splitlines();compile_line=next(x for x in lines if '-c src/'+filename+' ' in x);link_line=next(x for x in reversed(lines) if ' -o '+native_target.name in x)
+    plans[filename]=(shlex.split(compile_line),shlex.split(link_line))
+-  prefix='bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime, const json::Document& snapshots, const std::string& name) const {'
++  prefix='bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {'
+   mutants=[('content-invalidation','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.parent_path().filename()=="content")return false;',['content']),
+    ('template-invalidation','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.filename()=="template.html")return false;',['template']),
+    ('generated-file-edge','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.parent_path().filename()=="public")return false;',['generated']),
+diff --git a/src/FileSystem.cpp b/src/FileSystem.cpp
+index b7fbf54..791b216 100644
+--- a/src/FileSystem.cpp
++++ b/src/FileSystem.cpp
+@@ -655,6 +655,47 @@ bool path_within(const fs::path& base, const fs::path& candidate) {
+     return *canonical_relative.begin() != "..";
+ }
+ 
++DependencyStatus dependency_status(const fs::path& path) {
++    DependencyStatus result;
++#ifdef _WIN32
++    // Omit OPEN_REPARSE_POINT: observe the target, not the symlink/junction leaf.
++    // BACKUP_SEMANTICS also permits directory dependencies. Sharing mirrors stat.
++    HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
++        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
++        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
++    if (handle == INVALID_HANDLE_VALUE) {
++        result.error = std::error_code(static_cast<int>(GetLastError()), std::system_category());
++        return result;
++    }
++    FILE_BASIC_INFO info{};
++    const bool ok = GetFileInformationByHandleEx(handle, FileBasicInfo, &info, sizeof(info)) != 0;
++    const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
++    CloseHandle(handle);
++    if (!ok) {
++        result.error = std::error_code(static_cast<int>(error), std::system_category());
++        return result;
++    }
++    const auto ticks = static_cast<std::uint64_t>(info.LastWriteTime.QuadPart);
++    result.mtime.seconds = static_cast<std::int64_t>(ticks / 10000000ull) - 11644473600ll;
++    result.mtime.nanoseconds = static_cast<std::uint32_t>((ticks % 10000000ull) * 100ull);
++#else
++    struct stat info{};
++    if (::stat(path.c_str(), &info) != 0) {
++        result.error = std::error_code(errno, std::generic_category());
++        return result;
++    }
++#ifdef __APPLE__
++    result.mtime.seconds = info.st_mtimespec.tv_sec;
++    result.mtime.nanoseconds = static_cast<std::uint32_t>(info.st_mtimespec.tv_nsec);
++#else
++    result.mtime.seconds = info.st_mtim.tv_sec;
++    result.mtime.nanoseconds = static_cast<std::uint32_t>(info.st_mtim.tv_nsec);
++#endif
++#endif
++    result.exists = true;
++    return result;
++}
++
+ fs::file_time_type modified_time(const fs::path& path) {
+     std::error_code error;
+     const auto value = fs::last_write_time(path, error);
+diff --git a/src/FileSystem.h b/src/FileSystem.h
+index 254fde7..271084e 100644
+--- a/src/FileSystem.h
++++ b/src/FileSystem.h
+@@ -3,6 +3,7 @@
+ #include <filesystem>
+ #include <optional>
+ #include <string>
++#include <system_error>
+ #include <vector>
+ 
+ namespace filesystem {
+@@ -49,6 +50,22 @@ std::optional<std::filesystem::path> resolved_path(const std::filesystem::path&
+ bool path_within(const std::filesystem::path& base, const std::filesystem::path& candidate);
+ std::string normalise_slashes(std::string path);
+ std::filesystem::file_time_type modified_time(const std::filesystem::path& path);
++// Native timestamps avoid a lossy/implementation-specific file_clock conversion.
++// A status is an observation for one comparison, never a cached file identity.
++struct DependencyTime {
++    std::int64_t seconds = 0;
++    std::uint32_t nanoseconds = 0;
++    bool operator>=(const DependencyTime& other) const {
++        return seconds > other.seconds || (seconds == other.seconds && nanoseconds >= other.nanoseconds);
++    }
++};
++struct DependencyStatus {
++    bool exists = false;
++    DependencyTime mtime;
++    std::error_code error;
++};
++DependencyStatus dependency_status(const std::filesystem::path& path);
++
+ std::uint64_t hash_bytes(const std::string& contents);
+ std::uint64_t hash_path(const std::filesystem::path& path);
+ std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);
+diff --git a/src/ProjectInfo.cpp b/src/ProjectInfo.cpp
+index 2551df3..595a5a3 100644
+--- a/src/ProjectInfo.cpp
++++ b/src/ProjectInfo.cpp
+@@ -557,8 +557,8 @@ bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
+     return true;
+ }
+ 
+-bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime, const json::Document& snapshots, const std::string& name) const {
+-    if (!filesystem::path_exists(dependency)) return true;
++bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {
++    if (!status.exists || status.error || !page_info_status.exists || page_info_status.error) return true;
+     // Strictly-greater comparison misses edits whose mtime lands in the same
+     // filesystem timestamp quantum as the page-info write (equal timestamps
+     // are common on coarse-resolution or batched-update filesystems). An equal
+@@ -567,11 +567,11 @@ bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_t
+     // never report success while a source change went unnoticed. Hash mode is
+     // unaffected (content hashing, no timestamps); hybrid keeps both signals.
+     if (config.incremental_mode == "modified")
+-        return filesystem::modified_time(dependency) >= page_info_mtime;
++        return status.mtime >= page_info_status.mtime;
+     if (!snapshots.is_object() || !snapshots.has(name) || !snapshots[name].is_string()) return true;
+     const auto& value = snapshots[name].string;
+     if (value.empty() || value.size() > 20 || value.find_first_not_of("0123456789") != std::string::npos) return true;
+-    if (config.incremental_mode == "hybrid" && filesystem::modified_time(dependency) >= page_info_mtime) return true;
++    if (config.incremental_mode == "hybrid" && status.mtime >= page_info_status.mtime) return true;
+     return value != std::to_string(current_hash_cached(dependency));
+ }
+ 
+@@ -656,7 +656,11 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
+         ? *info.minify
+         : config.minify_exts.count(current_output_extension) != 0;
+     if (document["minify"].boolean != current_minify) reasons.push_back("minification setting changed");
+-    const fs::file_time_type page_info_mtime = filesystem::modified_time(page_info);
++    const auto page_info_status = filesystem::dependency_status(page_info);
++    if (!page_info_status.exists || page_info_status.error) {
++        reasons.push_back("page build metadata status is unavailable");
++        return reasons;
++    }
+     const int expected_minify_version = current_minify ? minify::format_version : 0;
+     if (!std::isfinite(document["minify-version"].num) ||
+         std::floor(document["minify-version"].num) != document["minify-version"].num ||
+@@ -681,7 +685,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
+             // comparing values instead of mtimes (which can collide between the
+             // fingerprint write and the page-info write within one fast build).
+             refresh_project_fingerprint();
+-            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
++            if (config.incremental_mode != "modified" && dependency_changed(dependency,filesystem::dependency_status(dependency),page_info_status,document["dependency-hashes"],value.string))
+                 reasons.push_back("dependency snapshot changed or invalid: " + value.string);
+             const std::string current = filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{});
+             std::string stored;
+@@ -697,7 +701,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
+             // reparent invalidates hierarchy consumers without a per-page x
+             // project-size dependency list.
+             refresh_hierarchy_fingerprint();
+-            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
++            if (config.incremental_mode != "modified" && dependency_changed(dependency,filesystem::dependency_status(dependency),page_info_status,document["dependency-hashes"],value.string))
+                 reasons.push_back("dependency snapshot changed or invalid: " + value.string);
+             const std::string current = filesystem::read_file_checked(root / ".nift/hierarchy.fingerprint").value_or(std::string{});
+             std::string stored;
+@@ -707,9 +711,10 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
+                 reasons.push_back("hierarchy structure changed");
+             continue;
+         }
+-        if (!filesystem::path_exists(dependency))
++        const auto status = filesystem::dependency_status(dependency);
++        if (!status.exists || status.error)
+             reasons.push_back("dependency removed: " + value.string);
+-        else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], value.string))
++        else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string))
+             reasons.push_back("dependency changed: " + value.string);
+     }
+ 
+@@ -748,9 +753,10 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
+                 std::find(reasons.begin(), reasons.end(), removed) != reasons.end()) continue;
+ 
+             const fs::path dependency = root / dependency_name;
+-            if (!filesystem::path_exists(dependency))
++            const auto status = filesystem::dependency_status(dependency);
++            if (!status.exists || status.error)
+                 reasons.push_back(removed);
+-            else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], dependency_name))
++            else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], dependency_name))
+                 reasons.push_back(reason);
+         }
+     }
+diff --git a/src/ProjectInfo.h b/src/ProjectInfo.h
+index 5dc1125..e2d2910 100644
+--- a/src/ProjectInfo.h
++++ b/src/ProjectInfo.h
+@@ -13,6 +13,7 @@
+ #include <unordered_set>
+ 
+ class WatchList;
++namespace filesystem { struct DependencyStatus; }
+ namespace json { class Document; }
+ namespace nift { class RuntimeValue; }
+ namespace content_model { struct Model; }
+@@ -147,7 +148,7 @@ private:
+     void rebuild_tracked_index() const;
+     bool is_tracked_output(const std::filesystem::path& path) const;
+     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
+-    bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime, const json::Document& snapshots, const std::string& name) const;
++    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
+     bool metadata_path_is_safe(const std::filesystem::path& path) const;
+     std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
+     void reset_build_caches();

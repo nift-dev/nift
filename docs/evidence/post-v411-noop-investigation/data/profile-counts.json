@@ -1,0 +1,373 @@
+[
+  {
+    "pattern": "operator new(",
+    "call_count": 12243057,
+    "self_instructions": 195888912,
+    "functions": [
+      {
+        "function": "operator new(unsigned long)",
+        "calls": 12243057,
+        "self_instructions": 195888912
+      }
+    ]
+  },
+  {
+    "pattern": "malloc",
+    "call_count": 12916078,
+    "self_instructions": 420715850,
+    "functions": [
+      {
+        "function": "__minimal_malloc",
+        "calls": 42,
+        "self_instructions": 866
+      },
+      {
+        "function": "__rtld_malloc_init_real",
+        "calls": 1,
+        "self_instructions": 44
+      },
+      {
+        "function": "__rtld_malloc_init_stubs",
+        "calls": 1,
+        "self_instructions": 10
+      },
+      {
+        "function": "lookup_malloc_symbol",
+        "calls": 4,
+        "self_instructions": 152
+      },
+      {
+        "function": "__malloc_arena_thread_freeres",
+        "calls": 8,
+        "self_instructions": 18378
+      },
+      {
+        "function": "__libc_malloc2",
+        "calls": 316428,
+        "self_instructions": 11024204
+      },
+      {
+        "function": "sysmalloc_mmap",
+        "calls": 2,
+        "self_instructions": 120
+      },
+      {
+        "function": "_int_malloc",
+        "calls": 316432,
+        "self_instructions": 44633206
+      },
+      {
+        "function": "malloc",
+        "calls": 12283159,
+        "self_instructions": 365038016
+      },
+      {
+        "function": "__ptmalloc_init",
+        "calls": 1,
+        "self_instructions": 854
+      }
+    ]
+  },
+  {
+    "pattern": "free",
+    "call_count": 13434918,
+    "self_instructions": 453934817,
+    "functions": [
+      {
+        "function": "__minimal_free",
+        "calls": 3,
+        "self_instructions": 15
+      },
+      {
+        "function": "__nptl_free_tcb",
+        "calls": 8,
+        "self_instructions": 72
+      },
+      {
+        "function": "__libc_thread_freeres",
+        "calls": 8,
+        "self_instructions": 72
+      },
+      {
+        "function": "__res_thread_freeres",
+        "calls": 8,
+        "self_instructions": 120
+      },
+      {
+        "function": "__glibc_tls_internal_free",
+        "calls": 8,
+        "self_instructions": 96
+      },
+      {
+        "function": "__libc_dlerror_result_free",
+        "calls": 8,
+        "self_instructions": 48
+      },
+      {
+        "function": "__malloc_arena_thread_freeres",
+        "calls": 8,
+        "self_instructions": 18378
+      },
+      {
+        "function": "__resolv_context_freeres",
+        "calls": 8,
+        "self_instructions": 176
+      },
+      {
+        "function": "_int_free_chunk",
+        "calls": 383618,
+        "self_instructions": 10487326
+      },
+      {
+        "function": "_int_free_merge_chunk",
+        "calls": 383989,
+        "self_instructions": 26939001
+      },
+      {
+        "function": "_int_free_maybe_trim",
+        "calls": 383989,
+        "self_instructions": 10529346
+      },
+      {
+        "function": "tcache_free_init",
+        "calls": 9,
+        "self_instructions": 1269
+      },
+      {
+        "function": "free'2",
+        "calls": 9,
+        "self_instructions": 297
+      },
+      {
+        "function": "free",
+        "calls": 12283245,
+        "self_instructions": 405958601
+      }
+    ]
+  },
+  {
+    "pattern": "lexically_normal",
+    "call_count": 580548,
+    "self_instructions": 102024608,
+    "functions": [
+      {
+        "function": "std::filesystem::__cxx11::path::lexically_normal() const",
+        "calls": 580548,
+        "self_instructions": 102024608
+      }
+    ]
+  },
+  {
+    "pattern": "lexically_relative",
+    "call_count": 190199,
+    "self_instructions": 77219842,
+    "functions": [
+      {
+        "function": "std::filesystem::__cxx11::path::lexically_relative(std::filesystem::__cxx11::path const&) const",
+        "calls": 190199,
+        "self_instructions": 77219842
+      }
+    ]
+  },
+  {
+    "pattern": "path::operator/=",
+    "call_count": 4534217,
+    "self_instructions": 490903316,
+    "functions": [
+      {
+        "function": "std::filesystem::__cxx11::path::operator/=(std::filesystem::__cxx11::path const&)",
+        "calls": 4534217,
+        "self_instructions": 490903316
+      }
+    ]
+  },
+  {
+    "pattern": "generic_string",
+    "call_count": 210197,
+    "self_instructions": 42079029,
+    "functions": [
+      {
+        "function": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::filesystem::__cxx11::path::generic_string<char, std::char_traits<char>, std::allocator<char> >(std::allocator<char> const&) const [clone .isra.0]",
+        "calls": 210197,
+        "self_instructions": 42079029
+      }
+    ]
+  },
+  {
+    "pattern": "parse_string",
+    "call_count": 560723,
+    "self_instructions": 169621679,
+    "functions": [
+      {
+        "function": "json::Document::Parser<false>::parse_string[abi:cxx11]()",
+        "calls": 430542,
+        "self_instructions": 143375066
+      },
+      {
+        "function": "json::Document::Parser<true>::parse_string[abi:cxx11]()",
+        "calls": 130181,
+        "self_instructions": 26246613
+      }
+    ]
+  },
+  {
+    "pattern": "_M_split_cmpts",
+    "call_count": 10249600,
+    "self_instructions": 393839600,
+    "functions": [
+      {
+        "function": "std::filesystem::__cxx11::path::_M_split_cmpts()",
+        "calls": 10249600,
+        "self_instructions": 393839600
+      }
+    ]
+  },
+  {
+    "pattern": "_Rb_tree",
+    "call_count": 410429,
+    "self_instructions": 14563166,
+    "functions": [
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >::_M_erase(std::_Rb_tree_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >*) [clone .isra.0]",
+        "calls": 30047,
+        "self_instructions": 360543
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::_Identity<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_erase(std::_Rb_tree_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >*) [clone .isra.0]",
+        "calls": 10018,
+        "self_instructions": 741852
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::_Identity<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_erase(std::_Rb_tree_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >*) [clone .isra.0]'2",
+        "calls": 70059,
+        "self_instructions": 864600
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::_Identity<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .isra.0]",
+        "calls": 10016,
+        "self_instructions": 200402
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >::_M_get_insert_hint_unique_pos(std::_Rb_tree_const_iterator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0]",
+        "calls": 10015,
+        "self_instructions": 220330
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >::_M_get_insert_unique_pos(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0]",
+        "calls": 10015,
+        "self_instructions": 240360
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .isra.0]",
+        "calls": 20030,
+        "self_instructions": 841260
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::_Identity<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_get_insert_unique_pos(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0]",
+        "calls": 70059,
+        "self_instructions": 6455940
+      },
+      {
+        "function": "std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >::_M_erase(std::_Rb_tree_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >*) [clone .isra.0]'2",
+        "calls": 10015,
+        "self_instructions": 30045
+      },
+      {
+        "function": "std::_Rb_tree_increment(std::_Rb_tree_node_base*)",
+        "calls": 90076,
+        "self_instructions": 1188267
+      },
+      {
+        "function": "std::_Rb_tree_insert_and_rebalance(bool, std::_Rb_tree_node_base*, std::_Rb_tree_node_base*, std::_Rb_tree_node_base&)",
+        "calls": 80074,
+        "self_instructions": 3419469
+      },
+      {
+        "function": "std::_Rb_tree_decrement(std::_Rb_tree_node_base*)",
+        "calls": 5,
+        "self_instructions": 98
+      }
+    ]
+  },
+  {
+    "pattern": "build_many",
+    "call_count": 10024,
+    "self_instructions": 5072757,
+    "functions": [
+      {
+        "function": "ProjectInfo::build_many(std::vector<ProjectInfo::BuildJob, std::allocator<ProjectInfo::BuildJob> > const&, bool, bool, unsigned long)",
+        "calls": 1,
+        "self_instructions": 3079940
+      },
+      {
+        "function": "ProjectInfo::build_many(std::vector<ProjectInfo::BuildJob, std::allocator<ProjectInfo::BuildJob> > const&, bool, bool, unsigned long)::{lambda(unsigned long)#1}::operator()(unsigned long) const",
+        "calls": 10015,
+        "self_instructions": 1241404
+      },
+      {
+        "function": "std::thread::_State_impl<std::thread::_Invoker<std::tuple<ProjectInfo::build_many(std::vector<ProjectInfo::BuildJob, std::allocator<ProjectInfo::BuildJob> > const&, bool, bool, unsigned long)::{lambda()#1}> > >::~_State_impl()",
+        "calls": 4,
+        "self_instructions": 40
+      },
+      {
+        "function": "std::thread::_State_impl<std::thread::_Invoker<std::tuple<ProjectInfo::build_many(std::vector<ProjectInfo::BuildJob, std::allocator<ProjectInfo::BuildJob> > const&, bool, bool, unsigned long)::{lambda()#1}> > >::_M_run()",
+        "calls": 4,
+        "self_instructions": 751373
+      }
+    ]
+  },
+  {
+    "pattern": "build_reasons",
+    "call_count": 10015,
+    "self_instructions": 20553031,
+    "functions": [
+      {
+        "function": "ProjectInfo::build_reasons[abi:cxx11](TrackedInfo const&) const",
+        "calls": 10015,
+        "self_instructions": 20553031
+      }
+    ]
+  },
+  {
+    "pattern": "load_tracking",
+    "call_count": 14485,
+    "self_instructions": 21848830,
+    "functions": [
+      {
+        "function": "ProjectInfo::load_tracking()",
+        "calls": 1,
+        "self_instructions": 30170
+      },
+      {
+        "function": "bool json::Document::for_each_array_item<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(json::Document&&)#1}>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(json::Document&&)#1}&&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, json::ParseOptions const&) [clone .constprop.0]",
+        "calls": 1,
+        "self_instructions": 9994254
+      },
+      {
+        "function": "void std::__introsort_loop<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}> >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}>) [clone .isra.0]",
+        "calls": 1,
+        "self_instructions": 150349
+      },
+      {
+        "function": "void std::__introsort_loop<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}> >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}>) [clone .isra.0]'2",
+        "calls": 26,
+        "self_instructions": 3857551
+      },
+      {
+        "function": "void std::__adjust_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}> >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, long, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}>) [clone .isra.0]",
+        "calls": 14454,
+        "self_instructions": 4089251
+      },
+      {
+        "function": "project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)",
+        "calls": 1,
+        "self_instructions": 3725420
+      },
+      {
+        "function": "void std::__insertion_sort<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}> >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const**, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*> > >, __gnu_cxx::__ops::_Iter_comp_iter<project_read::load_tracking(std::filesystem::__cxx11::path const&, Config const&, std::vector<TrackedInfo, std::allocator<TrackedInfo> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const*)#1}>) [clone .isra.0]",
+        "calls": 1,
+        "self_instructions": 1835
+      }
+    ]
+  }
+]

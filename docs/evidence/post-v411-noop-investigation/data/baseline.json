@@ -1,0 +1,950 @@
+[
+  {
+    "size": 100,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 1.9043099600821733,
+    "min_ms": 1.7369179986417294,
+    "max_ms": 2.574348822236061,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 102,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 3.328555030748248,
+        "cpu_ms": 2.881999999999999
+      },
+      {
+        "warmup": true,
+        "wall_ms": 2.6851478032767773,
+        "cpu_ms": 2.416000000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.574348822236061,
+        "cpu_ms": 2.3279999999999985
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.1926360204815865,
+        "cpu_ms": 2.027000000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.0138679537922144,
+        "cpu_ms": 1.842999999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.9517969340085983,
+        "cpu_ms": 1.7900000000000016
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.8061487935483456,
+        "cpu_ms": 1.6810000000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.7522869165986776,
+        "cpu_ms": 1.6359999999999986
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.7369179986417294,
+        "cpu_ms": 1.627
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.8760289531201124,
+        "cpu_ms": 1.7469999999999986
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.9325909670442343,
+        "cpu_ms": 1.7760000000000016
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.8118361476808786,
+        "cpu_ms": 1.6819999999999995
+      }
+    ]
+  },
+  {
+    "size": 100,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 1.6875270521268249,
+    "min_ms": 1.518273027613759,
+    "max_ms": 2.0073179621249437,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 102,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 2.4786239955574274,
+        "cpu_ms": 2.294000000000001
+      },
+      {
+        "warmup": true,
+        "wall_ms": 2.091028029099107,
+        "cpu_ms": 1.9289999999999967
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.6834840644150972,
+        "cpu_ms": 1.5650000000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5369730535894632,
+        "cpu_ms": 1.4289999999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.518273027613759,
+        "cpu_ms": 1.4139999999999986
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5846260357648134,
+        "cpu_ms": 1.465000000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.537027070298791,
+        "cpu_ms": 1.4279999999999986
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.6915700398385525,
+        "cpu_ms": 1.5510000000000037
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.8336228094995022,
+        "cpu_ms": 1.5930000000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.0073179621249437,
+        "cpu_ms": 1.7350000000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.7902518156915903,
+        "cpu_ms": 1.6169999999999969
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.7377790063619614,
+        "cpu_ms": 1.5849999999999995
+      }
+    ]
+  },
+  {
+    "size": 100,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 9.113990585319698,
+    "min_ms": 8.294248022139072,
+    "max_ms": 9.76032204926014,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 102,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 7.785615976899862,
+        "cpu_ms": 20.835000000000004
+      },
+      {
+        "warmup": true,
+        "wall_ms": 8.184074889868498,
+        "cpu_ms": 21.511999999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.143635164946318,
+        "cpu_ms": 23.4
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.148974902927876,
+        "cpu_ms": 23.096000000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.843155112117529,
+        "cpu_ms": 22.73599999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.76032204926014,
+        "cpu_ms": 23.661
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.187523974105716,
+        "cpu_ms": 23.648000000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.167350828647614,
+        "cpu_ms": 23.680999999999965
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.720962097868323,
+        "cpu_ms": 22.92399999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.914669044315815,
+        "cpu_ms": 23.473999999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.084346005693078,
+        "cpu_ms": 22.712999999999955
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.294248022139072,
+        "cpu_ms": 21.64399999999997
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 19.224656629376113,
+    "min_ms": 18.318943912163377,
+    "max_ms": 22.51787716522813,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 1002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 19.30673304013908,
+        "cpu_ms": 18.927000000000028
+      },
+      {
+        "warmup": true,
+        "wall_ms": 20.36221604794264,
+        "cpu_ms": 20.012
+      },
+      {
+        "warmup": false,
+        "wall_ms": 19.301837077364326,
+        "cpu_ms": 18.875000000000032
+      },
+      {
+        "warmup": false,
+        "wall_ms": 22.51787716522813,
+        "cpu_ms": 22.134999999999987
+      },
+      {
+        "warmup": false,
+        "wall_ms": 21.62300911732018,
+        "cpu_ms": 21.094
+      },
+      {
+        "warmup": false,
+        "wall_ms": 20.259100943803787,
+        "cpu_ms": 19.847000000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 18.613734981045127,
+        "cpu_ms": 18.30400000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 19.1474761813879,
+        "cpu_ms": 18.729000000000024
+      },
+      {
+        "warmup": false,
+        "wall_ms": 18.399982014670968,
+        "cpu_ms": 18.069000000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 18.318943912163377,
+        "cpu_ms": 17.96100000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 19.116084091365337,
+        "cpu_ms": 18.66400000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 19.889403833076358,
+        "cpu_ms": 19.429999999999946
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 9.092562599107623,
+    "min_ms": 8.58778995461762,
+    "max_ms": 10.058911051601171,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 1002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 10.067225899547338,
+        "cpu_ms": 9.64399999999993
+      },
+      {
+        "warmup": true,
+        "wall_ms": 9.963630000129342,
+        "cpu_ms": 9.529000000000066
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.58778995461762,
+        "cpu_ms": 8.249999999999924
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.92045202292502,
+        "cpu_ms": 9.510000000000074
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.058911051601171,
+        "cpu_ms": 9.612999999999927
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.974038995802402,
+        "cpu_ms": 8.602000000000054
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.984377840533853,
+        "cpu_ms": 8.618999999999932
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.604668011888862,
+        "cpu_ms": 9.110000000000063
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.186224080622196,
+        "cpu_ms": 8.784000000000013
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.99890111759305,
+        "cpu_ms": 8.657999999999944
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.937239879742265,
+        "cpu_ms": 8.525000000000116
+      },
+      {
+        "warmup": false,
+        "wall_ms": 9.278129087761045,
+        "cpu_ms": 8.783999999999958
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 61.07698054984212,
+    "min_ms": 59.48208901099861,
+    "max_ms": 62.68923217430711,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 1002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 63.15529998391867,
+        "cpu_ms": 207.28499999999994
+      },
+      {
+        "warmup": true,
+        "wall_ms": 62.49342090450227,
+        "cpu_ms": 204.17999999999992
+      },
+      {
+        "warmup": false,
+        "wall_ms": 62.541038962081075,
+        "cpu_ms": 204.63999999999993
+      },
+      {
+        "warmup": false,
+        "wall_ms": 60.82790601067245,
+        "cpu_ms": 200.57100000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 61.32605508901179,
+        "cpu_ms": 200.47300000000013
+      },
+      {
+        "warmup": false,
+        "wall_ms": 60.00061798840761,
+        "cpu_ms": 196.26200000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 59.48208901099861,
+        "cpu_ms": 194.24300000000017
+      },
+      {
+        "warmup": false,
+        "wall_ms": 60.27116090990603,
+        "cpu_ms": 197.4070000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 62.68181302584708,
+        "cpu_ms": 205.40000000000026
+      },
+      {
+        "warmup": false,
+        "wall_ms": 60.5135231744498,
+        "cpu_ms": 197.70799999999977
+      },
+      {
+        "warmup": false,
+        "wall_ms": 61.40493298880756,
+        "cpu_ms": 201.30099999999973
+      },
+      {
+        "warmup": false,
+        "wall_ms": 62.68923217430711,
+        "cpu_ms": 203.75199999999992
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 128.3437319798395,
+    "min_ms": 124.1670351009816,
+    "max_ms": 135.2483071386814,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 5002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 124.87168703228235,
+        "cpu_ms": 124.41199999999996
+      },
+      {
+        "warmup": true,
+        "wall_ms": 127.77431611903012,
+        "cpu_ms": 127.3059999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 132.18153803609312,
+        "cpu_ms": 131.6710000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 127.41278717294335,
+        "cpu_ms": 126.81999999999994
+      },
+      {
+        "warmup": false,
+        "wall_ms": 125.82996115088463,
+        "cpu_ms": 125.42600000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 128.1396800186485,
+        "cpu_ms": 127.64800000000021
+      },
+      {
+        "warmup": false,
+        "wall_ms": 130.40519901551306,
+        "cpu_ms": 129.99799999999962
+      },
+      {
+        "warmup": false,
+        "wall_ms": 128.5477839410305,
+        "cpu_ms": 128.1830000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 129.70319809392095,
+        "cpu_ms": 129.28000000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 127.58179614320397,
+        "cpu_ms": 127.09899999999985
+      },
+      {
+        "warmup": false,
+        "wall_ms": 124.1670351009816,
+        "cpu_ms": 123.59999999999971
+      },
+      {
+        "warmup": false,
+        "wall_ms": 135.2483071386814,
+        "cpu_ms": 134.8200000000004
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 46.31682997569442,
+    "min_ms": 44.32791890576482,
+    "max_ms": 58.75718896277249,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 5002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 62.293484807014465,
+        "cpu_ms": 61.85599999999991
+      },
+      {
+        "warmup": true,
+        "wall_ms": 62.72454280406237,
+        "cpu_ms": 62.2309999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 58.75718896277249,
+        "cpu_ms": 58.14500000000034
+      },
+      {
+        "warmup": false,
+        "wall_ms": 50.275302957743406,
+        "cpu_ms": 49.52800000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 49.09737012349069,
+        "cpu_ms": 48.60699999999962
+      },
+      {
+        "warmup": false,
+        "wall_ms": 49.86171214841306,
+        "cpu_ms": 49.29400000000017
+      },
+      {
+        "warmup": false,
+        "wall_ms": 46.56247003003955,
+        "cpu_ms": 46.1039999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 45.35074392333627,
+        "cpu_ms": 44.813000000000436
+      },
+      {
+        "warmup": false,
+        "wall_ms": 45.17796682193875,
+        "cpu_ms": 44.71399999999947
+      },
+      {
+        "warmup": false,
+        "wall_ms": 45.879754004999995,
+        "cpu_ms": 45.48900000000033
+      },
+      {
+        "warmup": false,
+        "wall_ms": 46.07118992134929,
+        "cpu_ms": 45.59200000000008
+      },
+      {
+        "warmup": false,
+        "wall_ms": 44.32791890576482,
+        "cpu_ms": 43.92200000000024
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 298.024756484665,
+    "min_ms": 291.57857596874237,
+    "max_ms": 333.34253495559096,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 5002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 288.90668880194426,
+        "cpu_ms": 982.6799999999997
+      },
+      {
+        "warmup": true,
+        "wall_ms": 296.09771305695176,
+        "cpu_ms": 1005.214
+      },
+      {
+        "warmup": false,
+        "wall_ms": 293.97294111549854,
+        "cpu_ms": 997.2590000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 291.57857596874237,
+        "cpu_ms": 991.4290000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 297.4205301143229,
+        "cpu_ms": 1012.0290000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 297.66908613964915,
+        "cpu_ms": 1011.2989999999993
+      },
+      {
+        "warmup": false,
+        "wall_ms": 298.3804268296808,
+        "cpu_ms": 1013.5150000000017
+      },
+      {
+        "warmup": false,
+        "wall_ms": 294.3310188129544,
+        "cpu_ms": 999.3039999999995
+      },
+      {
+        "warmup": false,
+        "wall_ms": 299.2793859448284,
+        "cpu_ms": 1014.074
+      },
+      {
+        "warmup": false,
+        "wall_ms": 306.3804639969021,
+        "cpu_ms": 1037.631000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 306.66919611394405,
+        "cpu_ms": 1042.7539999999995
+      },
+      {
+        "warmup": false,
+        "wall_ms": 333.34253495559096,
+        "cpu_ms": 1111.3609999999987
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 334.14146106224507,
+    "min_ms": 315.6453459523618,
+    "max_ms": 372.3991708829999,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 10002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 354.84438692219555,
+        "cpu_ms": 354.2330000000007
+      },
+      {
+        "warmup": true,
+        "wall_ms": 361.142965964973,
+        "cpu_ms": 360.30899999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 347.909240052104,
+        "cpu_ms": 346.8080000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 339.6902550011873,
+        "cpu_ms": 338.8939999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 328.5926671233028,
+        "cpu_ms": 328.12600000000015
+      },
+      {
+        "warmup": false,
+        "wall_ms": 321.72385114245117,
+        "cpu_ms": 321.14100000000167
+      },
+      {
+        "warmup": false,
+        "wall_ms": 342.84702804870903,
+        "cpu_ms": 342.25699999999824
+      },
+      {
+        "warmup": false,
+        "wall_ms": 372.3991708829999,
+        "cpu_ms": 371.74000000000086
+      },
+      {
+        "warmup": false,
+        "wall_ms": 346.90125309862196,
+        "cpu_ms": 346.2010000000024
+      },
+      {
+        "warmup": false,
+        "wall_ms": 315.6453459523618,
+        "cpu_ms": 315.10699999999935
+      },
+      {
+        "warmup": false,
+        "wall_ms": 324.893054086715,
+        "cpu_ms": 324.3459999999967
+      },
+      {
+        "warmup": false,
+        "wall_ms": 323.54860194027424,
+        "cpu_ms": 322.8840000000002
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 99.18344567995518,
+    "min_ms": 97.98385505564511,
+    "max_ms": 109.39062689431012,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 10002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 102.21429681405425,
+        "cpu_ms": 101.78400000000387
+      },
+      {
+        "warmup": true,
+        "wall_ms": 98.37653185240924,
+        "cpu_ms": 97.99599999999664
+      },
+      {
+        "warmup": false,
+        "wall_ms": 99.35349319130182,
+        "cpu_ms": 98.93700000000116
+      },
+      {
+        "warmup": false,
+        "wall_ms": 98.72466092929244,
+        "cpu_ms": 98.35399999999694
+      },
+      {
+        "warmup": false,
+        "wall_ms": 99.01339816860855,
+        "cpu_ms": 98.5830000000032
+      },
+      {
+        "warmup": false,
+        "wall_ms": 99.41573115065694,
+        "cpu_ms": 98.91899999999687
+      },
+      {
+        "warmup": false,
+        "wall_ms": 97.98385505564511,
+        "cpu_ms": 97.60600000000075
+      },
+      {
+        "warmup": false,
+        "wall_ms": 100.08525499142706,
+        "cpu_ms": 99.67400000000026
+      },
+      {
+        "warmup": false,
+        "wall_ms": 109.39062689431012,
+        "cpu_ms": 108.99499999999662
+      },
+      {
+        "warmup": false,
+        "wall_ms": 98.21273316629231,
+        "cpu_ms": 97.85899999999792
+      },
+      {
+        "warmup": false,
+        "wall_ms": 98.18472294136882,
+        "cpu_ms": 97.77200000000086
+      },
+      {
+        "warmup": false,
+        "wall_ms": 100.46667186543345,
+        "cpu_ms": 100.08500000000353
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "encoding": "accepted frozen suite2467101 shared rules and no extra Make/Ninja recipes",
+    "median_ms": 603.0846700305119,
+    "min_ms": 593.1305750273168,
+    "max_ms": 648.8494859077036,
+    "zero_actions": true,
+    "compiler_include_audit": {
+      "objects_checked": 10002,
+      "all_include_closures_match": true
+    },
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 643.8023471273482,
+        "cpu_ms": 1988.1019999999996
+      },
+      {
+        "warmup": true,
+        "wall_ms": 592.8035159595311,
+        "cpu_ms": 2019.622000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 593.5633708722889,
+        "cpu_ms": 2015.5650000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 593.1305750273168,
+        "cpu_ms": 2015.6770000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 596.3633109349757,
+        "cpu_ms": 2030.7439999999967
+      },
+      {
+        "warmup": false,
+        "wall_ms": 603.7059940863401,
+        "cpu_ms": 2059.6320000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 645.1211429666728,
+        "cpu_ms": 2178.686999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 648.8494859077036,
+        "cpu_ms": 2054.401000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 602.4633459746838,
+        "cpu_ms": 2050.036999999996
+      },
+      {
+        "warmup": false,
+        "wall_ms": 605.7438729330897,
+        "cpu_ms": 2065.079999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 604.339764919132,
+        "cpu_ms": 2055.1709999999944
+      },
+      {
+        "warmup": false,
+        "wall_ms": 601.378089049831,
+        "cpu_ms": 2047.4850000000054
+      }
+    ]
+  }
+]

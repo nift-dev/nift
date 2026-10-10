@@ -1,0 +1,34 @@
+{
+  "other/unresolved": {
+    "self_instructions": 1477598855,
+    "percent_of_total": 22.079281544379555
+  },
+  "filesystem path objects": {
+    "self_instructions": 2172607086,
+    "percent_of_total": 32.464564637949756
+  },
+  "allocation/destruction excluding path destructors": {
+    "self_instructions": 1116154815,
+    "percent_of_total": 16.678340216702374
+  },
+  "strings/copies excluding path objects": {
+    "self_instructions": 1494006666,
+    "percent_of_total": 22.324458154641594
+  },
+  "JSON parser/document": {
+    "self_instructions": 332981327,
+    "percent_of_total": 4.975632217753792
+  },
+  "filesystem/stream user code (not kernel)": {
+    "self_instructions": 19482111,
+    "percent_of_total": 0.291114880329177
+  },
+  "associative containers/hash functions": {
+    "self_instructions": 4607736,
+    "percent_of_total": 0.06885190800054679
+  },
+  "locking/thread runtime": {
+    "self_instructions": 8709679,
+    "percent_of_total": 0.13014591487496122
+  }
+}

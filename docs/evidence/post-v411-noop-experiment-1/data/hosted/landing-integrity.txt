@@ -1,0 +1,2 @@
+test-integrity clean: 318 files scanned, 0 findings
+report=/tmp/nift-status-experiment/landing-integrity.json

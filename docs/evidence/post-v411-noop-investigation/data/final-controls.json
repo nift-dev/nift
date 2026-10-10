@@ -1,0 +1,50 @@
+[
+  {
+    "fixture": "fixture-100-make",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 115
+  },
+  {
+    "fixture": "fixture-100-nift",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 115
+  },
+  {
+    "fixture": "fixture-100-ninja",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 115
+  },
+  {
+    "fixture": "fixture-1000-nift",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 1015
+  },
+  {
+    "fixture": "fixture-10000-make",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 10015
+  },
+  {
+    "fixture": "fixture-10000-nift",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 10015
+  },
+  {
+    "fixture": "fixture-10000-ninja",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 10015
+  },
+  {
+    "fixture": "fixture-5000-nift",
+    "zero_actions": true,
+    "output_hash_map_unchanged": true,
+    "outputs_verified": 5015
+  }
+]

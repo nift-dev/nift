@@ -1,0 +1,353 @@
+{
+  "topology": {
+    "actions": 10015,
+    "completion_edges": 20015,
+    "declared_input_occurrences": 60031,
+    "unique_declared_inputs": 30039
+  },
+  "state_files": {
+    ".nift/tracked.json": {
+      "files": 1,
+      "bytes": 2373266
+    },
+    ".nift/config.json": {
+      "files": 1,
+      "bytes": 243
+    },
+    "**/*.info.json": {
+      "files": 10015,
+      "bytes": 8070235
+    },
+    "**/*.deps.json": {
+      "files": 10015,
+      "bytes": 2121273
+    },
+    ".nift/**/*.hash": {
+      "files": 0,
+      "bytes": 0
+    }
+  },
+  "syscalls-100-nift": {
+    "newfstatat": 7966,
+    "futex": 74,
+    "lseek": 696,
+    "openat": 477,
+    "close": 477,
+    "read": 238,
+    "readlink": 125,
+    "clone3": 8,
+    "rt_sigprocmask": 33,
+    "mmap": 31,
+    "madvise": 12,
+    "mprotect": 10,
+    "munmap": 6,
+    "rseq": 9,
+    "set_robust_list": 9,
+    "fstat": 12,
+    "unlink": 1,
+    "ioctl": 4,
+    "brk": 4,
+    "getdents64": 8,
+    "getcwd": 1,
+    "pread64": 2,
+    "write": 1,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "arch_prctl": 1,
+    "set_tid_address": 1,
+    "rt_sigaction": 1,
+    "access": 1,
+    "execve": 1,
+    "flock": 3,
+    "fsync": 2,
+    "total": 10216
+  },
+  "syscalls-1000-nift": {
+    "newfstatat": 73666,
+    "futex": 120,
+    "lseek": 6096,
+    "openat": 4077,
+    "close": 4077,
+    "read": 2038,
+    "readlink": 125,
+    "getdents64": 10,
+    "execve": 1,
+    "mmap": 33,
+    "clone3": 8,
+    "madvise": 12,
+    "munmap": 7,
+    "rt_sigprocmask": 33,
+    "set_robust_list": 9,
+    "mprotect": 10,
+    "brk": 8,
+    "rseq": 9,
+    "fstat": 12,
+    "unlink": 1,
+    "flock": 3,
+    "ioctl": 4,
+    "pread64": 2,
+    "access": 1,
+    "fsync": 2,
+    "getcwd": 1,
+    "rt_sigaction": 1,
+    "set_tid_address": 1,
+    "write": 1,
+    "arch_prctl": 1,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "total": 90371
+  },
+  "syscalls-5000-nift": {
+    "newfstatat": 365666,
+    "futex": 178,
+    "lseek": 30096,
+    "openat": 20077,
+    "close": 20077,
+    "read": 10038,
+    "getdents64": 18,
+    "mprotect": 24,
+    "readlink": 125,
+    "clone3": 8,
+    "rt_sigprocmask": 33,
+    "munmap": 10,
+    "madvise": 12,
+    "mmap": 33,
+    "brk": 26,
+    "rseq": 9,
+    "set_robust_list": 9,
+    "fstat": 12,
+    "unlink": 1,
+    "ioctl": 4,
+    "getcwd": 1,
+    "pread64": 2,
+    "write": 1,
+    "arch_prctl": 1,
+    "set_tid_address": 1,
+    "fsync": 2,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "rt_sigaction": 1,
+    "flock": 3,
+    "access": 1,
+    "execve": 1,
+    "total": 446472
+  },
+  "syscalls-10000-nift": {
+    "newfstatat": 730666,
+    "futex": 565,
+    "lseek": 60096,
+    "openat": 40077,
+    "close": 40077,
+    "read": 20038,
+    "getdents64": 29,
+    "readlink": 125,
+    "mprotect": 31,
+    "execve": 1,
+    "rt_sigprocmask": 33,
+    "mmap": 33,
+    "clone3": 8,
+    "munmap": 7,
+    "madvise": 12,
+    "rseq": 9,
+    "brk": 58,
+    "fstat": 12,
+    "set_robust_list": 9,
+    "unlink": 1,
+    "getcwd": 1,
+    "access": 1,
+    "getrandom": 1,
+    "pread64": 2,
+    "arch_prctl": 1,
+    "set_tid_address": 1,
+    "prlimit64": 1,
+    "flock": 3,
+    "ioctl": 4,
+    "rt_sigaction": 1,
+    "write": 1,
+    "fsync": 2,
+    "total": 891906
+  },
+  "syscalls-100-ninja": {
+    "newfstatat": 341,
+    "mmap": 22,
+    "mprotect": 6,
+    "openat": 8,
+    "read": 15,
+    "munmap": 1,
+    "fstat": 10,
+    "close": 8,
+    "brk": 4,
+    "set_robust_list": 1,
+    "access": 1,
+    "futex": 1,
+    "ioctl": 2,
+    "pread64": 2,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "write": 1,
+    "arch_prctl": 1,
+    "rseq": 1,
+    "lseek": 1,
+    "set_tid_address": 1,
+    "execve": 1,
+    "total": 430
+  },
+  "syscalls-1000-ninja": {
+    "newfstatat": 3041,
+    "read": 50,
+    "munmap": 2,
+    "brk": 16,
+    "mprotect": 6,
+    "openat": 8,
+    "fstat": 10,
+    "mmap": 23,
+    "ioctl": 2,
+    "close": 8,
+    "prlimit64": 1,
+    "futex": 1,
+    "getrandom": 1,
+    "write": 1,
+    "lseek": 1,
+    "pread64": 2,
+    "access": 1,
+    "execve": 1,
+    "arch_prctl": 1,
+    "set_tid_address": 1,
+    "set_robust_list": 1,
+    "rseq": 1,
+    "total": 3179
+  },
+  "syscalls-5000-ninja": {
+    "newfstatat": 15041,
+    "read": 207,
+    "brk": 65,
+    "mmap": 26,
+    "mprotect": 6,
+    "munmap": 4,
+    "close": 8,
+    "fstat": 10,
+    "openat": 8,
+    "ioctl": 2,
+    "futex": 1,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "write": 1,
+    "arch_prctl": 1,
+    "set_tid_address": 1,
+    "rseq": 1,
+    "set_robust_list": 1,
+    "lseek": 1,
+    "pread64": 2,
+    "access": 1,
+    "execve": 1,
+    "total": 15390
+  },
+  "syscalls-10000-ninja": {
+    "newfstatat": 30041,
+    "read": 403,
+    "execve": 1,
+    "mmap": 27,
+    "brk": 121,
+    "munmap": 5,
+    "openat": 8,
+    "mprotect": 6,
+    "fstat": 10,
+    "close": 8,
+    "ioctl": 2,
+    "access": 1,
+    "write": 1,
+    "pread64": 2,
+    "prlimit64": 1,
+    "getrandom": 1,
+    "arch_prctl": 1,
+    "futex": 1,
+    "set_tid_address": 1,
+    "set_robust_list": 1,
+    "rseq": 1,
+    "lseek": 1,
+    "total": 30644
+  },
+  "targeted100_stat_top": [
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/build/gen/config.h",
+      817
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/global.h",
+      800
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module01.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module00.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module02.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module03.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module04.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module05.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module06.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module07.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module08.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/include/module09.h",
+      80
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift",
+      16
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/inputs/spec.json",
+      16
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/tools/generate-input.py",
+      16
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/recipes/gen/config.deps.json",
+      11
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/recipes/gen/generated.deps.json",
+      11
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/recipes/obj/u000001.deps.json",
+      11
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/recipes/obj/u000000.deps.json",
+      11
+    ],
+    [
+      "/tmp/nift-noop-investigation/fixture-100-nift/recipes/obj/u000003.deps.json",
+      11
+    ]
+  ],
+  "targeted100_unique_named_stat_paths": 822
+}

@@ -1,0 +1,8 @@
+{
+  "all_passed": true,
+  "observations": 9348,
+  "rotation_order_verified": true,
+  "independent_inclusive_percentiles_verified": true,
+  "original_audit_sha256": "587d681060b27ca9153ca6dacbfbfe37059e505fb8b4d779614fa48661dd4fc6",
+  "original_observations_sha256": "bbe87a57f5067581a431f431fd3c249a0395de602ff36cc8a3484f0b826d6591"
+}

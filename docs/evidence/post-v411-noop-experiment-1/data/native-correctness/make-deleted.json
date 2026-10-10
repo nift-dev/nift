@@ -1,0 +1,17 @@
+{
+  "system": "make",
+  "scenario": "deleted",
+  "command": [
+    "make",
+    "-j4"
+  ],
+  "elapsed_ms": 3.45681,
+  "exit_code": 2,
+  "expected_actions": [],
+  "executed_actions": [],
+  "action_ok": true,
+  "stdout_oracle": "6607\n",
+  "executable_stdout": null,
+  "output_sha256": {},
+  "passed": true
+}

@@ -1,0 +1,570 @@
+[
+  {
+    "size": 100,
+    "scenario": "leaf",
+    "samples": [
+      {
+        "wall_ms": 279.1993368882686,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 82.33510097488761,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 92.63459802605212,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 92.63459802605212,
+    "sample_count": 3
+  },
+  {
+    "size": 100,
+    "scenario": "private",
+    "samples": [
+      {
+        "wall_ms": 103.60527597367764,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 111.10312887467444,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 114.47580996900797,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 111.10312887467444,
+    "sample_count": 3
+  },
+  {
+    "size": 100,
+    "scenario": "medium",
+    "samples": [
+      {
+        "wall_ms": 183.13200888223946,
+        "action_count": 12,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 154.27299193106592,
+        "action_count": 12,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 151.2018379289657,
+        "action_count": 12,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 154.27299193106592,
+    "sample_count": 3
+  },
+  {
+    "size": 100,
+    "scenario": "global",
+    "samples": [
+      {
+        "wall_ms": 958.9402119163424,
+        "action_count": 111,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 768.857009941712,
+        "action_count": 111,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 852.0616968162358,
+        "action_count": 111,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 102,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 852.0616968162358,
+    "sample_count": 3
+  },
+  {
+    "size": 1000,
+    "scenario": "leaf",
+    "samples": [
+      {
+        "wall_ms": 360.0394770037383,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 340.18585504963994,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 331.1733149457723,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 340.18585504963994,
+    "sample_count": 3
+  },
+  {
+    "size": 1000,
+    "scenario": "private",
+    "samples": [
+      {
+        "wall_ms": 281.8492138758302,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 300.0307048205286,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 291.0592290572822,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 291.0592290572822,
+    "sample_count": 3
+  },
+  {
+    "size": 1000,
+    "scenario": "medium",
+    "samples": [
+      {
+        "wall_ms": 926.4931490179151,
+        "action_count": 102,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 939.9575639981776,
+        "action_count": 102,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 941.1143488250673,
+        "action_count": 102,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 939.9575639981776,
+    "sample_count": 3
+  },
+  {
+    "size": 1000,
+    "scenario": "global",
+    "samples": [
+      {
+        "wall_ms": 6917.502679862082,
+        "action_count": 1011,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 6271.479530958459,
+        "action_count": 1011,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 6271.859685890377,
+        "action_count": 1011,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 1002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 6271.859685890377,
+    "sample_count": 3
+  },
+  {
+    "size": 5000,
+    "scenario": "leaf",
+    "samples": [
+      {
+        "wall_ms": 1021.8827358912677,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 972.0978948753327,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 1050.291595980525,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 1021.8827358912677,
+    "sample_count": 3
+  },
+  {
+    "size": 5000,
+    "scenario": "private",
+    "samples": [
+      {
+        "wall_ms": 949.3408729322255,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 976.6619079746306,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 951.5454478096217,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 951.5454478096217,
+    "sample_count": 3
+  },
+  {
+    "size": 5000,
+    "scenario": "medium",
+    "samples": [
+      {
+        "wall_ms": 3870.9316791500896,
+        "action_count": 502,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 3928.8842589594424,
+        "action_count": 502,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 3923.79192286171,
+        "action_count": 502,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 3923.79192286171,
+    "sample_count": 3
+  },
+  {
+    "size": 5000,
+    "scenario": "global",
+    "samples": [
+      {
+        "wall_ms": 31327.911894069985,
+        "action_count": 5011,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 5002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 31327.911894069985,
+    "sample_count": 1
+  },
+  {
+    "size": 10000,
+    "scenario": "leaf",
+    "samples": [
+      {
+        "wall_ms": 2187.666203128174,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 2757.5609399937093,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 1954.8225780017674,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 2187.666203128174,
+    "sample_count": 3
+  },
+  {
+    "size": 10000,
+    "scenario": "private",
+    "samples": [
+      {
+        "wall_ms": 1883.0792198423296,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 1848.6347969155759,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 1849.5452620554715,
+        "action_count": 3,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 1849.5452620554715,
+    "sample_count": 3
+  },
+  {
+    "size": 10000,
+    "scenario": "medium",
+    "samples": [
+      {
+        "wall_ms": 7606.436310801655,
+        "action_count": 1002,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 7583.025658968836,
+        "action_count": 1002,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      },
+      {
+        "wall_ms": 7610.218494897708,
+        "action_count": 1002,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 7606.436310801655,
+    "sample_count": 3
+  },
+  {
+    "size": 10000,
+    "scenario": "global",
+    "samples": [
+      {
+        "wall_ms": 60298.06909291074,
+        "action_count": 10011,
+        "action_oracle": true,
+        "stdout_oracle": true,
+        "include_audit": {
+          "objects_checked": 10002,
+          "all_include_closures_match": true
+        }
+      }
+    ],
+    "median_ms": 60298.06909291074,
+    "sample_count": 1
+  }
+]

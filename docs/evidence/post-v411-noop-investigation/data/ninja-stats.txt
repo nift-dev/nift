@@ -1,0 +1,8 @@
+ninja: no work to do.
+metric          	count 	avg (us) 	total (ms)
+.ninja parse    	1     	28949.0 	28.9
+.ninja_log load 	1     	2794.0  	2.8
+.ninja_deps load	1     	6251.0  	6.3
+node stat       	30041 	1.2     	36.1
+
+path->node hash load 0.46 (30040 entries / 65536 buckets)

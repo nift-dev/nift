@@ -1,0 +1,8 @@
+{
+  "strace": "strace -- version 6.19",
+  "valgrind": "valgrind-3.26.0",
+  "perf": "perf version 7.0.14",
+  "g++": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "make": "GNU Make 4.4.1",
+  "ar": "GNU ar (GNU Binutils for Ubuntu) 2.46"
+}

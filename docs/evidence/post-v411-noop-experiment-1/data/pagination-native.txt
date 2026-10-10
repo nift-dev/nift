@@ -1,0 +1,1 @@
+Pagination ordering smoke test passed (output 1 < cleanup 3 < info 5)

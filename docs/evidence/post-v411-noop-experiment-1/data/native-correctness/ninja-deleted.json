@@ -1,0 +1,17 @@
+{
+  "system": "ninja",
+  "scenario": "deleted",
+  "command": [
+    "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+    "-j4"
+  ],
+  "elapsed_ms": 4.48181,
+  "exit_code": 1,
+  "expected_actions": [],
+  "executed_actions": [],
+  "action_ok": true,
+  "stdout_oracle": "6607\n",
+  "executable_stdout": null,
+  "output_sha256": {},
+  "passed": true
+}

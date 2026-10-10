@@ -1,0 +1,15 @@
+{
+  "recorded_utc": "2026-10-10T15:12:10.713254+00:00",
+  "uname": "Linux nick-NUC12SNKi72 7.0.0-29-generic #29-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 17 20:52:35 UTC 2026 x86_64 GNU/Linux",
+  "compiler": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "filesystem": "Filesystem     Type  1K-blocks     Used Available Use% Mounted on\ntmpfs          tmpfs  32044064 17751532  14292532  56% /tmp\n",
+  "baseline_sha256": "c0357ab201589cba256741e1964c39ede78c06b50a3f7e158c1d4a944d8bdfdd",
+  "candidate_sha256": "2ac04a913b293775406c95352047c8729d8de7a8e41b9eefa35d7f12ba3db046",
+  "affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "jobs": 4
+}

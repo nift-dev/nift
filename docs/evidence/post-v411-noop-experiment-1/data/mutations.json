@@ -1,0 +1,111 @@
+{
+  "passed": true,
+  "mutants": 9,
+  "caught": 9,
+  "missed": 0,
+  "results": [
+    {
+      "name": "content-invalidation",
+      "family": "incremental",
+      "operations": [
+        "content"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['content']: AssertionError: {'missing': [], 'extra': [], 'changed': ['b.html', 'a.html', 'c.html']}; retention_error=None"
+    },
+    {
+      "name": "template-invalidation",
+      "family": "incremental",
+      "operations": [
+        "template"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['template']: AssertionError: {'missing': [], 'extra': [], 'changed': ['b.html', 'move/y.html', 'c.html', 'a.html', 'move/x.html']}; retention_error=None"
+    },
+    {
+      "name": "generated-file-edge",
+      "family": "incremental",
+      "operations": [
+        "generated"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['generated']: AssertionError: {'missing': [], 'extra': [], 'changed': ['c.html', 'b.html']}; retention_error=None"
+    },
+    {
+      "name": "metadata-refresh",
+      "family": "incremental",
+      "operations": [
+        "tracking"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['tracking']: AssertionError: public metadata mismatch a.info.json:title; retention_error=None"
+    },
+    {
+      "name": "output-deletion",
+      "family": "incremental",
+      "operations": [
+        "add",
+        "remove"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=1 history=['add', 'remove']: AssertionError: {'missing': [], 'extra': ['extra/p0.html'], 'changed': []}; retention_error=None"
+    },
+    {
+      "name": "rename-deletion",
+      "family": "incremental",
+      "operations": [
+        "rename"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['rename']: AssertionError: {'missing': [], 'extra': ['move/x.html'], 'changed': []}; retention_error=None"
+    },
+    {
+      "name": "shared-global-baseline",
+      "family": "incremental",
+      "operations": [
+        "atomic",
+        "targeted"
+      ],
+      "seed": 3,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CampaignFailure: mode=hash seed=3 step=1 history=['atomic', 'targeted']: AssertionError: {'missing': [], 'extra': [], 'changed': ['b.html']}; retention_error=None"
+    },
+    {
+      "name": "late-native-hash",
+      "family": "incremental",
+      "operations": [
+        "__contracts__"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "AssertionError"
+    },
+    {
+      "name": "drop-hook-dependencies",
+      "family": "incremental",
+      "operations": [
+        "__contracts__"
+      ],
+      "seed": 411,
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "AssertionError"
+    }
+  ],
+  "elapsed_seconds": 149.745,
+  "production_artifacts_unchanged": true
+}

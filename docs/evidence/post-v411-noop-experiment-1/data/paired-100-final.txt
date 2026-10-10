@@ -1,0 +1,2 @@
+100 baseline 12.311
+100 candidate 9.935

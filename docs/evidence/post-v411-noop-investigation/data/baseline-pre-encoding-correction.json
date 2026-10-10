@@ -1,0 +1,890 @@
+[
+  {
+    "size": 100,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "median_ms": 1.682990463450551,
+    "min_ms": 1.5297168865799904,
+    "max_ms": 2.541700843721628,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 6.126380059868097,
+        "cpu_ms": 5.576000000000001
+      },
+      {
+        "warmup": true,
+        "wall_ms": 3.0500050634145737,
+        "cpu_ms": 2.717999999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.541700843721628,
+        "cpu_ms": 2.3130000000000024
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.017764840275049,
+        "cpu_ms": 1.8370000000000017
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.7625507898628712,
+        "cpu_ms": 1.6190000000000058
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.588878920301795,
+        "cpu_ms": 1.445999999999996
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5297168865799904,
+        "cpu_ms": 1.4200000000000046
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5376838855445385,
+        "cpu_ms": 1.4430000000000034
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.8134508281946182,
+        "cpu_ms": 1.6929999999999965
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.722882967442274,
+        "cpu_ms": 1.5839999999999985
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.643097959458828,
+        "cpu_ms": 1.5210000000000015
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5377202071249485,
+        "cpu_ms": 1.4329999999999967
+      }
+    ]
+  },
+  {
+    "size": 100,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "median_ms": 1.3922409852966666,
+    "min_ms": 1.3069361448287964,
+    "max_ms": 2.462135860696435,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 3.06229991838336,
+        "cpu_ms": 2.8049999999999984
+      },
+      {
+        "warmup": true,
+        "wall_ms": 2.3340790066868067,
+        "cpu_ms": 2.1510000000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.462135860696435,
+        "cpu_ms": 1.9680000000000044
+      },
+      {
+        "warmup": false,
+        "wall_ms": 2.005243906751275,
+        "cpu_ms": 1.8499999999999905
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.5169428661465645,
+        "cpu_ms": 1.4049999999999965
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.4042770490050316,
+        "cpu_ms": 1.2980000000000076
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.4459139201790094,
+        "cpu_ms": 1.33599999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.3802049215883017,
+        "cpu_ms": 1.3000000000000025
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.352459890767932,
+        "cpu_ms": 1.2759999999999994
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.326291123405099,
+        "cpu_ms": 1.2529999999999972
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.341668888926506,
+        "cpu_ms": 1.2679999999999982
+      },
+      {
+        "warmup": false,
+        "wall_ms": 1.3069361448287964,
+        "cpu_ms": 1.2349999999999999
+      }
+    ]
+  },
+  {
+    "size": 100,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "median_ms": 7.544967462308705,
+    "min_ms": 6.955181946977973,
+    "max_ms": 8.018488064408302,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 8.377220015972853,
+        "cpu_ms": 21.068000000000005
+      },
+      {
+        "warmup": true,
+        "wall_ms": 7.626574020832777,
+        "cpu_ms": 20.115999999999996
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.416845997795463,
+        "cpu_ms": 19.734999999999996
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.766363909468055,
+        "cpu_ms": 20.477999999999994
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.915053982287645,
+        "cpu_ms": 20.384999999999987
+      },
+      {
+        "warmup": false,
+        "wall_ms": 6.955181946977973,
+        "cpu_ms": 19.28300000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.012483896687627,
+        "cpu_ms": 19.371
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.656134897843003,
+        "cpu_ms": 20.038000000000014
+      },
+      {
+        "warmup": false,
+        "wall_ms": 8.018488064408302,
+        "cpu_ms": 20.876999999999992
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.6414309442043304,
+        "cpu_ms": 20.17599999999996
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.429232122376561,
+        "cpu_ms": 20.093
+      },
+      {
+        "warmup": false,
+        "wall_ms": 7.448503980413079,
+        "cpu_ms": 19.874000000000002
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "median_ms": 17.48231193050742,
+    "min_ms": 16.886208904907107,
+    "max_ms": 18.669746117666364,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 18.75168294645846,
+        "cpu_ms": 18.39400000000002
+      },
+      {
+        "warmup": true,
+        "wall_ms": 18.183899112045765,
+        "cpu_ms": 17.812999999999967
+      },
+      {
+        "warmup": false,
+        "wall_ms": 18.669746117666364,
+        "cpu_ms": 18.313999999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.687686951830983,
+        "cpu_ms": 17.336999999999993
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.932067858055234,
+        "cpu_ms": 17.573000000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.38891191780567,
+        "cpu_ms": 17.054000000000013
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.46101793833077,
+        "cpu_ms": 17.105000000000036
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.476327950134873,
+        "cpu_ms": 17.16999999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.35648396424949,
+        "cpu_ms": 17.019000000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 17.48829591087997,
+        "cpu_ms": 17.195000000000014
+      },
+      {
+        "warmup": false,
+        "wall_ms": 18.117669969797134,
+        "cpu_ms": 17.76400000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 16.886208904907107,
+        "cpu_ms": 16.51700000000003
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "median_ms": 10.897002997808158,
+    "min_ms": 10.24673506617546,
+    "max_ms": 12.214810121804476,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 11.572946095839143,
+        "cpu_ms": 11.05899999999993
+      },
+      {
+        "warmup": true,
+        "wall_ms": 11.372354114428163,
+        "cpu_ms": 10.867000000000015
+      },
+      {
+        "warmup": false,
+        "wall_ms": 11.306857923045754,
+        "cpu_ms": 10.969999999999924
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.794530855491757,
+        "cpu_ms": 10.471000000000007
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.24673506617546,
+        "cpu_ms": 9.929999999999994
+      },
+      {
+        "warmup": false,
+        "wall_ms": 11.065688915550709,
+        "cpu_ms": 10.131999999999975
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.448561981320381,
+        "cpu_ms": 10.161000000000087
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.337671032175422,
+        "cpu_ms": 10.02200000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 11.014109943062067,
+        "cpu_ms": 10.61200000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.996130993589759,
+        "cpu_ms": 10.68100000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 12.214810121804476,
+        "cpu_ms": 11.653999999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 10.797875002026558,
+        "cpu_ms": 10.425999999999934
+      }
+    ]
+  },
+  {
+    "size": 1000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "median_ms": 55.68713240791112,
+    "min_ms": 54.754141019657254,
+    "max_ms": 56.711922865360975,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 60.220712097361684,
+        "cpu_ms": 199.931
+      },
+      {
+        "warmup": true,
+        "wall_ms": 56.59030401147902,
+        "cpu_ms": 185.0369999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.67915481515229,
+        "cpu_ms": 183.73900000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 56.711922865360975,
+        "cpu_ms": 186.73100000000008
+      },
+      {
+        "warmup": false,
+        "wall_ms": 56.10571498982608,
+        "cpu_ms": 183.4
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.695110000669956,
+        "cpu_ms": 181.71599999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.753977969288826,
+        "cpu_ms": 183.60399999999987
+      },
+      {
+        "warmup": false,
+        "wall_ms": 54.754141019657254,
+        "cpu_ms": 180.51099999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.306042078882456,
+        "cpu_ms": 181.18500000000014
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.53288501687348,
+        "cpu_ms": 182.37099999999995
+      },
+      {
+        "warmup": false,
+        "wall_ms": 56.40979390591383,
+        "cpu_ms": 184.4920000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.5557138286531,
+        "cpu_ms": 182.55900000000014
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "median_ms": 130.5865989997983,
+    "min_ms": 121.34639383293688,
+    "max_ms": 176.04481312446296,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 120.58157799765468,
+        "cpu_ms": 120.20999999999971
+      },
+      {
+        "warmup": true,
+        "wall_ms": 122.2897560801357,
+        "cpu_ms": 121.9290000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 125.78445905819535,
+        "cpu_ms": 125.22699999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 127.51633091829717,
+        "cpu_ms": 127.06399999999985
+      },
+      {
+        "warmup": false,
+        "wall_ms": 137.36868789419532,
+        "cpu_ms": 135.26599999999945
+      },
+      {
+        "warmup": false,
+        "wall_ms": 148.31987977959216,
+        "cpu_ms": 147.78900000000016
+      },
+      {
+        "warmup": false,
+        "wall_ms": 147.68386096693575,
+        "cpu_ms": 147.13400000000033
+      },
+      {
+        "warmup": false,
+        "wall_ms": 129.60948911495507,
+        "cpu_ms": 129.11300000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 122.16713605448604,
+        "cpu_ms": 121.75100000000016
+      },
+      {
+        "warmup": false,
+        "wall_ms": 121.34639383293688,
+        "cpu_ms": 120.94900000000064
+      },
+      {
+        "warmup": false,
+        "wall_ms": 131.56370888464153,
+        "cpu_ms": 131.1179999999994
+      },
+      {
+        "warmup": false,
+        "wall_ms": 176.04481312446296,
+        "cpu_ms": 175.60599999999994
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "median_ms": 57.12721205782145,
+    "min_ms": 54.59171999245882,
+    "max_ms": 58.62397514283657,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 57.421726174652576,
+        "cpu_ms": 56.867000000000225
+      },
+      {
+        "warmup": true,
+        "wall_ms": 57.93886189348996,
+        "cpu_ms": 57.57999999999974
+      },
+      {
+        "warmup": false,
+        "wall_ms": 57.11877206340432,
+        "cpu_ms": 56.66100000000007
+      },
+      {
+        "warmup": false,
+        "wall_ms": 54.59171999245882,
+        "cpu_ms": 54.14099999999955
+      },
+      {
+        "warmup": false,
+        "wall_ms": 57.135652052238584,
+        "cpu_ms": 56.79100000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 57.278417982161045,
+        "cpu_ms": 56.87799999999932
+      },
+      {
+        "warmup": false,
+        "wall_ms": 58.17725695669651,
+        "cpu_ms": 57.59800000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 57.73414997383952,
+        "cpu_ms": 57.2499999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 56.80641392245889,
+        "cpu_ms": 56.093000000000174
+      },
+      {
+        "warmup": false,
+        "wall_ms": 56.43012188374996,
+        "cpu_ms": 55.747000000000654
+      },
+      {
+        "warmup": false,
+        "wall_ms": 55.317979073151946,
+        "cpu_ms": 54.8469999999992
+      },
+      {
+        "warmup": false,
+        "wall_ms": 58.62397514283657,
+        "cpu_ms": 58.16600000000038
+      }
+    ]
+  },
+  {
+    "size": 5000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "median_ms": 273.5824235714972,
+    "min_ms": 267.2409920487553,
+    "max_ms": 277.91280997917056,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 268.3832449838519,
+        "cpu_ms": 918.1179999999997
+      },
+      {
+        "warmup": true,
+        "wall_ms": 270.32868401147425,
+        "cpu_ms": 921.0690000000002
+      },
+      {
+        "warmup": false,
+        "wall_ms": 267.2409920487553,
+        "cpu_ms": 913.7360000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 268.5562090482563,
+        "cpu_ms": 915.8250000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 272.52403483726084,
+        "cpu_ms": 929.2790000000011
+      },
+      {
+        "warmup": false,
+        "wall_ms": 277.91280997917056,
+        "cpu_ms": 941.2349999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 273.7692650407553,
+        "cpu_ms": 928.5560000000004
+      },
+      {
+        "warmup": false,
+        "wall_ms": 273.7824229989201,
+        "cpu_ms": 887.6640000000009
+      },
+      {
+        "warmup": false,
+        "wall_ms": 275.6410320289433,
+        "cpu_ms": 941.8040000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 273.39558210223913,
+        "cpu_ms": 933.4819999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 272.8134470526129,
+        "cpu_ms": 918.7310000000019
+      },
+      {
+        "warmup": false,
+        "wall_ms": 276.45999006927013,
+        "cpu_ms": 916.3949999999987
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "make",
+    "command": [
+      "make",
+      "-j4"
+    ],
+    "median_ms": 314.8939065868035,
+    "min_ms": 310.0811408367008,
+    "max_ms": 346.9523990061134,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 318.9110029488802,
+        "cpu_ms": 318.4260000000023
+      },
+      {
+        "warmup": true,
+        "wall_ms": 313.3206879720092,
+        "cpu_ms": 312.9579999999992
+      },
+      {
+        "warmup": false,
+        "wall_ms": 314.06033714301884,
+        "cpu_ms": 313.63800000000094
+      },
+      {
+        "warmup": false,
+        "wall_ms": 319.659979082644,
+        "cpu_ms": 319.1679999999986
+      },
+      {
+        "warmup": false,
+        "wall_ms": 318.5941509436816,
+        "cpu_ms": 318.080000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 317.31739500537515,
+        "cpu_ms": 316.5650000000006
+      },
+      {
+        "warmup": false,
+        "wall_ms": 313.1800468545407,
+        "cpu_ms": 312.38999999999794
+      },
+      {
+        "warmup": false,
+        "wall_ms": 315.6406991183758,
+        "cpu_ms": 315.199999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 310.0811408367008,
+        "cpu_ms": 309.60699999999883
+      },
+      {
+        "warmup": false,
+        "wall_ms": 312.2949709650129,
+        "cpu_ms": 311.79499999999916
+      },
+      {
+        "warmup": false,
+        "wall_ms": 314.1471140552312,
+        "cpu_ms": 313.23100000000005
+      },
+      {
+        "warmup": false,
+        "wall_ms": 346.9523990061134,
+        "cpu_ms": 346.52099999999916
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "ninja",
+    "command": [
+      "/tmp/build-systems-tools/ninja/usr/bin/ninja",
+      "-j4"
+    ],
+    "median_ms": 118.55139001272619,
+    "min_ms": 115.9053249284625,
+    "max_ms": 127.79631791636348,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 124.08267403952777,
+        "cpu_ms": 123.72999999999834
+      },
+      {
+        "warmup": true,
+        "wall_ms": 120.03491586074233,
+        "cpu_ms": 119.5649999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 118.99149091914296,
+        "cpu_ms": 118.60500000000229
+      },
+      {
+        "warmup": false,
+        "wall_ms": 121.68001290410757,
+        "cpu_ms": 121.21299999999913
+      },
+      {
+        "warmup": false,
+        "wall_ms": 116.84915004298091,
+        "cpu_ms": 116.43999999999899
+      },
+      {
+        "warmup": false,
+        "wall_ms": 127.79631791636348,
+        "cpu_ms": 127.34199999999873
+      },
+      {
+        "warmup": false,
+        "wall_ms": 118.89628088101745,
+        "cpu_ms": 118.37300000000184
+      },
+      {
+        "warmup": false,
+        "wall_ms": 117.2780329361558,
+        "cpu_ms": 116.89700000000158
+      },
+      {
+        "warmup": false,
+        "wall_ms": 118.54422301985323,
+        "cpu_ms": 117.9219999999983
+      },
+      {
+        "warmup": false,
+        "wall_ms": 118.55855700559914,
+        "cpu_ms": 118.05100000000124
+      },
+      {
+        "warmup": false,
+        "wall_ms": 118.47403785213828,
+        "cpu_ms": 118.13700000000082
+      },
+      {
+        "warmup": false,
+        "wall_ms": 115.9053249284625,
+        "cpu_ms": 115.55299999999846
+      }
+    ]
+  },
+  {
+    "size": 10000,
+    "system": "nift",
+    "command": [
+      "/home/nick/Repositories/nift/nift/nift",
+      "build"
+    ],
+    "median_ms": 550.0616409117356,
+    "min_ms": 545.989016070962,
+    "max_ms": 596.3746309280396,
+    "zero_actions": true,
+    "samples": [
+      {
+        "warmup": true,
+        "wall_ms": 554.9218521919101,
+        "cpu_ms": 1897.5989999999997
+      },
+      {
+        "warmup": true,
+        "wall_ms": 552.7361729182303,
+        "cpu_ms": 1882.3279999999993
+      },
+      {
+        "warmup": false,
+        "wall_ms": 549.2227198556066,
+        "cpu_ms": 1879.998999999998
+      },
+      {
+        "warmup": false,
+        "wall_ms": 550.9005619678646,
+        "cpu_ms": 1874.422000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 596.3746309280396,
+        "cpu_ms": 2001.900000000001
+      },
+      {
+        "warmup": false,
+        "wall_ms": 562.590619083494,
+        "cpu_ms": 1923.485999999997
+      },
+      {
+        "warmup": false,
+        "wall_ms": 546.868038829416,
+        "cpu_ms": 1875.508999999999
+      },
+      {
+        "warmup": false,
+        "wall_ms": 545.989016070962,
+        "cpu_ms": 1874.2440000000026
+      },
+      {
+        "warmup": false,
+        "wall_ms": 556.714512873441,
+        "cpu_ms": 1892.1999999999973
+      },
+      {
+        "warmup": false,
+        "wall_ms": 546.038568019867,
+        "cpu_ms": 1869.7570000000035
+      },
+      {
+        "warmup": false,
+        "wall_ms": 563.1709508597851,
+        "cpu_ms": 1934.6420000000003
+      },
+      {
+        "warmup": false,
+        "wall_ms": 547.4155789706856,
+        "cpu_ms": 1872.0789999999993
+      }
+    ]
+  }
+]

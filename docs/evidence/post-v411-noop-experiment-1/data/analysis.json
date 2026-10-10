@@ -1,0 +1,86 @@
+{
+  "noop": [
+    {
+      "size": 100,
+      "binary": "baseline",
+      "n": 20,
+      "median_ms": 12.3111555,
+      "min_ms": 11.595346,
+      "max_ms": 12.910834,
+      "cpu_median_ms": 36.236999999999895
+    },
+    {
+      "size": 100,
+      "binary": "candidate",
+      "n": 20,
+      "median_ms": 9.9348515,
+      "min_ms": 9.133457,
+      "max_ms": 10.419378,
+      "cpu_median_ms": 27.147500000000047
+    },
+    {
+      "size": 1000,
+      "binary": "baseline",
+      "n": 20,
+      "median_ms": 102.7406225,
+      "min_ms": 99.773069,
+      "max_ms": 130.64858,
+      "cpu_median_ms": 358.87500000000074
+    },
+    {
+      "size": 1000,
+      "binary": "candidate",
+      "n": 20,
+      "median_ms": 78.6544065,
+      "min_ms": 76.031618,
+      "max_ms": 85.762082,
+      "cpu_median_ms": 265.45700000000096
+    },
+    {
+      "size": 5000,
+      "binary": "baseline",
+      "n": 20,
+      "median_ms": 503.93597550000004,
+      "min_ms": 494.62928,
+      "max_ms": 528.480086,
+      "cpu_median_ms": 1813.5255000000006
+    },
+    {
+      "size": 5000,
+      "binary": "candidate",
+      "n": 20,
+      "median_ms": 384.574142,
+      "min_ms": 371.487274,
+      "max_ms": 413.53343,
+      "cpu_median_ms": 1342.5744999999995
+    },
+    {
+      "size": 10000,
+      "binary": "baseline",
+      "n": 20,
+      "median_ms": 1024.1931815,
+      "min_ms": 998.717921,
+      "max_ms": 1122.521046,
+      "cpu_median_ms": 3691.5720000000006
+    },
+    {
+      "size": 10000,
+      "binary": "candidate",
+      "n": 20,
+      "median_ms": 771.1505569999999,
+      "min_ms": 756.272686,
+      "max_ms": 843.81498,
+      "cpu_median_ms": 2716.913500000011
+    }
+  ],
+  "slopes": {
+    "baseline": {
+      "ms_per_TU": 0.10214075345627578,
+      "intercept_ms": -0.32129891150998446
+    },
+    "candidate": {
+      "ms_per_TU": 0.0768804557403096,
+      "intercept_ms": 1.6346548952537887
+    }
+  }
+}

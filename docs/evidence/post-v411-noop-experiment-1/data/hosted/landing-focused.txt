@@ -1,0 +1,8 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/dependency_status.cpp src/FileSystem.o -o .build/dependency-status-test
+.build/dependency-status-test .build/dependency-status-fixture
+dependency status contracts PASS
+/usr/bin/python3 tests/dependency_status.py --nift ./nift --output .build/dependency-status-contracts.json
+CLI status adversarial PASS 30 SKIP 0
+python3 tests/macos_runner_policy_test.py
+macOS runner-policy guard passed (10 official macOS matrix entries)
