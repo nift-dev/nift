@@ -1986,7 +1986,7 @@ $(PROCESS_CONTRACT_TEST): tests/process_contract.cpp src/Process.cpp src/Proc.h 
 	@mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_contract.cpp src/Process.cpp -o $@
 test-process-hardening: $(PROCESS_FAILURE_TEST) $(PROCESS_CONTRACT_TEST)
-	python3 tests/process_hardening.py --failure $(PROCESS_FAILURE_TEST) --contract $(PROCESS_CONTRACT_TEST)
+	python3 tests/process_hardening.py --failure $(PROCESS_FAILURE_TEST) --contract $(PROCESS_CONTRACT_TEST) --output $(TEST_DIR)/process-hardening.json
 test: test-process-hardening
 .PHONY: test-process-hardening
 

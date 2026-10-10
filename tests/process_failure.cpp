@@ -34,6 +34,7 @@ static size_t fds(){size_t n=0;for(int i=0;i<1024;++i)if(fcntl(i,F_GETFD)!=-1)++
 
 #endif
 int main(int argc,char**argv){
+ if(argc>1 && std::string(argv[1])=="exit")return 0;
  if(argc>1 && std::string(argv[1])=="block"){
 #ifdef _WIN32
  Sleep(60000);
@@ -61,12 +62,19 @@ int main(int argc,char**argv){
  require(fds()==before,"fd leak");for(const auto& path:captures)require(!std::filesystem::exists(path),"temp leak");
  int st;require(waitpid(-1,&st,WNOHANG)==-1&&errno==ECHILD,"live child or zombie");
 #else
+ // A successful launch control warms OS/CRT process initialization before
+ // measuring retained handles from each failed operation. Report the control
+ // counts so first-launch initialization cannot be hidden as failure cleanup.
+ auto saved_operation=operation;operation.clear();
+ ProcessSpec warm;warm.program=std::filesystem::absolute(argv[0]).u8string();warm.args={"exit"};
+ for(int iteration=0;iteration<3;++iteration){DWORD start,end;GetProcessHandleCount(GetCurrentProcess(),&start);auto control=nift_run_process(warm);require(control.exit_code==0 && control.error.empty(),"launch control failed");for(HANDLE h:children){require(h && WaitForSingleObject(h,1000)==WAIT_OBJECT_0,"control child alive");CloseHandle(h);}children.clear();for(const auto& path:captures)require(!std::filesystem::exists(path),"control capture tempfile leak");captures.clear();GetProcessHandleCount(GetCurrentProcess(),&end);std::cout<<"control handles "<<iteration<<": "<<start<<" -> "<<end<<'\n';require(iteration==0 || start==end,"successful launch control leaks handles");}
+ operation=saved_operation;
  for(int repeat=0;repeat<10;++repeat){children.clear();captures.clear();
  DWORD before,after;GetProcessHandleCount(GetCurrentProcess(),&before);
  ProcessSpec s;s.program=std::filesystem::absolute(argv[0]).string();s.args={"block"};
  auto r=nift_run_pipeline(std::vector<ProcessSpec>(3,s));require(!r.error.empty(),"missing failure diagnostic");
  for(HANDLE h:children){require(h && WaitForSingleObject(h,1000)==WAIT_OBJECT_0,"live child after failure");CloseHandle(h);}
- GetProcessHandleCount(GetCurrentProcess(),&after);require(before==after,"handle leak");
+ GetProcessHandleCount(GetCurrentProcess(),&after);if(before!=after)std::cerr<<"failure handles repeat "<<repeat<<": "<<before<<" -> "<<after<<'\n';require(before==after,"handle leak");
  for(const auto& path:captures)require(!std::filesystem::exists(path),"capture tempfile leak");
  }
 #endif

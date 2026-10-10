@@ -1,0 +1,59 @@
+name: Process hardening contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Process.cpp'
+      - 'src/JobControl.cpp'
+      - 'src/Proc.h'
+      - 'src/Process*.h'
+      - 'src/PreparedProcessPOSIX.h'
+      - 'tests/process_*.cpp'
+      - 'tests/process_hardening.py'
+      - 'Makefile'
+      - '.github/workflows/process-hardening.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: ${{ matrix.id }} process contracts
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make python mingw-w64-ucrt-x86_64-gcc
+      - name: Process launch and failure contracts
+        if: runner.os != 'Windows'
+        run: make -j2 test-process-hardening
+      - name: Native Windows process launch and failure contracts
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2 test-process-hardening
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: process-hardening-${{ matrix.id }}
+          path: .build/process-hardening.json
+          if-no-files-found: warn

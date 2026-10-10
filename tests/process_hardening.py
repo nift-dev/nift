@@ -3,9 +3,13 @@
 import argparse, json, os, pathlib, subprocess, time
 p=argparse.ArgumentParser();p.add_argument('--failure',required=True);p.add_argument('--contract',required=True);p.add_argument('--output');a=p.parse_args()
 start=time.monotonic();results=[]
+def save(passed):
+ data=dict(pass_=passed,platform=os.name,cases=results,elapsed_seconds=time.monotonic()-start)
+ if a.output:pathlib.Path(a.output).write_text(json.dumps(data,indent=2)+'\n')
 def run(binary,args):
  r=subprocess.run([str(pathlib.Path(binary).resolve()),*args],text=True,capture_output=True,timeout=10)
  results.append(dict(case=args,returncode=r.returncode,stdout=r.stdout,stderr=r.stderr))
+ save(False)
  assert r.returncode==0,results[-1]
 run(a.contract,[])
 windows=os.name=='nt' or bool(os.environ.get('MSYSTEM'))
@@ -16,6 +20,5 @@ for job in ([False] if windows else [False,True]):
 if not windows:
  for job in [False,True]:
   for op in ['dup2-in','dup2-out','dup2-err']:run(a.failure,[op,'0']+(['job'] if job else []))
-data=dict(pass_=True,platform=os.name,cases=results,elapsed_seconds=time.monotonic()-start)
-if a.output:pathlib.Path(a.output).write_text(json.dumps(data,indent=2)+'\n')
+save(True)
 print('process hardening PASS:',len(results),'cases')

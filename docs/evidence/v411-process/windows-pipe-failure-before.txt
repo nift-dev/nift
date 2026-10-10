@@ -1,0 +1,781 @@
+﻿2026-10-10T08:02:53.6068014Z Current runner version: '2.337.0'
+2026-10-10T08:02:53.6089637Z ##[group]Runner Image Provisioner
+2026-10-10T08:02:53.6090323Z Hosted Compute Agent
+2026-10-10T08:02:53.6090777Z Version: 20260901.588
+2026-10-10T08:02:53.6091255Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+2026-10-10T08:02:53.6091889Z Build Date: 2026-09-01T19:56:44Z
+2026-10-10T08:02:53.6092434Z Worker ID: {075afc7d-00b6-4902-985b-00512064f223}
+2026-10-10T08:02:53.6093066Z Azure Region: westus3
+2026-10-10T08:02:53.6093516Z ##[endgroup]
+2026-10-10T08:02:53.6094562Z ##[group]Operating System
+2026-10-10T08:02:53.6095387Z Microsoft Windows Server 2025
+2026-10-10T08:02:53.6095865Z 10.0.26100
+2026-10-10T08:02:53.6096260Z Datacenter
+2026-10-10T08:02:53.6096666Z ##[endgroup]
+2026-10-10T08:02:53.6097119Z ##[group]Runner Image
+2026-10-10T08:02:53.6097610Z Image: windows-2025-vs2026
+2026-10-10T08:02:53.6098166Z Version: 20260925.250.1
+2026-10-10T08:02:53.6099605Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260925.250/images/windows/Windows2025-VS2026-Readme.md
+2026-10-10T08:02:53.6101095Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260925.250
+2026-10-10T08:02:53.6101988Z ##[endgroup]
+2026-10-10T08:02:53.6102867Z ##[group]GITHUB_TOKEN Permissions
+2026-10-10T08:02:53.6104334Z Contents: read
+2026-10-10T08:02:53.6104850Z Metadata: read
+2026-10-10T08:02:53.6105276Z ##[endgroup]
+2026-10-10T08:02:53.6106907Z Secret source: Actions
+2026-10-10T08:02:53.6107658Z Cache mode: write
+2026-10-10T08:02:53.6108221Z Prepare workflow directory
+2026-10-10T08:02:53.6344659Z Prepare all required actions
+2026-10-10T08:02:53.6386548Z Getting action download info
+2026-10-10T08:02:53.9444973Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-10-10T08:02:54.0466296Z Download action repository 'actions/setup-python@v6' (SHA:ece7cb06caefa5fff74198d8649806c4678c61a1)
+2026-10-10T08:02:54.1529850Z Download action repository 'msys2/setup-msys2@v2' (SHA:ec48f7c5447b3140e2b088413ae3a55687bccb6e)
+2026-10-10T08:02:54.5894922Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-10T08:02:55.3177489Z Complete job name: windows behavioural corpus
+2026-10-10T08:02:55.4272904Z ##[group]Run actions/checkout@v5
+2026-10-10T08:02:55.4273783Z with:
+2026-10-10T08:02:55.4274198Z   repository: nift-dev/nift
+2026-10-10T08:02:55.4277688Z   token: ***
+2026-10-10T08:02:55.4278284Z   ssh-strict: true
+2026-10-10T08:02:55.4278751Z   ssh-user: git
+2026-10-10T08:02:55.4279188Z   persist-credentials: true
+2026-10-10T08:02:55.4279653Z   clean: true
+2026-10-10T08:02:55.4280095Z   sparse-checkout-cone-mode: true
+2026-10-10T08:02:55.4280607Z   fetch-depth: 1
+2026-10-10T08:02:55.4281030Z   fetch-tags: false
+2026-10-10T08:02:55.4281461Z   show-progress: true
+2026-10-10T08:02:55.4281910Z   lfs: false
+2026-10-10T08:02:55.4282319Z   submodules: false
+2026-10-10T08:02:55.4282761Z   set-safe-directory: true
+2026-10-10T08:02:55.4283284Z   allow-unsafe-pr-checkout: false
+2026-10-10T08:02:55.4283884Z ##[endgroup]
+2026-10-10T08:02:55.5210434Z Syncing repository: nift-dev/nift
+2026-10-10T08:02:55.5211837Z ##[group]Getting Git version info
+2026-10-10T08:02:55.5212450Z Working directory is 'D:\a\nift\nift'
+2026-10-10T08:02:55.5655247Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:02:55.9398905Z git version 2.55.0.windows.5
+2026-10-10T08:02:55.9432006Z ##[endgroup]
+2026-10-10T08:02:55.9445002Z Temporarily overriding HOME='D:\a\_temp\ea62880c-7550-4680-a42b-921b79dfe071' before making global git config changes
+2026-10-10T08:02:55.9446189Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:02:55.9452125Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift
+2026-10-10T08:02:55.9951790Z Deleting the contents of 'D:\a\nift\nift'
+2026-10-10T08:02:55.9955557Z ##[group]Initializing the repository
+2026-10-10T08:02:55.9961357Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\nift\nift
+2026-10-10T08:02:56.0641375Z Initialized empty Git repository in D:/a/nift/nift/.git/
+2026-10-10T08:02:56.0667530Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/nift-dev/nift
+2026-10-10T08:02:56.1122540Z ##[endgroup]
+2026-10-10T08:02:56.1123284Z ##[group]Disabling automatic garbage collection
+2026-10-10T08:02:56.1128183Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-10T08:02:56.1309354Z ##[endgroup]
+2026-10-10T08:02:56.1310043Z ##[group]Setting up auth
+2026-10-10T08:02:56.1317788Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:02:56.1499412Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:02:57.3152628Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:02:57.3331632Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:02:57.6652807Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:02:57.6831884Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:02:58.0007526Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-10T08:02:58.0207107Z ##[endgroup]
+2026-10-10T08:02:58.0207595Z ##[group]Fetching the repository
+2026-10-10T08:02:58.0214965Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +619318b1e90fc2dc6885e3c1d2d0b9683c1f5e76:refs/remotes/origin/main
+2026-10-10T08:03:00.6687478Z From https://github.com/nift-dev/nift
+2026-10-10T08:03:00.6689891Z  * [new ref]         619318b1e90fc2dc6885e3c1d2d0b9683c1f5e76 -> origin/main
+2026-10-10T08:03:00.6716588Z ##[endgroup]
+2026-10-10T08:03:00.6716930Z ##[group]Determining the checkout info
+2026-10-10T08:03:00.6718766Z ##[endgroup]
+2026-10-10T08:03:00.6727593Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-10T08:03:00.7018223Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-10T08:03:00.7196513Z ##[group]Checking out the ref
+2026-10-10T08:03:00.7202864Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B main refs/remotes/origin/main
+2026-10-10T08:03:01.4773475Z Switched to a new branch 'main'
+2026-10-10T08:03:01.4833039Z branch 'main' set up to track 'origin/main'.
+2026-10-10T08:03:01.4940520Z ##[endgroup]
+2026-10-10T08:03:01.5240810Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-10T08:03:01.5405690Z 619318b1e90fc2dc6885e3c1d2d0b9683c1f5e76
+2026-10-10T08:03:01.5779846Z ##[group]Run actions/setup-python@v6
+2026-10-10T08:03:01.5780045Z with:
+2026-10-10T08:03:01.5780157Z   python-version: 3.13
+2026-10-10T08:03:01.5780287Z   check-latest: false
+2026-10-10T08:03:01.5781593Z   token: ***
+2026-10-10T08:03:01.5781713Z   update-environment: true
+2026-10-10T08:03:01.5781850Z   allow-prereleases: false
+2026-10-10T08:03:01.5782008Z   freethreaded: false
+2026-10-10T08:03:01.5782212Z ##[endgroup]
+2026-10-10T08:03:01.6763701Z ##[group]Installed versions
+2026-10-10T08:03:01.6913544Z Successfully set up CPython (3.13.15)
+2026-10-10T08:03:01.6914233Z ##[endgroup]
+2026-10-10T08:03:01.7123716Z ##[group]Run msys2/setup-msys2@v2
+2026-10-10T08:03:01.7123925Z with:
+2026-10-10T08:03:01.7124032Z   msystem: UCRT64
+2026-10-10T08:03:01.7124656Z   update: true
+2026-10-10T08:03:01.7124802Z   install: make diffutils python mingw-w64-ucrt-x86_64-gcc
+2026-10-10T08:03:01.7124974Z   path-type: minimal
+2026-10-10T08:03:01.7125087Z   release: true
+2026-10-10T08:03:01.7125207Z   platform-check-severity: fatal
+2026-10-10T08:03:01.7125335Z   cache: true
+2026-10-10T08:03:01.7125433Z env:
+2026-10-10T08:03:01.7125574Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:01.7125831Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+2026-10-10T08:03:01.7126072Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:01.7126282Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:01.7126491Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:01.7126686Z ##[endgroup]
+2026-10-10T08:03:01.7994653Z ##[group]Downloading MSYS2...
+2026-10-10T08:03:02.3192895Z ##[endgroup]
+2026-10-10T08:03:02.3193170Z ##[group]Extracting MSYS2...
+2026-10-10T08:03:02.3203354Z [command]C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe -y
+2026-10-10T08:03:03.0816188Z
+2026-10-10T08:03:03.0816917Z 7-Zip SFX 26.02 ZS v1.5.7 R1 (x64) : Copyright (c) 1999- Igor Pavlov, 2016- Tino Reichardt, 2022- Sergey G. Brester : 2026-06-27
+2026-10-10T08:03:03.0817332Z
+2026-10-10T08:03:03.0817559Z Extracting archive: C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe
+2026-10-10T08:03:03.0818263Z --
+2026-10-10T08:03:03.0818538Z Path = C:\hostedtoolcache\windows\msys2-installer\0.0.20260927\x64\base.exe
+2026-10-10T08:03:03.0818851Z Type = 7z
+2026-10-10T08:03:03.0819053Z
+2026-10-10T08:03:03.2754795Z   0%
+2026-10-10T08:03:03.2754964Z
+2026-10-10T08:03:03.4781688Z   1% 1389 - msys64\usr\lib\terminfo\63\cons25r-m
+2026-10-10T08:03:03.4782021Z
+2026-10-10T08:03:03.7284931Z   1% 2672 - msys64\usr\lib\terminfo\71\qume
+2026-10-10T08:03:03.7285286Z
+2026-10-10T08:03:03.9176215Z   2% 3587 - msys64\usr\lib\terminfo\78\xnuppc-100x37-m
+2026-10-10T08:03:03.9176443Z
+2026-10-10T08:03:04.1189867Z   3% 4759 - msys64\usr\share\bash-completi . etions-fallback\interdiff.bash
+2026-10-10T08:03:04.1190318Z
+2026-10-10T08:03:04.3226351Z  16% 5717 - msys64\usr\share\locale\fr\LC_MESSAGES\util-linux.mo
+2026-10-10T08:03:04.3226738Z
+2026-10-10T08:03:04.5252196Z  35% 6524 - msys64\usr\share\man\man1\basename.1.gz
+2026-10-10T08:03:04.5252533Z
+2026-10-10T08:03:04.7282106Z  37% 7769 - msys64\usr\share\man\man3\field_fore.3x.gz
+2026-10-10T08:03:04.7282478Z
+2026-10-10T08:03:04.9327205Z  39% 8963 - msys64\usr\share\mintty\lang\messages.pot
+2026-10-10T08:03:04.9327539Z
+2026-10-10T08:03:05.5065752Z  45% 10203 - msys64\usr\share\terminfo\69\i3164
+2026-10-10T08:03:05.5065978Z
+2026-10-10T08:03:05.6969753Z  45% 10505 - msys64\usr\share\terminfo\6e\ncr260vt200pp
+2026-10-10T08:03:05.6969999Z
+2026-10-10T08:03:05.9003551Z  45% 11689 - msys64\usr\share\terminfo\77\wyse325-25
+2026-10-10T08:03:05.9003776Z
+2026-10-10T08:03:06.1407679Z  46% 12946 - msys64\usr\share\zoneinfo\posix\Etc\GMT+6
+2026-10-10T08:03:06.1407911Z
+2026-10-10T08:03:06.3438172Z  47% 14057 - msys64\var\lib\pacman\sync\mingw64.db
+2026-10-10T08:03:06.3440023Z
+2026-10-10T08:03:06.7534143Z  77% 14362 - msys64\usr\bin\pacsort.exe
+2026-10-10T08:03:06.7535122Z
+2026-10-10T08:03:06.8078946Z  84% 14424 - msys64\usr\bin\stty.exe
+2026-10-10T08:03:06.8079291Z
+2026-10-10T08:03:06.8079470Z Everything is Ok
+2026-10-10T08:03:06.8099386Z ##[endgroup]
+2026-10-10T08:03:06.8099740Z ##[group]Disable Key Refresh...
+2026-10-10T08:03:06.8111462Z ##[endgroup]
+2026-10-10T08:03:06.8123560Z ##[group]Restoring package cache...
+2026-10-10T08:03:07.0837326Z Cache hit for restore-key: msys2-pkgs-upd:true-conf:27a10b6e-files:76ccc4243860e4a6aa1f953826f722dc5db6db0d89526fce008b35a85709c9e0
+2026-10-10T08:03:08.2987129Z Received 83886080 of 131379410 (63.9%), 79.2 MBs/sec
+2026-10-10T08:03:08.8626546Z Received 131379410 of 131379410 (100.0%), 79.6 MBs/sec
+2026-10-10T08:03:08.8629688Z Cache Size: ~125 MB (131379410 B)
+2026-10-10T08:03:08.8721422Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/311a6799-bfcb-4951-83e7-403081405b99/cache.tzst -P -C D:/a/nift/nift --force-local --use-compress-program "zstd -d"
+2026-10-10T08:03:09.1198537Z Cache restored successfully
+2026-10-10T08:03:09.1275135Z Cache restore for msys2-pkgs-upd:true-conf:27a10b6e, got msys2-pkgs-upd:true-conf:27a10b6e-files:76ccc4243860e4a6aa1f953826f722dc5db6db0d89526fce008b35a85709c9e0
+2026-10-10T08:03:09.1275847Z Cache restore for msys2-pkgs-upd:true-conf:27a10b6e, got msys2-pkgs-upd:true-conf:27a10b6e-files:76ccc4243860e4a6aa1f953826f722dc5db6db0d89526fce008b35a85709c9e0
+2026-10-10T08:03:09.1277041Z ##[endgroup]
+2026-10-10T08:03:09.1277264Z ##[group]Starting MSYS2 for the first time...
+2026-10-10T08:03:09.1953057Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'uname' '-a'"
+2026-10-10T08:03:09.2428754Z [1;32mMSYS2 is starting for the first time. Executing the initial setup.[1;0m
+2026-10-10T08:03:09.3122467Z Copying skeleton files.
+2026-10-10T08:03:09.3122788Z These files are for the users to personalise their msys2 experience.
+2026-10-10T08:03:09.3123018Z
+2026-10-10T08:03:09.3123171Z They will never be overwritten nor automatically updated.
+2026-10-10T08:03:09.3123399Z
+2026-10-10T08:03:09.3477898Z './.bashrc' -> '/home/runneradmin/.bashrc'
+2026-10-10T08:03:09.3593704Z './.bash_profile' -> '/home/runneradmin/.bash_profile'
+2026-10-10T08:03:09.3707369Z './.profile' -> '/home/runneradmin/.profile'
+2026-10-10T08:03:09.4115215Z 'C:\Windows\system32\drivers\etc\hosts' -> '/etc/hosts'
+2026-10-10T08:03:09.4475496Z 'C:\Windows\system32\drivers\etc\protocol' -> '/etc/protocols'
+2026-10-10T08:03:09.4823385Z 'C:\Windows\system32\drivers\etc\services' -> '/etc/services'
+2026-10-10T08:03:09.5163651Z 'C:\Windows\system32\drivers\etc\networks' -> '/etc/networks'
+2026-10-10T08:03:09.6409769Z gpg: /etc/pacman.d/gnupg/trustdb.gpg: trustdb created
+2026-10-10T08:03:09.6462127Z gpg: no ultimately trusted keys found
+2026-10-10T08:03:09.8377240Z gpg: starting migration from earlier GnuPG versions
+2026-10-10T08:03:09.8768676Z gpg: porting secret keys from '/etc/pacman.d/gnupg/secring.gpg' to gpg-agent
+2026-10-10T08:03:09.8770464Z gpg: migration succeeded
+2026-10-10T08:03:09.8934954Z ==> Generating pacman master key. This may take some time.
+2026-10-10T08:03:09.9046789Z gpg: Generating pacman keyring master key...
+2026-10-10T08:03:10.2365031Z gpg: directory '/etc/pacman.d/gnupg/openpgp-revocs.d' created
+2026-10-10T08:03:10.2530657Z gpg: revocation certificate stored as '/etc/pacman.d/gnupg/openpgp-revocs.d/09A341C90326253782CD55F9AF94C8FC9AB7D0B1.rev'
+2026-10-10T08:03:10.2531618Z gpg: Done
+2026-10-10T08:03:10.2661492Z ==> Updating trust database...
+2026-10-10T08:03:10.2922310Z gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+2026-10-10T08:03:10.2922803Z gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+2026-10-10T08:03:10.3768930Z ==> Appending keys from msys2.gpg...
+2026-10-10T08:03:10.7597429Z ==> Locally signing trusted keys in keyring...
+2026-10-10T08:03:11.1645336Z   -> Locally signed 5 keys.
+2026-10-10T08:03:11.1754351Z ==> Importing owner trust values...
+2026-10-10T08:03:11.1883708Z gpg: setting ownertrust to 4
+2026-10-10T08:03:11.1884016Z gpg: setting ownertrust to 4
+2026-10-10T08:03:11.1884216Z gpg: setting ownertrust to 4
+2026-10-10T08:03:11.1884406Z gpg: setting ownertrust to 4
+2026-10-10T08:03:11.1884605Z gpg: setting ownertrust to 4
+2026-10-10T08:03:11.2084509Z ==> Disabling revoked keys in keyring...
+2026-10-10T08:03:11.3999959Z   -> Disabled 4 keys.
+2026-10-10T08:03:11.4102467Z ==> Updating trust database...
+2026-10-10T08:03:11.4372442Z gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+2026-10-10T08:03:11.4387347Z gpg: depth: 0  valid:   1  signed:   5  trust: 0-, 0q, 0n, 0m, 0f, 1u
+2026-10-10T08:03:11.4406956Z gpg: depth: 1  valid:   5  signed:   7  trust: 0-, 0q, 0n, 5m, 0f, 0u
+2026-10-10T08:03:11.4414106Z gpg: depth: 2  valid:   4  signed:   2  trust: 4-, 0q, 0n, 0m, 0f, 0u
+2026-10-10T08:03:11.4415777Z gpg: next trustdb check due at 2027-02-10
+2026-10-10T08:03:11.4690055Z pacman-key (pacman) 6.1.0
+2026-10-10T08:03:11.4690409Z Copyright (c) 2010-2024 Pacman Development Team <pacman-dev@lists.archlinux.org>.
+2026-10-10T08:03:11.4690592Z
+2026-10-10T08:03:11.4798367Z This is free software; see the source for copying conditions.
+2026-10-10T08:03:11.4798853Z There is NO WARRANTY, to the extent permitted by law.
+2026-10-10T08:03:11.6280126Z [1;32mInitial setup complete. MSYS2 is now ready to use.[1;0m
+2026-10-10T08:03:11.6399998Z MINGW64_NT-10.0-26100 runnervmfi6oq 3.6.10-c770e1b9.x86_64 2026-09-26 06:38 UTC x86_64 Msys
+2026-10-10T08:03:11.6435509Z ##[endgroup]
+2026-10-10T08:03:11.6435892Z ##[group]Disable CheckSpace...
+2026-10-10T08:03:11.6753169Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'sed' '-i' 's/^CheckSpace/#CheckSpace/g' '/etc/pacman.conf'"
+2026-10-10T08:03:11.8117964Z ##[endgroup]
+2026-10-10T08:03:11.8118260Z ##[group]Updating packages...
+2026-10-10T08:03:11.8460764Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Syuu' '--overwrite' '*'"
+2026-10-10T08:03:12.3106696Z :: Synchronizing package databases...
+2026-10-10T08:03:13.4771434Z  clangarm64 downloading...
+2026-10-10T08:03:13.4771651Z  mingw32 downloading...
+2026-10-10T08:03:13.4771785Z  mingw64 downloading...
+2026-10-10T08:03:13.4771899Z  ucrt64 downloading...
+2026-10-10T08:03:13.4772014Z  clang64 downloading...
+2026-10-10T08:03:13.4772141Z  msys downloading...
+2026-10-10T08:03:13.7768262Z :: Starting core system upgrade...
+2026-10-10T08:03:13.8934558Z warning: terminate other MSYS2 programs before proceeding
+2026-10-10T08:03:13.8934817Z resolving dependencies...
+2026-10-10T08:03:13.8934959Z looking for conflicting packages...
+2026-10-10T08:03:13.8991636Z
+2026-10-10T08:03:13.8991773Z Packages (1) msys2-runtime-3.6.10-6
+2026-10-10T08:03:13.8992066Z
+2026-10-10T08:03:13.8992178Z Total Installed Size:  6.31 MiB
+2026-10-10T08:03:13.8992378Z Net Upgrade Size:      0.00 MiB
+2026-10-10T08:03:13.8992491Z
+2026-10-10T08:03:13.8993856Z :: Proceed with installation? [Y/n]
+2026-10-10T08:03:13.8994073Z checking keyring...
+2026-10-10T08:03:13.9379263Z checking package integrity...
+2026-10-10T08:03:14.0325299Z loading package files...
+2026-10-10T08:03:14.0342123Z checking for file conflicts...
+2026-10-10T08:03:14.0342433Z :: Processing package changes...
+2026-10-10T08:03:14.0342685Z upgrading msys2-runtime...
+2026-10-10T08:03:14.1215511Z :: To complete this update all MSYS2 processes including this terminal will be closed. Confirm to proceed [Y/n]
+2026-10-10T08:03:14.3085583Z ##[endgroup]
+2026-10-10T08:03:14.3085829Z ##[group]Killing remaining tasks...
+2026-10-10T08:03:14.3414860Z [command]C:\Windows\system32\taskkill.exe /F /FI "MODULES eq msys-2.0.dll"
+2026-10-10T08:03:14.4139572Z
+2026-10-10T08:03:14.4140025Z INFO: No tasks running with the specified criteria.
+2026-10-10T08:03:14.4164382Z ##[endgroup]
+2026-10-10T08:03:14.4164632Z ##[group]Final system upgrade...
+2026-10-10T08:03:14.4484052Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Syuu' '--overwrite' '*'"
+2026-10-10T08:03:14.9054181Z :: Synchronizing package databases...
+2026-10-10T08:03:15.8817491Z  clangarm64 downloading...
+2026-10-10T08:03:15.8817797Z  mingw32 downloading...
+2026-10-10T08:03:15.8817988Z  mingw64 downloading...
+2026-10-10T08:03:15.8818163Z  ucrt64 downloading...
+2026-10-10T08:03:15.8818345Z  clang64 downloading...
+2026-10-10T08:03:15.8818523Z  msys downloading...
+2026-10-10T08:03:16.1721624Z :: Starting core system upgrade...
+2026-10-10T08:03:16.2901124Z  there is nothing to do
+2026-10-10T08:03:16.2901379Z :: Starting full system upgrade...
+2026-10-10T08:03:16.3067942Z resolving dependencies...
+2026-10-10T08:03:16.3119361Z looking for conflicting packages...
+2026-10-10T08:03:16.3131689Z
+2026-10-10T08:03:16.3132036Z Packages (5) libexpat-2.9.0-1  libopenssl-3.6.5-1  libpcre2_8-10.49-1  openssl-3.6.5-1  tzcode-2026e-1
+2026-10-10T08:03:16.3132279Z
+2026-10-10T08:03:16.3132343Z Total Installed Size:  9.36 MiB
+2026-10-10T08:03:16.3132478Z Net Upgrade Size:      0.01 MiB
+2026-10-10T08:03:16.3132561Z
+2026-10-10T08:03:16.3136745Z :: Proceed with installation? [Y/n]
+2026-10-10T08:03:16.3136923Z checking keyring...
+2026-10-10T08:03:16.3515686Z checking package integrity...
+2026-10-10T08:03:16.7386072Z loading package files...
+2026-10-10T08:03:16.7499405Z checking for file conflicts...
+2026-10-10T08:03:16.7517003Z :: Processing package changes...
+2026-10-10T08:03:16.7517231Z upgrading libexpat...
+2026-10-10T08:03:16.7546304Z upgrading libopenssl...
+2026-10-10T08:03:16.7747411Z upgrading libpcre2_8...
+2026-10-10T08:03:16.7779632Z upgrading openssl...
+2026-10-10T08:03:16.8380545Z upgrading tzcode...
+2026-10-10T08:03:17.9433841Z ##[endgroup]
+2026-10-10T08:03:17.9434159Z ##[group]Installing additional packages through pacman...
+2026-10-10T08:03:17.9751691Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-S' '--needed' '--overwrite' '*' 'make' 'diffutils' 'python' 'mingw-w64-ucrt-x86_64-gcc'"
+2026-10-10T08:03:18.5486605Z resolving dependencies...
+2026-10-10T08:03:18.5544000Z looking for conflicting packages...
+2026-10-10T08:03:18.5560647Z
+2026-10-10T08:03:18.5562442Z Packages (24) binutils-2.47-1  mingw-w64-ucrt-x86_64-binutils-2.47-4  mingw-w64-ucrt-x86_64-cc-libs-16.2.0-5  mingw-w64-ucrt-x86_64-crt-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-gettext-runtime-1.0-1  mingw-w64-ucrt-x86_64-gmp-6.3.0-2  mingw-w64-ucrt-x86_64-headers-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-isl-0.28-1  mingw-w64-ucrt-x86_64-libgcc-16.2.0-5  mingw-w64-ucrt-x86_64-libiconv-1.19-1  mingw-w64-ucrt-x86_64-libstdc++-16.2.0-5  mingw-w64-ucrt-x86_64-libwinpthread-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-mpc-1.4.1-1  mingw-w64-ucrt-x86_64-mpfr-4.2.2-3  mingw-w64-ucrt-x86_64-tzdata-2026e-1  mingw-w64-ucrt-x86_64-windows-default-manifest-20260815-1  mingw-w64-ucrt-x86_64-winpthreads-14.0.0.r426.g4564ee4b5-1  mingw-w64-ucrt-x86_64-zlib-1.3.2-2  mingw-w64-ucrt-x86_64-zstd-1.5.7-2  mpdecimal-4.0.1-1  diffutils-3.12-1  make-4.4.1-3  mingw-w64-ucrt-x86_64-gcc-16.2.0-5  python-3.12.15-1
+2026-10-10T08:03:18.5564168Z
+2026-10-10T08:03:18.5564229Z Total Installed Size:  703.56 MiB
+2026-10-10T08:03:18.5564320Z
+2026-10-10T08:03:18.5581322Z :: Proceed with installation? [Y/n]
+2026-10-10T08:03:18.5581512Z checking keyring...
+2026-10-10T08:03:18.5941970Z checking package integrity...
+2026-10-10T08:03:21.3361023Z loading package files...
+2026-10-10T08:03:21.4172996Z checking for file conflicts...
+2026-10-10T08:03:21.7676644Z :: Processing package changes...
+2026-10-10T08:03:21.7676922Z installing make...
+2026-10-10T08:03:21.7860864Z installing diffutils...
+2026-10-10T08:03:21.8074924Z installing mpdecimal...
+2026-10-10T08:03:21.8104728Z installing binutils...
+2026-10-10T08:03:22.1187668Z installing python...
+2026-10-10T08:03:26.4678513Z installing mingw-w64-ucrt-x86_64-libwinpthread...
+2026-10-10T08:03:26.4706010Z installing mingw-w64-ucrt-x86_64-libgcc...
+2026-10-10T08:03:26.4737130Z installing mingw-w64-ucrt-x86_64-tzdata...
+2026-10-10T08:03:27.3388365Z installing mingw-w64-ucrt-x86_64-libstdc++...
+2026-10-10T08:03:27.3458061Z installing mingw-w64-ucrt-x86_64-cc-libs...
+2026-10-10T08:03:27.3476001Z installing mingw-w64-ucrt-x86_64-libiconv...
+2026-10-10T08:03:27.3624951Z installing mingw-w64-ucrt-x86_64-gettext-runtime...
+2026-10-10T08:03:27.4775385Z installing mingw-w64-ucrt-x86_64-zlib...
+2026-10-10T08:03:27.4824667Z installing mingw-w64-ucrt-x86_64-zstd...
+2026-10-10T08:03:27.4944480Z installing mingw-w64-ucrt-x86_64-binutils...
+2026-10-10T08:03:27.6598519Z installing mingw-w64-ucrt-x86_64-headers...
+2026-10-10T08:03:28.6030883Z installing mingw-w64-ucrt-x86_64-crt...
+2026-10-10T08:03:28.9608756Z installing mingw-w64-ucrt-x86_64-gmp...
+2026-10-10T08:03:28.9698292Z installing mingw-w64-ucrt-x86_64-isl...
+2026-10-10T08:03:29.0078130Z installing mingw-w64-ucrt-x86_64-mpfr...
+2026-10-10T08:03:29.0200414Z installing mingw-w64-ucrt-x86_64-mpc...
+2026-10-10T08:03:29.0239743Z installing mingw-w64-ucrt-x86_64-windows-default-manifest...
+2026-10-10T08:03:29.0256627Z installing mingw-w64-ucrt-x86_64-winpthreads...
+2026-10-10T08:03:29.0312481Z installing mingw-w64-ucrt-x86_64-gcc...
+2026-10-10T08:03:29.8382015Z Optional dependencies for mingw-w64-ucrt-x86_64-gcc
+2026-10-10T08:03:29.8382263Z     mingw-w64-ucrt-x86_64-libatomic
+2026-10-10T08:03:29.8382421Z     mingw-w64-ucrt-x86_64-libgomp: OpenMP
+2026-10-10T08:03:29.8382603Z     mingw-w64-ucrt-x86_64-libquadmath: Quad Math
+2026-10-10T08:03:29.8440597Z :: Running post-transaction hooks...
+2026-10-10T08:03:29.8441276Z (1/1) Updating the info directory file...
+2026-10-10T08:03:30.3201706Z ##[endgroup]
+2026-10-10T08:03:30.3202096Z ##[group]Saving package cache...
+2026-10-10T08:03:30.3523706Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'paccache' '-r' '-f' '-u' '-k0'"
+2026-10-10T08:03:30.8928420Z ==> no candidate packages found for pruning
+2026-10-10T08:03:30.9270237Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'paccache' '-r' '-f' '-k1'"
+2026-10-10T08:03:31.1261763Z ==> no candidate packages found for pruning
+2026-10-10T08:03:31.3504382Z Cache unchanged, skipping save for msys2-pkgs-upd:true-conf:27a10b6e-files:76ccc4243860e4a6aa1f953826f722dc5db6db0d89526fce008b35a85709c9e0
+2026-10-10T08:03:31.3834377Z [command]C:\Windows\system32\cmd.exe /D /S /C D:\a\_temp\setup-msys2\msys2.cmd -c "'pacman' '--noconfirm' '-Scc'"
+2026-10-10T08:03:31.8415491Z
+2026-10-10T08:03:31.8415976Z Cache directory: /var/cache/pacman/pkg/
+2026-10-10T08:03:31.8732523Z :: Do you want to remove ALL files from cache? [Y/n]
+2026-10-10T08:03:31.8733130Z removing all files from cache...
+2026-10-10T08:03:31.8733293Z
+2026-10-10T08:03:31.8733366Z Database directory: /var/lib/pacman/
+2026-10-10T08:03:31.8744296Z :: Do you want to remove unused repositories? [Y/n]
+2026-10-10T08:03:31.8744563Z removing unused sync repositories...
+2026-10-10T08:03:31.8796847Z ##[endgroup]
+2026-10-10T08:03:31.9149021Z ##[group]Run make -j2
+2026-10-10T08:03:31.9149234Z [36;1mmake -j2[0m
+2026-10-10T08:03:31.9151841Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+2026-10-10T08:03:31.9151994Z env:
+2026-10-10T08:03:31.9152141Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:31.9152394Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+2026-10-10T08:03:31.9152638Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:31.9152855Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:31.9153068Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:03:31.9153246Z   MSYSTEM: UCRT64
+2026-10-10T08:03:31.9153356Z ##[endgroup]
+2026-10-10T08:03:32.5987223Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/nift.cpp -o src/nift.o
+2026-10-10T08:03:32.6173549Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectOwnership.cpp -o src/ProjectOwnership.o
+2026-10-10T08:03:32.8440460Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/PackageTransaction.cpp -o src/PackageTransaction.o
+2026-10-10T08:03:33.8570903Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/CLI.cpp -o src/CLI.o
+2026-10-10T08:03:37.5350936Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Process.cpp -o src/Process.o
+2026-10-10T08:03:39.7779606Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JobControl.cpp -o src/JobControl.o
+2026-10-10T08:03:40.4207702Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/RuntimeValue.cpp -o src/RuntimeValue.o
+2026-10-10T08:03:42.6856259Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Value.cpp -o src/Value.o
+2026-10-10T08:03:43.3181638Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/FileSystem.cpp -o src/FileSystem.o
+2026-10-10T08:03:45.5579153Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonFile.cpp -o src/JsonFile.o
+2026-10-10T08:03:46.9912106Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+2026-10-10T08:03:47.1137749Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c minifypp/src/Minify.cpp -o minifypp/src/Minify.o
+2026-10-10T08:03:50.4520165Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/Markup.cpp -o markuppp/src/Markup.o
+2026-10-10T08:03:51.8703366Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/AsciiDoc.cpp -o markuppp/src/AsciiDoc.o
+2026-10-10T08:03:53.9119958Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/ReStructuredText.cpp -o markuppp/src/ReStructuredText.o
+2026-10-10T08:03:54.1536810Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectInfo.cpp -o src/ProjectInfo.o
+2026-10-10T08:03:56.0538184Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectRead.cpp -o src/ProjectRead.o
+2026-10-10T08:03:59.7537659Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectState.cpp -o src/ProjectState.o
+2026-10-10T08:04:03.5631381Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/WatchList.cpp -o src/WatchList.o
+2026-10-10T08:04:03.5873218Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/BuildProgress.cpp -o src/BuildProgress.o
+2026-10-10T08:04:04.6253512Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Automation.cpp -o src/Automation.o
+2026-10-10T08:04:06.3373325Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Hooks.cpp -o src/Hooks.o
+2026-10-10T08:04:06.5261575Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Ast.cpp -o src/Ast.o
+2026-10-10T08:04:09.5173133Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/blocks.c -o markuppp/vendor/cmark/blocks.o
+2026-10-10T08:04:09.7914219Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/buffer.c -o markuppp/vendor/cmark/buffer.o
+2026-10-10T08:04:09.9023060Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark.c -o markuppp/vendor/cmark/cmark.o
+2026-10-10T08:04:09.9771999Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark_ctype.c -o markuppp/vendor/cmark/cmark_ctype.o
+2026-10-10T08:04:10.0429742Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_href_e.c -o markuppp/vendor/cmark/houdini_href_e.o
+2026-10-10T08:04:10.1250204Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_e.c -o markuppp/vendor/cmark/houdini_html_e.o
+2026-10-10T08:04:10.2033064Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_u.c -o markuppp/vendor/cmark/houdini_html_u.o
+2026-10-10T08:04:10.3127171Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/html.c -o markuppp/vendor/cmark/html.o
+2026-10-10T08:04:10.4307362Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/inlines.c -o markuppp/vendor/cmark/inlines.o
+2026-10-10T08:04:10.8085978Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/iterator.c -o markuppp/vendor/cmark/iterator.o
+2026-10-10T08:04:10.9038891Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/node.c -o markuppp/vendor/cmark/node.o
+2026-10-10T08:04:11.0740958Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/references.c -o markuppp/vendor/cmark/references.o
+2026-10-10T08:04:11.1845170Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/render.c -o markuppp/vendor/cmark/render.o
+2026-10-10T08:04:11.2856778Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/scanners.c -o markuppp/vendor/cmark/scanners.o
+2026-10-10T08:04:11.8850314Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/utf8.c -o markuppp/vendor/cmark/utf8.o
+2026-10-10T08:04:12.0932126Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+2026-10-10T08:04:12.6380704Z BUILD vendored libffi (x86_64-w64-mingw32-cc)
+2026-10-10T08:04:45.9029245Z BUILD vendored libffi: done (33s)
+2026-10-10T08:04:45.9055734Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Parser.cpp -o src/Parser.o
+2026-10-10T08:04:45.9214250Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserAsyncPool.cpp -o src/ParserAsyncPool.o
+2026-10-10T08:04:46.3330883Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserExpression.cpp -o src/ParserExpression.o
+2026-10-10T08:04:53.0847733Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserHelpers.cpp -o src/ParserHelpers.o
+2026-10-10T08:04:57.2075451Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserScript.cpp -o src/ParserScript.o
+2026-10-10T08:05:04.1855636Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserTemplate.cpp -o src/ParserTemplate.o
+2026-10-10T08:05:15.1200978Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o nift.exe
+2026-10-10T08:05:15.3876455Z ##[group]Run make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-process-hardening
+2026-10-10T08:05:15.3879886Z [36;1mmake test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-process-hardening[0m
+2026-10-10T08:05:15.3882831Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+2026-10-10T08:05:15.3883021Z env:
+2026-10-10T08:05:15.3883220Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:05:15.3883513Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+2026-10-10T08:05:15.3883823Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:05:15.3884090Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:05:15.3884351Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+2026-10-10T08:05:15.3884583Z   MSYSTEM: UCRT64
+2026-10-10T08:05:15.3884738Z ##[endgroup]
+2026-10-10T08:05:16.1280448Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+2026-10-10T08:05:16.6107801Z python3 tests/v410_build_pipeline.py --nift "/d/a/nift/nift/nift.exe"
+2026-10-10T08:05:16.7603965Z PASS custom replaces render; pre/main/post; dependency recording; incremental
+2026-10-10T08:05:16.9184911Z PASS all scripts and content invalidate
+2026-10-10T08:05:16.9496913Z PASS pre-build generates missing content before render
+2026-10-10T08:05:17.0127159Z PASS script-relevant tracked metadata invalidates
+2026-10-10T08:05:17.0440258Z PASS failure pre-build
+2026-10-10T08:05:17.0753410Z PASS repair pre-build
+2026-10-10T08:05:17.1067936Z PASS failure build
+2026-10-10T08:05:17.1383818Z PASS repair build
+2026-10-10T08:05:17.1698400Z PASS failure post-build
+2026-10-10T08:05:17.2013922Z PASS repair post-build
+2026-10-10T08:05:17.2327511Z PASS failure missing-output
+2026-10-10T08:05:17.2644381Z PASS repair missing-output
+2026-10-10T08:05:17.3908331Z PASS sidecars; removal invalidation; conflict; explicit precedence
+2026-10-10T08:05:17.5171970Z PASS chain ordering, targeted closure, clean prerequisites and no invalidation
+2026-10-10T08:05:17.6438250Z PASS diamond ordering, targeted closure, clean prerequisites and no invalidation
+2026-10-10T08:05:17.7070747Z PASS transitive failure propagation; independent branch; recovery
+2026-10-10T08:05:17.9123662Z PASS missing/self/duplicate/cycle/type validation before mutation
+2026-10-10T08:05:17.9440306Z PASS parallel independent branches with deterministic barrier
+2026-10-10T08:05:17.9757622Z PASS normal/custom composition
+2026-10-10T08:05:20.1678778Z PASS 10k iterative cycle diagnostic
+2026-10-10T08:05:20.2457786Z PASS transitive closure across a clean intermediate
+2026-10-10T08:05:20.4663576Z PASS same-pass ordinary file invalidation, multiple consumers hash
+2026-10-10T08:05:20.7012099Z PASS same-pass ordinary file invalidation, multiple consumers modified
+2026-10-10T08:05:22.9011019Z PASS generated output alias cache freshness
+2026-10-10T08:05:23.0296352Z PASS tracking serialization, rename references and safe prerequisite removal
+2026-10-10T08:05:23.4035185Z PASS build-auto reloads changed script and dependency graph
+2026-10-10T08:05:23.5943826Z PASS existing project preservation/idempotency ('rewrite', 'redesign')
+2026-10-10T08:05:23.7351345Z PASS existing project preservation/idempotency ('redesign', 'rewrite')
+2026-10-10T08:05:23.7648627Z PASS fresh rewrite
+2026-10-10T08:05:23.7965627Z PASS fresh redesign
+2026-10-10T08:05:24.2648219Z PASS 30 build pipeline groups
+2026-10-10T08:05:24.3322300Z NIFT=/d/a/nift/nift/nift.exe /usr/bin/python3 tests/v410_file_buffer_parity.py
+2026-10-10T08:05:24.4926363Z PASS open-r
+2026-10-10T08:05:24.5684061Z PASS open-rw
+2026-10-10T08:05:24.6477372Z PASS open-w
+2026-10-10T08:05:24.7100208Z PASS open-a
+2026-10-10T08:05:24.7747413Z PASS mutate-write("xy")
+2026-10-10T08:05:24.8713102Z PASS mutate-write("")
+2026-10-10T08:05:24.9476490Z PASS mutate-write_line("xy")
+2026-10-10T08:05:25.0263474Z PASS mutate-write_bytes(bytes([0,255,65]))
+2026-10-10T08:05:25.1099834Z PASS mutate-write(bytes([0,255,65]))
+2026-10-10T08:05:25.1847714Z PASS mutate-write_val(42)
+2026-10-10T08:05:25.2494483Z PASS mutate-append("xy")
+2026-10-10T08:05:25.3110149Z PASS mutate-append("")
+2026-10-10T08:05:25.3747626Z PASS mutate-prepend("xy")
+2026-10-10T08:05:25.4403488Z PASS mutate-insert(2,"xy")
+2026-10-10T08:05:25.5233624Z PASS mutate-insert_before("CD","xy")
+2026-10-10T08:05:25.6352677Z PASS mutate-insert_after("CD","xy")
+2026-10-10T08:05:25.7251118Z PASS mutate-replace("CD","xy")
+2026-10-10T08:05:25.8199302Z PASS mutate-replace("CD","CD")
+2026-10-10T08:05:25.8969537Z PASS mutate-replace("missing","xy")
+2026-10-10T08:05:25.9765270Z PASS mutate-replace_once("CD","xy")
+2026-10-10T08:05:26.0559584Z PASS save-then-revert
+2026-10-10T08:05:26.1371367Z PASS overwrite-initial-revert
+2026-10-10T08:05:26.2133577Z PASS new-empty-write
+2026-10-10T08:05:26.2917052Z PASS append-new-empty-write
+2026-10-10T08:05:26.3559615Z PASS reopen-external-edit
+2026-10-10T08:05:26.4360021Z PASS opaque-closed-reopen
+2026-10-10T08:05:26.5126689Z PASS write-argument-saves
+2026-10-10T08:05:26.5774998Z PASS write-argument-reverts
+2026-10-10T08:05:26.6565986Z PASS write-argument-closes
+2026-10-10T08:05:26.7372011Z PASS closed-write-factory-count
+2026-10-10T08:05:26.8137582Z PASS readonly-write-factory-count
+2026-10-10T08:05:26.8779851Z PASS failed-save-revert
+2026-10-10T08:05:26.9399337Z PASS duplicate-replace-once-error
+2026-10-10T08:05:27.0028454Z PASS receiver-factory-count
+2026-10-10T08:05:27.0683106Z PASS factory-path-counter
+2026-10-10T08:05:27.1615833Z PASS factory-changing-cwd
+2026-10-10T08:05:27.2273740Z PASS open-mode-factory-cwd
+2026-10-10T08:05:27.3053777Z PASS closed-file-copy
+2026-10-10T08:05:27.3828842Z PASS closed-file-move
+2026-10-10T08:05:27.4621410Z PASS closed-file-remove
+2026-10-10T08:05:27.5245301Z PASS open-copy-precondition-counter
+2026-10-10T08:05:27.5889330Z PASS copy-invalid-argument
+2026-10-10T08:05:27.6528316Z PASS unknown-file-tag
+2026-10-10T08:05:27.7310505Z PASS nonfile-receiver-counter
+2026-10-10T08:05:27.8143659Z PASS read-val-token-contract
+2026-10-10T08:05:27.8889521Z PASS invalid-mode-arity
+2026-10-10T08:05:27.9663407Z PASS save-argument-arity
+2026-10-10T08:05:28.0461342Z PASS empty-write-return-to-clean
+2026-10-10T08:05:28.1260169Z PASS nested-method-depth-20
+2026-10-10T08:05:28.2199814Z PASS nested-method-depth-40
+2026-10-10T08:05:28.2997141Z PASS nested-method-depth-48
+2026-10-10T08:05:28.3814424Z PASS nested-method-depth-50
+2026-10-10T08:05:28.4573686Z PASS nested-method-depth-60
+2026-10-10T08:05:28.5229775Z PASS stack-named-20
+2026-10-10T08:05:28.5999925Z PASS stack-named-40
+2026-10-10T08:05:28.6647640Z PASS stack-named-48
+2026-10-10T08:05:28.7409459Z PASS stack-named-50
+2026-10-10T08:05:28.8207147Z PASS stack-named-60
+2026-10-10T08:05:28.8993499Z PASS stack-named-80
+2026-10-10T08:05:29.0101835Z PASS stack-named-96
+2026-10-10T08:05:29.0908296Z PASS stack-named-110
+2026-10-10T08:05:29.1685301Z PASS stack-html_escape-20
+2026-10-10T08:05:29.2465048Z PASS stack-html_escape-40
+2026-10-10T08:05:29.3251610Z PASS stack-html_escape-48
+2026-10-10T08:05:29.4045262Z PASS stack-html_escape-50
+2026-10-10T08:05:29.4874047Z PASS stack-html_escape-60
+2026-10-10T08:05:29.5628661Z PASS stack-html_escape-80
+2026-10-10T08:05:29.6276061Z PASS stack-html_escape-96
+2026-10-10T08:05:29.7041454Z PASS stack-html_escape-110
+2026-10-10T08:05:29.7832956Z PASS stack-type-20
+2026-10-10T08:05:29.8628869Z PASS stack-type-40
+2026-10-10T08:05:29.9269171Z PASS stack-type-48
+2026-10-10T08:05:29.9899310Z PASS stack-type-50
+2026-10-10T08:05:30.0531255Z PASS stack-type-60
+2026-10-10T08:05:30.1326246Z PASS stack-type-80
+2026-10-10T08:05:30.2127334Z PASS stack-type-96
+2026-10-10T08:05:30.2906576Z PASS stack-type-110
+2026-10-10T08:05:30.3690851Z PASS stack-min-20
+2026-10-10T08:05:30.4334237Z PASS stack-min-40
+2026-10-10T08:05:30.5127819Z PASS stack-min-48
+2026-10-10T08:05:30.5910243Z PASS stack-min-50
+2026-10-10T08:05:30.6680094Z PASS stack-min-60
+2026-10-10T08:05:30.7344854Z PASS stack-min-80
+2026-10-10T08:05:30.8109834Z PASS stack-min-96
+2026-10-10T08:05:30.9050876Z PASS stack-min-110
+2026-10-10T08:05:30.9840979Z PASS stack-method-20
+2026-10-10T08:05:31.0622446Z PASS stack-method-40
+2026-10-10T08:05:31.1417104Z PASS stack-method-48
+2026-10-10T08:05:31.2061096Z PASS stack-method-50
+2026-10-10T08:05:31.2828561Z PASS stack-method-60
+2026-10-10T08:05:31.3485255Z PASS stack-method-80
+2026-10-10T08:05:31.4293074Z PASS stack-method-96
+2026-10-10T08:05:31.5047396Z PASS stack-method-110
+2026-10-10T08:05:31.5702813Z PASS stack-method-argument-20
+2026-10-10T08:05:31.6645608Z PASS stack-method-argument-40
+2026-10-10T08:05:31.7412281Z PASS stack-method-argument-48
+2026-10-10T08:05:31.8031555Z PASS stack-method-argument-50
+2026-10-10T08:05:31.8833602Z PASS stack-method-argument-60
+2026-10-10T08:05:31.9496347Z PASS stack-method-argument-80
+2026-10-10T08:05:32.0270074Z PASS stack-method-argument-96
+2026-10-10T08:05:32.0897358Z PASS stack-method-argument-110
+2026-10-10T08:05:32.1703284Z PASS write-preserves-string-slots
+2026-10-10T08:05:32.1709139Z PASS 102 exact buffer/factory/cwd/reentry/file-effect contracts
+2026-10-10T08:05:32.2019978Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v410_file_buffer_guard.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -static -static-libgcc -static-libstdc++ .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/file-buffer-guard.exe
+2026-10-10T08:05:37.5221515Z .build/file-buffer-guard.exe
+2026-10-10T08:05:37.5570010Z PASS saved-state alias, lazy snapshots, no-op writes, revert, retained shell/IDs; cache=32 entries/1089024 conservative bytes
+2026-10-10T08:05:37.5906411Z NIFT=/d/a/nift/nift/nift.exe /usr/bin/python3 tests/v410_large_string_parity.py
+2026-10-10T08:05:39.9395819Z PASS payload-8192-Z-q
+2026-10-10T08:05:39.9396169Z PASS payload-8192-_-__
+2026-10-10T08:05:39.9396439Z PASS payload-8192-_-
+2026-10-10T08:05:39.9397051Z PASS payload-8192-_-_
+2026-10-10T08:05:39.9397231Z PASS payload-8192-missing-x
+2026-10-10T08:05:39.9397422Z PASS payload-16384-Z-q
+2026-10-10T08:05:39.9397621Z PASS payload-16384-_-__
+2026-10-10T08:05:39.9397790Z PASS payload-16384-_-
+2026-10-10T08:05:39.9397954Z PASS payload-16384-_-_
+2026-10-10T08:05:39.9398126Z PASS payload-16384-missing-x
+2026-10-10T08:05:39.9398331Z PASS payload-32768-Z-q
+2026-10-10T08:05:39.9398497Z PASS payload-32768-_-__
+2026-10-10T08:05:39.9398664Z PASS payload-32768-_-
+2026-10-10T08:05:39.9398867Z PASS payload-32768-_-_
+2026-10-10T08:05:39.9399039Z PASS payload-32768-missing-x
+2026-10-10T08:05:39.9399240Z PASS payload-65536-Z-q
+2026-10-10T08:05:39.9399414Z PASS payload-65536-_-__
+2026-10-10T08:05:39.9399581Z PASS payload-65536-_-
+2026-10-10T08:05:39.9399744Z PASS payload-65536-_-_
+2026-10-10T08:05:39.9399926Z PASS payload-65536-missing-x
+2026-10-10T08:05:39.9400105Z PASS payload-131072-Z-q
+2026-10-10T08:05:39.9400275Z PASS payload-131072-_-__
+2026-10-10T08:05:39.9400443Z PASS payload-131072-_-
+2026-10-10T08:05:39.9400630Z PASS payload-131072-_-_
+2026-10-10T08:05:39.9400799Z PASS payload-131072-missing-x
+2026-10-10T08:05:39.9400994Z PASS shape-.to_upper().replace("A","x")
+2026-10-10T08:05:39.9401203Z PASS shape-.to_upper().replace("A","x",)
+2026-10-10T08:05:39.9401404Z PASS shape-.to_upper().replace(,"A","x")
+2026-10-10T08:05:39.9401622Z PASS shape-.to_upper().replace("","x")
+2026-10-10T08:05:39.9401815Z PASS shape-.to_upper(,).replace("A","x")
+2026-10-10T08:05:39.9402009Z PASS shape-.trim().replace("a","x")
+2026-10-10T08:05:39.9402203Z PASS shape-.to_lower().replace("a","x")
+2026-10-10T08:05:39.9402416Z PASS shape-.replace("a",7)
+2026-10-10T08:05:39.9402670Z PASS mixed-body-counts
+2026-10-10T08:05:39.9402913Z PASS receiver-factory
+2026-10-10T08:05:39.9403097Z PASS argument-factory
+2026-10-10T08:05:39.9403257Z PASS nested-error
+2026-10-10T08:05:39.9403438Z PASS 37 exact payload/factory/diagnostic contracts
+2026-10-10T08:05:39.9705226Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v410_large_string_guard.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -static -static-libgcc -static-libstdc++ .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/large-string-guard.exe
+2026-10-10T08:05:44.9307260Z .build/large-string-guard.exe
+2026-10-10T08:05:45.1620157Z PASS bounded canonical cache: peak owned-capacity allowance=3891684 entries=10
+2026-10-10T08:05:45.1847966Z NIFT=/d/a/nift/nift/nift.exe /usr/bin/python3 tests/v410_filesystem_recipe_parity.py
+2026-10-10T08:05:45.3545808Z PASS stat-prepared
+2026-10-10T08:05:45.4524184Z PASS stat-compatibility
+2026-10-10T08:05:45.5449923Z PASS stat-wrong-arity
+2026-10-10T08:05:45.6405286Z PASS stat-wrong-type
+2026-10-10T08:05:45.7347060Z PASS stat-first-error
+2026-10-10T08:05:45.8147215Z PASS named-stat-prepared
+2026-10-10T08:05:45.9087244Z PASS named-stat-compatibility
+2026-10-10T08:05:45.9882193Z PASS move-order
+2026-10-10T08:05:46.0665751Z PASS move-argument-mutates-source
+2026-10-10T08:05:46.1635646Z PASS move-first-source-error
+2026-10-10T08:05:46.2576692Z PASS move-first-destination-error
+2026-10-10T08:05:46.3520637Z PASS move-wrong-arity
+2026-10-10T08:05:46.4312276Z PASS move-cwd-boundary
+2026-10-10T08:05:46.5277738Z PASS copy-order
+2026-10-10T08:05:46.6539745Z PASS copy-argument-mutates-source
+2026-10-10T08:05:46.7363657Z PASS copy-first-source-error
+2026-10-10T08:05:46.8416971Z PASS copy-first-destination-error
+2026-10-10T08:05:46.9366001Z PASS copy-wrong-arity
+2026-10-10T08:05:47.0306207Z PASS copy-cwd-boundary
+2026-10-10T08:05:47.1423981Z PASS move-unmatched-source
+2026-10-10T08:05:47.2365077Z PASS move-array-source
+2026-10-10T08:05:47.3308784Z PASS move-bad-source-array
+2026-10-10T08:05:47.4282510Z PASS move-second-destination-error
+2026-10-10T08:05:47.5221110Z PASS move-second-source-error
+2026-10-10T08:05:47.6028747Z PASS move-spread
+2026-10-10T08:05:47.6948779Z PASS copy-unmatched-source
+2026-10-10T08:05:47.7788156Z PASS copy-array-source
+2026-10-10T08:05:47.8706926Z PASS copy-bad-source-array
+2026-10-10T08:05:47.9495878Z PASS copy-second-destination-error
+2026-10-10T08:05:48.0426060Z PASS copy-second-source-error
+2026-10-10T08:05:48.1228169Z PASS copy-spread
+2026-10-10T08:05:48.2184103Z PASS move-loop-location
+2026-10-10T08:05:48.3105558Z PASS move-index-probe-order
+2026-10-10T08:05:48.3897653Z PASS move-root-path-replacement
+2026-10-10T08:05:48.4851674Z PASS copy-loop-location
+2026-10-10T08:05:48.5637940Z PASS copy-index-probe-order
+2026-10-10T08:05:48.6604474Z PASS copy-root-path-replacement
+2026-10-10T08:05:51.9898107Z PASS all 37 exact source-count/order/origin/error/file-effect contracts
+2026-10-10T08:05:51.9898737Z PASS 60 pure-string canonical fallback contracts
+2026-10-10T08:05:52.0220518Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/fs-recipe/ParserExpression.o
+2026-10-10T08:06:16.1408094Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c src/ParserTemplate.cpp -o .build/fs-recipe/ParserTemplate.o
+2026-10-10T08:06:26.6219523Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/fs-recipe/ParserExpression.o .build/fs-recipe/ParserTemplate.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-fs-recipe-guard.exe
+2026-10-10T08:06:26.8918440Z NIFT_FS_STATS=/d/a/nift/nift/.build/nift-fs-recipe-guard.exe /usr/bin/python3 tests/v410_filesystem_recipe_guard.py
+2026-10-10T08:06:27.1093132Z PASS immutable recipe reuse, canonical operands, pure plans, factories and spread fallback counters
+2026-10-10T08:06:27.1244022Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_string_replace_parity.py
+2026-10-10T08:06:27.6317671Z PASS 20 exact byte-string replacement contracts
+2026-10-10T08:06:27.6451562Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_native_dispatch_parity.py
+2026-10-10T08:06:28.0563434Z PASS 15 exact native dispatch/method/error contracts
+2026-10-10T08:06:28.0711490Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_glob_parity.py
+2026-10-10T08:06:28.4215323Z PASS 10 exact glob path/ordering/hidden/Unicode/alias contracts
+2026-10-10T08:06:28.4351206Z mkdir -p ".build/glob-relative/"
+2026-10-10T08:06:28.4657809Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PATH_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-relative/ParserExpression.o
+2026-10-10T08:06:52.8458369Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-relative/ParserExpression.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-glob-relative-guard.exe
+2026-10-10T08:06:53.0983875Z NIFT="/d/a/nift/nift/.build/nift-glob-relative-guard.exe" python3 tests/v410_glob_relative_guard.py
+2026-10-10T08:06:53.6876756Z PASS relative-base scaling: 32/128/512; absolute and empty globs bypass canonicalization
+2026-10-10T08:06:53.7166099Z NIFT=/d/a/nift/nift/nift.exe /usr/bin/python3 tests/v410_glob_prefix_parity.py
+2026-10-10T08:06:53.7955474Z POSIX alias/path contracts; portable glob contracts run separately
+2026-10-10T08:06:53.8227051Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c src/ParserHelpers.cpp -o .build/glob-prefix/ParserHelpers.o
+2026-10-10T08:06:57.8552063Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-prefix/ParserExpression.o
+2026-10-10T08:07:21.7075951Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-prefix/ParserHelpers.o .build/glob-prefix/ParserExpression.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-glob-prefix-guard.exe
+2026-10-10T08:07:21.9779360Z NIFT_PREFIX_STATS=/d/a/nift/nift/.build/nift-glob-prefix-guard.exe /usr/bin/python3 tests/v410_glob_prefix_guard.py
+2026-10-10T08:07:22.4035027Z PASS shared-prefix scaling, empty/absolute bypass, repeated glob and leaf alias counters
+2026-10-10T08:07:22.4143815Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v49_selector_parity.py
+2026-10-10T08:07:23.9775704Z PASS 58 selector/capture/location/error contracts
+2026-10-10T08:07:23.9927038Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v49_glob_order.py
+2026-10-10T08:07:24.1240856Z PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts
+2026-10-10T08:07:24.1353630Z mkdir -p ".build/glob-keys/"
+2026-10-10T08:07:24.1667859Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_KEY_STATS -MMD -MP -c src/ParserHelpers.cpp -o .build/glob-keys/ParserHelpers.o
+2026-10-10T08:07:28.3588982Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-keys/ParserHelpers.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-glob-key-guard.exe
+2026-10-10T08:07:28.6109884Z NIFT="/d/a/nift/nift/.build/nift-glob-key-guard.exe" python3 tests/v49_glob_key_guard.py
+2026-10-10T08:07:28.8802754Z PASS 100 entries: 100 ordering-key conversions
+2026-10-10T08:07:28.8803156Z PASS 200 entries: 200 ordering-key conversions
+2026-10-10T08:07:28.8803486Z PASS 400 entries: 400 ordering-key conversions
+2026-10-10T08:07:28.8949563Z mkdir -p ".build"
+2026-10-10T08:07:28.9202916Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_JSON_PREFLIGHT_STATS tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp -o ".build/nift-json-preflight-guard.exe"
+2026-10-10T08:07:31.8071457Z NIFT_JSON_GUARD="/d/a/nift/nift/.build/nift-json-preflight-guard.exe" python3 tests/v49_json_preflight_guard.py
+2026-10-10T08:07:31.9331100Z PASS 100 leaves, depth 48: one preflight, 149 converted nodes
+2026-10-10T08:07:31.9331652Z PASS 200 leaves, depth 48: one preflight, 249 converted nodes
+2026-10-10T08:07:31.9332933Z PASS 400 leaves, depth 48: one preflight, 449 converted nodes
+2026-10-10T08:07:31.9490071Z mkdir -p ".build"
+2026-10-10T08:07:31.9723212Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/runtime_value.cpp src/RuntimeValue.cpp -o ".build/nift-runtime-value.exe"
+2026-10-10T08:07:36.2209990Z ".build/nift-runtime-value.exe"
+2026-10-10T08:07:36.2497901Z NIFT="/d/a/nift/nift/nift.exe" bash tests/v48_callback_parity.sh
+2026-10-10T08:07:37.3095043Z PASS v4.8 identifier and callback compatibility parity
+2026-10-10T08:07:37.4366021Z PASS v4.8 callback compatibility matrix
+2026-10-10T08:07:37.4520686Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v48_callback_numeric_parity.py
+2026-10-10T08:07:53.7326705Z PASS 470 ordinary/callback numeric and fallback parity pairs
+2026-10-10T08:07:53.7475061Z mkdir -p ".build/lambda-cache/"
+2026-10-10T08:07:53.7788615Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/lambda-cache/ParserExpression.o
+2026-10-10T08:08:17.8298264Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/lambda-cache/ParserExpression.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-lambda-cache-guard.exe
+2026-10-10T08:08:18.0647903Z NIFT="/d/a/nift/nift/.build/nift-lambda-cache-guard.exe" python3 tests/v48_callback_guard.py
+2026-10-10T08:08:19.9494195Z PASS indexed map: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9494648Z PASS indexed sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9495042Z PASS identity map: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9495391Z PASS identity sort: {'syntax': 1, 'numeric': 0, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9495741Z PASS identity typed fallback: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 1, 'legacy': 1}
+2026-10-10T08:08:19.9496084Z PASS sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9496432Z PASS reduce: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9496774Z PASS numeric filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9497145Z PASS numeric equality filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+2026-10-10T08:08:19.9497767Z PASS bounded cache: {'syntax': 300, 'numeric': 256, 'instances': 300, 'prepared': 256, 'legacy': 44}
+2026-10-10T08:08:19.9498244Z PASS oversized body: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 0, 'legacy': 1}
+2026-10-10T08:08:19.9498584Z PASS typed fallback: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 1, 'legacy': 1}
+2026-10-10T08:08:19.9642747Z python3 tests/v410_oracle_paths_test.py
+2026-10-10T08:08:20.0601802Z ...
+2026-10-10T08:08:20.0602182Z ----------------------------------------------------------------------
+2026-10-10T08:08:20.0602502Z Ran 3 tests in 0.001s
+2026-10-10T08:08:20.0602598Z
+2026-10-10T08:08:20.0602678Z OK
+2026-10-10T08:08:20.0723962Z python3 tests/v410_sort_factory_parity.py --nift ./nift.exe
+2026-10-10T08:08:20.9865434Z PASS 31 exact sort/factory/capture/origin contracts
+2026-10-10T08:08:20.9999001Z python3 tests/v410_callback_overlay_parity.py --nift "/d/a/nift/nift/nift.exe"
+2026-10-10T08:08:21.6796030Z PASS 23 exact callback environment/origin contracts
+2026-10-10T08:08:21.6942399Z NIFT="/d/a/nift/nift/.build/nift-lambda-cache-guard.exe" python3 tests/v410_callback_overlay_guard.py
+2026-10-10T08:08:21.9798922Z PASS parameter: {'overlay_hits': 3, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+2026-10-10T08:08:21.9799376Z PASS hydrate once per frame: {'overlay_hits': 9, 'capture_hits': 3, 'hydrations': 3, 'misses': 0, 'fallbacks': 0}
+2026-10-10T08:08:21.9799764Z PASS missing x1: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 3, 'fallbacks': 3}
+2026-10-10T08:08:21.9800126Z PASS missing x8: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 24, 'fallbacks': 24}
+2026-10-10T08:08:21.9800514Z PASS missing x32: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 96, 'fallbacks': 96}
+2026-10-10T08:08:21.9800835Z PASS missing x128: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+2026-10-10T08:08:21.9801184Z PASS missing x256: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+2026-10-10T08:08:21.9801498Z PASS missing x1024: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+2026-10-10T08:08:21.9950979Z python3 tests/v410_object_member_parity.py --nift ./nift.exe
+2026-10-10T08:08:24.7443173Z PASS 86 exact object/member/location/origin contracts
+2026-10-10T08:08:24.7517694Z mkdir -p .build
+2026-10-10T08:08:24.7673176Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+2026-10-10T08:08:28.1064811Z .build/v410-object-member-unit
+2026-10-10T08:08:28.1246992Z mkdir -p ".build/object-lookup/"
+2026-10-10T08:08:28.1538635Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_OBJECT_LOOKUP_STATS -MMD -MP -c src/RuntimeValue.cpp -o .build/object-lookup/RuntimeValue.o
+2026-10-10T08:08:30.3562632Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -static -static-libgcc -static-libstdc++ src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/object-lookup/RuntimeValue.o .build/libffi/x86_64-w64-mingw32-cc/install/lib/libffi.a -o .build/nift-object-lookup-guard.exe
+2026-10-10T08:08:30.6084161Z python3 tests/v410_object_member_guard.py --nift ./.build/nift-object-lookup-guard.exe
+2026-10-10T08:08:32.5465180Z PASS one traversal per object lookup, exact comparison positions and missing checks
+2026-10-10T08:08:32.5609290Z mkdir -p .build
+2026-10-10T08:08:32.5728727Z python3 tests/shared_dependency_targeted_reproducer.py --nift ./nift.exe --require-clean --output .build/consumer-snapshot-matrix.json
+2026-10-10T08:08:37.8271580Z NOT REPRODUCED 0 contractual failures of 27 cases
+2026-10-10T08:08:37.8349032Z python3 tests/consumer_dependency_snapshots.py --nift ./nift.exe --output .build/consumer-snapshot-contracts.json
+2026-10-10T08:08:42.2810483Z {"fanout": [{"consumers": 2, "dependency_edges": 4, "metadata_bytes": 1186}, {"consumers": 3, "dependency_edges": 6, "metadata_bytes": 1779}, {"consumers": 10, "dependency_edges": 20, "metadata_bytes": 5930}, {"consumers": 128, "dependency_edges": 256, "metadata_bytes": 76780}], "declared_filevalue_hook": true, "fingerprint_migration": true, "post_output_validation": true, "generated_variants": true, "conflicting_reads": true, "versions_migration_rename": true, "json_schema_hook_import": true, "barriers": [{"kind": "native", "passed": true}, {"kind": "external", "passed": true}, {"kind": "interrupt", "passed": true}], "passed": true, "elapsed_seconds": 4.366}
+2026-10-10T08:08:42.3166667Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_PROCESS_TEST_HOOKS tests/process_failure.cpp src/Process.cpp src/JobControl.cpp -o .build/process-failure.exe
+2026-10-10T08:08:46.2537054Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-w64-mingw32-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_PROCESS_TEST_HOOKS tests/process_contract.cpp src/Process.cpp -o .build/process-contract.exe
+2026-10-10T08:08:49.9976460Z python3 tests/process_hardening.py --failure .build/process-failure.exe --contract .build/process-contract.exe
+2026-10-10T08:08:50.4236849Z Traceback (most recent call last):
+2026-10-10T08:08:50.4243075Z   File "/d/a/nift/nift/tests/process_hardening.py", line 15, in <module>
+2026-10-10T08:08:50.4243483Z     for stage in stages:run(a.failure,[op,str(stage)]+(['job'] if job else []))
+2026-10-10T08:08:50.4243789Z                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-10T08:08:50.4244080Z   File "/d/a/nift/nift/tests/process_hardening.py", line 9, in run
+2026-10-10T08:08:50.4244391Z     assert r.returncode==0,results[-1]
+2026-10-10T08:08:50.4244588Z            ^^^^^^^^^^^^^^^
+2026-10-10T08:08:50.4244902Z AssertionError: {'case': ['pipe', '1'], 'returncode': 1, 'stdout': '', 'stderr': 'handle leak\n'}
+2026-10-10T08:08:50.4392872Z make: *** [Makefile:1989: test-process-hardening] Error 1
+2026-10-10T08:08:50.4446135Z ##[error]Process completed with exit code 2.
+2026-10-10T08:08:50.4634713Z Post job cleanup.
+2026-10-10T08:08:50.5659329Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-10T08:08:50.5846753Z git version 2.55.0.windows.5
+2026-10-10T08:08:50.5889178Z Temporarily overriding HOME='D:\a\_temp\266c3e6d-efc9-4230-96f6-99126eb28fd3' before making global git config changes
+2026-10-10T08:08:50.5889761Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T08:08:50.5896137Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\nift\nift
+2026-10-10T08:08:50.6099676Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T08:08:50.6298958Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-10T08:08:51.0380892Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T08:08:51.0544552Z http.https://github.com/.extraheader
+2026-10-10T08:08:51.0571040Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T08:08:51.0769127Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-10T08:08:51.4423279Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T08:08:51.4622407Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-10T08:08:51.8626085Z Cleaning up orphan processes
