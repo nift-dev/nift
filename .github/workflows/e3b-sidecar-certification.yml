@@ -47,7 +47,7 @@ jobs:
       - name: Build both candidates on Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -j2 nift && make -C .build/e2-source -j2 nift
+        run: make -j2 nift.exe && make -C .build/e2-source -j2 nift.exe
       - name: Native sidecar contracts
         shell: pwsh
         run: |
@@ -106,7 +106,7 @@ jobs:
       - name: Build candidate on Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -j2 nift
+        run: make -j2 nift.exe
       - name: Check real cross-platform metadata exports
         shell: pwsh
         run: |
