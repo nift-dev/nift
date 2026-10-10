@@ -6,10 +6,10 @@ prior results support the claims but do not replace that certification.
 
 | Material claim | Authority |
 |---|---|
-| Per-consumer history and targeted omission correctness | `src/BuildState.cpp`, `src/ProjectInfo.cpp`; `tests/consumer_dependency_snapshots.py`; accepted v411-resume closeout/matrix |
+| Per-consumer history and targeted omission correctness | `src/ProjectInfo.cpp` and its consumer metadata/read authority; `tests/consumer_dependency_snapshots.py`; accepted v411-resume closeout/matrix |
 | Exact native consumed-byte authority | Native dependency recording in `src/Parser.cpp`, `src/ParserTemplate.cpp`, `src/ProjectInfo.cpp`; conflicting-read/native barrier and declared FileValue hook contracts |
 | v4.10 migration and fingerprint compatibility | `tests/consumer_dependency_snapshots.py` migration/fingerprint cases; hash/hybrid rebuild once, modified remains timestamp-based |
-| Generated dependencies and prerequisite closure | `tests/v410_build_pipeline_smoke.sh`; snapshot generated variants and final differential smoke |
+| Generated dependencies and prerequisite closure | `tests/v410_build_pipeline.py`; snapshot generated variants and final differential smoke |
 | Parent-prepared POSIX launch state / cleanup | `src/PreparedProcessPOSIX.h`, `src/ProcessPOSIX.h`, `src/Process.cpp`, `src/JobControl.cpp`; process contracts/faults and5/5 mutants |
 | Windows env isolation / handle list / redirects / Unicode | `src/Process.cpp`; `tests/process_contract.cpp`, `tests/process_failure.cpp`; native30-case process receipt |
 | Native platform coverage | Process run38038408869, checkpoint38038408828, shell/runtime38039057855; `docs/evidence/v411-process/hosted-*.json` |

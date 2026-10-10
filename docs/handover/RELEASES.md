@@ -19,11 +19,14 @@ maintainer-managed; Homebrew downstream propagation was not checked in this task
 See `docs/evidence/release-4.10.0/release-verification.md` for final checksums and
 evidence. Canonical reviewed notes remain unchanged at
 `docs/evidence/release-4.10.0/release-notes-4.10.0.md`. External suites remain NRS
-`a50c8dafbca81daf881a17d76dc195a84b9f3ca2` (94 modules) and PRS
+`6da99128a5ea053551fe952a4994a390a38d0258` (94 modules) and PRS
 `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). The v4.10 performance
 campaign is closed. No new feature, optimization, official benchmark campaign,
 Labs change or provisioning is authorized by this development transition.
 Future tags and package publication require explicit authorization.
+Current authorization covers v4.11 documentation, full release certification and
+non-publishing rehearsal. It excludes tagging, GitHub publication, Chocolatey
+submission and website release-state publication. Stop for final authorization.
 Prior entries below are historical records.
 
 ### v4.7.2 release status (2026-10-06)
