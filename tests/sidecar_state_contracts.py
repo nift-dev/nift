@@ -5,7 +5,8 @@ from shared_dependency_targeted_reproducer import setup
 from consumer_dependency_snapshots import python_tool
 import argparse
 a=argparse.ArgumentParser();a.add_argument('--nift',required=True);a.add_argument('--baseline',required=True);a.add_argument('--output',required=True);args=a.parse_args();bins={'e2':str(Path(args.baseline).resolve()),'e3b':str(Path(args.nift).resolve())};rows=[]
-def run(d,label,*args):return subprocess.run([bins[label],*args],cwd=d,capture_output=True,text=True)
+def run(d,label,*args):
+ return subprocess.run([bins[label],*args],cwd=d,capture_output=True,text=True)
 def fixture(d,mode):
  d.mkdir();setup(d,mode,'explicit')
  for n in ['one','two','three']:(d/f'data/{n}.txt').write_text(n)
