@@ -20,17 +20,20 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.11.0` (development), following the verified public v4.10.0 release.
+- Current executable identity: `Nift v4.11.0`, the verified public release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-v4.10 release; v4.11 development**.
-  The immutable v4.10.0 tag targets `76dbe2661fe7d221827db63959bf4a392bae2ba6`.
-  Release workflow #37987877884 and all public installer lanes passed.
-  Exactly five public assets and deployed website bytes were independently verified.
-  Chocolatey 4.10.0 was submitted via #37989307795; its feed reports Submitted/Pending,
-  not approved. Release verification is recorded in
-  `docs/evidence/release-4.10.0/release-verification.md`.
+- Current project phase: **v4.11.0 released and verified; stop for next direction**.
+  Immutable v4.11.0 targets `c8d9c266518d115e4f289c5c6a2b94ddd7ee9968`;
+  annotated tag object `aca0cc8bfe5b0b906b300d6f92ad1ef9bb23b9e2`.
+  Release workflow #38049463374 and all public installer lanes passed. Exactly
+  five public assets, all four native public archive lanes (#38049878898), Linux
+  published-artifact NRS/PRS and deployed website bytes were independently verified.
+  Chocolatey 4.11.0 was submitted via #38049985758; feed status is Submitted/Pending,
+  not approved. Snap edge version metadata is available for the five required
+  architectures; Store promotion remains manual-only. Release verification is
+  recorded in `docs/evidence/release-4.11.0/release-verification.md`.
   External contracts are NRS `6da99128a5ea053551fe952a4994a390a38d0258`
   (94 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
   The v4.10 performance campaign is historical and closed. Frozen official
@@ -43,10 +46,10 @@ whether it is a regression.
   handle inheritance, redirects and Unicode capture paths are certified natively.
   No urgent unresolved correctness blocker is known. Further hardening is
   demand-driven; do not reopen these campaigns without a concrete regression.
-  Current activity is v4.11 release preparation: documentation, reviewed release
-  notes, exact-candidate local/hosted certification and non-publishing rehearsal.
-  Normal commits/pushes are authorized for that work. STOP before tag/publication
-  or Chocolatey submission; final release authorization remains separate.
+  Release preparation and authorized publication are complete. The exact-candidate
+  certification and rehearsal remain historical provenance. No new feature,
+  performance or architecture campaign is authorized by release closeout. STOP
+  for next direction; do not move the immutable tag or promote Snap channels.
   Production process source ends at `bb7c95a531d35670352dfa412ec535e9dbdae1cd`;
   `0b642c8` changes a test fixture/evidence and `c16ca7a` records closeout evidence.
   See `docs/evidence/v411-process/closeout.json` and the accepted post-hardening

@@ -1,6 +1,6 @@
 # Nift release notes
 
-## v4.11.0 (unreleased development)
+## v4.11.0 — released 10 October 2026
 
 Nift v4.11 improves incremental build correctness after targeted builds and
 subprocess reliability across Linux, macOS and Windows. C ABI remains **1.3**.

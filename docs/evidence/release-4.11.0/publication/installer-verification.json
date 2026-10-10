@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "url": "https://nift.dev/install",
+  "canonical_bytes_equal": true,
+  "sha256": "a98bdf72c2c5bd3aed0181f16e0361220b15cf02a2b96d183d98702be6d90708",
+  "version": "Nift v4.11.0",
+  "installed_binary_matches_public_archive": true,
+  "init_build_status": "PASS"
+}

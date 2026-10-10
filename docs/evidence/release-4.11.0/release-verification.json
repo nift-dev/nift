@@ -1,0 +1,205 @@
+{
+  "candidate": "c8d9c266518d115e4f289c5c6a2b94ddd7ee9968",
+  "tag_target": "c8d9c266518d115e4f289c5c6a2b94ddd7ee9968",
+  "tag_object": "aca0cc8bfe5b0b906b300d6f92ad1ef9bb23b9e2",
+  "published": true,
+  "draft": false,
+  "prerelease": false,
+  "release_workflow": 38049463374,
+  "release_url": "https://github.com/nift-dev/nift/releases/tag/v4.11.0",
+  "canonical_and_public_notes_sha256": "6e23387174acf897f898d7db9f29af1ff0edcdc23797d9ba8a25420b22794304",
+  "public_assets": {
+    "passed": true,
+    "assets": [
+      {
+        "name": "nift-4.11.0-linux-x86_64.tar.gz",
+        "platform": "linux-x86_64",
+        "sha256": "445083b2e932ec775a1ca0076e88a7593aacf5843df36a7cd30ec0e8c21b0c7b",
+        "payload": [
+          "nift-4.11.0-linux-x86_64/LICENSE",
+          "nift-4.11.0-linux-x86_64/README.md",
+          "nift-4.11.0-linux-x86_64/nift"
+        ],
+        "executable_sha256": "cf1a34cda3e7d09d9a94728995a55cc6473befc7e755701274bc01aa53b19445",
+        "architecture": "PASS",
+        "readme_license": "PASS",
+        "rehearsal_archive_equal": false,
+        "rehearsal_executable_equal": true
+      },
+      {
+        "name": "nift-4.11.0-macos-arm64.tar.gz",
+        "platform": "macos-arm64",
+        "sha256": "958d3a1695b64e72936f77d37579c817823f24c3490b50dcde059ca2884749f4",
+        "payload": [
+          "nift-4.11.0-macos-arm64/LICENSE",
+          "nift-4.11.0-macos-arm64/README.md",
+          "nift-4.11.0-macos-arm64/nift"
+        ],
+        "executable_sha256": "5b4ea41edf8013ce571dbf5515c68950ff730e7eb58adb64970fa6348acd0de7",
+        "architecture": "PASS",
+        "readme_license": "PASS",
+        "rehearsal_archive_equal": false,
+        "rehearsal_executable_equal": true
+      },
+      {
+        "name": "nift-4.11.0-macos-x86_64.tar.gz",
+        "platform": "macos-x86_64",
+        "sha256": "56ce0da59bd9bca933bcd4e6bf69ee165e9edd9abcc0c0e7fd8222fe0cfcf146",
+        "payload": [
+          "nift-4.11.0-macos-x86_64/LICENSE",
+          "nift-4.11.0-macos-x86_64/README.md",
+          "nift-4.11.0-macos-x86_64/nift"
+        ],
+        "executable_sha256": "51f85e1392f7148dfcd347523e19c2ae57dc04c14c160501045bc6ee9ab380fd",
+        "architecture": "PASS",
+        "readme_license": "PASS",
+        "rehearsal_archive_equal": false,
+        "rehearsal_executable_equal": true
+      },
+      {
+        "name": "nift-4.11.0-windows-x86_64.zip",
+        "platform": "windows-x86_64",
+        "sha256": "e513bc9bf8a126a51b5f5329ca4641eabc6013327b223ea5c278d7fed573a3d3",
+        "payload": [
+          "nift-4.11.0-windows-x86_64/LICENSE",
+          "nift-4.11.0-windows-x86_64/README.md",
+          "nift-4.11.0-windows-x86_64/nift.exe"
+        ],
+        "executable_sha256": "f1b6abd326e54981a7fafafd29f9efd5d2926f958f5a23506b68b969f6ae8bdb",
+        "architecture": "PASS",
+        "readme_license": "PASS",
+        "rehearsal_archive_equal": false,
+        "rehearsal_executable_equal": false
+      }
+    ],
+    "asset_set": "exact four native archives + SHA256SUMS",
+    "linux_extracted_smoke": "PASS version/about/commands/unknown-help diagnostics/init/build/status",
+    "other_native_smokes": "PASS actual public archives on all four native runners, distribution run38049878898",
+    "untracked_or_debug_payload": "NONE"
+  },
+  "native_public_smokes": {
+    "workflow": 38049878898,
+    "all_four": "PASS"
+  },
+  "NRS": "94/94 PASS from actual public Linux archive",
+  "PRS": "12/12 PASS from actual public Linux archive",
+  "installer": {
+    "passed": true,
+    "url": "https://nift.dev/install",
+    "canonical_bytes_equal": true,
+    "sha256": "a98bdf72c2c5bd3aed0181f16e0361220b15cf02a2b96d183d98702be6d90708",
+    "version": "Nift v4.11.0",
+    "installed_binary_matches_public_archive": true,
+    "init_build_status": "PASS"
+  },
+  "Chocolatey": {
+    "workflow": 38049985758,
+    "package": "nift.4.11.0.nupkg",
+    "nupkg_sha256": "3e358ae5014d62d24f4c000f0dfe257f2f7236d64e4e5e90cc9d2d40ff3c7fa4",
+    "version": "4.11.0",
+    "public_windows_sha256": "e513bc9bf8a126a51b5f5329ca4641eabc6013327b223ea5c278d7fed573a3d3",
+    "release_url_in_package": true,
+    "feed": {
+      "Version": "4.11.0",
+      "IsLatestVersion": "false",
+      "Published": "1900-01-01T00:00:00",
+      "IsApproved": "false",
+      "PackageStatus": "Submitted",
+      "PackageTestResultStatus": "Pending"
+    }
+  },
+  "website": {
+    "source_SHA": "63ebd5617f9adca37de007a14941c171cf15dcf6",
+    "public_SHA": "1f5950619891fb9322e5ca1c3aaae881b2b0d5ef",
+    "deployment": 38050102226,
+    "result": "PASS",
+    "live": {
+      "passed": true,
+      "version": "4.11.0",
+      "pages": [
+        {
+          "url": "https://nift.dev/",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "3c2c33a517c2b9101f9dd46ba3d2ee916d9242646d61f3c7306803ea44775bf9"
+        },
+        {
+          "url": "https://nift.dev/docs/installing.html",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "8aec642af3774c47fb2b83c2d7505cd196921839b1cba36fe512bcff58f81d67"
+        },
+        {
+          "url": "https://nift.dev/docs/incremental-builds.html",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "af3669b0b7483aa103c7661e34bda515b105639455c783023a69dd2c98d2c770"
+        },
+        {
+          "url": "https://nift.dev/docs/build-scripts.html",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "0ca801d5417892c0ce4c5e08c71868c31f949fa941753ffc59737e37621370bc"
+        },
+        {
+          "url": "https://nift.dev/docs/scripting-run-shell.html",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "1dea64604bf30f5004483aa7546afbf7c3c7c6cb0bea45a7c401f61910a7017d"
+        },
+        {
+          "url": "https://nift.dev/docs/commands.html",
+          "status": 200,
+          "matches_generated_bytes": true,
+          "sha256": "79a1e8d854cd22101a5afb030f903af2d6c4244d21a2401369fbfe24364c33fb"
+        }
+      ]
+    }
+  },
+  "Snap": {
+    "edge_store_metadata": [
+      {
+        "architecture": "amd64",
+        "version": "4.11.0",
+        "revision": 1762
+      },
+      {
+        "architecture": "arm64",
+        "version": "4.11.0",
+        "revision": 1764
+      },
+      {
+        "architecture": "armhf",
+        "version": "4.11.0",
+        "revision": 1763
+      },
+      {
+        "architecture": "ppc64el",
+        "version": "4.11.0",
+        "revision": 1766
+      },
+      {
+        "architecture": "riscv64",
+        "version": "4.10.0",
+        "revision": 1761
+      },
+      {
+        "architecture": "s390x",
+        "version": "4.11.0",
+        "revision": 1765
+      }
+    ],
+    "promoted_by_agent": false,
+    "exact_build_commit_and_cross_arch_executable_identity": "Not certified; maintainer build-page/provenance inspection required before manual promotion",
+    "riscv64": "Best effort; still4.10.0 edge at observation"
+  },
+  "historical_files": {
+    "count": 38,
+    "unchanged": true,
+    "packaged": false
+  },
+  "frozen_benchmarks": "UNCHANGED",
+  "Jsonic++": "UNCHANGED",
+  "blockers": [],
+  "recommendation": "v4.11.0 RELEASE COMPLETE"
+}

@@ -7,27 +7,25 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The executable and Snap recipe declare `4.11.0` for development after the completed
-v4.10.0 GitHub release. The immutable annotated `v4.10.0` tag targets
-`76dbe2661fe7d221827db63959bf4a392bae2ba6`; tag object
-`00acc981185ab3946a5a4f88e583ea17b5c5834f`. Release workflow #37987877884 passed,
-including all three public installer lanes. Exactly five public assets and the
-live website were independently verified. Chocolatey 4.10.0 was submitted through
-#37989307795; its feed reports Submitted/Pending, not approved. Snap remains
-maintainer-managed; Homebrew downstream propagation was not checked in this task.
+The executable and Snap recipe declare `4.11.0`. The authorized GitHub v4.11.0
+release is published and verified at immutable annotated tag target
+`c8d9c266518d115e4f289c5c6a2b94ddd7ee9968`; tag object
+`aca0cc8bfe5b0b906b300d6f92ad1ef9bb23b9e2`. Release workflow #38049463374,
+all public installer lanes and native public archives #38049878898 passed.
+Exactly five actual public assets and the live website were independently verified.
+Chocolatey 4.11.0 was submitted through #38049985758; feed status Submitted/Pending
+is not approval. Snap promotion remains manual-only; read-only Store metadata
+reports 4.11.0 edge revisions for all five required architectures, with riscv64
+still on 4.10.0 (best effort). Homebrew propagation was not checked in this task.
 
-See `docs/evidence/release-4.10.0/release-verification.md` for final checksums and
-evidence. Canonical reviewed notes remain unchanged at
-`docs/evidence/release-4.10.0/release-notes-4.10.0.md`. External suites remain NRS
+See `docs/evidence/release-4.11.0/release-verification.md` for actual public hashes
+and evidence. Reviewed canonical notes remain unchanged. External suites are NRS
 `6da99128a5ea053551fe952a4994a390a38d0258` (94 modules) and PRS
-`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). The v4.10 performance
-campaign is closed. No new feature, optimization, official benchmark campaign,
-Labs change or provisioning is authorized by this development transition.
-Future tags and package publication require explicit authorization.
-Current authorization covers v4.11 documentation, full release certification and
-non-publishing rehearsal. It excludes tagging, GitHub publication, Chocolatey
-submission and website release-state publication. Stop for final authorization.
-Prior entries below are historical records.
+`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). Incremental correctness,
+process hardening and the v4.10 performance campaign remain closed; frozen benchmark
+and Jsonic++ inputs remain unchanged. This release closeout authorizes no further
+feature/performance/architecture work. STOP for next direction. Prior entries below
+are historical records.
 
 ### v4.7.2 release status (2026-10-06)
 

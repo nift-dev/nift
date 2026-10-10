@@ -1,0 +1,15 @@
+{
+  "package": "nift.4.11.0.nupkg",
+  "nupkg_sha256": "3e358ae5014d62d24f4c000f0dfe257f2f7236d64e4e5e90cc9d2d40ff3c7fa4",
+  "version": "4.11.0",
+  "public_windows_sha256": "e513bc9bf8a126a51b5f5329ca4641eabc6013327b223ea5c278d7fed573a3d3",
+  "release_url_in_package": true,
+  "feed": {
+    "Version": "4.11.0",
+    "IsLatestVersion": "false",
+    "Published": "1900-01-01T00:00:00",
+    "IsApproved": "false",
+    "PackageStatus": "Submitted",
+    "PackageTestResultStatus": "Pending"
+  }
+}

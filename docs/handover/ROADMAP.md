@@ -1,9 +1,9 @@
 # Nift maintained roadmap
 
-## Current status — v4.11 release preparation
+## Current status — v4.11 released and verified
 
-Public v4.10.0 is released and verified at immutable
-`76dbe2661fe7d221827db63959bf4a392bae2ba6`. Development is v4.11.0;
+Public v4.11.0 is released and verified at immutable
+`c8d9c266518d115e4f289c5c6a2b94ddd7ee9968`. The current executable is v4.11.0;
 C ABI remains 1.3. The accepted v4.11 incremental correctness and process
 hardening campaigns are CLOSED, with native Linux/macOS/Windows certification.
 Hash/hybrid consumers retain their own historical dependency snapshots, native
@@ -18,13 +18,12 @@ no hostile-repository sandbox claim. See the accepted state review in
 
 ## Next review boundary
 
-1. Complete living-doc/release-note reconciliation and exact-candidate local and
-   hosted certification, including manual Deep guards.
-2. Pass the canonical non-publishing Release artifacts rehearsal for 4.11.0 and
-   inspect the four native archives plus SHA256SUMS. Stop for final release
-   authorization before tagging, publishing or submitting Chocolatey.
-3. After an authorized release, return to a bounded real product/Labs workload.
-   Further hardening should follow demonstrated defects or missing user contracts.
+Release preparation, exact-candidate local/hosted certification, Deep guards,
+canonical rehearsal, publication and public-artifact/site verification are complete.
+See `../evidence/release-4.11.0/release-verification.md`. Chocolatey moderation and
+manual Snap promotion are separate downstream states. STOP for next direction;
+return to a bounded product/Labs workload only when separately requested. Further
+hardening follows demonstrated defects or missing user contracts.
 
 Persistent RuntimeValue indexing, canonical Jsonic++ optimization, broader
 sort/frame architecture, VM/JIT, process redesign and posix_spawn migration remain

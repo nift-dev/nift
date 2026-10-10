@@ -1,0 +1,69 @@
+{
+  "passed": true,
+  "assets": [
+    {
+      "name": "nift-4.11.0-linux-x86_64.tar.gz",
+      "platform": "linux-x86_64",
+      "sha256": "445083b2e932ec775a1ca0076e88a7593aacf5843df36a7cd30ec0e8c21b0c7b",
+      "payload": [
+        "nift-4.11.0-linux-x86_64/LICENSE",
+        "nift-4.11.0-linux-x86_64/README.md",
+        "nift-4.11.0-linux-x86_64/nift"
+      ],
+      "executable_sha256": "cf1a34cda3e7d09d9a94728995a55cc6473befc7e755701274bc01aa53b19445",
+      "architecture": "PASS",
+      "readme_license": "PASS",
+      "rehearsal_archive_equal": false,
+      "rehearsal_executable_equal": true
+    },
+    {
+      "name": "nift-4.11.0-macos-arm64.tar.gz",
+      "platform": "macos-arm64",
+      "sha256": "958d3a1695b64e72936f77d37579c817823f24c3490b50dcde059ca2884749f4",
+      "payload": [
+        "nift-4.11.0-macos-arm64/LICENSE",
+        "nift-4.11.0-macos-arm64/README.md",
+        "nift-4.11.0-macos-arm64/nift"
+      ],
+      "executable_sha256": "5b4ea41edf8013ce571dbf5515c68950ff730e7eb58adb64970fa6348acd0de7",
+      "architecture": "PASS",
+      "readme_license": "PASS",
+      "rehearsal_archive_equal": false,
+      "rehearsal_executable_equal": true
+    },
+    {
+      "name": "nift-4.11.0-macos-x86_64.tar.gz",
+      "platform": "macos-x86_64",
+      "sha256": "56ce0da59bd9bca933bcd4e6bf69ee165e9edd9abcc0c0e7fd8222fe0cfcf146",
+      "payload": [
+        "nift-4.11.0-macos-x86_64/LICENSE",
+        "nift-4.11.0-macos-x86_64/README.md",
+        "nift-4.11.0-macos-x86_64/nift"
+      ],
+      "executable_sha256": "51f85e1392f7148dfcd347523e19c2ae57dc04c14c160501045bc6ee9ab380fd",
+      "architecture": "PASS",
+      "readme_license": "PASS",
+      "rehearsal_archive_equal": false,
+      "rehearsal_executable_equal": true
+    },
+    {
+      "name": "nift-4.11.0-windows-x86_64.zip",
+      "platform": "windows-x86_64",
+      "sha256": "e513bc9bf8a126a51b5f5329ca4641eabc6013327b223ea5c278d7fed573a3d3",
+      "payload": [
+        "nift-4.11.0-windows-x86_64/LICENSE",
+        "nift-4.11.0-windows-x86_64/README.md",
+        "nift-4.11.0-windows-x86_64/nift.exe"
+      ],
+      "executable_sha256": "f1b6abd326e54981a7fafafd29f9efd5d2926f958f5a23506b68b969f6ae8bdb",
+      "architecture": "PASS",
+      "readme_license": "PASS",
+      "rehearsal_archive_equal": false,
+      "rehearsal_executable_equal": false
+    }
+  ],
+  "asset_set": "exact four native archives + SHA256SUMS",
+  "linux_extracted_smoke": "PASS version/about/commands/unknown-help diagnostics/init/build/status",
+  "other_native_smokes": "PASS actual public archives on all four native runners, distribution run38049878898",
+  "untracked_or_debug_payload": "NONE"
+}
