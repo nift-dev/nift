@@ -157,13 +157,15 @@ jobs:
           set -euo pipefail
           git init nift-regression-suite
           git -C nift-regression-suite remote add origin https://github.com/nift-dev/nift-regression-suite.git
-          git -C nift-regression-suite fetch --depth=1 --no-tags origin 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0
+          git -C nift-regression-suite fetch --depth=1 --no-tags origin 6da99128a5ea053551fe952a4994a390a38d0258
           git -C nift-regression-suite checkout --detach FETCH_HEAD
-          test "$(git -C nift-regression-suite rev-parse HEAD)" = 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0
+          test "$(git -C nift-regression-suite rev-parse HEAD)" = 6da99128a5ea053551fe952a4994a390a38d0258
       - name: Run independent contract with embedding consumers enabled
         shell: bash
         run: |
           set -euo pipefail
-          NIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.10.0 \
+          expected="$(grep -m1 -oE 'v[0-9]+\.[0-9]+\.[0-9]+' ReleaseNotes.md | tr -d v)"
+          python3 scripts/check_version_consistency.py --expected "$expected"
+          NIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION="$expected" \
             NIFT_EMBED_PREFIX="$PWD/dist/embed-prefix" \
             bash nift-regression-suite/run-contract.sh

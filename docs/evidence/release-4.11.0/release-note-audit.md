@@ -20,3 +20,11 @@ prior results support the claims but do not replace that certification.
 No release note claims arbitrary external ABA safety, recursive descendant
 ownership, Windows interactive jobs, universal external environment-writer safety,
 security proof, formal verification or new official benchmark rankings.
+
+Release-preparation CI reconciliation: first Deep run38042005449 used obsolete
+NRS80ac41bf and hard-coded4.10.0. Its completed job log is preserved in
+`deep-nrs-before.txt`. The accepted NRS6da99128 correction preserves historical
+consumer-hash authority, and Deep now derives the expected version from the
+release notes with an explicit source/Snap version-consistency guard. This
+changes certification provenance, not runtime semantics or the manual-only
+Deep scheduling policy. All walls must certify the resulting new candidate.

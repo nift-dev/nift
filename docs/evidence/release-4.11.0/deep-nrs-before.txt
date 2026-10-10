@@ -1,0 +1,425 @@
+﻿2026-10-10T09:43:13.1354943Z Current runner version: '2.337.0'
+2026-10-10T09:43:13.1379875Z ##[group]Runner Image Provisioner
+2026-10-10T09:43:13.1380787Z Hosted Compute Agent
+2026-10-10T09:43:13.1381484Z Version: 20261002.596
+2026-10-10T09:43:13.1382141Z Commit: c3d12f3313a95f25162a1503be624f3b0617f8c0
+2026-10-10T09:43:13.1382889Z Build Date: 2026-10-02T22:28:27Z
+2026-10-10T09:43:13.1383923Z Worker ID: {f7612fb2-81e2-4f84-beb1-336912e0e734}
+2026-10-10T09:43:13.1384665Z Region: eastus
+2026-10-10T09:43:13.1385686Z Cloud: Azure
+2026-10-10T09:43:13.1386291Z ##[endgroup]
+2026-10-10T09:43:13.1388130Z ##[group]Operating System
+2026-10-10T09:43:13.1388887Z Ubuntu
+2026-10-10T09:43:13.1389422Z 24.04.5
+2026-10-10T09:43:13.1389981Z LTS
+2026-10-10T09:43:13.1390524Z ##[endgroup]
+2026-10-10T09:43:13.1391118Z ##[group]Runner Image
+2026-10-10T09:43:13.1391778Z Image: ubuntu-24.04
+2026-10-10T09:43:13.1392391Z Version: 20261004.327.1
+2026-10-10T09:43:13.1393954Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-10T09:43:13.1395603Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261004.327
+2026-10-10T09:43:13.1396634Z ##[endgroup]
+2026-10-10T09:43:13.1397769Z ##[group]GITHUB_TOKEN Permissions
+2026-10-10T09:43:13.1399710Z Contents: read
+2026-10-10T09:43:13.1400427Z Metadata: read
+2026-10-10T09:43:13.1401069Z ##[endgroup]
+2026-10-10T09:43:13.1403488Z Secret source: Actions
+2026-10-10T09:43:13.1404458Z Cache mode: write
+2026-10-10T09:43:13.1405332Z Prepare workflow directory
+2026-10-10T09:43:13.1750862Z Prepare all required actions
+2026-10-10T09:43:13.1801699Z Getting action download info
+2026-10-10T09:43:13.4218065Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-10-10T09:43:13.6112507Z Complete job name: Independent NRS contract (94 modules)
+2026-10-10T09:43:13.6997749Z ##[group]Run actions/checkout@v5
+2026-10-10T09:43:13.6998631Z with:
+2026-10-10T09:43:13.6999088Z   repository: nift-dev/nift
+2026-10-10T09:43:13.7003110Z   token: ***
+2026-10-10T09:43:13.7003765Z   ssh-strict: true
+2026-10-10T09:43:13.7004204Z   ssh-user: git
+2026-10-10T09:43:13.7004653Z   persist-credentials: true
+2026-10-10T09:43:13.7005142Z   clean: true
+2026-10-10T09:43:13.7005583Z   sparse-checkout-cone-mode: true
+2026-10-10T09:43:13.7006113Z   fetch-depth: 1
+2026-10-10T09:43:13.7006543Z   fetch-tags: false
+2026-10-10T09:43:13.7006988Z   show-progress: true
+2026-10-10T09:43:13.7007430Z   lfs: false
+2026-10-10T09:43:13.7007838Z   submodules: false
+2026-10-10T09:43:13.7008285Z   set-safe-directory: true
+2026-10-10T09:43:13.7008783Z   allow-unsafe-pr-checkout: false
+2026-10-10T09:43:13.7009560Z ##[endgroup]
+2026-10-10T09:43:13.8012675Z Syncing repository: nift-dev/nift
+2026-10-10T09:43:13.8015448Z ##[group]Getting Git version info
+2026-10-10T09:43:13.8016587Z Working directory is '/home/runner/work/nift/nift'
+2026-10-10T09:43:13.8018113Z [command]/usr/bin/git version
+2026-10-10T09:43:13.8082203Z git version 2.55.0
+2026-10-10T09:43:13.8102607Z ##[endgroup]
+2026-10-10T09:43:13.8117456Z Temporarily overriding HOME='/home/runner/work/_temp/927c4f47-3c03-451a-ad82-4faa5b2f3ea7' before making global git config changes
+2026-10-10T09:43:13.8119935Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T09:43:13.8122272Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/nift/nift
+2026-10-10T09:43:13.8175797Z Deleting the contents of '/home/runner/work/nift/nift'
+2026-10-10T09:43:13.8180188Z ##[group]Initializing the repository
+2026-10-10T09:43:13.8184336Z [command]/usr/bin/git init /home/runner/work/nift/nift
+2026-10-10T09:43:13.8305570Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-10T09:43:13.8307193Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-10T09:43:13.8308280Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-10T09:43:13.8309323Z hint: call:
+2026-10-10T09:43:13.8310028Z hint:
+2026-10-10T09:43:13.8310560Z hint: 	git config --global init.defaultBranch <name>
+2026-10-10T09:43:13.8311196Z hint:
+2026-10-10T09:43:13.8311793Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-10T09:43:13.8313129Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-10T09:43:13.8314212Z hint:
+2026-10-10T09:43:13.8314642Z hint: 	git branch -m <name>
+2026-10-10T09:43:13.8315131Z hint:
+2026-10-10T09:43:13.8315769Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-10T09:43:13.8328436Z Initialized empty Git repository in /home/runner/work/nift/nift/.git/
+2026-10-10T09:43:13.8340607Z [command]/usr/bin/git remote add origin https://github.com/nift-dev/nift
+2026-10-10T09:43:13.8391898Z ##[endgroup]
+2026-10-10T09:43:13.8393572Z ##[group]Disabling automatic garbage collection
+2026-10-10T09:43:13.8397292Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-10T09:43:13.8435210Z ##[endgroup]
+2026-10-10T09:43:13.8436489Z ##[group]Setting up auth
+2026-10-10T09:43:13.8444053Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T09:43:13.8479929Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-10T09:43:13.8874105Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T09:43:13.8914571Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-10T09:43:13.9146085Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T09:43:13.9182227Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-10T09:43:13.9407387Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-10T09:43:13.9458460Z ##[endgroup]
+2026-10-10T09:43:13.9459528Z ##[group]Fetching the repository
+2026-10-10T09:43:13.9468798Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +df1ac5c6128dc615264703fb2bc5ad1eebbf69dd:refs/remotes/origin/main
+2026-10-10T09:43:15.4776475Z From https://github.com/nift-dev/nift
+2026-10-10T09:43:15.4778788Z  * [new ref]         df1ac5c6128dc615264703fb2bc5ad1eebbf69dd -> origin/main
+2026-10-10T09:43:15.4783974Z ##[endgroup]
+2026-10-10T09:43:15.4786155Z ##[group]Determining the checkout info
+2026-10-10T09:43:15.4788576Z ##[endgroup]
+2026-10-10T09:43:15.4791035Z [command]/usr/bin/git sparse-checkout disable
+2026-10-10T09:43:15.4848744Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-10T09:43:15.4881999Z ##[group]Checking out the ref
+2026-10-10T09:43:15.4888679Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-10T09:43:15.8524436Z Switched to a new branch 'main'
+2026-10-10T09:43:15.8525751Z branch 'main' set up to track 'origin/main'.
+2026-10-10T09:43:15.8535571Z ##[endgroup]
+2026-10-10T09:43:15.8582480Z [command]/usr/bin/git log -1 --format=%H
+2026-10-10T09:43:15.8610945Z df1ac5c6128dc615264703fb2bc5ad1eebbf69dd
+2026-10-10T09:43:15.8833142Z ##[group]Run make -j2 all embed
+2026-10-10T09:43:15.8833968Z [36;1mmake -j2 all embed[0m
+2026-10-10T09:43:15.9085454Z shell: /usr/bin/bash -e {0}
+2026-10-10T09:43:15.9085845Z ##[endgroup]
+2026-10-10T09:43:15.9856145Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/nift.cpp -o src/nift.o
+2026-10-10T09:43:15.9863477Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectOwnership.cpp -o src/ProjectOwnership.o
+2026-10-10T09:43:16.0819592Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/PackageTransaction.cpp -o src/PackageTransaction.o
+2026-10-10T09:43:16.9074027Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/CLI.cpp -o src/CLI.o
+2026-10-10T09:43:20.7874170Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Process.cpp -o src/Process.o
+2026-10-10T09:43:22.2340974Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JobControl.cpp -o src/JobControl.o
+2026-10-10T09:43:23.7266168Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/RuntimeValue.cpp -o src/RuntimeValue.o
+2026-10-10T09:43:26.2871363Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Value.cpp -o src/Value.o
+2026-10-10T09:43:27.1717847Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/FileSystem.cpp -o src/FileSystem.o
+2026-10-10T09:43:28.9523585Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonFile.cpp -o src/JsonFile.o
+2026-10-10T09:43:30.3141435Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+2026-10-10T09:43:32.0941340Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c minifypp/src/Minify.cpp -o minifypp/src/Minify.o
+2026-10-10T09:43:34.5771165Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/Markup.cpp -o markuppp/src/Markup.o
+2026-10-10T09:43:36.3002647Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/AsciiDoc.cpp -o markuppp/src/AsciiDoc.o
+2026-10-10T09:43:38.6881217Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/ReStructuredText.cpp -o markuppp/src/ReStructuredText.o
+2026-10-10T09:43:40.7789251Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectInfo.cpp -o src/ProjectInfo.o
+2026-10-10T09:43:41.0495016Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectRead.cpp -o src/ProjectRead.o
+2026-10-10T09:43:44.6265313Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectState.cpp -o src/ProjectState.o
+2026-10-10T09:43:48.6532346Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/WatchList.cpp -o src/WatchList.o
+2026-10-10T09:43:51.1045973Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/BuildProgress.cpp -o src/BuildProgress.o
+2026-10-10T09:43:51.5403541Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Automation.cpp -o src/Automation.o
+2026-10-10T09:43:51.7888372Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Hooks.cpp -o src/Hooks.o
+2026-10-10T09:43:53.0465164Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Ast.cpp -o src/Ast.o
+2026-10-10T09:43:56.4721555Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/blocks.c -o markuppp/vendor/cmark/blocks.o
+2026-10-10T09:43:57.5273473Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/buffer.c -o markuppp/vendor/cmark/buffer.o
+2026-10-10T09:43:57.5988334Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark.c -o markuppp/vendor/cmark/cmark.o
+2026-10-10T09:43:57.6188855Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark_ctype.c -o markuppp/vendor/cmark/cmark_ctype.o
+2026-10-10T09:43:57.6262177Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_href_e.c -o markuppp/vendor/cmark/houdini_href_e.o
+2026-10-10T09:43:57.6376172Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_e.c -o markuppp/vendor/cmark/houdini_html_e.o
+2026-10-10T09:43:57.6580326Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_u.c -o markuppp/vendor/cmark/houdini_html_u.o
+2026-10-10T09:43:57.6667610Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/html.c -o markuppp/vendor/cmark/html.o
+2026-10-10T09:43:57.7482539Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/inlines.c -o markuppp/vendor/cmark/inlines.o
+2026-10-10T09:43:57.7619756Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/iterator.c -o markuppp/vendor/cmark/iterator.o
+2026-10-10T09:43:57.8200312Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/node.c -o markuppp/vendor/cmark/node.o
+2026-10-10T09:43:57.9636176Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/references.c -o markuppp/vendor/cmark/references.o
+2026-10-10T09:43:58.0252253Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/render.c -o markuppp/vendor/cmark/render.o
+2026-10-10T09:43:58.0828359Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/scanners.c -o markuppp/vendor/cmark/scanners.o
+2026-10-10T09:43:58.1360778Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/utf8.c -o markuppp/vendor/cmark/utf8.o
+2026-10-10T09:43:58.4586718Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/embed/Engine.cpp -o src/embed/Engine.o
+2026-10-10T09:43:59.2006400Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/embed/Context.cpp -o src/embed/Context.o
+2026-10-10T09:44:00.9511759Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/embed/c_abi.cpp -o src/embed/c_abi.o
+2026-10-10T09:44:02.3014193Z mkdir -p .build/pic/src/
+2026-10-10T09:44:02.3026271Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectOwnership.cpp -o .build/pic/src/ProjectOwnership.o
+2026-10-10T09:44:02.6490734Z mkdir -p .build/pic/src/
+2026-10-10T09:44:02.6505290Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/PackageTransaction.cpp -o .build/pic/src/PackageTransaction.o
+2026-10-10T09:44:02.9815644Z mkdir -p .build/pic/src/
+2026-10-10T09:44:02.9829494Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Process.cpp -o .build/pic/src/Process.o
+2026-10-10T09:44:04.4227250Z mkdir -p .build/pic/src/
+2026-10-10T09:44:04.4245329Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/JobControl.cpp -o .build/pic/src/JobControl.o
+2026-10-10T09:44:05.9316911Z mkdir -p .build/pic/src/
+2026-10-10T09:44:05.9331475Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/RuntimeValue.cpp -o .build/pic/src/RuntimeValue.o
+2026-10-10T09:44:07.2453030Z mkdir -p .build/pic/src/
+2026-10-10T09:44:07.2468431Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Value.cpp -o .build/pic/src/Value.o
+2026-10-10T09:44:07.9842506Z mkdir -p .build/pic/src/
+2026-10-10T09:44:07.9857199Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/FileSystem.cpp -o .build/pic/src/FileSystem.o
+2026-10-10T09:44:08.5139111Z mkdir -p .build/pic/src/
+2026-10-10T09:44:08.5156914Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/JsonFile.cpp -o .build/pic/src/JsonFile.o
+2026-10-10T09:44:09.6820897Z mkdir -p .build/pic/src/
+2026-10-10T09:44:09.6834974Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/JsonSchema.cpp -o .build/pic/src/JsonSchema.o
+2026-10-10T09:44:09.8921925Z mkdir -p .build/pic/minifypp/src/
+2026-10-10T09:44:09.8941042Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c minifypp/src/Minify.cpp -o .build/pic/minifypp/src/Minify.o
+2026-10-10T09:44:13.9144813Z mkdir -p .build/pic/markuppp/src/
+2026-10-10T09:44:13.9160541Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c markuppp/src/Markup.cpp -o .build/pic/markuppp/src/Markup.o
+2026-10-10T09:44:15.6320144Z mkdir -p .build/pic/markuppp/src/
+2026-10-10T09:44:15.6334276Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c markuppp/src/AsciiDoc.cpp -o .build/pic/markuppp/src/AsciiDoc.o
+2026-10-10T09:44:17.9926331Z mkdir -p .build/pic/markuppp/src/
+2026-10-10T09:44:17.9940628Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c markuppp/src/ReStructuredText.cpp -o .build/pic/markuppp/src/ReStructuredText.o
+2026-10-10T09:44:18.6025423Z mkdir -p .build/pic/src/
+2026-10-10T09:44:18.6042520Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectInfo.cpp -o .build/pic/src/ProjectInfo.o
+2026-10-10T09:44:20.3541933Z mkdir -p .build/pic/src/
+2026-10-10T09:44:20.3556198Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectRead.cpp -o .build/pic/src/ProjectRead.o
+2026-10-10T09:44:23.9154368Z mkdir -p .build/pic/src/
+2026-10-10T09:44:23.9169297Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectState.cpp -o .build/pic/src/ProjectState.o
+2026-10-10T09:44:27.9118129Z mkdir -p .build/pic/src/
+2026-10-10T09:44:27.9132164Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/WatchList.cpp -o .build/pic/src/WatchList.o
+2026-10-10T09:44:29.0730402Z mkdir -p .build/pic/src/
+2026-10-10T09:44:29.0745960Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/BuildProgress.cpp -o .build/pic/src/BuildProgress.o
+2026-10-10T09:44:29.7542924Z mkdir -p .build/pic/src/
+2026-10-10T09:44:29.7556567Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Automation.cpp -o .build/pic/src/Automation.o
+2026-10-10T09:44:30.7913513Z mkdir -p .build/pic/src/
+2026-10-10T09:44:30.7927767Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Hooks.cpp -o .build/pic/src/Hooks.o
+2026-10-10T09:44:31.2663756Z mkdir -p .build/pic/src/
+2026-10-10T09:44:31.2677571Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Ast.cpp -o .build/pic/src/Ast.o
+2026-10-10T09:44:34.6902770Z mkdir -p .build/pic/src/embed/
+2026-10-10T09:44:34.6922024Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/embed/Engine.cpp -o .build/pic/src/embed/Engine.o
+2026-10-10T09:44:36.5650841Z mkdir -p .build/pic/src/embed/
+2026-10-10T09:44:36.5665757Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/embed/Context.cpp -o .build/pic/src/embed/Context.o
+2026-10-10T09:44:38.2772310Z mkdir -p .build/pic/src/embed/
+2026-10-10T09:44:38.2785548Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/embed/c_abi.cpp -o .build/pic/src/embed/c_abi.o
+2026-10-10T09:44:38.9057954Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:38.9072444Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/blocks.c -o .build/pic/markuppp/vendor/cmark/blocks.o
+2026-10-10T09:44:39.1621166Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.1634207Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/buffer.c -o .build/pic/markuppp/vendor/cmark/buffer.o
+2026-10-10T09:44:39.2272470Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.2284691Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/cmark.c -o .build/pic/markuppp/vendor/cmark/cmark.o
+2026-10-10T09:44:39.2558841Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.2574234Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/cmark_ctype.c -o .build/pic/markuppp/vendor/cmark/cmark_ctype.o
+2026-10-10T09:44:39.2757044Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.2772679Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/houdini_href_e.c -o .build/pic/markuppp/vendor/cmark/houdini_href_e.o
+2026-10-10T09:44:39.3067604Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.3083610Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/houdini_html_e.c -o .build/pic/markuppp/vendor/cmark/houdini_html_e.o
+2026-10-10T09:44:39.3365911Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.3378326Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/houdini_html_u.c -o .build/pic/markuppp/vendor/cmark/houdini_html_u.o
+2026-10-10T09:44:39.4091548Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.4104698Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/html.c -o .build/pic/markuppp/vendor/cmark/html.o
+2026-10-10T09:44:39.4909728Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.4926218Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/inlines.c -o .build/pic/markuppp/vendor/cmark/inlines.o
+2026-10-10T09:44:39.5970485Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.5984502Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/iterator.c -o .build/pic/markuppp/vendor/cmark/iterator.o
+2026-10-10T09:44:39.6382627Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.6396697Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/node.c -o .build/pic/markuppp/vendor/cmark/node.o
+2026-10-10T09:44:39.7815754Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.7828682Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/references.c -o .build/pic/markuppp/vendor/cmark/references.o
+2026-10-10T09:44:39.8358578Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.8370809Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/render.c -o .build/pic/markuppp/vendor/cmark/render.o
+2026-10-10T09:44:39.8475012Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.8490476Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/scanners.c -o .build/pic/markuppp/vendor/cmark/scanners.o
+2026-10-10T09:44:39.8951696Z mkdir -p .build/pic/markuppp/vendor/cmark/
+2026-10-10T09:44:39.8964086Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -fPIC -MMD -MP -c markuppp/vendor/cmark/utf8.c -o .build/pic/markuppp/vendor/cmark/utf8.o
+2026-10-10T09:44:40.2157731Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+2026-10-10T09:44:40.3908787Z BUILD vendored libffi (x86_64-linux-gnu-cc)
+2026-10-10T09:44:51.7583018Z BUILD vendored libffi: done (11s)
+2026-10-10T09:44:51.7587733Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Parser.cpp -o src/Parser.o
+2026-10-10T09:44:51.7595637Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserAsyncPool.cpp -o src/ParserAsyncPool.o
+2026-10-10T09:44:52.2036736Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserExpression.cpp -o src/ParserExpression.o
+2026-10-10T09:45:00.2746016Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserHelpers.cpp -o src/ParserHelpers.o
+2026-10-10T09:45:04.1377661Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserScript.cpp -o src/ParserScript.o
+2026-10-10T09:45:11.8138412Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserTemplate.cpp -o src/ParserTemplate.o
+2026-10-10T09:45:12.8734041Z src/ParserTemplate.cpp: In lambda function:
+2026-10-10T09:45:12.8738994Z src/ParserTemplate.cpp:1253: note: ‘-Wmisleading-indentation’ is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers
+2026-10-10T09:45:12.8781326Z  1253 |             variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){nift::RuntimeValue rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<nift::RuntimeValue>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){if(st.name.empty()){if(!st.expr){e="unsupported prepared expression statement";return false;}nift::RuntimeValue cv;return nift::ast::evaluate(*st.expr,c,cv,e);}return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<nift::RuntimeValue>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}next=nift::RuntimeValue(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=nift::RuntimeValue(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=nift::RuntimeValue(oldv.num+rhs.num);else if(st.op=="-=")next=nift::RuntimeValue(oldv.num-rhs.num);else if(st.op=="*=")next=nift::RuntimeValue(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=nift::RuntimeValue(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=nift::RuntimeValue(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
+2026-10-10T09:45:12.8814427Z       | 
+2026-10-10T09:45:12.8815775Z src/ParserTemplate.cpp:1253: note: adding ‘-flarge-source-files’ will allow for more column-tracking support, at the expense of compilation time and memory
+2026-10-10T09:45:24.8257298Z mkdir -p .build/pic/src/
+2026-10-10T09:45:24.8271331Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Parser.cpp -o .build/pic/src/Parser.o
+2026-10-10T09:45:33.3599358Z mkdir -p .build/pic/src/
+2026-10-10T09:45:33.3613872Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserAsyncPool.cpp -o .build/pic/src/ParserAsyncPool.o
+2026-10-10T09:45:33.8046908Z mkdir -p .build/pic/src/
+2026-10-10T09:45:33.8060274Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserExpression.cpp -o .build/pic/src/ParserExpression.o
+2026-10-10T09:45:40.5384832Z mkdir -p .build/pic/src/
+2026-10-10T09:45:40.5399255Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserHelpers.cpp -o .build/pic/src/ParserHelpers.o
+2026-10-10T09:45:44.4336395Z mkdir -p .build/pic/src/
+2026-10-10T09:45:44.4350413Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserScript.cpp -o .build/pic/src/ParserScript.o
+2026-10-10T09:45:52.2110398Z mkdir -p .build/pic/src/
+2026-10-10T09:45:52.2124906Z g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserTemplate.cpp -o .build/pic/src/ParserTemplate.o
+2026-10-10T09:45:53.2855617Z src/ParserTemplate.cpp: In lambda function:
+2026-10-10T09:45:53.2860359Z src/ParserTemplate.cpp:1253: note: ‘-Wmisleading-indentation’ is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers
+2026-10-10T09:45:53.2903830Z  1253 |             variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){nift::RuntimeValue rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<nift::RuntimeValue>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){if(st.name.empty()){if(!st.expr){e="unsupported prepared expression statement";return false;}nift::RuntimeValue cv;return nift::ast::evaluate(*st.expr,c,cv,e);}return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<nift::RuntimeValue>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}next=nift::RuntimeValue(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=nift::RuntimeValue(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=nift::RuntimeValue(oldv.num+rhs.num);else if(st.op=="-=")next=nift::RuntimeValue(oldv.num-rhs.num);else if(st.op=="*=")next=nift::RuntimeValue(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=nift::RuntimeValue(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=nift::RuntimeValue(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
+2026-10-10T09:45:53.2953773Z       | 
+2026-10-10T09:45:53.2955087Z src/ParserTemplate.cpp:1253: note: adding ‘-flarge-source-files’ will allow for more column-tracking support, at the expense of compilation time and memory
+2026-10-10T09:46:05.4647560Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o nift
+2026-10-10T09:46:05.5824650Z cp .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a libnift_c.a
+2026-10-10T09:46:05.5846415Z ar rcs libnift_c.a src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o
+2026-10-10T09:46:21.7657270Z g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -shared -Wl,--exclude-libs,ALL -Wl,-Bsymbolic -o libnift_c.so .build/pic/src/ProjectOwnership.o .build/pic/src/PackageTransaction.o .build/pic/src/Process.o .build/pic/src/JobControl.o .build/pic/src/RuntimeValue.o .build/pic/src/Value.o .build/pic/src/FileSystem.o .build/pic/src/JsonFile.o .build/pic/src/JsonSchema.o .build/pic/minifypp/src/Minify.o .build/pic/markuppp/src/Markup.o .build/pic/markuppp/src/AsciiDoc.o .build/pic/markuppp/src/ReStructuredText.o .build/pic/src/Parser.o .build/pic/src/ParserAsyncPool.o .build/pic/src/ParserExpression.o .build/pic/src/ParserHelpers.o .build/pic/src/ParserScript.o .build/pic/src/ParserTemplate.o .build/pic/src/ProjectInfo.o .build/pic/src/ProjectRead.o .build/pic/src/ProjectState.o .build/pic/src/WatchList.o .build/pic/src/BuildProgress.o .build/pic/src/Automation.o .build/pic/src/Hooks.o .build/pic/src/Ast.o .build/pic/src/embed/Engine.o .build/pic/src/embed/Context.o .build/pic/src/embed/c_abi.o .build/pic/markuppp/vendor/cmark/blocks.o .build/pic/markuppp/vendor/cmark/buffer.o .build/pic/markuppp/vendor/cmark/cmark.o .build/pic/markuppp/vendor/cmark/cmark_ctype.o .build/pic/markuppp/vendor/cmark/houdini_href_e.o .build/pic/markuppp/vendor/cmark/houdini_html_e.o .build/pic/markuppp/vendor/cmark/houdini_html_u.o .build/pic/markuppp/vendor/cmark/html.o .build/pic/markuppp/vendor/cmark/inlines.o .build/pic/markuppp/vendor/cmark/iterator.o .build/pic/markuppp/vendor/cmark/node.o .build/pic/markuppp/vendor/cmark/references.o .build/pic/markuppp/vendor/cmark/render.o .build/pic/markuppp/vendor/cmark/scanners.o .build/pic/markuppp/vendor/cmark/utf8.o .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a
+2026-10-10T09:46:21.8787674Z rm -rf dist/embed-prefix
+2026-10-10T09:46:21.8798202Z mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
+2026-10-10T09:46:21.8810426Z cp include/nift/*.h dist/embed-prefix/include/nift/
+2026-10-10T09:46:21.8832573Z cp libnift_c.a libnift_c.so dist/embed-prefix/lib/
+2026-10-10T09:46:21.8894757Z # Dev prefix: the version here is not release metadata (the real per-release
+2026-10-10T09:46:21.8901602Z # nift.pc is generated by packaging/stage-release.sh with the validated
+2026-10-10T09:46:21.8908492Z # version). 0.0.0-dev avoids running the CLI binary inside make (fragile on
+2026-10-10T09:46:21.8915326Z # Windows); ABI compatibility is governed by the C ABI version.
+2026-10-10T09:46:21.8921301Z bash packaging/gen-dev-pc.sh
+2026-10-10T09:46:21.8972589Z gen-dev-pc: uname_s=Linux uname_m=x86_64
+2026-10-10T09:46:21.9011524Z gen-dev-pc: wrote dist/embed-prefix/lib/pkgconfig/nift.pc with PC_LIBS=-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread
+2026-10-10T09:46:21.9058864Z ##[group]Run set -euo pipefail
+2026-10-10T09:46:21.9059192Z [36;1mset -euo pipefail[0m
+2026-10-10T09:46:21.9059452Z [36;1mgit init nift-regression-suite[0m
+2026-10-10T09:46:21.9060016Z [36;1mgit -C nift-regression-suite remote add origin https://github.com/nift-dev/nift-regression-suite.git[0m
+2026-10-10T09:46:21.9060790Z [36;1mgit -C nift-regression-suite fetch --depth=1 --no-tags origin 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0[0m
+2026-10-10T09:46:21.9061405Z [36;1mgit -C nift-regression-suite checkout --detach FETCH_HEAD[0m
+2026-10-10T09:46:21.9061965Z [36;1mtest "$(git -C nift-regression-suite rev-parse HEAD)" = 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0[0m
+2026-10-10T09:46:21.9127969Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-10T09:46:21.9128318Z ##[endgroup]
+2026-10-10T09:46:21.9234761Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-10T09:46:21.9236273Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-10T09:46:21.9237126Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-10T09:46:21.9237812Z hint: call:
+2026-10-10T09:46:21.9238124Z hint:
+2026-10-10T09:46:21.9238540Z hint: 	git config --global init.defaultBranch <name>
+2026-10-10T09:46:21.9239048Z hint:
+2026-10-10T09:46:21.9239540Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-10T09:46:21.9240623Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-10T09:46:21.9241254Z hint:
+2026-10-10T09:46:21.9241559Z hint: 	git branch -m <name>
+2026-10-10T09:46:21.9241924Z hint:
+2026-10-10T09:46:21.9242437Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-10T09:46:21.9243145Z Initialized empty Git repository in /home/runner/work/nift/nift/nift-regression-suite/.git/
+2026-10-10T09:46:22.0778477Z From https://github.com/nift-dev/nift-regression-suite
+2026-10-10T09:46:22.0779322Z  * branch            80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0 -> FETCH_HEAD
+2026-10-10T09:46:22.0967746Z HEAD is now at 80ac41b test: certify v4.10 item build pipelines and additive init
+2026-10-10T09:46:22.1022984Z ##[group]Run set -euo pipefail
+2026-10-10T09:46:22.1023873Z [36;1mset -euo pipefail[0m
+2026-10-10T09:46:22.1024173Z [36;1mNIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.10.0 \[0m
+2026-10-10T09:46:22.1024553Z [36;1m  NIFT_EMBED_PREFIX="$PWD/dist/embed-prefix" \[0m
+2026-10-10T09:46:22.1024922Z [36;1m  bash nift-regression-suite/run-contract.sh[0m
+2026-10-10T09:46:22.1088655Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-10T09:46:22.1088997Z ##[endgroup]
+2026-10-10T09:47:04.3582205Z FAIL  historical + ruthless regression contract
+2026-10-10T09:47:04.3591372Z FAIL [test 001]: nift version did not report v4.10.0
+2026-10-10T09:47:04.3592121Z FAIL [467] stored hash with trailing garbage was accepted as valid
+2026-10-10T09:47:04.3592594Z Ruthless adversarial extension: 192 checks, 1 failures
+2026-10-10T09:47:04.3593146Z FAIL: 2 of 574 assertions/tests failed
+2026-10-10T09:47:04.5288365Z PASS  contract/v410_build_pipeline_smoke.sh
+2026-10-10T09:47:04.6063636Z PASS  contract/json_schema_integration_smoke.sh
+2026-10-10T09:47:04.7156513Z PASS  contract/parser_content_smoke.sh
+2026-10-10T09:47:04.7561191Z PASS  contract/diagnostics_smoke.sh
+2026-10-10T09:47:04.7845668Z PASS  contract/comments_smoke.sh
+2026-10-10T09:47:05.1018452Z PASS  contract/json_binding_smoke.sh
+2026-10-10T09:47:05.7735351Z PASS  contract/control_flow_smoke.sh
+2026-10-10T09:47:05.8885524Z PASS  contract/collection_ops_smoke.sh
+2026-10-10T09:47:06.1559113Z PASS  contract/pagination_smoke.sh
+2026-10-10T09:47:06.3535167Z PASS  contract/requirements_smoke.sh
+2026-10-10T09:47:06.4030146Z PASS  contract/path_alias_smoke.sh
+2026-10-10T09:47:06.4280736Z PASS  contract/path_security_smoke.sh
+2026-10-10T09:47:06.4656457Z PASS  contract/path_safety_smoke.sh
+2026-10-10T09:47:06.5325884Z PASS  contract/metadata_safety_smoke.sh
+2026-10-10T09:47:06.6737396Z PASS  contract/cross_feature_smoke.sh
+2026-10-10T09:47:15.8373166Z PASS  contract/incremental_new_features_smoke.sh
+2026-10-10T09:47:30.1404661Z PASS  contract/parameter_interpolation_smoke.sh
+2026-10-10T09:47:30.3514429Z PASS  contract/contracts_smoke.sh
+2026-10-10T09:47:30.6635665Z PASS  contract/persistence_concurrency_failure_smoke.sh
+2026-10-10T09:47:31.3592257Z PASS  contract/filesystem_recovery_smoke.sh
+2026-10-10T09:47:31.7231889Z PASS  contract/minify_integration_smoke.sh
+2026-10-10T09:47:31.8476200Z PASS  contract/template_optional_smoke.sh
+2026-10-10T09:47:32.1428649Z PASS  contract/init_targets_smoke.sh
+2026-10-10T09:47:32.2408566Z PASS  contract/unreadable_source_smoke.sh
+2026-10-10T09:47:34.3972165Z PASS  contract/json_six_forms_smoke.sh
+2026-10-10T09:47:35.5532053Z PASS  contract/markup_directives_smoke.sh
+2026-10-10T09:47:35.5922665Z PASS  contract/v41_template_variables_smoke.sh
+2026-10-10T09:47:35.6125889Z PASS  contract/v41_language_smoke.sh
+2026-10-10T09:47:35.6270545Z PASS  contract/v41_operator_smoke.sh
+2026-10-10T09:47:36.6470146Z PASS  contract/v41_inject_dependency.sh
+2026-10-10T09:47:36.7125081Z PASS  contract/v41_duplicate_key_smoke.sh
+2026-10-10T09:47:36.8694996Z PASS  contract/v41_certification_adversarial.sh
+2026-10-10T09:47:36.8854568Z PASS  contract/v42_structs_smoke.sh
+2026-10-10T09:47:36.9120141Z PASS  contract/v42_numeric_literals_smoke.sh
+2026-10-10T09:47:37.0632213Z PASS  contract/v43_language_smoke.sh
+2026-10-10T09:47:37.0753772Z PASS  contract/v43_scripting_io_smoke.sh
+2026-10-10T09:47:37.1345223Z PASS  contract/v43_scripting_inspection_smoke.sh
+2026-10-10T09:47:37.1840746Z PASS  contract/v43_scripting_ergonomics_smoke.sh
+2026-10-10T09:47:37.1997802Z PASS  contract/v43_managed_file_smoke.sh
+2026-10-10T09:47:37.2835304Z PASS  contract/v43_managed_file_editing_smoke.sh
+2026-10-10T09:47:37.3925682Z PASS  contract/v43_scripting_smoke.sh
+2026-10-10T09:47:37.5836820Z PASS  contract/v43_typed_content_taxonomy_smoke.sh
+2026-10-10T09:47:37.6819891Z PASS  contract/v43_frontend_algebra_smoke.sh
+2026-10-10T09:47:38.8824145Z PASS  contract/v43_final_language_smoke.sh
+2026-10-10T09:47:38.9629683Z PASS  contract/v43_object_expressions_smoke.sh
+2026-10-10T09:47:39.0620774Z PASS  contract/v43_hierarchy_smoke.sh
+2026-10-10T09:47:39.1550130Z PASS  contract/v43_mundane_surface_smoke.sh
+2026-10-10T09:47:39.1660432Z PASS  contract/v44_language_foundation_smoke.sh
+2026-10-10T09:47:39.1820627Z PASS  contract/v44_execution_shell_smoke.sh
+2026-10-10T09:47:39.1986653Z PASS  contract/v44_packages_smoke.sh
+2026-10-10T09:47:39.2239152Z PASS  contract/v44_automation_smoke.sh
+2026-10-10T09:47:39.2560838Z PASS  contract/v44_hooks_smoke.sh
+2026-10-10T09:47:39.2918744Z PASS  contract/v44_restricted_smoke.sh
+2026-10-10T09:47:39.3191178Z PASS  contract/v44_package_hardening_smoke.sh
+2026-10-10T09:47:39.3368449Z PASS  contract/v44_module_export_smoke.sh
+2026-10-10T09:47:39.3701802Z PASS  contract/v44_minify_native_smoke.sh
+2026-10-10T09:47:39.5164777Z PASS  contract/v44_executable_script_smoke.sh
+2026-10-10T09:47:39.5494658Z PASS  contract/v44_shell_bare_command_smoke.sh
+2026-10-10T09:47:39.6630010Z PASS  contract/v45_cli_invocation_smoke.sh
+2026-10-10T09:47:39.6825775Z PASS  contract/v45_host_introspection_smoke.sh
+2026-10-10T09:47:39.7181127Z PASS  contract/v45_target_smoke.sh
+2026-10-10T09:47:40.0271971Z PASS  contract/v45_jobs_background_smoke.sh
+2026-10-10T09:47:40.2066501Z PASS  contract/v45_job_control_smoke.sh
+2026-10-10T09:47:40.2270785Z PASS  contract/v45_threads_smoke.sh
+2026-10-10T09:47:40.2769101Z PASS  contract/v45_mutex_smoke.sh
+2026-10-10T09:47:40.2988100Z PASS  contract/v45_atomics_smoke.sh
+2026-10-10T09:47:40.3254315Z PASS  contract/v45_async_smoke.sh
+2026-10-10T09:47:40.3656888Z PASS  contract/v45_ffi_smoke.sh
+2026-10-10T09:47:40.5583014Z PASS  contract/v45_embed_consumer_smoke.sh
+2026-10-10T09:47:40.5710463Z PASS  contract/v45_integration_smoke.sh
+2026-10-10T09:47:40.6111835Z PASS  contract/v46_bytes_ffi_smoke.sh
+2026-10-10T09:47:40.6627789Z PASS  contract/v46_bytes_smoke.sh
+2026-10-10T09:47:40.6690751Z FAIL  contract/v46_cli_smoke.sh
+2026-10-10T09:47:40.6699738Z version: Nift v4.11.0 (expected v4.10.0)
+2026-10-10T09:47:40.6910723Z PASS  contract/v46_concurrency_smoke.sh
+2026-10-10T09:47:40.7187827Z PASS  contract/v46_diagnostics_smoke.sh
+2026-10-10T09:47:40.8633330Z PASS  contract/v46_embed_consumer_smoke.sh
+2026-10-10T09:47:40.8968859Z PASS  contract/v46_exact_numbers_smoke.sh
+2026-10-10T09:47:40.9204925Z PASS  contract/v46_filesystem_types_smoke.sh
+2026-10-10T09:47:40.9631322Z PASS  contract/v46_import_ownership_smoke.sh
+2026-10-10T09:47:40.9909687Z PASS  contract/v46_output_channels_smoke.sh
+2026-10-10T09:47:41.0478801Z PASS  contract/v46_package_graph_smoke.sh
+2026-10-10T09:47:41.1189333Z PASS  contract/v46_package_metadata_smoke.sh
+2026-10-10T09:47:41.1935261Z PASS  contract/v46_recoverable_errors_smoke.sh
+2026-10-10T09:47:41.2902993Z PASS  contract/v46_runtime_utilities_smoke.sh
+2026-10-10T09:47:41.3428646Z PASS  contract/v46_streams_smoke.sh
+2026-10-10T09:47:41.8470693Z PASS  contract/v47_deep_expression_smoke.sh
+2026-10-10T09:47:41.8868105Z PASS  contract/v47_prepared_method_parity_smoke.sh
+2026-10-10T09:47:41.9105648Z PASS  contract/v48_package_combined_fixture_smoke.sh
+2026-10-10T09:47:41.9452758Z PASS  contract/v48_warn_smoke.sh
+2026-10-10T09:47:41.9811522Z PASS  contract/v48_bytes_index_parity_smoke.sh
+2026-10-10T09:47:42.2588947Z PASS  contract/v48_init_migration_smoke.sh
+2026-10-10T09:47:42.3076659Z PASS  contract/v48_comparison_parity_smoke.sh
+2026-10-10T09:47:42.3470867Z PASS  contract/v48_callable_parity_smoke.sh
+2026-10-10T09:47:42.3471274Z 
+2026-10-10T09:47:42.3471438Z FAIL: 2 of 94 contract modules failed
+2026-10-10T09:47:42.3676514Z ##[error]Process completed with exit code 1.
+2026-10-10T09:47:42.3808367Z Post job cleanup.
+2026-10-10T09:47:42.4635830Z [command]/usr/bin/git version
+2026-10-10T09:47:42.4682429Z git version 2.55.0
+2026-10-10T09:47:42.4724807Z Temporarily overriding HOME='/home/runner/work/_temp/3294379c-c1e3-4994-b22c-048249b33f3c' before making global git config changes
+2026-10-10T09:47:42.4726154Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-10T09:47:42.4732839Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/nift/nift
+2026-10-10T09:47:42.4773760Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-10T09:47:42.4809251Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-10T09:47:42.5077498Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-10T09:47:42.5107122Z http.https://github.com/.extraheader
+2026-10-10T09:47:42.5119141Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-10T09:47:42.5154772Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-10T09:47:42.5435571Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-10T09:47:42.5474996Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-10T09:47:42.5881757Z Cleaning up orphan processes
+2026-10-10T09:47:42.6202895Z Terminate orphan process: pid (7312) (nift)
