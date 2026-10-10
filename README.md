@@ -136,6 +136,12 @@ A Nift template can be as simple as:
 
 Nift renders the tracked page's content at `@content`, processes inputs and dependencies, and records enough information to make subsequent builds incremental.
 
+Hash and hybrid builds keep dependency hashes per consumer. Native tracked dependency reads record the bytes Nift consumed; a targeted build advances only the consumers it rebuilds. Existing metadata without these snapshots rebuilds once automatically in hash/hybrid mode. Modified mode remains timestamp-based.
+
+Build inputs are expected to remain stable while a consumer executes. Nift supports dependency changes between builds and scheduled producer transitions within its build graph. Detectable changes to declared inputs during an external custom build reject certification; arbitrary external ABA changes during opaque reads are outside this consistency contract. FileValue reads do not automatically declare dependencies: use explicit dependency declarations for files that must invalidate the consumer.
+
+Treat templates, scripts, packages, imports and configured or discovered hooks as trusted project code. Nift is not a sandbox for hostile repositories. Process and filesystem-root controls restrict selected Nift APIs; they are not an operating-system sandbox.
+
 Structured project data can be loaded directly from JSON:
 
 ```html
