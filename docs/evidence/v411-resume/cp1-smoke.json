@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "seeds": 1,
+  "operations": 2,
+  "builds": 5,
+  "clean_oracles": 2,
+  "cases": [
+    {
+      "mode": "hash",
+      "seed": 411,
+      "operations": [
+        "content",
+        "touch"
+      ]
+    }
+  ],
+  "elapsed_seconds": 0.035
+}

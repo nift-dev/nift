@@ -1,0 +1,23 @@
+{
+  "passed": false,
+  "mode": "hash",
+  "seed": 3,
+  "step": 1,
+  "operation": "targeted",
+  "history": [
+    "atomic",
+    "targeted"
+  ],
+  "sequence_operations": 2,
+  "operations": 2,
+  "builds": 6,
+  "clean_oracles": 2,
+  "completed_sequences": 0,
+  "deck": [
+    "atomic",
+    "targeted"
+  ],
+  "retained": "/tmp/nift-v411-resume-red/hash-3-step1",
+  "retention_error": null,
+  "elapsed_seconds": 0.042
+}
