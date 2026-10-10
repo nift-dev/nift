@@ -99,6 +99,21 @@ def barrier(binary,base,kind):
  finally:
   if proc.poll() is None:proc.kill();proc.communicate()
 
+def fingerprint_migration(binary,base):
+ p=base/'fingerprints';p.mkdir();setup(p,'hash','template')
+ tracked(p,[dict(name='a',title='a',template='templates/shared.html')])
+ (p/'templates/shared.html').write_text('$[project.files[0].name]@content')
+ run(binary,p,'build','--all');key='.nift/project.fingerprint'
+ assert key in hashes(p,'a')
+ for value in [None,'invalid','0']:
+  obj=json.loads(metadata(p,'a').read_text())
+  if value is None:obj['dependency-hashes'].pop(key)
+  else:obj['dependency-hashes'][key]=value
+  writable_json(metadata(p,'a'),obj);old=metadata(p,'a').stat().st_mtime_ns
+  run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns!=old
+  old=metadata(p,'a').stat().st_mtime_ns;run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns==old
+ return True
+
 def post_hook_output_validation(binary,base):
  p=base/'post-removes-output';p.mkdir();setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='templates/shared.html',**{'post-build':'post.f'})])
@@ -158,5 +173,5 @@ def json_and_hooks(binary,base):
 if __name__=='__main__':
  ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--output',required=True);ap.add_argument('--scaling',action='store_true');a=ap.parse_args();binary=str(pathlib.Path(a.nift).resolve());started=time.monotonic()
  with tempfile.TemporaryDirectory(prefix='nift-consumer-snapshots-') as td:
-  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
  result.update(passed=True,elapsed_seconds=round(time.monotonic()-started,3));pathlib.Path(a.output).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))

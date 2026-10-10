@@ -681,6 +681,8 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             // comparing values instead of mtimes (which can collide between the
             // fingerprint write and the page-info write within one fast build).
             refresh_project_fingerprint();
+            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
+                reasons.push_back("dependency snapshot changed or invalid: " + value.string);
             const std::string current = filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{});
             std::string stored;
             if (document.has("project-fingerprint") && document["project-fingerprint"].is_string())
@@ -695,6 +697,8 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             // reparent invalidates hierarchy consumers without a per-page x
             // project-size dependency list.
             refresh_hierarchy_fingerprint();
+            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
+                reasons.push_back("dependency snapshot changed or invalid: " + value.string);
             const std::string current = filesystem::read_file_checked(root / ".nift/hierarchy.fingerprint").value_or(std::string{});
             std::string stored;
             if (document.has("hierarchy-fingerprint") && document["hierarchy-fingerprint"].is_string())
