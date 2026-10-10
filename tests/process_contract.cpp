@@ -15,7 +15,8 @@
 #endif
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
 void nift_process_test_child(long long) {}
-void nift_process_test_temp(const std::string&) {}
+static bool unicode_temp_expected=false;
+void nift_process_test_temp(const std::string& path) {if(unicode_temp_expected)require(path.find(u8"子-é")!=std::string::npos,"Unicode capture temp path not exercised");}
 static std::string parent_env();
 static std::mutex mutex;
 static std::condition_variable cv;
@@ -112,8 +113,9 @@ int main(int argc,char**argv){
  auto ur=nift_run_process(unicode);require(ur.exit_code==0 && ur.out==u8"héllo-子","Unicode executable/cwd/environment");
  unicode.args={"cwd"};require(nift_run_process(unicode).out==unicode_dir.u8string(),"Unicode cwd");
  wchar_t old_temp[32768]{};SetLastError(ERROR_SUCCESS);DWORD old_size=GetEnvironmentVariableW(L"TEMP",old_temp,32768);bool had_temp=old_size>0 || GetLastError()!=ERROR_ENVVAR_NOT_FOUND;
- SetEnvironmentVariableW(L"TEMP",unicode_dir.c_str());unicode.args={"child"};auto tr=nift_run_process(unicode);
- SetEnvironmentVariableW(L"TEMP",had_temp?old_temp:nullptr);require(tr.exit_code==7 && tr.out=="A\n" && tr.err=="err\n","Unicode temp capture");
+ wchar_t old_tmp[32768]{};SetLastError(ERROR_SUCCESS);DWORD tmp_size=GetEnvironmentVariableW(L"TMP",old_tmp,32768);bool had_tmp=tmp_size>0 || GetLastError()!=ERROR_ENVVAR_NOT_FOUND;
+ SetEnvironmentVariableW(L"TMP",unicode_dir.c_str());SetEnvironmentVariableW(L"TEMP",unicode_dir.c_str());unicode_temp_expected=true;unicode.args={"child"};auto tr=nift_run_process(unicode);unicode_temp_expected=false;
+ SetEnvironmentVariableW(L"TMP",had_tmp?old_tmp:nullptr);SetEnvironmentVariableW(L"TEMP",had_temp?old_temp:nullptr);require(tr.exit_code==7 && tr.out=="A\n" && tr.err=="err\n","Unicode temp capture");
  auto case_env=s;case_env.env.clear();case_env.env["nift_process_test_env"]="case-overlay";require(nift_run_process(case_env).out=="case-overlay\n","case insensitive child environment");
  DWORD before,after;GetProcessHandleCount(GetCurrentProcess(),&before);
  for(int i=0;i<30;++i){auto r=nift_run_process(s);require(r.exit_code==7,"repeated capture");}

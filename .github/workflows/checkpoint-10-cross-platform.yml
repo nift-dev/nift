@@ -19,6 +19,9 @@ on:
       - 'scripts/compare_checkpoint10.py'
       - 'tests/consumer_dependency_snapshots.py'
       - 'tests/shared_dependency_targeted_reproducer.py'
+      - 'tests/process_contract.cpp'
+      - 'tests/process_failure.cpp'
+      - 'tests/process_hardening.py'
   workflow_dispatch:
 
 permissions:

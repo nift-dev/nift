@@ -61,12 +61,14 @@ int main(int argc,char**argv){
  require(fds()==before,"fd leak");for(const auto& path:captures)require(!std::filesystem::exists(path),"temp leak");
  int st;require(waitpid(-1,&st,WNOHANG)==-1&&errno==ECHILD,"live child or zombie");
 #else
+ for(int repeat=0;repeat<10;++repeat){children.clear();captures.clear();
  DWORD before,after;GetProcessHandleCount(GetCurrentProcess(),&before);
  ProcessSpec s;s.program=std::filesystem::absolute(argv[0]).string();s.args={"block"};
  auto r=nift_run_pipeline(std::vector<ProcessSpec>(3,s));require(!r.error.empty(),"missing failure diagnostic");
  for(HANDLE h:children){require(h && WaitForSingleObject(h,1000)==WAIT_OBJECT_0,"live child after failure");CloseHandle(h);}
  GetProcessHandleCount(GetCurrentProcess(),&after);require(before==after,"handle leak");
  for(const auto& path:captures)require(!std::filesystem::exists(path),"capture tempfile leak");
+ }
 #endif
  std::cout<<"PASS "<<operation<<' '<<failure_stage<<'\n';
 }
