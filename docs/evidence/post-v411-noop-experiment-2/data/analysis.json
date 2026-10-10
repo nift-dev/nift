@@ -1,0 +1,95 @@
+{
+  "noop": [
+    {
+      "size": 100,
+      "binary": "experiment1",
+      "n": 20,
+      "median_ms": 23.0431925,
+      "min_ms": 15.350181,
+      "max_ms": 51.083174,
+      "cpu_median_ms": 38.44299999999995
+    },
+    {
+      "size": 100,
+      "binary": "experiment2",
+      "n": 20,
+      "median_ms": 21.861649,
+      "min_ms": 14.14541,
+      "max_ms": 54.48019,
+      "cpu_median_ms": 37.14249999999997
+    },
+    {
+      "size": 1000,
+      "binary": "experiment1",
+      "n": 20,
+      "median_ms": 92.672456,
+      "min_ms": 87.950289,
+      "max_ms": 103.110603,
+      "cpu_median_ms": 296.10350000000005
+    },
+    {
+      "size": 1000,
+      "binary": "experiment2",
+      "n": 20,
+      "median_ms": 86.8114775,
+      "min_ms": 80.508751,
+      "max_ms": 109.500842,
+      "cpu_median_ms": 279.82400000000075
+    },
+    {
+      "size": 5000,
+      "binary": "experiment1",
+      "n": 20,
+      "median_ms": 408.69746399999997,
+      "min_ms": 379.829782,
+      "max_ms": 465.032857,
+      "cpu_median_ms": 1409.560499999996
+    },
+    {
+      "size": 5000,
+      "binary": "experiment2",
+      "n": 20,
+      "median_ms": 395.828989,
+      "min_ms": 370.282157,
+      "max_ms": 435.804011,
+      "cpu_median_ms": 1369.1365000000014
+    },
+    {
+      "size": 10000,
+      "binary": "experiment1",
+      "n": 20,
+      "median_ms": 756.549308,
+      "min_ms": 726.981813,
+      "max_ms": 794.855465,
+      "cpu_median_ms": 2652.491499999989
+    },
+    {
+      "size": 10000,
+      "binary": "experiment2",
+      "n": 20,
+      "median_ms": 729.55077,
+      "min_ms": 698.604072,
+      "max_ms": 768.714795,
+      "cpu_median_ms": 2544.966999999996
+    },
+    {
+      "size": 10000,
+      "binary": "original",
+      "n": 20,
+      "median_ms": 989.3664309999999,
+      "min_ms": 947.897129,
+      "max_ms": 1044.096947,
+      "cpu_median_ms": 3586.008
+    }
+  ],
+  "slopes": {
+    "experiment1": {
+      "ms_per_TU": 0.07430598264489646,
+      "intercept_ms": 21.159024979291758
+    },
+    "experiment2": {
+      "ms_per_TU": 0.07183086097720869,
+      "intercept_ms": 19.39400594173503
+    }
+  }
+}

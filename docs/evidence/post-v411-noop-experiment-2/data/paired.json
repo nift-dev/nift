@@ -1,0 +1,1586 @@
+[
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 15.643499,
+    "cpu_ms": 33.61899999999999
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 14.636765,
+    "cpu_ms": 33.709
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 16.045613,
+    "cpu_ms": 35.83700000000002
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 17.367006,
+    "cpu_ms": 35.846
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 16.392787,
+    "cpu_ms": 37.17099999999999
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 23.905456,
+    "cpu_ms": 38.31200000000001
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 22.822943,
+    "cpu_ms": 38.882
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 25.674111,
+    "cpu_ms": 38.756999999999984
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 26.345473,
+    "cpu_ms": 40.349999999999994
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 20.102548,
+    "cpu_ms": 39.90799999999997
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 23.990163,
+    "cpu_ms": 37.907
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 22.881242,
+    "cpu_ms": 37.731000000000044
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 23.708436,
+    "cpu_ms": 40.212999999999944
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 33.219723,
+    "cpu_ms": 34.91299999999992
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 53.812891,
+    "cpu_ms": 36.143000000000036
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 41.68759,
+    "cpu_ms": 38.929999999999964
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 51.083174,
+    "cpu_ms": 37.319000000000045
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 54.48019,
+    "cpu_ms": 38.65399999999997
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 42.199921,
+    "cpu_ms": 40.09700000000005
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 23.205143,
+    "cpu_ms": 37.40399999999988
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 30.761209,
+    "cpu_ms": 38.154000000000075
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 27.122837,
+    "cpu_ms": 37.65300000000005
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 21.717098,
+    "cpu_ms": 34.32899999999989
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 27.625912,
+    "cpu_ms": 37.011000000000074
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 20.750562,
+    "cpu_ms": 38.210999999999885
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 17.11088,
+    "cpu_ms": 35.296000000000106
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 28.745315,
+    "cpu_ms": 35.522000000000055
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 33.459408,
+    "cpu_ms": 41.07300000000003
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 18.60559,
+    "cpu_ms": 35.0370000000001
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 20.610301,
+    "cpu_ms": 36.905999999999885
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 21.671587,
+    "cpu_ms": 36.38699999999984
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 29.685588,
+    "cpu_ms": 39.922000000000125
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 18.615357,
+    "cpu_ms": 38.67500000000001
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 20.581297,
+    "cpu_ms": 38.085000000000036
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 22.0062,
+    "cpu_ms": 36.83500000000017
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 15.840581,
+    "cpu_ms": 39.939999999999976
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 18.152353,
+    "cpu_ms": 39.13499999999992
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 15.717193,
+    "cpu_ms": 34.32400000000002
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 18.139975,
+    "cpu_ms": 37.37900000000005
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 17.608848,
+    "cpu_ms": 36.813000000000095
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 15.350181,
+    "cpu_ms": 33.277
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 14.14541,
+    "cpu_ms": 34.27699999999989
+  },
+  {
+    "size": 100,
+    "binary": "experiment2",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 18.038233,
+    "cpu_ms": 37.612999999999786
+  },
+  {
+    "size": 100,
+    "binary": "experiment1",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 20.471011,
+    "cpu_ms": 39.303000000000196
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 110.126456,
+    "cpu_ms": 333.92599999999993
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 101.154774,
+    "cpu_ms": 299.6789999999998
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 95.598859,
+    "cpu_ms": 306.07500000000033
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 94.136118,
+    "cpu_ms": 313.6449999999999
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 94.163743,
+    "cpu_ms": 318.273
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 109.500842,
+    "cpu_ms": 279.423
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 102.274305,
+    "cpu_ms": 287.91699999999975
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 91.264569,
+    "cpu_ms": 305.9730000000007
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 103.110603,
+    "cpu_ms": 307.4379999999999
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 92.97303,
+    "cpu_ms": 281.682
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 86.597262,
+    "cpu_ms": 292.7990000000005
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 98.851089,
+    "cpu_ms": 255.3289999999997
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 94.198851,
+    "cpu_ms": 282.5110000000004
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 83.318807,
+    "cpu_ms": 279.5860000000006
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 84.705918,
+    "cpu_ms": 283.0239999999997
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 91.100845,
+    "cpu_ms": 287.0430000000006
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 88.802926,
+    "cpu_ms": 282.62200000000036
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 88.688471,
+    "cpu_ms": 281.76200000000006
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 90.825289,
+    "cpu_ms": 279.2520000000005
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 91.374108,
+    "cpu_ms": 304.2420000000012
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 92.232317,
+    "cpu_ms": 295.76399999999927
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 82.575717,
+    "cpu_ms": 275.3440000000005
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 81.731987,
+    "cpu_ms": 272.79499999999945
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 91.423721,
+    "cpu_ms": 296.4430000000009
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 97.328452,
+    "cpu_ms": 293.19899999999956
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 87.961214,
+    "cpu_ms": 280.0620000000009
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 89.63694,
+    "cpu_ms": 279.069999999999
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 93.608284,
+    "cpu_ms": 297.682
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 88.100844,
+    "cpu_ms": 297.5699999999994
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 83.42712,
+    "cpu_ms": 255.36199999999985
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 80.508751,
+    "cpu_ms": 269.6930000000002
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 92.581808,
+    "cpu_ms": 284.3499999999999
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 92.763104,
+    "cpu_ms": 296.9689999999989
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 98.919925,
+    "cpu_ms": 301.59100000000103
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 104.012587,
+    "cpu_ms": 298.46400000000006
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 95.384054,
+    "cpu_ms": 293.86199999999985
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 87.950289,
+    "cpu_ms": 293.6319999999988
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 84.84367,
+    "cpu_ms": 281.4550000000002
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 80.86323,
+    "cpu_ms": 272.6329999999999
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 90.556079,
+    "cpu_ms": 289.575000000001
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 96.232852,
+    "cpu_ms": 306.33599999999996
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 86.453168,
+    "cpu_ms": 278.92200000000054
+  },
+  {
+    "size": 1000,
+    "binary": "experiment2",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 87.025693,
+    "cpu_ms": 292.86800000000034
+  },
+  {
+    "size": 1000,
+    "binary": "experiment1",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 94.394566,
+    "cpu_ms": 312.40500000000003
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 443.576023,
+    "cpu_ms": 1484.5029999999992
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 416.062436,
+    "cpu_ms": 1397.722
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 439.410671,
+    "cpu_ms": 1379.2949999999973
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 439.600146,
+    "cpu_ms": 1500.0149999999994
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 465.032857,
+    "cpu_ms": 1540.0770000000002
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 435.804011,
+    "cpu_ms": 1447.7539999999997
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 402.772157,
+    "cpu_ms": 1392.0229999999983
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 414.853038,
+    "cpu_ms": 1454.0050000000003
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 430.158759,
+    "cpu_ms": 1471.8959999999993
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 416.491098,
+    "cpu_ms": 1416.161000000006
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 408.05686,
+    "cpu_ms": 1371.267000000003
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 421.715992,
+    "cpu_ms": 1467.9559999999974
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 447.915901,
+    "cpu_ms": 1562.6189999999979
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 406.436283,
+    "cpu_ms": 1407.4050000000007
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 405.803333,
+    "cpu_ms": 1375.0060000000026
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 432.463069,
+    "cpu_ms": 1444.4879999999998
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 435.238813,
+    "cpu_ms": 1467.6490000000015
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 410.952427,
+    "cpu_ms": 1408.6750000000025
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 395.243016,
+    "cpu_ms": 1367.0059999999999
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 404.387428,
+    "cpu_ms": 1415.9979999999948
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 416.8459,
+    "cpu_ms": 1440.6670000000013
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 408.512069,
+    "cpu_ms": 1405.254999999997
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 407.939052,
+    "cpu_ms": 1394.0869999999954
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 395.386895,
+    "cpu_ms": 1351.2079999999962
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 397.170549,
+    "cpu_ms": 1341.6790000000028
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 376.262417,
+    "cpu_ms": 1306.8839999999966
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 379.820154,
+    "cpu_ms": 1318.9070000000029
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 410.618218,
+    "cpu_ms": 1432.929000000005
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 401.570293,
+    "cpu_ms": 1403.1229999999973
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 381.392775,
+    "cpu_ms": 1325.683999999999
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 396.119678,
+    "cpu_ms": 1366.2110000000034
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 406.77671,
+    "cpu_ms": 1384.7909999999856
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 417.423747,
+    "cpu_ms": 1393.9870000000028
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 376.348243,
+    "cpu_ms": 1302.2689999999955
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 370.282157,
+    "cpu_ms": 1293.4240000000018
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 381.356982,
+    "cpu_ms": 1337.050000000005
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 379.829782,
+    "cpu_ms": 1330.922000000001
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 374.62485,
+    "cpu_ms": 1287.1559999999959
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 395.5383,
+    "cpu_ms": 1383.1969999999956
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 392.76507,
+    "cpu_ms": 1380.5830000000014
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 380.882753,
+    "cpu_ms": 1337.3700000000072
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 372.878893,
+    "cpu_ms": 1300.6019999999835
+  },
+  {
+    "size": 5000,
+    "binary": "experiment2",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 372.357245,
+    "cpu_ms": 1297.9840000000067
+  },
+  {
+    "size": 5000,
+    "binary": "experiment1",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 387.934821,
+    "cpu_ms": 1347.7189999999978
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 999.674746,
+    "cpu_ms": 3608.899000000008
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 778.14445,
+    "cpu_ms": 2725.948999999993
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 0,
+    "warmup": true,
+    "wall_ms": 762.664111,
+    "cpu_ms": 2660.0469999999987
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 750.588229,
+    "cpu_ms": 2620.1390000000088
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 784.339877,
+    "cpu_ms": 2747.3989999999944
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 1,
+    "warmup": true,
+    "wall_ms": 1015.370691,
+    "cpu_ms": 3664.012999999997
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 1031.690398,
+    "cpu_ms": 3703.353
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 770.40714,
+    "cpu_ms": 2704.5289999999936
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 2,
+    "warmup": false,
+    "wall_ms": 737.301206,
+    "cpu_ms": 2582.494999999987
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 732.089313,
+    "cpu_ms": 2547.6690000000062
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 776.391945,
+    "cpu_ms": 2733.482000000009
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 3,
+    "warmup": false,
+    "wall_ms": 1007.770141,
+    "cpu_ms": 3642.405000000004
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 985.808701,
+    "cpu_ms": 3580.596
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 753.623812,
+    "cpu_ms": 2637.038000000004
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 4,
+    "warmup": false,
+    "wall_ms": 750.792302,
+    "cpu_ms": 2583.9260000000054
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 717.649382,
+    "cpu_ms": 2515.911000000003
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 759.474804,
+    "cpu_ms": 2666.458000000006
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 5,
+    "warmup": false,
+    "wall_ms": 1019.561424,
+    "cpu_ms": 3676.0720000000047
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 990.614842,
+    "cpu_ms": 3586.2339999999904
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 770.413842,
+    "cpu_ms": 2727.382000000006
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 6,
+    "warmup": false,
+    "wall_ms": 735.542679,
+    "cpu_ms": 2575.0830000000065
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 728.565707,
+    "cpu_ms": 2542.2649999999862
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 747.617643,
+    "cpu_ms": 2638.524999999973
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 7,
+    "warmup": false,
+    "wall_ms": 988.11802,
+    "cpu_ms": 3585.782000000009
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 1020.712641,
+    "cpu_ms": 3680.6279999999842
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 785.949364,
+    "cpu_ms": 2754.8590000000104
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 8,
+    "warmup": false,
+    "wall_ms": 768.714795,
+    "cpu_ms": 2660.078999999982
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 758.805498,
+    "cpu_ms": 2643.8739999999825
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 783.988227,
+    "cpu_ms": 2724.9270000000224
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 9,
+    "warmup": false,
+    "wall_ms": 1044.096947,
+    "cpu_ms": 3737.5379999999723
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 1025.305602,
+    "cpu_ms": 3688.0700000000247
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 794.855465,
+    "cpu_ms": 2771.327999999997
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 10,
+    "warmup": false,
+    "wall_ms": 749.344184,
+    "cpu_ms": 2606.2919999999963
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 740.56728,
+    "cpu_ms": 2581.7050000000136
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 737.867046,
+    "cpu_ms": 2589.1340000000155
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 11,
+    "warmup": false,
+    "wall_ms": 977.809775,
+    "cpu_ms": 3553.9600000000178
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 980.334663,
+    "cpu_ms": 3551.0149999999926
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 785.235296,
+    "cpu_ms": 2679.2350000000056
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 12,
+    "warmup": false,
+    "wall_ms": 711.037978,
+    "cpu_ms": 2476.618000000002
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 701.309133,
+    "cpu_ms": 2464.9670000000015
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 760.855115,
+    "cpu_ms": 2691.697999999988
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 13,
+    "warmup": false,
+    "wall_ms": 1001.536036,
+    "cpu_ms": 3586.691000000016
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 995.231488,
+    "cpu_ms": 3598.805999999982
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 767.078489,
+    "cpu_ms": 2697.7970000000228
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 14,
+    "warmup": false,
+    "wall_ms": 731.121698,
+    "cpu_ms": 2557.746999999992
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 718.362046,
+    "cpu_ms": 2500.3010000000077
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 737.097906,
+    "cpu_ms": 2590.927999999991
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 15,
+    "warmup": false,
+    "wall_ms": 998.859077,
+    "cpu_ms": 3618.186000000009
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 985.839203,
+    "cpu_ms": 3567.048
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 732.843204,
+    "cpu_ms": 2574.95000000003
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 16,
+    "warmup": false,
+    "wall_ms": 715.549952,
+    "cpu_ms": 2501.556999999991
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 721.815669,
+    "cpu_ms": 2518.2120000000054
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 743.964091,
+    "cpu_ms": 2607.2920000000013
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 17,
+    "warmup": false,
+    "wall_ms": 966.929884,
+    "cpu_ms": 3499.0099999999984
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 974.301678,
+    "cpu_ms": 3511.154000000005
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 730.900225,
+    "cpu_ms": 2559.285000000017
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 18,
+    "warmup": false,
+    "wall_ms": 698.604072,
+    "cpu_ms": 2439.604000000031
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 706.128448,
+    "cpu_ms": 2464.346000000006
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 733.529118,
+    "cpu_ms": 2582.4440000000095
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 19,
+    "warmup": false,
+    "wall_ms": 955.502003,
+    "cpu_ms": 3465.0360000000264
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 947.897129,
+    "cpu_ms": 3438.9759999999683
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 731.632561,
+    "cpu_ms": 2567.1739999999945
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 20,
+    "warmup": false,
+    "wall_ms": 713.042683,
+    "cpu_ms": 2482.8430000000026
+  },
+  {
+    "size": 10000,
+    "binary": "experiment2",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 730.535833,
+    "cpu_ms": 2548.956999999973
+  },
+  {
+    "size": 10000,
+    "binary": "experiment1",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 726.981813,
+    "cpu_ms": 2551.456000000002
+  },
+  {
+    "size": 10000,
+    "binary": "original",
+    "round": 21,
+    "warmup": false,
+    "wall_ms": 950.667227,
+    "cpu_ms": 3430.3200000000234
+  }
+]

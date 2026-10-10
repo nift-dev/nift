@@ -1,0 +1,23 @@
+0 retained exit=0
+250 pages: 0.015s  1000 pages: 0.039s  ratio=2.6x
+PASS: full-build typed-content scaling approximately linear
+
+0 original exit=0
+250 pages: 0.011s  1000 pages: 0.038s  ratio=3.3x
+PASS: full-build typed-content scaling approximately linear
+
+1 retained exit=0
+250 pages: 0.014s  1000 pages: 0.040s  ratio=2.8x
+PASS: full-build typed-content scaling approximately linear
+
+1 original exit=0
+250 pages: 0.013s  1000 pages: 0.033s  ratio=2.6x
+PASS: full-build typed-content scaling approximately linear
+
+2 retained exit=0
+250 pages: 0.011s  1000 pages: 0.038s  ratio=3.3x
+PASS: full-build typed-content scaling approximately linear
+
+2 original exit=0
+250 pages: 0.012s  1000 pages: 0.040s  ratio=3.4x
+PASS: full-build typed-content scaling approximately linear

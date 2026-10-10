@@ -1,0 +1,10 @@
+caught content-invalidation
+caught template-invalidation
+caught generated-file-edge
+caught metadata-refresh
+caught output-deletion
+caught rename-deletion
+caught shared-global-baseline
+caught late-native-hash
+caught drop-hook-dependencies
+mutation liveness PASS: 9 caught

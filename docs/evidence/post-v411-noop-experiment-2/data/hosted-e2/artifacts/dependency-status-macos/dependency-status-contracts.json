@@ -1,0 +1,152 @@
+[
+  {
+    "mode": "modified",
+    "case": "older",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "equal",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "newer",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "deleted-recreated",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "denied-parent",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "unreadable",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "alias",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "escaping",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "broken",
+    "passed": true
+  },
+  {
+    "mode": "modified",
+    "case": "pre-hook",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "older",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "equal",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "newer",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "deleted-recreated",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "denied-parent",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "unreadable",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "alias",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "escaping",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "broken",
+    "passed": true
+  },
+  {
+    "mode": "hash",
+    "case": "pre-hook",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "older",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "equal",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "newer",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "deleted-recreated",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "denied-parent",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "unreadable",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "alias",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "escaping",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "broken",
+    "passed": true
+  },
+  {
+    "mode": "hybrid",
+    "case": "pre-hook",
+    "passed": true
+  }
+]

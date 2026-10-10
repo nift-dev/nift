@@ -1,0 +1,14 @@
+==62== Callgrind, a call-graph generating cache profiler
+==62== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==62== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==62== Command: /tmp/nift-path-experiment/nift-experiment1 build
+==62== 
+==62== For interactive control, run 'callgrind_control -h'.
+==62== brk segment overflow in thread #1: can't grow to 0x4c86000
+==62== (see section Limitations in user manual)
+==62== NOTE: further instances of this message will not be shown
+==62== 
+==62== Events    : Ir
+==62== Collected : 6686776528
+==62== 
+==62== I   refs:      6,686,776,528

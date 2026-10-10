@@ -1,0 +1,4 @@
+100 [('experiment2', 21.862), ('experiment1', 23.043)]
+1000 [('experiment2', 86.811), ('experiment1', 92.672)]
+5000 [('experiment2', 395.829), ('experiment1', 408.697)]
+10000 [('experiment2', 729.551), ('experiment1', 756.549), ('original', 989.366)]

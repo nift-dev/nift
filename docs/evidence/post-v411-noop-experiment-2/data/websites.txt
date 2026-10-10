@@ -1,0 +1,5 @@
+100 noop [('experiment1', 4.44), ('experiment2', 4.39)]
+5000 noop [('experiment1', 124.723), ('experiment2', 120.663)]
+5000 one-page [('experiment1', 130.238), ('experiment2', 126.958)]
+5000 shared-template [('experiment1', 375.326), ('experiment2', 351.094)]
+5000 shared-dependency [('experiment1', 356.697), ('experiment2', 350.881)]

@@ -1,0 +1,1756 @@
+{
+  "schema_version": 1,
+  "checkpoint": "10-cross-platform-behavioural-equivalence",
+  "platform": {
+    "runner_os": "Windows",
+    "system": "Windows",
+    "release": "2025Server",
+    "machine": "AMD64",
+    "python": "3.13.15",
+    "compiler": "g++ (x86_64-posix-seh-rev1, Built by MinGW-Builds project) 15.2.0",
+    "nift_commit": "64d68993a981fdb6aaf6a52e37c666b035073b3e"
+  },
+  "normalization": [
+    "relative-path-separators-to-slash",
+    "crlf-to-lf-before-output-hash"
+  ],
+  "cases": [
+    {
+      "name": "clean-build",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "033b1f8d438a2eca67dc961f5c204e97cbbd5066b3cf2257c0dfd4792d2b2d2a",
+          "index.html": "1fc6ced4149be90cd791a38a42cf534a033b8bfdd37510fc8e77b58793a022a9",
+          "nested/深い/ページ.html": "a4c197895095a3290ecf02f484f5026092ff845f3c619d772c66c05d04c41aca"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "exit_class": "success"
+      }
+    },
+    {
+      "name": "no-op-incremental",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "033b1f8d438a2eca67dc961f5c204e97cbbd5066b3cf2257c0dfd4792d2b2d2a",
+          "index.html": "1fc6ced4149be90cd791a38a42cf534a033b8bfdd37510fc8e77b58793a022a9",
+          "nested/深い/ページ.html": "a4c197895095a3290ecf02f484f5026092ff845f3c619d772c66c05d04c41aca"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "exit_class": "success",
+        "output_unchanged": true
+      }
+    },
+    {
+      "name": "content-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "033b1f8d438a2eca67dc961f5c204e97cbbd5066b3cf2257c0dfd4792d2b2d2a",
+          "index.html": "0033f8c74e0d2bcf5a558b6a0a7b096cd2608b35708e23f9d4cbb762527b6b11",
+          "nested/深い/ページ.html": "a4c197895095a3290ecf02f484f5026092ff845f3c619d772c66c05d04c41aca"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "template-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "102660631b9d43995fc255999b13080e37dfd35826c71212ff9332554a60f1ac",
+          "index.html": "1c7a92f6caaa5bcd1261aadfaa172314cfdcc9ad1ce4bb859089be8afe8d7bd6",
+          "nested/深い/ページ.html": "351e84235d2961dff8d13aa7e5af7ff8a5ce0cf3a4f06ea4764f36682929b35f"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "input-dependency-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "893b48942425abce1c30c927a8419268b6e6bc476c1b79dee45581f22b0d315c",
+          "index.html": "1f5ba3750d19813145e6b9e77897e3a7d2ec5ffd2a92835c530c6e7a693e6010",
+          "nested/深い/ページ.html": "2fa0e39e28e7d1c8961dd3575ff03381d64c85ff2f5dd7d831625a2e724d0e64"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "json-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "a7c63315cd04841bfbaabe621341f2ac435c04237dddd30e060788cbfad5f1fa",
+          "index.html": "c699e2f55976fe20ffa5753691a57be8525b29302a55254b286feaace9f8bf49",
+          "nested/深い/ページ.html": "dccc7e66b40927339729cc1f9148e55790b78242fd6aafa607a05d6bbc882a56"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "schema-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "a7c63315cd04841bfbaabe621341f2ac435c04237dddd30e060788cbfad5f1fa",
+          "index.html": "c699e2f55976fe20ffa5753691a57be8525b29302a55254b286feaace9f8bf49",
+          "nested/深い/ページ.html": "dccc7e66b40927339729cc1f9148e55790b78242fd6aafa607a05d6bbc882a56"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "contract-invalidation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean"
+      }
+    },
+    {
+      "name": "requirement-recovery",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "stale_before": "clean",
+        "required_output_restored": true
+      }
+    },
+    {
+      "name": "tracked-add",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "extra.html": "b737c27865bf0ff6f7ca6e4ca75df32df140e817749c7ee24a9029b695895c24",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            },
+            {
+              "name": "extra",
+              "title": "Extra",
+              "template": "templates/page.html"
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "extra.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/extra.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean"
+      }
+    },
+    {
+      "name": "tracked-move",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "moved/extra.html": "7e19cda3df87951d8f14bc7ad815a9cec2c51fc97fd3a65acee79999a83fd4e0",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            },
+            {
+              "name": "moved/extra",
+              "title": "Extra",
+              "template": "templates/page.html"
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "moved/extra.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/moved/extra.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "old_output_absent": true
+      }
+    },
+    {
+      "name": "tracked-remove",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "removed_output_absent": true
+      }
+    },
+    {
+      "name": "template-less-minified-output",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "css": ".x{color:red;margin:0 1rem;}"
+      }
+    },
+    {
+      "name": "unicode-and-nested-paths",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "2ae2e02b1d4ce4a7e86cbed2e97ff1b6e030ddd408d532019e8d4564c53d9405",
+          "index.html": "7ad9cce22fdfc3030407d6b70879576dfbc87c103a1717520a3ef37cb3991e6c",
+          "nested/深い/ページ.html": "24071539d1aa138d5234841f981be58a6ac9d85e73fad69d367a15449be442a8"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean",
+        "unicode_output_present": true
+      }
+    },
+    {
+      "name": "failed-render-preservation",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "exit_class": "controlled-failure",
+        "diagnostic_class": "json-schema-validation",
+        "output_preserved": true,
+        "metadata_preserved": true,
+        "status": "clean"
+      }
+    },
+    {
+      "name": "failed-render-recovery",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "321474b17de76eccf1322d195b46280f75699d21c96c2d0acd10780f2d0c7b2c",
+          "index.html": "68154f74110e91974cd7c04ebaeac44320e3374881fbd7fee119171399c7443f",
+          "nested/深い/ページ.html": "cd664a88527993d7e51e6b09e5b5a580a79f1e8a867a6dba13848b3630ff3f5a"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean"
+      }
+    },
+    {
+      "name": "malformed-parser-input",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "exit_class": "controlled-failure",
+        "diagnostic_class": "malformed-template",
+        "output_preserved": true,
+        "status": "clean"
+      }
+    },
+    {
+      "name": "malformed-parser-recovery",
+      "classification": "portable",
+      "pass": true,
+      "observation": {
+        "outputs": {
+          "assets/style.css": "704efe179bc5bffe323ec2fb1ae29dff4d4ab33e189eee9b63ded1b988b90229",
+          "docs/index.html": "321474b17de76eccf1322d195b46280f75699d21c96c2d0acd10780f2d0c7b2c",
+          "index.html": "68154f74110e91974cd7c04ebaeac44320e3374881fbd7fee119171399c7443f",
+          "nested/深い/ページ.html": "cd664a88527993d7e51e6b09e5b5a580a79f1e8a867a6dba13848b3630ff3f5a"
+        },
+        "state": {
+          "tracked": [
+            {
+              "name": "/",
+              "title": "Home",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "docs/index",
+              "title": "Docs",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "nested/深い/ページ",
+              "title": "Unicode",
+              "template": "templates/page.html"
+            },
+            {
+              "name": "assets/style",
+              "title": "Style",
+              "content-ext": ".css",
+              "output-ext": ".css",
+              "minify": true
+            }
+          ],
+          "pages": {
+            "assets/style.info.json": {
+              "template": "",
+              "dependencies": [
+                "content/assets/style.css"
+              ],
+              "requirements": [],
+              "minify": true,
+              "minify_version": 1
+            },
+            "docs/index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/docs/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "index.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/index.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            },
+            "nested/深い/ページ.info.json": {
+              "template": "templates/page.html",
+              "dependencies": [
+                ".nift/config.json",
+                ".nift/routes.json",
+                "content/nested/深い/ページ.html",
+                "data/site.json",
+                "schemas/site.schema.json",
+                "templates/page.html",
+                "templates/parts/shared.html"
+              ],
+              "requirements": [
+                "public/docs/index.html"
+              ],
+              "minify": false,
+              "minify_version": 0
+            }
+          }
+        },
+        "status": "clean"
+      }
+    },
+    {
+      "name": "executable-suffix",
+      "classification": "platform-specific",
+      "pass": true,
+      "observation": {
+        "expected_exe_suffix": true,
+        "has_exe_suffix": true
+      }
+    },
+    {
+      "name": "readonly-output-deletion",
+      "classification": "platform-specific",
+      "pass": true,
+      "observation": {
+        "expected_write_attribute_adjustment": true,
+        "write_attribute_adjustment_required": true
+      }
+    }
+  ],
+  "portable_case_count": 18,
+  "platform_specific_case_count": 2,
+  "pass": true
+}

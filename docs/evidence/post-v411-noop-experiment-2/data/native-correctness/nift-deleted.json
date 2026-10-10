@@ -1,0 +1,17 @@
+{
+  "system": "nift",
+  "scenario": "deleted",
+  "command": [
+    "/home/nick/Repositories/nift/nift/nift",
+    "build"
+  ],
+  "elapsed_ms": 15.787789,
+  "exit_code": 1,
+  "expected_actions": [],
+  "executed_actions": [],
+  "action_ok": true,
+  "stdout_oracle": "6607\n",
+  "executable_stdout": null,
+  "output_sha256": {},
+  "passed": true
+}

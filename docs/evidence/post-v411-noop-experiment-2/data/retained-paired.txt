@@ -1,0 +1,2 @@
+10000 baseline 934.578
+10000 candidate 709.516

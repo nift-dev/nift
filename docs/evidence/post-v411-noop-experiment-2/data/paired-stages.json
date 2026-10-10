@@ -1,0 +1,122 @@
+[
+  {
+    "binary": "retained",
+    "round": 0,
+    "warmup": true,
+    "stages_ms": {
+      "tracking": 89.911,
+      "open": 90.1319,
+      "dirty_scan": 621.328,
+      "build_many": 9.63894,
+      "build_all": 631.168
+    }
+  },
+  {
+    "binary": "candidate",
+    "round": 0,
+    "warmup": true,
+    "stages_ms": {
+      "tracking": 96.1893,
+      "open": 96.3826,
+      "dirty_scan": 593.251,
+      "build_many": 9.03559,
+      "build_all": 602.44
+    }
+  },
+  {
+    "binary": "candidate",
+    "round": 1,
+    "warmup": true,
+    "stages_ms": {
+      "tracking": 94.8729,
+      "open": 95.0729,
+      "dirty_scan": 590.129,
+      "build_many": 9.9163,
+      "build_all": 600.223
+    }
+  },
+  {
+    "binary": "retained",
+    "round": 1,
+    "warmup": true,
+    "stages_ms": {
+      "tracking": 94.4817,
+      "open": 94.6513,
+      "dirty_scan": 607.844,
+      "build_many": 9.19078,
+      "build_all": 617.182
+    }
+  },
+  {
+    "binary": "retained",
+    "round": 2,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 93.6687,
+      "open": 93.8595,
+      "dirty_scan": 624.999,
+      "build_many": 10.926,
+      "build_all": 636.097
+    }
+  },
+  {
+    "binary": "candidate",
+    "round": 2,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 99.3229,
+      "open": 99.5322,
+      "dirty_scan": 586.112,
+      "build_many": 8.78289,
+      "build_all": 595.055
+    }
+  },
+  {
+    "binary": "candidate",
+    "round": 3,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 94.2491,
+      "open": 94.4379,
+      "dirty_scan": 583.541,
+      "build_many": 9.23371,
+      "build_all": 592.93
+    }
+  },
+  {
+    "binary": "retained",
+    "round": 3,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 95.0026,
+      "open": 95.192,
+      "dirty_scan": 633.8,
+      "build_many": 9.74603,
+      "build_all": 643.737
+    }
+  },
+  {
+    "binary": "retained",
+    "round": 4,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 101.163,
+      "open": 101.368,
+      "dirty_scan": 634.492,
+      "build_many": 8.60381,
+      "build_all": 643.268
+    }
+  },
+  {
+    "binary": "candidate",
+    "round": 4,
+    "warmup": false,
+    "stages_ms": {
+      "tracking": 93.5551,
+      "open": 93.7349,
+      "dirty_scan": 575.96,
+      "build_many": 9.67612,
+      "build_all": 585.788
+    }
+  }
+]

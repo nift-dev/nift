@@ -1,0 +1,149 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "mode": "modified",
+      "spelling": "data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "modified",
+      "spelling": "data/./shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "modified",
+      "spelling": "./data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "modified",
+      "spelling": "data//shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "modified",
+      "spelling": "data/nested/../shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "modified",
+      "spelling": "data\\shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "data/./shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "./data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "data//shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "data/nested/../shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hash",
+      "spelling": "data\\shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "data/./shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "./data/shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "data//shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "data/nested/../shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    },
+    {
+      "mode": "hybrid",
+      "spelling": "data\\shared.html",
+      "saved_alias_clean": true,
+      "changed_targeted_and_remaining": true,
+      "sidecar_parent_rejected": true,
+      "baseline_matches": false
+    }
+  ]
+}

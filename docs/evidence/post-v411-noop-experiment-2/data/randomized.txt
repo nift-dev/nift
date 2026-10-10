@@ -1,0 +1,1 @@
+{"passed": true, "seeds": 9, "operations": 288, "builds": 645, "clean_oracles": 288, "elapsed_seconds": 5.505}

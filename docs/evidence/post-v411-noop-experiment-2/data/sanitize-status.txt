@@ -1,0 +1,1 @@
+CLI status adversarial PASS 30 SKIP 0

@@ -1,0 +1,12 @@
+==59== Callgrind, a call-graph generating cache profiler
+==59== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==59== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==59== Command: /tmp/nift-path-experiment/nift-experiment1 build
+==59== 
+==59== For interactive control, run 'callgrind_control -h'.
+error: another build appears to be running; refusing to mutate build state
+==59== 
+==59== Events    : Ir
+==59== Collected : 953080972
+==59== 
+==59== I   refs:      953,080,972

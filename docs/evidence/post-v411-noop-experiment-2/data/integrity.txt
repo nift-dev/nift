@@ -1,0 +1,2 @@
+test-integrity clean: 319 files scanned, 0 findings
+report=/tmp/nift-path-experiment/integrity.json

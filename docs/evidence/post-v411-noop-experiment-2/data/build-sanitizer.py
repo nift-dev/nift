@@ -1,0 +1,4 @@
+import pathlib,subprocess,shlex
+p=pathlib.Path('/tmp/nift-path-experiment');repo=pathlib.Path('/home/nick/Repositories/nift/nift');lines=subprocess.check_output(['make','-n','-W','src/ProjectInfo.cpp','all'],cwd=repo,text=True).splitlines();compile_=next(x for x in lines if '-c src/ProjectInfo.cpp ' in x);link=next(x for x in reversed(lines) if x.endswith(' -o nift'))
+flags=['-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer'];cmd=shlex.split(compile_);cmd=[str(p/'ProjectInfo-sanitize.o') if x=='src/ProjectInfo.o' else x for x in cmd];cmd[1:1]=flags;cmd.remove('-O2');subprocess.run(cmd,cwd=repo,check=True)
+cmd=shlex.split(link);cmd=[str(p/'ProjectInfo-sanitize.o') if x=='src/ProjectInfo.o' else str(p/'nift-path-sanitize') if x=='nift' else x for x in cmd];cmd[1:1]=flags;subprocess.run(cmd,cwd=repo,check=True)
