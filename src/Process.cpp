@@ -247,6 +247,14 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     if (specs.empty()) { r.error = "empty pipeline"; return r; }
     std::wstring ow, ew; std::string op, ep;
     if (capture) { op = win_temp_file(ow,0); ep = win_temp_file(ew,1); if (op.empty() || ep.empty()) { if(!ow.empty())DeleteFileW(ow.c_str());if(!ew.empty())DeleteFileW(ew.c_str());r.error = "cannot create capture files"; return r; } }
+    // All child stderr duplicates share one write-capable file object and
+    // position. Append-only handles are rejected by MSYS stdio adapters;
+    // reopening per stage would instead truncate or overwrite earlier bytes.
+    HANDLE capture_error=INVALID_HANDLE_VALUE;
+    if(capture){
+        capture_error=nift_process_test_fail("capture-file",1)?INVALID_HANDLE_VALUE:CreateFileW(ew.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(capture_error==INVALID_HANDLE_VALUE){DeleteFileW(ow.c_str());DeleteFileW(ew.c_str());r.error="cannot open stderr capture file";return r;}
+    }
     std::vector<HANDLE> procs;
     HANDLE prev_read = INVALID_HANDLE_VALUE;
     bool ok = true;
@@ -267,7 +275,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = nift_process_test_fail("capture-out",i)?INVALID_HANDLE_VALUE:CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
         if (spec.merge_stderr) err = out;
         else if (!spec.stderr_path.empty()) err = open_redirect(spec.stderr_path, false, spec.append_stderr);
-        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; err = nift_process_test_fail("capture-err",i)?INVALID_HANDLE_VALUE:CreateFileW(ew.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ|FILE_SHARE_WRITE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
+        else if(capture)err=nift_process_test_fail("capture-err",i)?INVALID_HANDLE_VALUE:capture_error;
 
         // Requested routing must fail closed: INVALID is not inherited stdio.
         bool routing_ok=(prev_read!=INVALID_HANDLE_VALUE || spec.stdin_path.empty() || in!=INVALID_HANDLE_VALUE)
@@ -337,7 +345,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         // never see EOF (pipeline deadlock) and handles leak.
         if (in != INVALID_HANDLE_VALUE) CloseHandle(in);
         if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
-        if (err != INVALID_HANDLE_VALUE && err != out) CloseHandle(err);
+        if (err != INVALID_HANDLE_VALUE && err != out && err != capture_error) CloseHandle(err);
         prev_read = next_read;
         if (!created) break;
         CloseHandle(pi.hThread);
@@ -346,6 +354,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         r.launched = true;
     }
     if (prev_read != INVALID_HANDLE_VALUE) CloseHandle(prev_read);
+    if(capture_error!=INVALID_HANDLE_VALUE)CloseHandle(capture_error);
     if(!ok)for(HANDLE h:procs)TerminateProcess(h,126);
     DWORD exit = 0;
     for (std::size_t i = 0; i < procs.size(); ++i) {

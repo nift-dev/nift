@@ -14,7 +14,7 @@ def run(binary,args):
 run(a.contract,[])
 windows=os.name=='nt' or bool(os.environ.get('MSYSTEM'))
 for job in ([False] if windows else [False,True]):
- for op,stages in [('temp',range(2)),('pipe',range(2)),('spawn' if windows else 'fork',range(3))]+([('temp-open',range(2)),('capture-out',[2]),('capture-err',range(3)),('duplicate',range(9)),('attributes-init',range(3)),('attributes-update',range(3))] if windows else []):
+ for op,stages in [('temp',range(2)),('pipe',range(2)),('spawn' if windows else 'fork',range(3))]+([('capture-file',[1]),('temp-open',range(2)),('capture-out',[2]),('capture-err',range(3)),('duplicate',range(9)),('attributes-init',range(3)),('attributes-update',range(3))] if windows else []):
   if job and op=='temp':continue
   for stage in stages:run(a.failure,[op,str(stage)]+(['job'] if job else []))
 if not windows:

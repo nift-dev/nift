@@ -105,6 +105,9 @@ int main(int argc,char**argv){
  auto cwd=s;cwd.cwd=dir;cwd.args={"cwd"};auto cr=nift_run_process(cwd);require(cr.exit_code==0 && std::filesystem::equivalent(std::filesystem::u8path(cr.out),dir),"cwd contract");
  auto missing=s;missing.program="nift-missing-executable-411";auto mr=nift_run_process(missing);require(mr.exit_code!=7,"missing executable contract");
 #ifdef _WIN32
+ ProcessSpec msys;msys.program="sh";msys.args={"-c","printf out; printf err >&2; exit 3"};auto sr=nift_run_process(msys);
+ if(sr.exit_code!=3 || sr.out!="out" || sr.err!="err")std::cerr<<"MSYS shell capture out="<<sr.out<<" err="<<sr.err<<" error="<<sr.error<<'\n';
+ require(sr.exit_code==3 && sr.out=="out" && sr.err=="err","MSYS shell capture");
  SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};HANDLE sentinel=CreateEventW(&sa,TRUE,FALSE,nullptr);require(sentinel!=nullptr,"sentinel creation");
  auto check=s;check.args={"sentinel",std::to_string(reinterpret_cast<uintptr_t>(sentinel))};require(nift_run_process(check).exit_code==0,"unrelated inheritable handle leaked");CloseHandle(sentinel);
  auto unicode_dir=dir/std::filesystem::u8path(u8"子-é");std::filesystem::create_directory(unicode_dir);
