@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='nift-v411-mutants-') as td:
    ('output-deletion','CLI.cpp','filesystem::remove_owned_file(project.output_path(info));','', ['add','remove']),
    ('rename-deletion','CLI.cpp','filesystem::remove_owned_file(project.output_path(info));','', ['rename']),
    ('shared-global-baseline','ProjectInfo.cpp','return value != std::to_string(current_hash_cached(dependency));','return filesystem::stored_hash_changed(root, dependency);',['atomic','targeted']),
-   ('late-native-hash','ProjectInfo.cpp','    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots)) {','    for (auto& entry : snapshots) entry.second = std::to_string(filesystem::hash_path(root/entry.first));\n    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots)) {',['__contracts__']),
+   ('late-native-hash','ProjectInfo.cpp','    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr)) {','    for (auto& entry : snapshots) entry.second = std::to_string(filesystem::hash_path(root/entry.first));\n    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr)) {',['__contracts__']),
    ('drop-hook-dependencies','Hooks.cpp','dependencies->insert(rr.dependencies.begin(), rr.dependencies.end());','',['__contracts__'])]
   for name,filename,old,new,ops in mutants:
    source=(repo/'src'/filename).read_text();assert source.count(old)==1,(name,source.count(old));mutant=temp/filename;mutant.write_text(source.replace(old,new));
