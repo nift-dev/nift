@@ -1,0 +1,830 @@
+{
+  "title": "NIFT v4.11 \u2014 OBSERVED DEPENDENCY SNAPSHOT CLOSEOUT",
+  "consistency_contract": {
+    "external_inputs_stable_during_consumer": "REQUIRED: supported external-input contract",
+    "opaque_external_ABA": "OUT OF CONTRACT",
+    "Nift_controlled_producer_transitions": "SUPPORTED",
+    "documentation_audit": "No promise found of exact opaque external reads during concurrent mutation; audited README, core docs, handover contracts and build/process tests."
+  },
+  "design": {
+    "consumer_authority": "Additive dependency-hashes object, sorted normalized path keys and decimal uint64 strings, alongside existing dependencies array",
+    "invalidation": "Compare each consumer snapshot with invocation-local current content hash; no consumer freshness reader uses global .hash baseline",
+    "global_hash_role": "Derived compatibility/current-value files only; no core consumer freshness uses global historical baseline",
+    "modified": "Timestamp-only; observation/hash collection disabled",
+    "hybrid": "Timestamp check preserved; valid consumer snapshot compared when hash fallback needed; missing/malformed snapshot is always stale",
+    "native_buffer_hashing": "FNV-1a hash_bytes of exact raw consumed buffer; immutable source hash cached once per buffer; JSON parses same cached raw source used for its observation",
+    "conflicts": "Tracked dependency observed at multiple versions rejects certification, including across pre/render/post/hook phases",
+    "atomic_metadata": "Existing write_readonly_file temporary-and-rename replacement; outputs and stale pagination cleanup occur before metadata commit; existing ownership/unfinished marker still guards interrupted derived output mutations",
+    "current_hash_dedup": "Invocation-local normalized path cache; native immutable source buffer cache hashes each buffer once; producer completion invalidates changed output/parent-directory caches before scheduler release; no reverse project scan per consumer."
+  },
+  "native_read_audit": [
+    {
+      "path": "content/template/@input/partials/pagination",
+      "required": true,
+      "model": "ProjectInfoHost shared source observation hashes the returned immutable buffer; includes front-matter stripping after raw observation",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "JSON/JSON Schema/contracts",
+      "required": true,
+      "model": "Parsed cache reads shared raw source; host retains/reuses hash of that raw buffer, never parsed-object serialization",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "imports",
+      "required": true,
+      "model": "Host source buffers observed; nested imports use same per-consumer host",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "inject",
+      "required": true,
+      "model": "Fresh read buffer explicitly observed; two different reads conflict",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "FileValue",
+      "required": "Only when explicitly declared/currently registered dependency",
+      "model": "Observe exact disk bytes buffered at read/rw open; do not automatically add FileValue paths to dependency set. Observations for undeclared paths are excluded from certification.",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "build/pre/post .f scripts",
+      "required": true,
+      "model": "Observe exact script buffer; merge native reads through consumer host before success metadata",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "legacy per-file hooks",
+      "required": true,
+      "model": "Propagate hook source, parser-discovered dependencies, and native FileValue observations for the owning consumer declarations; project-wide hook semantics unchanged.",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "page front matter",
+      "required": "Existing/declared dependency relationships",
+      "model": "Observation callback hashes raw content and external front-matter buffers; retains existing dependency registration semantics",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "project/hierarchy metadata",
+      "required": "Existing semantic fingerprint relationships",
+      "model": "Existing compact fingerprint relationships retained; hash/hybrid validate per-consumer hashes after refreshing semantic fingerprints.",
+      "raw_bytes_available": true,
+      "classification": "required within existing/explicit dependency relationships"
+    },
+    {
+      "path": "opaque command and late-declared path",
+      "required": false,
+      "model": "Known sidecar declarations hashed before consumer and rechecked after execution; changes reject metadata. Late-only declarations use current hash under stable-input contract; no exact opaque-read claim.",
+      "raw_bytes_available": false,
+      "classification": "stable-input fallback; exact opaque observation outside scope"
+    }
+  ],
+  "compatibility": {
+    "v410_shaped_metadata": "PASS for v4.10-shaped metadata (snapshot field removed): hash/hybrid rebuild once and then no-op; actual tagged v4.10 binary interoperability was source-audited, not executed",
+    "missing_partial_malformed": "PASS; conservative stale",
+    "stale_extra_entry": "Ignored; cannot substitute for a missing dependency snapshot",
+    "downgrade": "Source audit: older reader ignores extra fields and writer drops them; older binary can reproduce old global-baseline bug. No new downgrade promise."
+  },
+  "matrix": {
+    "cases": 27,
+    "contractual_failures": 0,
+    "modified_supported": "6/6",
+    "hash": "9/9",
+    "hybrid": "9/9",
+    "excluded": "Three modified preserved-mtime cases remain timestamp limitations",
+    "fixture_correction": "Old collision fixture borrowed B timestamp and could make D older than C metadata. Preserve old run; corrected fixture assigns all initial metadata one coarse timestamp quantum.",
+    "evidence": "final-owner-matrix.json"
+  },
+  "deterministic": {
+    "fanout": [
+      2,
+      3,
+      10,
+      128,
+      1000,
+      4000,
+      10000
+    ],
+    "target_sets": "one/subset/all-but-one; omitted snapshots unchanged; final ordinary build then genuine no-op",
+    "repeated_versions": "A=h3/B=h2/C=h0 verified before ordinary convergence",
+    "generated": "Primary outputs, directory hashes and pagination output dependencies; cache invalidation before dependent scheduler release",
+    "rename_remove": "Consumer rename/removal and tracking update validated; randomized deck also covers dependency/directory/symlink changes",
+    "post_failure": "Normal post-hook removed output and failed post-hook do not advance prior metadata; repair converges",
+    "interruption": "Deterministic interruption after output before metadata; ordinary build refuses unfinished epoch; repair restores valid snapshots. Existing crash-recovery campaign also passed. No claim of exhaustive deterministic pause at every instruction.",
+    "fingerprint_migration": "PASS missing, malformed and wrong hash values for compact project fingerprint",
+    "declared_native_hook": "PASS synchronized native FileValue read at h2 between stable h1 endpoints rejects conflicting certification"
+  },
+  "scaling": {
+    "fanout": [
+      {
+        "consumers": 1000,
+        "dependency_edges": 2000,
+        "metadata_bytes": 604340
+      },
+      {
+        "consumers": 4000,
+        "dependency_edges": 8000,
+        "metadata_bytes": 2437340
+      },
+      {
+        "consumers": 10000,
+        "dependency_edges": 20000,
+        "metadata_bytes": 6103340
+      }
+    ],
+    "versions_migration_rename": true,
+    "json_schema_hook_import": true,
+    "barriers": [
+      {
+        "kind": "native",
+        "passed": true
+      },
+      {
+        "kind": "external",
+        "passed": true
+      },
+      {
+        "kind": "interrupt",
+        "passed": true
+      }
+    ],
+    "passed": true,
+    "elapsed_seconds": 14.674
+  },
+  "campaigns": {
+    "smoke": {
+      "passed": true,
+      "seeds": 9,
+      "operations": 243,
+      "builds": 534,
+      "clean_oracles": 243,
+      "elapsed_seconds": 3.458,
+      "evidence": "atomic-smoke.json"
+    },
+    "medium": {
+      "passed": true,
+      "seeds": 30,
+      "operations": 1920,
+      "builds": 4167,
+      "clean_oracles": 1920,
+      "elapsed_seconds": 26.341,
+      "evidence": "atomic-medium.json"
+    },
+    "long": {
+      "passed": true,
+      "seeds": 60,
+      "operations": 7680,
+      "builds": 16407,
+      "clean_oracles": 7680,
+      "elapsed_seconds": 106.61,
+      "evidence": "atomic-long.json"
+    }
+  },
+  "mutations": {
+    "passed": true,
+    "mutants": 9,
+    "caught": 9,
+    "missed": 0,
+    "results": [
+      {
+        "name": "content-invalidation",
+        "family": "incremental",
+        "operations": [
+          "content"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['content']: AssertionError: {'missing': [], 'extra': [], 'changed': ['a.html', 'b.html', 'c.html']}; retention_error=None"
+      },
+      {
+        "name": "template-invalidation",
+        "family": "incremental",
+        "operations": [
+          "template"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['template']: AssertionError: {'missing': [], 'extra': [], 'changed': ['a.html', 'move/x.html', 'c.html', 'move/y.html', 'b.html']}; retention_error=None"
+      },
+      {
+        "name": "generated-file-edge",
+        "family": "incremental",
+        "operations": [
+          "generated"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['generated']: AssertionError: {'missing': [], 'extra': [], 'changed': ['c.html', 'b.html']}; retention_error=None"
+      },
+      {
+        "name": "metadata-refresh",
+        "family": "incremental",
+        "operations": [
+          "tracking"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['tracking']: AssertionError: public metadata mismatch a.info.json:title; retention_error=None"
+      },
+      {
+        "name": "output-deletion",
+        "family": "incremental",
+        "operations": [
+          "add",
+          "remove"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=1 history=['add', 'remove']: AssertionError: {'missing': [], 'extra': ['extra/p0.html'], 'changed': []}; retention_error=None"
+      },
+      {
+        "name": "rename-deletion",
+        "family": "incremental",
+        "operations": [
+          "rename"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=411 step=0 history=['rename']: AssertionError: {'missing': [], 'extra': ['move/x.html'], 'changed': []}; retention_error=None"
+      },
+      {
+        "name": "shared-global-baseline",
+        "family": "incremental",
+        "operations": [
+          "atomic",
+          "targeted"
+        ],
+        "seed": 3,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "CampaignFailure: mode=hash seed=3 step=1 history=['atomic', 'targeted']: AssertionError: {'missing': [], 'extra': [], 'changed': ['b.html']}; retention_error=None"
+      },
+      {
+        "name": "late-native-hash",
+        "family": "incremental",
+        "operations": [
+          "__contracts__"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "AssertionError"
+      },
+      {
+        "name": "drop-hook-dependencies",
+        "family": "incremental",
+        "operations": [
+          "__contracts__"
+        ],
+        "seed": 411,
+        "caught": true,
+        "returncode": 1,
+        "diagnostic": "AssertionError"
+      }
+    ],
+    "elapsed_seconds": 105.06,
+    "production_artifacts_unchanged": true
+  },
+  "local_checks": {
+    "make_test": "PASS including atomic metadata ordering, permissions, migration and recovery",
+    "isolated_checkpoint": "Built with original Process/JobControl/CLI and incremental-only Hooks/ParserExpression; matrix/contracts and long pass independently of process drafts",
+    "pipeline": "30 groups PASS",
+    "test_integrity": "317 files, zero findings",
+    "native_Windows_macOS": "PASS hosted snapshot contracts on Linux/macOS/Windows plus normalized comparison",
+    "focused_after_final_fingerprint_guard": "PASS metadata safety + 30 pipeline groups + isolated current contracts",
+    "campaign_checkpoint_note": "Atomic metadata checkpoint smoke/medium/long green; final compact-fingerprint and declared native hook guards have targeted regressions plus final smoke and mutation rerun.",
+    "final_smoke": {
+      "passed": true,
+      "seeds": 9,
+      "operations": 243,
+      "builds": 534,
+      "clean_oracles": 243,
+      "elapsed_seconds": 2.619
+    }
+  },
+  "commits": {
+    "7d5987c9db54f5b32466a686f669074edc2b3fa2": "per-consumer/native observed snapshots; pushed",
+    "bac2545be0b394523d270009f3a5106397d213be": "post-output certification validation; pushed",
+    "9d2f9590bfdf95014fb1be0c359b515ae0385ed0": "atomic consumer metadata; pushed",
+    "a1be4c0c4278fefb270c2a795eb7e72f056bfb64": "compact fingerprint snapshot validation; pushed",
+    "db2c09022025b21dde03edff1771228891962f44": "declared FileValue observations from consumer hooks; pushed",
+    "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10": "incremental tests, mutation guards, Linux/macOS/Windows snapshot gate; pushed",
+    "ce30fcd91f4d582f50fd992304c7aaef27ebbd9a": "build-input stability, migration and trusted-code documentation; pushed"
+  },
+  "process_drafts": "PRESERVED, NOT LANDED",
+  "release_tags_frozen_benchmarks_Jsonic": "UNCHANGED",
+  "hosted": {
+    "CP1": "all eight workflows PASS",
+    "native_snapshot_coverage": {
+      "commit": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+      "url": "https://github.com/nift-dev/nift/actions/runs/38033902734",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "windows behavioural corpus",
+          "conclusion": "success",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261451"
+        },
+        {
+          "name": "macos behavioural corpus",
+          "conclusion": "success",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261624"
+        },
+        {
+          "name": "linux behavioural corpus",
+          "conclusion": "success",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261652"
+        },
+        {
+          "name": "Compare normalized semantics",
+          "conclusion": "success",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114162618490"
+        }
+      ]
+    },
+    "workflows": {
+      "54a29b7": [
+        {
+          "conclusion": "",
+          "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+          "status": "in_progress",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902775",
+          "workflowName": "Test integrity guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902742",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902787",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033902734",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        }
+      ],
+      "db2c090": [
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761387",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761396",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761323",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "in_progress",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761397",
+          "workflowName": "Test integrity guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761410",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761400",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761355",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "db2c09022025b21dde03edff1771228891962f44",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38033761382",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        }
+      ],
+      "a1be4c0": [
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852169",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852139",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852096",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852098",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "in_progress",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852138",
+          "workflowName": "Test integrity guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852104",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852144",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032852165",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        }
+      ],
+      "9d2f959": [
+        {
+          "conclusion": "",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "in_progress",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505278",
+          "workflowName": "Test integrity guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505232",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505337",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505328",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505319",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505341",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505310",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38032505498",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        }
+      ],
+      "bac2545": [
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949285",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949354",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949238",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "in_progress",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949282",
+          "workflowName": "Test integrity guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949253",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949235",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949241",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031949265",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        }
+      ],
+      "7d5987c": [
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598209",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598203",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598214",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598242",
+          "workflowName": "Gate 6A-R vendored libffi"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598225",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598239",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598210",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598219",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38031598276",
+          "workflowName": "Test integrity guards"
+        }
+      ],
+      "55e32b0": [
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710716",
+          "workflowName": "Performance regression guards"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710744",
+          "workflowName": "Init targets"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710763",
+          "workflowName": "Gate 6B bytes value semantics"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710839",
+          "workflowName": "Hosted certification diagnostic"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710715",
+          "workflowName": "v4.4/v4.5 cross-platform"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710754",
+          "workflowName": "Checkpoint 10 cross-platform equivalence"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710790",
+          "workflowName": "packaging matrix (build-only, non-publishing)"
+        },
+        {
+          "conclusion": "success",
+          "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+          "status": "completed",
+          "url": "https://github.com/nift-dev/nift/actions/runs/38029710817",
+          "workflowName": "Test integrity guards"
+        }
+      ]
+    },
+    "note": "Snapshot at closeout; any in_progress workflows remain pending, not claimed green."
+  },
+  "recommendation": "PROCEED TO PROCESS HARDENING in subsequent work; STOP here. Native snapshot coverage green; remaining hosted integrity jobs are pending and explicitly recorded.",
+  "campaign_totals": {
+    "operations": 9843,
+    "builds": 21108,
+    "clean_oracles": 9843
+  },
+  "hosted_CP1": "All 8 workflows passed",
+  "native_classification": {
+    "required": "Registered native source/JSON/import/inject reads and explicitly declared FileValue reads: observations certify exact consumed buffers. Owning hook observations must propagate.",
+    "defense_in_depth": "No universal FileValue registration, external receipts, snapshot execution or global-hook dependency expansion introduced."
+  },
+  "evidence": {
+    "matrix": "final-owner-matrix.json",
+    "native_contracts": "isolated-owner-hook-contracts.json",
+    "scaling": "snapshot-scaling.json",
+    "mutations": "final-mutations.json",
+    "integrity": "final-integrity.json",
+    "campaigns": [
+      "atomic-smoke.json",
+      "atomic-medium.json",
+      "atomic-long.json"
+    ],
+    "final_smoke": "final-owner-smoke.json",
+    "prior_collision_fixture": "independent-after.json",
+    "initial_failure_matrix": "independent-baseline.json"
+  },
+  "scope_check": {
+    "committed_paths": [
+      ".github/workflows/checkpoint-10-cross-platform.yml",
+      "Makefile",
+      "README.md",
+      "docs/evidence/v411-resume/atomic-long.json",
+      "docs/evidence/v411-resume/atomic-medium.json",
+      "docs/evidence/v411-resume/atomic-smoke.json",
+      "docs/evidence/v411-resume/cp1-red.json",
+      "docs/evidence/v411-resume/cp1-smoke.json",
+      "docs/evidence/v411-resume/final-fingerprint-matrix.json",
+      "docs/evidence/v411-resume/final-integrity.json",
+      "docs/evidence/v411-resume/final-mutations.json",
+      "docs/evidence/v411-resume/final-owner-matrix.json",
+      "docs/evidence/v411-resume/final-owner-smoke.json",
+      "docs/evidence/v411-resume/fingerprint-before.txt",
+      "docs/evidence/v411-resume/independent-after.json",
+      "docs/evidence/v411-resume/independent-baseline.json",
+      "docs/evidence/v411-resume/initial-state.json",
+      "docs/evidence/v411-resume/isolated-owner-hook-contracts.json",
+      "docs/evidence/v411-resume/local-checks.json",
+      "docs/evidence/v411-resume/native-hook-before.txt",
+      "docs/evidence/v411-resume/snapshot-scaling.json",
+      "scripts/consumer_snapshot_mutations.py",
+      "src/FrontMatter.h",
+      "src/Hooks.cpp",
+      "src/Hooks.h",
+      "src/ParserExpression.cpp",
+      "src/ProjectInfo.cpp",
+      "src/ProjectInfo.h",
+      "src/ProjectInfoHost.h",
+      "src/ProjectModel.h",
+      "src/RenderHost.h",
+      "src/ScriptHost.h",
+      "tests/consumer_dependency_snapshots.py",
+      "tests/pagination_ordering_smoke.sh",
+      "tests/randomized_diagnostics_test.py",
+      "tests/randomized_incremental_differential.py",
+      "tests/shared_dependency_targeted_reproducer.py"
+    ],
+    "uncommitted_tracked_paths": [
+      "Makefile",
+      "src/CLI.cpp",
+      "src/Hooks.cpp",
+      "src/JobControl.cpp",
+      "src/ParserExpression.cpp",
+      "src/Process.cpp"
+    ],
+    "head": "ce30fcd91f4d582f50fd992304c7aaef27ebbd9a",
+    "origin_main": "ce30fcd91f4d582f50fd992304c7aaef27ebbd9a",
+    "tag_and_release_action": "None; no tag/release commands issued",
+    "process_drafts": "Tracked draft paths still uncommitted; PreparedProcessPOSIX.h, ProcessEnvironment.h, ProcessTestHooks.h and process tests still present and untracked.",
+    "checkpoint_note": "Scope recorded at documentation checkpoint ce30fcd before committing this closeout evidence."
+  }
+}

@@ -1,0 +1,799 @@
+{
+  "native": {
+    "conclusion": "success",
+    "jobs": [
+      {
+        "completedAt": "2026-10-10T07:31:16Z",
+        "conclusion": "success",
+        "databaseId": 114160261451,
+        "name": "windows behavioural corpus",
+        "startedAt": "2026-10-10T07:20:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v5",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run msys2/setup-msys2@v2",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Build Nift",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Build Nift on Windows",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "v4.9/v4.10 build, selector, filesystem and JSON contracts",
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "v4.9/v4.10 contracts on Windows",
+            "number": 8,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Run normalized behavioural corpus",
+            "number": 9,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run normalized behavioural corpus on Windows",
+            "number": 10,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Ownership lock+marker unit test (all platforms)",
+            "number": 11,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Ownership lock+marker unit test on Windows",
+            "number": 12,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Ownership lifecycle/concurrency suite (POSIX)",
+            "number": 13,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v7",
+            "number": 14,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 27,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v5",
+            "number": 28,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 29,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261451"
+      },
+      {
+        "completedAt": "2026-10-10T07:23:27Z",
+        "conclusion": "success",
+        "databaseId": 114160261624,
+        "name": "macos behavioural corpus",
+        "startedAt": "2026-10-10T07:19:22Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v5",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Run msys2/setup-msys2@v2",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Build Nift",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Build Nift on Windows",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "v4.9/v4.10 build, selector, filesystem and JSON contracts",
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "v4.9/v4.10 contracts on Windows",
+            "number": 8,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run normalized behavioural corpus",
+            "number": 9,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Run normalized behavioural corpus on Windows",
+            "number": 10,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Ownership lock+marker unit test (all platforms)",
+            "number": 11,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Ownership lock+marker unit test on Windows",
+            "number": 12,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Ownership lifecycle/concurrency suite (POSIX)",
+            "number": 13,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v7",
+            "number": 14,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 27,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v5",
+            "number": 28,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 29,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261624"
+      },
+      {
+        "completedAt": "2026-10-10T07:27:42Z",
+        "conclusion": "success",
+        "databaseId": 114160261652,
+        "name": "linux behavioural corpus",
+        "startedAt": "2026-10-10T07:21:45Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v5",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Run msys2/setup-msys2@v2",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Build Nift",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Build Nift on Windows",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "v4.9/v4.10 build, selector, filesystem and JSON contracts",
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "v4.9/v4.10 contracts on Windows",
+            "number": 8,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run normalized behavioural corpus",
+            "number": 9,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Run normalized behavioural corpus on Windows",
+            "number": 10,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Ownership lock+marker unit test (all platforms)",
+            "number": 11,
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "Ownership lock+marker unit test on Windows",
+            "number": 12,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Ownership lifecycle/concurrency suite (POSIX)",
+            "number": 13,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v7",
+            "number": 14,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 27,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v5",
+            "number": 28,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 29,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114160261652"
+      },
+      {
+        "completedAt": "2026-10-10T07:31:31Z",
+        "conclusion": "success",
+        "databaseId": 114162618490,
+        "name": "Compare normalized semantics",
+        "startedAt": "2026-10-10T07:31:18Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v5",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Compare all portable observations",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v7",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 11,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v5",
+            "number": 12,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902734/job/114162618490"
+      }
+    ],
+    "status": "completed"
+  },
+  "workflows": {
+    "54a29b7": [
+      {
+        "conclusion": "",
+        "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+        "status": "in_progress",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902775",
+        "workflowName": "Test integrity guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902742",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902787",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033902734",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      }
+    ],
+    "db2c090": [
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761387",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761396",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761323",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "in_progress",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761397",
+        "workflowName": "Test integrity guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761410",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761400",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761355",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "db2c09022025b21dde03edff1771228891962f44",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38033761382",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      }
+    ],
+    "a1be4c0": [
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852169",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852139",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852096",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852098",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "in_progress",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852138",
+        "workflowName": "Test integrity guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852104",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852144",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "a1be4c0c4278fefb270c2a795eb7e72f056bfb64",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032852165",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      }
+    ],
+    "9d2f959": [
+      {
+        "conclusion": "",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "in_progress",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505278",
+        "workflowName": "Test integrity guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505232",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505337",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505328",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505319",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505341",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505310",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "9d2f9590bfdf95014fb1be0c359b515ae0385ed0",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38032505498",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      }
+    ],
+    "bac2545": [
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949285",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949354",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949238",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "in_progress",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949282",
+        "workflowName": "Test integrity guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949253",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949235",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949241",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "bac2545be0b394523d270009f3a5106397d213be",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031949265",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      }
+    ],
+    "7d5987c": [
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598209",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598203",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598214",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598242",
+        "workflowName": "Gate 6A-R vendored libffi"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598225",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598239",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598210",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598219",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "7d5987c9db54f5b32466a686f669074edc2b3fa2",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38031598276",
+        "workflowName": "Test integrity guards"
+      }
+    ],
+    "55e32b0": [
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710716",
+        "workflowName": "Performance regression guards"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710744",
+        "workflowName": "Init targets"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710763",
+        "workflowName": "Gate 6B bytes value semantics"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710839",
+        "workflowName": "Hosted certification diagnostic"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710715",
+        "workflowName": "v4.4/v4.5 cross-platform"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710754",
+        "workflowName": "Checkpoint 10 cross-platform equivalence"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710790",
+        "workflowName": "packaging matrix (build-only, non-publishing)"
+      },
+      {
+        "conclusion": "success",
+        "headSha": "55e32b0d76bcdb987b73f90317a3789a478eb6da",
+        "status": "completed",
+        "url": "https://github.com/nift-dev/nift/actions/runs/38029710817",
+        "workflowName": "Test integrity guards"
+      }
+    ]
+  }
+}
