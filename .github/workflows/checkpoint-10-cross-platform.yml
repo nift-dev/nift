@@ -47,6 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
+        id: python
         with:
           python-version: '3.13'
       - uses: msys2/setup-msys2@v2
@@ -64,11 +65,21 @@ jobs:
         run: make -j2
       - name: v4.9/v4.10 build, selector, filesystem and JSON contracts
         if: runner.os != 'Windows'
-        run: make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-process-hardening
+        run: make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-dependency-status test-process-hardening
       - name: v4.9/v4.10 contracts on Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-process-hardening
+      - name: Native Windows dependency status contracts
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make test-dependency-status PYTHON="$(cygpath -u '${{ steps.python.outputs.python-path }}')"
+      - name: Record native dependency status contracts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-status-${{ matrix.id }}
+          path: .build/dependency-status-contracts.json
+          if-no-files-found: error
       - name: Run normalized behavioural corpus
         if: runner.os != 'Windows'
         shell: bash

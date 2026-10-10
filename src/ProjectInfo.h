@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 class WatchList;
+namespace filesystem { struct DependencyStatus; }
 namespace json { class Document; }
 namespace nift { class RuntimeValue; }
 namespace content_model { struct Model; }
@@ -147,7 +148,7 @@ private:
     void rebuild_tracked_index() const;
     bool is_tracked_output(const std::filesystem::path& path) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
-    bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime, const json::Document& snapshots, const std::string& name) const;
+    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
     bool metadata_path_is_safe(const std::filesystem::path& path) const;
     std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();

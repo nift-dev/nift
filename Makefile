@@ -2000,3 +2000,12 @@ test-consumer-snapshots: $(TARGET)
 	mkdir -p .build
 	python3 tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json
 	python3 tests/consumer_dependency_snapshots.py --nift ./$(TARGET) --output .build/consumer-snapshot-contracts.json
+
+# One-comparison following status: native precision, errors and mutation boundaries.
+.PHONY: test-dependency-status
+test: test-dependency-status
+test-dependency-status: $(TARGET) src/FileSystem.o
+	@mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/dependency_status.cpp src/FileSystem.o -o $(TEST_DIR)/dependency-status-test$(EXEEXT)
+	$(TEST_DIR)/dependency-status-test$(EXEEXT) $(TEST_DIR)/dependency-status-fixture
+	$(PYTHON) tests/dependency_status.py --nift ./$(TARGET) --output $(TEST_DIR)/dependency-status-contracts.json

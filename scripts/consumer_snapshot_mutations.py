@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='nift-v411-mutants-') as td:
    plan=run(['make','-n','-W','src/'+filename]);assert plan.returncode==0,plan.stderr
    lines=plan.stdout.splitlines();compile_line=next(x for x in lines if '-c src/'+filename+' ' in x);link_line=next(x for x in reversed(lines) if ' -o '+native_target.name in x)
    plans[filename]=(shlex.split(compile_line),shlex.split(link_line))
-  prefix='bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime, const json::Document& snapshots, const std::string& name) const {'
+  prefix='bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {'
   mutants=[('content-invalidation','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.parent_path().filename()=="content")return false;',['content']),
    ('template-invalidation','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.filename()=="template.html")return false;',['template']),
    ('generated-file-edge','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.parent_path().filename()=="public")return false;',['generated']),

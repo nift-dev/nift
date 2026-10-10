@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace filesystem {
@@ -49,6 +50,22 @@ std::optional<std::filesystem::path> resolved_path(const std::filesystem::path& 
 bool path_within(const std::filesystem::path& base, const std::filesystem::path& candidate);
 std::string normalise_slashes(std::string path);
 std::filesystem::file_time_type modified_time(const std::filesystem::path& path);
+// Native timestamps avoid a lossy/implementation-specific file_clock conversion.
+// A status is an observation for one comparison, never a cached file identity.
+struct DependencyTime {
+    std::int64_t seconds = 0;
+    std::uint32_t nanoseconds = 0;
+    bool operator>=(const DependencyTime& other) const {
+        return seconds > other.seconds || (seconds == other.seconds && nanoseconds >= other.nanoseconds);
+    }
+};
+struct DependencyStatus {
+    bool exists = false;
+    DependencyTime mtime;
+    std::error_code error;
+};
+DependencyStatus dependency_status(const std::filesystem::path& path);
+
 std::uint64_t hash_bytes(const std::string& contents);
 std::uint64_t hash_path(const std::filesystem::path& path);
 std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);

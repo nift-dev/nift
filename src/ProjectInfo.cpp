@@ -557,8 +557,8 @@ bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
     return true;
 }
 
-bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime, const json::Document& snapshots, const std::string& name) const {
-    if (!filesystem::path_exists(dependency)) return true;
+bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {
+    if (!status.exists || status.error || !page_info_status.exists || page_info_status.error) return true;
     // Strictly-greater comparison misses edits whose mtime lands in the same
     // filesystem timestamp quantum as the page-info write (equal timestamps
     // are common on coarse-resolution or batched-update filesystems). An equal
@@ -567,11 +567,11 @@ bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_t
     // never report success while a source change went unnoticed. Hash mode is
     // unaffected (content hashing, no timestamps); hybrid keeps both signals.
     if (config.incremental_mode == "modified")
-        return filesystem::modified_time(dependency) >= page_info_mtime;
+        return status.mtime >= page_info_status.mtime;
     if (!snapshots.is_object() || !snapshots.has(name) || !snapshots[name].is_string()) return true;
     const auto& value = snapshots[name].string;
     if (value.empty() || value.size() > 20 || value.find_first_not_of("0123456789") != std::string::npos) return true;
-    if (config.incremental_mode == "hybrid" && filesystem::modified_time(dependency) >= page_info_mtime) return true;
+    if (config.incremental_mode == "hybrid" && status.mtime >= page_info_status.mtime) return true;
     return value != std::to_string(current_hash_cached(dependency));
 }
 
@@ -656,7 +656,11 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         ? *info.minify
         : config.minify_exts.count(current_output_extension) != 0;
     if (document["minify"].boolean != current_minify) reasons.push_back("minification setting changed");
-    const fs::file_time_type page_info_mtime = filesystem::modified_time(page_info);
+    const auto page_info_status = filesystem::dependency_status(page_info);
+    if (!page_info_status.exists || page_info_status.error) {
+        reasons.push_back("page build metadata status is unavailable");
+        return reasons;
+    }
     const int expected_minify_version = current_minify ? minify::format_version : 0;
     if (!std::isfinite(document["minify-version"].num) ||
         std::floor(document["minify-version"].num) != document["minify-version"].num ||
@@ -681,7 +685,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             // comparing values instead of mtimes (which can collide between the
             // fingerprint write and the page-info write within one fast build).
             refresh_project_fingerprint();
-            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
+            if (config.incremental_mode != "modified" && dependency_changed(dependency,filesystem::dependency_status(dependency),page_info_status,document["dependency-hashes"],value.string))
                 reasons.push_back("dependency snapshot changed or invalid: " + value.string);
             const std::string current = filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{});
             std::string stored;
@@ -697,7 +701,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             // reparent invalidates hierarchy consumers without a per-page x
             // project-size dependency list.
             refresh_hierarchy_fingerprint();
-            if (config.incremental_mode != "modified" && dependency_changed(dependency,page_info_mtime,document["dependency-hashes"],value.string))
+            if (config.incremental_mode != "modified" && dependency_changed(dependency,filesystem::dependency_status(dependency),page_info_status,document["dependency-hashes"],value.string))
                 reasons.push_back("dependency snapshot changed or invalid: " + value.string);
             const std::string current = filesystem::read_file_checked(root / ".nift/hierarchy.fingerprint").value_or(std::string{});
             std::string stored;
@@ -707,9 +711,10 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
                 reasons.push_back("hierarchy structure changed");
             continue;
         }
-        if (!filesystem::path_exists(dependency))
+        const auto status = filesystem::dependency_status(dependency);
+        if (!status.exists || status.error)
             reasons.push_back("dependency removed: " + value.string);
-        else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], value.string))
+        else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string))
             reasons.push_back("dependency changed: " + value.string);
     }
 
@@ -748,9 +753,10 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
                 std::find(reasons.begin(), reasons.end(), removed) != reasons.end()) continue;
 
             const fs::path dependency = root / dependency_name;
-            if (!filesystem::path_exists(dependency))
+            const auto status = filesystem::dependency_status(dependency);
+            if (!status.exists || status.error)
                 reasons.push_back(removed);
-            else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], dependency_name))
+            else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], dependency_name))
                 reasons.push_back(reason);
         }
     }
