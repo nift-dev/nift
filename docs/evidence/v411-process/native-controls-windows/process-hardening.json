@@ -1,0 +1,49 @@
+{
+  "pass_": false,
+  "platform": "posix",
+  "cases": [
+    {
+      "case": [],
+      "returncode": 0,
+      "stdout": "process contracts PASS\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles 0: 85 -> 87\ncontrol handles 1: 87 -> 87\ncontrol handles 2: 87 -> 87\nPASS temp 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "control handles 0: 85 -> 87\ncontrol handles 1: 87 -> 87\ncontrol handles 2: 87 -> 87\nPASS temp 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "control handles 0: 85 -> 87\ncontrol handles 1: 87 -> 87\ncontrol handles 2: 87 -> 87\nPASS pipe 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "1"
+      ],
+      "returncode": 1,
+      "stdout": "control handles 0: 85 -> 87\ncontrol handles 1: 87 -> 87\ncontrol handles 2: 87 -> 87\n",
+      "stderr": "failure handles repeat 0: 87 -> 88\nhandle leak\n"
+    }
+  ],
+  "elapsed_seconds": 0.5668429999999773
+}
