@@ -21,7 +21,13 @@ void nift_process_test_child(long long pid){children.push_back(OpenProcess(SYNCH
 #else
 void nift_process_test_child(long long) {}
 #endif
-bool nift_process_test_fail(const char* op, size_t stage) { return operation==op&&stage==failure_stage; }
+bool nift_process_test_fail(const char* op, size_t stage) {
+ bool fail=operation==op&&stage==failure_stage;
+#ifdef _WIN32
+ if(fail)SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+#endif
+ return fail;
+}
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';for(const auto& path:captures){std::error_code ec;std::filesystem::remove(path,ec);}std::exit(1);}}
 #ifndef _WIN32
 static size_t fds(){size_t n=0;for(int i=0;i<1024;++i)if(fcntl(i,F_GETFD)!=-1)++n;return n;}

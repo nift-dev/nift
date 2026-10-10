@@ -21,8 +21,8 @@ extern char **environ;
 namespace fs=std::filesystem;
 static std::string read_all(const fs::path&p){std::ifstream f(p,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 bool nift_find_executable(const std::string& name,std::string& path){
-    fs::path p(name);
 #ifdef _WIN32
+    fs::path p=fs::u8path(name);
     // Match Windows command lookup semantics closely enough for direct
     // CreateProcessW execution: for an extensionless command, prefer PATHEXT
     // candidates (.COM/.EXE/.BAT/.CMD by default) before an extensionless file.
@@ -47,18 +47,19 @@ bool nift_find_executable(const std::string& name,std::string& path){
         for(const auto& e:exts){
             std::string low=e;for(char& c:low)c=(char)std::tolower((unsigned char)c);
             if(std::find(seen.begin(),seen.end(),low)!=seen.end())continue;
-            seen.push_back(low);out.push_back(fs::path(base.string()+e));
+            seen.push_back(low);out.push_back(fs::u8path(base.u8string()+e));
         }
         out.push_back(base);
         return out;
     };
-    auto accept=[&](const fs::path& c){std::error_code ec;if(fs::is_regular_file(c,ec)&&!ec){path=fs::absolute(c).string();return true;}return false;};
+    auto accept=[&](const fs::path& c){std::error_code ec;if(fs::is_regular_file(c,ec)&&!ec){path=fs::absolute(c).u8string();return true;}return false;};
     if(p.has_parent_path()){for(const auto& c:win_candidates(p))if(accept(c))return true;return false;}
     const char* pe=std::getenv("PATH");if(!pe)return false;
     std::stringstream ss(pe);std::string d;
-    while(std::getline(ss,d,';'))for(const auto& c:win_candidates(fs::path(d)/name))if(accept(c))return true;
+    while(std::getline(ss,d,';'))for(const auto& c:win_candidates(fs::u8path(d)/fs::u8path(name)))if(accept(c))return true;
     return false;
 #else
+    fs::path p(name);
     if(p.has_parent_path()){std::error_code ec;if(fs::is_regular_file(p,ec)&&!ec&&::access(p.c_str(),X_OK)==0){path=fs::absolute(p).string();return true;}return false;}
     const char* pe=std::getenv("PATH");if(!pe)return false;
     std::stringstream ss(pe);std::string d;
@@ -133,8 +134,7 @@ ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream){ret
 // direct spawn (no shell), real OS pipes between pipeline stages, capture via
 // temporary files, per-stage cwd/env overrides, stdin/stdout/stderr routing,
 // merge_stderr, append flags and last-stage exit status. NOTE: this backend is
-// code-reviewed on Linux but has NOT been compiled/run here; it must be
-// verified in CI on a Windows runner before release.
+// covered by the native Windows process contract and failure matrix.
 #include <windows.h>
 #include <wchar.h>
 #include <vector>
@@ -142,6 +142,12 @@ ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream){ret
 #include <mutex>
 
 namespace {
+std::string narrow(const std::wstring& value) {
+    if(value.empty())return {};
+    int size=WideCharToMultiByte(CP_UTF8,0,value.data(),(int)value.size(),nullptr,0,nullptr,nullptr);
+    if(size<=0)return {};
+    std::string result(size,0);WideCharToMultiByte(CP_UTF8,0,value.data(),(int)value.size(),result.data(),size,nullptr,nullptr);return result;
+}
 std::wstring widen(const std::string& s) {
     if (s.empty()) return L"";
     int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), nullptr, 0);
@@ -185,29 +191,54 @@ HANDLE open_redirect(const std::string& path, bool read, bool append) {
     if (!read && append) { SetFilePointer(h, 0, nullptr, FILE_END); }
     return h;
 }
-std::string win_temp_file(std::wstring& out) {
-    wchar_t dir[MAX_PATH]; if (!GetTempPathW(MAX_PATH, dir)) return "";
+std::string win_temp_file(std::wstring& out, size_t stage) {
+    if(nift_process_test_fail("temp",stage))return "";
+    wchar_t dir[MAX_PATH]; DWORD length=GetTempPathW(MAX_PATH,dir);if(!length || length>=MAX_PATH)return "";
     wchar_t name[MAX_PATH];
     if (!GetTempFileNameW(dir, L"nift", 0, name)) return "";
     out = name;
     // GetTempFileName creates the file; truncate it for capture use.
-    HANDLE h = CreateFileW(name, GENERIC_WRITE, 0, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+    HANDLE h = nift_process_test_fail("temp-open",stage)?INVALID_HANDLE_VALUE:CreateFileW(name, GENERIC_WRITE, 0, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if(h==INVALID_HANDLE_VALUE){DeleteFileW(name);out.clear();return "";}
+    CloseHandle(h);
     int n = WideCharToMultiByte(CP_UTF8, 0, name, -1, nullptr, 0, nullptr, nullptr);
-    std::string utf8(n - 1, 0); WideCharToMultiByte(CP_UTF8, 0, name, -1, &utf8[0], n, nullptr, nullptr);
+    if(n<=0){DeleteFileW(name);out.clear();return "";}
+    std::string utf8(n, 0); WideCharToMultiByte(CP_UTF8, 0, name, -1, &utf8[0], n, nullptr, nullptr);utf8.pop_back();
+    nift_process_test_temp(utf8);
     return utf8;
 }
-struct EnvRestore {
-    std::vector<std::pair<std::string, std::string>> prev;
-    ~EnvRestore() { for (const auto& kv : prev) if (kv.second.empty()) SetEnvironmentVariableA(kv.first.c_str(), nullptr); else SetEnvironmentVariableA(kv.first.c_str(), kv.second.c_str()); }
-};
-// Set per-stage env overrides; previous values restored on destruction.
-void apply_env(const std::map<std::string, std::string>& env, EnvRestore& restore) {
-    for (const auto& kv : env) {
-        char buf[32768]; DWORD n = GetEnvironmentVariableA(kv.first.c_str(), buf, sizeof(buf));
-        restore.prev.emplace_back(kv.first, (n > 0 && n < sizeof(buf)) ? std::string(buf) : std::string{});
-        SetEnvironmentVariableA(kv.first.c_str(), kv.second.c_str());
+// Windows environment names are case insensitive. Retain special =C: drive
+// entries from the inherited wide block and overlay without touching the parent.
+struct EnvLess {
+    bool operator()(const std::wstring& a,const std::wstring& b) const {
+        return CompareStringOrdinal(a.c_str(),-1,b.c_str(),-1,TRUE)==CSTR_LESS_THAN;
     }
+};
+std::vector<wchar_t> child_environment(const std::map<std::string,std::string>& overrides) {
+    std::map<std::wstring,std::wstring,EnvLess> values;
+    wchar_t* block=GetEnvironmentStringsW();
+    if(!block)return {};
+    for(const wchar_t* p=block;*p;p+=wcslen(p)+1){
+        std::wstring entry=p; auto eq=entry.find(L'=',entry[0]==L'='?1:0);
+        if(eq!=std::wstring::npos)values[entry.substr(0,eq)]=entry.substr(eq+1);
+    }
+    FreeEnvironmentStringsW(block);
+    for(const auto& kv:overrides)values[widen(kv.first)]=widen(kv.second);
+    std::vector<wchar_t> out;
+    for(const auto& kv:values){std::wstring entry=kv.first+L"="+kv.second;out.insert(out.end(),entry.begin(),entry.end());out.push_back(0);}
+    if(out.empty())out.push_back(0);
+    out.push_back(0);return out;
+}
+// Duplicating inherited stdio avoids changing the parent's handle flags.
+HANDLE child_stdio(HANDLE source,DWORD access,size_t stage) {
+    HANDLE out=INVALID_HANDLE_VALUE;
+    if(nift_process_test_fail("duplicate",stage))return out;
+    if(source && source!=INVALID_HANDLE_VALUE){
+        if(DuplicateHandle(GetCurrentProcess(),source,GetCurrentProcess(),&out,0,TRUE,DUPLICATE_SAME_ACCESS))return out;
+        return INVALID_HANDLE_VALUE;
+    }
+    SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};
+    return CreateFileW(L"NUL",access,FILE_SHARE_READ|FILE_SHARE_WRITE,&sa,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
 }
 } // namespace
 
@@ -215,7 +246,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     ProcessResult r;
     if (specs.empty()) { r.error = "empty pipeline"; return r; }
     std::wstring ow, ew; std::string op, ep;
-    if (capture) { op = win_temp_file(ow); ep = win_temp_file(ew); if (op.empty() || ep.empty()) { r.error = "cannot create capture files"; return r; } }
+    if (capture) { op = win_temp_file(ow,0); ep = win_temp_file(ew,1); if (op.empty() || ep.empty()) { if(!ow.empty())DeleteFileW(ow.c_str());if(!ew.empty())DeleteFileW(ew.c_str());r.error = "cannot create capture files"; return r; } }
     std::vector<HANDLE> procs;
     HANDLE prev_read = INVALID_HANDLE_VALUE;
     bool ok = true;
@@ -230,19 +261,37 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         HANDLE out = INVALID_HANDLE_VALUE, err = INVALID_HANDLE_VALUE;
         if (i + 1 < specs.size()) {
             SECURITY_ATTRIBUTES sa; sa.nLength = sizeof(sa); sa.bInheritHandle = TRUE; sa.lpSecurityDescriptor = nullptr;
-            HANDLE wp; if (!CreatePipe(&next_read, &wp, &sa, 0)) { ok = false; break; }
+            HANDLE wp; if (nift_process_test_fail("pipe",i)||!CreatePipe(&next_read, &wp, &sa, 0)) { if(in!=INVALID_HANDLE_VALUE && in!=prev_read)CloseHandle(in);r.error="pipe failed";ok = false; break; }
             out = wp;
         } else if (!spec.stdout_path.empty()) out = open_redirect(spec.stdout_path, false, spec.append_stdout);
-        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &ca, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
+        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = nift_process_test_fail("capture-out",i)?INVALID_HANDLE_VALUE:CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
         if (spec.merge_stderr) err = out;
         else if (!spec.stderr_path.empty()) err = open_redirect(spec.stderr_path, false, spec.append_stderr);
-        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; err = CreateFileW(ew.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &ca, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
+        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; err = nift_process_test_fail("capture-err",i)?INVALID_HANDLE_VALUE:CreateFileW(ew.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ|FILE_SHARE_WRITE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
 
-        STARTUPINFOW si{}; si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESTDHANDLES;
-        si.hStdInput = (in != INVALID_HANDLE_VALUE) ? in : GetStdHandle(STD_INPUT_HANDLE);
-        si.hStdOutput = (out != INVALID_HANDLE_VALUE) ? out : GetStdHandle(STD_OUTPUT_HANDLE);
-        si.hStdError = (err != INVALID_HANDLE_VALUE) ? err : GetStdHandle(STD_ERROR_HANDLE);
+        // Requested routing must fail closed: INVALID is not inherited stdio.
+        bool routing_ok=(prev_read!=INVALID_HANDLE_VALUE || spec.stdin_path.empty() || in!=INVALID_HANDLE_VALUE)
+            && (i+1<specs.size() || (spec.stdout_path.empty()&&!capture) || out!=INVALID_HANDLE_VALUE)
+            && (spec.merge_stderr || (spec.stderr_path.empty()&&!capture) || err!=INVALID_HANDLE_VALUE);
+        HANDLE inherited[3]={INVALID_HANDLE_VALUE,INVALID_HANDLE_VALUE,INVALID_HANDLE_VALUE};
+        if(routing_ok){
+            inherited[0]=child_stdio(in==INVALID_HANDLE_VALUE?GetStdHandle(STD_INPUT_HANDLE):in,GENERIC_READ,i*3);
+            inherited[1]=child_stdio(out==INVALID_HANDLE_VALUE?GetStdHandle(STD_OUTPUT_HANDLE):out,GENERIC_WRITE,i*3+1);
+            inherited[2]=child_stdio(spec.merge_stderr?inherited[1]:(err==INVALID_HANDLE_VALUE?GetStdHandle(STD_ERROR_HANDLE):err),GENERIC_WRITE,i*3+2);
+            for(HANDLE h:inherited)if(h==INVALID_HANDLE_VALUE)routing_ok=false;
+        }
+        STARTUPINFOEXW sx{};sx.StartupInfo.cb=sizeof(sx);
+        sx.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
+        sx.StartupInfo.hStdInput=inherited[0];sx.StartupInfo.hStdOutput=inherited[1];sx.StartupInfo.hStdError=inherited[2];
+        SIZE_T attribute_size=0;
+        InitializeProcThreadAttributeList(nullptr,1,0,&attribute_size);
+        std::vector<unsigned char> attribute_storage(attribute_size);
+        sx.lpAttributeList=reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attribute_storage.data());
+        bool attributes_initialized=false;
+        if(routing_ok){
+            attributes_initialized=!nift_process_test_fail("attributes-init",i) && InitializeProcThreadAttributeList(sx.lpAttributeList,1,0,&attribute_size)!=FALSE;
+            routing_ok=attributes_initialized && !nift_process_test_fail("attributes-update",i) && UpdateProcThreadAttribute(sx.lpAttributeList,0,PROC_THREAD_ATTRIBUTE_HANDLE_LIST,inherited,sizeof(inherited),nullptr,nullptr)!=FALSE;
+        }
 
         std::string program = spec.program;
         std::vector<std::string> args = spec.args;
@@ -259,9 +308,9 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         std::wstring cmdline;
         if (is_script) { cmdline = L"cmd.exe /c " + widen(build_command_line(resolved, args)); program = "cmd.exe"; }
         else if (nift_script) {
-            char self[MAX_PATH];
-            const DWORD n = GetModuleFileNameA(nullptr, self, MAX_PATH);
-            program = (n > 0 && n < MAX_PATH) ? std::string(self) : "nift";
+            wchar_t self[MAX_PATH];
+            const DWORD n = GetModuleFileNameW(nullptr, self, MAX_PATH);
+            program = (n > 0 && n < MAX_PATH) ? narrow(std::wstring(self,n)) : "nift";
             std::vector<std::string> runner; runner.reserve(1 + args.size());
             runner.push_back(resolved);
             runner.insert(runner.end(), args.begin(), args.end());
@@ -269,13 +318,20 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         }
         else { if (!resolved.empty()) program = resolved; cmdline = widen(build_command_line(program, args)); }
 
-        EnvRestore restore;
-        apply_env(spec.env, restore);
+        DWORD setup_error=routing_ok?ERROR_SUCCESS:GetLastError();
+        auto environment=child_environment(spec.env);
         PROCESS_INFORMATION pi{};
-        std::wstring cwd = spec.cwd.empty() ? L"" : widen(spec.cwd.string());
-        BOOL created = CreateProcessW(nullptr, &cmdline[0], nullptr, nullptr, TRUE,
-                                      0, nullptr, cwd.empty() ? nullptr : cwd.c_str(), &si, &pi);
-        if (!created) { r.error = "CreateProcessW failed for '" + spec.program + "' (error " + std::to_string(GetLastError()) + ")"; ok = false; }
+        std::wstring cwd = spec.cwd.empty() ? L"" : spec.cwd.wstring();
+        (void)nift_process_test_fail("launch",i);
+        BOOL created=FALSE;
+        if(routing_ok && !environment.empty() && !nift_process_test_fail("spawn",i))
+            created=CreateProcessW(nullptr,cmdline.data(),nullptr,nullptr,TRUE,
+                EXTENDED_STARTUPINFO_PRESENT|CREATE_UNICODE_ENVIRONMENT,environment.data(),
+                cwd.empty()?nullptr:cwd.c_str(),&sx.StartupInfo,&pi);
+        DWORD launch_error=routing_ok?GetLastError():setup_error;
+        if(attributes_initialized)DeleteProcThreadAttributeList(sx.lpAttributeList);
+        for(HANDLE h:inherited)if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);
+        if (!created) { r.error = (routing_ok?"CreateProcessW failed for '":"redirection/stdio setup failed for '") + spec.program + "' at stage " + std::to_string(i) + " (error " + std::to_string(launch_error) + ")"; ok = false; }
         // Parent must close its own copy of every inherited handle once the
         // child that consumes it has started; otherwise downstream readers
         // never see EOF (pipeline deadlock) and handles leak.
@@ -285,19 +341,22 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         prev_read = next_read;
         if (!created) break;
         CloseHandle(pi.hThread);
+        nift_process_test_child(pi.dwProcessId);
         procs.push_back(pi.hProcess);
         r.launched = true;
     }
     if (prev_read != INVALID_HANDLE_VALUE) CloseHandle(prev_read);
+    if(!ok)for(HANDLE h:procs)TerminateProcess(h,126);
     DWORD exit = 0;
     for (std::size_t i = 0; i < procs.size(); ++i) {
-        WaitForSingleObject(procs[i], INFINITE);
+        DWORD waited=WaitForSingleObject(procs[i],ok?INFINITE:5000);
+        if(waited!=WAIT_OBJECT_0){r.error += " process cleanup/wait failed";ok=false;}
         GetExitCodeProcess(procs[i], &exit);
         CloseHandle(procs[i]);
     }
-    if (r.launched) r.exit_code = (int)exit;
+    if (r.launched && ok) r.exit_code = (int)exit;
     if (capture) {
-        r.out = read_all(op); r.err = read_all(ep);
+        r.out = read_all(fs::u8path(op)); r.err = read_all(fs::u8path(ep));
         // MSYS2/Cygwin children write CRLF to redirected output in text mode,
         // so normalize captured output to LF; exact-output callers (run(),
         // cmd().run(), tests comparing stdout) otherwise see trailing \r.

@@ -41,7 +41,15 @@ int main(int argc,char**argv){
 #ifndef _WIN32
  if(argc>2 && std::string(argv[1])=="fdprobe") { return fcntl(std::stoi(argv[2]),F_GETFD)==-1 ? 0 : 1; }
 #endif
- if(argc>1 && std::string(argv[1])=="echo"){std::cout<<std::cin.rdbuf();return 0;}
+ if(argc>1 && (std::string(argv[1])=="echo" || std::string(argv[1])=="echoerr")){std::cout<<std::cin.rdbuf();if(std::string(argv[1])=="echoerr")std::cerr<<"err\n";return 0;}
+ if(argc>1 && std::string(argv[1])=="cwd"){std::cout<<std::filesystem::current_path().u8string();return 0;}
+#ifdef _WIN32
+ if(argc>1 && std::string(argv[1])=="unicode") {
+  wchar_t value[128];DWORD size=GetEnvironmentVariableW(L"NIFT_PROCESS_UNICODE",value,128);
+  int bytes=WideCharToMultiByte(CP_UTF8,0,value,size,nullptr,0,nullptr,nullptr);
+  std::string text(bytes,0);WideCharToMultiByte(CP_UTF8,0,value,size,text.data(),bytes,nullptr,nullptr);std::cout<<text;return 0;
+ }
+#endif
  if(argc>1 && std::string(argv[1])=="child"){
   std::cout<<parent_env()<<'\n';std::cerr<<"err\n";return 7;
  }
@@ -83,12 +91,30 @@ int main(int argc,char**argv){
 #endif
  ));std::filesystem::create_directory(dir);
  for(int route=0;route<3;++route){auto redirect=s;std::string bad=(dir/"missing"/"file").string();if(route==0)redirect.stdin_path=bad;if(route==1)redirect.stdout_path=bad;if(route==2)redirect.stderr_path=bad;auto r=nift_run_process(redirect);require(r.exit_code!=7 && r.out.empty(),"failed redirect ran child");}
- auto echo=s;echo.args={"echo"};auto pipeline=nift_run_pipeline({s,echo,echo});require(pipeline.exit_code==0&&pipeline.out=="A\n"&&pipeline.err=="err\n","pipeline bytes/EOF");
- auto cwd=s;cwd.cwd=dir;require(nift_run_process(cwd).exit_code==7,"cwd contract");
+#ifdef _WIN32
+ for(int route=0;route<3;++route)for(auto bad:{dir.u8string(),(dir/"invalid*name").u8string()}){
+  auto redirect=s;if(route==0)redirect.stdin_path=bad;if(route==1)redirect.stdout_path=bad;if(route==2)redirect.stderr_path=bad;
+  auto r=nift_run_process(redirect);require(!r.launched && !r.error.empty(),"invalid redirect silently inherited stdio");
+ }
+ auto readonly=dir/"readonly";{std::ofstream file(readonly);file<<"existing";}SetFileAttributesW(readonly.c_str(),FILE_ATTRIBUTE_READONLY);
+ for(int route:{1,2}){auto redirect=s;if(route==1)redirect.stdout_path=readonly.u8string();else redirect.stderr_path=readonly.u8string();auto r=nift_run_process(redirect);require(!r.launched && !r.error.empty(),"unwritable redirect launched child");}
+ SetFileAttributesW(readonly.c_str(),FILE_ATTRIBUTE_NORMAL);
+#endif
+ auto echo=s;echo.args={"echoerr"};auto pipeline=nift_run_pipeline({s,echo,echo});require(pipeline.exit_code==0&&pipeline.out=="A\n"&&pipeline.err=="err\nerr\nerr\n","pipeline bytes/EOF");
+ auto cwd=s;cwd.cwd=dir;cwd.args={"cwd"};auto cr=nift_run_process(cwd);require(cr.exit_code==0 && cr.out==dir.u8string(),"cwd contract");
  auto missing=s;missing.program="nift-missing-executable-411";auto mr=nift_run_process(missing);require(mr.exit_code!=7,"missing executable contract");
 #ifdef _WIN32
  SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};HANDLE sentinel=CreateEventW(&sa,TRUE,FALSE,nullptr);require(sentinel!=nullptr,"sentinel creation");
  auto check=s;check.args={"sentinel",std::to_string(reinterpret_cast<uintptr_t>(sentinel))};require(nift_run_process(check).exit_code==0,"unrelated inheritable handle leaked");CloseHandle(sentinel);
+ auto unicode_dir=dir/std::filesystem::u8path(u8"子-é");std::filesystem::create_directory(unicode_dir);
+ auto executable=unicode_dir/std::filesystem::u8path(u8"子-é.exe");std::filesystem::copy_file(std::filesystem::u8path(self),executable);
+ auto unicode=s;unicode.program=executable.u8string();unicode.cwd=unicode_dir;unicode.args={"unicode"};unicode.env["NIFT_PROCESS_UNICODE"]=u8"héllo-子";
+ auto ur=nift_run_process(unicode);require(ur.exit_code==0 && ur.out==u8"héllo-子","Unicode executable/cwd/environment");
+ unicode.args={"cwd"};require(nift_run_process(unicode).out==unicode_dir.u8string(),"Unicode cwd");
+ wchar_t old_temp[32768]{};SetLastError(ERROR_SUCCESS);DWORD old_size=GetEnvironmentVariableW(L"TEMP",old_temp,32768);bool had_temp=old_size>0 || GetLastError()!=ERROR_ENVVAR_NOT_FOUND;
+ SetEnvironmentVariableW(L"TEMP",unicode_dir.c_str());unicode.args={"child"};auto tr=nift_run_process(unicode);
+ SetEnvironmentVariableW(L"TEMP",had_temp?old_temp:nullptr);require(tr.exit_code==7 && tr.out=="A\n" && tr.err=="err\n","Unicode temp capture");
+ auto case_env=s;case_env.env.clear();case_env.env["nift_process_test_env"]="case-overlay";require(nift_run_process(case_env).out=="case-overlay\n","case insensitive child environment");
  DWORD before,after;GetProcessHandleCount(GetCurrentProcess(),&before);
  for(int i=0;i<30;++i){auto r=nift_run_process(s);require(r.exit_code==7,"repeated capture");}
  GetProcessHandleCount(GetCurrentProcess(),&after);require(before==after,"process handle leak");

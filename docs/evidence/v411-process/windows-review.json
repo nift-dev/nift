@@ -1,0 +1,18 @@
+{
+  "status": "SOURCE REVIEW + Linux shared contracts PASS; native Windows PENDING",
+  "environment": "GetEnvironmentStringsW snapshot, case-insensitive map, child-only overlays, explicit double-NUL Unicode environment block; no launch-time parent environment mutations",
+  "handles": "STARTUPINFOEXW explicit three-stdio handle list; parent handle flags untouched; duplicate and process/thread/pipe handles closed on failure",
+  "capture": "Partial temp setup deletes created paths; UTF8 conversion reserves terminator; capture stderr uses shared FILE_APPEND_DATA handles without per-stage truncation",
+  "unicode": "UTF8 process/redirect lookup uses u8path, UTF8 capture paths converted before read, wide self-executable path; native executable/cwd/temp/environment tests added",
+  "fault_matrix": "temp first/second, partial temp open first/second, pipe0/1, capture stderr each stage, capture stdout final stage, DuplicateHandle nine positions, attribute init/update each stage, CreateProcess each stage",
+  "redirects": "missing paths, directories, invalid names and read-only output files; child not launched on requested routing failure",
+  "intentional_differences": {
+    "missing_executable": "POSIX child127 vs Windows creation error",
+    "signals": "POSIX128+signal vs Windows DWORD exit code",
+    "interactive_job_control": "POSIX supported; Windows intentionally unsupported"
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/processenv/nf-processenv-setenvironmentvariablew"
+  ],
+  "native_compiler_local": "No MinGW cross compiler available; native hosted compile/run required"
+}
