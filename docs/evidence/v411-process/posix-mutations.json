@@ -1,0 +1,63 @@
+{
+  "passed": true,
+  "mutants": 5,
+  "caught": 5,
+  "missed": 0,
+  "results": [
+    {
+      "name": "capture-cleanup",
+      "family": "process",
+      "case": [
+        "temp",
+        "1"
+      ],
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "fd leak"
+    },
+    {
+      "name": "partial-pipeline-kill",
+      "family": "process",
+      "case": [
+        "fork",
+        "1"
+      ],
+      "caught": true,
+      "returncode": 124,
+      "diagnostic": "watchdog timeout"
+    },
+    {
+      "name": "job-child-reap",
+      "family": "process",
+      "case": [
+        "fork",
+        "1",
+        "job"
+      ],
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "live child or zombie"
+    },
+    {
+      "name": "cloexec",
+      "family": "process",
+      "case": [],
+      "caught": true,
+      "returncode": 1,
+      "diagnostic": "CLOEXEC descriptor leaked into exec"
+    },
+    {
+      "name": "dup2-error",
+      "family": "process",
+      "case": [
+        "dup2-out",
+        "0"
+      ],
+      "caught": true,
+      "returncode": 124,
+      "diagnostic": "watchdog timeout"
+    }
+  ],
+  "elapsed_seconds": 19.609,
+  "production_artifacts_unchanged": true
+}

@@ -1975,6 +1975,25 @@ test-sanitize-lifetime: test-v410-build-pipeline-lifetime
 
 .PHONY: test-v410-build-pipeline test-v410-build-pipeline-lifetime
 
+# Local v4.11 process hardening: isolated binaries carry deterministic faults;
+# production objects never link test hooks. Works on native Windows and POSIX.
+PROCESS_FAILURE_TEST := $(TEST_DIR)/process-failure$(EXEEXT)
+PROCESS_CONTRACT_TEST := $(TEST_DIR)/process-contract$(EXEEXT)
+$(PROCESS_FAILURE_TEST): tests/process_failure.cpp src/Process.cpp src/JobControl.cpp src/Proc.h src/PreparedProcessPOSIX.h src/ProcessPOSIX.h src/ProcessEnvironment.h src/ProcessTestHooks.h
+	@mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_failure.cpp src/Process.cpp src/JobControl.cpp -o $@
+$(PROCESS_CONTRACT_TEST): tests/process_contract.cpp src/Process.cpp src/Proc.h src/PreparedProcessPOSIX.h src/ProcessPOSIX.h src/ProcessEnvironment.h src/ProcessTestHooks.h
+	@mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_contract.cpp src/Process.cpp -o $@
+test-process-hardening: $(PROCESS_FAILURE_TEST) $(PROCESS_CONTRACT_TEST)
+	python3 tests/process_hardening.py --failure $(PROCESS_FAILURE_TEST) --contract $(PROCESS_CONTRACT_TEST)
+test: test-process-hardening
+.PHONY: test-process-hardening
+
+test-randomized-incremental: $(TARGET)
+	python3 tests/randomized_incremental_differential.py --nift $(TARGET)
+.PHONY: test-randomized-incremental
+
 .PHONY: test-consumer-snapshots
 test: test-consumer-snapshots
 test-consumer-snapshots: $(TARGET)

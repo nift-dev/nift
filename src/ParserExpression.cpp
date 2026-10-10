@@ -1,3 +1,4 @@
+#include "ProcessEnvironment.h"
 #include "JsonFile.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
@@ -2309,6 +2310,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             const auto evaluate_native_family_2 = [&]() NIFT_COMPAT_NOINLINE -> bool {
 #endif
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
+                std::lock_guard<std::mutex> lock(nift_environment_mutex());
 #ifdef _WIN32
                 if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}
 #else
@@ -2316,6 +2318,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #endif
                 out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("unsetenv",args,q)){if(!standalone_script_host_){error="unsetenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=1){error="unsetenv: expected name";return false;}std::string k;if(!string_arg("unsetenv",args,q,0,k))return false;
+                std::lock_guard<std::mutex> lock(nift_environment_mutex());
 #ifdef _WIN32
                 _putenv_s(k.c_str(),"");
 #else

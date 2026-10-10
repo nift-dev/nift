@@ -1,0 +1,183 @@
+{
+  "pass_": true,
+  "platform": "posix",
+  "cases": [
+    {
+      "case": [],
+      "returncode": 0,
+      "stdout": "process contracts PASS\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS temp 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "temp",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "PASS temp 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS pipe 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "PASS pipe 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "1"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "2"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "0",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS pipe 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "pipe",
+        "1",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS pipe 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "0",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "1",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 1\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "fork",
+        "2",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS fork 2\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-in",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-in 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-out",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-out 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-err",
+        "0"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-err 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-in",
+        "0",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-in 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-out",
+        "0",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-out 0\n",
+      "stderr": ""
+    },
+    {
+      "case": [
+        "dup2-err",
+        "0",
+        "job"
+      ],
+      "returncode": 0,
+      "stdout": "PASS dup2-err 0\n",
+      "stderr": ""
+    }
+  ],
+  "elapsed_seconds": 0.10689176386222243
+}

@@ -1,4 +1,7 @@
 #include "Proc.h"
+#include "ProcessTestHooks.h"
+#include "PreparedProcessPOSIX.h"
+#include "ProcessPOSIX.h"
 #include <algorithm>
 #include <cerrno>
 #include <map>
@@ -49,11 +52,11 @@ void child_reset_signals() {
     struct sigaction d{}; d.sa_handler=SIG_DFL; sigemptyset(&d.sa_mask);
     for(int s : {SIGINT,SIGQUIT,SIGTSTP,SIGTTIN,SIGTTOU,SIGCHLD}) sigaction(s,&d,nullptr);
 }
-bool redirect_fd(const std::string& path, int target, bool append, bool read) {
+bool redirect_fd(const std::string& path, int target, bool append, bool read, bool fail) {
     if(path.empty()) return true;
     int flags = read ? O_RDONLY : (O_WRONLY|O_CREAT|(append?O_APPEND:O_TRUNC));
     int fd = open(path.c_str(), flags, 0666); if(fd<0) return false;
-    bool ok = dup2(fd,target)>=0; close(fd); return ok;
+    bool ok = nift_process_dup2(fd,target,fail); if(fd!=target)close(fd); return ok;
 }
 }
 #endif
@@ -65,26 +68,28 @@ ProcessResult ShellJobTable::launch(const std::vector<ProcessSpec>& specs, const
     result.error="interactive job control is not supported on Windows"; result.exit_code=2; return result;
 #else
     if(specs.empty()){result.error="empty pipeline";return result;}
+    std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
     Impl::Entry entry; entry.info.id=impl_->next_id++; entry.info.command=command;
+    std::vector<PreparedProcessPOSIX> prepared;prepared.reserve(specs.size());
+    for(const auto& spec:specs)prepared.emplace_back(spec);
     int prev=-1; pid_t pgid=-1;
     for(size_t i=0;i<specs.size();++i){
-        int pp[2]={-1,-1}; if(i+1<specs.size()&&pipe(pp)!=0){result.error="pipe failed";break;}
-        pid_t pid=fork();
+        int pp[2]={-1,-1}; if(i+1<specs.size()&&(nift_process_test_fail("pipe",i)||!nift_process_pipe(pp))){result.error="pipe failed";break;}
+        const bool fail_in=nift_process_test_fail("dup2-in",i), fail_out=nift_process_test_fail("dup2-out",i), fail_err=nift_process_test_fail("dup2-err",i);
+        pid_t pid=nift_process_test_fail("fork",i)?-1:fork();
         if(pid<0){result.error="fork failed"; if(pp[0]>=0)close(pp[0]); if(pp[1]>=0)close(pp[1]); break;}
         if(pid==0){
             const pid_t group = pgid<0 ? 0 : pgid; setpgid(0,group); child_reset_signals();
             if(!specs[i].cwd.empty()&&chdir(specs[i].cwd.c_str())!=0)_exit(126);
-            for(const auto&kv:specs[i].env)setenv(kv.first.c_str(),kv.second.c_str(),1);
-            if(prev>=0)dup2(prev,STDIN_FILENO); else if(!redirect_fd(specs[i].stdin_path,STDIN_FILENO,false,true))_exit(126);
-            if(i+1<specs.size())dup2(pp[1],STDOUT_FILENO); else if(!redirect_fd(specs[i].stdout_path,STDOUT_FILENO,specs[i].append_stdout,false))_exit(126);
-            if(specs[i].merge_stderr)dup2(STDOUT_FILENO,STDERR_FILENO); else if(!redirect_fd(specs[i].stderr_path,STDERR_FILENO,specs[i].append_stderr,false))_exit(126);
+            if(prev>=0){if(!nift_process_dup2(prev,STDIN_FILENO,fail_in))_exit(126);} else if(!redirect_fd(specs[i].stdin_path,STDIN_FILENO,false,true,fail_in))_exit(126);
+            if(i+1<specs.size()){if(!nift_process_dup2(pp[1],STDOUT_FILENO,fail_out))_exit(126);} else if(!redirect_fd(specs[i].stdout_path,STDOUT_FILENO,specs[i].append_stdout,false,fail_out))_exit(126);
+            if(specs[i].merge_stderr){if(!nift_process_dup2(STDOUT_FILENO,STDERR_FILENO,fail_err))_exit(126);} else if(!redirect_fd(specs[i].stderr_path,STDERR_FILENO,specs[i].append_stderr,false,fail_err))_exit(126);
             if (prev >= 0) close(prev);
             if (pp[0] >= 0) close(pp[0]);
             if (pp[1] >= 0) close(pp[1]);
-            std::vector<std::string> avs{specs[i].program}; avs.insert(avs.end(),specs[i].args.begin(),specs[i].args.end());
-            std::vector<char*> av; for(auto& a:avs)av.push_back(a.data()); av.push_back(nullptr);
-            execvp(specs[i].program.c_str(),av.data()); _exit(errno==ENOENT?127:126);
+            prepared[i].exec();
         }
+        nift_process_test_child(pid);
         if (pgid < 0) pgid = pid;
         setpgid(pid, pgid);
         if (prev >= 0) close(prev);
@@ -93,7 +98,10 @@ ProcessResult ShellJobTable::launch(const std::vector<ProcessSpec>& specs, const
         entry.pids.push_back(pid); entry.remaining.insert(pid); entry.info.process_ids.push_back((long long)pid); entry.last_pid=pid; result.launched=true;
     }
     if(prev>=0)close(prev);
-    if(!result.error.empty()) { if(pgid>0)kill(-pgid,SIGTERM); return result; }
+    if(!result.error.empty()) { if(pgid>0)kill(-pgid,SIGKILL);
+        for(pid_t p:entry.pids){kill(p,SIGKILL);int st;while(waitpid(p,&st,0)<0&&errno==EINTR){}}
+        return result; }
+    launch_lock.unlock();
     entry.pgid=pgid; entry.info.process_group=(long long)pgid; entry.info.state=ShellJobState::Running;
     const int id=entry.info.id; impl_->entries.emplace(id,std::move(entry));
     if(foreground) return this->foreground(id);

@@ -1,3 +1,4 @@
+#include "ProcessEnvironment.h"
 #include "CLI.h"
 #include "FileSystem.h"
 #include "JsonFile.h"
@@ -70,6 +71,7 @@ bool cli_contains_bytes(const nift::RuntimeValue& value) {
 
 // Portable environment assignment (Windows has no setenv()).
 void nift_setenv(const char* name, const char* value, int /*overwrite*/) {
+    std::lock_guard<std::mutex> lock(nift_environment_mutex());
 #ifdef _WIN32
     _putenv_s(name, value);
 #else

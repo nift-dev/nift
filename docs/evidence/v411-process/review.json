@@ -1,0 +1,67 @@
+{
+  "initial_head": "9afaf4d4e5df85e295b2d548be285ce64beefdec",
+  "initial_origin_main": "9afaf4d4e5df85e295b2d548be285ce64beefdec",
+  "divergence": "0\t0",
+  "sequence": [
+    "55e32b0d76bcdb987b73f90317a3789a478eb6da test: repair randomized incremental differential diagnostics",
+    "7d5987c9db54f5b32466a686f669074edc2b3fa2 fix: track per-consumer dependency hashes from consumed native bytes",
+    "bac2545be0b394523d270009f3a5106397d213be fix: validate rendered outputs before dependency certification",
+    "9d2f9590bfdf95014fb1be0c359b515ae0385ed0 fix: atomically commit consumer dependency metadata",
+    "a1be4c0c4278fefb270c2a795eb7e72f056bfb64 fix: validate compact fingerprint dependency snapshots",
+    "db2c09022025b21dde03edff1771228891962f44 fix: retain declared FileValue observations from build hooks",
+    "54a29b7cdee24fc6a7b1b6d5cb02bc360c34bd10 test: expand incremental differential and mutation guards",
+    "ce30fcd91f4d582f50fd992304c7aaef27ebbd9a docs: document build-input stability and trusted-code boundary",
+    "9afaf4d4e5df85e295b2d548be285ce64beefdec docs: record observed dependency snapshot closeout"
+  ],
+  "draft_concerns": {
+    "POSIX": [
+      "PreparedProcessPOSIX.h",
+      "Process.cpp POSIX section",
+      "JobControl.cpp"
+    ],
+    "Windows": [
+      "Process.cpp Windows section"
+    ],
+    "shared": [
+      "ProcessEnvironment.h",
+      "CLI.cpp",
+      "Hooks.cpp",
+      "ParserExpression.cpp"
+    ],
+    "test_only": [
+      "ProcessTestHooks.h",
+      "process_failure.cpp",
+      "process_contract.cpp",
+      "process_hardening.py",
+      "v411_hardening_mutations.py"
+    ],
+    "evidence": [
+      "docs/evidence/v411-hardening",
+      "docs/evidence/v411-process"
+    ],
+    "incremental_leftovers": "docs/evidence/v411-resume untracked diagnostic/history files; observed_dependency_boundary_reproducer.py; no changes to accepted snapshot production code"
+  },
+  "review": {
+    "postfork": "Only close/dup2/fcntl/open/chdir/setpgid/sigaction/execve/_exit and read-only parent-prepared storage; no allocations, env mutation, logging or mutex operations",
+    "environment": "Parent map snapshot under Nift-owned writer mutex; duplicate inherited names resolve last entry, overrides replace; empty preserved. External FFI environment writers require serialization.",
+    "CLOEXEC": "All pipeline pipe and capture-temp descriptors FD_CLOEXEC. Portable creation + fcntl serialized through fork among Nift launches; external fork/descriptor activity outside that lock requires host coordination.",
+    "routing": "Required dup2 checked, EINTR retried, same-fd routing clears CLOEXEC; setup failures exit126",
+    "ownership": "Partial process pipeline kills/reaps direct children; interactive partial launch kills process group and reaps direct children. No universal descendant ownership claim."
+  },
+  "development_notes": [
+    "CLOEXEC mutant initially used unmodified inline helper in test TU; include precedence corrected.",
+    "First complete five-mutant run rejected concurrent production-binary rebuild by make test; rerun after compile completion."
+  ],
+  "nightly": "workflow_dispatch only; recommend documenting manual deep-certification cadence, no workflow hygiene changes.",
+  "local_posix": {
+    "make_test": "PASS",
+    "PRS": "12/12 PASS exact candidate",
+    "sanitizers": "ASan + UBSan + integrated LSan 19 cases PASS",
+    "process_faults": "19 cases PASS",
+    "mutations": "5/5 caught; production artifacts unchanged",
+    "shell_job_runtime_engine": "PASS",
+    "snapshot": "deterministic contracts and final smoke PASS",
+    "NRS": "94/94 PASS with corrected authoritative historical hash fixture"
+  },
+  "NRS_fixture_note": "One legacy test corrupted global .hash authority and failed on accepted snapshot baseline semantics. Updated NRS test conditionally corrupts consumer hash when present, retaining global hash corruption for older binaries. No incremental production change."
+}

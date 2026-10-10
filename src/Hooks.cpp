@@ -1,3 +1,4 @@
+#include "ProcessEnvironment.h"
 #include "Hooks.h"
 #include "ScriptHost.h"
 #include "Parser.h"
@@ -28,6 +29,7 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
     if (!filesystem::path_exists(p)) { error = "build hook script does not exist: " + p.generic_string(); return false; }
 
     // Structured hook context via the process environment.
+    {std::lock_guard<std::mutex> lock(nift_environment_mutex());
 #ifdef _WIN32
     _putenv_s("NIFT_HOOK_PHASE", phase.c_str());
     _putenv_s("NIFT_HOOK_MODE", mode.c_str());
@@ -40,6 +42,7 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
     else ::setenv("NIFT_HOOK_TARGET", target.c_str(), 1);
 #endif
 
+    }
     ScriptRenderHost host(root);
     TrackedInfo info;
     Parser parser(host, info);

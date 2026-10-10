@@ -1,4 +1,7 @@
 #include "Proc.h"
+#include "ProcessTestHooks.h"
+#include "PreparedProcessPOSIX.h"
+#include "ProcessPOSIX.h"
 #include <cstdlib>
 #include <algorithm>
 #include <cctype>
@@ -64,9 +67,10 @@ bool nift_find_executable(const std::string& name,std::string& path){
 #endif
 }
 #ifndef _WIN32
-static int open_temp(std::string& path){char t[]="/tmp/nift-proc-XXXXXX";int fd=mkstemp(t);if(fd>=0)path=t;return fd;}
+static int open_temp(std::string& path, size_t stage){if(nift_process_test_fail("temp",stage))return -1;char t[]="/tmp/nift-proc-XXXXXX";int fd=mkstemp(t);if(fd>=0){fd=nift_process_owned_fd(fd);if(fd<0){int error=errno;unlink(t);errno=error;return -1;}path=t;nift_process_test_temp(path);}return fd;}
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
-    ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op);efd=open_temp(ep);if(ofd<0||efd<0){r.error="cannot create capture files";return r;}}
+    std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
+    ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op,0);efd=open_temp(ep,1);if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);if(!op.empty())unlink(op.c_str());if(!ep.empty())unlink(ep.c_str());r.error="cannot create capture files";return r;}}
     // Interactive foreground execution: the child inherits the terminal
     // directly (no capture) and is placed in its own foreground process group
     // so terminal-aware programs and Ctrl-C behave like Bash. Only simple
@@ -74,37 +78,43 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     const bool foreground = specs.size()==1 && specs[0].foreground_terminal;
     struct sigaction ig{}, otto{}, otin{}, oint{}, oquit{};
     if(foreground && isatty(STDIN_FILENO)){ ig.sa_handler=SIG_IGN;sigaction(SIGTTOU,&ig,&otto);sigaction(SIGTTIN,&ig,&otin);sigaction(SIGINT,&ig,&oint);sigaction(SIGQUIT,&ig,&oquit); }
-    std::vector<pid_t> pids;int prev=-1;
-    for(size_t i=0;i<specs.size();++i){int pp[2]={-1,-1};if(i+1<specs.size()&&pipe(pp)!=0){r.error="pipe failed";break;}pid_t pid=fork();if(pid<0){r.error="fork failed";break;}if(pid==0){
+    std::vector<PreparedProcessPOSIX> prepared;prepared.reserve(specs.size());
+    for(const auto& spec:specs)prepared.emplace_back(spec);
+    std::vector<pid_t> pids;pids.reserve(specs.size());int prev=-1;
+    for(size_t i=0;i<specs.size();++i){int pp[2]={-1,-1};if(i+1<specs.size()&&(nift_process_test_fail("pipe",i)||!nift_process_pipe(pp))){r.error="pipe failed";break;}const bool fail_in=nift_process_test_fail("dup2-in",i), fail_out=nift_process_test_fail("dup2-out",i), fail_err=nift_process_test_fail("dup2-err",i);pid_t pid=nift_process_test_fail("fork",i)?-1:fork();if(pid<0){if(pp[0]>=0)close(pp[0]);if(pp[1]>=0)close(pp[1]);r.error="fork failed";break;}if(pid==0){
             if(specs[i].foreground_terminal)setpgid(0,0);
             if (!specs[i].cwd.empty() && chdir(specs[i].cwd.c_str()) != 0) _exit(126);
-            for (const auto& kv : specs[i].env) setenv(kv.first.c_str(), kv.second.c_str(), 1);
-            if(prev>=0)dup2(prev,STDIN_FILENO);else if(!specs[i].stdin_path.empty()){int fd=open(specs[i].stdin_path.c_str(),O_RDONLY);if(fd<0)_exit(126);dup2(fd,STDIN_FILENO);close(fd);}
-            if(i+1<specs.size())dup2(pp[1],STDOUT_FILENO);else if(!specs[i].stdout_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stdout?O_APPEND:O_TRUNC);int fd=open(specs[i].stdout_path.c_str(),fl,0666);if(fd<0)_exit(126);dup2(fd,STDOUT_FILENO);close(fd);}else if(capture)dup2(ofd,STDOUT_FILENO);
-            if(specs[i].merge_stderr)dup2(STDOUT_FILENO,STDERR_FILENO);else if(!specs[i].stderr_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stderr?O_APPEND:O_TRUNC);int fd=open(specs[i].stderr_path.c_str(),fl,0666);if(fd<0)_exit(126);dup2(fd,STDERR_FILENO);close(fd);}else if(capture)dup2(efd,STDERR_FILENO);
+            if(prev>=0){if(!nift_process_dup2(prev,STDIN_FILENO,fail_in))_exit(126);}else if(!specs[i].stdin_path.empty()){int fd=open(specs[i].stdin_path.c_str(),O_RDONLY);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDIN_FILENO,fail_in))_exit(126);if(fd!=STDIN_FILENO)close(fd);}
+            if(i+1<specs.size()){if(!nift_process_dup2(pp[1],STDOUT_FILENO,fail_out))_exit(126);}else if(!specs[i].stdout_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stdout?O_APPEND:O_TRUNC);int fd=open(specs[i].stdout_path.c_str(),fl,0666);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDOUT_FILENO,fail_out))_exit(126);if(fd!=STDOUT_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(ofd,STDOUT_FILENO,fail_out))_exit(126);}
+            if(specs[i].merge_stderr){if(!nift_process_dup2(STDOUT_FILENO,STDERR_FILENO,fail_err))_exit(126);}else if(!specs[i].stderr_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stderr?O_APPEND:O_TRUNC);int fd=open(specs[i].stderr_path.c_str(),fl,0666);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDERR_FILENO,fail_err))_exit(126);if(fd!=STDERR_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(efd,STDERR_FILENO,fail_err))_exit(126);}
             if (prev >= 0) close(prev);
             if (pp[0] >= 0) close(pp[0]);
             if (pp[1] >= 0) close(pp[1]);
             if (ofd >= 0) close(ofd);
             if (efd >= 0) close(efd);
             if(specs[i].foreground_terminal){ struct sigaction z{};z.sa_handler=SIG_DFL;sigaction(SIGTTOU,&z,nullptr);sigaction(SIGTTIN,&z,nullptr);sigaction(SIGINT,&z,nullptr);sigaction(SIGQUIT,&z,nullptr); }
-            std::vector<std::string> avs;avs.push_back(specs[i].program);avs.insert(avs.end(),specs[i].args.begin(),specs[i].args.end());std::vector<char*> av;for(auto&x:avs)av.push_back(x.data());av.push_back(nullptr);execvp(specs[i].program.c_str(),av.data());_exit(errno==ENOENT?127:126);
+            prepared[i].exec();
         }
         if(specs[i].foreground_terminal&&isatty(STDIN_FILENO)){ setpgid(pid,pid); tcsetpgrp(STDIN_FILENO,pid); }
         if (prev >= 0) close(prev);
         if (pp[1] >= 0) close(pp[1]);
         prev = pp[0];
+        nift_process_test_child(pid);
         pids.push_back(pid);
         r.launched = true;
     }
     if (prev >= 0) close(prev);
+    // A peer may be waiting forever for a stage that was never launched.
+    // SIGKILL bounds teardown even for stopped children or ignored SIGTERM.
+    if(!r.error.empty())for(pid_t p:pids)kill(p,SIGKILL);
+    launch_lock.unlock();
     int status = 0;
     for (pid_t p : pids) {
         int st = 0;
-        waitpid(p, &st, 0);
+        while(waitpid(p, &st, 0)<0 && errno==EINTR){};
         status = st;
     }
-    if (r.launched) r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1);
+    if (r.launched && r.error.empty()) r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1);
     if (ofd >= 0) close(ofd);
     if (efd >= 0) close(efd);
     if (capture) {
