@@ -1,38 +1,36 @@
 # Nift maintained roadmap
 
-## Current status — v4.10 scripting competitiveness review
+## Current status — v4.11 release preparation
 
-Public v4.9.0 targets immutable `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`.
-Release/public installer verification and Chocolatey submission are recorded in
-[release verification](../evidence/release-4.9.0/release-verification.md).
-Development is 4.10.0 with C ABI 1.3. The v4.9 performance campaign is closed;
-the separately authorized v4.10 investigation starts at local `629b1f2`.
+Public v4.10.0 is released and verified at immutable
+`76dbe2661fe7d221827db63959bf4a392bae2ba6`. Development is v4.11.0;
+C ABI remains 1.3. The accepted v4.11 incremental correctness and process
+hardening campaigns are CLOSED, with native Linux/macOS/Windows certification.
+Hash/hybrid consumers retain their own historical dependency snapshots, native
+reads snapshot consumed bytes, and targeted/generated dependency transitions are
+covered. POSIX launch safety/cleanup and Windows environment/handle/redirect/
+Unicode behavior have strengthened regression and fault guards.
 
-The [v4.10 candidate report](../evidence/cp410-competitiveness/report.md) explains
-fresh callback/frame/capture, native dispatch, value lifecycle and wide-object
-costs. Both bounded changes are accepted: canonical capture insertion and
-allocation-free native name probes. Normal commits/push and exact-SHA hosted
-certification are authorized. The peer competitiveness target remains unmet;
-the frozen `20261009-v490` series stays immutable. No campaign Labs edits,
-benchmark rerun, node provisioning or new release are authorized.
+No urgent unresolved correctness issue is known from the post-hardening review.
+Trusted project-code and host-coordination boundaries remain explicit; there is
+no hostile-repository sandbox claim. See the accepted state review in
+`../evidence/v411-state-review/review.json` and process closeout evidence.
 
 ## Next review boundary
 
-1. DONE: accepted source was committed and normally pushed at `4d80ca47`;
-   all ten exact-SHA hosted certifications passed.
-2. Prioritize sort/selector factory, capture, frame, instance and retention costs.
-   Extend exact semantic contracts and quantify the post-acceptance decomposition.
-   Design immutable plans plus fresh instances; return ownership, diagnostics,
-   captures, module and async proof for review before architecture implementation.
-3. As a secondary bounded experiment, implement one-fetch member access after
-   baseline alias/root-path/mutation oracles; retain only a measured safe win.
-4. Investigate canonical standalone Jsonic++ wide duplicate-key checking and
-   propose a fix. No standalone implementation or vendored-only patch is authorized.
-5. Persistent indexing and RuntimeValue layout remain review boundaries. A new
-   official series requires meaningful accepted changes and separate authorization.
+1. Complete living-doc/release-note reconciliation and exact-candidate local and
+   hosted certification, including manual Deep guards.
+2. Pass the canonical non-publishing Release artifacts rehearsal for 4.11.0 and
+   inspect the four native archives plus SHA256SUMS. Stop for final release
+   authorization before tagging, publishing or submitting Chocolatey.
+3. After an authorized release, return to a bounded real product/Labs workload.
+   Further hardening should follow demonstrated defects or missing user contracts.
 
-No speculative reclamation, reusable frames, arenas, compiler-wide slots,
-bytecode/JIT or capture/identity semantic changes are part of this checkpoint.
+Persistent RuntimeValue indexing, canonical Jsonic++ optimization, broader
+sort/frame architecture, VM/JIT, process redesign and posix_spawn migration remain
+deferred unless new evidence changes priority. Known ordinary sort/tiny-save
+performance residuals are not release correctness blockers. Frozen official
+benchmark series remain immutable; no benchmark campaign is authorized here.
 
 ## Distribution validation direction
 
@@ -92,7 +90,7 @@ This remains a maintained risk assessment. Field findings, release incidents, ne
 
 “Production ready” and “battle tested” are maintained scoped claims, not permanent medals.
 
-## CP49 accepted campaign checkpoint
+## Historical CP49 accepted campaign checkpoint
 
 The user accepted CP49-0/1/2 and authorized the bounded implementation campaign.
 Six measured changes are retained: live numeric identity/index selectors, cached
@@ -114,7 +112,7 @@ post-acceptance decomposition, ownership proposal and separate local object
 experiment. Callable architecture and canonical Jsonic++ implementation remain
 review boundaries. No release or official benchmark run is authorized.
 
-## Accepted sort-first follow-up and next boundary
+## Historical sort-first follow-up (superseded implementation boundary)
 
 The one-fetch object win is accepted and committed separately. Publish and
 certify it first; then investigate capture/frame/instance ownership for sort.
@@ -124,3 +122,7 @@ shared-environment/overlay, persistent-parent/overlay and COW prototypes outside
 production, with exact lookup/escape semantics and measured payoff. Canonical
 Jsonic++ threshold work is secondary. Stop before production representation or
 ownership changes. Current [checkpoint](../evidence/cp410-capture-frame/README.md).
+
+The historical sort-first authorization above was superseded by the accepted
+v4.10 implementation campaign (`../evidence/cp410-implementation-final/report.md`).
+It is not current authorization to implement architecture changes.

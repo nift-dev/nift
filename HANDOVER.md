@@ -31,23 +31,26 @@ whether it is a regression.
   Chocolatey 4.10.0 was submitted via #37989307795; its feed reports Submitted/Pending,
   not approved. Release verification is recorded in
   `docs/evidence/release-4.10.0/release-verification.md`.
-  External contracts remain NRS `a50c8dafbca81daf881a17d76dc195a84b9f3ca2`
+  External contracts are NRS `6da99128a5ea053551fe952a4994a390a38d0258`
   (94 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  The v4.10 performance campaign is CLOSED. The user separately authorized the
-  bounded v4.10 scripting competitiveness investigation; its accepted candidate
-  and review boundaries are in `docs/evidence/cp410-competitiveness/report.md`.
-  Frozen `20261009-v490` results and official workloads remain unchanged.
-  Concurrent external Labs presentation edits are preserved and recorded in the audit. Normal commit/push and exact-SHA non-release hosted certification are authorized.
-  Accepted source `4d80ca47` passed all ten exact-SHA hosted workflows.
-  The one-fetch checkpoint is accepted; runtime commit `7dfd2ebd` is separate
-  from design/evidence. Current publication and next review boundary are in
-  `docs/evidence/cp410-capture-frame/README.md`.
-  Sort capture/frame/instance ownership is the primary architectural target.
-  Do not implement the metadata plan split in isolation for its ~8% ceiling.
-  After exact-SHA hosted green, investigate and prototype environment ownership;
-  stop before production architecture implementation. Canonical Jsonic++ threshold
-  investigation is secondary; persistent RuntimeValue object indexing is deferred.
-  No official rerun, release or provisioning is authorized.
+  The v4.10 performance campaign is historical and closed. Frozen official
+  benchmark evidence remains unchanged; sort/tiny-save architecture, persistent
+  indexing and Jsonic++ optimization remain deferred.
+  The v4.11 incremental correctness and process-hardening campaigns are accepted
+  and CLOSED. Hash/hybrid builds retain per-consumer dependency snapshots;
+  native reads record consumed bytes. Modified mode remains timestamp-based.
+  POSIX launch preparation and failure cleanup, and Windows child environment,
+  handle inheritance, redirects and Unicode capture paths are certified natively.
+  No urgent unresolved correctness blocker is known. Further hardening is
+  demand-driven; do not reopen these campaigns without a concrete regression.
+  Current activity is v4.11 release preparation: documentation, reviewed release
+  notes, exact-candidate local/hosted certification and non-publishing rehearsal.
+  Normal commits/pushes are authorized for that work. STOP before tag/publication
+  or Chocolatey submission; final release authorization remains separate.
+  Production process source ends at `bb7c95a531d35670352dfa412ec535e9dbdae1cd`;
+  `0b642c8` changes a test fixture/evidence and `c16ca7a` records closeout evidence.
+  See `docs/evidence/v411-process/closeout.json` and the accepted post-hardening
+  review at `docs/evidence/v411-state-review/review.json`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
@@ -209,11 +212,28 @@ The newest files do not become trusted merely by existing.
 
 ## Public-action boundary
 
-Inspection, local implementation, tests, benchmarks, local website builds, and
-candidate preparation are normal development work. Do not push, tag, publish a
-release, deploy a website, alter public versions, or perform destructive
-repository restructuring without Nick's explicit approval. Do not create commits
-unless requested.
+The current user authorization covers normal v4.11 release-preparation commits
+and pushes, exact-candidate hosted certification, manual Deep guards and the
+non-publishing Release artifacts rehearsal. It does not authorize a tag, GitHub
+release, package submission, website release-state publication, or new engineering
+campaign. Stop after the readiness report for explicit final release authorization.
+
+## Preserved local evidence and release inputs
+
+Historical local campaign evidence under `docs/evidence/v411-hardening/` and
+`docs/evidence/v411-resume/`, the original
+`docs/evidence/v411-process/preserved-drafts.patch`, and
+`tests/observed_dependency_boundary_reproducer.py` are intentionally preserved.
+The exact 38-file inventory and classifications are in
+`docs/evidence/v411-state-review/review.json`. Do not delete them to make status
+empty, automatically commit them, or treat superseded drafts/red reports as
+current implementation instructions. They are not release inputs. Release archives
+are built in fresh hosted checkouts and stage only the executable, README and
+LICENSE; never package this local workspace wholesale.
+
+Deep guards remains manual-only: run before release candidates and after substantial
+parser/runtime/FFI/process changes; optionally weekly during active stabilization.
+Do not rename it or add scheduling as part of release preparation.
 
 ## Jsonic++ synchronization
 

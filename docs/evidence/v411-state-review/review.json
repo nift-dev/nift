@@ -1,0 +1,599 @@
+{
+  "title": "NIFT v4.11 — POST-HARDENING STATE REVIEW",
+  "implementation_authorization": "NONE — STOP FOR REVIEW",
+  "repository": {
+    "HEAD": "c16ca7a0b97494bf4e4d2252e20237255ade22b8",
+    "origin/main": "c16ca7a0b97494bf4e4d2252e20237255ade22b8",
+    "ahead": 0,
+    "behind": 0,
+    "branch": "main",
+    "tracked_clean": true,
+    "literally_clean": false,
+    "remote_ref_freshly_fetched": true
+  },
+  "production_process_source": {
+    "final_production_SHA": "bb7c95a531d35670352dfa412ec535e9dbdae1cd",
+    "last_change": "bb7c95a531d35670352dfa412ec535e9dbdae1cd fix: share write-capable Windows stderr capture handles",
+    "later_src_delta": ""
+  },
+  "later_test_evidence_commits": {
+    "0b642c8f6796a1cb528f1e0b4b6f9a0ff1139735": "test fixture + retained Windows failure evidence; no production src changes",
+    "c16ca7a0b97494bf4e4d2252e20237255ade22b8": "evidence-only accepted closeout commit"
+  },
+  "incremental": "CLOSED — accepted27case/0failure matrix and243operations/534builds/243clean-oracles smoke; 64-bit FNV-1a decimal values are trusted-project change detectors, not cryptographic integrity hashes",
+  "process": "CLOSED — accepted native Linux/macOS/Windows and local certification; no source modifications in this review",
+  "NRS": {
+    "SHA": "6da99128a5ea053551fe952a4994a390a38d0258",
+    "origin_main": "6da99128a5ea053551fe952a4994a390a38d0258",
+    "ahead": 0,
+    "behind": 0,
+    "clean": true,
+    "hosted": "PASS",
+    "url": "https://github.com/nift-dev/nift-regression-suite/actions/runs/38035852958",
+    "contract": "94modules accepted; no further correction"
+  },
+  "nightly_deep": {
+    "manual_only_policy": "CONFIRMED",
+    "trigger": "workflow_dispatch only",
+    "cadence": "Before release candidates and after substantial parser/runtime/FFI/process changes; optionally weekly in active stabilization",
+    "already_recorded": "docs/evidence/v411-process/closeout.json",
+    "workflow_changes": "NONE"
+  },
+  "untracked_preservation": {
+    "warning": "Intentional historical artifacts. DO NOT DELETE. DO NOT AUTOMATICALLY COMMIT. Original draft patches are not proposals for current source. Old STOP/red reports are historical, superseded by accepted closeouts. Ignore policy unchanged.",
+    "pre_review_file_count": 38,
+    "classifications": {
+      "intentionally retained local evidence": 35,
+      "superseded draft": 3,
+      "should be committed": 0,
+      "should be ignored": 0,
+      "accidental artifact": 0
+    },
+    "required_reproducibility": "No existing untracked item is required to reproduce accepted maintained guards. Authoritative sources/generators/contracts and final evidence are committed. Long developmental runs remain useful provenance, intentionally local.",
+    "items": [
+      {
+        "path": "docs/evidence/v411-hardening/differential-red.txt",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/differential-red.txt",
+        "classification": "intentionally retained local evidence",
+        "bytes": 1391,
+        "sha256": "ab85668884cbb6ed72608d9fdfdcd9b196c30d18609dd519de8ab66e809f9f59",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/differential-smoke.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/differential-smoke.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 2075,
+        "sha256": "baaccd87e9fcf4cf1d87a87eab55d6a70e2e7d16e2bcdc8be70f3325c17be095",
+        "summary": {
+          "passed": "True",
+          "operations": "81",
+          "builds": "177"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/incremental-stop.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/incremental-stop.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 3625,
+        "sha256": "e583321447cca50625d4e1183279e4721c43a3c6e9f48de6634b2fa562b925a8",
+        "summary": {},
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/nightly-review.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/nightly-review.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 680,
+        "sha256": "f8d9c035d95787daea3f7e636725ed16ffc25a37b8c8c0e9d6b023d9a20fa4a7",
+        "summary": {
+          "recommendation": "Document manual certification cadence or rename to deep-certification; add cron only after Nick decides."
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/process-after.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/process-after.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 1544,
+        "sha256": "d78e0dc0fffffbb3fbc4fb26b689f5704f5b3ebcc681e733f4dc204227c47185",
+        "summary": {},
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/process-before.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/process-before.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 455,
+        "sha256": "51c91aa15c5544d86a971a61eb15688648133304a1bc4e518d2c73eddd261766",
+        "summary": {},
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/process-final.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/process-final.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 1986,
+        "sha256": "67d8e26c7cce0b08160b6fe9ee9e87db112dff089f525927faae23c01b4565f1",
+        "summary": {
+          "pass_": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/process-mutations.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/process-mutations.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 804,
+        "sha256": "3085ae9eea2ecb1f8ffccaa092c52dcb913c6437a607cdd4fd186912dd9a1c9d",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/process-sanitized.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/process-sanitized.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 1985,
+        "sha256": "dcfa1f632b331ac7de29bf4ceb2a88057bd911fd2aba5686d937e3d6a4080b8b",
+        "summary": {
+          "pass_": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-hardening/review.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-hardening/review.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 20891,
+        "sha256": "2a089cc53b6129a5009789435ea8b6b051232b8273f731c27a62558c74daa9ad",
+        "summary": {
+          "title": "NIFT v4.11 LOCAL HARDENING REVIEW / WINDOWS PROCESS HARDENING REVIEW",
+          "recommendation": "STOP — shared dependency hash refresh after targeted builds hides stale outputs from other consumers"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-process/preserved-drafts.patch",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-process/preserved-drafts.patch",
+        "classification": "superseded draft",
+        "bytes": 25358,
+        "sha256": "107dc9ffde40bd5cd945da69155118e524ef2531e844759fca6ee541f6278cd4",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/design-review.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/design-review.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 9049,
+        "sha256": "bdf66474f979811a5e7a9f212d5e19fe0b1297b09753ce835232ddce0fb43347",
+        "summary": {
+          "title": "NIFT v4.11 HARDENING — CORRECTNESS CLOSEOUT",
+          "recommendation": "STOP — CP4 persistent metadata design decision required before core implementation"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/final-fingerprint-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/final-fingerprint-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 842,
+        "sha256": "3253dfb125bd770fcb77cf4735b82705f0f77d7a075efbbeaa9765cd54e49afc",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/final-medium.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/final-medium.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 43242,
+        "sha256": "a61cf7fbf9fb3233a03b6dab0908806e50ec5f64f30648d7202ba081b3607ad1",
+        "summary": {
+          "passed": "True",
+          "operations": "1920",
+          "builds": "4167"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/final-native-hook-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/final-native-hook-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 878,
+        "sha256": "0f5045ecba5d4c3e8399ed48904d459e9c3debce99ddded563870507fc7296ea",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/final-smoke.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/final-smoke.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 6076,
+        "sha256": "08e37725c5b6846e06784e60a66b04c1167b25f53923257732347c43067fb8bc",
+        "summary": {
+          "passed": "True",
+          "operations": "243",
+          "builds": "534"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/independent-after-normalized-clock.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/independent-after-normalized-clock.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 48152,
+        "sha256": "aa3df1efffcc0597bf1dca3588c637b32937d6ac1fe1844dafb6036c8dea3bed",
+        "summary": {
+          "contractual_failures": "0"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/initial-diff-stat.txt",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/initial-diff-stat.txt",
+        "classification": "intentionally retained local evidence",
+        "bytes": 317,
+        "sha256": "265039ad38680f47fa95c39aaedfcf3fd31709b3a74395e5c17564d7767a1f9a",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/initial-diff.patch",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/initial-diff.patch",
+        "classification": "superseded draft",
+        "bytes": 25315,
+        "sha256": "caa8acacf637e5af78e4f7e4307de4b041ff026c98973ddb5d05385d38d1aa89",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/initial-status.txt",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/initial-status.txt",
+        "classification": "intentionally retained local evidence",
+        "bytes": 438,
+        "sha256": "741441c3ee0db85446961c04987cf62e06a2961fdc2c86ad06c7c5dabb113ade",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/initial-untracked.txt",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/initial-untracked.txt",
+        "classification": "intentionally retained local evidence",
+        "bytes": 867,
+        "sha256": "5c40cadb4c21c32227396360bde5b9901c4e640910964807f8962d35847df0f1",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-atomic-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-atomic-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 810,
+        "sha256": "7c42bbaac03d15f29fdb5e943abcd7faca98864404693cf075d3c6dc106972b8",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-atomic-matrix.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-atomic-matrix.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 48046,
+        "sha256": "e6d164cb24365fdceb49b52eb741bfe05118913cfe45c1fa583eb5e425789f46",
+        "summary": {
+          "contractual_failures": "0"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 776,
+        "sha256": "86403ab2fc628c86764119e094a2eb9c19f8b790a8954409820f6709b0b1c524",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-current-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-current-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 843,
+        "sha256": "84920443b63eb04952053e6a1591c60f0247bc8f17a76b299f4ed6a044717a94",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-final-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-final-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 810,
+        "sha256": "6add68349e7cd7a9b9198dd112c04861a1bc5b66b5b1c0d316a4d2199cff4c8b",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-final-matrix.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-final-matrix.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 48154,
+        "sha256": "c2aef8620132e00645130a45b46ee35570ec861de8b16426cca10559b97e17e2",
+        "summary": {
+          "contractual_failures": "0"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-long.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-long.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 167981,
+        "sha256": "9436587d7031f6502adb6936de44c5b986f4c977294ef0abac687b643345db7c",
+        "summary": {
+          "passed": "True",
+          "operations": "7680",
+          "builds": "16407"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/isolated-matrix.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/isolated-matrix.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 48050,
+        "sha256": "1bdb9cd4748aa440f11722b082c4c4fcd5f7a14add4102e34349cc00390858cb",
+        "summary": {
+          "contractual_failures": "0"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/mutation-development.txt",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/mutation-development.txt",
+        "classification": "intentionally retained local evidence",
+        "bytes": 490,
+        "sha256": "9f05c085eda4ac95986eac525cbeff65082aebc224b51c63cbb0eac8f3e88fbe",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/observed-byte-boundary.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/observed-byte-boundary.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 1091,
+        "sha256": "5aea9597b29ebe301e87e6b3f71edb253688a381bc25e6c2ceb1e654b88846dc",
+        "summary": {},
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/observed-byte-design-stop.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/observed-byte-design-stop.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 7384,
+        "sha256": "296f74d818020deabb9e037b7d006632b1dc05cb5bc8395158a922d4990e44d1",
+        "summary": {
+          "title": "NIFT v4.11 — PER-CONSUMER INCREMENTAL CORRECTNESS CLOSEOUT",
+          "recommendation": "STOP — consumed-byte authority cannot currently be established for external custom-build reads"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/snapshot-contracts.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/snapshot-contracts.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 776,
+        "sha256": "26112c38f3cf42b67f143593791c235e8040873d3079972723d0af509a5aa2c3",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/snapshot-long.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/snapshot-long.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 167981,
+        "sha256": "05e24717d82b1993eed33f6302ec95bf03ac1b8929009c73a112466515791099",
+        "summary": {
+          "passed": "True",
+          "operations": "7680",
+          "builds": "16407"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/snapshot-medium.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/snapshot-medium.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 43241,
+        "sha256": "b8119f4530b7bcc0a3f68dc02d0e7d6ed9f6a2ac10bfdbbe6fe36eaea07eed3d",
+        "summary": {
+          "passed": "True",
+          "operations": "1920",
+          "builds": "4167"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/snapshot-mutations.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/snapshot-mutations.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 3352,
+        "sha256": "1b127e9bbf670b0e730b16fa4c4343909d27effe0f4b7ef672e47217f9316bb4",
+        "summary": {
+          "passed": "True"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "docs/evidence/v411-resume/snapshot-smoke.json",
+        "absolute_path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-resume/snapshot-smoke.json",
+        "classification": "intentionally retained local evidence",
+        "bytes": 6075,
+        "sha256": "e9264ad5fd87516f26344767852ca529668b6502df12141463faaf1bc90295a1",
+        "summary": {
+          "passed": "True",
+          "operations": "243",
+          "builds": "534"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      },
+      {
+        "path": "tests/observed_dependency_boundary_reproducer.py",
+        "absolute_path": "/home/nick/Repositories/nift/nift/tests/observed_dependency_boundary_reproducer.py",
+        "classification": "superseded draft",
+        "bytes": 3418,
+        "sha256": "34597650bec3d94fa2ef53125f9a12099791b7f998ad0a6ca1e894bda7580b52",
+        "summary": {
+          "format": "Historical text/diff/reproducer; full bytes inspected and hashed"
+        },
+        "handling": "Retain locally. Do not delete or automatically commit. Superseded by accepted committed guards/closeouts."
+      }
+    ],
+    "new_review_artifact": {
+      "path": "/home/nick/Repositories/nift/nift/docs/evidence/v411-state-review/review.json",
+      "classification": "should be committed",
+      "recommendation": "Review this inventory/state summary for the future handover; commit only this bounded review artifact/documentation if authorized. Do not sweep historical untracked files into git."
+    }
+  },
+  "reviewed_items": [
+    {
+      "item": "Deep flat expressions / parser stack",
+      "classification": "hardening",
+      "status": "Already resolved / superseded",
+      "evidence": "tests/v47_deep_expression_smoke.sh PASS at current binary (10k flat chains, 8k parentheses, supported64/controlled pathological nesting); ReleaseNotes v4.7 and cp410-implementation-final record later sanitizer dispatch-frame correction. Old SERVER5 crash note is not an open current defect. Constrained-stack hosts remain an explicit operating constraint, not a demonstrated new defect."
+    },
+    {
+      "item": "Filesystem and recovery",
+      "classification": "hardening",
+      "status": "Established contracts / no remaining reproduced defect found",
+      "evidence": "docs/handover/TESTING.md recovery/scaling guards; tests/crash_recovery_adversarial.py, tests/recovery_epoch_guard.cpp, accepted full tests and hosted aggregates. docs/handover/ARCHITECTURE.md describes recovery rather than a fully atomic two-file transaction. Performance residuals do not demonstrate recovery bugs."
+    },
+    {
+      "item": "Package / runtime security boundary",
+      "classification": "security issue",
+      "status": "Intentional trusted-code boundary; no new vulnerability demonstrated",
+      "evidence": "README.md explicitly includes templates/scripts/packages/imports/hooks as trusted code; process/filesystem controls are API restrictions, not OS sandbox. Native FFI may execute host operations. No hostile-repository safety claim or new sandbox design recommended."
+    },
+    {
+      "item": "Native FFI foundation",
+      "classification": "missing foundation",
+      "status": "Intentionally restricted / deferred, not a current regression",
+      "evidence": "src/ParserExpression.cpp thread-local callback activation, nested activation rejected; tests/v45_ffi_memory_callback.sh rejects signatures other than i64(i64). General signatures, userdata, variadics and retained/foreign-thread callbacks are not blanket supported. V4.6-HTTP-PACKAGE-AUDIT and SERVER5 proposals remain separate approval boundaries."
+    },
+    {
+      "item": "Embedding host lookup / root semantics",
+      "classification": "hardening",
+      "status": "Still real API caveats, low priority without host demand",
+      "evidence": "docs/handover/EMBED.md unresolved issues: empty-root cwd-derived containment, repeatable loader/probe and tracked-output lookup. src/embed/Engine.cpp source_exists and read_shared_source still allow custom loader probe then read; cached read is authoritative. Do not classify deterministic hosts as broken. Historic ASAN-FLAKE-001 retained for reappearance, not corroborated as a current memory bug."
+    },
+    {
+      "item": "Diagnostics",
+      "classification": "documentation",
+      "status": "No fresh failing diagnostic contract found",
+      "evidence": "tests/diagnostics_smoke.sh and maintained diagnostics/console targets, plus NRS contract/diagnostics_smoke.sh; historical tab/span rendering and structured recoverable-error work supersede older gaps. Public fatal/recoverable distinctions remain intentional. No fresh failing contract found; scoped review, not exhaustive semantic audit."
+    },
+    {
+      "item": "Sort / tiny-save / filesystem wrapper costs",
+      "classification": "performance opportunity",
+      "status": "Still measured but deferred; not urgent correctness work",
+      "evidence": "docs/evidence/cp410-implementation-final/report.md: callback overlays/snapshot reuse and FileValue changes already retained. Ordinary sort factory/snapshot validation/retention and save CPU gap remain. Earlier capture/frame investigation proposal is superseded as an implementation task. No official benchmark rerun performed."
+    },
+    {
+      "item": "Persistent RuntimeValue object indexing",
+      "classification": "speculative architecture",
+      "status": "Intentionally deferred; no new workload evidence",
+      "evidence": "docs/evidence/cp410-implementation-f/report.md and implementation-final: actual objects narrow, copy-heavy; synthetic wide lookup win does not justify copy/mutation/invalidation regressions."
+    },
+    {
+      "item": "Jsonic++ optimization",
+      "classification": "performance opportunity",
+      "status": "Intentionally deferred; canonical library unchanged",
+      "evidence": "cp410-implementation-final and cp410-implementation-f workload evidence; older threshold proposal remains a separate review boundary absent real workload need. No vendored-only changes."
+    },
+    {
+      "item": "Build system after snapshots",
+      "classification": "correctness bug",
+      "status": "Previously known stale-output bug resolved; no new known gap reproduced",
+      "evidence": "Accepted per-consumer consumed-native-byte snapshots, migration/fingerprint/recovery/output validation contracts. README stable-input/opaque external ABA boundary is explicit; FileValue requires dependency declaration. 27-case matrix and243-operation smoke accepted. No campaign reopened."
+    },
+    {
+      "item": "Process subsystem residuals",
+      "classification": "hardening",
+      "status": "Closed, deliberate non-blocking boundaries",
+      "evidence": "docs/evidence/v411-process/closeout.json: external env writers and external fork/descriptor activity require host coordination; direct children reaped, no universal descendant ownership; Windows interactive jobs unsupported. No posix_spawn/new abstraction/performance work."
+    },
+    {
+      "item": "Living current-state docs",
+      "classification": "documentation",
+      "status": "Still real, bounded high-value closure",
+      "evidence": "HANDOVER.md current identity retains old sort/capture architecture instructions and old NRSa50c8daf; docs/handover/ROADMAP.md says v4.9 public/v4.10 development and authorizes investigation already implemented; ReleaseNotes.md v4.11 says no user-visible changes recorded. Need concise accepted incremental/process behavior, source/test/evidence provenance, preserved-local artifacts and manual deep policy. No release/public version changes."
+    }
+  ],
+  "remaining_known_correctness_issues": "No urgent unresolved reproduced core correctness issue identified in this scoped review; not a claim of exhaustive bug absence.",
+  "remaining_security_hardening": "Explicit trusted-code and host coordination boundaries; standalone embedding repeatable-loader/empty-root contract caveats, and historical ASAN-FLAKE-001 watch item; no new security defect demonstrated.",
+  "candidate_next_priorities": [
+    {
+      "rank": 1,
+      "item": "Reconcile HANDOVER.md, maintained ROADMAP and unreleased v4.11 notes",
+      "classification": "documentation",
+      "scope": "Small documentation-only checkpoint based on accepted closeouts. Add durable local-artifact handling pointer. Preserve release/tag/benchmark state. Review and authorize before implementation/commit."
+    },
+    {
+      "rank": 2,
+      "item": "Choose one real product or Labs integration/dogfood task",
+      "classification": "experiment",
+      "scope": "Concrete user-facing workload or migration/agent workflow; define outcome before code. Let actual use reveal missing contracts. No new general core campaign."
+    },
+    {
+      "rank": 3,
+      "item": "If an embedding host demonstrates need, freeze repeatable-loader and empty-root contracts",
+      "classification": "hardening",
+      "scope": "Small host-seam contract review. No broad FFI/embedding rewrite; no current failing stable-host contract."
+    }
+  ],
+  "recommendation": "Single preferred next priority: bounded living-document reconciliation, then return to a concrete product/Labs workload rather than another core campaign.",
+  "validation_this_review": [
+    "Fresh git fetch + exact core/NRS identity and divergence",
+    "Production vs test/evidence diff checked",
+    "All38 pre-existing untracked files read/classified/hashed",
+    "tests/v47_deep_expression_smoke.sh PASS on current binary",
+    "Latest NRS hosted result PASS checked",
+    "Existing accepted closeouts and relevant source/test/docs inspected; no broad campaigns rerun"
+  ],
+  "protected_state": {
+    "v4.10_tag": "76dbe2661fe7d221827db63959bf4a392bae2ba6",
+    "release_Chocolatey_frozen_benchmarks_Jsonic": "UNCHANGED; no publication/benchmark actions",
+    "production_tests_workflows_ignore_policy": "UNCHANGED"
+  },
+  "report_status": "STOP FOR REVIEW; no commits or pushes created by this review"
+}
