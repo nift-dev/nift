@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/tests/consumer_dependency_snapshots.py", line 203, in <module>
+    base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'declared_filevalue_hook':declared_filevalue_hook(binary,base),'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+                                                                                                                                                             ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/nick/Repositories/nift/nift/tests/consumer_dependency_snapshots.py", line 115, in declared_filevalue_hook
+    assert proc.returncode!=0 and 'multiple versions' in out+err,(out,err)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('📦 1 file built successfully\ntime taken: 0.059937 seconds\n', '')

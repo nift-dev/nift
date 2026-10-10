@@ -1,0 +1,47 @@
+{
+  "fanout": [
+    {
+      "consumers": 2,
+      "dependency_edges": 4,
+      "metadata_bytes": 1186
+    },
+    {
+      "consumers": 3,
+      "dependency_edges": 6,
+      "metadata_bytes": 1779
+    },
+    {
+      "consumers": 10,
+      "dependency_edges": 20,
+      "metadata_bytes": 5930
+    },
+    {
+      "consumers": 128,
+      "dependency_edges": 256,
+      "metadata_bytes": 76780
+    }
+  ],
+  "declared_filevalue_hook": true,
+  "fingerprint_migration": true,
+  "post_output_validation": true,
+  "generated_variants": true,
+  "conflicting_reads": true,
+  "versions_migration_rename": true,
+  "json_schema_hook_import": true,
+  "barriers": [
+    {
+      "kind": "native",
+      "passed": true
+    },
+    {
+      "kind": "external",
+      "passed": true
+    },
+    {
+      "kind": "interrupt",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "elapsed_seconds": 0.942
+}

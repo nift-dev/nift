@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/tests/consumer_dependency_snapshots.py", line 184, in <module>
+    base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+                                                                                                                                                           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/nick/Repositories/nift/nift/tests/consumer_dependency_snapshots.py", line 113, in fingerprint_migration
+    run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns!=old
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

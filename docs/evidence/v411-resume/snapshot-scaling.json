@@ -1,0 +1,37 @@
+{
+  "fanout": [
+    {
+      "consumers": 1000,
+      "dependency_edges": 2000,
+      "metadata_bytes": 604340
+    },
+    {
+      "consumers": 4000,
+      "dependency_edges": 8000,
+      "metadata_bytes": 2437340
+    },
+    {
+      "consumers": 10000,
+      "dependency_edges": 20000,
+      "metadata_bytes": 6103340
+    }
+  ],
+  "versions_migration_rename": true,
+  "json_schema_hook_import": true,
+  "barriers": [
+    {
+      "kind": "native",
+      "passed": true
+    },
+    {
+      "kind": "external",
+      "passed": true
+    },
+    {
+      "kind": "interrupt",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "elapsed_seconds": 14.674
+}

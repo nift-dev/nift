@@ -134,12 +134,20 @@ def fingerprint_migration(binary,base):
  return True
 
 def post_hook_output_validation(binary,base):
- p=base/'post-removes-output';p.mkdir();setup(p,'hash','template')
+ p=base/'post-removes-output';p.mkdir();dep,_,_=setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='templates/shared.html',**{'post-build':'post.f'})])
+ (p/'post.f').write_text('print("post")\n');run(binary,p,'build','--all');old=metadata(p,'a').read_bytes()
+ dep.write_text('NEW\n@content')
  (p/'post.f').write_text('f := file(getenv("NIFT_HOOK_OUTPUT"))\nf.remove()\n')
  r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
  assert r.returncode!=0,(r.stdout,r.stderr)
- assert not metadata(p,'a').exists()
+ assert metadata(p,'a').read_bytes()==old
+ assert (p/'.nift/.unfinished').exists()
+ (p/'post.f').write_text('print("post")\n');run(binary,p,'build','--repair')
+ assert hashes(p,'a')['templates/shared.html']==hash_bytes(dep.read_bytes())
+ old=metadata(p,'a').read_bytes();dep.write_text('LATER\n@content');(p/'post.f').write_text('missing_function()\n')
+ r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
+ assert r.returncode!=0 and metadata(p,'a').read_bytes()==old
  return True
 
 def generated_variants(binary,base):

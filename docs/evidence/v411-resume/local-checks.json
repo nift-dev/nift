@@ -1,0 +1,22 @@
+{
+  "make_test": {
+    "command": "make -j4 test",
+    "exit_code": 0,
+    "scope": "working tree containing preserved process drafts; strace-capable execution"
+  },
+  "isolated": {
+    "binary": "/tmp/nift-snapshot-isolated/nift-owner-hook",
+    "process_implementation": "original committed Process/JobControl/CLI; incremental-only Hooks/ParserExpression",
+    "matrix": "27 cases, zero contractual failures",
+    "contracts": "PASS including declared FileValue native hook observation",
+    "pipeline": "30 groups PASS",
+    "final_smoke": "9 sequences, 243 operations, 534 builds, 243 clean oracles, zero failures"
+  },
+  "test_integrity": {
+    "schema": 1,
+    "campaign": "bh2",
+    "scanned_files": 317,
+    "findings": []
+  },
+  "frozen_benchmarks": "Not modified or rerun"
+}
