@@ -1028,6 +1028,16 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     if(!item_script("post-build"))return false;
     if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
     if(custom){std::error_code ec;if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom post-build removed the tracked output"},out_error);return false;}}
+    if (!custom) {
+        for (std::size_t page = 1; page <= std::max<std::size_t>(1,result.pagination_outputs.size()); ++page) {
+            const auto generated = pagination_output_path(info,page);
+            std::error_code ec;
+            if (!fs::is_regular_file(generated,ec) || ec) {
+                report_build_error({info.name,generated,0,"post-build removed a tracked output; metadata was not certified"},out_error);
+                return false;
+            }
+        }
+    }
     for(const auto& hook:info.build_hooks)if(hook.first.find(' ')!=std::string::npos)hook_dependencies.insert(relative((root/hook.second).lexically_normal()));
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());

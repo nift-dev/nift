@@ -3,6 +3,12 @@
 import argparse,json,pathlib,subprocess,tempfile,time,sys,os
 from shared_dependency_targeted_reproducer import setup,run
 
+def python_tool():
+ # Nift's native Windows CreateProcess does not apply MSYS path translation.
+ if os.environ.get('MSYSTEM'):
+  return subprocess.check_output(['cygpath','-aw',sys.executable],text=True).strip()
+ return sys.executable
+
 def hash_bytes(data):
  h=14695981039346656037
  for v in data:h=((h^v)*1099511628211)&((1<<64)-1)
@@ -64,7 +70,7 @@ def barrier(binary,base,kind):
  # One consumer eliminates unrelated output timing.
  tracked(p,[dict(name='a',title='a',template='templates/shared.html' if kind!='external' else '',**({'build':'main.f'} if kind=='external' else {'post-build':'post.f'}))])
  (p/'gate.py').write_text("from pathlib import Path\nimport time\np=Path('.')\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('barrier timeout')\n time.sleep(.005)\n")
- command='r := run('+json.dumps(sys.executable)+', "gate.py")\n'
+ command='r := run('+json.dumps(python_tool())+', "gate.py")\n'
  if kind=='external':
   (p/'content/a.deps.json').write_text(json.dumps({'dependencies':['data/shared.html']}))
   (p/'main.f').write_text(command+'f := file(getenv("NIFT_HOOK_OUTPUT"))\nf.open("w")\nf.write("custom")\nf.save()\nf.close()\n')
@@ -93,6 +99,15 @@ def barrier(binary,base,kind):
  finally:
   if proc.poll() is None:proc.kill();proc.communicate()
 
+def post_hook_output_validation(binary,base):
+ p=base/'post-removes-output';p.mkdir();setup(p,'hash','template')
+ tracked(p,[dict(name='a',title='a',template='templates/shared.html',**{'post-build':'post.f'})])
+ (p/'post.f').write_text('f := file(getenv("NIFT_HOOK_OUTPUT"))\nf.remove()\n')
+ r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
+ assert r.returncode!=0,(r.stdout,r.stderr)
+ assert not metadata(p,'a').exists()
+ return True
+
 def generated_variants(binary,base):
  for variant in ['directory','pagination']:
   p=base/('generated-'+variant);p.mkdir();setup(p,'hash','template')
@@ -119,7 +134,7 @@ def conflicting_reads(binary,base):
  tracked(p,[dict(name='a',title='a',template='',build='main.f')])
  (p/'data/observed.json').write_text('1')
  (p/'gate.py').write_text("from pathlib import Path\nimport time\np=Path('.')\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('timeout')\n time.sleep(.005)\n")
- (p/'main.f').write_text('x := inject("data/observed.json")\nr := run('+json.dumps(sys.executable)+', "gate.py")\ny := inject("data/observed.json")\nf := file(getenv("NIFT_HOOK_OUTPUT"))\nf.open("w")\nf.write("output")\nf.save()\nf.close()\n')
+ (p/'main.f').write_text('x := inject("data/observed.json")\nr := run('+json.dumps(python_tool())+', "gate.py")\ny := inject("data/observed.json")\nf := file(getenv("NIFT_HOOK_OUTPUT"))\nf.open("w")\nf.write("output")\nf.save()\nf.close()\n')
  proc=subprocess.Popen([binary,'build','--all'],cwd=p,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  try:
   wait(p,'ready',proc);(p/'data/observed.json').write_text('2');(p/'finish').touch();out,err=proc.communicate(timeout=15)
@@ -143,5 +158,5 @@ def json_and_hooks(binary,base):
 if __name__=='__main__':
  ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--output',required=True);ap.add_argument('--scaling',action='store_true');a=ap.parse_args();binary=str(pathlib.Path(a.nift).resolve());started=time.monotonic()
  with tempfile.TemporaryDirectory(prefix='nift-consumer-snapshots-') as td:
-  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
  result.update(passed=True,elapsed_seconds=round(time.monotonic()-started,3));pathlib.Path(a.output).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))
