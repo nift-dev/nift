@@ -2445,7 +2445,11 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     // logical name with a directory). A bare in-memory source
                     // must never fall back to the process working directory.
                     const fs::path relative_to_source = source_path.parent_path() / input_path;
-                    if (!source_path.parent_path().empty() && host_.source_exists(relative_to_source)) {
+                    const bool shadowed = !source_path.parent_path().empty() && host_.source_exists(relative_to_source);
+                    // CP02: whether a source-relative file shadows the root one
+                    // decides which bytes are included; record the probe.
+                    if (!source_path.parent_path().empty() && !host_.root().empty()) observe_presence(relative_to_source, shadowed);
+                    if (shadowed) {
                         input_path = relative_to_source;
                     } else if (host_.root().empty()) {
                         fail(source_path, source, i, "@input cannot resolve relative path '" + parameters[0] + "' without a project root");

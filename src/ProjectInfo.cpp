@@ -557,8 +557,25 @@ void ProjectInfo::invalidate_output_caches(const fs::path& output) {
     }
 }
 
+std::string ProjectInfo::listing_fingerprint_cached(const std::string& key) const {
+    {
+        std::lock_guard<std::mutex> lock(listing_cache_mutex_);
+        auto found = listing_cache_.find(key);
+        if (found != listing_cache_.end()) return found->second;
+    }
+    // Computed outside the lock: a duplicate computation by another thread is
+    // harmless (first insertion wins), a serialized directory walk is not.
+    std::string fingerprint = nift::observe::listing_fingerprint(root, key);
+    std::lock_guard<std::mutex> lock(listing_cache_mutex_);
+    return listing_cache_.emplace(key, std::move(fingerprint)).first->second;
+}
+
 void ProjectInfo::reset_build_caches() {
     if(identity_reload_pending_)reload_identity_catalogue();
+    {
+        std::lock_guard<std::mutex> lock(listing_cache_mutex_);
+        listing_cache_.clear();
+    }
     {
         std::lock_guard<std::mutex> lock(hash_mutex_);
         current_hash_cache_.clear();
@@ -836,7 +853,8 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         // (a retargeted symlink) rebuilds the page, where @path reports it.
         const fs::path output_root = (root / config.output_dir).lexically_normal();
         const fs::path below = requirement.lexically_relative(output_root);
-        if (!below.empty() && *below.begin() != ".." && !filesystem::path_within(root, requirement))
+        if (!below.empty() && *below.begin() != ".." && !filesystem::path_within(root, requirement) &&
+            !filesystem::path_within(output_root, requirement))
             reasons.push_back("required output path now resolves outside the project: " + value.string);
     }
 
@@ -973,6 +991,18 @@ void ProjectInfo::append_read_observations(std::string& output, const ReadObserv
         output += "]";
     };
     string_list("absent", observed.absent);
+    if (!observed.kinds.empty()) {
+        output += ",\n  \"kinds\": {";
+        std::size_t i = 0;
+        for (const auto& [path, kind] : observed.kinds) {
+            output += i++ ? ", \"" : "\"";
+            json::Document::append_escaped_string(output, path);
+            output += "\": \"";
+            json::Document::append_escaped_string(output, kind);
+            output += "\"";
+        }
+        output += "}";
+    }
     if (!observed.listings.empty()) {
         output += ",\n  \"listings\": {";
         std::size_t i = 0;
@@ -1012,9 +1042,21 @@ void ProjectInfo::read_observation_reasons(const json::Document& document, std::
                 reasons.push_back("path that was absent now exists: " + value.string);
         }
     }
+    if (document.has("kinds") && document["kinds"].is_object()) {
+        for (const auto& [path, kind] : document["kinds"].object) {
+            const fs::path resolved = nift::observe::resolve(root, path);
+            std::error_code error;
+            // Same classification as Parser::inspect_path (symlinks followed).
+            const auto status = fs::status(resolved, error);
+            const std::string current = error || !fs::exists(status) ? std::string{} :
+                fs::is_regular_file(status) ? "file" : fs::is_directory(status) ? "directory" : "other";
+            if (!current.empty() && (!kind.is_string() || kind.string != current))
+                reasons.push_back("path changed type: " + path);
+        }
+    }
     if (document.has("listings") && document["listings"].is_object()) {
         for (const auto& [key, fingerprint] : document["listings"].object) {
-            if (!fingerprint.is_string() || nift::observe::listing_fingerprint(root, key) != fingerprint.string)
+            if (!fingerprint.is_string() || listing_fingerprint_cached(key) != fingerprint.string)
                 reasons.push_back("directory listing changed: " + key.substr(key.find(':') + 1));
         }
     }
@@ -1214,6 +1256,21 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     ProjectInfoHost host(*this);
     host.observe_dependencies = hashing;
     std::set<std::string> hook_dependencies;
+    std::set<std::string> hook_reqs;
+    ReadObservations hook_observed;
+    // CP02: paths a render or build script wrote or removed are its output,
+    // not its input; drop observations of them so they cannot rebuild the
+    // page forever (e.g. touch(x); exists(x); rm(x)).
+    auto absorb_hook_observations=[&](RenderResult& target){
+        target.reqs.insert(hook_reqs.begin(),hook_reqs.end());
+        target.observed.merge(hook_observed);
+        for(const auto& written:target.observed.written){
+            const std::string as_dependency=relative(written);
+            const std::string as_observation=nift::observe::spell(root,written);
+            target.dependencies.erase(as_dependency);
+            target.reqs.erase(as_observation);target.observed.absent.erase(as_observation);target.observed.kinds.erase(as_observation);
+        }
+    };
     auto item_script = [&](const std::string& phase, RenderResult* returned=nullptr) {
         auto it=info.build_hooks.find(phase); std::string path;
         if(it!=info.build_hooks.end())path=it->second;
@@ -1230,6 +1287,8 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         auto rr=script.run_script(source_bytes,source,true);
         if(!rr.ok){report_build_error(rr.error,out_error);return false;}
         hook_dependencies.insert(relative(source));hook_dependencies.insert(rr.dependencies.begin(),rr.dependencies.end());
+        // CP02: dynamic reads in build scripts invalidate the page like reads in it.
+        hook_reqs.insert(rr.reqs.begin(),rr.reqs.end());hook_observed.merge(rr.observed);
         if(returned)*returned=std::move(rr);
         return true;
     };
@@ -1247,6 +1306,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
     if (!result.ok) { report_build_error(result.error, out_error); return false; }
+    absorb_hook_observations(result);
     SidecarObservation authoritative_sidecar;
     if (!load_user_dependencies(info, result.dependencies, &result.error, &authoritative_sidecar)) { report_build_error(result.error, out_error); return false; }
     // Decide raciness now, before outputs and post-build hooks are written:
@@ -1328,6 +1388,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     for(const auto& hook:info.build_hooks)if(hook.first.find(' ')!=std::string::npos)hook_dependencies.insert(relative((root/hook.second).lexically_normal()));
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
+    absorb_hook_observations(result);
     if (hashing) {
         std::string conflict;
         const auto observations = host.dependency_observations(conflict);

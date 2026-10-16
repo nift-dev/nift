@@ -21,6 +21,9 @@ namespace content_model { struct Model; }
 
 class ProjectInfo {
 public:
+    // Runtime 2.0 CP02: listing fingerprints computed at most once per build
+    // or status run (cleared by reset_build_caches).
+    std::string listing_fingerprint_cached(const std::string& key) const;
     std::filesystem::path root;
     Config config;
     std::vector<TrackedInfo> tracked;
@@ -178,6 +181,8 @@ private:
                          const ReadObservations* observed = nullptr) const;
     void append_read_observations(std::string& output, const ReadObservations& observed) const;
     void read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const;
+    mutable std::mutex listing_cache_mutex_;
+    mutable std::unordered_map<std::string, std::string> listing_cache_;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);

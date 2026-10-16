@@ -8,8 +8,8 @@ _Last updated: 2026-10-17_
 | --- | --- | --- | --- |
 | CP00 | complete | `runtime-2` | Baseline in `benchmarks.md` |
 | CP01 | complete (Linux); Windows pending CI | `runtime-2` | Defect D1 fixed; adversarial review F1–F7 resolved or documented (`checkpoints/cp01-modified-race.md`) |
-| CP02 | implemented, under review | `runtime-2-dev` | Defect D2: dynamic reads recorded (`checkpoints/cp02-dynamic-reads.md`) |
-| CP03 | implemented, under review | `runtime-2-dev` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
+| CP02 | complete (Linux); macOS/Windows pending CI | `runtime-2` | Defect D2 fixed; review findings 1–7 fixed, 8/10a/10b open for CP16, 9 documented (`checkpoints/cp02-dynamic-reads.md`) |
+| CP03 | complete (Linux); macOS/Windows pending CI | `runtime-2` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
@@ -32,9 +32,15 @@ untracked evidence files. The bundle and patches apply cleanly on it.
 
 ## Next action
 
-1. Close CP02/CP03 review findings; rebase `runtime-2-dev` onto `runtime-2`;
-   split into CP02 and CP03 commits; promote to `runtime-2`.
-2. CP04 (prepared path for top-level code) per `checkpoints.md`.
+1. CP04 (prepared path for top-level code) per `checkpoints.md`, on
+   `runtime-2-dev`.
+2. Carried to CP16 (Host ops): reads inside `async` functions, OS (not
+   lexical) resolution of `link/..`, globs in `cp()`/`rm()`, recording
+   `@path` targets separately from presence checks.
+
+Note: commit `1ecb2ae` is titled "WIP CP03"; its content is the reviewed CP03
+implementation (review fixes follow in the next commit). Not rewritten, because
+the branch was already delivered in a bundle.
 
 ## Open escalations
 

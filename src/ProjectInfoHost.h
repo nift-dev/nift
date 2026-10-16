@@ -16,6 +16,7 @@ public:
     explicit ProjectInfoHost(ProjectInfo& project) : project_(project) {}
 
     const std::filesystem::path& root() const override { return project_.root; }
+    std::string listing_fingerprint(const std::string& key) const override { return project_.listing_fingerprint_cached(key); }
     std::string relative(const std::filesystem::path& path) const override { return project_.relative(path); }
     const std::string& output_dir() const override { return project_.config.output_dir; }
     int build_threads() const override { return project_.config.build_threads; }

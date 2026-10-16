@@ -19,8 +19,9 @@ Nift-owned state stays protected. Restrictions are opt-in only.
 - Project configuration: contract files, schemas and taxonomies may live
   outside the project (`ProjectRead.cpp`, `Parser.cpp`).
 - Page-info: `metadata_path_is_safe` no longer rejects external dependency or
-  requirement paths. External paths are spelled absolute (CP02
-  `nift::observe::spell`) and checked like any other dependency.
+  requirement paths. External dependencies are stored relative to the project
+  (`../x`, as before); requirements and absences observed by CP02 are stored
+  absolute. Both are checked like any other dependency.
 - `NIFT_HOOK_*` names are not recorded as environment observations (they are
   per-invocation facts supplied by the build; recording them caused perpetual
   rebuilds in `test-v410-build-pipeline`).
@@ -31,8 +32,11 @@ Nift-owned state stays protected. Restrictions are opt-in only.
 - `@path`/`@pathto` URL containment: generated URLs must name files inside
   the project. Because those targets are recorded as requirements under the
   output tree, `build_reasons` now flags a requirement under the output tree
-  that resolves outside the project ("required output path now resolves
-  outside the project: …"); the rebuild then reports the `@path` error. This
+  that resolves outside both the project and the (resolved) output root
+  ("required output path now resolves outside the project: …"); the rebuild
+  then reports the `@path` error. An output directory that itself lives
+  outside the project (`"output-dir": "../site/"`, or a symlinked deploy
+  directory) is therefore not flagged. This
   replaces the old blanket "invalid requirement" rejection for that case.
 - Nift-owned state: `.nift/` metadata writes, managed outputs, `rm`/untrack
   cleanup only touch Nift-managed paths (checked in `fs_freedom.sh`).
@@ -59,10 +63,12 @@ behaviour. Each change keeps a test of the same scenario:
 - Full `make -k test`: see Evidence in `../progress.md`.
 
 ## Residual risk
-- `exists()` on a symlink under the output tree that points outside the
-  project now triggers a rebuild on every status check. This is the price of
-  keeping the `@path` invariant without a separate record of `@path` targets;
-  CP16 (Host ops) will record `@path` targets distinctly and remove it.
+- `exists()` on a symlink under the output tree that points outside both the
+  project and the output root triggers a rebuild on every status check. This
+  is the price of keeping the `@path` invariant without a separate record of
+  `@path` targets; CP16 (Host ops) will record `@path` targets distinctly.
+- `link/..` is normalised lexically before the OS sees it (pre-existing);
+  CP16.
 - Embedders that relied on the default confinement must opt in with
   `--fs-root`/the host policy. Release notes must say so.
 

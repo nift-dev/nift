@@ -20,8 +20,10 @@ std::string directory_key(const std::filesystem::path& root, const std::filesyst
 std::string glob_key(const std::filesystem::path& root, const std::filesystem::path& absolute_pattern);
 std::string listing_fingerprint(const std::filesystem::path& root, const std::string& key);
 
-// Hash of the whole process environment (sorted NAME=VALUE entries).
+// Hash of the process environment (sorted NAME=VALUE entries), excluding
+// names that change per invocation (environment_name_is_volatile).
 std::string environment_fingerprint();
+bool environment_name_is_volatile(const std::string& name);
 
 // Current value of one environment variable (nullopt when unset).
 std::optional<std::string> environment_value(const std::string& name);

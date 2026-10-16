@@ -57,6 +57,11 @@ private:
 public:
     virtual ~RenderHost() = default;
 
+    // Runtime 2.0 CP02: fingerprint of a directory listing or glob observed
+    // while rendering. Project hosts cache it per build so a listing shared by
+    // many pages is computed once; the default computes it directly.
+    virtual std::string listing_fingerprint(const std::string& key) const;
+
     virtual const std::filesystem::path& root() const = 0;
     virtual std::string relative(const std::filesystem::path& path) const = 0;
     virtual const std::string& output_dir() const = 0;

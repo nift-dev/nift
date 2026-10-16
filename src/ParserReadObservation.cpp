@@ -49,6 +49,14 @@ fs::path normal_absolute(const fs::path& path) {
 
 } // namespace
 
+bool environment_name_is_volatile(const std::string& name) {
+    // Set per invocation by the shell or by Nift itself, never by a user who
+    // wants a page to change: the last command (_), working directory,
+    // shell depth, and the NIFT_HOOK_* values build hooks receive.
+    return name == "_" || name == "PWD" || name == "OLDPWD" || name == "SHLVL" ||
+           name.rfind("NIFT_HOOK_", 0) == 0;
+}
+
 std::string spell(const fs::path& root, const fs::path& path) {
     const fs::path absolute = normal_absolute(path);
     const fs::path base = normal_absolute(root);
@@ -93,7 +101,12 @@ std::string listing_fingerprint(const fs::path& root, const std::string& key) {
 std::string environment_fingerprint() {
     std::vector<std::string> entries;
     std::lock_guard<std::mutex> lock(nift_environment_mutex());
-    for (char** entry = NIFT_ENVIRON; entry && *entry; ++entry) entries.emplace_back(*entry);
+    for (char** entry = NIFT_ENVIRON; entry && *entry; ++entry) {
+        const std::string text(*entry);
+        const std::string name = text.substr(0, text.find('='));
+        if (environment_name_is_volatile(name)) continue;
+        entries.push_back(text);
+    }
     return hash_sorted(std::move(entries));
 }
 

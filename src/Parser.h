@@ -132,7 +132,14 @@ public:
 private:
     // Runtime 2.0 CP02: record dynamic reads that can change page output.
     // No-ops for standalone scripts (nothing to invalidate).
-    void observe_presence(const std::filesystem::path& path, bool exists) const;
+    void observe_presence(const std::filesystem::path& path, bool exists, const std::string& kind = {}) const;
+    // A file whose bytes the page read (cat, open, file().open("r"), stat):
+    // an ordinary dependency, snapshotted for hash/hybrid modes.
+    void observe_read(const std::filesystem::path& path, const std::string& bytes);
+    // A path the page itself created, changed or removed: observations of it
+    // are dropped when page-info is written (it is output, not input).
+    void note_written(const std::filesystem::path& path);
+    void observe_metadata_read(const std::filesystem::path& path);
     void observe_listing(const std::string& key, const std::filesystem::path& path);
     void observe_environment(const std::string& name, const nift::HostResult& value);
     // Consume a callable's return into `out`, propagating any location that the
