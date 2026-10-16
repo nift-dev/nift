@@ -1,0 +1,40 @@
+{"kind": "meta", "nift": "Nift v4.12.0", "binary": "/home/claude/review/nift-baseline-ce8cd36", "host": {"platform": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39", "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz", "nproc": 2, "python": "3.13.16", "time": "2026-10-17T08:57:39+1100"}}
+{"group": "startup", "name": "nift_version", "median_s": 0.00323, "min_s": 0.00187, "n": 12}
+{"group": "startup", "name": "nift_empty_script", "median_s": 0.00207, "min_s": 0.00198, "n": 12}
+{"group": "startup", "name": "python3_pass", "median_s": 0.01374, "min_s": 0.01302, "n": 12}
+{"group": "startup", "name": "bash_true", "median_s": 0.00214, "min_s": 0.00181, "n": 12}
+{"group": "kernels", "name": "nift.fib22_top", "median_s": 1.41519, "min_s": 1.35674, "n": 3}
+{"group": "kernels", "name": "nift.fib22_loop", "median_s": 0.14217, "min_s": 0.11373, "n": 3}
+{"group": "kernels", "name": "nift.loop1m", "median_s": 0.5646, "min_s": 0.53828, "n": 3}
+{"group": "kernels", "name": "nift.calls200k", "median_s": 0.39826, "min_s": 0.36037, "n": 3}
+{"group": "kernels", "name": "nift.sortkey20k", "median_s": 0.0624, "min_s": 0.05911, "n": 3}
+{"group": "kernels", "name": "nift.strbuild50k", "median_s": 0.15336, "min_s": 0.15067, "n": 3}
+{"group": "kernels", "name": "nift.argcopy100k", "median_s": 0.49595, "min_s": 0.49272, "n": 3}
+{"group": "kernels", "name": "python3.fib22_top", "median_s": 0.01594, "min_s": 0.01539, "n": 3}
+{"group": "kernels", "name": "python3.loop1m", "median_s": 0.06471, "min_s": 0.06459, "n": 3}
+{"group": "kernels", "name": "python3.calls200k", "median_s": 0.0419, "min_s": 0.0409, "n": 3}
+{"group": "kernels", "name": "python3.sortkey20k", "median_s": 0.02432, "min_s": 0.02359, "n": 3}
+{"group": "kernels", "name": "python3.strbuild50k", "median_s": 0.0226, "min_s": 0.02209, "n": 3}
+{"group": "ops", "name": "loop", "nift_instr": 3084, "cpython_fn_instr": 394, "ratio": 7.82}
+{"group": "ops", "name": "add_local", "nift_instr": 4957, "cpython_fn_instr": 647, "ratio": 7.66}
+{"group": "ops", "name": "call", "nift_instr": 14970, "cpython_fn_instr": 990, "ratio": 15.12}
+{"group": "ops", "name": "array_index", "nift_instr": 5374, "cpython_fn_instr": 698, "ratio": 7.7}
+{"group": "ops", "name": "array_push", "nift_instr": 4568, "cpython_fn_instr": 506, "ratio": 9.02}
+{"group": "ops", "name": "object_member", "nift_instr": 5240, "cpython_fn_instr": 886, "ratio": 5.92}
+{"group": "ops", "name": "string_concat", "nift_instr": 9381, "cpython_fn_instr": 1787, "ratio": 5.25}
+{"group": "ops", "name": "if_branch", "nift_instr": 6006, "cpython_fn_instr": 779, "ratio": 7.71}
+{"group": "ops", "name": "fib_call_toplevel", "nift_instr_per_call": 184340}
+{"group": "ops", "name": "fib_call_in_loop", "nift_instr_per_call": 14763}
+{"group": "ops", "name": "fib_call_cpython", "cpython_instr_per_call": 353}
+{"group": "process", "name": "nift_cmd_run_x300", "median_s": 0.47821, "min_s": 0.4771, "n": 3}
+{"group": "process", "name": "bash_direct_x300", "median_s": 0.3603, "min_s": 0.35742, "n": 3}
+{"group": "process", "name": "bash_capture_x300", "median_s": 0.44297, "min_s": 0.44145, "n": 3}
+{"group": "process", "name": "python_subprocess_x300", "median_s": 0.36757, "min_s": 0.36603, "n": 3}
+{"group": "async", "name": "futures_1000", "median_s": 0.2251, "min_s": 0.2251, "n": 1}
+{"group": "async", "name": "futures_2000", "median_s": 0.82431, "min_s": 0.82431, "n": 1}
+{"group": "async", "name": "futures_4000", "median_s": 3.44006, "min_s": 3.44006, "n": 1}
+{"group": "site", "name": "full_2k", "median_s": 0.6893, "min_s": 0.44392, "n": 3}
+{"group": "site", "name": "noop_2k", "median_s": 0.0761, "min_s": 0.06377, "n": 3}
+{"group": "site", "name": "one_page_2k", "wall_s": 0.07147}
+{"group": "site", "name": "shared_partial_2k", "wall_s": 0.7162}
+{"group": "site", "name": "profile_300_instr_per_page", "instr_per_page": 1983219}
