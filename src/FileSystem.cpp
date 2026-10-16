@@ -16,6 +16,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
 #endif
@@ -321,10 +322,30 @@ static bool file_contents_equal(const fs::path& path, const std::string& content
     return true;
 }
 
-static bool refresh_modified_time(const fs::path& path) {
-    std::error_code error;
-    fs::last_write_time(path, fs::file_time_type::clock::now(), error);
-    return !error;
+// Stamp "now" using the same clock the filesystem uses for ordinary writes.
+// A user-space clock (std::chrono) can run up to one kernel tick ahead of the
+// coarse clock that stamps file modifications, so a source edited just after a
+// build would otherwise look older than the build metadata and be missed by
+// modified-mode incremental builds (Runtime 2.0 CP01).
+bool refresh_modified_time_now(const fs::path& path) {
+#ifndef _WIN32
+    return ::utimensat(AT_FDCWD, path.c_str(), nullptr, 0) == 0;
+#else
+    // NTFS stamps ordinary writes from the coarse system clock
+    // (GetSystemTimeAsFileTime, ~15.6 ms ticks); file_clock::now() uses the
+    // precise clock and can run ahead of later writes. Stamp from the same
+    // coarse clock. (Not compiled in the Linux-only campaign environment;
+    // verification pending Windows CI, decision D-004.)
+    HANDLE handle = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    const BOOL ok = SetFileTime(handle, nullptr, nullptr, &now);
+    CloseHandle(handle);
+    return ok != 0;
+#endif
 }
 
 bool write_file(const fs::path& path, const std::string& contents) {
@@ -372,7 +393,7 @@ bool write_readonly_file(const fs::path& path, const std::string& contents, fs::
     // transactional path below and therefore retains last-good interruption
     // safety. If touching is unsupported, fall back to the transactional write.
     if (file_contents_equal(path, contents)) {
-        if ((is_readonly(path) || apply_mode(path, mode)) && refresh_modified_time(path)) return true;
+        if ((is_readonly(path) || apply_mode(path, mode)) && refresh_modified_time_now(path)) return true;
     }
     const fs::path temp = temporary_sibling(path);
     if (!write_temp_file(temp, contents)) {

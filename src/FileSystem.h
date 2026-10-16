@@ -15,6 +15,9 @@ std::string read_file(const std::filesystem::path& path);
 // without separate exists/readable/open probes (performance-regression repair).
 std::optional<std::string> read_file_checked(const std::filesystem::path& path);
 void begin_recovery_epoch();
+// Set a file's modification time to "now" as the filesystem stamps writes
+// (kernel clock on POSIX), so it compares consistently with ordinary edits.
+bool refresh_modified_time_now(const std::filesystem::path& path);
 bool write_file(const std::filesystem::path& path, const std::string& contents);
 bool replace_file_atomic(const std::filesystem::path& temporary, const std::filesystem::path& destination);
 bool write_readonly_file(const std::filesystem::path& path, const std::string& contents,

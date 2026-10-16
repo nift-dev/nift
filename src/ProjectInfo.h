@@ -14,7 +14,7 @@
 
 class WatchList;
 namespace niftid { struct Catalogue; }
-namespace filesystem { struct DependencyStatus; }
+namespace filesystem { struct DependencyStatus; struct DependencyTime; }
 namespace json { class Document; }
 namespace nift { class RuntimeValue; }
 namespace content_model { struct Model; }
@@ -155,14 +155,26 @@ private:
     struct SidecarObservation;
     bool cached_user_dependencies_match(const TrackedInfo& info, const json::Document& document) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr, SidecarObservation* observation = nullptr) const;
-    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
+    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name, const json::Document* tick_hashes = nullptr) const;
     // Inputs are lexically normalized within one consumer dirty-check.
     bool metadata_path_is_safe(const std::filesystem::path& normalized, const std::filesystem::path& normalized_root) const;
     std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
     void invalidate_output_caches(const std::filesystem::path& path);
     void refresh_hash_once(const std::filesystem::path& dependency);
-    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr) const;
+    // Runtime 2.0 CP01: "now" in the filesystem's clock domain, taken just
+    // before each page renders (modified mode only).
+    std::optional<filesystem::DependencyTime> stamp_render_clock() const;
+    mutable std::mutex render_clock_mutex_;
+    mutable bool render_clock_warned_ = false;
+    struct RenderClockObservation {
+        std::vector<std::string> racy;                 // stamped after render start
+        std::map<std::string, std::string> tick_hashes; // stamped in render start's tick
+    };
+    RenderClockObservation classify_render_dependencies(const std::set<std::string>& dependencies,
+                                                        const filesystem::DependencyTime& render_started) const;
+    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr,
+                         const RenderClockObservation* render_clock = nullptr) const;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);

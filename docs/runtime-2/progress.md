@@ -4,31 +4,37 @@ _Last updated: 2026-10-17_
 
 ## Where things stand
 
-| CP | Status | Commit(s) | Notes |
+| CP | Status | Branch / commit(s) | Notes |
 | --- | --- | --- | --- |
-| CP00 | complete | see `git log -- docs/runtime-2 benchmarks/runtime2` | Baseline in `benchmarks.md` |
-| CP01 | in progress | — | Failing test written: 98/200 immediate edits missed; edit-during-render missed |
+| CP00 | complete | `runtime-2` | Baseline in `benchmarks.md` |
+| CP01 | complete (Linux); Windows pending CI | `runtime-2` | Defect D1 fixed; adversarial review F1–F7 resolved or documented (`checkpoints/cp01-modified-race.md`) |
+| CP02 | implemented, under review | `runtime-2-dev` | Defect D2: dynamic reads recorded (`checkpoints/cp02-dynamic-reads.md`) |
+| CP03 | implemented, under review | `runtime-2-dev` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
+
+`runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
+whose review is still open; it is rebased onto `runtime-2` before each delivery.
 
 ## Environment
 
-- Work happens in a cloud clone of public `main` at `ce8cd36` on branch
-  `runtime-2` (D-003). The owner's checkout is readable via a file bridge but
-  has no shell; divergence check: pending (see below).
+- Work happens in a cloud clone of public `main` at `ce8cd36` (D-003).
 - Linux only (D-004). macOS/Windows: pending CI, which requires an
   owner-approved push.
+- Known environmental test failures on this host (also on the baseline): the
+  sandbox runs as root (test-v43-language, test-unreadable-source,
+  test-dependency-status), lacks `/usr/bin/time` (two v48 guard tests), and
+  has no usable pty (test-progress-pty).
 
 ## Local checkout divergence
 
-Not yet checked: the file bridge granted access but its listing tools had not
-appeared in the session when CP00 closed. Next agent: compare
-`/home/nick/Repositories/nift/.git/HEAD` and `git status` with `ce8cd36`
-before applying the bundle.
+Checked through the file bridge: `/home/nick/Repositories/nift` HEAD is
+`00dda50` = `ce8cd36` plus a version bump only; no modified tracked files; 37
+untracked evidence files. The bundle and patches apply cleanly on it.
 
 ## Next action
 
-Finish CP01: implement kernel-clock metadata stamping and the racy-dependency
-rule in modified mode; make `tests/runtime2/modified_race.sh` pass with 1,000
-cycles; run the incremental suites; record evidence and reviews.
+1. Close CP02/CP03 review findings; rebase `runtime-2-dev` onto `runtime-2`;
+   split into CP02 and CP03 commits; promote to `runtime-2`.
+2. CP04 (prepared path for top-level code) per `checkpoints.md`.
 
 ## Open escalations
 
