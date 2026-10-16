@@ -28,7 +28,9 @@ whose review is still open; it is rebased onto `runtime-2` before each delivery.
 
 Checked through the file bridge: `/home/nick/Repositories/nift` HEAD is
 `00dda50` = `ce8cd36` plus a version bump only; no modified tracked files; 37
-untracked evidence files. The bundle and patches apply cleanly on it.
+untracked evidence files. `ce8cd36` is an ancestor of it, so the bundle's
+prerequisite is present; applying the patches with `git am` there has not been
+tried (the bridge cannot run git in that checkout).
 
 ## Next action
 
@@ -38,9 +40,13 @@ untracked evidence files. The bundle and patches apply cleanly on it.
    lexical) resolution of `link/..`, globs in `cp()`/`rm()`, recording
    `@path` targets separately from presence checks.
 
-Note: commit `1ecb2ae` is titled "WIP CP03"; its content is the reviewed CP03
-implementation (review fixes follow in the next commit). Not rewritten, because
-the branch was already delivered in a bundle.
+Notes on history:
+- Commit `1ecb2ae` is titled "WIP CP03"; its content is the CP03
+  implementation and the review fixes follow in `a02072e`.
+- `runtime-2-dev` was rebased once (CP02/CP03 split onto the final CP01) after
+  the first delivery bundle. Neither branch has been pushed; fetch the new
+  bundle with forced refspecs (see `APPLY.md`). `runtime-2` itself has only
+  moved forward.
 
 ## Open escalations
 
