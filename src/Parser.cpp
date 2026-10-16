@@ -1263,11 +1263,6 @@ bool Parser::resolve_json_value(const std::string& expression,
 
             const std::string& contract_path_argument = *contract_source;
             const fs::path contract_path = (host_.root() / contract_path_argument).lexically_normal();
-            if (!filesystem::path_within(host_.root(), contract_path)) {
-                error = "contract '" + root_name + "': path must stay inside the Nift project: " +
-                        contract_path_argument;
-                return true;
-            }
             if (!host_.source_exists(contract_path)) {
                 error = "contract '" + root_name + "': file does not exist: " + contract_path_argument;
                 return true;

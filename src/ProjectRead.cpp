@@ -158,19 +158,14 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
                 error = "contract '" + name + "' must map to a non-empty JSON path string";
                 return false;
             }
-            const fs::path contract_path = (root / source.string).lexically_normal();
-            if (!filesystem::path_within(root, contract_path)) {
-                error = "contract '" + name + "' path must stay inside the Nift project: " + source.string;
-                return false;
-            }
             config.contracts.emplace(name, source.string);
         }
     }
 
     auto load_source_list = [&](const char* key, std::vector<std::string>& out, const char* ext) -> bool {
-        out.clear(); if (!value.has(key)) return true; if (!value[key].is_array()) { error = std::string(key) + " must be an array of project-relative paths"; return false; }
+        out.clear(); if (!value.has(key)) return true; if (!value[key].is_array()) { error = std::string(key) + " must be an array of paths"; return false; }
         for (const auto& item : value[key].array) { if (!item.is_string() || item.string.empty()) { error = std::string("every ") + key + " entry must be a non-empty path string"; return false; }
-            fs::path p=(root/item.string).lexically_normal(); if(!filesystem::path_within(root,p)){error=std::string(key)+" path must stay inside the Nift project: "+item.string;return false;}
+            fs::path p=(root/item.string).lexically_normal();
             if(p.extension()!=ext){error=std::string(key)+" entries must use "+ext+": "+item.string;return false;} out.push_back(item.string); } return true; };
     if (!load_source_list("schemas", config.schema_files, ".schema") || !load_source_list("taxonomies", config.taxonomy_files, ".tax")) return false;
 

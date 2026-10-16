@@ -21,6 +21,7 @@ JSON
 {"tracked":[{"name":"/","title":"Contract Test","template":"templates/template.html"}]}
 JSON
     printf 'CONTENT\n' > "$d/content/index.html"
+    printf '@content\n' > "$d/templates/template.html"
 }
 
 expect_build_failure() {
@@ -201,13 +202,16 @@ make_project "$D" '{"routes":42}'
 expect_open_failure "$D" "contract 'routes' must map to a non-empty JSON path string"
 
 D="$TMP/config-traversal"
+# Runtime 2.0 decision D-002: contract files outside the project (or reached
+# through symlinks) are ordinary reads.
 make_project "$D" '{"routes":"../outside.json"}'
-expect_open_failure "$D" "contract 'routes' path must stay inside the Nift project"
+printf '{}\n' > "$TMP/outside.json"
+(cd "$D" && "$NIFT_BIN" build --all >log 2>&1) || { echo "external contract refused" >&2; cat "$D/log" >&2; exit 1; }
 
 D="$TMP/config-symlink"
 make_project "$D" '{"routes":"data/link.json"}'
 printf '{}\n' > "$TMP/outside.json"
 ln -s "$TMP/outside.json" "$D/data/link.json"
-expect_open_failure "$D" "contract 'routes' path must stay inside the Nift project"
+(cd "$D" && "$NIFT_BIN" build --all >log 2>&1) || { echo "symlinked contract refused" >&2; cat "$D/log" >&2; exit 1; }
 
 echo "Project contracts smoke test passed"

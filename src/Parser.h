@@ -245,7 +245,9 @@ private:
     struct ResourcePathAuthority {
         std::filesystem::path project_root;
         std::filesystem::path filesystem_root;
-        bool enforce_project_root = true;
+        // Project-root confinement is an opt-in host policy (Runtime 2.0
+        // CP03, decision D-002); ordinary Nift programs are unconfined.
+        bool enforce_project_root = false;
         bool enforce_filesystem_root = false;
     };
     struct PackageProvenance {

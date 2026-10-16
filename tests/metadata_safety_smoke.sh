@@ -16,7 +16,8 @@ JSON
   printf '@content\n' >"$d/templates/template.html"
 }
 
-# Corrupt page-info must not make status trust paths outside the project.
+# Runtime 2.0 decision D-002: page-info paths outside the project are ordinary
+# external dependencies/requirements and are checked, not rejected.
 P="$TMP/corrupt"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
@@ -31,8 +32,11 @@ PY
 printf 'secret\n' >"$TMP/outside-secret.txt"
 printf 'required\n' >"$TMP/outside-required.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'invalid dependency' "$P/status.log"
-grep -Fq 'invalid requirement' "$P/status.log"
+! grep -Fq 'invalid dependency' "$P/status.log"
+! grep -Fq 'invalid requirement' "$P/status.log"
+rm "$TMP/outside-required.txt"
+(cd "$P" && "$NIFT_BIN" status >status.log)
+grep -Fq 'required path missing: ../../outside-required.txt' "$P/status.log"
 
 # A req symlink that was safe at build time but is later retargeted outside the
 # project must stop satisfying the project-local @path invariant.
@@ -45,7 +49,9 @@ printf '<a href="@path('"'"'public/assets/link.txt'"'"')">x</a>\n' >"$P/content/
 rm "$P/public/assets/link.txt"
 ln -s "$TMP/outside-target.txt" "$P/public/assets/link.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
+grep -Fq 'required output path now resolves outside the project' "$P/status.log"
+if (cd "$P" && "$NIFT_BIN" build >build.log 2>&1); then echo "retargeted @path rebuilt without error" >&2; exit 1; fi
+grep -Fq 'path must stay inside the Nift project' "$P/build.log"
 
 
 # The optimized metadata containment cache is parent-directory based. Retargeting
@@ -61,6 +67,6 @@ printf '<a href="@path('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content
 rm "$P/public/linkdir"
 ln -s "$TMP/outside-dir" "$P/public/linkdir"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
+grep -Fq 'required output path now resolves outside the project' "$P/status.log"
 
 echo "Metadata safety smoke test passed"

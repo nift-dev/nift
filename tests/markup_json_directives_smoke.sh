@@ -61,9 +61,16 @@ grep -F '<h1>Changed From file</h1>' public/index.html >/dev/null
 printf '@json(bad, "schemas/article.json") { {"title":1} }\n' > content/index.html
 if "$NIFT_BIN" build >out 2>err; then exit 1; fi
 grep -F 'does not satisfy schema' err >/dev/null
-printf '@markup("md", "../outside.md")\n' > content/index.html
+# Runtime 2.0 decision D-002: an external @markup file is an ordinary read;
+# a missing one still fails with a controlled diagnostic.
+OUTSIDE_MD="../$(basename "$ROOT")-outside.md"
+printf '# Outside\n' > "$OUTSIDE_MD"
+printf '@markup("md", "%s")\n' "$OUTSIDE_MD" > content/index.html
+"$NIFT_BIN" build >out 2>err
+grep -F '<h1>Outside</h1>' public/index.html >/dev/null
+rm -f "$OUTSIDE_MD"
+printf '@markup("md", "../missing-outside.md")\n' > content/index.html
 if "$NIFT_BIN" build >out 2>err; then exit 1; fi
-grep -F 'path must stay inside the Nift project' err >/dev/null
 printf '@markup("unknown") { text }\n' > content/index.html
 if "$NIFT_BIN" build >out 2>err; then exit 1; fi
 grep -F "unknown format 'unknown'" err >/dev/null

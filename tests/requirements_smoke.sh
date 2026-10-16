@@ -98,8 +98,8 @@ grep -Fq 'while building about' "$P/producer-fail.log"
 ! grep -Fq 'required path missing: public/about.html' "$P/producer-fail.log"
 
 
-# Corrupt internal metadata must not be allowed to point dependency/req checks
-# outside the project root.
+# Runtime 2.0 decision D-002: metadata paths outside the project root are
+# ordinary external dependencies/requirements and are checked normally.
 P="$TMP/poisoned"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
@@ -110,7 +110,12 @@ p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["reqs"]=["../outside.txt"]; json.dump(d,open(p,"w"))
 PY
 (cd "$P" && "$NIFT_BIN" status >poison-req.log)
-grep -Fq 'page build metadata has an invalid requirement' "$P/poison-req.log"
+! grep -Fq 'invalid requirement' "$P/poison-req.log"
+grep -Fq 'up to date' "$P/poison-req.log"
+rm "$TMP/outside.txt"
+(cd "$P" && "$NIFT_BIN" status >poison-req.log)
+grep -Fq 'required path missing: ../outside.txt' "$P/poison-req.log"
+printf 'outside\n' >"$TMP/outside.txt"
 
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
@@ -119,6 +124,9 @@ p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["dependencies"]=["../outside.txt"]; json.dump(d,open(p,"w"))
 PY
 (cd "$P" && "$NIFT_BIN" status >poison-dep.log)
-grep -Fq 'page build metadata has an invalid dependency' "$P/poison-dep.log"
+! grep -Fq 'invalid dependency' "$P/poison-dep.log"
+sleep 1; printf 'changed\n' >"$TMP/outside.txt"
+(cd "$P" && "$NIFT_BIN" status >poison-dep.log)
+grep -Fq 'dependency changed: ../outside.txt' "$P/poison-dep.log"
 
 echo "Requirements smoke test passed"

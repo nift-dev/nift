@@ -315,7 +315,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     active_module_env_.reset(); loading_module_env_.reset(); saved_lexical_scopes_.clear(); module_envs_.clear(); next_module_identity_=1;
-    in_import_program_=false; standalone_script_host_=!project_build; resource_path_authority_.enforce_project_root=project_build; resource_path_authority_.enforce_filesystem_root=!project_build; strict_script_mode_=true; function_call_depth_=1;
+    in_import_program_=false; standalone_script_host_=!project_build; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!project_build; strict_script_mode_=true; function_call_depth_=1;
     const std::string identity=source_path.generic_string();
     const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')
         ? SourceProvenance::FileBacked : SourceProvenance::InMemory;
@@ -475,7 +475,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         if(!acquire_package_read(package_provenance,package_reader,error))return false;
         if(!filesystem::path_within(package_root,path)){error="package-relative import escapes package root: "+path.generic_string();return false;}
     }
-    if(!standalone_script_host_ && !resource_path_authority_.project_root.empty() && !filesystem::path_within(resource_path_authority_.project_root,path)){error="path must stay inside the Nift project";return false;}
+    if(resource_path_authority_.enforce_project_root && !resource_path_authority_.project_root.empty() && !filesystem::path_within(resource_path_authority_.project_root,path)){error="path must stay inside the Nift project";return false;}
     const fs::path import_identity=stable_import_identity(path);
     bool cycle=std::find(input_stack_.begin(),input_stack_.end(),import_identity)!=input_stack_.end();
     if(!cycle)for(const auto& source:source_context_stack_)if(!source.path().empty()&&source.provenance==SourceProvenance::FileBacked&&stable_import_identity(source.path())==import_identity){cycle=true;break;}

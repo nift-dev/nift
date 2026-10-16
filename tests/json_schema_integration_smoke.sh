@@ -106,20 +106,13 @@ P="$TMP/traversal"; mkproj "$P"
 printf '{}\n' >"$TMP/outside.json"
 printf '{}\n' >"$P/data/ok.json"
 printf '{}\n' >"$P/schemas/ok.json"
+# Runtime 2.0 decision D-002: data and schema files outside the project are
+# ordinary reads (previously refused as traversal).
 printf '@json(data, "../outside.json")\n@content\n' >"$P/templates/template.html"
 printf '\n' >"$P/content/index.html"
-if (cd "$P" && "$NIFT_BIN" build --all >trav-data.log 2>&1); then
-  echo "json traversal unexpectedly succeeded" >&2
-  exit 1
-fi
-(cd "$P" && rm -f .nift/.unfinished)
-grep -Fq 'path must stay inside the Nift project' "$P/trav-data.log"
+(cd "$P" && "$NIFT_BIN" build --all >trav-data.log 2>&1) || { echo "external json data refused" >&2; cat "$P/trav-data.log" >&2; exit 1; }
 
 printf '@json(data, "../outside.json", "data/ok.json")\n@content\n' >"$P/templates/template.html"
-if (cd "$P" && "$NIFT_BIN" build --all >trav-schema.log 2>&1); then
-  echo "schema traversal unexpectedly succeeded" >&2
-  exit 1
-fi
-grep -Fq 'schema path must stay inside the Nift project' "$P/trav-schema.log"
+(cd "$P" && "$NIFT_BIN" build --all >trav-schema.log 2>&1) || { echo "external json schema refused" >&2; cat "$P/trav-schema.log" >&2; exit 1; }
 
 echo "JSON Schema integration smoke test passed"

@@ -45,11 +45,24 @@ fail_build(){
   }
 }
 
-fail_build json-symlink 'path must stay inside the Nift project' '@json(x, "data/link.json")'
-printf '{}\n' >"$P/data/local.json"
-fail_build schema-symlink 'schema path must stay inside the Nift project' '@json(x, "schemas/link.json", "data/local.json")'
+ok_build(){
+  local name="$1" expected="$2" template="$3"
+  printf '%s\n@content\n' "$template" >"$P/templates/template.html"
+  rm -f "$P/.nift/.unfinished"
+  (cd "$P" && "$NIFT_BIN" build --all >"$name.log" 2>&1) || {
+    echo "$name failed (Runtime 2.0 D-002: reads outside the project are ordinary)" >&2
+    cat "$P/$name.log" >&2; exit 1; }
+  [ -z "$expected" ] || grep -F "$expected" "$P/public/index.html" >/dev/null || {
+    echo "$name output missing: $expected" >&2; exit 1; }
+}
 
-fail_build dep-symlink 'path must stay inside the Nift project' '@dep("data/dep-link.txt")'
+# Runtime 2.0 decision D-002: symlinked/external inputs are ordinary reads.
+ok_build json-symlink 'outside' '@json(x, "data/link.json")$[x.secret]'
+printf '{}\n' >"$P/data/local.json"
+ok_build schema-symlink '' '@json(x, "schemas/link.json", "data/local.json")'
+
+ok_build dep-symlink '' '@dep("data/dep-link.txt")'
+# Generated-URL containment is retained: @path must not point outside output.
 fail_build pathto-symlink 'path must stay inside the Nift project' '@path("public/link.txt")'
 
 echo "Path safety smoke test passed"

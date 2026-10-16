@@ -2587,11 +2587,6 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     fs::path candidate = resolved_path;
                     if (candidate.is_relative()) candidate = host_.root() / candidate;
                     candidate = fs::absolute(candidate).lexically_normal();
-                    if (!filesystem::path_within(host_.root().lexically_normal(), candidate)) {
-                        fail(source_path, source, i,
-                             "markup: path must stay inside the Nift project: " + resolved_path);
-                        break;
-                    }
                     if (!host_.source_exists(candidate)) {
                         fail(source_path, source, i, "markup: file does not exist: " + resolved_path);
                         break;
@@ -2632,10 +2627,6 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     fs::path candidate = fs::path(requested);
                     if (candidate.is_relative()) candidate = base / candidate;
                     candidate = fs::absolute(candidate).lexically_normal();
-                    if (!filesystem::path_within(host_.root().lexically_normal(), candidate)) {
-                        resolver_error = "markup include must stay inside the Nift project: " + requested;
-                        return false;
-                    }
                     if (!host_.source_exists(candidate)) {
                         resolver_error = "markup include does not exist: " + requested;
                         return false;
@@ -2754,13 +2745,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                         fail(source_path, source, i, "json: " + interpolation_error);
                         break;
                     }
-                    const fs::path host_root = host_.root().lexically_normal();
                     const fs::path json_path = (host_.root() / json_path_argument).lexically_normal();
-                    if (!filesystem::path_within(host_root, json_path)) {
-                        fail(source_path, source, i,
-                             "json: path must stay inside the Nift project: " + json_path_argument);
-                        break;
-                    }
                     if (!host_.source_exists(json_path)) {
                         fail(source_path, source, i, "json: file does not exist: " + json_path_argument);
                         break;
@@ -2825,13 +2810,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                             fail(source_path, source, i, "json: " + interpolation_error);
                             break;
                         }
-                        const fs::path host_root = host_.root().lexically_normal();
                         const fs::path schema_path = (host_.root() / schema_path_argument).lexically_normal();
-                        if (!filesystem::path_within(host_root, schema_path)) {
-                            fail(source_path, source, i,
-                                 "json: schema path must stay inside the Nift project: " + schema_path_argument);
-                            break;
-                        }
                         if (!host_.source_exists(schema_path)) {
                             fail(source_path, source, i,
                                  "json: schema file does not exist: " + schema_path_argument);
@@ -2889,10 +2868,6 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     }
                     dependency = std::move(resolved);
                     const fs::path dependency_path = (host_.root() / dependency).lexically_normal();
-                    if (!filesystem::path_within(host_.root(), dependency_path)) {
-                        fail(source_path, source, i, "dep: path must stay inside the Nift project: " + dependency);
-                        break;
-                    }
                     if (!host_.source_exists(dependency_path)) {
                         fail(source_path, source, i, "failed as dependency does not exist: " + dependency);
                         break;
@@ -3031,9 +3006,9 @@ RenderResult Parser::render() {
     fs::path pagination_template = config.template_path.has_value()
         ? (host_.root() / *config.template_path).lexically_normal()
         : conventional(".paginate");
-    if (!filesystem::path_within(host_.root(), pagination_template) || !host_.source_readable(pagination_template)) {
+    if (!host_.source_readable(pagination_template)) {
         result.ok = false;
-        result.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
+        result.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing or unreadable"};
         return result;
     }
     fs::path separator;
@@ -3042,9 +3017,9 @@ RenderResult Parser::render() {
         const fs::path candidate = conventional(".separator");
         if (host_.source_exists(candidate)) separator = candidate;
     }
-    if (!separator.empty() && (!filesystem::path_within(host_.root(), separator) || !host_.source_readable(separator))) {
+    if (!separator.empty() && !host_.source_readable(separator)) {
         result.ok = false;
-        result.error = {tracked_info_.name, separator, 0, "pagination separator is unreadable or outside the project"};
+        result.error = {tracked_info_.name, separator, 0, "pagination separator is unreadable"};
         return result;
     }
 
