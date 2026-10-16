@@ -2511,6 +2511,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 }
                 parameters[0] = std::move(resolved);
                 nift::HostResult env = host_.environment(parameters[0]);
+                observe_environment(parameters[0], env);
                 if (env.status == nift::HostStatus::Found) output += env.value;
                 else if (env.status == nift::HostStatus::Error) {
                     fail(source_path, source, i, "getenv: " + env.error);
@@ -3059,6 +3060,7 @@ RenderResult Parser::render() {
         BuildError error;
         std::set<std::string> dependencies;
         std::set<std::string> reqs;
+        ReadObservations observed;
     };
     std::vector<PageRender> pages(total);
     const auto page_source = host_.read_shared_source(pagination_template);
@@ -3139,6 +3141,7 @@ RenderResult Parser::render() {
             pages[page_index].output = std::move(page_output);
             pages[page_index].dependencies = rendered_page.dependencies;
             pages[page_index].reqs = rendered_page.reqs;
+            pages[page_index].observed = rendered_page.observed;
         }
     };
 
@@ -3157,6 +3160,7 @@ RenderResult Parser::render() {
         }
         result_.dependencies.insert(pages[page_index].dependencies.begin(), pages[page_index].dependencies.end());
         result_.reqs.insert(pages[page_index].reqs.begin(), pages[page_index].reqs.end());
+        result_.observed.merge(pages[page_index].observed);
         result_.pagination_outputs.push_back(std::move(pages[page_index].output));
     }
     result_.output = result_.pagination_outputs.front();

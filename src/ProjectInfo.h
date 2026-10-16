@@ -174,7 +174,10 @@ private:
     RenderClockObservation classify_render_dependencies(const std::set<std::string>& dependencies,
                                                         const filesystem::DependencyTime& render_started) const;
     bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr,
-                         const RenderClockObservation* render_clock = nullptr) const;
+                         const RenderClockObservation* render_clock = nullptr,
+                         const ReadObservations* observed = nullptr) const;
+    void append_read_observations(std::string& output, const ReadObservations& observed) const;
+    void read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);

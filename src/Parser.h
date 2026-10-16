@@ -69,6 +69,8 @@ public:
         std::string error_message;
     };
     FsInfo inspect_path(const std::filesystem::path& path) const;
+    // Raw metadata query without dependency observation (CP02).
+    FsInfo inspect_path_unobserved(const std::filesystem::path& path) const;
     using TimerClock = std::function<std::chrono::steady_clock::time_point()>;
     Parser(RenderHost& host, TrackedInfo& tracked_info,
            std::shared_ptr<ExecutionOutput> execution_output = {},
@@ -128,6 +130,11 @@ public:
                                  bool require_exactly_one_content);
 
 private:
+    // Runtime 2.0 CP02: record dynamic reads that can change page output.
+    // No-ops for standalone scripts (nothing to invalidate).
+    void observe_presence(const std::filesystem::path& path, bool exists) const;
+    void observe_listing(const std::string& key, const std::filesystem::path& path);
+    void observe_environment(const std::string& name, const nift::HostResult& value);
     // Consume a callable's return into `out`, propagating any location that the
     // return carried so a following declaration can rebind to the same location.
     void consume_return(nift::RuntimeValue& out) {

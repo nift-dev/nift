@@ -72,6 +72,24 @@ struct BuildError {
           source_line(std::move(source_text)) {}
 };
 
+// Dynamic reads observed while rendering a page (Runtime 2.0 CP02). These are
+// facts that can change rendered bytes without changing any file the page
+// declared as a dependency: a path that was absent, the entry list of a
+// directory or glob, and environment variables.
+struct ReadObservations {
+    std::set<std::string> absent;                               // paths observed missing
+    std::map<std::string, std::string> listings;                // listing key -> fingerprint
+    std::map<std::string, std::optional<std::string>> env;      // name -> value (nullopt = unset)
+    bool environment_snapshot = false;                          // env() read the whole environment
+    void merge(const ReadObservations& other) {
+        absent.insert(other.absent.begin(), other.absent.end());
+        listings.insert(other.listings.begin(), other.listings.end());
+        env.insert(other.env.begin(), other.env.end());
+        environment_snapshot = environment_snapshot || other.environment_snapshot;
+    }
+    bool empty() const { return absent.empty() && listings.empty() && env.empty() && !environment_snapshot; }
+};
+
 struct RenderResult {
     bool ok = true;
     bool content_used = false;
@@ -81,6 +99,7 @@ struct RenderResult {
     std::optional<nift::detail::Diagnostic> diagnostic;
     std::set<std::string> dependencies;
     std::set<std::string> reqs;
+    ReadObservations observed;
     std::vector<std::string> pagination_items;
     std::vector<std::string> pagination_outputs;
     std::size_t paginate_count = 0;

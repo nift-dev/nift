@@ -1,6 +1,7 @@
 #include "IdentityPublication.h"
 #include <condition_variable>
 #include "ProjectInfo.h"
+#include "ReadObservation.h"
 #include "RuntimeJson.h"
 #include "ProjectInfoHost.h"
 #include "ProjectOwnership.h"
@@ -721,6 +722,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             if (value.is_string())
                 reasons.push_back("dependency was modified while the page was being built: " + value.string);
     }
+    read_observation_reasons(document, reasons);
     const std::string current_hooks = build_script_signature(info);
     const std::string old_hooks=document.has("build-hooks")&&document["build-hooks"].is_string()?document["build-hooks"].string:std::string{};
     if(old_hooks!=current_hooks) reasons.push_back("build scripts changed");
@@ -987,8 +989,83 @@ ProjectInfo::RenderClockObservation ProjectInfo::classify_render_dependencies(
     return observation;
 }
 
+// Runtime 2.0 CP02: dynamic reads observed while rendering. Each section is
+// optional; metadata written by older versions simply has none of them.
+void ProjectInfo::append_read_observations(std::string& output, const ReadObservations& observed) const {
+    auto string_list = [&](const char* name, const std::set<std::string>& values) {
+        if (values.empty()) return;
+        output += ",\n  \"";
+        output += name;
+        output += "\": [";
+        std::size_t i = 0;
+        for (const auto& value : values) {
+            output += i++ ? ", \"" : "\"";
+            json::Document::append_escaped_string(output, value);
+            output += "\"";
+        }
+        output += "]";
+    };
+    string_list("absent", observed.absent);
+    if (!observed.listings.empty()) {
+        output += ",\n  \"listings\": {";
+        std::size_t i = 0;
+        for (const auto& [key, fingerprint] : observed.listings) {
+            output += i++ ? ", \"" : "\"";
+            json::Document::append_escaped_string(output, key);
+            output += "\": \"" + fingerprint + "\"";
+        }
+        output += "}";
+    }
+    if (!observed.env.empty()) {
+        output += ",\n  \"environment\": {";
+        std::size_t i = 0;
+        for (const auto& [name, value] : observed.env) {
+            output += i++ ? ", \"" : "\"";
+            json::Document::append_escaped_string(output, name);
+            output += "\": ";
+            if (value) {
+                output += "\"";
+                json::Document::append_escaped_string(output, *value);
+                output += "\"";
+            } else {
+                output += "null";
+            }
+        }
+        output += "}";
+    }
+    if (observed.environment_snapshot)
+        output += ",\n  \"environment-snapshot\": \"" + nift::observe::environment_fingerprint() + "\"";
+}
+
+void ProjectInfo::read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const {
+    if (document.has("absent") && document["absent"].is_array()) {
+        for (const auto& value : document["absent"].array) {
+            if (!value.is_string()) { reasons.push_back("page build metadata has an invalid absent path"); continue; }
+            if (filesystem::path_exists(nift::observe::resolve(root, value.string)))
+                reasons.push_back("path that was absent now exists: " + value.string);
+        }
+    }
+    if (document.has("listings") && document["listings"].is_object()) {
+        for (const auto& [key, fingerprint] : document["listings"].object) {
+            if (!fingerprint.is_string() || nift::observe::listing_fingerprint(root, key) != fingerprint.string)
+                reasons.push_back("directory listing changed: " + key.substr(key.find(':') + 1));
+        }
+    }
+    if (document.has("environment") && document["environment"].is_object()) {
+        for (const auto& [name, recorded] : document["environment"].object) {
+            const auto current = nift::observe::environment_value(name);
+            const bool same = recorded.is_null() ? !current : (recorded.is_string() && current && *current == recorded.string);
+            if (!same) reasons.push_back("environment variable changed: " + name);
+        }
+    }
+    if (document.has("environment-snapshot") && document["environment-snapshot"].is_string() &&
+        document["environment-snapshot"].string != nift::observe::environment_fingerprint())
+        reasons.push_back("environment changed");
+}
+
 bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation,
-                                  const RenderClockObservation* render_clock) const {
+                                  const RenderClockObservation* render_clock,
+                                  const ReadObservations* observed) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
     std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -1112,6 +1189,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
             output += "}";
         }
     }
+    if (observed && !observed->empty()) append_read_observations(output, *observed);
     if(observation){
         output += ",\n  \"sidecar-state\": {\"version\":1,\"platform\":\"";
         output += sidecar_platform();
@@ -1323,7 +1401,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         certificate_valid=current&&*current==authoritative_sidecar.bytes;
     }else certificate_valid=!filesystem::path_exists(sidecar_path);
     // Later hook changes suppress only the new certificate, preserving E2 behavior.
-    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr)) {
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr, &result.observed)) {
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
     }
