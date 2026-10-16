@@ -362,6 +362,17 @@ RenderResult Parser::execute_loop_emission(const LoopEmissionPlan& plan,
     return result_;
 }
 
+// Runtime 2.0 CP06: keyword probes in the template scanner. Equivalent to
+// `source.compare(i, strlen(literal), literal) == 0` for i < source.size(),
+// but rejects on the first character before any strlen/memcmp, and the
+// literal length is a compile-time constant.
+template <std::size_t N>
+static inline bool source_starts_at(const std::string& source, std::size_t i, const char (&literal)[N]) {
+    constexpr std::size_t length = N - 1;
+    if (i >= source.size() || source[i] != literal[0]) return false;
+    return source.size() - i >= length && std::char_traits<char>::compare(source.data() + i, literal, length) == 0;
+}
+
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth) {
     const SourceProvenance provenance = active_module_env_ ? active_module_env_->source_provenance
         : (source_context_stack_.empty() ? SourceProvenance::FileBacked : source_context_stack_.back().provenance);
@@ -392,7 +403,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
         expression_failure_view_ = {};
         if (pending_control_.kind != ControlFlow::None) break;
-        if (in_fragment_body_ && source.compare(i, 6, "return") == 0 &&
+        if (in_fragment_body_ && source_starts_at(source, i, "return") &&
             (i + 6 == source.size() || source[i + 6] == ';' || source[i + 6] == '\n' || source[i + 6] == '\r' || std::isspace(static_cast<unsigned char>(source[i + 6])))) {
             std::size_t e = i + 6;
             while (e < source.size() && (source[e] == ' ' || source[e] == '\t')) ++e;
@@ -401,13 +412,13 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             }
             pending_control_.kind = ControlFlow::Return; pending_control_.value.reset(); break;
         }
-        if (source.compare(i, 5, "break") == 0 &&
+        if (source_starts_at(source, i, "break") &&
             (i + 5 == source.size() || source[i + 5] == ';' || source[i + 5] == '\n' || source[i + 5] == '\r')) {
             if (loop_depth_ <= 0) { fail(source_path, source, i, "break is only valid inside a loop"); break; }
             pending_control_.kind = ControlFlow::Break;
             break;
         }
-        if (source.compare(i, 8, "continue") == 0 &&
+        if (source_starts_at(source, i, "continue") &&
             (i + 8 == source.size() || source[i + 8] == ';' || source[i + 8] == '\n' || source[i + 8] == '\r')) {
             if (loop_depth_ <= 0) { fail(source_path, source, i, "continue is only valid inside a loop"); break; }
             pending_control_.kind = ControlFlow::Continue;
@@ -419,13 +430,13 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             continue;
         }
 
-        if (source.compare(i, 3, "@/*") == 0) {
+        if (source_starts_at(source, i, "@/*")) {
             const auto end = source.find("*/", i + 3);
             if (end == std::string::npos) { fail(source_path, source, i, "open comment '@/*' has no close '*/'"); break; }
             i = end + 2;
             continue;
         }
-        if (source.compare(i, 3, "@//") == 0) {
+        if (source_starts_at(source, i, "@//")) {
             const auto end = source.find('\n', i);
             i = end == std::string::npos ? source.size() : end;
             continue;
@@ -436,10 +447,10 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
         // literal '<' characters are escaped except for <code>/</code> tags and
         // the outer </pre>. Nift expressions still parse normally, so \@ / \$
         // remain the way to show Nift syntax literally in code examples.
-        if (source.compare(i, 4, "<!--") == 0) {
+        if (source_starts_at(source, i, "<!--")) {
             ++html_comment_depth_;
         }
-        if (source.compare(i, 3, "-->") == 0 && html_comment_depth_ > 0) {
+        if (source_starts_at(source, i, "-->") && html_comment_depth_ > 0) {
             --html_comment_depth_;
             output.append(source, i, 3);
             i += 3;
@@ -475,7 +486,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             continue;
         }
 
-        if (source.compare(i, 7, "@script") == 0 && (i+7==source.size() || std::isspace(static_cast<unsigned char>(source[i+7])) || source[i+7]=='{')) {
+        if (source_starts_at(source, i, "@script") && (i+7==source.size() || std::isspace(static_cast<unsigned char>(source[i+7])) || source[i+7]=='{')) {
             std::size_t bo=i+7; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@script requires a balanced block");break;}
             if(pending_control_.kind!=ControlFlow::None) pending_control_={};
@@ -495,12 +506,12 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             i=bc+1; continue;
         }
 
-        if (source.compare(i, 16, "@__bare_return()") == 0) {
+        if (source_starts_at(source, i, "@__bare_return()")) {
             if(function_call_depth_<=0){fail(source_path,source,i,"return is only valid in script/function execution");break;}
             pending_control_.kind=ControlFlow::Return; pending_control_.value.reset(); i+=16; break;
         }
 
-        if (source.compare(i, 9, "@__throw(") == 0) {
+        if (source_starts_at(source, i, "@__throw(")) {
             std::size_t close=0;if(!find_balanced(source,i+8,'(',')',close)){fail(source_path,source,i,"throw has no matching ')' ");break;}
             const std::string payload=source.substr(i+9,close-(i+9));const auto first_comma=payload.find(',');const auto second_comma=first_comma==std::string::npos?first_comma:payload.find(',',first_comma+1);
             if(first_comma==std::string::npos||second_comma==std::string::npos){fail(source_path,source,i,"throw metadata is malformed");break;}
@@ -520,7 +531,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             break;
         }
 
-        if (source.compare(i, 7, "@__try(") == 0) {
+        if (source_starts_at(source, i, "@__try(")) {
             std::size_t binding_close=0;if(!find_balanced(source,i+6,'(',')',binding_close)){fail(source_path,source,i,"try has malformed catch binding");break;}
             const std::string binding=trim_copy(source.substr(i+7,binding_close-(i+7)));
             std::size_t try_open=binding_close+1;while(try_open<source.size()&&std::isspace((unsigned char)source[try_open]))++try_open;std::size_t try_close=0;
@@ -543,7 +554,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             output+=handled.output;i=catch_close+1;continue;
         }
 
-        if (source.compare(i, 12, "@__nift_cmd(") == 0) {
+        if (source_starts_at(source, i, "@__nift_cmd(")) {
             // Executable-path command style from script land (e.g. ./generate.f
             // foo bar): ordinary OS process execution. Never in-process Nift
             // evaluation. Output is streamed; a non-zero exit status does not
@@ -585,7 +596,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             i=cc+1; continue;
         }
 
-        if (source.compare(i, 10, "@__export(") == 0) {
+        if (source_starts_at(source, i, "@__export(")) {
             std::size_t ec=0; if(!find_balanced(source,i+9,'(',')',ec)){fail(source_path,source,i,"export has no matching ')'");break;}
             if(!in_import_program_ && !standalone_script_host_){fail(source_path,source,i,"export() is only valid in an imported/external script");break;}
             const std::string name=trim_copy(source.substr(i+10,ec-(i+10)));
@@ -598,8 +609,8 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             requested_exports_.push_back(name); i=ec+1; continue;
         }
 
-        const bool bare_import=strict_script_mode_&&source.compare(i,6,"import")==0&&(i+6==source.size()||(!std::isalnum(static_cast<unsigned char>(source[i+6]))&&source[i+6]!='_'));
-        if (bare_import || source.compare(i, 8, "@import(") == 0) {
+        const bool bare_import=strict_script_mode_&&source_starts_at(source, i, "import")&&(i+6==source.size()||(!std::isalnum(static_cast<unsigned char>(source[i+6]))&&source[i+6]!='_'));
+        if (bare_import || source_starts_at(source, i, "@import(")) {
             std::size_t po=bare_import?i+6:i+7;while(po<source.size()&&std::isspace(static_cast<unsigned char>(source[po])))++po;
             auto import_fail=[&](const std::string& message,std::size_t){fail(source_path,source,i,message);};
             std::size_t ec=0; if(po>=source.size()||source[po]!='('||!find_balanced(source,po,'(',')',ec)){import_fail(bare_import?"import has no matching ')'":"@import has no matching ')'",6);break;}
@@ -609,7 +620,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             i=ec+1; continue;
         }
 
-        if(source.compare(i,6,"@enum(")==0){
+        if(source_starts_at(source, i, "@enum(")){
             std::size_t hc=0;if(!find_balanced(source,i+5,'(',')',hc)){fail(source_path,source,i,"enum definition has no matching ')'");break;}const std::string name=trim_copy(source.substr(i+6,hc-(i+6)));if(!valid_binding_identifier(name)){fail(source_path,source,i,"invalid enum name");break;}std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"enum definition requires a block");break;}
             if(variable_scopes_.empty())variable_scopes_.emplace_back();
             if(variable_scopes_.back().count(name)){fail(source_path,source,i,"binding already declared in this scope: "+name);break;}
@@ -620,7 +631,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             auto sp=std::make_shared<nift::RuntimeValue>(std::move(ns));variable_scopes_.back().emplace(name,VariableBinding{sp,nift_binding_type_from_text("{}",*sp),false,true});i=bc+1;continue;
         }
 
-        if (source.compare(i, 8, "@struct(") == 0) {
+        if (source_starts_at(source, i, "@struct(")) {
             std::size_t hc = 0;
             if (!find_balanced(source, i + 7, '(', ')', hc)) { fail(source_path, source, i, "struct definition has no matching ')'"); break; }
             const std::string struct_name = trim_copy(source.substr(i + 8, hc - (i + 8)));
@@ -666,9 +677,9 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             structs_[struct_name]=std::move(def); i=bc+1; continue;
         }
 
-        if (source.compare(i, 4, "@fn(") == 0 || source.compare(i, 11, "@fn[async](") == 0 || source.compare(i, 10, "@fragment(") == 0) {
-            const bool fragment = source.compare(i, 10, "@fragment(") == 0;
-            const bool async = !fragment && source.compare(i, 11, "@fn[async](") == 0;
+        if (source_starts_at(source, i, "@fn(") || source_starts_at(source, i, "@fn[async](") || source_starts_at(source, i, "@fragment(")) {
+            const bool fragment = source_starts_at(source, i, "@fragment(");
+            const bool async = !fragment && source_starts_at(source, i, "@fn[async](");
             const std::size_t open = i + (fragment ? 9 : (async ? 10 : 3));
             std::size_t header_close = 0; if (!find_balanced(source, open, '(', ')', header_close)) { fail(source_path, source, i, "callable definition has no matching ')'"); break; }
             const std::string signature = trim_copy(source.substr(open + 1, header_close - open - 1)); const auto lp = signature.find('(');
@@ -681,7 +692,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment,async,active_module_env_ ? active_module_env_ : loading_module_env_,source_provenance,def_body.view}; i=bc+1; continue;
         }
 
-        if (source.compare(i, 4, "@:=(") == 0) {
+        if (source_starts_at(source, i, "@:=(")) {
             std::size_t header_close = 0;
             if (!find_balanced(source, i + 3, '(', ')', header_close)) { fail(source_path, source, i, "@:= has no matching ')'"); break; }
             const std::string name = trim_copy(source.substr(i + 4, header_close - (i + 4)));
@@ -693,7 +704,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             i = block_close + 1; continue;
         }
 
-        if (source.compare(i, 2, "$[") == 0) {
+        if (source_starts_at(source, i, "$[")) {
             std::size_t end = i + 2;
             std::size_t nested_brackets = 0;
             bool value_quoted = false;
@@ -890,7 +901,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             }
         }
 
-        if (source.compare(i, 5, "@item") == 0 &&
+        if (source_starts_at(source, i, "@item") &&
             (i + 5 == source.size() || source[i + 5] == '{' || std::isspace(static_cast<unsigned char>(source[i + 5])))) {
             if (!pagination_collecting_) { fail(source_path, source, i, "@item requires pagination on the tracked item"); break; }
             std::size_t block_open = i + 5;
@@ -908,7 +919,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             continue;
         }
 
-        if (source.compare(i, 9, "@paginate") == 0 &&
+        if (source_starts_at(source, i, "@paginate") &&
             (i + 9 == source.size() || !(std::isalnum(static_cast<unsigned char>(source[i + 9])) || source[i + 9] == '_'))) {
             if (!pagination_collecting_) { fail(source_path, source, i, "@paginate requires pagination on the tracked item"); break; }
             if (++result_.paginate_count > 1) { fail(source_path, source, i, "paginated tracked items must execute exactly one @paginate"); break; }
@@ -917,7 +928,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             continue;
         }
 
-        if (source.compare(i, 4, "@if(") == 0) {
+        if (source_starts_at(source, i, "@if(")) {
             std::size_t condition_close = 0;
             if (!find_balanced(source, i + 3, '(', ')', condition_close)) {
                 fail(source_path, source, i, "@if has no matching ')' for its condition");
@@ -1687,7 +1698,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
             lb.is_iteration_selector=true;variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){nift::RuntimeValue rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<nift::RuntimeValue>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){if(st.name.empty()){if(!st.expr){e="unsupported prepared expression statement";return false;}nift::RuntimeValue cv;return nift::ast::evaluate(*st.expr,c,cv,e);}return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<nift::RuntimeValue>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}next=nift::RuntimeValue(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=nift::RuntimeValue(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=nift::RuntimeValue(oldv.num+rhs.num);else if(st.op=="-=")next=nift::RuntimeValue(oldv.num-rhs.num);else if(st.op=="*=")next=nift::RuntimeValue(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=nift::RuntimeValue(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=nift::RuntimeValue(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
         execute_prepared_outcome=[&](const nift::ast::Stmt& statement){std::string error;if(!execute_prepared(statement,error)){if(active_recoverable_)return nift::detail::ExecOutcome::recoverable(*active_recoverable_);if(active_diagnostic_)return nift::detail::ExecOutcome::fatal(*active_diagnostic_);if(result_.diagnostic)return nift::detail::ExecOutcome::fatal(*result_.diagnostic);return nift::detail::ExecOutcome::fatal(nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error),expression_failure_view_?expression_failure_view_.locate(0,expression_failure_view_.size()):prepared_view->locate(statement.span.begin)));}if(pending_control_.kind==ControlFlow::Return)return nift::detail::ExecOutcome::returned();if(pending_control_.kind==ControlFlow::Break)return nift::detail::ExecOutcome::broken();if(pending_control_.kind==ControlFlow::Continue)return nift::detail::ExecOutcome::continued();return nift::detail::ExecOutcome::normal();};
         execute_body_outcome=[&](const std::vector<std::unique_ptr<nift::ast::Stmt>>& body){for(const auto& statement:body){auto outcome=execute_prepared_outcome(*statement);if(outcome.kind()!=nift::detail::ExecOutcome::Kind::Normal)return outcome;}return nift::detail::ExecOutcome::normal();};
-        if (source.compare(i, 7, "@while(") == 0) {
+        if (source_starts_at(source, i, "@while(")) {
             std::size_t hc=0;if(!find_balanced(source,i+6,'(',')',hc)){fail(source_path,source,i,"@while has no matching ')' for its condition");break;}
             std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@while(...) must be followed by a '{...}' block");break;}
@@ -1707,7 +1718,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
             i=bc+1;continue;
         }
 
-        if (source.compare(i, 5, "@for(") == 0) {
+        if (source_starts_at(source, i, "@for(")) {
             std::size_t header_close = 0;
             if (!find_balanced(source, i + 4, '(', ')', header_close)) {
                 fail(source_path, source, i, "@for has no matching ')' for its header");

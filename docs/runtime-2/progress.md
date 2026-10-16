@@ -12,7 +12,7 @@ _Last updated: 2026-10-17_
 | CP03 | complete (Linux); macOS/Windows pending CI | `runtime-2` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
 | CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
 | CP05 | next after CP06 review | — | Reassessed: independent of CP04 (it trims the canonical call path: flag snapshot, no per-call body copies), so it proceeds; gate requires no behaviour change |
-| CP06 | in progress | `runtime-2-dev` | Template scanner dispatch |
+| CP06 | implemented, under review | `runtime-2-dev` | Template scanner dispatch: −57.8% full-build instructions, byte-identical (`checkpoints/cp06-scanner-dispatch.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.

@@ -807,23 +807,32 @@ void append_indented(std::string& output, const std::string& text, const std::st
         return pos + 6 <= size && text.compare(pos, 6, "</pre>") == 0;
     };
 
+    // Runtime 2.0 CP06: only '<', '-' and '\n' can change state here; every
+    // other byte is skipped without a keyword comparison. The probes below are
+    // the same `text.compare(...) == 0` tests as before, reached only when
+    // their first character matches.
+    auto starts_at = [&](std::size_t pos, const char* literal, std::size_t length) {
+        return text.size() - pos >= length && std::char_traits<char>::compare(text.data() + pos, literal, length) == 0;
+    };
     std::size_t segment_start = 0;
     for (std::size_t i = 0; i < size; ++i) {
-        if (text.compare(i, 4, "<!--") == 0) {
-            ++html_comment_depth;
-        } else if (text.compare(i, 3, "-->") == 0 && html_comment_depth > 0) {
-            --html_comment_depth;
-        }
-
-        if (html_comment_depth == 0) {
-            if (is_pre_close(i) && code_block_depth > 0) {
-                --code_block_depth;
-            } else if (is_pre_open(i)) {
-                ++code_block_depth;
+        const char c = text[i];
+        if (c == '<') {
+            if (starts_at(i, "<!--", 4)) ++html_comment_depth;
+            if (html_comment_depth == 0) {
+                if (is_pre_close(i) && code_block_depth > 0) {
+                    --code_block_depth;
+                } else if (is_pre_open(i)) {
+                    ++code_block_depth;
+                }
             }
+            continue;
         }
-
-        if (text[i] != '\n') continue;
+        if (c == '-') {
+            if (starts_at(i, "-->", 3) && html_comment_depth > 0) --html_comment_depth;
+            continue;
+        }
+        if (c != '\n') continue;
 
         output.append(text, segment_start, i - segment_start + 1);
         if (i + 1 < size && code_block_depth == 0) output += indent;
