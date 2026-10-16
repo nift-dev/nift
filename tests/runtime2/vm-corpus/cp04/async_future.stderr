@@ -1,0 +1,1 @@
+error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/async_future.f:3:7: unknown value or malformed expression: fu.await()

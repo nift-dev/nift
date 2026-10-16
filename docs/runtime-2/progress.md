@@ -10,6 +10,9 @@ _Last updated: 2026-10-17_
 | CP01 | complete (Linux); Windows pending CI | `runtime-2` | Defect D1 fixed; adversarial review F1–F7 resolved or documented (`checkpoints/cp01-modified-race.md`) |
 | CP02 | complete (Linux); macOS/Windows pending CI | `runtime-2` | Defect D2 fixed; review findings 1–7 fixed, 8/10a/10b open for CP16, 9 documented (`checkpoints/cp02-dynamic-reads.md`) |
 | CP03 | complete (Linux); macOS/Windows pending CI | `runtime-2` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
+| CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
+| CP05 | next after CP06 review | — | Reassessed: independent of CP04 (it trims the canonical call path: flag snapshot, no per-call body copies), so it proceeds; gate requires no behaviour change |
+| CP06 | in progress | `runtime-2-dev` | Template scanner dispatch |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
@@ -38,9 +41,12 @@ to the owner's git repository without approval).
 
 ## Next action
 
-1. CP04 (prepared path for top-level code) per `checkpoints.md`, on
-   `runtime-2-dev`.
-2. Carried to CP16 (Host ops): reads inside `async` functions, OS (not
+1. Review CP06; then CP08 (semantics + differential harness, prioritised by
+   the owner), CP05 and CP07.
+2. CI (D-007): push `runtime-2` to `origin` once credentials are available
+   (see below) and run the cross-platform workflows.
+3. CP04 resumes after CP08 (D-006).
+3. Carried to CP16 (Host ops): reads inside `async` functions, OS (not
    lexical) resolution of `link/..`, globs in `cp()`/`rm()`, recording
    `@path` targets separately from presence checks.
 
@@ -54,4 +60,14 @@ Notes on history:
 
 ## Open escalations
 
-None.
+None. D-006 decided by the owner (defer CP04).
+
+## CI status (D-007)
+
+Not yet pushed: this session has no GitHub credentials (the session's GitHub
+link is missing; the owner's machine cannot reach github.com over SSH from the
+sandbox). Pushing to `runtime-2` alone also does not trigger most workflows,
+which run on `push` to `main`, on `pull_request`, or on `workflow_dispatch`;
+cross-platform runs need `workflow_dispatch` on the branch:
+`checkpoint-10-cross-platform.yml`, `v44-cross-platform.yml` and
+`test-integrity.yml` all accept it.

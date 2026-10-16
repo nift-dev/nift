@@ -1,0 +1,1 @@
+error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/native_errors.f:2:7: JSON array index 5 is out of range in 'x[5]'

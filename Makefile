@@ -723,7 +723,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-runtime2-vm-corpus test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1079,6 +1079,10 @@ test-runtime2-dynamic-reads: $(TARGET)
 
 test-runtime2-fs-freedom: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/fs_freedom.sh
+
+# Runtime 2.0 VM regression corpus (golden outputs from the canonical evaluator).
+test-runtime2-vm-corpus: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/vm_corpus.sh
 
 # Runtime 2.0 CP01 (review defect D1): modified-mode timestamp races.
 test-runtime2-modified-race: $(TARGET)

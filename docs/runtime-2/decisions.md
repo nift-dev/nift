@@ -40,3 +40,23 @@ cross-platform verified without CI results.
 The campaign host is a shared 2-vCPU VM. Exit gates use callgrind instruction
 counts (deterministic); reported results use wall-time medians with the host
 fingerprint.
+
+## D-006 — CP04 deferred (owner, 2026-10-17)
+Running top-level code on the prepared path met the 8× gate (12.4×) but changed
+observable behaviour: the prepared and canonical evaluators diverge (16 suite
+targets, 4/44 parity probes). Owner decision: defer CP04 until the semantics
+specification and differential harness (CP08) exist; do not merge the two
+legacy execution paths to pass an interim gate; do not weaken tests or change
+language behaviour for interim performance targets. Preserve the measurements,
+experimental patch and failing cases; the divergences join the VM regression
+corpus. Reassess CP05's dependency on CP04. Engineering effort goes to the
+compiled runtime; CP08 is prioritised before substantial VM implementation.
+
+## D-007 — CI push authorised (owner, 2026-10-17)
+Push certified checkpoint commits to a `runtime-2` branch on the Nift
+repository's `origin` (verified as `github.com/nift-dev/nift`, the owner's
+checkout's origin, which contains base `ce8cd36`). No force-push, no change to
+`main`, no releases or deploys; branch must contain only checkpoint commits (no
+credentials, generated artifacts or CP04 experimental code). Run the Linux,
+macOS and Windows workflows on it and fix failures before calling a checkpoint
+fully certified; keep baseline results to separate pre-existing failures.

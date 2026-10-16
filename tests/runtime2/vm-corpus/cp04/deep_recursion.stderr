@@ -1,0 +1,1 @@
+error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/deep_recursion.f:1:36: callable recursion depth exceeded: r
