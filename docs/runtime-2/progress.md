@@ -26,11 +26,15 @@ whose review is still open; it is rebased onto `runtime-2` before each delivery.
 
 ## Local checkout divergence
 
-Checked through the file bridge: `/home/nick/Repositories/nift` HEAD is
-`00dda50` = `ce8cd36` plus a version bump only; no modified tracked files; 37
-untracked evidence files. `ce8cd36` is an ancestor of it, so the bundle's
-prerequisite is present; applying the patches with `git am` there has not been
-tried (the bridge cannot run git in that checkout).
+Checked with git through the device bridge: `/home/nick/Repositories/nift/nift`
+HEAD is `00dda50` = `ce8cd36` plus a version bump touching 7 files
+(HANDOVER.md, README.md, docs/guarantees/registry.json,
+docs/handover/RELEASES.md, snap/snapcraft.yaml, src/CLI.cpp,
+tests/version_consistency_test.py); no modified tracked files; untracked
+evidence directories only. `ce8cd36` is its parent, so the bundle's
+prerequisite is present, and no `runtime-2` commit touches those 7 files, so
+the patches apply without overlap (not yet applied there: nothing is written
+to the owner's git repository without approval).
 
 ## Next action
 

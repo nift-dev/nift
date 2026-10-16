@@ -22,8 +22,9 @@ not described as a security sandbox. Dependency tracking must cover external
 files.
 
 ## D-003 — Work location (campaign, 2026-10-17)
-The owner's checkout `/home/nick/Repositories/nift` is readable only through a
-file bridge without a shell, so builds and tests run in a cloud clone of public
+The owner's checkout (`/home/nick/Repositories/nift/nift`, inside the
+`/home/nick/Repositories/nift` workspace) is reachable only through a file
+bridge, later also a sandboxed shell; builds and tests run in a cloud clone of public
 `main` (`ce8cd36`). Work is committed on branch `runtime-2` there and delivered
 as a git bundle plus patch series. Before each delivery the local checkout's
 HEAD is compared with `ce8cd36`; any divergence is recorded in `progress.md`.
