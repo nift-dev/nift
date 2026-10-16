@@ -12,7 +12,11 @@ from incremental_state_transitions_adversarial import setup
 OPS=['content','template','add','remove','rename','directory_rename','atomic',
      'touch','same_mtime','collision','coarse','tracking','depends','generated',
      'fanout','explicit_dependency','sidecar','sidecar_remove','build_script','symlink_add','symlink_retarget',
-     'symlink_remove','recreate_dependency','interrupted','repair','targeted','full','noop']
+     'symlink_remove','recreate_dependency','interrupted','repair','targeted','full','noop',
+     'dynamic_absent','dynamic_glob']
+# Runtime 2.0 CP02: dynamic reads (presence/absence and glob listings) in the
+# shared template must invalidate pages exactly like declared dependencies.
+DYNAMIC_READS='@if(exists("templates/parts/banner.html")) { BANNER-PRESENT }\nGLOB:@script { return ls("templates/parts/data/*.json").length() }\n'
 
 def remove_oracle(root):
  # Nift metadata is deliberately readonly. Native Windows cannot unlink it
@@ -47,7 +51,7 @@ def campaign(binary,seeds,steps,modes,retain,selected_ops=None):
      root.mkdir();setup(root,mode,['a','b','c','move/x','move/y'])
      cfg=json.loads((root/'.nift/config.json').read_text());cfg['config'].update({'build-threads':4,'minify-exts':[]});(root/'.nift/config.json').write_text(json.dumps(cfg))
      parts=root/'templates/parts';parts.mkdir();(parts/'shared.html').write_text('shared-0');(parts/'manual.html').write_text('manual-0');(parts/'one.html').write_text('ONE');(parts/'two.html').write_text('TWO')
-     (root/'templates/template.html').write_text('@dep("templates/parts/manual.html")\n@input("parts/shared.html")\n@content\n')
+     (parts/'data').mkdir();(root/'templates/template.html').write_text(DYNAMIC_READS+'@dep("templates/parts/manual.html")\n@input("parts/shared.html")\n@content\n')
      tracking=root/'.nift/tracked.json'
      def entries():return json.loads(tracking.read_text())['tracked']
      def save(items):tracking.write_text(json.dumps({'tracked':items}))
@@ -70,7 +74,16 @@ def campaign(binary,seeds,steps,modes,retain,selected_ops=None):
       op=deck[step] if step<len(deck) else rng.choice(selected_ops or OPS);history.append(op);operations+=1;sequence_operations+=1
       tag=f'{seed}-{step}-{rng.randrange(100000)}';flags=[];es=entries()
       if op=='content':alter(root/'content/a.html','CONTENT-'+tag)
-      elif op=='template':alter(root/'templates/template.html','TEMPLATE-'+tag+'\n@dep("templates/parts/manual.html")\n@input("parts/shared.html")\n@content\n')
+      elif op=='template':alter(root/'templates/template.html','TEMPLATE-'+tag+'\n'+DYNAMIC_READS+'@dep("templates/parts/manual.html")\n@input("parts/shared.html")\n@content\n')
+      elif op=='dynamic_absent':
+       banner=parts/'banner.html'
+       if banner.exists():banner.unlink()
+       else:banner.write_text('banner')
+      elif op=='dynamic_glob':
+       entry=parts/'data'/f'{tag}.json'
+       existing=sorted((parts/'data').glob('*.json'))
+       if existing and rng.random()<0.5:existing[0].unlink()
+       else:entry.write_text('{}')
       elif op=='add':
        name='extra/p'+str(step);p=root/'content'/f'{name}.html';p.parent.mkdir(parents=True,exist_ok=True);p.write_text(tag);run('track',name,name,'templates/template.html')
       elif op=='remove':
