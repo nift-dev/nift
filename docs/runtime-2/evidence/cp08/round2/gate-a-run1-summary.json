@@ -1,0 +1,20 @@
+{
+ "approved": 0,
+ "by_kind": {
+  "eval": 1,
+  "script": 3500,
+  "site": 167,
+  "workspace": 4
+ },
+ "channels": [],
+ "combined_unstable": 0,
+ "command": "tools/rt-diff/rt-diff --a /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/r2/nift-gate --b /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/r2/nift-gate --corpus tests/runtime2/rt-diff-corpus --corpus tests/runtime2/vm-corpus --corpus tests/runtime2/semantics --corpus docs/evidence/cp410-competitiveness/probes --corpus tests/conformance/cases --corpus bindings/python/app --corpus bindings/node/app --corpus bindings/csharp/apps --extract-smoke tests --ignore tools/rt-diff/ignore.txt --gen 3000 --seed 2026 --jobs 3 --min-entries 600 --quiet --report /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/r2/gate-a-run1.json",
+ "differing": 0,
+ "entries": 3672,
+ "entries_with_trace": 2611,
+ "generated": 3000,
+ "seed": 2026,
+ "trace": true,
+ "trace_events": 20977,
+ "unused_policies": []
+}

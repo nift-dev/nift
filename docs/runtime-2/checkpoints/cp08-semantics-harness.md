@@ -1,6 +1,6 @@
 # CP08 — Semantics and differential harness
 
-Status: see `../progress.md` (implemented; review findings and owner CP08 requirements addressed).
+Status: see `../progress.md` (implemented; round-2 review findings addressed).
 
 ## Objective
 Before any new engine runs user code, make "same behaviour" measurable: a
@@ -94,15 +94,46 @@ part of `make test-all`).
 | O4 | Reproducibility | programs record seed and index; `--repro-dir` delta-minimises differing generated programs (hanging candidates rejected) and writes a replay script; reports record the command line |
 | O5 | Semantics categories | `semantics.md` v1.1: legacy behaviour / Runtime 2.0 / approved change / deferred per row; D-009#3 compatibility scan (no existing program outside the two pinning probes relies on a built-in winning) |
 
+## Round-2 review (same-model adversarial re-review; not independent)
+
+The re-review verified the round-1 fixes and attacked the new surface. Every
+finding below is exercised by `tests/runtime2/rt_diff_selftest.sh` (83 checks),
+using the reviewer's reproducers committed in
+`tests/runtime2/rt-diff-selftest-corpus/`.
+
+| # | Finding | Resolution | Evidence |
+| --- | --- | --- | --- |
+| 1 | Page-info normalisation re-serialised JSON (hid whitespace, escapes, number spelling, duplicate keys) | page-info is compared byte for byte; no JSON parsing in the snapshot | `x-info-reformat`, `x-info-dupkey`, `x-info-escape`, `x-info-number` caught (files) |
+| 2 | Dropping `racy-dependencies`/`tick-hashes` and masking `listings` values hid wrong metadata; no demonstrated need | all three rules removed. A and B run in the same absolute directory, so listing fingerprints are directly comparable. The one observed source of variation (a `write` step and the next build sharing a timestamp tick, making CP01 record `tick-hashes` in one run and not the other: `workspaces/missing-external`) is removed at the source by a 20 ms settle after edit steps — nothing is masked. Every site/workspace ends with `nift status` | `x-racy-inject`, `x-tick-inject`, `x-listing-garbage` caught in every site/workspace (files); 10 consecutive same-binary corpus runs 0 differing |
+| 3 | Writes escaping the copy through `..` unseen | copy nested three levels below the snapshot root; the whole root is snapshotted | `x-escape-write` caught in every entry (files) |
+| 4 | Combined channel skipped by a regex (44% of scripts; comment mentioning async) | A runs the combined channel twice; it is compared unless A's two runs differ (measured), and the count of unstable entries is reported | `interleave` caught in `channels/il` (async, computes) and `channels/il2` (comment mentions async); gate: unstable count in the summary |
+| 5 | Minimiser copied only `main.f` (module programs unreproducible; replay broken; original difference never re-checked) | copies the whole entry directory, re-checks the difference before minimising and the final program after; output is a directory with modules and `replay.sh` (stdin from /dev/null); `REPRO … verified` or `REPRO-WARNING` | `gen/m1` (imports a module) minimised to 2 lines, replay reproduces; generated difference verified |
+| 6 | Timeouts killed only the direct child; both-sides timeout counted as equal | every step runs in its own session; the process group is killed on timeout and after each step; a timeout on either side is a `timeout` difference | `timeout/hang` (child `sleep 25`), `timeout/loop`: both reported, no process left |
+| s1 | `time taken` normalised everywhere (user output, pages, traces) | only a whole `time taken: N seconds` line on nift's stdout/stderr for site/workspace steps | `x-time-user` caught (`channels/time`); `time-number` still hidden on builds |
+| s2 | Trace parser ignored unknown fields | each event compared as the whole JSON object (sorted keys) | `x-trace-extra-field` caught (trace) |
+| s3 | Policies matched entry id only | rules carry `source_sha256` (script file, or every file of a site/workspace) | same id, different program: not approved, policy reported unused |
+| s4 | Policy validation gaps (empty `old`, unmatched channels, unused rules, unchecked `test`/`decision`) | refused at load (exit 2): empty `old`, `old == new`, channel outside stdout/stderr/combined/exit, `count < 1`, malformed `decision`, `test` not starting with an existing repository path; unused policies fail the run | five invalid-rule self-tests; `UNUSED-POLICY` self-test |
+| s5 | Self-test (d) vacuous (`status` emits no trace events) | uses `build --all`, and first proves the same command does emit events to fd 1 when explicitly allowed | self-test (d) |
+| p1 | Empty `NIFT_TRACE_HOST=""` stayed in the environment | removed like any other value (`src/HostTrace.h`) | `getenv("NIFT_TRACE_HOST")` is `null` |
+| p2 | `ignore.txt` dropped whole entries | `channels=` is mandatory; only the named channels are skipped (`all` must be explicit) | channel-exclusion self-tests (stdout hidden, files still compared) |
+| p3 | Cross-context order never compared | page first-appearance order compared for `build-threads: 1` builds (new `sites/multipage-serial`); cross-task order is not compared because the trace has no happens-before edges (documented precisely in `rt-diff.md`/`trace-format.md`) | `x-trace-page-reverse` caught (ctx-order); `x-trace-cross` remains hidden by design |
+| p4 | realpath mapping could hide logical-vs-resolved paths | realpath forms are added only when they differ from the path (macOS `/var`); documented | — |
+| p5 | Duplicate async/thread labels across threads | not observed in any run; per-task labels unchanged | — |
+
 ## Residual risks after hardening
+- Cross-task order (a parent's operations after `await`/`join` relative to the
+  child) is not compared: the trace carries no happens-before edges. CP16's
+  Host layer can add them.
 - Trace scope is still parser-level Host operations; build-engine reads, PATH
   lookups and FFI are not traced (listed in `../trace-format.md`). CP16 moves
   all Host access behind one layer.
-- The combined (interleaving) channel is skipped for scripts that use async or
-  threads, whose stream order is legitimately nondeterministic.
-- `.nift/` is compared as contract (owner direction: page-info is observable),
-  with two documented normalisations; a future metadata format change will
-  show up as a difference and needs a policy or a recorded decision.
+- The combined channel is skipped when A's own two runs disagree (counted in
+  every summary); such entries rely on the per-stream channels.
+- `.nift/` is compared byte for byte as contract; a future metadata format
+  change will show up as a difference and needs a policy or a recorded
+  decision.
+- The 20 ms settle after edit steps assumes a filesystem timestamp tick below
+  20 ms (true for ext4/APFS/NTFS in CI; FAT/HFS+ would need more).
 - Policies match exact text; when the new engine's diagnostics positions are
   settled, D-009 intended goldens may need deliberate regeneration (each such
   change is a recorded decision, never a broad suppression).

@@ -1,0 +1,83 @@
+PASS caught: file-mode (files)
+PASS caught: empty-dir (files)
+PASS caught: nift-garble (files)
+PASS caught: home-write (home)
+PASS caught: tmp-write (tmp)
+PASS caught: home-tmp-swap (stdout|combined)
+PASS caught: stdout-only (stdout)
+PASS caught: stderr-only (stderr)
+PASS caught: exit-only (exit)
+PASS caught: stdin-only (stdout)
+PASS caught: eval-key-order (stdout)
+PASS caught: number-format (stdout)
+PASS caught: interleave (combined)
+PASS caught: trace-drop (trace)
+PASS caught: trace-reorder (trace)
+PASS caught: trace-async-reorder (trace)
+PASS caught: time-word (stdout)
+PASS caught: x-info-reformat (files)
+PASS caught: x-info-dupkey (files)
+PASS caught: x-info-escape (files)
+PASS caught: x-info-number (files)
+PASS caught: x-racy-inject (files)
+PASS caught: x-tick-inject (files)
+PASS caught: x-listing-garbage (files)
+PASS caught: x-escape-write (files)
+PASS caught: x-trace-extra-field (trace)
+PASS caught: x-trace-relabel (trace)
+PASS caught: x-trace-page-reverse (ctx-order)
+PASS caught: x-time-user in channels (stdout)
+PASS caught: interleave in channels (combined)
+PASS combined order compared although a comment mentions async
+PASS hidden by design: identity
+PASS hidden by design: time-number
+PASS combined order measured stable for the async probes
+PASS trace op exercised: stat
+PASS trace op exercised: list
+PASS trace op exercised: glob
+PASS trace op exercised: read
+PASS trace op exercised: open
+PASS trace op exercised: save
+PASS trace op exercised: touch
+PASS trace op exercised: remove
+PASS trace op exercised: mkdir
+PASS trace op exercised: copy-to
+PASS trace op exercised: move-to
+PASS trace op exercised: move-from
+PASS trace op exercised: read-source
+PASS trace op exercised: read-json
+PASS trace op exercised: getenv
+PASS trace op exercised: env-all
+PASS trace op exercised: spawn
+PASS trace neutrality over the corpus
+PASS closed trace descriptor never reaches page outputs (5 x 25 pages, 4 threads)
+PASS trace events reach fd 1 when explicitly allowed (check is not vacuous)
+PASS NIFT_TRACE_HOST=1 refused (build stdout unchanged)
+PASS empty NIFT_TRACE_HOST removed from the environment
+PASS policy approves its exact substitution
+PASS policy rejects a different substitution
+PASS policy rejects its substitution plus an unrelated change
+PASS policy rejects a wrong occurrence count
+PASS policy bound to its source: same entry id, different program not approved
+PASS unused policies are failures
+PASS invalid policy refused: old=
+PASS invalid policy refused: channel=trace
+PASS invalid policy refused: decision=D9
+PASS invalid policy refused: test=no/such/file
+PASS invalid policy refused: count=0
+PASS pattern policies are refused
+PASS D-009 policies approve exactly the intended changes (13 channels, none unused)
+PASS without policies the same changes are regressions (13 channel diffs)
+PASS missing corpus directory fails
+PASS empty corpus directory fails
+PASS minimum entry count enforced
+PASS exclusion without channels= refused
+PASS channel exclusion hides only its channels (stdout)
+PASS channel exclusion leaves other channels compared (files)
+PASS generator deterministic by seed
+PASS programs record seed and index
+PASS module program minimised to 2 lines with its module; replay reproduces
+PASS generated difference minimised and verified
+PASS timeouts on both sides are differences
+PASS no process outlives a timed-out entry
+PASS rt-diff self-tests

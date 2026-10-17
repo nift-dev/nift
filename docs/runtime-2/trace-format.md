@@ -34,7 +34,7 @@ cannot be written, the line is dropped silently.
 
 | Field | Meaning |
 | --- | --- |
-| `ctx` | Where the operation ran: the tracked page's name during a build (`/`, `about`, …), `script` for a standalone script or the main thread of a REPL/eval, and for work started from those, `<owner>/async#N` (an async call) or `<owner>/thread#N` (a `thread(...)` worker), numbered in creation order within the owner (nested: `script/async#1/async#2`). Creation happens in program order on the owning thread, so labels are stable across runs and engines. Order is meaningful within every context; contexts are unordered relative to each other. |
+| `ctx` | Where the operation ran: the tracked page's name during a build (`/`, `about`, …), `script` for a standalone script or the main thread of a REPL/eval, and for work started from those, `<owner>/async#N` (an async call) or `<owner>/thread#N` (a `thread(...)` worker), numbered in creation order within the owner (nested: `script/async#1/async#2`). Creation happens in program order on the owning thread, so labels are stable across runs and engines. Order is meaningful within every context. Across contexts only the first-appearance order of pages in a `build-threads: 1` build is deterministic (rt-diff channel `ctx-order`); the trace carries no happens-before edges, so a parent's operations after `await`/`join` are not ordered against the child task. |
 | `op` | Operation (table below). |
 | `arg` | Absolute, lexically normalised path (generic separators), environment variable name, or for `spawn` the program and arguments joined by single spaces. |
 | `res` | Result class (table below). Never file contents or environment values. |

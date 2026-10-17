@@ -84,3 +84,64 @@ test-v48-prepared-collection-guard, test-v48-prepared-object-literal-guard
 (environmental: root user, no `/usr/bin/time`, no pty). Inside that run:
 `PASS vm corpus: 101 scripts` and `rt-diff: 695 entries, 0 differing`.
 All `tests/runtime2/*.sh` pass when run directly.
+
+## Round 2 (after the re-review; rebased on runtime-2 084f09f)
+
+Files in `round2/`.
+
+### (a) Same binary, full corpus + 3,000 generated programs, twice
+
+Committed corpora, extracted smoke scripts, 3,000 generated programs and 150
+generated sites (seed 2026), traces compared, `--jobs 3`:
+
+| Run | Entries | Differing | Traced entries (Host ops) | Combined order unstable |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 3,672 | 0 | 2,611 (20,977) | 0 |
+| 2 | 3,672 | 0 | 2,611 (20,977) | 0 |
+
+The first attempt reported one difference: `smoke/v44_executable_script_smoke/010-signal`
+loops until its test sends SIGTERM, so both sides timed out. Round 1 counted
+that as equal; round 2 reports every timeout. It is excluded (`channels=all`,
+reason recorded) — it never finishes on its own.
+
+### (b) Seeded mutations — `round2/selftest.txt` (83 checks, all pass)
+
+| Mutation | Source | Caught on |
+| --- | --- | --- |
+| file-mode, empty-dir, nift-garble | review 1 | files |
+| home-write / tmp-write | review 1 | home / tmp |
+| home-tmp-swap | review 1 | stdout, combined |
+| stdout-only, stdin-only, eval-key-order, number-format, time-word | review 1 | stdout |
+| stderr-only / exit-only | review 1 | stderr / exit |
+| interleave | review 1 | combined |
+| trace-drop, trace-reorder, trace-async-reorder | review 1 | trace |
+| x-info-reformat, x-info-dupkey, x-info-escape, x-info-number | re-review | files (page-info bytes) |
+| x-racy-inject, x-tick-inject, x-listing-garbage | re-review | files (every site/workspace) |
+| x-escape-write | re-review | files (every entry) |
+| x-trace-extra-field, x-trace-relabel | re-review | trace |
+| x-trace-page-reverse (single-threaded build) | round 2 | ctx-order |
+| x-time-user (script prints `time taken: 1 seconds`) | re-review | stdout |
+| interleave in an async script and in a script whose comment mentions async | re-review | combined |
+| timeout (child `sleep 25`; busy loop) | re-review | timeout; no process left |
+| policy for another program with the same entry id | re-review | not approved; UNUSED-POLICY |
+| policy with empty `old` (and four other invalid shapes) | re-review | refused, exit 2 |
+| policy substitution plus an unrelated change | re-review | not approved |
+| each of 17 trace op categories dropped | round 1 | trace |
+
+Hidden by design: identity; `time-number` (Nift's build summary line only);
+`x-trace-cross` (cross-task order — no happens-before edges in the trace).
+
+### (c) Trace hook cost when unset
+
+300-page site, callgrind, runtime-2 084f09f vs CP08 round 2:
+
+| Binary | full build | no-op build |
+| --- | ---: | ---: |
+| runtime-2 | 357,232,724 | 114,917,758 |
+| CP08 | 357,247,633 (+0.004%) | 114,912,341 (−0.005%) |
+
+### Determinism under load
+
+`tests/runtime2/rt-diff-corpus` same-binary at `--jobs 8`: 10 consecutive runs,
+0 differing (after the 20 ms settle that removed the tick-hash race).
+

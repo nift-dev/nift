@@ -14,7 +14,7 @@ _Last updated: 2026-10-17_
 | CP05 | complete (Linux); macOS/Windows: CI after push | `runtime-2` | Flat call in loop −10.5% (top level −4.6%); review: unbounded cache memory and latched flags fixed (`checkpoints/cp05-call-path.md`) |
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 | CP07 | complete as leak/resource fix (Linux; CI after push); launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files (no leaked `/tmp/nift-proc-*`), behaviour unchanged; pipes would meet the gate but change child-visible behaviour (`checkpoints/cp07-process-capture.md`) |
-| CP08 | implemented; review findings being addressed | `runtime-2-cp08` | Host-op trace, `tools/rt-diff`, semantics v1 (`checkpoints/cp08-semantics-harness.md` on that branch) |
+| CP08 | implemented; round-2 review findings addressed | `runtime-2-cp08` | Host-op trace, `tools/rt-diff` (byte-exact page-info, same-path A/B runs, process-group timeouts, source-bound policies), semantics v1.1 (`checkpoints/cp08-semantics-harness.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
