@@ -1,0 +1,10 @@
+# CP10 parse throughput, callgrind (Ir), valgrind-3.22.0, g++ -O2
+# files: vm-corpus + semantics + cp410 probes + gen.py --count 500 --seed 1010 (877 files, 588,766 bytes)
+rt iters=1 Collected : 100589597 bench: files=877 bytes=588766 iterations=1 nodes=159861
+rt iters=3 Collected : 285967128 bench: files=877 bytes=588766 iterations=3 nodes=479583
+legacy iters=1 Collected : 148912898 bench-legacy: files=877 bytes=588766 iterations=1 ok=877
+legacy iters=3 Collected : 429928432 bench-legacy: files=877 bytes=588766 iterations=3 ok=2631
+# per pass = (3 passes - 1 pass) / 2
+rt:     92,688,766 Ir/pass  161,208 Ir/KB
+legacy: 140,507,767 Ir/pass  244,375 Ir/KB
+ratio rt/legacy 0.66

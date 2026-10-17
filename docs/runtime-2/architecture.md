@@ -40,7 +40,7 @@ New code lives under `src/rt/` with small files and explicit interfaces:
 | Area | Files (planned) |
 | --- | --- |
 | Values | `rt/value.h`, `rt/string.*`, `rt/array.*`, `rt/object.*`, `rt/handle.*` |
-| Front end | `rt/lexer.*`, `rt/parser.*`, `rt/ast.*`, `rt/template_lexer.*`, `rt/shell_parser.*` |
+| Front end | `rt/lexer.*`, `rt/parser.*` (statements; `rt/expr_parser.cpp` expressions, `rt/parser_internal.h` between them; CP10), `rt/ast.*`, `rt/template_lexer.*`, `rt/shell_parser.*` |
 | Compiler | `rt/resolver.*`, `rt/compiler.*`, `rt/opcodes.h`, `rt/proto.*` |
 | VM | `rt/vm.*`, `rt/frame.*`, `rt/native.*` (native function table) |
 | Host | `rt/host.*` (filesystem, env, process, clock; dependency recording) |

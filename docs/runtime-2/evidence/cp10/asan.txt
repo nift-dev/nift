@@ -1,0 +1,13 @@
+mkdir -p .build/rt-asan
+g++ -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+	tests/rt/parser_unit.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/parser.cpp src/rt/expr_parser.cpp -o .build/rt-asan/rt-parser-unit
+g++ -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+	tests/rt/parse_dump.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/parser.cpp src/rt/expr_parser.cpp -o .build/rt-asan/rt-parse-dump
+.build/rt-asan/rt-parser-unit
+PASS rt parser unit
+python3 tests/runtime2/rt_parser_corpus.py --sanitized .build/rt-asan/rt-parse-dump
+sanitized check: files=8617 failed_batches=0
+error corpus: 1500/1500 identical
+fuzz: iterations=20000 accepted=14993 rejected=5007 worst_ms=24.4286
+PASS rt parser sanitized
+exit 0

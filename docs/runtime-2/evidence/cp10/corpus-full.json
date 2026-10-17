@@ -1,0 +1,140 @@
+{
+ "corpora": {
+  "cp410-probes": {
+   "files": 120,
+   "legacy_accepted": 120,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {},
+   "seconds": 0.03
+  },
+  "gen.py": {
+   "files": 6587,
+   "legacy_accepted": 6587,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {},
+   "seconds": 0.92
+  },
+  "rt-diff-corpus": {
+   "files": 15,
+   "legacy_accepted": 15,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {},
+   "seconds": 0.02
+  },
+  "semantics": {
+   "files": 57,
+   "legacy_accepted": 57,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {
+    "legacy-runtime-error": 2,
+    "units_with_opaque": 2
+   },
+   "seconds": 0.01
+  },
+  "smoke-extract": {
+   "files": 1759,
+   "legacy_accepted": 1759,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {
+    "legacy-runtime-error": 12,
+    "template-text": 21,
+    "units_with_opaque": 28
+   },
+   "seconds": 0.08
+  },
+  "syntax-errors": {
+   "files": 34,
+   "legacy_accepted": 0,
+   "legacy_rejected_identical": 34,
+   "legacy_rejects": [
+    "tests/rt/syntax-errors/after_comment.f\t3:1: struct requires '(name)'",
+    "tests/rt/syntax-errors/after_string.f\t2:1: fn requires '(name(args))'",
+    "tests/rt/syntax-errors/catch_block.f\t1:1: catch(identifier) requires a block",
+    "tests/rt/syntax-errors/catch_ident.f\t1:1: catch requires one valid identifier",
+    "tests/rt/syntax-errors/catch_paren.f\t1:1: catch requires '(identifier)'",
+    "tests/rt/syntax-errors/comment_at.f\t2:3: open comment '@/*' has no close '*/'",
+    "tests/rt/syntax-errors/comment_block.f\t2:1: open comment '/*' has no close '*/'",
+    "tests/rt/syntax-errors/deep_else.f\t4:4: function else requires block",
+    "tests/rt/syntax-errors/else_block.f\t1:11: function else requires block",
+    "tests/rt/syntax-errors/else_chain_offset.f\t1:27: function else if malformed",
+    "tests/rt/syntax-errors/else_if_block.f\t1:11: function else if requires block",
+    "tests/rt/syntax-errors/else_if_malformed.f\t2:2: function else if malformed",
+    "tests/rt/syntax-errors/enum.f\t1:1: enum requires 'Name { members }'",
+    "tests/rt/syntax-errors/export.f\t2:1: export requires '(binding)'",
+    "tests/rt/syntax-errors/fn_async_block.f\t1:1: fn requires a block",
+    "tests/rt/syntax-errors/fn_block.f\t1:1: fn requires a block",
+    "tests/rt/syntax-errors/fn_signature.f\t2:1: fn requires '(name(args))'",
+    "tests/rt/syntax-errors/for_block.f\t1:1: function for requires a block",
+    "tests/rt/syntax-errors/for_paren.f\t1:1: function for requires '(...)'",
+    "tests/rt/syntax-errors/if_block.f\t1:1: function if requires a block",
+    "tests/rt/syntax-errors/if_match.f\t1:1: function if has no matching ')'",
+    "tests/rt/syntax-errors/if_paren.f\t1:1: function if requires '(...)'",
+    "tests/rt/syntax-errors/nested_catch_body.f\t2:3: enum requires 'Name { members }'",
+    "tests/rt/syntax-errors/nested_in_try.f\t3:5: fn requires '(name(args))'",
+    "tests/rt/syntax-errors/nested_while.f\t4:7: function while requires '(...)'",
+    "tests/rt/syntax-errors/shebang.f\t2:1: function while requires '(...)'",
+    "tests/rt/syntax-errors/struct_block.f\t1:1: struct requires a block",
+    "tests/rt/syntax-errors/struct_name.f\t1:1: struct requires '(name)'",
+    "tests/rt/syntax-errors/tabs_crlf.f\t3:3: function else requires block",
+    "tests/rt/syntax-errors/throw_empty.f\t1:9: throw requires an Error expression",
+    "tests/rt/syntax-errors/try_balanced.f\t1:1: try requires a balanced block",
+    "tests/rt/syntax-errors/try_catch.f\t1:1: try requires catch(identifier)",
+    "tests/rt/syntax-errors/while_block.f\t1:1: function while requires a block",
+    "tests/rt/syntax-errors/while_paren.f\t1:1: function while requires '(...)'"
+   ],
+   "mismatched": 0,
+   "opaque": {},
+   "seconds": 0.02
+  },
+  "tests-f": {
+   "files": 1,
+   "legacy_accepted": 1,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {},
+   "seconds": 0.01
+  },
+  "vm-corpus": {
+   "files": 44,
+   "legacy_accepted": 44,
+   "legacy_rejected_identical": 0,
+   "legacy_rejects": [],
+   "mismatched": 0,
+   "opaque": {
+    "legacy-runtime-error": 1,
+    "units_with_opaque": 1
+   },
+   "seconds": 0.03
+  }
+ },
+ "failed": [],
+ "gates": {
+  "error_corpus": "error corpus: 1500/1500 identical",
+  "fuzz": {
+   "output": "fuzz: iterations=200000 accepted=150135 rejected=49865 worst_ms=36.062",
+   "rc": 0,
+   "seconds": 6.3
+  },
+  "paren_oracle": {
+   "details": [],
+   "divergent": 0,
+   "inserted_parentheses": 167754,
+   "same_and_exit0": 7094,
+   "scripts": 8566,
+   "scripts_with_insertions": 7987,
+   "seconds": 432.2,
+   "skipped_nondeterministic": 17
+  }
+ }
+}
