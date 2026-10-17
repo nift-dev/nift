@@ -1,0 +1,9 @@
+certify @ 0dc60c6: FAIL 0, BASELINE-FAILURE 1, UNVERIFIED 4, SKIPPED-ENVIRONMENTAL 2, FLAKY 0, PASS 159
+  BASELINE-FAILURE       test-v43-language: also fails on the v4.12.0 baseline (/home/claude/review/baseline-src)
+  UNVERIFIED             test-csharp-binding: tool 'dotnet' not installed
+  UNVERIFIED             test-go-binding: Go toolchain download blocked (no network access to proxy.golang.org)
+  UNVERIFIED             test-v48-prepared-collection-guard: system tool /usr/bin/time missing
+  UNVERIFIED             test-v48-prepared-object-literal-guard: system tool /usr/bin/time missing
+  SKIPPED-ENVIRONMENTAL  test-dependency-status: fails only as root; passes as unprivileged user 'tester'
+  SKIPPED-ENVIRONMENTAL  test-unreadable-source: fails only as root; passes as unprivileged user 'tester'
+NOT FULLY VERIFIED HERE: 7 target(s) are not counted as passes (see reasons; CI covers UNVERIFIED)
