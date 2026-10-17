@@ -94,5 +94,12 @@
   "count": 1,
   "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
   "test": "tests/runtime2/semantics/recursion_limit.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-recursion-budget-class",
+  "decision": "D-001#4",
+  "class": "recursion-budget",
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames. Approved on any entry only for the exact shape checked by recursion_budget_matches (legacy: only the recursion diagnostic, exit 1; VM: exit 0, no diagnostic, legacy stdout a prefix); vm_parity.py additionally requires the VM statistics to show the run completed beyond 64 frames.",
+  "test": "tests/runtime2/vm_adversarial_gen.py (recursion family; vm_parity.py checks the statistics)"
  }
 ]

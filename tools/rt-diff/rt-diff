@@ -562,6 +562,33 @@ def source_hash(entry):
     return digest.hexdigest()
 
 
+# Class rules approve one narrowly defined difference on any entry; each class
+# is a function of (a, b) below. Unlike exact rules, a class rule that
+# approves nothing in a run is not a failure.
+RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
+CLASS_CHANNELS = ("stdout", "stderr", "exit", "combined")
+
+
+def recursion_budget_matches(a, b):
+    """D-001#4: A (legacy) fails only with "callable recursion depth exceeded"
+    (exit 1, that one diagnostic line), B completes (exit 0, empty stderr) and
+    A's stdout is a prefix of B's; on the combined channel A is its stdout
+    then the diagnostic and B is its stdout. The caller (vm_parity.py) also
+    checks the VM statistics (completed beyond legacy's 64 frames)."""
+    if not a["exit"] or not b["exit"] or any(x != 1 for x in a["exit"]) or any(x != 0 for x in b["exit"]):
+        return False
+    if b["stderr"] != b"" or not RECURSION_ERROR.match(a["stderr"]) or not b["stdout"].startswith(a["stdout"]):
+        return False
+    if a["combined"] and any(run != a["stdout"] + a["stderr"] for run in a["combined"]):
+        return False
+    if b["combined"] and any(run != b["stdout"] for run in b["combined"]):
+        return False
+    return True
+
+
+CLASS_RULES = {"recursion-budget": recursion_budget_matches}
+
+
 def load_policies(paths):
     """Approved semantic differences. Each rule:
       {"id": "...", "decision": "D-009#6", "entry": "<exact entry id>",
@@ -579,6 +606,18 @@ def load_policies(paths):
     for path in paths:
         with open(path) as handle:
             for rule in json.load(handle):
+                if "class" in rule:
+                    rid = rule.get("id", "?")
+                    missing = [k for k in ("id", "decision", "class", "justification", "test") if k not in rule]
+                    test_path = str(rule.get("test", "")).split()[0] if str(rule.get("test", "")).split() else ""
+                    if (missing or rule["class"] not in CLASS_RULES or rid in ids
+                            or not re.match(r"^D-\d{3}#\d+(,#\d+)*$", str(rule["decision"]))
+                            or not os.path.exists(os.path.join(REPO, test_path))):
+                        usage_error("rt-diff: class policy %s: needs id, decision, a known class (%s), "
+                                    "justification and an existing test path" % (rid, ", ".join(CLASS_RULES)))
+                    ids.add(rid)
+                    rules.append(rule)
+                    continue
                 missing = [k for k in required if k not in rule]
                 rid = rule.get("id", "?")
                 problems = []
@@ -614,15 +653,24 @@ def load_policies(paths):
 def apply_policies(entry, a, b, diffs, rules, used=None):
     approved, remaining = [], []
     entry_hash = None
+    class_rule = None
+    for candidate in rules:
+        if "class" in candidate and CLASS_RULES[candidate["class"]](a, b):
+            class_rule = candidate
+            break
     for diff in diffs:
         rule = None
         for candidate in rules:
+            if "class" in candidate:
+                continue
             if candidate["entry"] != entry["id"] or candidate["channel"] != diff["channel"]:
                 continue
             entry_hash = entry_hash or source_hash(entry)
             if candidate["source_sha256"] == entry_hash and policy_matches(candidate, a, b):
                 rule = candidate
                 break
+        if rule is None and class_rule is not None and diff["channel"] in CLASS_CHANNELS:
+            rule = class_rule
         if rule:
             approved.append({"channel": diff["channel"], "policy": rule["id"], "decision": rule["decision"]})
             if used is not None:
@@ -821,7 +869,7 @@ def main():
                     print("REPRO %s -> %s (%d lines, verified)" % (r["id"], outcome["file"], outcome["lines"]))
                 else:
                     print("REPRO-WARNING %s: %s" % (r["id"], outcome.get("note") or "minimised program does not reproduce"))
-        unused = sorted(r["id"] for r in rules if r["id"] not in used)
+        unused = sorted(r["id"] for r in rules if r["id"] not in used and "class" not in r)
         for rid in unused:
             print("UNUSED-POLICY %s (approved nothing in this run)" % rid)
         unstable = sum(1 for r in results if r["combined_unstable"])
