@@ -243,8 +243,6 @@ test-rt-value-sanitize:
 # Runtime 2.0 CP11: compiler + register VM (src/rt), linked into nift behind
 # NIFT_VM=1. Unit tests in-process; differential parity against the legacy
 # engine (VM corpus expectations, generated programs, rt-diff with policies).
-# CP10 parser files have open lint findings fixed on runtime-2-cp10; not linted here.
-RT_LINT_CP10_FILES := parser.cpp parser.h expr_parser.cpp parser_internal.h lexer.cpp lexer.h ast.cpp ast.h
 RT_VM_UNIT := $(TEST_DIR)/rt/vm-unit$(EXEEXT)
 RT_VM_RUN := $(TEST_DIR)/rt/vm-run$(EXEEXT)
 RT_VM_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) tests/rt/rt_vm_tool.h src/RuntimeValue.cpp
@@ -260,7 +258,7 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
 test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(TARGET)
 	"$(RT_VM_UNIT)"
-	python3 tools/rt-lint.py $(filter-out $(addprefix src/rt/,$(RT_LINT_CP10_FILES)),$(wildcard src/rt/*.cpp src/rt/*.h))
+	python3 tools/rt-lint.py src/rt
 	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a

@@ -17,11 +17,11 @@ fallback_interpolation.f fallback interpolation
 fallback_lambda.f fallback expression:Lambda
 fallback_large_literal.f fallback number-literal
 fallback_parse_error.f fallback parse-error
-fallback_postfix_space.f fallback postfix-spelling
+fallback_postfix_space.f fallback opaque:legacy-runtime-error
 fallback_shadow_native.f fallback fn-name-reserved
 fallback_shebang_mid.f fallback shebang-statement
 fallback_struct.f fallback statement:StructDecl
-fallback_trailing_comma.f fallback trailing-comma
+fallback_trailing_comma.f fallback opaque:legacy-runtime-error
 fallback_try.f fallback statement:Try
 functions.f vm 
 kernels.f vm 

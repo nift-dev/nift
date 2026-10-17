@@ -62,6 +62,9 @@ void check_outputs() {
 }
 
 void check_fallbacks() {
+    // Since the CP10 review fixes (integrated before CP11), the parser marks
+    // several shapes Opaque that the CP11 compiler also refused; the parser's
+    // verdict comes first (the compiler checks stay as a second line).
     const Case cases[] = {
         {"x := 1\nprint(\"$[x]\")\n", "interpolation"},
         {"fn(f()) { return n }\nprint(f())\n", "free-name"},
@@ -73,13 +76,13 @@ void check_fallbacks() {
         {"fn(min(a, b)) { return 0 }\nprint(min(1, 2))\n", "fn-name-reserved"},
         {"x := \"a\"\nprint(x.split(\",\"))\n", "method:split"},
         {"print(args)\n", "unresolved-name"},
-        {"a := [1]\nprint(a [0])\n", "postfix-spelling"},
-        {"a := [1,]\n", "trailing-comma"},
-        {"o := {\"a\": 1, \"a\": 2}\n", "object-duplicate-key"},
+        {"a := [1]\nprint(a [0])\n", "opaque:legacy-runtime-error"},
+        {"a := [1,]\n", "opaque:legacy-runtime-error"},
+        {"o := {\"a\": 1, \"a\": 2}\n", "opaque:legacy-runtime-error"},
         {"x := 1\nx\n", "expression-statement"},
         {"f := (x) => x\n", "expression:Lambda"},
         {"if(1 { }\n", "parse-error"},
-        {"x := 2\nprint(!x + 1)\n", "prefix-not-precedence"},
+        {"x := 2\nprint(!x + 1)\n", "opaque:irregular-legacy-parse"},
         {"x := 2\ny := 1\nprint(y && !x || true)\n", "prefix-not-precedence"},
     };
     for (const Case& c : cases) {
