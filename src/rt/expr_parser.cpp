@@ -348,8 +348,14 @@ NodeId ExprParser::infix(NodeId left, int prec, Tok kind, std::uint32_t begin) {
         return id;
     }
     const bool right_assoc = prec == kCoalesce || prec == kEquality;
+    const std::uint32_t right_begin = tok_.begin;
     const NodeId right = parse(right_assoc ? prec : prec + 1);
     if (right == kNoNode) return kNoNode;
+    // Conditions group an unparenthesised `a != b == c` differently.
+    const Node& r = ast_.at(right);
+    if (options_.condition && prec == kEquality && r.kind == NodeKind::Binary && r.begin == right_begin &&
+        (r.op == Op::Eq || r.op == Op::Ne))
+        return fail(OpaqueReason::IrregularLegacyParse);
     if (prec == kRelational && infix_prec(tok_.kind) == kRelational) return fail(OpaqueReason::LegacyRuntimeError);
     if (kind == Tok::Coalesce) return node2(NodeKind::Coalesce, Op::None, begin, left, right);
     const NodeKind node_kind = prec == kOr || prec == kAnd ? NodeKind::Logical : NodeKind::Binary;

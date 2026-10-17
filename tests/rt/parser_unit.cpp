@@ -205,6 +205,9 @@ void review_findings() {
     // `!` binds looser than arithmetic in legacy
     contains("print(!1 + 1)", irr);
     contains("print(!a == b)", "Binary ==");
+    // equality chains in conditions
+    contains("while (a != b == c) { }", irr);
+    contains("while (a != (b == c)) { }", "While");
     // lambdas in if conditions
     contains("if ((p) => 1) { }", irr);
 }
