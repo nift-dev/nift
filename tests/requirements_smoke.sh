@@ -78,11 +78,11 @@ grep -Fq '"public/about.html"' "$P/.nift/public/index.info.json"
 test ! -f "$P/public/about.html"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'about' "$P/status.log"
-! grep -Fq 'required path missing: public/about.html' "$P/status.log"
-! grep -Fxq '/' "$P/status.log"
+if grep -Fq 'required path missing: public/about.html' "$P/status.log"; then echo "unexpected match: 'required path missing: public/about.html' "$P/status.log"" >&2; exit 1; fi
+if grep -Fxq '/' "$P/status.log"; then echo "unexpected match: '/' "$P/status.log"" >&2; exit 1; fi
 (cd "$P" && "$NIFT_BIN" build >build.log)
 test -f "$P/public/about.html"
-! grep -Fq 'required path missing: public/about.html' "$P/build.log"
+if grep -Fq 'required path missing: public/about.html' "$P/build.log"; then echo "unexpected match: 'required path missing: public/about.html' "$P/build.log"" >&2; exit 1; fi
 
 # If the tracked producer later fails with no output present, the referrer is still
 # a successful/up-to-date artifact; the overall invocation fails because the
@@ -94,8 +94,8 @@ if (cd "$P" && "$NIFT_BIN" build >producer-fail.log 2>&1); then
   exit 1
 fi
 grep -Fq 'while building about' "$P/producer-fail.log"
-! grep -Fq 'while building /' "$P/producer-fail.log"
-! grep -Fq 'required path missing: public/about.html' "$P/producer-fail.log"
+if grep -Fq 'while building /' "$P/producer-fail.log"; then echo "unexpected match: 'while building /' "$P/producer-fail.log"" >&2; exit 1; fi
+if grep -Fq 'required path missing: public/about.html' "$P/producer-fail.log"; then echo "unexpected match: 'required path missing: public/about.html' "$P/producer-fail.log"" >&2; exit 1; fi
 
 
 # Runtime 2.0 decision D-002: metadata paths outside the project root are
@@ -110,7 +110,7 @@ p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["reqs"]=["../outside.txt"]; json.dump(d,open(p,"w"))
 PY
 (cd "$P" && "$NIFT_BIN" status >poison-req.log)
-! grep -Fq 'invalid requirement' "$P/poison-req.log"
+if grep -Fq 'invalid requirement' "$P/poison-req.log"; then echo "unexpected match: 'invalid requirement' "$P/poison-req.log"" >&2; exit 1; fi
 grep -Fq 'up to date' "$P/poison-req.log"
 rm "$TMP/outside.txt"
 (cd "$P" && "$NIFT_BIN" status >poison-req.log)
@@ -124,7 +124,7 @@ p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["dependencies"]=["../outside.txt"]; json.dump(d,open(p,"w"))
 PY
 (cd "$P" && "$NIFT_BIN" status >poison-dep.log)
-! grep -Fq 'invalid dependency' "$P/poison-dep.log"
+if grep -Fq 'invalid dependency' "$P/poison-dep.log"; then echo "unexpected match: 'invalid dependency' "$P/poison-dep.log"" >&2; exit 1; fi
 sleep 1; printf 'changed\n' >"$TMP/outside.txt"
 (cd "$P" && "$NIFT_BIN" status >poison-dep.log)
 grep -Fq 'dependency changed: ../outside.txt' "$P/poison-dep.log"

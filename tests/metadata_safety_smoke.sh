@@ -32,8 +32,8 @@ PY
 printf 'secret\n' >"$TMP/outside-secret.txt"
 printf 'required\n' >"$TMP/outside-required.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-! grep -Fq 'invalid dependency' "$P/status.log"
-! grep -Fq 'invalid requirement' "$P/status.log"
+if grep -Fq 'invalid dependency' "$P/status.log"; then echo "unexpected match: 'invalid dependency' "$P/status.log"" >&2; exit 1; fi
+if grep -Fq 'invalid requirement' "$P/status.log"; then echo "unexpected match: 'invalid requirement' "$P/status.log"" >&2; exit 1; fi
 rm "$TMP/outside-required.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'required path missing: ../../outside-required.txt' "$P/status.log"
