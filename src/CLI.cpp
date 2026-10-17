@@ -27,6 +27,7 @@
 // heavy headers so libstdc++'s <filesystem>/<locale> are parsed before any
 // windows.h macros are visible (mingw locale/gthread fragility).
 #include "Console.h"
+#include "rt/script_runner.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1490,6 +1491,11 @@ static int run_script_shell_loop(Parser& parser, bool load_rc);
 static int run_script_source(const std::string& source, const fs::path& source_path,
                              const std::string& cmd, const std::vector<std::string>& script_args,
                              const fs::path& host_root, bool interactive_after = false, const std::string& target = "native") {
+    // Runtime 2.0 CP11: opt-in VM (NIFT_VM=1); returns false to run legacy unchanged.
+    if (!interactive_after && target == "native") {
+        int vm_exit = 0;
+        if (nift::rt::run_script_on_vm(source, source_path, vm_exit)) return vm_exit;
+    }
     ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host,info);
     parser.set_script_invocation(cmd, script_args);
     auto rr=parser.run_script(source,source_path);
