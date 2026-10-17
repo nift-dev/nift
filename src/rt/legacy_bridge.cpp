@@ -2,6 +2,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/heap.h"
+#include "rt/heap_account.h"
 #include "rt/string.h"
 
 #include <limits>
@@ -22,6 +23,7 @@ bool error_from_legacy(const std::shared_ptr<const nift::RuntimeErrorData>& data
     object->line = data->line;
     object->column = data->column;
     if (data->cause && !error_from_legacy(data->cause, depth + 1, object->cause, error)) return false;
+    heap_retally(object);
     out = holder;
     return true;
 }
@@ -33,7 +35,10 @@ std::shared_ptr<const nift::RuntimeErrorData> error_to_legacy(const ErrorObject&
                                                            cause);
 }
 
-bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error) {
+bool convert_from(const nift::RuntimeValue& legacy, Value& out, std::string& error, std::size_t depth);
+bool convert_to(const Value& value, nift::RuntimeValue& out, std::string& error, std::size_t depth);
+
+bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error, std::size_t depth) {
     out = make_object();
     for (const auto& entry : legacy.object) {
         const Atom key = atom(entry.first);
@@ -42,15 +47,20 @@ bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::strin
             return false;
         }
         Value v;
-        if (!from_legacy(entry.second, v, error)) return false;
+        if (!convert_from(entry.second, v, error, depth + 1)) return false;
         object_set(out, key, static_cast<Value&&>(v));
     }
     return true;
 }
 
-} // namespace
+bool too_deep(std::size_t depth, std::string& error) {
+    if (depth < kMaxBridgeDepth) return false;
+    error = "value nesting exceeds " + std::to_string(kMaxBridgeDepth) + " levels";
+    return true;
+}
 
-bool from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error) {
+bool convert_from(const nift::RuntimeValue& legacy, Value& out, std::string& error, std::size_t depth) {
+    if (too_deep(depth, error)) return false;
     switch (legacy.type) {
         case nift::RuntimeType::Null: out = Value(); return true;
         case nift::RuntimeType::Boolean: out = Value::boolean(legacy.boolean); return true;
@@ -64,12 +74,12 @@ bool from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& erro
             out = make_array(legacy.array.size());
             for (const auto& item : legacy.array) {
                 Value v;
-                if (!from_legacy(item, v, error)) return false;
+                if (!convert_from(item, v, error, depth + 1)) return false;
                 array_push(out, static_cast<Value&&>(v));
             }
             return true;
         }
-        case nift::RuntimeType::Object: return object_from_legacy(legacy, out, error);
+        case nift::RuntimeType::Object: return object_from_legacy(legacy, out, error, depth);
         case nift::RuntimeType::Timer:
             if (!legacy.timer || legacy.timer->owner > std::numeric_limits<std::uint32_t>::max()) {
                 error = "timer owner does not fit a handle generation";
@@ -86,7 +96,8 @@ bool from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& erro
     return false;
 }
 
-bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) {
+bool convert_to(const Value& value, nift::RuntimeValue& out, std::string& error, std::size_t depth) {
+    if (too_deep(depth, error)) return false;
     switch (value.kind()) {
         case Kind::Null: out = nift::RuntimeValue(nullptr); return true;
         case Kind::Bool: out = nift::RuntimeValue(value.as_bool()); return true;
@@ -104,7 +115,7 @@ bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) 
             out.array.reserve(array_size(value));
             for (const auto& item : array_items(value)) {
                 nift::RuntimeValue converted;
-                if (!to_legacy(item, converted, error)) return false;
+                if (!convert_to(item, converted, error, depth + 1)) return false;
                 out.array.push_back(std::move(converted));
             }
             return true;
@@ -114,7 +125,7 @@ bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) 
             out.object.reserve(object_size(value));
             for (const auto& entry : object_entries(value)) {
                 nift::RuntimeValue converted;
-                if (!to_legacy(entry.second, converted, error)) return false;
+                if (!convert_to(entry.second, converted, error, depth + 1)) return false;
                 out.object.emplace_back(std::string(atom_text(entry.first)), std::move(converted));
             }
             return true;
@@ -133,6 +144,16 @@ bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) 
             error = std::string(kind_name(value.kind())) + " values have no legacy representation";
             return false;
     }
+}
+
+} // namespace
+
+bool from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error) {
+    return convert_from(legacy, out, error, 0);
+}
+
+bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) {
+    return convert_to(value, out, error, 0);
 }
 
 } // namespace nift::rt

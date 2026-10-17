@@ -31,8 +31,13 @@ const char* kind_name(Kind kind);
 struct HeapObject {
     std::uint32_t refcount = 1;
     Kind kind;
+    // Live-heap accounting (rt/heap_account.h): the footprint last counted
+    // for this object, in 64-byte granules (24 bits, saturating); 0 = not
+    // counted. Uses the header's padding: HeapObject stays 8 bytes.
+    std::uint8_t counted[3] = {0, 0, 0};
     explicit HeapObject(Kind k) : kind(k) {}
 };
+static_assert(sizeof(HeapObject) == 8, "HeapObject header must stay 8 bytes");
 void destroy_heap_object(HeapObject* object);
 
 // Handle kinds are typed tags, never strings (decision 5). Values carry

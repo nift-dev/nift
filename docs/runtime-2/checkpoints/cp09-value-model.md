@@ -74,7 +74,36 @@ the value and mutating either copy, and by assigning or destroying the
 value. Holding an `array_mut` reference across a copy and then writing
 through it writes into the other sharer's storage (a copy-semantics
 violation) or into freed memory. Callers must re-fetch after any of these.
-There is no runtime check; the VM (CP11+) must follow the contract.
+
+Ownership and lifetime contract (since the CP11 review round 2, owner item
+6). A `Value` owns one reference to its heap object; a reference or pointer
+obtained from it (element, member, entry, `string_view_of`, `array_mut`)
+borrows from the object it was read from and is valid only until the next
+mutation entry point on that object or on any Value sharing it
+(`array_mut`, `array_push`, `object_set`, `object_remove`, `unshare`,
+`append_in_place`), or until that Value is reassigned or destroyed. A
+borrowed element that must outlive such a point is copied out first (a
+`Value` copy is O(1)). **Enforced** in sanitizer builds (AddressSanitizer,
+or `-DNIFT_RT_CHECKED_REFS`): every mutation entry point first moves the
+storage of the aggregate (and, on `unshare`, of the shared original; for
+`append_in_place`, of the string) to a fresh allocation and frees the old
+one, so any reference held across it is a deterministic heap-use-after-free
+that ASan reports on its next use, not only when a real reallocation
+happens to occur. `make test-rt-value-sanitize` checks the mechanism itself
+(`value_round2 stale-array|stale-object|stale-string` must abort), and every
+sanitized suite (`test-rt-value-sanitize`, `test-rt-vm-sanitize`: unit tests,
+corpus, generated programs, the adversarial gate) runs with it. Release
+builds compile it away (no cost).
+
+Audit of the VM and compiler (CP11 round 2): `get_index`, `get_member`
+copy the element out (`out = items[i]`; `Value::operator=` copies before
+releasing, so `R[a] = R[a][i]` is safe); `set_index` reads the old
+element's type, then calls `array_mut` with no reference held, and the
+assigned value was copied first; `push_value`/`array_push`, `ObjectSet` and
+`NewArray` copy their argument before mutating; `concatenate` builds a new
+string; in-place `s += t` (`append_in_place`) handles `t` aliasing `s`. No
+borrowed reference is held across a mutation, a copy-then-mutate, a push, a
+set or an unshare.
 
 ### Objects
 Objects are an insertion-ordered `vector<pair<Atom, Value>>`. From 8 entries
@@ -111,6 +140,15 @@ These are ported from legacy `NumericForm` and `runtime_equal`.
   split. Zero, integer-ness, ordering, equality, hashing, truthiness and the
   arithmetic error messages therefore match legacy for spellings such as
   `0e99999999999999999999` and `1e-99999999999999999999`.
+- `equal` and `hash` are iterative (heap worklists; CP11 review round 2,
+  R6): no nesting depth reaches the C++ stack (300,000-deep values are
+  tested). `equal_within(a, b, max_depth)` visits pairs depth-first in
+  legacy's order (array elements in order; object entries in the left
+  object's order, matched by key; no identity shortcut when bounded) and
+  returns `TooDeep` when two aggregates below `max_depth` still had to be
+  compared; the VM uses it (default 10,000 levels, legacy's recursive
+  `runtime_equal` answers to about 30,000 and crashes near 50,000) and hands
+  deeper comparisons to legacy.
 - Hashing is a function of the exact decimal form that equality compares (a
   Double by its shortest round-trip spelling). Integers with |v| ≤ 2^53 take
   an integer shortcut that every kind reaches for the same value; all other
@@ -257,16 +295,22 @@ counts. Storing the payload as a union may fix this. It is left open
 - **Atom tables are `thread_local`.** This is correct for one isolate per
   thread. If isolates migrate between threads, the table must instead hang
   off the isolate object. That is an architecture point for CP11+.
-- **Reference invalidation is a contract, not a check.** References from
-  `array_mut`, `object_get` and friends dangle or bypass copy semantics if
-  held across a copy-and-mutate, push, set or unshare (see Copy-on-write).
-  No debug assertion was added; the VM must re-fetch after mutation.
-- **Recursion that remains.** Destruction is iterative, but `equal` and
-  `hash` on arrays/objects, `from_legacy` and `to_legacy` recurse with
-  nesting depth (they were not bounded in this round). `equal` on two
-  distinct 1,000,000-deep values would overflow the stack (equal on aliases
-  of one object short-circuits). Legacy has the same property; script-level
-  depth limits are a VM concern (CP11+).
+- **Reference invalidation is enforced only in sanitizer builds.** The
+  relocate-on-mutation check (Copy-on-write) turns any violation into an
+  ASan abort in the sanitized suites; a release build relies on the audited
+  contract. A violation on a path no sanitized test executes would go
+  unnoticed.
+- **Recursion that remains.** Destruction, `equal` and `hash` are
+  iterative. `from_legacy`/`to_legacy` still recurse once per nesting level
+  and fail cleanly ("value nesting exceeds 512 levels") at
+  `kMaxBridgeDepth`, which bounds their stack use (also under ASan); neither
+  is reachable from the VM. Error cause chains are bounded at 16.
+- **Live-heap accounting granularity.** `heap_account.h` counts each object
+  as its own size plus the capacity it owns, rounded up to 64-byte granules
+  and saturating at 1 GiB per object, with libstdc++'s 15-character inline
+  string buffer; the count is exact in those units (it returns to its
+  starting value when everything is freed, tested) but is not the
+  allocator's real usage (malloc headers, fragmentation).
 - **Refcount saturation leaks.** An object referenced 2^32 − 1 times
   becomes immortal. This trades an unreachable-in-practice leak for memory
   safety.
@@ -322,3 +366,11 @@ pointed at an `evidence/cp09/README.md` that was never committed.)
 
 Mutation B is taken to be "object COW skips `unshare`" (the reviewer's text
 named A and C; B was not restated in the brief this round worked from).
+
+### Follow-ups from the CP11 review, round 2 (2026-10-18)
+
+| # | Finding | Status | Fix | Test |
+| --- | --- | --- | --- | --- |
+| R6 | RISK (CP11 review): `rt::equal` recursion segfaulted on ~50,000-deep nested arrays reached by the VM (legacy also crashes at 50,000; it returns `true` at 20,000–30,000) | fixed | `equal` and `hash` iterative (same results and hash values as before); `equal_within` depth-bounded in legacy's visiting order (the VM bails beyond 10,000 levels, so legacy decides exactly where it can); `from_legacy`/`to_legacy` fail cleanly beyond 512 levels | `tests/rt/value_round2.cpp`: 300,000-deep equal/unequal/hash, bound and visiting order, bridge depth both ways, hash values against the recursive definition; VM: unit tests (9,999 decided, 10,001 bails), corpus `review2_r6_deep_equality.f`, adversarial `deepeq` family |
+| R5 | D-013 violation (CP11 review): the VM's frame-memory budget sampled values two levels deep, so nested values evaded it and the process was OOM-killed | fixed (exact) | `heap_account.{h,cpp}`: every heap object records the footprint it was counted with (24 bits of the header padding: `HeapObject` stays 8 bytes); the isolate keeps the exact total; creation, capacity changes (string append, push, insert/remove, COW clone) and destruction update it | `value_round2` heap accounting (strings, appends, nested arrays, COW clone, objects, 100,000-deep nesting; the total returns exactly to its start); VM: see the CP11 record |
+| 4 (round 1) | RISK: reference invalidation was a contract without a check | fixed (enforced in sanitizer builds) | relocate-on-mutation in `aggregate.cpp`/`string.cpp` (Copy-on-write above); ownership/lifetime contract and VM/compiler audit documented | `value_round2 stale-*` must abort under ASan (`test-rt-value-sanitize`); every sanitized suite runs with the check |

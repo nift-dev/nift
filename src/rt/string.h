@@ -15,6 +15,10 @@ inline Value make_string(const char* text) { return make_string(std::string_view
 inline Value make_string(const std::string& text) { return make_string(std::string_view(text)); }
 // Valid only while `value` (a String) is alive and unchanged.
 std::string_view string_view_of(const Value& value);
+// Appends `tail` to `text` in place. `text` must be an unshared heap string
+// (refcount 1); `tail` may be `text` itself. Keeps the live-heap count exact
+// and, in sanitizer builds, relocates the storage first (aggregate.h).
+void append_in_place(Value& text, const Value& tail);
 
 Value make_bytes(std::vector<std::uint8_t> data);
 const std::vector<std::uint8_t>& bytes_of(const Value& value);

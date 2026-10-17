@@ -1,6 +1,7 @@
 #include "rt/value.h"
 
 #include "rt/heap.h"
+#include "rt/heap_account.h"
 
 #include <vector>
 
@@ -44,6 +45,7 @@ void detach_children(HeapObject* object, std::vector<HeapObject*>& pending) {
 }
 
 void delete_object(HeapObject* object) {
+    heap_untally(object);
     switch (object->kind) {
         case Kind::String: delete static_cast<StringObject*>(object); return;
         case Kind::Decimal: delete static_cast<DecimalObject*>(object); return;

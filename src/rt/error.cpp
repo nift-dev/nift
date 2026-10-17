@@ -4,6 +4,7 @@
 // error paths only (not a property-access hot path).
 
 #include "rt/heap.h"
+#include "rt/heap_account.h"
 #include "rt/string.h"
 
 namespace nift::rt {
@@ -41,6 +42,7 @@ bool make_error(std::string message, std::string code, const Value& cause, std::
     object->line = line;
     object->column = column;
     object->cause = cause;
+    heap_retally(object);
     out = Value::adopt(object);
     return true;
 }

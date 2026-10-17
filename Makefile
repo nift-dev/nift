@@ -201,6 +201,7 @@ RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
 RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
 RT_VALUE_REGRESS := $(TEST_DIR)/rt/value-regress$(EXEEXT)
 RT_VALUE_BENCH := $(TEST_DIR)/rt/value-bench$(EXEEXT)
+RT_VALUE_ROUND2 := $(TEST_DIR)/rt/value-round2$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
 
 $(RT_VALUE_UNIT): tests/rt/value_unit.cpp $(RT_VALUE_DEPS)
@@ -221,9 +222,14 @@ $(RT_VALUE_BENCH): tests/rt/value_bench.cpp $(RT_VALUE_DEPS)
 
 .PHONY: test-rt-value test-rt-lint test-rt-value-sanitize bench-rt-value
 # RT_VALUE_SEED / RT_VALUE_SCALE vary the randomised suite (default seed is fixed).
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY)
+$(RT_VALUE_ROUND2): tests/rt/value_round2.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_round2.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
+	"$(RT_VALUE_ROUND2)"
 	"$(RT_VALUE_PROPERTY)" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 
 test-rt-lint:
@@ -236,8 +242,16 @@ test-rt-value-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_property.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-property"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_regress.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-regress"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_round2.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-round2"
 	"$(TEST_DIR)/rt-san/value-unit"
 	"$(TEST_DIR)/rt-san/value-regress"
+	"$(TEST_DIR)/rt-san/value-round2"
+	# Reference safety is enforced: a reference held across a mutation must abort.
+	for m in stale-array stale-object stale-string; do \
+		if ASAN_OPTIONS=detect_leaks=0 "$(TEST_DIR)/rt-san/value-round2" $$m 2>"$(TEST_DIR)/rt-san/$$m.log"; then \
+			echo "FAIL: stale reference ($$m) not detected"; exit 1; fi; \
+		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
+		echo "PASS stale reference detected: $$m"; done
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 
 # Runtime 2.0 CP11: compiler + register VM (src/rt), linked into nift behind

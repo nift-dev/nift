@@ -10,12 +10,19 @@
 // hash(a) == hash(b) whenever equal(a, b).
 #include "rt/value.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 namespace nift::rt {
 
 bool equal(const Value& left, const Value& right);
+// Depth-bounded equality for callers that must not decide beyond a nesting
+// depth (the VM bails there; legacy's recursive equality crashes on deep
+// enough values). TooDeep: two aggregates at `max_depth` still had to be
+// compared. equal() is unbounded; both are iterative (no C++ recursion).
+enum class Equality : std::uint8_t { Unequal, Equal, TooDeep };
+Equality equal_within(const Value& left, const Value& right, std::size_t max_depth);
 // Relational order for two numbers or two strings; false when not comparable
 // (other kinds, or NaN), in which case `<`, `<=`, `>`, `>=` are all false.
 bool compare_relational(const Value& left, const Value& right, int& comparison);

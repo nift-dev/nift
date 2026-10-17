@@ -6,6 +6,7 @@
 #include "rt/number.h"
 #include "rt/string.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -33,27 +34,6 @@ bool errors_equal(const Value& l, const Value& r) {
         b = b->cause.is(Kind::Error) ? b->cause.heap_as<ErrorObject>() : nullptr;
     }
     return !a && !b;
-}
-
-// Legacy object equality is an unordered match of (key, value) pairs.
-bool objects_equal(const Value& l, const Value& r) {
-    const auto& a = object_entries(l);
-    const auto& b = object_entries(r);
-    if (a.size() != b.size()) return false;
-    for (const auto& entry : a) {
-        const Value* other = object_get(r, entry.first);
-        if (!other || !equal(entry.second, *other)) return false;
-    }
-    return true;
-}
-
-bool arrays_equal(const Value& l, const Value& r) {
-    const auto& a = array_items(l);
-    const auto& b = array_items(r);
-    if (a.size() != b.size()) return false;
-    for (std::size_t i = 0; i < a.size(); ++i)
-        if (!equal(a[i], b[i])) return false;
-    return true;
 }
 
 std::uint64_t mix(std::uint64_t h, std::uint64_t v) {
@@ -97,23 +77,91 @@ std::uint64_t hash_number(const Value& number) {
 
 } // namespace
 
-bool equal(const Value& left, const Value& right) {
-    if (left.is_number() && right.is_number()) return numbers_equal(left, right);
-    if (left.kind() != right.kind()) return false;
+namespace {
+
+struct EqualPair {
+    const Value* left;
+    const Value* right;
+    std::size_t depth;
+};
+
+enum class Shallow : std::uint8_t { Unequal, Equal, Descend };
+
+// One level of legacy runtime_equal: scalars and identities are decided here;
+// two distinct arrays/objects of equal size need their children compared.
+Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
+    if (left.is_number() && right.is_number()) return numbers_equal(left, right) ? Shallow::Equal : Shallow::Unequal;
+    if (left.kind() != right.kind()) return Shallow::Unequal;
+    bool same = false;
     switch (left.kind()) {
-        case Kind::Null: return true;
-        case Kind::Bool: return left.as_bool() == right.as_bool();
-        case Kind::String: return string_view_of(left) == string_view_of(right);
-        case Kind::Bytes: return bytes_of(left) == bytes_of(right);
-        case Kind::Array: return left.heap() == right.heap() || arrays_equal(left, right);
-        case Kind::Object: return left.heap() == right.heap() || objects_equal(left, right);
-        case Kind::Error: return left.heap() == right.heap() || errors_equal(left, right);
-        case Kind::Function: case Kind::Struct: return left.heap() == right.heap();
+        case Kind::Null: same = true; break;
+        case Kind::Bool: same = left.as_bool() == right.as_bool(); break;
+        case Kind::String: same = string_view_of(left) == string_view_of(right); break;
+        case Kind::Bytes: same = bytes_of(left) == bytes_of(right); break;
+        case Kind::Array:
+            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+            return array_size(left) == array_size(right) ? Shallow::Descend : Shallow::Unequal;
+        case Kind::Object:
+            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+            return object_size(left) == object_size(right) ? Shallow::Descend : Shallow::Unequal;
+        case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
+        case Kind::Function: case Kind::Struct: same = left.heap() == right.heap(); break;
         case Kind::Handle:
-            return left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
+            same = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                    left.handle_generation() == right.handle_generation();
-        default: return false;
+            break;
+        default: break;
     }
+    return same ? Shallow::Equal : Shallow::Unequal;
+}
+
+// Pushes the children of two equal-sized aggregates so they pop in legacy's
+// order (array elements first to last; object entries in the left object's
+// order, matched by key). A missing key is a pair with no right side, which
+// decides the result when legacy would reach it.
+void push_children(const EqualPair& pair, std::vector<EqualPair>& work) {
+    const Value& l = *pair.left;
+    const Value& r = *pair.right;
+    if (l.is(Kind::Array)) {
+        const auto& a = array_items(l);
+        const auto& b = array_items(r);
+        for (std::size_t i = a.size(); i-- > 0;) work.push_back({&a[i], &b[i], pair.depth + 1});
+        return;
+    }
+    const auto& entries = object_entries(l);
+    const std::size_t mark = work.size();
+    for (const auto& entry : entries) {
+        work.push_back({&entry.second, object_get(r, entry.first), pair.depth + 1});
+    }
+    std::reverse(work.begin() + static_cast<std::ptrdiff_t>(mark), work.end());
+}
+
+} // namespace
+
+// Iterative (heap worklist, CP11 review round 2, R6): no nesting depth can
+// exhaust the C++ stack. Pairs are visited depth-first in legacy's order, so
+// when `max_depth` stops the walk, legacy (whose recursion goes deeper before
+// it crashes) has not yet decided either. A bounded walk also descends into
+// two references to the same aggregate, as legacy does.
+Equality equal_within(const Value& left, const Value& right, std::size_t max_depth) {
+    const bool identity = max_depth == static_cast<std::size_t>(-1);
+    std::vector<EqualPair> work;
+    EqualPair pair{&left, &right, 0};
+    for (;;) {
+        const Shallow s = pair.right ? shallow_equal(*pair.left, *pair.right, identity) : Shallow::Unequal;
+        if (s == Shallow::Unequal) return Equality::Unequal;
+        if (s == Shallow::Descend) {
+            if (pair.depth >= max_depth) return Equality::TooDeep;
+            push_children(pair, work);
+        }
+        if (work.empty()) return Equality::Equal;
+        pair = work.back();
+        work.pop_back();
+    }
+}
+
+bool equal(const Value& left, const Value& right) {
+    return equal_within(left, right, static_cast<std::size_t>(-1)) == Equality::Equal;
 }
 
 bool compare_relational(const Value& left, const Value& right, int& comparison) {
@@ -148,7 +196,9 @@ bool truthy(const Value& value) {
     }
 }
 
-std::uint64_t hash(const Value& value) {
+namespace {
+
+std::uint64_t leaf_hash(const Value& value) {
     switch (value.kind()) {
         case Kind::Null: return 0x6e756c6cull;
         case Kind::Bool: return value.as_bool() ? 0x7472ull : 0x6661ull;
@@ -158,20 +208,58 @@ std::uint64_t hash(const Value& value) {
             const auto& b = bytes_of(value);
             return mix(7, hash_text(std::string_view(reinterpret_cast<const char*>(b.data()), b.size())));
         }
-        case Kind::Array: {
-            std::uint64_t h = 8;
-            for (const auto& item : array_items(value)) h = mix(h, hash(item));
-            return h;
-        }
-        case Kind::Object: {
-            std::uint64_t h = 9;  // order-insensitive: sum of entry hashes
-            for (const auto& entry : object_entries(value))
-                h += mix(hash_text(atom_text(entry.first)), hash(entry.second));
-            return h;
-        }
         case Kind::Error: return mix(13, hash_text(value.heap_as<ErrorObject>()->message));
         case Kind::Handle: return mix(mix(12, value.handle_id()), value.handle_generation());
         default: return mix(static_cast<std::uint64_t>(value.kind()), reinterpret_cast<std::uintptr_t>(value.heap()));
+    }
+}
+
+// A partially hashed aggregate: arrays fold children in order
+// (h = mix(h, child)); objects add mix(key, child) per entry.
+struct HashFrame {
+    const Value* value;
+    std::size_t next;
+    std::uint64_t h;
+};
+
+std::size_t child_count(const Value& v) { return v.is(Kind::Array) ? array_size(v) : object_size(v); }
+
+const Value& child_at(const Value& v, std::size_t i) {
+    return v.is(Kind::Array) ? array_items(v)[i] : object_entries(v)[i].second;
+}
+
+std::uint64_t combine(const Value& parent, std::size_t i, std::uint64_t h, std::uint64_t child) {
+    if (parent.is(Kind::Array)) return mix(h, child);
+    return h + mix(hash_text(atom_text(object_entries(parent)[i].first)), child);
+}
+
+bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Object); }
+
+} // namespace
+
+// Iterative post-order (CP11 review round 2, R6); same values as the former
+// recursive definition.
+std::uint64_t hash(const Value& value) {
+    if (!is_aggregate(value)) return leaf_hash(value);
+    std::vector<HashFrame> stack{{&value, 0, value.is(Kind::Array) ? 8u : 9u}};
+    for (;;) {
+        HashFrame& top = stack.back();
+        if (top.next < child_count(*top.value)) {
+            const Value& child = child_at(*top.value, top.next);
+            if (is_aggregate(child)) {
+                stack.push_back({&child, 0, child.is(Kind::Array) ? 8u : 9u});
+                continue;
+            }
+            top.h = combine(*top.value, top.next, top.h, leaf_hash(child));
+            ++top.next;
+            continue;
+        }
+        const std::uint64_t done = top.h;
+        stack.pop_back();
+        if (stack.empty()) return done;
+        HashFrame& parent = stack.back();
+        parent.h = combine(*parent.value, parent.next, parent.h, done);
+        ++parent.next;
     }
 }
 

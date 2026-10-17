@@ -18,9 +18,15 @@
 #include "RuntimeValue.h"
 #include "rt/value.h"
 
+#include <cstddef>
 #include <string>
 
 namespace nift::rt {
+
+// Both directions recurse once per nesting level and fail (error "value
+// nesting exceeds N levels") at kMaxBridgeDepth instead of exhausting the C++
+// stack (CP11 review round 2, R6). Neither is reachable from the VM.
+inline constexpr std::size_t kMaxBridgeDepth = 512;
 
 bool from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error);
 bool to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error);
