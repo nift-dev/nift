@@ -187,3 +187,34 @@ Candidates recorded (class 2, not yet changed; the VM falls back today):
 - Built-ins win over user functions of the same name, e.g. `is_int` (CP11
   review D4). Already decided as D-009 #3 (user definitions shadow built-ins);
   to be implemented as its own change with compatibility tests.
+
+## D-015 — Legacy is an oracle, not the language definition; CP11 subset narrowed (owner, 2026-10-18)
+- The legacy interpreter identifies behavioural differences; it is not the
+  permanent definition of correct semantics. Runtime 2.0 may make intentional
+  breaking changes where they give a more coherent, maintainable and performant
+  language — always explicit, specified, documented and tested, never silent.
+- CP11 is a proof of concept: a conservative, explicitly specified subset runs on
+  the VM with exact behaviour; everything else is refused by the compiler and
+  falls back before execution. The subset may shrink; no new compatibility
+  machinery or replay is added to reproduce accidental legacy behaviour.
+  Fallback must not hide compiler defects: a supported suite runs entirely on
+  the VM; an unsupported suite proves fallback happens before execution.
+- Review cycles: after round-2 fixes and a focused third review, any further
+  class of contextual legacy behaviour narrows the subset and is recorded for a
+  later language checkpoint; no fourth open-ended compatibility cycle.
+- Foundational blockers regardless of subset: complete memory-budget
+  enforcement (R5) and enforced lifetime guarantees for references into
+  mutable collections (CP09).
+- Language-evolution candidates (proposed Runtime 2.0 semantics, to be
+  specified with old/new behaviour, compatibility impact and tests before any
+  checkpoint implements them):
+
+| Legacy behaviour | Proposed semantics | Found in |
+| --- | --- | --- |
+| Arguments evaluated twice when a loop-called function fails preparation | Exactly once | CP11 review M2 |
+| Parameter/binding type depends on the source text of the argument or initialiser | Type from the evaluated value | CP11 M3, N1, binding-type rules |
+| Loop preparation types declarations against bindings visible at preparation | Consistent declarations everywhere | CP11 M1, N1 |
+| Statements after `break`/`continue` run | `break`/`continue` always jump | CP11 D2 |
+| Built-ins win over user functions; precedence varies by context | Consistent lexical resolution (D-009 #3) | CP11 D4 |
+| Aliasing depends on argument shape (`f(o.k)` aliases, `f(a)` copies) | Explicit, documented value/reference rules | CP11 D6 |
+| Some runtime errors cannot be caught | Structured, catchable runtime errors | owner |
