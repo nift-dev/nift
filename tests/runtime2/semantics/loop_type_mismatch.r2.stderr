@@ -1,0 +1,1 @@
+error: $ROOT/loop_type_mismatch.f:3:16: cannot assign string to int binding 'x'
