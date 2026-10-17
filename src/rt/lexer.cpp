@@ -1,8 +1,6 @@
 #include "rt/lexer.h"
 
-
 namespace nift::rt {
-
 
 const char* token_name(Tok kind) {
     switch (kind) {
@@ -17,7 +15,9 @@ const char* token_name(Tok kind) {
     case Tok::AddAssign: return "+="; case Tok::SubAssign: return "-="; case Tok::MulAssign: return "*=";
     case Tok::DivAssign: return "/="; case Tok::ModAssign: return "%="; case Tok::AndAssign: return "&=";
     case Tok::OrAssign: return "|="; case Tok::XorAssign: return "^="; case Tok::Increment: return "++";
-    case Tok::Decrement: return "--"; case Tok::Eq: return "=="; case Tok::Ne: return "!=";
+    case Tok::Decrement: return "--";
+    case Tok::Eq: return "==";  // rt-lint: allow-string-compare display name, nothing is compared
+    case Tok::Ne: return "!=";  // rt-lint: allow-string-compare display name, nothing is compared
     case Tok::Lt: return "<"; case Tok::Le: return "<="; case Tok::Gt: return ">"; case Tok::Ge: return ">=";
     case Tok::AndAnd: return "&&"; case Tok::OrOr: return "||"; case Tok::Bang: return "!";
     case Tok::Plus: return "+"; case Tok::Minus: return "-"; case Tok::Star: return "*";

@@ -50,7 +50,9 @@ const char* node_kind_name(NodeKind kind) {
 
 const char* op_name(Op op) {
     static const char* const names[] = {
-        "", "neg", "pos", "!", "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||",
+        "", "neg", "pos", "!", "+", "-", "*", "/", "%",
+        "==", "!=",  // rt-lint: allow-string-compare display names in a table, nothing is compared
+        "<", "<=", ">", ">=", "&&", "||",
         "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "++pre", "--pre", "++post", "--post"};
     return names[static_cast<int>(op)];
 }

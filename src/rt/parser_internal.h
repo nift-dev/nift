@@ -1,9 +1,11 @@
 #pragma once
-// Internal interface between the statement layer (parser.cpp) and the
-// expression layer (expr_parser.cpp). Not part of the rt/ public surface.
+// Internal interface between the statement layer (statement_parser.h) and the
+// expression layer (expr_parser.h): modes, entry points, recursion bounds.
+// Not part of the rt/ public surface.
 #include "rt/ast.h"
 #include "rt/lexer.h"
 #include "rt/parser.h"
+#include "rt/source_scan.h"
 
 #include <cstdint>
 #include <vector>
@@ -21,16 +23,6 @@ enum class Mode : std::uint8_t { Strict, Deferred };
 // `error` on a statement-structure error.
 bool parse_block(Ast& ast, std::uint32_t begin, std::uint32_t end, Mode mode,
                  std::vector<NodeId>& out, ParseError& error);
-
-// Legacy Parser::find_balanced on src[open, end): quote, backtick-run, @/*,
-// <!-- and @// aware. Sets `close` to the matching close character.
-bool find_balanced(std::string_view src, std::uint32_t open, std::uint32_t end,
-                   char open_char, char close_char, std::uint32_t& close);
-
-bool is_space(char c);
-std::uint32_t skip_space(std::string_view src, std::uint32_t p, std::uint32_t end);
-bool valid_identifier(std::string_view text);
-std::string_view trim(std::string_view text);
 
 // Expression-layer entry points. Each returns kNoNode when the text is not a
 // complete, regular expression/statement; the caller then emits Opaque.
