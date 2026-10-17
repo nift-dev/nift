@@ -1,3 +1,4 @@
+#include "HostTrace.h"
 #include "IdentityPublication.h"
 #include <condition_variable>
 #include "ProjectInfo.h"
@@ -1289,6 +1290,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error, std::vector<std::string>* identities) {
+    const nift::trace::ContextGuard trace_context(info.name);
     std::map<std::string,std::string> snapshots;
     const bool hashing = config.incremental_mode != "modified";
     std::set<std::string> declared;

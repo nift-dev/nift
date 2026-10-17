@@ -3,11 +3,26 @@
 // them. Standalone scripts record nothing: there is no page to invalidate.
 #include "Parser.h"
 #include "ReadObservation.h"
+#include "HostTrace.h"
 
 namespace fs = std::filesystem;
 
+namespace {
+// Trace spelling: absolute, lexically normal (the harness maps temp roots).
+std::string trace_path(const fs::path& path) {
+    std::error_code error;
+    const fs::path absolute = fs::absolute(path, error);
+    return (error ? path : absolute).lexically_normal().generic_string();
+}
+} // namespace
+
+void Parser::trace_host(const char* op, const fs::path& path, const std::string& result) const {
+    if (nift::trace::enabled()) nift::trace::emit(op, trace_path(path), result);
+}
+
 Parser::FsInfo Parser::inspect_path(const fs::path& path) const {
     FsInfo info = inspect_path_unobserved(path);
+    if (nift::trace::enabled()) trace_host("stat", path, info.error ? "error" : info.exists ? info.type : "missing");
     if (!info.error) observe_presence(path, info.exists, info.type);
     return info;
 }
@@ -28,6 +43,7 @@ void Parser::observe_presence(const fs::path& path, bool exists, const std::stri
 }
 
 void Parser::observe_read(const fs::path& path, const std::string& bytes) {
+    if (nift::trace::enabled()) trace_host("read", path, std::to_string(bytes.size()));
     if (standalone_script_host_ || host_.root().empty()) return;
     result_.dependencies.insert(host_.relative(path));
     host_.observe_dependency(path, bytes);
@@ -39,19 +55,24 @@ void Parser::observe_metadata_read(const fs::path& path) {
     host_.observe_dependency_hash(path, filesystem::hash_path(path));
 }
 
-void Parser::note_written(const fs::path& path) {
+void Parser::note_written(const fs::path& path, const char* op) {
+    if (nift::trace::enabled()) trace_host(op, path, "");
     if (standalone_script_host_ || host_.root().empty()) return;
     std::error_code error;
     const fs::path absolute = fs::absolute(path, error);
     result_.observed.written.insert((error ? path : absolute).lexically_normal());
 }
 
-void Parser::observe_listing(const std::string& key, const fs::path&) {
+void Parser::observe_listing(const std::string& key, const fs::path& path) {
+    if (nift::trace::enabled()) trace_host(key.rfind("glob:", 0) == 0 ? "glob" : "list", path, "");
     if (standalone_script_host_ || host_.root().empty()) return;
     result_.observed.listings[key] = host_.listing_fingerprint(key);
 }
 
 void Parser::observe_environment(const std::string& name, const nift::HostResult& value) {
+    if (nift::trace::enabled())
+        nift::trace::emit("getenv", name, value.status == nift::HostStatus::Found ? "found" :
+                                          value.status == nift::HostStatus::NotFound ? "unset" : "error");
     if (standalone_script_host_ || host_.root().empty()) return;
     // NIFT_HOOK_* values are invocation-local facts about the tracked item
     // (target, paths, phase) supplied by the build itself, not the process

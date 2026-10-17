@@ -1,4 +1,5 @@
 #include "FeatureFlags.h"
+#include "HostTrace.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
 #include "ParserAsyncPool.h"
@@ -1277,7 +1278,7 @@ bool Parser::resolve_json_value(const std::string& expression,
                 current = cached->second;
             } else {
                 std::string contract_error;
-                auto document = host_.read_shared_runtime_json(contract_path, contract_error);
+                auto document = host_.read_shared_runtime_json(contract_path, contract_error);if(nift::trace::enabled())trace_host("read-json",contract_path,document?"ok":"error");
                 if (!document) {
                     error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
                             (contract_error.empty() ? "" : " (" + contract_error + ")");

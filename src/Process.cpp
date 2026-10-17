@@ -66,6 +66,13 @@ bool nift_find_executable(const std::string& name,std::string& path){
     return false;
 #endif
 }
+
+#include "HostTrace.h"
+// Runtime 2.0 CP08: one "spawn" trace line per pipeline stage.
+static void nift_trace_spawn(const std::vector<ProcessSpec>& specs){
+    if(!nift::trace::enabled())return;
+    for(const auto& spec:specs){std::string arg=spec.program;for(const auto& a:spec.args){arg.push_back(' ');arg+=a;}nift::trace::emit("spawn",arg,spec.cwd.empty()?std::string():spec.cwd.generic_string());}
+}
 #ifndef _WIN32
 // Runtime 2.0 CP07: capture files are anonymous regular files in /tmp (the
 // same directory and file type as before), so a crash or kill can never leave
@@ -97,6 +104,7 @@ static std::string read_fd_all(int fd){
     return data;
 }
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
+    nift_trace_spawn(specs);
     std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
     ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op,0);efd=open_temp(ep,1);if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);r.error="cannot create capture files";return r;}}
     // Interactive foreground execution: the child inherits the terminal
@@ -279,6 +287,7 @@ HANDLE child_stdio(HANDLE source,DWORD access,size_t stage) {
 } // namespace
 
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture, bool stream) {
+    nift_trace_spawn(specs);
     ProcessResult r;
     if (specs.empty()) { r.error = "empty pipeline"; return r; }
     std::wstring ow, ew; std::string op, ep; HANDLE okeep = INVALID_HANDLE_VALUE, ekeep = INVALID_HANDLE_VALUE;

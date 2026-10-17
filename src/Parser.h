@@ -138,7 +138,9 @@ private:
     void observe_read(const std::filesystem::path& path, const std::string& bytes);
     // A path the page itself created, changed or removed: observations of it
     // are dropped when page-info is written (it is output, not input).
-    void note_written(const std::filesystem::path& path);
+    void note_written(const std::filesystem::path& path, const char* op = "write");
+    // Runtime 2.0 CP08: Host-operation trace (no-op unless NIFT_TRACE_HOST is set).
+    void trace_host(const char* op, const std::filesystem::path& path, const std::string& result) const;
     void observe_metadata_read(const std::filesystem::path& path);
     void observe_listing(const std::string& key, const std::filesystem::path& path);
     void observe_environment(const std::string& name, const nift::HostResult& value);

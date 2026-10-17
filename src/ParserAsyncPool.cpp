@@ -1,3 +1,4 @@
+#include "HostTrace.h"
 #include "ParserAsyncPool.h"
 
 #include <algorithm>
@@ -24,6 +25,8 @@ NiftAsyncPool::NiftAsyncPool() {
     workers_.reserve(count);
     for (unsigned i = 0; i < count; ++i) workers_.emplace_back([this] {
         nift_async_pool_worker = true;
+        // CP08 trace: work on pool threads is unordered relative to the page.
+        if (nift::trace::enabled()) nift::trace::detail::context() = "async";
         for (;;) {
             std::function<void()> task;
             {

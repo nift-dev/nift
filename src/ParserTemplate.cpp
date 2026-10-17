@@ -1,3 +1,4 @@
+#include "HostTrace.h"
 #include "P4Plan.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
@@ -2288,7 +2289,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     // The read is the authority: missing/unreadable content
                     // yields nullptr -> the typed content error, with no
                     // separate readability probe (performance-regression repair).
-                    const auto cached = host_.read_shared_source(content_path);
+                    const auto cached = host_.read_shared_source(content_path);if(nift::trace::enabled())trace_host("read-source",content_path,cached.status==nift::HostStatus::Error?"error":cached.content?"ok":"missing");
                     if (cached.status == nift::HostStatus::Error) { fail(source_path, source, i, cached.error); break; }
                     if (!cached.content) { fail(source_path, source, i, "content file is not readable"); break; }
                     content_source = frontmatter::parse_inline(*cached.content).body;
@@ -2482,7 +2483,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 result_.dependencies.insert(host_.relative(input_path));
                 const int insertion_code_block_depth = code_block_depth_;
                 // The read is the authority (no separate readability probe).
-                const auto input_source = host_.read_shared_source(input_path);
+                const auto input_source = host_.read_shared_source(input_path);if(nift::trace::enabled())trace_host("read-source",input_path,input_source.status==nift::HostStatus::Error?"error":input_source.content?"ok":"missing");
                 if (input_source.status == nift::HostStatus::Error) { fail(source_path, source, i, input_source.error); break; }
                 if (!input_source.content) { fail(source_path, source, i, "input file is not readable"); break; }
                 push_variable_scope();
@@ -2614,7 +2615,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                              "@markup would result in an input loop through " + candidate.generic_string());
                         break;
                     }
-                    const auto loaded = host_.read_shared_source(candidate);
+                    const auto loaded = host_.read_shared_source(candidate);if(nift::trace::enabled())trace_host("read-source",candidate,loaded.status==nift::HostStatus::Error?"error":loaded.content?"ok":"missing");
                     if (loaded.status == nift::HostStatus::Error) {
                         fail(source_path, source, i, "markup: " + loaded.error);
                         break;
@@ -2649,7 +2650,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                         resolver_error = "markup include does not exist: " + requested;
                         return false;
                     }
-                    const auto loaded = host_.read_shared_source(candidate);
+                    const auto loaded = host_.read_shared_source(candidate);if(nift::trace::enabled())trace_host("read-source",candidate,loaded.status==nift::HostStatus::Error?"error":loaded.content?"ok":"missing");
                     if (loaded.status == nift::HostStatus::Error) {
                         resolver_error = loaded.error;
                         return false;
@@ -2769,7 +2770,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                         break;
                     }
                     std::string parse_error;
-                    auto runtime_document = host_.read_shared_runtime_json(json_path, parse_error);
+                    auto runtime_document = host_.read_shared_runtime_json(json_path, parse_error);if(nift::trace::enabled())trace_host("read-json",json_path,runtime_document?"ok":"error");
                     if (!runtime_document) {
                         const std::string message = "json: failed to parse " + json_path_argument +
                              (parse_error.empty() ? "" : " (" + parse_error + ")");
@@ -2835,7 +2836,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                             break;
                         }
                         std::string schema_parse_error;
-                        schema = host_.read_shared_json(schema_path, schema_parse_error);
+                        schema = host_.read_shared_json(schema_path, schema_parse_error);if(nift::trace::enabled())trace_host("read-json",schema_path,schema?"ok":"error");
                         if (!schema) {
                             fail(source_path, source, i, "json: failed to parse schema " + schema_path_argument +
                                  (schema_parse_error.empty() ? "" : " (" + schema_parse_error + ")"));
@@ -2935,7 +2936,7 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
     fs::path template_identity;
     if (!template_source.path.empty()) {
         template_identity = fs::absolute(template_source.path).lexically_normal();
-        const auto cached = host_.read_shared_source(template_identity);
+        const auto cached = host_.read_shared_source(template_identity);if(nift::trace::enabled())trace_host("read-source",template_identity,cached.status==nift::HostStatus::Error?"error":cached.content?"ok":"missing");
         if (cached.status == nift::HostStatus::Error) {
             result_.ok = false;
             result_.error = {tracked_info_.name, template_identity, 0, cached.error};
@@ -2972,7 +2973,7 @@ RenderResult Parser::render() {
     if (tracked_info_.template_path.empty()) {
         // The read is the authority: missing/unreadable content yields nullptr
         // -> the typed content error, with no separate readability probe.
-        const auto content_source = host_.read_shared_source(content_path);
+        const auto content_source = host_.read_shared_source(content_path);if(nift::trace::enabled())trace_host("read-source",content_path,content_source.status==nift::HostStatus::Error?"error":content_source.content?"ok":"missing");
         if (content_source.status == nift::HostStatus::Error) {
             result_.ok = false;
             result_.error = {tracked_info_.name, content_path, 0, content_source.error};
@@ -3056,7 +3057,7 @@ RenderResult Parser::render() {
         ReadObservations observed;
     };
     std::vector<PageRender> pages(total);
-    const auto page_source = host_.read_shared_source(pagination_template);
+    const auto page_source = host_.read_shared_source(pagination_template);if(nift::trace::enabled())trace_host("read-source",pagination_template,page_source.status==nift::HostStatus::Error?"error":page_source.content?"ok":"missing");
     if (page_source.status == nift::HostStatus::Error) {
         result_.ok = false;
         result_.error = {tracked_info_.name, pagination_template, 0, page_source.error};
@@ -3072,7 +3073,7 @@ RenderResult Parser::render() {
     // (Error != NotFound). Found with an empty value is a valid empty separator.
     const std::string* separator_source = nullptr;
     if (!separator.empty()) {
-        const auto separator_read = host_.read_shared_source(separator);
+        const auto separator_read = host_.read_shared_source(separator);if(nift::trace::enabled())trace_host("read-source",separator,separator_read.status==nift::HostStatus::Error?"error":separator_read.content?"ok":"missing");
         if (separator_read.status == nift::HostStatus::Error) {
             result_.ok = false;
             result_.error = {tracked_info_.name, separator, 0, separator_read.error};

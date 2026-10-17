@@ -1,3 +1,4 @@
+#include "HostTrace.h"
 #include "Proc.h"
 #include "ProcessTestHooks.h"
 #include "PreparedProcessPOSIX.h"
@@ -68,6 +69,7 @@ ProcessResult ShellJobTable::launch(const std::vector<ProcessSpec>& specs, const
     result.error="interactive job control is not supported on Windows"; result.exit_code=2; return result;
 #else
     if(specs.empty()){result.error="empty pipeline";return result;}
+    if(nift::trace::enabled())for(const auto& spec:specs){std::string arg=spec.program;for(const auto& a:spec.args){arg.push_back(' ');arg+=a;}nift::trace::emit("spawn",arg,"job");}
     std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
     Impl::Entry entry; entry.info.id=impl_->next_id++; entry.info.command=command;
     std::vector<PreparedProcessPOSIX> prepared;prepared.reserve(specs.size());
