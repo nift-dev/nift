@@ -76,6 +76,9 @@ void statement_errors() {
     verdict("throw ;", "1:1: throw requires an Error expression");
     verdict("fn(f()) {\n  if (x) {\n    while y {}\n  }\n}", "3:5: function while requires '(...)'");
     verdict("x := [1,\n 2]\n  if (a) { } else\n", "3:13: function else requires block");
+    // find_balanced skips <!-- --> and @/* */ (review mutation: removing them)
+    verdict("while (x) { <!-- } -->", "1:1: function while requires a block");
+    verdict("while (x) { @/* } */", "1:1: function while requires a block");
 }
 
 void accepted_forms() {

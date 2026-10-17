@@ -1,13 +1,17 @@
 mkdir -p .build/rt-asan
 g++ -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
-	tests/rt/parser_unit.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/parser.cpp src/rt/expr_parser.cpp -o .build/rt-asan/rt-parser-unit
+	tests/rt/parser_unit.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/source_scan.cpp src/rt/parser.cpp src/rt/statement_parser.cpp src/rt/declarations.cpp src/rt/control_flow.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/expr_literals.cpp -o .build/rt-asan/rt-parser-unit
 g++ -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
-	tests/rt/parse_dump.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/parser.cpp src/rt/expr_parser.cpp -o .build/rt-asan/rt-parse-dump
+	tests/rt/parse_dump.cpp src/rt/lexer.cpp src/rt/ast.cpp src/rt/source_scan.cpp src/rt/parser.cpp src/rt/statement_parser.cpp src/rt/declarations.cpp src/rt/control_flow.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/expr_literals.cpp -o .build/rt-asan/rt-parse-dump
 .build/rt-asan/rt-parser-unit
 PASS rt parser unit
 python3 tests/runtime2/rt_parser_corpus.py --sanitized .build/rt-asan/rt-parse-dump
-sanitized check: files=8617 failed_batches=0
+sanitized check: files=8864 failed_batches=0
 error corpus: 1500/1500 identical
-fuzz: iterations=20000 accepted=14993 rejected=5007 worst_ms=24.4286
+sanitized deep nesting, 1 MB stack: files=22 rc=0 ['files=22 accepted=22 nesting-limit=24']
+fuzz: iterations=20000 accepted=14993 rejected=5007 worst_ms=9.15744
 PASS rt parser sanitized
-exit 0
+
+real	0m43.126s
+user	0m28.042s
+sys	0m4.468s

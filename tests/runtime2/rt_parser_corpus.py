@@ -206,6 +206,46 @@ def executable(build, name):
     return path + ".exe" if not os.path.exists(path) and os.path.exists(path + ".exe") else path
 
 
+def deep_nesting_files(work):
+    """Programs nested far beyond the parser's bounds (blocks, lambdas,
+    expressions); they must parse within a 1 MB stack (the Windows main
+    thread), the bounds turning the excess into Opaque(nesting-limit)."""
+    out = os.path.join(work, "deep")
+    os.makedirs(out, exist_ok=True)
+    shapes = {
+        "if": lambda n: "if (true) {\n" * n + "x := 1\n" + "}\n" * n,
+        "fn": lambda n: "fn(g()) {\n" * n + "x := 1\n" + "}\n" * n,
+        "lambda": lambda n: "f := (p) => {\n" * n + "x := [[1]]\n" + "}\n" * n,
+        "try": lambda n: "try {\n" * n + "x := 1\n" + "} catch (e) { }\n" * n,
+        "struct": lambda n: "struct (S) {\nfn(m()) {\n" * n + "x := 1\n" + "}\n}\n" * n,
+        "paren": lambda n: "x := " + "(" * n + "1" + ")" * n,
+        "array": lambda n: "x := " + "[" * n + "]" * n,
+        "call": lambda n: "x := " + "f(" * n + ")" * n,
+        "unary": lambda n: "x := " + "- " * n + "1",
+        "chain": lambda n: "x := s" + ".to_string()" * n,
+        "interp": lambda n: "x := \"$[" + "(" * n + "1" + ")" * n + "]\"",
+    }
+    files = []
+    for name, make in shapes.items():
+        for n in (300, 5000):
+            path = os.path.join(out, "%s_%d.f" % (name, n))
+            with open(path, "w") as handle:
+                handle.write(make(n))
+            files.append(path)
+    return files
+
+
+def small_stack_check(dump, work):
+    """parse_dump check on deep_nesting_files under `ulimit -s 1024`."""
+    if os.name != "posix":
+        return True, "skipped (not POSIX)"
+    files = deep_nesting_files(work)
+    r = subprocess.run(["bash", "-c", 'ulimit -s 1024 && exec "$0" check "$@"', dump] + files,
+                       capture_output=True, text=True, errors="replace")
+    ok = r.returncode == 0 and r.stdout.count("\tok") == len(files)
+    return ok, "1 MB stack: files=%d rc=%d %s" % (len(files), r.returncode, r.stderr.strip().splitlines()[-1:] or "")
+
+
 def sanitized_run(dump, a):
     work = tempfile.mkdtemp(prefix="rt-parser-asan.")
     failed = []
@@ -227,6 +267,11 @@ def sanitized_run(dump, a):
         print(r.stdout.splitlines()[-1] if r.stdout else r.stderr[-3000:])
         if r.returncode or "runtime error" in r.stderr:
             failed.append("sanitized error corpus")
+        ok, summary = small_stack_check(dump, work)
+        print("sanitized deep nesting, " + summary)
+        record["small_stack"] = summary
+        if not ok:
+            failed.append("sanitized deep nesting on a 1 MB stack")
         seeds = corpora["vm-corpus"] + corpora["semantics"] + corpora["gen.py"][:200]
         r = run_limited([dump, "fuzz", str(a.seed), str(a.fuzz_iters)] + seeds, 3000)
         print(r.stdout.strip() or r.stderr[-3000:])
@@ -314,6 +359,12 @@ def main():
                                    "seconds": round(time.time() - t0, 1)}
         if r.returncode:
             failed.append("fuzz (rc=%d)" % r.returncode)
+
+        ok, summary = small_stack_check(dump, work)
+        print("deep nesting, " + summary)
+        record["gates"]["small_stack"] = summary
+        if not ok:
+            failed.append("deep nesting on a 1 MB stack")
 
         if a.negative_count:
             t0 = time.time()
