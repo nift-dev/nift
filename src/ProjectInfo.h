@@ -57,6 +57,9 @@ public:
     std::filesystem::path output_path(const TrackedInfo& info) const;
     std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t page) const;
     std::filesystem::path info_path(const TrackedInfo& info) const;
+    // Runtime 2.0 CP01: per-page modified-mode timing record (correctness
+    // state, not reproducible metadata); see docs/runtime-2/incremental-state.md.
+    std::filesystem::path render_clock_path(const TrackedInfo& info) const;
     std::string relative(const std::filesystem::path& path) const;
     const std::string* read_shared_source(const std::filesystem::path& path) const;
     std::uint64_t observed_source_hash(const std::string* bytes) const;
@@ -180,7 +183,7 @@ private:
                          const RenderClockObservation* render_clock = nullptr,
                          const ReadObservations* observed = nullptr) const;
     void append_read_observations(std::string& output, const ReadObservations& observed) const;
-    std::filesystem::path render_clock_path(const TrackedInfo& info) const;
+    void prune_render_clock_records() const;
     bool write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const;
     void read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const;
     mutable std::mutex listing_cache_mutex_;

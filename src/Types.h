@@ -83,15 +83,17 @@ struct ReadObservations {
     bool environment_snapshot = false;                          // env() read the whole environment
     std::map<std::string, std::string> kinds;                   // existing path -> "file"/"dir"/...
     std::set<std::filesystem::path> written;                    // absolute paths this render wrote/removed
+    std::optional<std::string> platform;                       // platform() value the render observed
     void merge(const ReadObservations& other) {
         absent.insert(other.absent.begin(), other.absent.end());
         kinds.insert(other.kinds.begin(), other.kinds.end());
         written.insert(other.written.begin(), other.written.end());
+        if (other.platform) platform = other.platform;
         listings.insert(other.listings.begin(), other.listings.end());
         env.insert(other.env.begin(), other.env.end());
         environment_snapshot = environment_snapshot || other.environment_snapshot;
     }
-    bool empty() const { return absent.empty() && listings.empty() && env.empty() && kinds.empty() && !environment_snapshot; }
+    bool empty() const { return absent.empty() && listings.empty() && env.empty() && kinds.empty() && !environment_snapshot && !platform; }
 };
 
 struct RenderResult {

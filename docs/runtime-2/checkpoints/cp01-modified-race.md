@@ -99,3 +99,16 @@ caught locally because BH6 is not in `make test-all`; D-010's certification
 target is now `make certify` (test-all plus every suite the CI workflows run),
 kept complete by `tests/runtime2/certification_guard.sh`.
 
+## Owner review follow-up: timing-record lifecycle and touch semantics
+- The timing record is correctness state (`docs/runtime-2/incremental-state.md`):
+  always written in modified mode; missing/malformed → conservative rebuild;
+  removed with its page; pruned for untracked pages on non-no-op builds;
+  removed in hash/hybrid mode. `tests/runtime2/clock_lifecycle.sh` (22 checks:
+  clean/unchanged/rebuild, missing, truncated, stale racy entry, SIGKILL
+  mid-build + repair, rm, untrack pruning, bounded count, mode switches,
+  external symlinked dependency).
+- Tick hashes are bound to the dependency's exact mtime
+  (`"<sec>.<nsec>:<hash>"`): any later write — including rewriting identical
+  bytes (a touch) — counts as a change again, as in v4.12.0. Found while
+  investigating `v45_target_smoke`, which tick-hashing made fail more often.
+

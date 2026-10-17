@@ -2545,7 +2545,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}if(!standalone_script_host_)result_.observed.environment_snapshot=true;return host_.environment_snapshot(out,error);}
             if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_os()));return true;}
             if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_arch()));return true;}
-            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}out=nift::RuntimeValue(host_.platform());return true;}
+            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}if(!standalone_script_host_&&!host_.root().empty())result_.observed.platform=host_.platform();out=nift::RuntimeValue(host_.platform());return true;}
             if(call_args("module_path",args,q)||call_args("package_path",args,q)){
                 const std::string name=text.rfind("module_path",0)==0?"module_path":"package_path";
                 std::vector<nift::RuntimeValue> values;

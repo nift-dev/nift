@@ -168,6 +168,7 @@ bool WatchList::reconcile(ProjectInfo& project) {
                         project.mark_mutation();
                         filesystem::remove_owned_file(project.output_path(*it));
                         filesystem::remove_owned_file(project.info_path(*it));
+                        filesystem::remove_owned_file(project.render_clock_path(*it));
                         filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(*it)));
                         fs::path sidecar = project.content_path(*it);
                         sidecar.replace_extension(".deps.json");

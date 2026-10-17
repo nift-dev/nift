@@ -564,6 +564,7 @@ void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info
     }
     filesystem::remove_owned_file(project.output_path(info));
     filesystem::remove_owned_file(project.info_path(info));
+    filesystem::remove_owned_file(project.render_clock_path(info));
     filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(info)));
     filesystem::remove_owned_file(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)));
 }

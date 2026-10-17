@@ -64,4 +64,16 @@ echo '<a href="@pathto("/")">home</a>' > content/index.html
 "$NIFT" build --all >/dev/null 2>&1
 fresh && ok "external output directory stays up to date" || bad "external output dir rebuilds: $("$NIFT" status | sed -n 2,4p | tr '\n' ' ')"
 cd /; rm -rf "$T"
+# platform() output depends on --platform (v45_target_smoke review: v4.12.0
+# served the previous target's output when nothing else changed).
+mode=platform
+T="$(mktemp -d)"; cd "$T" && "$NIFT" init >/dev/null 2>&1 || exit 2
+printf 'P:@script { return platform() }\n' > content/index.html
+"$NIFT" build --platform=android >/dev/null 2>&1
+"$NIFT" build --platform=ios >/dev/null 2>&1
+grep "P:ios" public/index.html >/dev/null && ok "switching --platform rebuilds platform() pages" || bad "stale platform output"
+"$NIFT" build --platform=ios 2>&1 | grep "up to date" >/dev/null && ok "same platform stays up to date" || bad "same platform rebuilds"
+printf 'NOPLATFORM\n' > content/index.html; "$NIFT" build >/dev/null 2>&1
+"$NIFT" build --platform=android 2>&1 | grep "up to date" >/dev/null && ok "pages not calling platform() ignore --platform" || bad "platform-independent page rebuilt"
+cd /; rm -rf "$T"
 exit $fail

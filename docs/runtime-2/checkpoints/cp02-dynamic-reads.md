@@ -80,3 +80,14 @@ are one `stat` per recorded path. Gate: no-op build instructions within +5%.
 ## Commit strategy
 1. Tests that fail on v4.12.0. 2. Observation module + recording. 3. Metadata
 write/check + docs + evidence.
+
+## Follow-up: `platform()` (pre-existing v4.12.0 bug)
+`platform()` output was cached without the selected platform: `build
+--platform=ios` after an android build served the android output when nothing
+else changed (root cause of the timing-dependent `v45_target_smoke`). A render
+that calls `platform()` now records it in page-info (`"platform"`), and a
+different `--platform` rebuilds the page ("platform changed"); pages that never
+call it are unaffected. Tests in `dynamic_reads_review.sh` (the stale case
+fails on v4.12.0). The regression suite's `v45_target_smoke` (`runtime-2`)
+now asserts this directly instead of rewriting the content file.
+
