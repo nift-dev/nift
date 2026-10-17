@@ -1,0 +1,1 @@
+error: $ROOT/replay_concat_array.f:1:7: string concatenation requires renderable scalar values

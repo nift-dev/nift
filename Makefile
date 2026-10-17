@@ -240,6 +240,43 @@ test-rt-value-sanitize:
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 
+# Runtime 2.0 CP11: compiler + register VM (src/rt), linked into nift behind
+# NIFT_VM=1. Unit tests in-process; differential parity against the legacy
+# engine (VM corpus expectations, generated programs, rt-diff with policies).
+# CP10 parser files have open lint findings fixed on runtime-2-cp10; not linted here.
+RT_LINT_CP10_FILES := parser.cpp parser.h expr_parser.cpp parser_internal.h lexer.cpp lexer.h ast.cpp ast.h
+RT_VM_UNIT := $(TEST_DIR)/rt/vm-unit$(EXEEXT)
+RT_VM_RUN := $(TEST_DIR)/rt/vm-run$(EXEEXT)
+RT_VM_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) tests/rt/rt_vm_tool.h src/RuntimeValue.cpp
+
+$(RT_VM_UNIT): tests/rt/vm_unit.cpp $(RT_VM_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+$(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_run.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+.PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
+test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(TARGET)
+	"$(RT_VM_UNIT)"
+	python3 tools/rt-lint.py $(filter-out $(addprefix src/rt/,$(RT_LINT_CP10_FILES)),$(wildcard src/rt/*.cpp src/rt/*.h))
+	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
+
+# ASan+UBSan: the unit tests, then the corpus and generated programs on a
+# sanitized nift (both engines in one sanitized binary).
+test-rt-vm-sanitize: $(SAN_TARGET)
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-unit"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(SAN_TARGET)" --gen $${RT_VM_GEN:-150} --seed $${RT_VM_SEED:-2} --timeout 120
+
+# CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
+bench-rt-vm: $(TARGET) $(RT_VM_RUN)
+	python3 benchmarks/runtime2/vm_compare.py --nift "$(CURDIR)/$(TARGET)" --baseline "$${NIFT_BASELINE:-../baseline-src/nift}" \
+		--vm-run "$(CURDIR)/$(RT_VM_RUN)"
+
 # Callgrind instruction counts, rt::Value vs legacy RuntimeValue (needs valgrind).
 bench-rt-value: $(RT_VALUE_BENCH)
 	tools/rt-bench.sh "$(RT_VALUE_BENCH)"
@@ -1948,6 +1985,7 @@ test-rt-parser: $(TEST_DIR)/rt-parser-unit$(EXEEXT) $(TEST_DIR)/rt-parse-dump$(E
 	python3 tests/runtime2/rt_parser_corpus.py --build $(TEST_DIR) --nift ./$(TARGET)
 
 test: test-rt-parser
+test: test-rt-vm
 
 # ASan/UBSan run of the rt parser over the script corpora plus fuzzing (CP10
 # evidence; slower, not part of `make test`).

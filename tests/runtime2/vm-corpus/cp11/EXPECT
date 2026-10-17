@@ -1,0 +1,57 @@
+# CP11 VM corpus: expected NIFT_VM=1 outcome per script (tests/runtime2/vm_parity.py).
+# <script> <vm|fallback|replayed> [reason prefix]. Every script must also match legacy byte for byte.
+arith.f vm 
+arrays.f vm 
+control.f vm 
+fallback_args.f fallback unresolved-name
+fallback_await.f fallback fn-flags
+fallback_bare_expression.f fallback expression-statement
+fallback_builtin.f fallback method:split
+fallback_const.f fallback declare-const
+fallback_escape.f fallback string-literal
+fallback_fn_after.f fallback fn-after-statement
+fallback_for.f fallback statement:For
+fallback_free_name.f fallback free-name
+fallback_index_assign_call.f fallback index-assign-order
+fallback_interpolation.f fallback interpolation
+fallback_lambda.f fallback expression:Lambda
+fallback_large_literal.f fallback number-literal
+fallback_parse_error.f fallback parse-error
+fallback_postfix_space.f fallback postfix-spelling
+fallback_shadow_native.f fallback fn-name-reserved
+fallback_shebang_mid.f fallback shebang-statement
+fallback_struct.f fallback statement:StructDecl
+fallback_trailing_comma.f fallback trailing-comma
+fallback_try.f fallback statement:Try
+functions.f vm 
+kernels.f vm 
+logic.f vm 
+objects.f vm 
+replay_alias.f replayed bail:aliasing
+replay_arity.f replayed bail:static-error
+replay_bad_index.f replayed bail:runtime-error
+replay_concat_array.f replayed bail:runtime-error
+replay_div_zero.f replayed bail:runtime-error
+replay_increment_string.f replayed bail:runtime-error
+replay_index_assign_type.f replayed bail:unverified
+replay_int_overflow.f replayed bail:number-range
+typed_double_binding.f vm
+replay_large_literal_result.f replayed bail:number-range
+replay_loop_type_change.f replayed bail:runtime-error
+replay_member_assign.f replayed bail:static-error
+replay_missing_member.f replayed bail:runtime-error
+replay_modulo_float.f replayed bail:runtime-error
+replay_negate_string.f replayed bail:runtime-error
+replay_negative_zero.f replayed bail:number-range
+replay_ordering.f replayed bail:runtime-error
+replay_overflow.f replayed bail:runtime-error
+replay_param_redeclare.f replayed bail:static-error
+replay_redeclare.f replayed bail:static-error
+replay_render_array.f replayed bail:runtime-error
+replay_return_array.f replayed bail:runtime-error
+replay_return_local_array.f replayed bail:aliasing
+replay_return_place.f replayed bail:aliasing
+replay_string_plus_assign.f replayed bail:runtime-error
+replay_type_change.f replayed bail:runtime-error
+strings.f vm 
+top_return.f vm 

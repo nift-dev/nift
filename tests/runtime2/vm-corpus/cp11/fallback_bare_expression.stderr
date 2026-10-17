@@ -1,0 +1,1 @@
+error: $ROOT/fallback_bare_expression.f:2:1: cannot render JSON object $[o]; select a member first

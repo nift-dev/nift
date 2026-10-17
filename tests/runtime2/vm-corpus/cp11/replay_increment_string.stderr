@@ -1,0 +1,1 @@
+error: $ROOT/replay_increment_string.f:2:1: increment/decrement requires a numeric lvalue

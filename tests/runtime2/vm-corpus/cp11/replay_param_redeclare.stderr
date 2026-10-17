@@ -1,0 +1,1 @@
+error: $ROOT/replay_param_redeclare.f:1:12: binding already declared in this scope: a

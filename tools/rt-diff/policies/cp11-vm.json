@@ -1,0 +1,98 @@
+[
+ {
+  "id": "cp11-deep_recursion-stdout",
+  "decision": "D-001#4",
+  "entry": "vm-corpus/cp04/deep_recursion.f",
+  "source_sha256": "a8ecb1a5c64b0ab683ae96d08dbe6d04855e93af666279c26aeff666cd212c37",
+  "channel": "stdout",
+  "old": "30\n",
+  "new": "30\n200\nunreachable?\n",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/vm-corpus/cp04/deep_recursion.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-deep_recursion-stderr",
+  "decision": "D-001#4",
+  "entry": "vm-corpus/cp04/deep_recursion.f",
+  "source_sha256": "a8ecb1a5c64b0ab683ae96d08dbe6d04855e93af666279c26aeff666cd212c37",
+  "channel": "stderr",
+  "old": "error: $ROOT/deep_recursion.f:1:36: callable recursion depth exceeded: r\n",
+  "new": "",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/vm-corpus/cp04/deep_recursion.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-deep_recursion-exit",
+  "decision": "D-001#4",
+  "entry": "vm-corpus/cp04/deep_recursion.f",
+  "source_sha256": "a8ecb1a5c64b0ab683ae96d08dbe6d04855e93af666279c26aeff666cd212c37",
+  "channel": "exit",
+  "old": "1",
+  "new": "0",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/vm-corpus/cp04/deep_recursion.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-deep_recursion-combined",
+  "decision": "D-001#4",
+  "entry": "vm-corpus/cp04/deep_recursion.f",
+  "source_sha256": "a8ecb1a5c64b0ab683ae96d08dbe6d04855e93af666279c26aeff666cd212c37",
+  "channel": "combined",
+  "old": "30\nerror: $ROOT/deep_recursion.f:1:36: callable recursion depth exceeded: r\n",
+  "new": "30\n200\nunreachable?\n",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/vm-corpus/cp04/deep_recursion.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-recursion_limit-stdout",
+  "decision": "D-001#4",
+  "entry": "semantics/recursion_limit.f",
+  "source_sha256": "e670dd02ab2c379592fd842de21147f7669ce9a66c406ba59308aa5093360493",
+  "channel": "stdout",
+  "old": "0\n0\n",
+  "new": "0\n0\n0\n",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/semantics/recursion_limit.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-recursion_limit-stderr",
+  "decision": "D-001#4",
+  "entry": "semantics/recursion_limit.f",
+  "source_sha256": "e670dd02ab2c379592fd842de21147f7669ce9a66c406ba59308aa5093360493",
+  "channel": "stderr",
+  "old": "error: $ROOT/recursion_limit.f:1:39: callable recursion depth exceeded: down\n",
+  "new": "",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/semantics/recursion_limit.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-recursion_limit-exit",
+  "decision": "D-001#4",
+  "entry": "semantics/recursion_limit.f",
+  "source_sha256": "e670dd02ab2c379592fd842de21147f7669ce9a66c406ba59308aa5093360493",
+  "channel": "exit",
+  "old": "1",
+  "new": "0",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/semantics/recursion_limit.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ },
+ {
+  "id": "cp11-recursion_limit-combined",
+  "decision": "D-001#4",
+  "entry": "semantics/recursion_limit.f",
+  "source_sha256": "e670dd02ab2c379592fd842de21147f7669ce9a66c406ba59308aa5093360493",
+  "channel": "combined",
+  "old": "0\n0\nerror: $ROOT/recursion_limit.f:1:39: callable recursion depth exceeded: down\n",
+  "new": "0\n0\n0\n",
+  "count": 1,
+  "justification": "Recursion depth is a VM frame budget (~100k frames, architecture.md decision 4, approved by D-001; semantics.md Recursion row) instead of the legacy limit of 64 user-callable frames; beyond the budget the same error family is reported.",
+  "test": "tests/runtime2/semantics/recursion_limit.f (legacy golden: limit 64; VM frame budget: tests/rt/vm_unit.cpp check_frame_budget)"
+ }
+]

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs nift with the Runtime 2.0 VM enabled (CP11), for differential runs:
+#   tools/rt-diff/rt-diff --a ./nift --b tools/rt-vm/nift-vm ...
+# NIFT_VM_BIN overrides the binary (default: the checkout's ./nift);
+# NIFT_VM_WRAPPER_MODE overrides the mode (default 1; `require` for benchmarks).
+# rt-diff passes a minimal environment, so per-run statistics are enabled by
+# writing a file path into .build/rt-vm/stats-path (tools/rt-vm/vm-parity.sh).
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+NIFT_VM=${NIFT_VM_WRAPPER_MODE:-1}
+export NIFT_VM
+if [ -z "${NIFT_VM_STATS:-}" ] && [ -f "$here/../../.build/rt-vm/stats-path" ]; then
+  NIFT_VM_STATS=$(cat "$here/../../.build/rt-vm/stats-path")
+  export NIFT_VM_STATS
+fi
+exec "${NIFT_VM_BIN:-$here/../../nift}" "$@"

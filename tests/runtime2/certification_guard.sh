@@ -11,7 +11,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
-          test-rt-parser test-sha256)
+          test-rt-parser test-sha256
+          test-rt-vm)
 WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys

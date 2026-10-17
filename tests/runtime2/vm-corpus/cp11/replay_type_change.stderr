@@ -1,0 +1,1 @@
+error: $ROOT/replay_type_change.f:3:1: cannot assign string to int binding 'x'
