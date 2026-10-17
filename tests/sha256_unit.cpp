@@ -206,6 +206,11 @@ static void files(const char* impl, const fs::path& dir, std::mt19937_64& rng) {
         const auto r = nift::crypto::sha256_file(locked);
         CHECK(r.status == Sha256FileStatus::OpenFailed && r.error.value() == EACCES, "[%s] unreadable -> OpenFailed", impl);
         ::chmod(locked.c_str(), 0600);
+        const fs::path closed = dir / "closed-dir";
+        fs::create_directories(closed);
+        ::chmod(closed.c_str(), 0);
+        CHECK(nift::crypto::sha256_file(closed).status == Sha256FileStatus::IsDirectory, "[%s] unreadable directory -> IsDirectory", impl);
+        ::chmod(closed.c_str(), 0700);
     } else {
         std::printf("note: running as root; unreadable-file check skipped (root bypasses permissions)\n");
     }

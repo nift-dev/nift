@@ -134,9 +134,18 @@ User documentation: `docs/HASHING-API.md`; website queue:
   baseline: `r := "t0"; try { r = open("data/t.txt"); x := open("missing") }
   catch(e) {...}; return r` renders `t.txt`'s content, but editing `t.txt`
   did not rebuild the page (stale output in all modes). Now the failed block's
-  dependencies, requirements and observations are merged back (output is
-  still discarded). Recording more can only add rebuilds, never stale output.
-  Without this the caught-missing-file absence above was lost too.
+  dependencies, requirements and **read** observations (absent paths, kinds,
+  listings, environment, platform) are merged back; output is still
+  discarded. The failed block's `written` set is deliberately **not** merged:
+  page-info writing erases every observation of a written path
+  (`absorb_hook_observations`), so merging it could drop a dependency
+  recorded before the try. The first version of this fix merged `written`
+  too, and the independent review (D1) showed exactly that: `v :=
+  open("data/o.txt"); try { touch("data/o.txt"); z := open("missing") }
+  catch(e) {...}` left the page stale after `o.txt` was edited (the baseline
+  rebuilt). With `written` excluded the merge only ever adds dependencies, so
+  it can only add rebuilds. Without the fix the caught-missing-file absence
+  above was lost too.
 - Evidence (`tests/sha256_builtins.sh`, each in modified/hash/hybrid): initial
   build, trace line present, unchanged inputs stay up to date, editing the
   hashed file rebuilds with the new digest, editing an external file (outside
@@ -166,7 +175,7 @@ independent textbook implementation written in the test, one-shot and with
 random splits; files of 0, 1, 55, 56, 63, 64, 65, buffer−1/buffer/buffer+1,
 2×buffer, 3×buffer+17 and 5 MiB+3 bytes (digest, size, observer sees exactly
 the bytes, chunk bound, repeat); all byte values and NULs; missing,
-file-as-directory, directory, symlink, dangling symlink, unreadable (skipped
+file-as-directory, directory, unreadable directory, symlink, dangling symlink, unreadable (skipped
 as root); 8 threads concurrently.
 
 Language/build coverage: NIST vectors through `sha256`; bytes vs string;
@@ -330,14 +339,36 @@ because `stat()` returns only `exists`, `type`, `size`.
 - Windows `sha256_file` and the clang/MinGW pragma path are untested here;
   first exercised by the cross-platform CI at integration.
 - ARMv8 SHA acceleration not vendored (future work, needs an arm64 runner).
-- A FIFO or device path blocks or streams until EOF, as with `sha256sum`.
+- A FIFO or device path blocks or streams until EOF, as with `sha256sum`;
+  `/dev/zero` or a file that grows forever never returns (same as `open()`).
 - Reads inside `async` functions are not recorded as dependencies (pre-existing
-  CP02 item 8, CP16), and permission-denied failures are not recorded (a page
-  that catches one does not rebuild when permissions change; same as `open`).
+  CP02 item 8, CP16). Caught `OpenFailed`/`ReadFailed` (permission denied,
+  `EMFILE`, I/O errors) record no dependency, so a page that catches one does
+  not rebuild when the file becomes readable — same as `open()`; CP16.
+- `sha256(open(p))` refuses content that starts with `\x1fnift:<kind>:`
+  (legacy in-band handle tagging, review R3); documented in
+  `HASHING-API.md`, removed by CP17 typed handles. `sha256_file(p)` and
+  `sha256(open_bytes(p))` are unaffected.
 - `open()` on a missing file does not record absence (pre-existing; only
   `sha256_file` does). Left unchanged to keep this checkpoint's scope.
 - The `@try` observation fix changes rebuild behaviour (more rebuilds, never
   fewer) for pages whose try blocks read files before failing.
+- Review round 1 (independent): D1 `@try` `written` merge (fixed, above);
+  D2 the Python sdist staging in `.github/workflows/packaging.yml` and
+  `packaging/test-version-derivation.sh` lacked `third_party/bitcoin-sha256`
+  (fixed; replayed on `git archive HEAD`: sdist builds and compiles); R1 CLI
+  archives shipped no third-party notices — `release.yml` archives, the staged
+  raw CLI and `make install` (hence the snap, installed under
+  `$(PREFIX)/share/licenses/nift/`) now carry `THIRD_PARTY_NOTICES.md`, which
+  also closes the pre-existing gap for statically linked libffi; R2
+  `test-sha256` runs in `checkpoint-10-cross-platform.yml` on Linux, macOS
+  and Windows (MSYS2; no sanitizer build on MinGW), `tests/sha256_builtins.sh`
+  is portable (no GNU `sed -i`, no `mapfile`, `sha256sum`/`shasum`/hashlib,
+  native paths via `cygpath -m`, symlink/permission/trace checks skipped where
+  unsupported), and Windows `ReadFile` treats `ERROR_BROKEN_PIPE` /
+  `ERROR_HANDLE_EOF` as end of input; DOC1 an unreadable directory is now
+  classified as a directory (one `stat` on the open-failure path), matching
+  `open()`; DOC2/DOC3/R3 documented.
 - `progress.md` is not edited here to avoid conflicts with the CP11 line; add
   a row when this branch is integrated. Release notes likewise.
 

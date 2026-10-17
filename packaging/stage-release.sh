@@ -42,6 +42,9 @@ chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasu
 make -j2 nift >/dev/null 2>&1
 cp nift "$STAGE_OUT/nift-$OS-$ARCH"
 STAGED_CLI="$STAGE_OUT/nift-$OS-$ARCH"
+# The raw CLI statically links vendored libffi and the Bitcoin Core SHA-256
+# subset; their notices travel next to it.
+cp THIRD_PARTY_NOTICES.md "$STAGE_OUT/THIRD_PARTY_NOTICES.md"
 echo "built CLI: $STAGE_OUT/nift-$OS-$ARCH"
 
 # 2. Native embed bundle (per-target .pc stamped) + SHA256SUMS

@@ -1160,10 +1160,16 @@ $(SHA256_BENCH): tests/sha256_bench.cpp $(SHA256_DEPS)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) tests/sha256_bench.cpp src/Sha256.cpp -o "$@"
 .PHONY: test-sha256 benchmark-sha256
-test-sha256: $(SHA256_UNIT) $(SHA256_UNIT_SAN) $(SHA256_UNIT_PORTABLE) $(TARGET)
+# MinGW has no ASan/UBSan runtime: Windows runs the unsanitized builds only.
+ifeq ($(OS),Windows_NT)
+SHA256_UNIT_SANITIZED :=
+else
+SHA256_UNIT_SANITIZED := $(SHA256_UNIT_SAN)
+endif
+test-sha256: $(SHA256_UNIT) $(SHA256_UNIT_SANITIZED) $(SHA256_UNIT_PORTABLE) $(TARGET)
 	python3 scripts/check_vendored_sha256.py
 	"$(SHA256_UNIT)"
-	"$(SHA256_UNIT_SAN)"
+	$(if $(SHA256_UNIT_SANITIZED),"$(SHA256_UNIT_SANITIZED)")
 	"$(SHA256_UNIT_PORTABLE)"
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/sha256_builtins.sh
 test: test-sha256
@@ -1321,13 +1327,19 @@ bh3-mutation-tranche1:
 
 .PHONY: test-guarantee-registry test-guarantee-registry-ci test-test-integrity bh1-guarantee-registry bh2-test-integrity bh3-mutation-tranche1
 
+# The CLI statically links vendored third-party code (libffi, the Bitcoin Core
+# SHA-256 subset); install its notices with it (the snap is built this way).
+LICENSEDIR ?= $(PREFIX)/share/licenses/nift
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
 	$(INSTALL_PROGRAM) "$(TARGET)" "$(DESTDIR)$(BINDIR)/$(TARGET)"
+	mkdir -p "$(DESTDIR)$(LICENSEDIR)"
+	cp LICENSE THIRD_PARTY_NOTICES.md "$(DESTDIR)$(LICENSEDIR)/"
 	@echo "Installed $(TARGET) to $(DESTDIR)$(BINDIR)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(BINDIR)/$(TARGET)"
+	rm -f "$(DESTDIR)$(LICENSEDIR)/LICENSE" "$(DESTDIR)$(LICENSEDIR)/THIRD_PARTY_NOTICES.md"
 	@echo "Removed $(DESTDIR)$(BINDIR)/$(TARGET)"
 
 clean:

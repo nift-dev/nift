@@ -114,7 +114,7 @@ jobs:
           test "$(./nift version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
           root="nift-$version-${{ matrix.platform }}"
           mkdir "$root"
-          cp nift README.md LICENSE "$root/"
+          cp nift README.md LICENSE THIRD_PARTY_NOTICES.md "$root/"
           tar -czf "$root.tar.gz" "$root"
       - name: Rehearse extracted archive (native runner)
         shell: bash
@@ -161,7 +161,7 @@ jobs:
           test "$(./nift.exe version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
           root="nift-$version-windows-x86_64"
           mkdir "$root"
-          cp nift.exe README.md LICENSE "$root/"
+          cp nift.exe README.md LICENSE THIRD_PARTY_NOTICES.md "$root/"
           powershell.exe -NoProfile -Command "Compress-Archive -Path '$root' -DestinationPath '$root.zip'"
       - name: Rehearse extracted archive (native runner)
         shell: bash

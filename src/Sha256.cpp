@@ -23,6 +23,7 @@
 #include <windows.h>
 #else
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -211,7 +212,11 @@ Sha256FileResult sha256_file(const std::filesystem::path& path, Sha256ChunkObser
     for (;;) {
         DWORD received = 0;
         if (!::ReadFile(handle, buffer.data.get(), static_cast<DWORD>(kSha256FileBufferSize), &received, nullptr)) {
-            const std::error_code error(static_cast<int>(::GetLastError()), std::system_category());
+            const DWORD code = ::GetLastError();
+            // A pipe whose writer closed, or end-of-file reported as an error
+            // by some devices, is end of input, not a read failure.
+            if (code == ERROR_BROKEN_PIPE || code == ERROR_HANDLE_EOF) break;
+            const std::error_code error(static_cast<int>(code), std::system_category());
             ::CloseHandle(handle);
             return fail(Sha256FileStatus::ReadFailed, error);
         }
@@ -243,6 +248,10 @@ Sha256FileResult sha256_file(const std::filesystem::path& path, Sha256ChunkObser
         // std::filesystem (and so exists()/stat()) also reports as not found.
         if (code == ENOENT || code == ENOTDIR) return fail(Sha256FileStatus::NotFound, error);
         if (code == EISDIR) return fail(Sha256FileStatus::IsDirectory, error);
+        // An unreadable directory fails open() with EACCES; classify it as a
+        // directory like open()/open_bytes() do (failure path only).
+        struct stat info;
+        if (::stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode)) return fail(Sha256FileStatus::IsDirectory, error);
         return fail(Sha256FileStatus::OpenFailed, error);
     }
     ReadBuffer buffer;

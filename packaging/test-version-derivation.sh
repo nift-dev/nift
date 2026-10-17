@@ -61,6 +61,7 @@ cp -r minifypp bindings/python/native/minifypp && cp -r markuppp bindings/python
 cp -r jsonic bindings/python/native/jsonic
 mkdir -p bindings/python/native/third_party bindings/python/native/scripts
 cp -r third_party/libffi bindings/python/native/third_party/libffi
+cp -r third_party/bitcoin-sha256 bindings/python/native/third_party/bitcoin-sha256
 cp scripts/build_vendored_libffi.sh bindings/python/native/scripts/
 cp scripts/check_vendored_libffi.py bindings/python/native/scripts/
 ( cd bindings/python && NIFT_VERSION="$TV" python3 setup.py sdist --dist-dir "$WORK" >/dev/null 2>&1 )

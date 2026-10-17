@@ -56,7 +56,7 @@ for(name : ls("dist")) {
   | missing file, missing parent, dangling symlink | recoverable Error, code `io.open_failed`, `sha256_file: cannot open path` |
   | permission denied or another open failure | recoverable Error, code `io.open_failed`, same message |
   | I/O error while reading | recoverable Error, code `io.read_failed`, `sha256_file: input failure` |
-  | path is a directory | error `sha256_file: path is a directory` |
+  | path is a directory (readable or not) | error `sha256_file: path is a directory` |
   | path is not a string | error `sha256_file: expected string path` |
 
   ```nift
@@ -65,7 +65,9 @@ for(name : ls("dist")) {
 
   Special files are read like any other file (`sha256_file("/dev/stdin")`
   hashes standard input until end-of-file; a FIFO blocks until a writer
-  appears), matching `sha256sum`.
+  appears), matching `sha256sum`. A source that never reaches end-of-file
+  (`/dev/zero`, a file another process keeps appending to) never returns,
+  exactly as with `open()` or `sha256sum`; there is no size limit or timeout.
 
 ## In website builds
 
@@ -77,12 +79,29 @@ catches is recorded as absent, so the page rebuilds when the file appears.
 `sha256()` of a value read with `open()`/`open_bytes()` is tracked through
 that read.
 
+Not tracked (same as `open()`): a caught failure other than "missing" —
+permission denied, too many open files, an I/O error — records no dependency,
+so the page does not rebuild when the file later becomes readable. Rebuild it
+explicitly or declare the file with `@dep`. (Planned with the Runtime 2.0
+Host-op layer, CP16.)
+
 ## Name precedence
 
 `sha256` and `sha256_file` are new names. If a program already defines a
 function (or module or host callable) with one of these names, the program's
 own definition is called, at top level and in loops alike; nothing changes for
 existing programs.
+
+## Known limitation: text that looks like an internal handle
+
+Nift currently marks some values (files, functions, structs, …) with an
+in-band string prefix (`\x1fnift:file:` and similar). `sha256(text)` refuses a
+string that starts with such a prefix, because `type()` reports it as a handle,
+not a string. This only matters for text that itself begins with the control
+character U+001F followed by `nift:<kind>:` — for example
+`sha256(open(p))` on such a file. Hash the file with `sha256_file(p)` or the
+bytes with `sha256(open_bytes(p))` instead; both are unaffected. Typed handles
+(Runtime 2.0, CP17) remove the ambiguity.
 
 ## Not provided (yet)
 
