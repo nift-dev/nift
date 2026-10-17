@@ -77,6 +77,8 @@ void check_fallbacks() {
         {"x := 1\nx\n", "expression-statement"},
         {"f := (x) => x\n", "expression:Lambda"},
         {"if(1 { }\n", "parse-error"},
+        {"x := 2\nprint(!x + 1)\n", "prefix-not-precedence"},
+        {"x := 2\ny := 1\nprint(y && !x || true)\n", "prefix-not-precedence"},
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -216,9 +218,9 @@ void check_code_shape() {
     CHECK(c.program != nullptr);
     if (!c.program) return;
     const std::string text = disassemble(*c.program);
-    CHECK(text.find("Call 5 1 2") != std::string::npos);    // arguments passed in place
+    CHECK(text.find("Call 4 1 2") != std::string::npos);    // arguments passed in place
     CHECK(text.find("JmpNotLt") != std::string::npos);      // fused loop condition
-    CHECK(text.find("AddI 0 0 1") != std::string::npos);    // i += 1
+    CHECK(text.find("AddI 1 1 1") != std::string::npos);    // i += 1
     CHECK(c.program->protos.size() == 2);
     CHECK(c.program->protos[1]->nparams == 2);
 }

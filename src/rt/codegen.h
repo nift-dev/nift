@@ -31,6 +31,12 @@ public:
     void set_offset(std::uint32_t offset) { offset_ = offset; }
     void set_params(std::uint16_t count) { proto_->nparams = count; }
 
+    // True when `operand` is a constant -1 or 2 (a text type that defers to the value).
+    bool is_untyped_constant(std::uint16_t operand) const;
+    // Removes BindType instructions whose type register is never read (and
+    // closes the gaps, re-targeting jumps). Run once, after the last emit.
+    void drop_unread_types();
+
     std::unique_ptr<Proto> finish();
     const std::string& error() const { return error_; }
 

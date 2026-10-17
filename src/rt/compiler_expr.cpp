@@ -160,6 +160,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
 bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
+    if (!infix_left_ok(node)) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t left = 0, right = 0;
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
@@ -172,6 +173,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
 // `&&` / `||` produce a bool (legacy converts the deciding operand).
 bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (node.op != Op::And && node.op != Op::Or) return fail(node, "logical-operator");
+    if (!infix_left_ok(node)) return false;
     if (!expr_to(node.a, dst)) return false;
     const bool is_and = node.op == Op::And;
     const std::size_t decided = fb_->emit(is_and ? OpCode::JmpFalse : OpCode::JmpTrue, dst);
@@ -185,6 +187,7 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
 }
 
 bool UnitCompiler::coalesce(const Node& node, std::uint16_t dst) {
+    if (!infix_left_ok(node)) return false;
     if (!expr_to(node.a, dst)) return false;
     const std::size_t done = fb_->emit(OpCode::JmpNotNull, dst);
     if (!expr_to(node.b, dst)) return false;
@@ -193,6 +196,7 @@ bool UnitCompiler::coalesce(const Node& node, std::uint16_t dst) {
 }
 
 bool UnitCompiler::ternary(const Node& node, std::uint16_t dst) {
+    if (!infix_left_ok(node)) return false;
     std::vector<std::size_t> to_else;
     if (!false_jump(node.a, to_else) || !expr_to(node.b, dst)) return false;
     const std::size_t done = fb_->emit(OpCode::Jmp);
@@ -229,12 +233,17 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     if (fn == plan_.index.end() && !is_native) return fail(callee, "callable:" + std::string(name));
     const std::uint16_t arity = is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
-    const std::uint16_t base = fb_->top();
+    // When `dst` is the newest register nothing above it is live, so the call
+    // window (arguments, then the callee frame) starts at `dst` and the result
+    // lands in place; otherwise it starts at the first free register.
+    const bool in_place = dst + 1u == fb_->top();
+    const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
-        std::uint16_t reg = 0;
+        std::uint16_t reg = base;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        if (!temp(reg) || !expr_to(args[k], reg)) return false;
+        if (!(in_place && k == 0) && !temp(reg)) return false;
+        if (!expr_to(args[k], reg)) return false;
         if (!is_native && !param_check(args[k], reg)) return false;
     }
     fb_->set_offset(node.begin);
@@ -247,9 +256,9 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         fb_->emit(OpCode::Call, base, fn->second, static_cast<std::uint16_t>(node.count));
     }
     std::uint16_t slot = base;
-    if (node.count == 0 && !temp(slot)) return false;  // the result slot exists even without arguments
+    if (node.count == 0 && !in_place && !temp(slot)) return false;  // the result slot exists even without arguments
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
-    fb_->release_to(base);
+    fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
 
@@ -339,6 +348,7 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
 
 bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
     const Node& node = ast_.at(id);
+    if ((node.kind == NodeKind::Logical || node.kind == NodeKind::Binary) && !infix_left_ok(node)) return false;
     if (node.kind == NodeKind::Logical && node.op == Op::And)
         return false_jump(node.a, jumps) && false_jump(node.b, jumps);
     const std::uint16_t mark = fb_->top();

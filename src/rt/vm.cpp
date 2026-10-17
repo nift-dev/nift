@@ -159,9 +159,15 @@ VmResult Vm::run(std::string& output) {
         if (!check_assign(R[pc->a], R[pc->b].as_int(), RK(pc->c).as_int(), fault)) FAIL();
         NEXT();
     }
+    OP(CheckParam) {
+        const std::int64_t text = RK(pc->c).as_int();
+        if (text_binding_type(text, R[pc->a]) == fast_tag(R[pc->a])) NEXT();
+        raise(fault, BailReason::Unverified, "parameter type differs between legacy paths");
+        FAIL();
+    }
     OP(CheckType) {
         const std::int64_t to = R[pc->b].as_int();
-        if ((R[pc->a].is(Kind::Int) && to == 2) || tag_assignable(binding_tag(R[pc->a]), to)) NEXT();
+        if (tag_assignable(fast_tag(R[pc->a]), to)) NEXT();
         raise(fault, BailReason::Error, "cannot assign a value of another type to a typed binding");
         FAIL();
     }
@@ -198,7 +204,7 @@ VmResult Vm::run(std::string& output) {
     OP(Halt) { goto done; }
     OP(Bail) { raise(fault, static_cast<BailReason>(pc->b), "the legacy engine reports an error here"); FAIL(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
-    OP(ObjectSet) OP(CheckParam) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NoAlias) {
+    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NoAlias) {
         if (!cold(*pc, R, K, output, fault)) FAIL();
         NEXT();
     }
@@ -253,10 +259,6 @@ bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fa
         case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
         case OpCode::Push: return push_value(R[in.a], RK(in.b), fault);
         case OpCode::Length: if (!length_of(R[in.b], out, fault)) return false; break;
-        case OpCode::CheckParam:
-            if (text_binding_type(RK(in.c).as_int(), R[in.a]) != binding_tag(R[in.a]))
-                return raise(fault, BailReason::Unverified, "parameter type differs between legacy paths");
-            return true;
         case OpCode::TypeMeet:
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));

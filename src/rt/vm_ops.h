@@ -43,13 +43,14 @@ bool positive_slow(const Value& value, Value& out, Fault& fault);
 // Legacy binding types (nift_binding_type): null 0, bool 1, int 2 (an
 // integral number), double 3, string 4, array 5, object 6, other kinds above.
 std::int64_t binding_tag(const Value& value);
+inline std::int64_t fast_tag(const Value& value) { return value.is(Kind::Int) ? 2 : binding_tag(value); }
 inline bool tag_assignable(std::int64_t from, std::int64_t to) { return from == to || (from == 2 && to == 3); }
 // Legacy nift_binding_type_from_text: a text type of 3 wins, 2 or none defer
 // to the value, another known type (a referenced binding's) wins.
 inline std::int64_t text_binding_type(std::int64_t text_type, const Value& value) {
     if (text_type == 3) return 3;
     if (text_type >= 0 && text_type != 2) return text_type;
-    return binding_tag(value);
+    return fast_tag(value);
 }
 // `x = e`: legacy checks the text-derived type at top level and the value
 // type in loop bodies; when the two verdicts differ the VM cannot know which

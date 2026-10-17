@@ -69,6 +69,8 @@ private:
     bool false_jump(NodeId cond, std::vector<std::size_t>& jumps);
     bool has_call(NodeId id) const;
     bool plain_postfix(const Node& node);
+    bool ends_with_not(NodeId id) const;
+    bool infix_left_ok(const Node& node);
     std::string_view type_text(const Node& node) const;
     bool text_type_of(const TextType& type, const Node& at, std::uint16_t& operand);
     bool text_type_operand(NodeId value, std::uint16_t& operand);

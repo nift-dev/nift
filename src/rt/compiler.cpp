@@ -48,6 +48,7 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
         if (!statement(list[k])) return false;
     }
     fb_->emit(OpCode::Halt);
+    fb_->drop_unread_types();
     return finish(out);
 }
 
@@ -77,6 +78,7 @@ bool UnitCompiler::compile_function(NodeId fn, std::unique_ptr<Proto>& out) {
     // The body shares the parameters' scope: `p := ...` redeclares a parameter.
     if (!statements(ast_.at(node.b))) return false;
     fb_->emit(OpCode::ReturnNull);
+    fb_->drop_unread_types();
     return finish(out);
 }
 
@@ -118,10 +120,11 @@ bool UnitCompiler::bail_statement(const Node& node) {
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
     if (reserved_name(name)) return fail(at, "binding-name-reserved");
     if (plan_.index.count(name)) return fail(at, "binding-shadows-fn");
-    if (!fb_->alloc(reg)) return builder_ok();
-    binding.reg = reg;
+    // The type register comes first so the value register is the newest one
+    // (a call initialiser then returns in place).
     binding.typed = true;  // every binding: assignments check it, bare references propagate it
-    if (!fb_->alloc(binding.type_reg)) return builder_ok();
+    if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
+    binding.reg = reg;
     return true;
 }
 
@@ -173,7 +176,9 @@ bool UnitCompiler::assign(const Node& node) {
     std::uint16_t text_type = 0;
     if (!text_type_operand(node.b, text_type)) return false;
     fb_->set_offset(node.begin);
-    fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
+    // With a text type of none or int both legacy paths check the value's own type.
+    if (fb_->is_untyped_constant(text_type)) fb_->emit(OpCode::CheckType, value, b.type_reg);
+    else fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
     fb_->emit(OpCode::Move, b.reg, value);
     return true;
 }

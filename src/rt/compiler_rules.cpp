@@ -92,4 +92,20 @@ bool UnitCompiler::param_check(NodeId arg, std::uint16_t reg) {
     return true;
 }
 
+// Legacy applies a prefix `!` to the rest of the evaluation unit (`!x + 1`
+// is `!(x + 1)`), which CP10 (before its fix) parses as `(!x) + 1`. A `!`
+// that ends the left side of an infix operator is therefore not compiled.
+bool UnitCompiler::ends_with_not(NodeId id) const {
+    const Node& n = ast_.at(id);
+    if (n.kind == NodeKind::Unary && n.op == Op::Not) return true;
+    if (n.kind == NodeKind::Binary || n.kind == NodeKind::Logical || n.kind == NodeKind::Coalesce)
+        return ends_with_not(n.b);
+    if (n.kind == NodeKind::Ternary) return ends_with_not(n.c);
+    return false;
+}
+
+bool UnitCompiler::infix_left_ok(const Node& node) {
+    return !ends_with_not(node.a) || fail(node, "prefix-not-precedence");
+}
+
 } // namespace nift::rt::detail

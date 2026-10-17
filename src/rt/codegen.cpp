@@ -3,6 +3,7 @@
 #include "rt/string.h"
 
 #include <cstring>
+#include <vector>
 
 namespace nift::rt {
 
@@ -65,6 +66,66 @@ bool FunctionBuilder::patch(std::size_t at, std::size_t target) {
     if (distance < -32768 || distance > 32767) { error_ = "jump distance exceeds 16 bits"; return false; }
     proto_->code[at].c = jump_operand(static_cast<int>(distance));
     return true;
+}
+
+bool FunctionBuilder::is_untyped_constant(std::uint16_t operand) const {
+    if (!(operand & kConstantBit)) return false;
+    const Value& v = proto_->constants[operand & ~kConstantBit];
+    return v.is(Kind::Int) && (v.as_int() == -1 || v.as_int() == 2);
+}
+
+namespace {
+
+bool is_jump(OpCode op) {
+    switch (op) {
+        case OpCode::Jmp: case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull:
+        case OpCode::JmpNotLt: case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe:
+        case OpCode::JmpNotEq: case OpCode::JmpNotNe: return true;
+        default: return false;
+    }
+}
+
+void mark_register(std::vector<bool>& read, std::uint16_t operand) {
+    if (!(operand & kConstantBit) && operand < read.size()) read[operand] = true;
+}
+
+} // namespace
+
+void FunctionBuilder::drop_unread_types() {
+    auto& code = proto_->code;
+    std::vector<bool> read(proto_->nregs + 1u, false);
+    for (const Instr& in : code) {
+        switch (in.op) {
+            case OpCode::CheckType: case OpCode::CheckAssign: mark_register(read, in.b); break;
+            case OpCode::TypeMeet: mark_register(read, in.b); mark_register(read, in.c); break;
+            case OpCode::BindType: case OpCode::CheckParam: mark_register(read, in.c); break;
+            default: break;
+        }
+    }
+    std::vector<std::size_t> position(code.size() + 1);
+    std::size_t kept = 0;
+    for (std::size_t i = 0; i < code.size(); ++i) {
+        position[i] = kept;
+        if (!(code[i].op == OpCode::BindType && !read[code[i].a])) ++kept;
+    }
+    position[code.size()] = kept;
+    if (kept == code.size()) return;
+    std::vector<Instr> out;
+    std::vector<std::uint32_t> offsets;
+    out.reserve(kept);
+    for (std::size_t i = 0; i < code.size(); ++i) {
+        if (code[i].op == OpCode::BindType && !read[code[i].a]) continue;
+        Instr in = code[i];
+        if (is_jump(in.op)) {
+            const long target = static_cast<long>(i) + 1 + jump_offset(in.c);
+            in.c = jump_operand(static_cast<int>(static_cast<long>(position[static_cast<std::size_t>(target)]) -
+                                                 static_cast<long>(out.size() + 1)));
+        }
+        out.push_back(in);
+        offsets.push_back(proto_->offsets[i]);
+    }
+    code = std::move(out);
+    proto_->offsets = std::move(offsets);
 }
 
 std::unique_ptr<Proto> FunctionBuilder::finish() { return std::move(proto_); }
