@@ -87,9 +87,14 @@ with tempfile.TemporaryDirectory(prefix='nift-status-contract-') as td:
                     rows.append({'mode': mode, 'case': case, 'skipped': str(error)})
                     continue
                 result = subprocess.run([exe, 'build'], cwd=p, capture_output=True)
-                assert (result.returncode == 0) == (case == 'alias'), (mode, case, result.stdout, result.stderr)
+                # Runtime 2.0 decision D-002: a dependency symlinked outside the
+                # project is an ordinary read (previously refused); a dangling
+                # symlink still fails.
+                assert (result.returncode == 0) == (case in ('alias', 'escaping')), (mode, case, result.stdout, result.stderr)
                 if case == 'alias':
                     assert 'ALIAS' in (p / 'public/a.html').read_text()
+                if case == 'escaping':
+                    assert 'ESCAPED' in (p / 'public/a.html').read_text(), mode
             rows.append({'mode': mode, 'case': case, 'passed': True})
 if args.output:
     pathlib.Path(args.output).write_text(json.dumps(rows, indent=2) + '\n')
