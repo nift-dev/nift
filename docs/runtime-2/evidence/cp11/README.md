@@ -13,6 +13,7 @@ runs, so wall times are noisy and are not gated), g++ 13.3 `-O2`, CPython
 | `vm_compare-tables.md` | the same data as tables |
 | `parity-seed3.log` | `tests/runtime2/vm_parity.py --gen 600 --seed 3 --rt-diff` (see note below) |
 | `rt-diff-vm-outcomes.json` | NIFT_VM=1 outcome (vm / fallback / replayed, with reason) of every rt-diff script entry in that run |
+| `sanitize.txt` | `make test-rt-vm-sanitize RT_VM_GEN=150` (ASan+UBSan, `-fno-sanitize-recover=all`, leak detection on): unit tests, then corpus + 150 generated + 150 mutants on `.build/nift-sanitize` (legacy and VM in one sanitized binary) |
 | `profile-call.txt` | `callgrind_annotate` of the flat-call workload (N=8,000) on the VM |
 
 ## Reproduce
