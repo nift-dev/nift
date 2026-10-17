@@ -1,3 +1,4 @@
+#include "FeatureFlags.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
 #include "ParserAsyncPool.h"
@@ -116,6 +117,9 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
     if (const char* configured_root = std::getenv("NIFT_FS_ROOT"); configured_root && *configured_root)
         resource_path_authority_.filesystem_root = canonical_authority_path(configured_root);
     variable_scopes_.emplace_back();
+    // CP05: a host may change the environment between renders; re-read the
+    // cached NIFT_P4_* switches for this parser.
+    nift::flags::note_environment_changed();
     if (!tracked_info_.name.empty()) {
         nift::RuntimeValue metadata=nift::RuntimeValue::make_object(); bool from_project=false; std::string page_metadata_error;
         // Per-page model-equivalent metadata (front matter + type + schema

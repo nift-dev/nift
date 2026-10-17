@@ -45,3 +45,26 @@ See `../evidence/cp05/README.md`.
 The translation cache trusts that `translate_function_program` stays a pure
 function of (text, view). A future change that makes translation depend on
 parser state must key the cache on that state or drop it.
+
+## Review (same-model adversarial pass; not independent)
+
+| # | Finding | Resolution |
+| --- | --- | --- |
+| 1 | Memory: a `fn` declared inside a loop or another function got a fresh span vector per evaluation, so pointer-keyed entries never hit and the cache grew (up to 386 MB RSS vs 11 MB) | Keys use span *contents*; a hit also needs identical text and an exactly equal mapping (`SourceView::same_mapping`); the cache is bounded by 4,096 entries and 16 MiB. Reproducers now 11.4 MB, same as the reference |
+| 2 | `setenv("NIFT_P4_TRACE", ...)` mid-run ignored (flags latched per process; also hid host env changes between Engine renders) | Flags cached per environment generation; Nift's setenv/unsetenv builtins, hooks, CLI writer and every Parser construction bump it. Reproducer matches the reference |
+| 3 | Reference numbers for `call_top`/`fib_top` did not reproduce | Corrected below: the gated flat call (in a loop) is −10.5%; top-level calls −4.6%, `fib` −5.9% |
+| — | Translator purity, eviction, ASan/UBSan (781 scripts), TSan (63 runs), rt-diff 9,514 entries | Held up |
+
+## Corrected measurements (callgrind instructions per op, reference = runtime-2 a3e15b5, after review fixes)
+
+| Op | Reference | CP05 | Change |
+| --- | ---: | ---: | ---: |
+| flat call in a loop (gate ≥10%) | 14,998 | 13,424 | −10.5% |
+| flat call at top level | 145,711 | 139,069 | −4.6% |
+| `fib` call at top level | 168,181 | 158,212 | −5.9% |
+
+The earlier top-level figures in this record were wrong (unreproducible
+reference numbers). Savings also scale with environment size (`getenv` scans
+the environment). The remaining call cost is architectural (textual
+re-evaluation per call); per D-006 the rest is left to the VM.
+

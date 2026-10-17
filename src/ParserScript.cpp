@@ -403,18 +403,27 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
                                             SourceProvenance source_provenance, bool rollback_files_on_failure, nift::detail::SourceView view) {
     const std::uint64_t file_checkpoint = begin_file_operation();
     // Only a caller-supplied view (function bodies, nested blocks) can repeat;
-    // a fresh identity view is unique per call and is never cached.
+    // a fresh identity view is unique per call and is never cached. Keys use
+    // span contents (a re-sliced body gets a new span vector each time), hits
+    // also require the same text and an exactly equal mapping, and the cache
+    // is bounded by entries and bytes.
     const bool cacheable=static_cast<bool>(view);
     if(!view)view=nift::detail::SourceView::identity(source_path,source);
     std::shared_ptr<const TranslatedProgram> cached;
-    if(cacheable){auto hit=translated_programs_.find(view.key());if(hit!=translated_programs_.end()&&hit->second->source==source)cached=hit->second;}
+    if(cacheable){auto hit=translated_programs_.find(view.key());if(hit!=translated_programs_.end()&&hit->second->source==source&&hit->second->input_view.same_mapping(view))cached=hit->second;}
     std::string translated_text, error;nift::detail::SourceView translated_view;nift::detail::DiagnosticOrigin translation_origin;
     if (!cached && !translate_function_program(source, translated_text, error,view,&translated_view,&translation_origin)) {
         RenderResult failed; failed.ok=false; failed.error.message=error;failed.error.source_file=translation_origin.source;failed.error.line=translation_origin.line;failed.error.column=translation_origin.column;failed.error.source_length=translation_origin.source_length;failed.error.source_line=translation_origin.source_line;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error,std::move(translation_origin));if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
     if(!cached){
         auto entry=std::make_shared<TranslatedProgram>(TranslatedProgram{source,view,std::move(translated_text),std::move(translated_view)});
-        if(cacheable){if(translated_programs_.size()>=4096)translated_programs_.clear();translated_programs_[view.key()]=entry;}
+        if(cacheable){
+            const std::size_t bytes=entry->source.size()+entry->program.size()+entry->input_view.mapping_bytes()+entry->program_view.mapping_bytes()+256;
+            if(translated_programs_.size()>=4096||translated_program_bytes_+bytes>(16u<<20)){translated_programs_.clear();translated_program_bytes_=0;}
+            auto& slot=translated_programs_[view.key()];
+            if(slot)translated_program_bytes_-=std::min(translated_program_bytes_,slot->source.size()+slot->program.size()+slot->input_view.mapping_bytes()+slot->program_view.mapping_bytes()+256);
+            slot=entry;translated_program_bytes_+=bytes;
+        }
         cached=std::move(entry);
     }
     const std::string& program=cached->program;const nift::detail::SourceView& program_view=cached->program_view;

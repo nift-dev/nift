@@ -303,11 +303,12 @@ private:
     struct SourceViewKeyHash {
         std::size_t operator()(const nift::detail::SourceView::Key& k) const {
             std::size_t h = std::hash<const void*>()(k.document);
-            for (std::size_t v : {std::hash<const void*>()(k.spans), k.base, k.size, k.eof}) h = h * 1099511628211ull ^ v;
+            for (std::size_t v : {static_cast<std::size_t>(k.spans), k.base, k.size, k.eof}) h = h * 1099511628211ull ^ v;
             return h;
         }
     };
     std::unordered_map<nift::detail::SourceView::Key, std::shared_ptr<const TranslatedProgram>, SourceViewKeyHash> translated_programs_;
+    std::size_t translated_program_bytes_ = 0;   // bounded: cleared above 16 MiB
     enum class CompletionPhase { Untouched, Evaluating, Evaluated, Completed, Failed };
     struct CompletionSite {
         nift::detail::SourceText source;

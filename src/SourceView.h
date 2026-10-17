@@ -2,6 +2,7 @@
 
 #include "Diagnostic.h"
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -65,15 +66,42 @@ public:
     }
     explicit operator bool() const { return static_cast<bool>(document_); }
     // Identity of the coordinate mapping (not of the text): two views with the
-    // same key map every offset to the same original position.
+    // same key map every offset to the same original position. The span table
+    // is keyed by content, not by allocation: re-slicing the same function
+    // body allocates a fresh span vector on every evaluation (CP05 review:
+    // pointer keys never hit for nested or loop-declared functions and grew
+    // the cache without bound).
     struct Key {
-        const void* document = nullptr; const void* spans = nullptr;
+        const void* document = nullptr; std::uint64_t spans = 0;
         std::size_t base = 0, size = 0, eof = 0;
         bool operator==(const Key& o) const {
             return document == o.document && spans == o.spans && base == o.base && size == o.size && eof == o.eof;
         }
     };
-    Key key() const { return {document_.get(), spans_.get(), base_, size_, eof_}; }
+    Key key() const {
+        std::uint64_t digest = 1469598103934665603ull;
+        auto mix = [&](std::uint64_t v) { digest = (digest ^ v) * 1099511628211ull; };
+        if (spans_) {
+            mix(spans_->size());
+            for (const auto& span : *spans_) {
+                mix(span.begin); mix(span.length); mix(span.original); mix(span.original_length); mix(span.anchored);
+            }
+        }
+        return {document_.get(), digest, base_, size_, eof_};
+    }
+    // Exact mapping equality (the key's span digest is only a hash).
+    bool same_mapping(const SourceView& o) const {
+        if (document_ != o.document_ || base_ != o.base_ || size_ != o.size_ || eof_ != o.eof_) return false;
+        if (!spans_ || !o.spans_) return !spans_ && !o.spans_;
+        if (spans_ == o.spans_) return true;
+        if (spans_->size() != o.spans_->size()) return false;
+        for (std::size_t i = 0; i < spans_->size(); ++i) {
+            const auto& a = (*spans_)[i]; const auto& b = (*o.spans_)[i];
+            if (a.begin != b.begin || a.length != b.length || a.original != b.original ||
+                a.original_length != b.original_length || a.anchored != b.anchored) return false;
+        }
+        return true;
+    }
     const std::shared_ptr<const SourceDocument>& document() const { return document_; }
     std::size_t size() const { return size_; }
     std::size_t span_count() const { return spans_ ? spans_->size() : (size_ ? 1 : 0); }

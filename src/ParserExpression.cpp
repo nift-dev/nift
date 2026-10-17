@@ -2731,6 +2731,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #else
                 if(::setenv(k.c_str(),v.c_str(),1)!=0){error="setenv: failed";return false;}
 #endif
+                nift::flags::note_environment_changed();
                 out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("unsetenv",args,q)){if(!standalone_script_host_){error="unsetenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=1){error="unsetenv: expected name";return false;}std::string k;if(!string_arg("unsetenv",args,q,0,k))return false;
                 std::lock_guard<std::mutex> lock(nift_environment_mutex());
@@ -2739,6 +2740,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #else
                 ::unsetenv(k.c_str());
 #endif
+                nift::flags::note_environment_changed();
                 out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=nift::RuntimeValue((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
             if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available in standalone Nift scripts/shell";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoChangeDirectoryFailed,"cd: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}

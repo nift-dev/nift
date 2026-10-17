@@ -1,3 +1,4 @@
+#include "FeatureFlags.h"
 #include "ProcessEnvironment.h"
 #include "Hooks.h"
 #include "ScriptHost.h"
@@ -41,6 +42,7 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
     if (target.empty()) ::unsetenv("NIFT_HOOK_TARGET");
     else ::setenv("NIFT_HOOK_TARGET", target.c_str(), 1);
 #endif
+    nift::flags::note_environment_changed();
 
     }
     ScriptRenderHost host(root);

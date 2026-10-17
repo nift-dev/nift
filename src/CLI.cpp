@@ -1,3 +1,4 @@
+#include "FeatureFlags.h"
 #include "ProcessEnvironment.h"
 #include "CLI.h"
 #include "FileSystem.h"
@@ -77,6 +78,7 @@ void nift_setenv(const char* name, const char* value, int /*overwrite*/) {
 #else
     ::setenv(name, value, 1);
 #endif
+    nift::flags::note_environment_changed();
 }
 constexpr const char* version_text = "Nift v4.12.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
