@@ -141,7 +141,11 @@ jobs:
           set -e
           tail -200 test-all.log
           if [ "$rc" -ne 0 ]; then
-            grep -nE '^make(\[[0-9]+\])?: \*\*\*|FAIL|Error|differing|AssertionError|Traceback' test-all.log | tail -40 | sed -e 's/%/%25/g' -e 's/^/::error title=test-all::/'
+            # The failing recipes and the lines just before each (GitHub keeps
+            # only ten annotations per step, so print the make errors first).
+            grep -nE '^make(\[[0-9]+\])?: \*\*\* \[' test-all.log | sed -e 's/%/%25/g' -e 's/^/::error title=failed recipe::/'
+            grep -nE '^(FAIL missed|FAIL rt-diff|FAIL \[|DIFF |AssertionError|RuntimeError)' test-all.log | head -8 | sed -e 's/%/%25/g' -e 's/^/::error title=failure::/'
+            grep -nE -B4 '^make(\[[0-9]+\])?: \*\*\* \[' test-all.log | grep -vE '^[0-9]+-(g\+\+|cc|mkdir) ' | tail -30 | sed -e 's/%/%25/g' -e 's/^/::error title=context::/'
             exit "$rc"
           fi
       - name: Build-boundary non-destructive proof (serial)
