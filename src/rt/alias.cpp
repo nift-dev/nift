@@ -59,7 +59,29 @@ struct Analysis {
 
 } // namespace
 
-void plan_escaping_params(const Ast& ast, UnitPlan& plan) {
+namespace {
+
+// Does any call to a user function in the subtree pass a place argument?
+bool has_place_call(const Ast& ast, const UnitPlan& plan, NodeId id) {
+    if (id == kNoNode) return false;
+    const Node& n = ast.at(id);
+    if (n.kind == NodeKind::Call && ast.at(n.a).kind == NodeKind::Ident && plan.index.count(ast.text(ast.at(n.a)))) {
+        const NodeId* args = ast.list(n);
+        for (std::uint32_t k = 0; k < n.count; ++k)
+            if (is_place_argument(ast, args[k])) return true;
+    }
+    if (has_place_call(ast, plan, n.a) || has_place_call(ast, plan, n.b) || has_place_call(ast, plan, n.c)) return true;
+    const NodeId* list = ast.list(n);
+    for (std::uint32_t k = 0; k < n.count; ++k)
+        if (has_place_call(ast, plan, list[k])) return true;
+    return false;
+}
+
+} // namespace
+
+void plan_escaping_params(const Ast& ast, NodeId root, UnitPlan& plan) {
+    // Only needed (and only computed) when some call passes a place.
+    if (plan.functions.empty() || !has_place_call(ast, plan, root)) return;
     plan.escaping.assign(plan.functions.size(), {});
     for (std::size_t f = 0; f < plan.functions.size(); ++f)
         plan.escaping[f].assign(ast.at(plan.functions[f]).count, false);

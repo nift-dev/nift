@@ -46,7 +46,7 @@ struct UnitPlan {
     std::vector<NodeId> functions;                           // FnDecl nodes, proto index = position + 1
     std::unordered_map<std::string_view, std::uint16_t> index;  // function name -> proto index
     // escaping[f][k]: parameter k of functions[f] may be mutated or rebound
-    // through (alias.h); filled by plan_unit.
+    // through (alias.h); filled by plan_unit, empty when no call passes a place.
     std::vector<std::vector<bool>> escaping;
 };
 

@@ -244,8 +244,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         std::uint16_t reg = base;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
-        if (!is_native && is_place_argument(ast_, args[k]) && k < plan_.escaping[fn->second - 1u].size() &&
-            plan_.escaping[fn->second - 1u][k])
+        if (!is_native && is_place_argument(ast_, args[k]) && fn->second - 1u < plan_.escaping.size() &&
+            k < plan_.escaping[fn->second - 1u].size() && plan_.escaping[fn->second - 1u][k])
             return fail(ast_.at(args[k]), "alias-argument");
         if (!(in_place && k == 0) && !temp(reg)) return false;
         if (!expr_to(args[k], reg)) return false;

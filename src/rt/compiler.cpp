@@ -150,12 +150,12 @@ bool UnitCompiler::declare(const Node& node) {
     if (value_kind == NodeKind::Ident || value_kind == NodeKind::Member || value_kind == NodeKind::Index)
         fb_->emit(OpCode::NoAlias, reg);
     std::uint16_t text_type = 0;
-    if (!text_type_operand(node.b, text_type)) return false;
+    const TextType inferred = infer_text_type(type_text(ast_.at(node.b)));
+    if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
     // Loop-body legacy types this declaration from the value alone (text_type.h).
-    if (refers_to_binding(infer_text_type(type_text(ast_.at(node.b)))))
-        fb_->emit(OpCode::CheckParam, reg, 0, text_type);
+    if (refers_to_binding(inferred)) fb_->emit(OpCode::CheckParam, reg, 0, text_type);
     if (!scopes_.declare(name, binding)) return bail_statement(node);  // "binding already declared"
     return true;
 }

@@ -16,7 +16,8 @@ namespace nift::rt {
 // the target of `=`, a compound assignment or `++`/`--`, or as a bare-name
 // argument to a parameter of a user function that escapes (fixpoint).
 // Conservative: a block-local shadowing binding of the same name counts too.
-void plan_escaping_params(const Ast& ast, UnitPlan& plan);
+// Left empty when no call in `root` passes a place argument.
+void plan_escaping_params(const Ast& ast, NodeId root, UnitPlan& plan);
 
 // True when `node` is an argument written as a place other than a bare name
 // (member or index access).
