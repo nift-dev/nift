@@ -20,6 +20,7 @@
 #include "rt/aggregate.h"
 #include "rt/compare.h"
 #include "rt/decimal.h"
+#include "rt/heap.h"
 #include "rt/legacy_bridge.h"
 #include "rt/number.h"
 #include "rt/string.h"
@@ -40,6 +41,15 @@ using nift::RuntimeValue;
 namespace {
 
 std::mt19937_64 rng;
+
+// Coverage counters, printed at the end so the record can state what the
+// random generators actually exercised.
+struct Coverage {
+    long equal_number_pairs = 0, equal_cross_kind = 0, big_exponent_operands = 0, big_double_operands = 0;
+    long large_objects = 0, duplicate_rejections = 0, object_index_lookups = 0;
+} coverage;
+
+bool big_exponent(const Value& v) { return v.is(Kind::Decimal) && !number_form(v).big_exponent.empty(); }
 std::uint64_t below(std::uint64_t n) { return std::uniform_int_distribution<std::uint64_t>(0, n - 1)(rng); }
 
 std::int64_t random_int() {
@@ -180,7 +190,15 @@ void numeric_differential(long iterations) {
         int c = 0, lc = 0;
         const bool cmp = compare_relational(a, b, c), lcmp = nift::runtime_compare_numbers_relational(la, lb, lc);
         same = same && cmp == lcmp && (!cmp || c == lc);
-        if (equal(a, b)) same = same && hash(a) == hash(b);
+        if (equal(a, b)) {
+            same = same && hash(a) == hash(b);
+            ++coverage.equal_number_pairs;
+            if (a.kind() != b.kind()) ++coverage.equal_cross_kind;
+        }
+        if (big_exponent(a) || big_exponent(b)) ++coverage.big_exponent_operands;
+        if (a.is(Kind::Double) && std::fabs(a.as_double()) > 9007199254740992.0 &&
+            std::trunc(a.as_double()) == a.as_double())
+            ++coverage.big_double_operands;
         std::int64_t x = 0, lx = 0;
         same = same && number_to_i64(a, x) == nift::runtime_number_to_i64(la, lx) && x == lx;
         CHECK(same);
@@ -217,6 +235,7 @@ RuntimeValue random_legacy(int depth, bool duplicates = false) {
             const bool large = depth <= 1 && below(6) == 0;
             const std::size_t n = large ? 1 + below(64) : below(4), keys = large ? 86 : 6;
             for (std::size_t i = 0; i < n; ++i) o[pool_key(below(keys))] = random_legacy(large ? 3 : depth + 1, duplicates);
+            if (o.object.size() >= ObjectObject::kIndexThreshold) ++coverage.large_objects;
             if (duplicates && !o.object.empty() && below(8) == 0)
                 o.object.emplace_back(o.object[below(o.object.size())].first, random_legacy(3));
             return o;
@@ -263,7 +282,7 @@ void structural_differential(long iterations) {
         const bool aok = from_legacy(la, a, err), bok = from_legacy(lb, b, err);
         // Duplicate keys (anywhere in the tree) are rejected, everything else converts.
         CHECK(aok == !has_duplicate_key(la) && bok == !has_duplicate_key(lb));
-        if (!aok || !bok) continue;
+        if (!aok || !bok) { ++coverage.duplicate_rejections; continue; }
         CHECK(identical(legacy_of(a), la));  // round trip keeps value, kind and order
         CHECK(equal(a, b) == nift::runtime_equal(la, lb));
         CHECK(truthy(a) == nift::runtime_truthy(la));
@@ -368,6 +387,7 @@ void object_model(long sequences) {
                 }
             }
             for (std::size_t i = 0; i < 4; ++i) CHECK(identical(legacy_of(slots[i]), model[i]));
+            if (object_size(slots[x]) >= ObjectObject::kIndexThreshold) coverage.object_index_lookups += keyspace;
             for (std::size_t j = 0; j < keyspace; ++j) {
                 const Value* got = object_get(slots[x], atom(pool_key(j)));
                 const RuntimeValue* want = model[x].find_member(pool_key(j));
@@ -394,5 +414,11 @@ int main(int argc, char** argv) {
     structural_differential(20000 * scale);
     cow_model(500 * scale);
     object_model(300 * scale);
+    std::printf("coverage: %ld equal number pairs (%ld cross-kind), %ld with a big-exponent Decimal, "
+                "%ld integral doubles > 2^53; %ld generated objects >= 8 keys, %ld duplicate-key rejections; "
+                "%ld object lookups on indexed objects\n",
+                coverage.equal_number_pairs, coverage.equal_cross_kind, coverage.big_exponent_operands,
+                coverage.big_double_operands, coverage.large_objects, coverage.duplicate_rejections,
+                coverage.object_index_lookups);
     return rt_test::finish("rt value property");
 }
