@@ -145,6 +145,77 @@ def main():
             if trace_fd is not None:
                 os.write(int(trace_fd), trace)
             sys.exit(int(golden(".r2.exit")))
+    elif mode.startswith("x-"):
+        import re, glob
+        infos = [p for p in walk_files(os.path.join(cwd, ".nift")) if p.endswith(".info.json")] if os.path.isdir(os.path.join(cwd, ".nift")) else []
+        def rewrite(fn):
+            for p in infos:
+                d = open(p, "rb").read(); n = fn(d)
+                if n != d: open(p, "wb").write(n)
+        if mode == "x-racy-drop":
+            rewrite(lambda d: re.sub(rb',\n  "racy-dependencies": \[[^\]]*\]', b"", d))
+        elif mode == "x-tick-drop":
+            rewrite(lambda d: re.sub(rb',\n  "tick-hashes": \{[^}]*\}', b"", d))
+        elif mode == "x-listing-garbage":
+            def g(d):
+                try: j = json.loads(d)
+                except ValueError: return d
+                if isinstance(j.get("listings"), dict) and j["listings"]:
+                    j["listings"] = {k: "0" for k in j["listings"]}
+                    return json.dumps(j, indent=2).encode()
+                return d
+            rewrite(g)
+        elif mode == "x-info-reformat":
+            rewrite(lambda d: d.replace(b"\n  ", b"\n\t"))
+        elif mode == "x-info-escape":
+            rewrite(lambda d: d.replace(b"/", b"\\/"))
+        elif mode == "x-info-dupkey":
+            rewrite(lambda d: d.replace(b'"title": ', b'"title": "BOGUS",\n  "title": ', 1))
+        elif mode == "x-info-number":
+            rewrite(lambda d: re.sub(rb'("pagination-pages": )(\d+)', rb'\g<1>\g<2>.0', d))
+        elif mode == "x-escape-write":
+            # A write that escapes the working copy through `..`.
+            open(os.path.join(cwd, "..", "rt-escape.txt"), "a").write("x")
+        elif mode == "x-hang":
+            # Never finishes: rt-diff must kill the whole process group and
+            # report a timeout difference.
+            import time
+            child = subprocess.Popen(["sleep", "300"])
+            time.sleep(300)
+        elif mode == "x-time-user":
+            out = out.replace(b"time taken: 1 seconds", b"time taken: 2 seconds")
+        elif mode == "x-trace-extra-field":
+            trace = b"".join(l.rstrip(b"}\n") + b',"extra":1}\n' for l in trace.splitlines(keepends=True))
+        elif mode == "x-trace-cross":
+            ls_ = trace.splitlines(keepends=True)
+            kids = [l for l in ls_ if b'/async#' in l or b'/thread#' in l]
+            trace = b"".join([l for l in ls_ if l not in kids] + kids)
+        elif mode == "x-trace-page-cross":
+            ls_ = trace.splitlines(keepends=True)
+            trace = b"".join(sorted(ls_, key=lambda l: json.loads(l)["ctx"]))
+        elif mode == "x-trace-page-reverse":
+            # Pages built in the opposite order (each page's own operations
+            # unchanged): visible only through cross-page order.
+            groups, order = {}, []
+            for l in trace.splitlines(keepends=True):
+                c = json.loads(l)["ctx"]
+                if c not in groups: order.append(c); groups[c] = []
+                groups[c].append(l)
+            trace = b"".join(l for c in reversed(order) for l in groups[c])
+        elif mode == "x-trace-relabel":
+            trace = trace.replace(b'"ctx":"script/async#1"', b'"ctx":"script/async#9"')
+        elif mode == "x-racy-inject":
+            if args[:1] == ["build"]:
+                rewrite(lambda d: d.replace(b'\n  "dependencies": [', b'\n  "racy-dependencies": ["templates/template.html"],\n  "dependencies": [', 1))
+        elif mode == "x-tick-inject":
+            if args[:1] == ["build"]:
+                rewrite(lambda d: d.replace(b'\n  "dependencies": [', b'\n  "tick-hashes": {"templates/template.html": "1"},\n  "dependencies": [', 1))
+        elif mode == "x-replace-plus":
+            out = out.replace(b"item", b"ITEM") + b"extra\n"
+        elif mode == "x-empty-old":
+            out = b"".join(bytes([c]) + b"Z" for c in out); out = b"Z" + out
+        else:
+            sys.exit("unknown mutant mode %s" % mode)
     elif mode.startswith("replace:"):
         # replace:OLD:NEW — used by policy self-tests.
         _, old, new = mode.split(":", 2)

@@ -1,0 +1,3 @@
+@json(d, "data/items.json")
+@for(x : d.items){@item{<b>$[x.name]</b>}}
+@paginate

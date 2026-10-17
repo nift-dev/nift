@@ -44,12 +44,14 @@ namespace detail {
 //    without tracing.
 inline int take_descriptor() {
     const char* value = std::getenv("NIFT_TRACE_HOST");
-    if (!value || !*value) return -1;
+    if (!value) return -1;
+    // An empty value disables tracing but is still removed from the
+    // environment (round-2 review: NIFT_TRACE_HOST="" stayed visible to env()).
     char* end = nullptr;
-    const long parsed = std::strtol(value, &end, 10);
+    const long parsed = *value ? std::strtol(value, &end, 10) : -1;
     const char* allow = std::getenv("NIFT_TRACE_HOST_ALLOW_STDIO");
     const bool allow_stdio = allow && std::strcmp(allow, "1") == 0;
-    int fd = (!end || *end != '\0' || parsed < 0 || parsed > (1L << 20)) ? -1 : static_cast<int>(parsed);
+    int fd = (!*value || !end || *end != '\0' || parsed < 0 || parsed > (1L << 20)) ? -1 : static_cast<int>(parsed);
     if (fd >= 0 && fd <= 2 && !allow_stdio) fd = -1;
 #ifdef _WIN32
     if (fd >= 0 && ::_get_osfhandle(fd) == -1) fd = -1;

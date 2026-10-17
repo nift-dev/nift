@@ -1,5 +1,7 @@
-# Entries excluded from rt-diff because their output is nondeterministic by
-# design (the same binary twice gives different bytes). Patterns match entry ids
-# `<corpus-name>/<path>`. Every line names its reason.
-smoke/v48_map_set_scaling_guard/*   # prints epoch() differences (clock)
-smoke/v46_output_smoke/001-workers/* # thread/async stdout interleaving
+# Channels excluded from rt-diff because the same binary twice gives different
+# bytes on them by design. Format: `<entry-id pattern> channels=<list|all> # reason`.
+# Only the named channels are skipped; every other channel of the entry is
+# still compared.
+smoke/v48_map_set_scaling_guard/* channels=stdout,combined # prints epoch() differences (clock)
+smoke/v46_output_smoke/001-workers/* channels=stdout,stderr,combined # thread/async stream interleaving
+smoke/v44_executable_script_smoke/010-signal/* channels=all # loops ~1e9 iterations until its test sends SIGTERM; never finishes on its own (a timeout is a difference)

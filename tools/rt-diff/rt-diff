@@ -30,18 +30,26 @@ STEPS (site and workspace entries; `$WS` expands to the copy's absolute path):
   symlink TARGET PATH     create a symlink
   sleep SECONDS           wait (mtime-based incremental modes need a tick)
 
-Exclusions (`rt-diff.ignore` in a corpus, or --ignore FILE): entry patterns, each
-with a reason after '#'. Approved semantic differences: --policy FILE (JSON, see
-docs/runtime-2/rt-diff.md); a policy matches one entry and channel and an exact
-old -> new substitution, and only that difference is reported as approved.
+Exclusions (`rt-diff.ignore` in a corpus, or --ignore FILE): one entry pattern
+per line, a mandatory `channels=` list (`stdout,combined`, or `all` to skip the
+entry) and a reason after '#'; only the named channels are excluded. Approved
+semantic differences: --policy FILE (JSON, see docs/runtime-2/rt-diff.md); a
+policy matches one entry (id and source hash), one channel and an exact
+old -> new substitution; unused policies are failures.
+
+Isolation: A and B run one after the other in the SAME absolute directory (so
+path-dependent values such as glob fingerprints are comparable without
+normalisation), nested three levels below the snapshot root (writes that
+escape the copy through `..` are snapshotted), each nift step in its own
+session/process group (killed on timeout and after the step, so no process
+outlives a run). A timeout on either side is always a difference.
 
 Normalisations (the only ones; each is tested in tests/runtime2/rt_diff_selftest.sh):
-  1. the entry's working copy path (and realpath) -> $ROOT
-  2. HOME -> $HOME, TMPDIR -> $TMPDIR, their common parent -> $BASE
-  3. `time taken: <number> seconds` -> `time taken: $T seconds`
-  4. page-info files (.nift/**/*.info.json): the keys `racy-dependencies` and
-     `tick-hashes` are removed (they record timing, not behaviour), and the
-     values (not keys) of `listings` become "$FP" (they hash absolute paths)
+  1. the copy's path -> $ROOT, HOME -> $HOME, TMPDIR -> $TMPDIR, the snapshot
+     root -> $BASE (each also under its realpath only if that differs, e.g.
+     macOS /var -> /private/var)
+  2. for site and workspace steps only, a whole stdout/stderr line
+     `time taken: <number> seconds` (Nift's build summary) -> `$T`
 Exit status: 0 when no unapproved difference, 1 otherwise, 2 on usage errors.
 """
 import argparse
@@ -61,10 +69,14 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONTENT = {}   # file fingerprint -> normalised bytes (small files), for reports
-TIME_RE = re.compile(rb"time taken: [0-9.eE+-]+ seconds")
+TIME_LINE_RE = re.compile(rb"(?m)^time taken: [0-9.eE+-]+ seconds$")
+CHANNELS = ("exit", "stdout", "stderr", "combined", "files", "home", "tmp", "trace", "ctx-order")
 GOLDEN_SUFFIXES = (".stdout", ".stderr", ".exit", ".args", ".env", ".stdin", ".expect")
-PAGE_INFO_TIMING_KEYS = ("racy-dependencies", "tick-hashes")
-NONDETERMINISTIC_INTERLEAVE = re.compile(r"\basync\b|\bthread\s*\(|\[async\]")
+
+
+def usage_error(message):
+    print(message, file=sys.stderr)
+    sys.exit(2)
 
 
 # --------------------------------------------------------------------- discovery
@@ -91,7 +103,7 @@ def discover(corpus_specs, global_ignore=()):
                 errors.append("corpus label collision: %s" % root)
                 continue
         labels[label] = root
-        ignore = load_ignore(os.path.join(root, "rt-diff.ignore")) + ["@" + p for p in global_ignore]
+        ignore = load_ignore(os.path.join(root, "rt-diff.ignore")) + [("@" + p, c) for p, c in global_ignore]
         before = len(entries)
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames.sort()
@@ -131,40 +143,54 @@ def discover(corpus_specs, global_ignore=()):
 
 
 def load_ignore(path):
+    """Lines: `PATTERN channels=a,b|all # reason`. Returns (pattern, channels)."""
     patterns = []
     if path and os.path.isfile(path):
         with open(path) as handle:
             for line in handle:
-                pattern, _, reason = line.partition("#")
-                pattern = pattern.strip()
-                if pattern:
-                    if not reason.strip():
-                        raise SystemExit("rt-diff: exclusion without a reason in %s: %s" % (path, pattern))
-                    patterns.append(pattern)
+                body, _, reason = line.partition("#")
+                body = body.strip()
+                if not body:
+                    continue
+                if not reason.strip():
+                    usage_error("rt-diff: exclusion without a reason in %s: %s" % (path, body))
+                fields = body.split()
+                chans = [f for f in fields[1:] if f.startswith("channels=")]
+                if len(fields) != 2 or not chans:
+                    usage_error("rt-diff: exclusion needs `PATTERN channels=...` in %s: %s" % (path, body))
+                value = chans[0].split("=", 1)[1]
+                channels = "all" if value == "all" else tuple(value.split(","))
+                if channels != "all" and not set(channels) <= set(CHANNELS):
+                    usage_error("rt-diff: unknown channel in %s: %s" % (path, body))
+                patterns.append((fields[0], channels))
     return patterns
 
 
 def add(entries, label, ignore, kind, path, rel, tree=None):
     rel = rel.replace(os.sep, "/")
     entry_id = label + "/" + rel
-    for pattern in ignore:
-        if pattern.startswith("@"):
-            if fnmatch.fnmatch(entry_id, pattern[1:]):
+    excluded = set()
+    for pattern, channels in ignore:
+        hit = fnmatch.fnmatch(entry_id, pattern[1:]) if pattern.startswith("@") else fnmatch.fnmatch(rel, pattern)
+        if hit:
+            if channels == "all":
                 return
-        elif fnmatch.fnmatch(rel, pattern):
-            return
-    entry = {"kind": kind, "path": path, "id": entry_id}
+            excluded.update(channels)
+    entry = {"kind": kind, "path": path, "id": entry_id, "excluded": sorted(excluded)}
     if tree:
         entry["tree"] = tree
     entries.append(entry)
 
 
 # --------------------------------------------------------------------- running
-def normalise(data, roots):
-    """roots: (path, token) pairs, longest path first."""
+def normalise(data, roots, build_summary=False):
+    """roots: (path, token) pairs, longest path first. build_summary: also map
+    Nift's own `time taken: N seconds` summary line (site/workspace steps)."""
     for root, token in roots:
         data = data.replace(root.encode(), token)
-    return TIME_RE.sub(b"time taken: $T seconds", data)
+    if build_summary:
+        data = TIME_LINE_RE.sub(b"time taken: $T seconds", data)
+    return data
 
 
 def sidecar(path, suffix, kind):
@@ -188,10 +214,9 @@ def parse_env(data):
     return env
 
 
-def plan(entry, base):
-    """Returns (work, project_dir, steps) where steps are tuples."""
+def plan(entry, work):
+    """Copies the entry to `work`; returns (project_dir, steps)."""
     kind, path = entry["kind"], entry["path"]
-    work = os.path.join(base, "w")
     skip = lambda d, names: [n for n in names if n.endswith(GOLDEN_SUFFIXES) or n in ("rt-diff.steps", "rt-diff.only")]
     if kind == "script":
         tree = entry.get("tree") or os.path.dirname(path)
@@ -199,12 +224,12 @@ def plan(entry, base):
         cwd = os.path.join(work, os.path.relpath(os.path.dirname(path), tree))
         extra = sidecar(path, ".args", kind)
         args = extra.decode().splitlines() if extra else []
-        return work, os.path.normpath(cwd), [("nift", [os.path.basename(path)] + args, sidecar(path, ".stdin", kind) or b"")]
+        return os.path.normpath(cwd), [("nift", [os.path.basename(path)] + args, sidecar(path, ".stdin", kind) or b"")]
     if kind == "eval":
         os.makedirs(work)
         with open(path) as handle:
             expressions = [line.rstrip("\n") for line in handle if line.strip() and not line.startswith("#")]
-        return work, work, [("nift", ["eval", "--json", expr], b"") for expr in expressions]
+        return work, [("nift", ["eval", "--json", expr], b"") for expr in expressions]
     shutil.copytree(path, work, symlinks=True, ignore=skip)
     project = work
     if kind == "workspace":
@@ -232,84 +257,148 @@ def plan(entry, base):
                 target, _, link = rest.partition(" ")
                 steps.append(("symlink", target, link))
             else:
-                raise SystemExit("rt-diff: unknown step %r in %s" % (verb, entry["path"]))
+                usage_error("rt-diff: unknown step %r in %s" % (verb, entry["path"]))
     else:
         steps.append(("nift", ["build", "--all"], b""))
-    return work, project, steps
+    # Every site/workspace ends with `nift status` (round-2 review): it reads
+    # back the page-info Nift wrote, so wrong metadata surfaces as behaviour.
+    if not (steps[-1][0] == "nift" and steps[-1][1][:1] == ["status"]):
+        steps.append(("nift", ["status"], b""))
+    return project, steps
 
 
-def run_one(binary, entry, timeout, trace, interleave):
-    base = tempfile.mkdtemp(prefix="rtdiff-")
+def build_threads(project):
     try:
-        home, tmp = os.path.join(base, "home"), os.path.join(base, "tmp")
+        with open(os.path.join(project, ".nift", "config.json")) as handle:
+            return json.load(handle).get("config", {}).get("build-threads")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def run_group(argv, cwd, env, stdin, timeout, pass_fds=(), stderr=subprocess.PIPE):
+    """Runs argv in its own session; kills the whole process group on timeout
+    and after completion (background descendants never outlive the step)."""
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=stderr, pass_fds=pass_fds, start_new_session=True)
+    try:
+        out, err = proc.communicate(stdin, timeout=timeout)
+        code = proc.returncode
+    except subprocess.TimeoutExpired:
+        kill_group(proc.pid)
+        out, err = proc.communicate()
+        code = "timeout"
+    kill_group(proc.pid)
+    return code, out or b"", err or b""
+
+
+def kill_group(pgid):
+    try:
+        os.killpg(pgid, 9)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def roots_for(paths):
+    """(path, token) pairs: each path, plus its realpath only if different."""
+    pairs = {}
+    for path_value, token in paths:
+        pairs[path_value] = token
+        real = os.path.realpath(path_value)
+        if real != path_value:
+            pairs[real] = token
+    return sorted(pairs.items(), key=lambda item: len(item[0]), reverse=True)
+
+
+def wipe(base):
+    for name in os.listdir(base):
+        full = os.path.join(base, name)
+        if os.path.isdir(full) and not os.path.islink(full):
+            shutil.rmtree(full, ignore_errors=True)
+        else:
+            os.remove(full)
+
+
+def run_one(binary, entry, base, timeout, trace, combined_runs):
+    """Runs one entry with one binary under `base` (an existing empty
+    directory shared by A and B, so absolute paths are identical). The copy
+    lives three levels down; the whole of `base` is snapshotted."""
+    sandbox = os.path.join(base, "s", "t", "u")
+    work, home, tmp = os.path.join(sandbox, "w"), os.path.join(sandbox, "home"), os.path.join(sandbox, "tmp")
+    tracedir = tempfile.mkdtemp(prefix="rtdiff-trace-")
+    roots = roots_for(((work, b"$ROOT"), (home, b"$HOME"), (tmp, b"$TMPDIR"), (base, b"$BASE")))
+    site_like = entry["kind"] in ("site", "workspace")
+    result = {"stdout": b"", "stderr": b"", "combined": [], "exit": [], "trace": [], "threads": None}
+
+    def prepare():
+        wipe(base)
         os.makedirs(home)
         os.makedirs(tmp)
-        work, project, steps = plan(entry, base)
+        project, steps = plan(entry, work)
         env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": home, "TMPDIR": tmp, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
             "TERM": "dumb", "NO_COLOR": "1",
         }
         env.update(parse_env(sidecar(entry["path"], ".env", entry["kind"])))
-        pairs = {}
-        for path_value, token in ((work, b"$ROOT"), (home, b"$HOME"), (tmp, b"$TMPDIR"), (base, b"$BASE")):
-            pairs[path_value] = token
-            pairs[os.path.realpath(path_value)] = token
-        roots = sorted(pairs.items(), key=lambda item: len(item[0]), reverse=True)
-        result = {"stdout": b"", "stderr": b"", "combined": b"", "exit": [], "trace": []}
+        return project, steps, env
+
+    try:
+        if combined_runs and entry["kind"] == "script":
+            # stdout and stderr on one pipe records their relative order. Runs
+            # first, each in a fresh copy, so its side effects never reach the
+            # snapshot of the main run.
+            for _ in range(combined_runs):
+                project, steps, env = prepare()
+                step = steps[0]
+                _, out, _ = run_group([binary] + step[1], project, env, step[2], timeout, stderr=subprocess.STDOUT)
+                result["combined"].append(normalise(out, roots))
+        project, steps, env = prepare()
+        threads = build_threads(project) if site_like else None
+        result["threads"] = threads
         for index, step in enumerate(steps):
             verb = step[0]
             if verb != "nift":
                 apply_step(step, project)
+                if verb in ("write", "append", "remove", "symlink"):
+                    # Let the filesystem clock move past the edit before the
+                    # next nift step. Otherwise whether the edit lands in the
+                    # render's own timestamp tick (CP01 `tick-hashes`) depends
+                    # on scheduling and page-info differs between identical
+                    # runs. This removes a harness-made race; nothing is
+                    # normalised.
+                    time.sleep(0.02)
                 continue
-            argv, stdin = [binary] + step[1], step[2]
-            trace_path = os.path.join(base, "trace-%d.jsonl" % index)
+            trace_path = os.path.join(tracedir, "trace-%d.jsonl" % index)
             trace_fd = os.open(trace_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             run_env = dict(env)
             if trace:
                 run_env["NIFT_TRACE_HOST"] = str(trace_fd)
             marker = ("-- step %d: %s\n" % (index, " ".join(step[1][:3]))).encode() if len(steps) > 1 else b""
             try:
-                proc = subprocess.run(argv, cwd=project, env=run_env, input=stdin, capture_output=True,
-                                      timeout=timeout, pass_fds=(trace_fd,) if trace else ())
-                code, out, err = proc.returncode, proc.stdout, proc.stderr
-            except subprocess.TimeoutExpired as expired:
-                code, out, err = "timeout", expired.stdout or b"", expired.stderr or b""
+                code, out, err = run_group([binary] + step[1], project, run_env, step[2], timeout,
+                                           pass_fds=(trace_fd,) if trace else ())
             finally:
                 os.close(trace_fd)
-            result["stdout"] += marker + normalise(out, roots)
-            result["stderr"] += marker + normalise(err, roots)
+            result["stdout"] += marker + normalise(out, roots, site_like)
+            result["stderr"] += marker + normalise(err, roots, site_like)
             result["exit"].append(code)
             with open(trace_path, "rb") as handle:
                 result["trace"].extend(parse_trace(normalise(handle.read(), roots)))
-            os.remove(trace_path)
-        if interleave and entry["kind"] == "script" and interleave_is_deterministic(entry["path"]):
-            # Second run with stdout and stderr on one pipe: records the order in
-            # which the two streams were written (single-threaded scripts only).
-            work2 = os.path.join(base, "w2")
-            tree = entry.get("tree") or os.path.dirname(entry["path"])
-            shutil.copytree(tree, work2, symlinks=True,
-                            ignore=lambda d, names: [n for n in names if n.endswith(GOLDEN_SUFFIXES) or n == "rt-diff.only"])
-            cwd2 = os.path.normpath(os.path.join(work2, os.path.relpath(os.path.dirname(entry["path"]), tree)))
-            step = steps[0]
-            try:
-                proc = subprocess.run([binary] + step[1], cwd=cwd2, env=env, input=step[2],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
-                combined = proc.stdout
-            except subprocess.TimeoutExpired as expired:
-                combined = expired.stdout or b""
-            pairs2 = dict(pairs)
-            pairs2[work2] = b"$ROOT"
-            pairs2[os.path.realpath(work2)] = b"$ROOT"
-            roots2 = sorted(pairs2.items(), key=lambda item: len(item[0]), reverse=True)
-            result["combined"] = normalise(combined, roots2)
-            shutil.rmtree(work2, ignore_errors=True)
-        result["files"] = snapshot(work, roots)
-        result["home"] = snapshot(home, roots)
-        result["tmp"] = snapshot(tmp, roots)
+        snap = snapshot(base, roots)
+        prefix_home = os.path.relpath(home, base).replace(os.sep, "/")
+        prefix_tmp = os.path.relpath(tmp, base).replace(os.sep, "/")
+        split = {"files": {}, "home": {}, "tmp": {}}
+        for name, value in snap.items():
+            if name == prefix_home + "/" or name.startswith(prefix_home + "/"):
+                split["home"][name] = value
+            elif name == prefix_tmp + "/" or name.startswith(prefix_tmp + "/"):
+                split["tmp"][name] = value
+            else:
+                split["files"][name] = value
+        result.update(split)
         return result
     finally:
-        shutil.rmtree(base, ignore_errors=True)
+        shutil.rmtree(tracedir, ignore_errors=True)
 
 
 def apply_step(step, project):
@@ -327,52 +416,40 @@ def apply_step(step, project):
         time.sleep(float(step[1]))
 
 
-def interleave_is_deterministic(path):
-    try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            return not NONDETERMINISTIC_INTERLEAVE.search(handle.read())
-    except OSError:
-        return False
-
-
 def parse_trace(data):
+    """Each trace line is compared as a whole JSON object (every field, sorted
+    keys), so unknown or extra fields are differences, not ignored."""
     events = []
     for line in data.splitlines():
         try:
             item = json.loads(line)
-            events.append((item.get("ctx", ""), item.get("op", ""), item.get("arg", ""), item.get("res", "")))
+            if not isinstance(item, dict):
+                raise ValueError
+            events.append((str(item.get("ctx", "")), json.dumps(item, sort_keys=True, ensure_ascii=False)))
         except ValueError:
-            events.append(("?", "unparsable", line.decode("utf-8", "replace"), ""))
+            events.append(("?", "unparsable: " + line.decode("utf-8", "replace")))
     return events
 
 
 def trace_groups(events):
     """Operations grouped by context; order is compared within every context.
     Contexts are pages, `script`, or `<owner>/async#N` / `<owner>/thread#N`
-    tasks numbered in creation order, so ordering across tasks is not compared
-    but ordering inside each task is."""
+    tasks numbered in creation order."""
     groups = {}
-    for ctx, op, arg, res in events:
-        groups.setdefault(ctx, []).append("%s %s -> %s" % (op, arg, res))
+    for ctx, text in events:
+        groups.setdefault(ctx, []).append(text)
     return groups
 
 
-def normalise_page_info(data):
-    try:
-        document = json.loads(data)
-    except ValueError:
-        return data
-    if isinstance(document, dict):
-        for key in PAGE_INFO_TIMING_KEYS:
-            document.pop(key, None)
-        # Glob listing fingerprints hash the matched absolute paths, so they
-        # depend on where the copy lives; keys (what was listed) stay compared,
-        # values become "$FP". A listing change remains visible through status
-        # output and rebuild behaviour.
-        listings = document.get("listings")
-        if isinstance(listings, dict):
-            document["listings"] = {key: "$FP" for key in listings}
-    return json.dumps(document, sort_keys=False, indent=1).encode()
+def context_order(events):
+    """Order in which non-task contexts first appear (pages of a build)."""
+    order = []
+    for ctx, _ in events:
+        if "/async#" in ctx or "/thread#" in ctx:
+            continue
+        if ctx not in order:
+            order.append(ctx)
+    return order
 
 
 def snapshot(top, roots):
@@ -403,8 +480,6 @@ def snapshot(top, roots):
             except OSError as error:
                 entries[rel] = "unreadable:%s" % error.errno
                 continue
-            if ("/" + rel).find("/.nift/") >= 0 and rel.endswith(".info.json"):
-                data = normalise_page_info(data)
             entries[rel] = "%o:%s:%d" % (mode, hashlib.sha256(data).hexdigest(), len(data))
             if len(data) <= 8192:
                 CONTENT[entries[rel]] = data
@@ -424,13 +499,22 @@ def first_difference(a, b):
     return None
 
 
-def compare(a, b, use_trace):
+def compare(a, b, use_trace, excluded=()):
     diffs = []
-    for key in ("exit", "stdout", "stderr", "combined"):
-        if a[key] != b[key]:
+    if "timeout" in a["exit"] or "timeout" in b["exit"]:
+        # A timeout is never "equal": partial output proves nothing.
+        diffs.append({"channel": "timeout", "first": {"a": a["exit"], "b": b["exit"]}})
+    for key in ("exit", "stdout", "stderr"):
+        if key not in excluded and a[key] != b[key]:
             diffs.append({"channel": key, "first": first_difference(a[key], b[key]) if key != "exit" else {"a": a[key], "b": b[key]}})
+    if "combined" not in excluded and a["combined"] and b["combined"]:
+        if all(run == a["combined"][0] for run in a["combined"]):
+            if b["combined"][0] != a["combined"][0]:
+                diffs.append({"channel": "combined", "first": first_difference(a["combined"][0], b["combined"][0])})
+        else:
+            a["combined_unstable"] = True
     for key in ("files", "home", "tmp"):
-        if a[key] != b[key]:
+        if key not in excluded and a[key] != b[key]:
             names = sorted(set(a[key]) | set(b[key]))
             changed = [n for n in names if a[key].get(n) != b[key].get(n)]
             first = {"changed": changed[:10], "count": len(changed),
@@ -439,46 +523,110 @@ def compare(a, b, use_trace):
             if fa in CONTENT and fb in CONTENT:
                 first["content"] = first_difference(CONTENT[fa], CONTENT[fb])
             diffs.append({"channel": key, "first": first})
-    if use_trace:
+    if use_trace and "trace" not in excluded:
         ga, gb = trace_groups(a["trace"]), trace_groups(b["trace"])
         for ctx in sorted(set(ga) | set(gb)):
             if ga.get(ctx) != gb.get(ctx):
                 diffs.append({"channel": "trace", "context": ctx,
                               "first": first_difference(ga.get(ctx, []), gb.get(ctx, []))})
+        # Page order is deterministic only in single-threaded builds.
+        if a.get("threads") == 1 and "ctx-order" not in excluded:
+            oa, ob = context_order(a["trace"]), context_order(b["trace"])
+            if oa != ob:
+                diffs.append({"channel": "ctx-order", "first": first_difference(oa, ob)})
     return diffs
 
 
 # --------------------------------------------------------------------- policies
+POLICY_CHANNELS = ("stdout", "stderr", "combined", "exit")
+REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
+
+
+def source_hash(entry):
+    """sha256 of the entry's source: the file for scripts/evals, every file of
+    the directory (sorted, golden/sidecar files excluded) for sites/workspaces."""
+    digest = hashlib.sha256()
+    path = entry["path"]
+    if os.path.isfile(path):
+        with open(path, "rb") as handle:
+            digest.update(handle.read())
+        return digest.hexdigest()
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames.sort()
+        for name in sorted(filenames):
+            full = os.path.join(dirpath, name)
+            digest.update(os.path.relpath(full, path).encode() + b"\0")
+            if not os.path.islink(full):
+                with open(full, "rb") as handle:
+                    digest.update(handle.read())
+    return digest.hexdigest()
+
+
 def load_policies(paths):
     """Approved semantic differences. Each rule:
       {"id": "...", "decision": "D-009#6", "entry": "<exact entry id>",
+       "source_sha256": "<sha256 of the entry source>",
        "channel": "stdout|stderr|combined|exit", "old": "<exact text in A>",
        "new": "<exact text in B>", "count": N, "justification": "...",
-       "test": "<path of the test case>"}
-    The difference is approved only if replacing exactly `count` occurrences of
-    `old` by `new` in A's channel yields B's channel byte for byte (for `exit`,
-    old/new are the exit codes as strings)."""
+       "test": "<repo path of the test case> [notes]"}
+    The difference is approved only for that entry id with that exact source,
+    and only if replacing exactly `count` occurrences of `old` by `new` in A's
+    channel yields B's channel byte for byte (for `exit`, old/new are the exit
+    codes as strings). A rule that approves nothing is a failure."""
     rules = []
-    required = ("id", "decision", "entry", "channel", "old", "new", "count", "justification", "test")
+    required = ("id", "decision", "entry", "source_sha256", "channel", "old", "new", "count", "justification", "test")
+    ids = set()
     for path in paths:
         with open(path) as handle:
             for rule in json.load(handle):
                 missing = [k for k in required if k not in rule]
+                rid = rule.get("id", "?")
+                problems = []
                 if missing:
-                    raise SystemExit("rt-diff: policy %s lacks %s" % (rule.get("id", "?"), ", ".join(missing)))
-                if "*" in rule["entry"] or "?" in rule["entry"]:
-                    raise SystemExit("rt-diff: policy %s: entry must be exact, not a pattern" % rule["id"])
+                    problems.append("lacks " + ", ".join(missing))
+                else:
+                    if "*" in rule["entry"] or "?" in rule["entry"] or "[" in rule["entry"]:
+                        problems.append("entry must be exact, not a pattern")
+                    if rule["channel"] not in POLICY_CHANNELS:
+                        problems.append("channel must be one of %s" % ", ".join(POLICY_CHANNELS))
+                    if not isinstance(rule["old"], str) or not rule["old"]:
+                        problems.append("`old` must be non-empty text")
+                    if rule["old"] == rule["new"]:
+                        problems.append("`old` and `new` are identical")
+                    if not isinstance(rule["count"], int) or rule["count"] < 1:
+                        problems.append("`count` must be a positive integer")
+                    if not re.match(r"^D-\d{3}#\d+(,#\d+)*$", str(rule["decision"])):
+                        problems.append("`decision` must name decision rows like D-009#6 or D-009#3,#4")
+                    if not re.match(r"^[0-9a-f]{64}$", str(rule["source_sha256"])):
+                        problems.append("`source_sha256` must be a sha256")
+                    test_path = str(rule["test"]).split()[0] if str(rule["test"]).split() else ""
+                    if not test_path or not os.path.exists(os.path.join(REPO, test_path)):
+                        problems.append("`test` must start with an existing repository path (got %r)" % test_path)
+                    if rid in ids:
+                        problems.append("duplicate id")
+                if problems:
+                    usage_error("rt-diff: policy %s: %s" % (rid, "; ".join(problems)))
+                ids.add(rid)
                 rules.append(rule)
     return rules
 
 
-def apply_policies(entry_id, a, b, diffs, rules):
+def apply_policies(entry, a, b, diffs, rules, used=None):
     approved, remaining = [], []
+    entry_hash = None
     for diff in diffs:
-        rule = next((r for r in rules if r["entry"] == entry_id and r["channel"] == diff["channel"]
-                     and policy_matches(r, a, b)), None)
+        rule = None
+        for candidate in rules:
+            if candidate["entry"] != entry["id"] or candidate["channel"] != diff["channel"]:
+                continue
+            entry_hash = entry_hash or source_hash(entry)
+            if candidate["source_sha256"] == entry_hash and policy_matches(candidate, a, b):
+                rule = candidate
+                break
         if rule:
             approved.append({"channel": diff["channel"], "policy": rule["id"], "decision": rule["decision"]})
+            if used is not None:
+                used.add(rule["id"])
         else:
             remaining.append(diff)
     return approved, remaining
@@ -492,37 +640,50 @@ def policy_matches(rule, a, b):
         hits = sum(1 for x in expected if x == rule["old"])
         replaced = [rule["new"] if x == rule["old"] else x for x in expected]
         return hits == rule["count"] and replaced == actual
-    if channel not in ("stdout", "stderr", "combined"):
-        return False
     old, new = rule["old"].encode(), rule["new"].encode()
-    if a[channel].count(old) != rule["count"]:
+    if channel == "combined":
+        left, right = (a["combined"] or [b""])[0], (b["combined"] or [b""])[0]
+    else:
+        left, right = a[channel], b[channel]
+    if left.count(old) != rule["count"]:
         return False
-    return a[channel].replace(old, new) == b[channel]
+    return left.replace(old, new) == right
 
 
 # --------------------------------------------------------------------- minimising
 def minimise(entry, a_bin, b_bin, options, rules, out_dir):
     """Line-based delta minimisation of a generated script while the
-    difference persists; writes the minimal program and a replay command."""
+    difference persists. The whole entry directory (modules, data) is copied;
+    the original difference is re-checked first and the final reproducer is
+    re-checked before it is reported. Returns a dict describing the outcome."""
+    tree = entry.get("tree") or os.path.dirname(entry["path"])
+    script_rel = os.path.relpath(entry["path"], tree)
     with open(entry["path"]) as handle:
         lines = handle.read().splitlines()
     scratch = tempfile.mkdtemp(prefix="rtdiff-min-")
+    copy = os.path.join(scratch, "tree")
+    shutil.copytree(tree, copy, symlinks=True)
+    base = tempfile.mkdtemp(prefix="rtdiff-minrun-")
 
     def still_differs(candidate):
-        script = os.path.join(scratch, "main.f")
+        script = os.path.join(copy, script_rel)
         with open(script, "w") as handle:
             handle.write("\n".join(candidate) + "\n")
-        probe = {"kind": "script", "path": script, "id": entry["id"]}
+        probe = {"kind": "script", "path": script, "id": entry["id"], "tree": copy, "excluded": entry.get("excluded", [])}
         timeout = min(options.timeout, 10.0)
-        a = run_one(a_bin, probe, timeout, not options.no_trace, not options.no_interleave)
+        runs = 0 if options.no_interleave else 1
+        a = run_one(a_bin, probe, base, timeout, not options.no_trace, runs)
         if "timeout" in a["exit"]:
             return False          # a candidate that hangs is not a reproducer
-        b = run_one(b_bin, probe, timeout, not options.no_trace, not options.no_interleave)
+        b = run_one(b_bin, probe, base, timeout, not options.no_trace, runs)
         if "timeout" in b["exit"]:
             return False
-        return bool(apply_policies(entry["id"], a, b, compare(a, b, not options.no_trace), rules)[1])
+        diffs = compare(a, b, not options.no_trace, entry.get("excluded", ()))
+        return bool(apply_policies(probe, a, b, diffs, rules)[1])
 
     try:
+        if not still_differs(lines):
+            return {"status": "not-reproduced", "note": "the difference did not recur in isolation; nothing minimised"}
         chunk = max(1, len(lines) // 2)
         budget = 120
         while chunk >= 1 and budget > 0:
@@ -536,19 +697,25 @@ def minimise(entry, a_bin, b_bin, options, rules, out_dir):
                     index += chunk
             if not changed:
                 chunk //= 2
-        os.makedirs(out_dir, exist_ok=True)
+        verified = still_differs(lines)
         name = entry["id"].replace("/", "_")
-        target = os.path.join(out_dir, name + ".min.f")
-        with open(target, "w") as handle:
-            handle.write("\n".join(lines) + "\n")
-        replay = "%s %s %s" % (shlex.quote(a_bin), shlex.quote(b_bin), shlex.quote(target))
-        with open(os.path.join(out_dir, name + ".replay.sh"), "w") as handle:
-            handle.write("#!/bin/sh\n# %s; minimised from %s\n" % (entry.get("origin", ""), entry["path"]))
-            handle.write("cd \"$(dirname \"$0\")\"\nfor b in %s %s; do echo \"== $b\"; \"$b\" %s; echo \"exit $?\"; done\n"
-                         % (shlex.quote(a_bin), shlex.quote(b_bin), shlex.quote(os.path.basename(target))))
-        return target, replay
+        target_dir = os.path.join(out_dir, name)
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir)
+        shutil.copytree(copy, target_dir, symlinks=True)   # holds the minimised script
+        replay = os.path.join(target_dir, "replay.sh")
+        with open(replay, "w") as handle:
+            handle.write("#!/bin/sh\n# %s; minimised from %s; reproduces: %s\n"
+                         % (entry.get("origin", ""), entry["path"], "yes" if verified else "NO"))
+            handle.write("cd \"$(dirname \"$0\")/%s\"\nfor b in %s %s; do echo \"== $b\"; \"$b\" %s </dev/null; echo \"exit $?\"; done\n"
+                         % (os.path.dirname(script_rel) or ".", shlex.quote(a_bin), shlex.quote(b_bin),
+                            shlex.quote(os.path.basename(script_rel))))
+        os.chmod(replay, 0o755)
+        return {"status": "verified" if verified else "unverified", "dir": target_dir,
+                "file": os.path.join(target_dir, script_rel), "lines": len(lines), "replay": replay}
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
+        shutil.rmtree(base, ignore_errors=True)
 
 
 # --------------------------------------------------------------------- main
@@ -609,18 +776,27 @@ def main():
         use_trace = not options.no_trace and not options.trace_neutrality
         interleave = not options.no_interleave
 
+        used = set()
+
         def job(entry):
-            a = run_one(a_bin, entry, options.timeout, use_trace or options.trace_neutrality, interleave)
-            b = run_one(b_bin, entry, options.timeout, use_trace, interleave)
-            diffs = compare(a, b, use_trace)
-            approved, remaining = apply_policies(entry["id"], a, b, diffs, rules)
-            return entry, approved, remaining, len(a["trace"])
+            base = tempfile.mkdtemp(prefix="rtdiff-")
+            try:
+                # A twice on the combined channel: its order is compared only
+                # if A reproduces it (measured stability, not a guess).
+                a = run_one(a_bin, entry, base, options.timeout, use_trace or options.trace_neutrality, 2 if interleave else 0)
+                b = run_one(b_bin, entry, base, options.timeout, use_trace, 1 if interleave else 0)
+            finally:
+                shutil.rmtree(base, ignore_errors=True)
+            diffs = compare(a, b, use_trace, entry.get("excluded", ()))
+            approved, remaining = apply_policies(entry, a, b, diffs, rules, used)
+            return entry, approved, remaining, len(a["trace"]), a.get("combined_unstable", False)
 
         results = []
         with cf.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
-            for entry, approved, diffs, events in pool.map(job, entries):
+            for entry, approved, diffs, events, unstable in pool.map(job, entries):
                 results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs,
-                                "approved": approved, "trace_events": events, "path": entry["path"]})
+                                "approved": approved, "trace_events": events, "path": entry["path"],
+                                "combined_unstable": unstable, "excluded": entry.get("excluded", [])})
         differing = [r for r in results if r["diffs"]]
         approved = [r for r in results if r["approved"]]
         counts = {}
@@ -636,24 +812,35 @@ def main():
                     print("APPROVED %s %s %s (%s)" % (r["id"], d["channel"], d["policy"], d["decision"]))
         if options.repro_dir:
             generated_diffs = [r for r in differing if "/gen/" in r["path"] and r["path"].endswith(".f")]
+            by_id = {e["id"]: e for e in entries}
             for r in generated_diffs[:options.repro_limit]:
-                entry = {"kind": "script", "path": r["path"], "id": r["id"], "origin": origin_of(r["path"])}
-                target, replay = minimise(entry, a_bin, b_bin, options, rules, options.repro_dir)
-                r["reproducer"] = {"file": target, "replay": replay}
-                print("REPRO %s -> %s" % (r["id"], target))
+                entry = dict(by_id[r["id"]], origin=origin_of(r["path"]))
+                outcome = minimise(entry, a_bin, b_bin, options, rules, options.repro_dir)
+                r["reproducer"] = outcome
+                if outcome["status"] == "verified":
+                    print("REPRO %s -> %s (%d lines, verified)" % (r["id"], outcome["file"], outcome["lines"]))
+                else:
+                    print("REPRO-WARNING %s: %s" % (r["id"], outcome.get("note") or "minimised program does not reproduce"))
+        unused = sorted(r["id"] for r in rules if r["id"] not in used)
+        for rid in unused:
+            print("UNUSED-POLICY %s (approved nothing in this run)" % rid)
+        unstable = sum(1 for r in results if r["combined_unstable"])
         traced = sum(1 for r in results if r["trace_events"])
         events = sum(r["trace_events"] for r in results)
         summary = {"entries": len(results), "by_kind": counts, "differing": len(differing),
                    "approved": len(approved), "entries_with_trace": traced, "trace_events": events,
                    "channels": sorted({d["channel"] for r in differing for d in r["diffs"]}),
                    "trace": use_trace, "seed": options.seed, "generated": options.gen,
+                   "combined_unstable": unstable, "unused_policies": unused,
                    "command": " ".join(shlex.quote(a) for a in sys.argv)}
-        print("rt-diff: %d entries %s, %d differing, %d approved; %d entries traced (%d Host ops)"
-              % (len(results), json.dumps(counts, sort_keys=True), len(differing), len(approved), traced, events))
+        print("rt-diff: %d entries %s, %d differing, %d approved; %d entries traced (%d Host ops); "
+              "combined order unstable (not compared) in %d; %d unused policies"
+              % (len(results), json.dumps(counts, sort_keys=True), len(differing), len(approved), traced, events,
+                 unstable, len(unused)))
         if options.report:
             with open(options.report, "w") as handle:
                 json.dump({"summary": summary, "results": results}, handle, indent=1, sort_keys=True)
-        return 1 if differing else 0
+        return 1 if differing or unused else 0
     finally:
         if generated:
             shutil.rmtree(generated, ignore_errors=True)

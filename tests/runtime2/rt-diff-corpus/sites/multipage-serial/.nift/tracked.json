@@ -1,0 +1,132 @@
+{
+ "tracked": [
+  {
+   "name": "/",
+   "title": "Page 0",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p01",
+   "title": "Page 1",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p02",
+   "title": "Page 2",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p03",
+   "title": "Page 3",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p04",
+   "title": "Page 4",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p05",
+   "title": "Page 5",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p06",
+   "title": "Page 6",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p07",
+   "title": "Page 7",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p08",
+   "title": "Page 8",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p09",
+   "title": "Page 9",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p10",
+   "title": "Page 10",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p11",
+   "title": "Page 11",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p12",
+   "title": "Page 12",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p13",
+   "title": "Page 13",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p14",
+   "title": "Page 14",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p15",
+   "title": "Page 15",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p16",
+   "title": "Page 16",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p17",
+   "title": "Page 17",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p18",
+   "title": "Page 18",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p19",
+   "title": "Page 19",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p20",
+   "title": "Page 20",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p21",
+   "title": "Page 21",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p22",
+   "title": "Page 22",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "p23",
+   "title": "Page 23",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "blog",
+   "title": "Blog",
+   "template": "templates/template.html",
+   "paginate": {
+    "items-per-page": 3
+   }
+  }
+ ]
+}
