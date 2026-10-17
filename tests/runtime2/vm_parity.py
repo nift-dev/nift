@@ -14,7 +14,11 @@
    (approved D-001 recursion-budget differences only); per-script outcomes
    are collected through tools/rt-vm/nift-vm.
 
-Exit 1 on any difference or expectation mismatch.
+A difference is approved only when it is the D-001#4 recursion budget
+(vm_adversarial.classify_difference: legacy fails with "callable recursion
+depth exceeded", the VM completed past legacy's 64-frame limit, legacy's
+output is a prefix of the VM's). Exit 1 on any other difference or
+expectation mismatch.
 """
 import argparse, collections, json, os, resource, shutil, subprocess, sys, tempfile
 
@@ -22,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import vm_gen  # noqa: E402
+from vm_adversarial import classify_difference  # noqa: E402
 
 CORPUS = os.path.join(HERE, "vm-corpus", "cp11")
 
@@ -106,7 +111,16 @@ def outcome_key(st):
         return "no-stats"
     if st["outcome"] == "vm":
         return "vm"
-    return f"{st['outcome']}:{st['reason'].split(':')[0] if st['reason'].startswith('opaque') else st['reason']}"
+    return f"{st['outcome']}:{st['reason']}"
+
+
+def verdict(same, a, b, st):
+    """'same', 'approved' (D-001#4), 'endless' or 'diff'."""
+    if same:
+        return "same"
+    if nonterminating(a, b):
+        return "endless"
+    return classify_difference(a, b, st)
 
 
 def show(label, a, b):
@@ -133,7 +147,10 @@ def corpus(args, work):
                                     require=bool(want and want[0] == "vm"))
         got = outcome_key(st)
         tally[got] += 1
-        if not same:
+        v = verdict(same, a, b, st)
+        if v == "approved":
+            tally["approved D-001#4"] += 1
+        elif v != "same":
             show(f"corpus {name}", a, b)
             failures += 1
         if not want:
@@ -155,16 +172,18 @@ def generated(args, work):
     for i in range(args.gen):
         text = vm_gen.program(args.seed, i)
         same, a, b, st, _ = compare(args.nift, text, "gen.f", work, args.timeout)
-        tally["nonterminating" if not same and nonterminating(a, b) else outcome_key(st)] += 1
-        if not same and not nonterminating(a, b):
+        v = verdict(same, a, b, st)
+        tally["nonterminating" if v == "endless" else "approved D-001#4" if v == "approved" else outcome_key(st)] += 1
+        if v == "diff":
             show(f"generated seed {args.seed} index {i}", a, b)
             failures += 1
             if failures > 20:
                 break
         mtext, kind = vm_gen.mutate(text, args.seed, i)
         same, a, b, st, _ = compare(args.nift, mtext, "mut.f", work, args.timeout)
-        mtally["nonterminating" if not same and nonterminating(a, b) else outcome_key(st)] += 1
-        if not same and not nonterminating(a, b):
+        v = verdict(same, a, b, st)
+        mtally["nonterminating" if v == "endless" else "approved D-001#4" if v == "approved" else outcome_key(st)] += 1
+        if v == "diff":
             show(f"mutant ({kind}) seed {args.seed} index {i}", a, b)
             print("  program:\n" + "\n".join("    " + l for l in mtext.splitlines()))
             failures += 1
@@ -198,13 +217,27 @@ def rt_diff(args, work):
     finally:
         os.unlink(os.path.join(stats_dir, "stats-path"))
     tally = collections.Counter()
-    seen = {}
+    seen, raw = {}, {}
     if os.path.exists(stats):
         for line in open(stats):
             st = json.loads(line)
             seen[st["path"]] = outcome_key(st)  # last run of a script wins (combined channel runs A twice)
+            raw[st["path"]] = st
         tally.update(seen.values())
     print(f"rt-diff VM outcomes over {len(seen)} distinct scripts: {dict(tally.most_common())}")
+    # The class rule is textual; the VM statistics must confirm each approval.
+    bad_class = 0
+    report = json.load(open(os.path.join(work, "rt-diff-report.json")))
+    for r in report["results"]:
+        if not any(d["policy"] == "cp11-recursion-budget-class" for d in r["approved"]):
+            continue
+        # rt-diff runs copies of the entry, so statistics are matched by file name.
+        same_name = [v for k, v in raw.items() if os.path.basename(k) == os.path.basename(r["path"])]
+        if not any(v["outcome"] == "vm" and v.get("beyond_legacy_depth") for v in same_name):
+            print(f"FAIL rt-diff class approval for {r['id']} not confirmed by VM statistics")
+            bad_class += 1
+    if bad_class:
+        return 1
     if args.outcomes:
         with open(args.outcomes, "w") as f:
             json.dump({"by_script": seen, "tally": dict(tally)}, f, indent=1, sort_keys=True)

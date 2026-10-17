@@ -3,6 +3,7 @@
 // v4.12/runtime-2 and, for whole programs, by tests/runtime2/vm_parity.py).
 #include "RuntimeValue.h"
 #include "rt/aggregate.h"
+#include "rt/legacy_names.h"
 #include "rt/literal.h"
 #include "rt/render.h"
 #include "rt/string.h"
@@ -50,6 +51,11 @@ void check_outputs() {
         {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n", "2\n1\n"},
         {"i := 0\nwhile(i < 9) { i += 1; if(i == 3) { return i } }\n", "3\n"},
         {"k := 1\nif(true) { k := 2; print(k) }\nprint(k)\n", "2\n1\n"},
+        // Review round 1.
+        {"a := [1, 2]\nprint(a.size())\n", "2\n"},                                       // D3: size() on arrays
+        {"x := 0.5 - 0.5\nprint(-x)\nprint(x)\n", "0\n0\n"},                            // D1: a computed zero
+        {"i := 0\nwhile(i < 3) { i += 1; if(i == 2) { break } }\nprint(i)\n", "2\n"},   // D2: jump last
+        {"fn(f(p)) { return p.length() }\no := {\"k\": [1, 2]}\nprint(f(o.k))\n", "2\n"},  // D6: read-only callee
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -84,6 +90,25 @@ void check_fallbacks() {
         {"if(1 { }\n", "parse-error"},
         {"x := 2\nprint(!x + 1)\n", "opaque:irregular-legacy-parse"},
         {"x := 2\ny := 1\nprint(y && !x || true)\n", "prefix-not-precedence"},
+        // Review round 1. D1: zero-valued decimal spellings keep their text in legacy.
+        {"print(0.0)\n", "number-literal"},
+        {"x := 0.00\nprint(-x)\n", "number-literal"},
+        {"print(0.0e5)\n", "number-literal"},
+        {"print(-0.0)\n", "number-literal"},
+        {"print(1.0e-300)\n", "number-literal"},  // exponent >= 300: exact spelling in legacy
+        // D2: legacy ignores a jump followed by statements in its block.
+        {"i := 0\nwhile(i < 3) { i += 1; break; print(\"after\") }\n", "jump-not-last"},
+        {"i := 0\nwhile(i < 3) { i += 1; if(true) { continue; print(\"x\") } }\n", "jump-not-last"},
+        // D4/D5: names legacy dispatches specially (generated from its source).
+        {"fn(is_null(x)) { return 42 }\nprint(is_null(1))\n", "fn-name-reserved"},
+        {"fn(is_enum(x)) { return 42 }\nprint(is_enum(1))\n", "fn-name-reserved"},
+        {"title := 1\nprint(title)\n", "binding-name-reserved"},
+        {"loop := 1\nprint(loop)\n", "binding-name-reserved"},
+        {"fn(f(name)) { return name }\nprint(f(1))\n", "param-name-reserved"},
+        // D6: a place argument to a parameter the callee mutates (legacy alias).
+        {"fn(f(p)) { p.push(9) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
+        {"fn(f(p)) { p[0] = 5 }\na := [[1]]\nf(a[0])\n", "alias-argument"},
+        {"fn(h(z)) { z.push(8) }\nfn(f(p)) { h(p) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -110,6 +135,14 @@ void check_bails() {
         {"fn(f(a)) { return a }\nprint(f())\n", BailReason::StaticError},
         {"a := [1]\na[0] = \"s\"\n", BailReason::Unverified},
         {"print([1])\n", BailReason::Error},
+        // Review round 1. D3: receiver-specific methods.
+        {"s := \"abc\"\nprint(s.size())\n", BailReason::Error},
+        {"x := 5\nprint(x.length())\n", BailReason::Error},
+        {"x := null\nprint(x.size())\n", BailReason::Error},
+        {"o := {\"k\": 1}\nprint(o.size())\n", BailReason::Unverified},
+        {"o := {\"k\": 1}\nprint(o.length())\n", BailReason::Unverified},
+        // Loop-body legacy types `b := a` from the value (int), top level from a's type (double).
+        {"i := 0\nwhile(i < 1) { i += 1; a := 2.0; b := a; b = 2.5 }\n", BailReason::Unverified},
     };
     for (const BailCase& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -215,6 +248,42 @@ void check_output_limit() {
     CHECK(flushed.text.size() + r.output.size() == 50);
     rt_vm_tool::Run quiet = rt_vm_tool::run("print(1)\n");
     CHECK(!quiet.result.committed);
+    // Review D7: without a flush hook (NIFT_VM=1) the run stops at the limit,
+    // nothing is committed and the runner replays the unit on legacy.
+    VmOptions bounded;
+    bounded.output_limit = 16;
+    rt_vm_tool::Run stopped = rt_vm_tool::run("i := 0\nwhile(i < 10) { print(\"line\"); i += 1 }\n", bounded);
+    CHECK(stopped.result.reason == BailReason::OutputLimit);
+    CHECK(!stopped.result.committed);
+}
+
+// Review R1: memory is bounded so the recursion budget triggers first.
+void check_memory_budget() {
+    const char* growing =
+        "fn(f(n, s)) { t := s + \"xxxxxxxx\"; if (n == 0) { return 0 } return f(n - 1, t) + 1 }\nprint(f(5000, \"a\"))\n";
+    VmOptions tight;
+    tight.frame_heap_budget = 1 << 20;  // 1 MiB held by registers
+    rt_vm_tool::Run r = rt_vm_tool::run(growing, tight);
+    CHECK(r.result.reason == BailReason::RecursionBudget);
+    CHECK(r.result.beyond_legacy_depth);
+    rt_vm_tool::Run fine = rt_vm_tool::run(growing);
+    CHECK(fine.result.reason == BailReason::None && fine.output == "5000\n" && fine.result.beyond_legacy_depth);
+    VmOptions few;
+    few.max_registers = 4096;
+    CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(5000))\n", few)
+              .result.reason == BailReason::RecursionBudget);
+    CHECK(!rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(63))\n")
+               .result.beyond_legacy_depth);
+    CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(64))\n")
+              .result.beyond_legacy_depth);
+}
+
+void check_legacy_names() {
+    for (const char* name : {"is_null", "is_enum", "is_collection", "title", "name", "loop", "print", "error",
+                             "build_all", "first", "split", "json"})
+        CHECK(legacy_special_name(name));
+    for (const char* name : {"fib", "add", "x", "n", "f0", "rec", "total"}) CHECK(!legacy_special_name(name));
+    CHECK(legacy_special_name_count() > 150);
 }
 
 void check_code_shape() {
@@ -241,6 +310,8 @@ int main() {
     check_frame_budget();
     check_no_native_recursion();
     check_output_limit();
+    check_memory_budget();
+    check_legacy_names();
     check_code_shape();
     return rt_test::finish("rt vm unit");
 }

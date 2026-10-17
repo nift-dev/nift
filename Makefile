@@ -259,7 +259,9 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(TARGET)
 	"$(RT_VM_UNIT)"
 	python3 tools/rt-lint.py src/rt
+	python3 tools/rt-vm/legacy_names.py --check
 	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
+	python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} --count $${RT_VM_ADV:-600}
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -269,6 +271,9 @@ test-rt-vm-sanitize: $(SAN_TARGET)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(SAN_TARGET)" --gen $${RT_VM_GEN:-150} --seed $${RT_VM_SEED:-2} --timeout 120
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(SAN_TARGET)" --seed $${RT_VM_SEED:-2} \
+		--count $${RT_VM_ADV:-60} --families typed,context,numeric,receiver,alias,control,recursion,malformed --timeout 120
 
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)

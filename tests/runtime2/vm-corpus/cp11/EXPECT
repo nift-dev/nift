@@ -55,3 +55,13 @@ replay_string_plus_assign.f replayed bail:runtime-error
 replay_type_change.f replayed bail:runtime-error
 strings.f vm 
 top_return.f vm 
+# CP11 review round 1 regressions.
+review_d1_zero_literals.f fallback number-literal
+review_d2_jump_not_last.f fallback jump-not-last
+review_d3_string_size.f replayed bail:runtime-error
+review_d4_builtin_name.f fallback fn-name-reserved
+review_d5_reserved_binding.f fallback binding-name-reserved
+review_d6_alias_argument.f fallback alias-argument
+review_d6_alias_readonly.f vm
+review_r1_frame_memory.f replayed bail:recursion-budget
+review_n1_loop_decl_type.f replayed bail:unverified
