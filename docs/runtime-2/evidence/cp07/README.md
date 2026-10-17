@@ -21,3 +21,15 @@
 - Not run, because the launch gate failed and the checkpoint is escalated
   (directive: stop and report): full `make test-all`, regression suite,
   300-page callgrind, rt-diff with 2,000 generated programs.
+
+## Certification run (anonymous-file design, 7bb6173)
+- rt-diff (CP08 snapshot 2fae2d2, traces off), reference c5db14d vs CP07,
+  committed corpora + extracted smoke + 2,000 generated (seed 707):
+  2,417 entries, 0 differing.
+- `make test-all`: known environmental set plus `test-v44-language-foundation`
+  (wall-clock scaling guard under load: push 40k=144 ms/80k=547 ms); passes 3/3
+  alone.
+- Regression suite (runtime-2): 92/94; `unreadable_source` (root) and
+  `v44_executable_script` (no `nift` on PATH) — both pass in the suite's CI.
+- Launch-cost gate: deferred, not passed (D-011).
+
