@@ -1,2 +1,3 @@
-seed 20261017 scale 1
-rt value property: 367200 checks, 0 failures
+seed 20261017 scale 1 @ 64a7f33
+coverage: 47126 equal number pairs (29002 cross-kind), 9148 with a big-exponent Decimal, 30095 integral doubles > 2^53; 959 generated objects >= 8 keys, 663 duplicate-key rejections; 754979 object lookups on indexed objects
+rt value property: 1867405 checks, 0 failures

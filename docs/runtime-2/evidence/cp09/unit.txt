@@ -1,1 +1,6 @@
+make -j2 test-rt-value on runtime-2-cp09 @ 64a7f33
 rt value unit: 82 checks, 0 failures
+rt value regress: 270 checks, 0 failures
+seed 20261017 scale 1
+coverage: 47126 equal number pairs (29002 cross-kind), 9148 with a big-exponent Decimal, 30095 integral doubles > 2^53; 959 generated objects >= 8 keys, 663 duplicate-key rejections; 754979 object lookups on indexed objects
+rt value property: 1867405 checks, 0 failures

@@ -1,6 +1,11 @@
+make test-rt-value-sanitize @ 64a7f33 (ASan+UBSan, -fno-sanitize-recover=all, leak detection on)
 rt value unit: 82 checks, 0 failures
+rt value regress: 270 checks, 0 failures
 seed 20261017 scale 1
-rt value property: 367200 checks, 0 failures
-seed 7 scale 3
-rt value property: 1101757 checks, 0 failures
+coverage: 47126 equal number pairs (29002 cross-kind), 9148 with a big-exponent Decimal, 30095 integral doubles > 2^53; 959 generated objects >= 8 keys, 663 duplicate-key rejections; 754979 object lookups on indexed objects
+rt value property: 1867405 checks, 0 failures
 exit 0
+extra: seed 7 scale 2
+coverage: 94794 equal number pairs (58205 cross-kind), 18669 with a big-exponent Decimal, 59825 integral doubles > 2^53; 1963 generated objects >= 8 keys, 1355 duplicate-key rejections; 1495260 object lookups on indexed objects
+rt value property: 3740565 checks, 0 failures
+(no sanitizer report; any ASan/UBSan error aborts the run before the summary line)

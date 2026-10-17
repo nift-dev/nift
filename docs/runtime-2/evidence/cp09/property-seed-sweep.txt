@@ -1,20 +1,16 @@
-seed 1: rt value property: 1836138 checks, 0 failures
-seed 2: rt value property: 1836332 checks, 0 failures
-seed 3: rt value property: 1836052 checks, 0 failures
-seed 4: rt value property: 1836327 checks, 0 failures
-seed 5: rt value property: 1836225 checks, 0 failures
-seed 6: rt value property: 1836309 checks, 0 failures
-seed 7: rt value property: 1836127 checks, 0 failures
-seed 8: rt value property: 1836212 checks, 0 failures
-seed 9: rt value property: 1836242 checks, 0 failures
-seed 10: rt value property: 1836349 checks, 0 failures
-seed 11: rt value property: 1836213 checks, 0 failures
-seed 12: rt value property: 1836348 checks, 0 failures
-seed 13: rt value property: 1836508 checks, 0 failures
-seed 14: rt value property: 1836176 checks, 0 failures
-seed 15: rt value property: 1836059 checks, 0 failures
-seed 16: rt value property: 1836351 checks, 0 failures
-seed 17: rt value property: 1836220 checks, 0 failures
-seed 18: rt value property: 1836357 checks, 0 failures
-seed 19: rt value property: 1836361 checks, 0 failures
-seed 20: rt value property: 1836232 checks, 0 failures
+property seed sweep, scale 5, @ 64a7f33
+seed 1:
+coverage: 235863 equal number pairs (145271 cross-kind), 46436 with a big-exponent Decimal, 150392 integral doubles > 2^53; 4943 generated objects >= 8 keys, 3434 duplicate-key rejections; 3689576 object lookups on indexed objects
+rt value property: 9196938 checks, 0 failures
+seed 2:
+coverage: 236306 equal number pairs (144976 cross-kind), 46226 with a big-exponent Decimal, 150565 integral doubles > 2^53; 4851 generated objects >= 8 keys, 3410 duplicate-key rejections; 3757503 object lookups on indexed objects
+rt value property: 9305573 checks, 0 failures
+seed 3:
+coverage: 236358 equal number pairs (145530 cross-kind), 46704 with a big-exponent Decimal, 150329 integral doubles > 2^53; 4830 generated objects >= 8 keys, 3397 duplicate-key rejections; 3745231 object lookups on indexed objects
+rt value property: 9306908 checks, 0 failures
+seed 4:
+coverage: 235412 equal number pairs (144419 cross-kind), 46538 with a big-exponent Decimal, 150129 integral doubles > 2^53; 4863 generated objects >= 8 keys, 3365 duplicate-key rejections; 3715479 object lookups on indexed objects
+rt value property: 9263483 checks, 0 failures
+seed 5:
+coverage: 236923 equal number pairs (145620 cross-kind), 46050 with a big-exponent Decimal, 150630 integral doubles > 2^53; 4900 generated objects >= 8 keys, 3471 duplicate-key rejections; 3724324 object lookups on indexed objects
+rt value property: 9274817 checks, 0 failures

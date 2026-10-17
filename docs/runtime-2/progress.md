@@ -15,7 +15,7 @@ _Last updated: 2026-10-18_
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 | CP07 | complete — Linux, macOS, Windows (CI @aba3a50) as leak/resource fix; launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files; pipe attempt rejected and preserved (`checkpoints/cp07-process-capture.md`) |
 | CP08 | complete — Linux, macOS, Windows (evidence split across two commits, see below) | `runtime-2` | Host-op trace, `tools/rt-diff` harness (policies, minimiser, 83 self-tests), corpus, semantics v1.1; two adversarial review rounds addressed (`checkpoints/cp08-semantics-harness.md`) |
-| CP09 | implemented, under review | `runtime-2-cp09` (local, not pushed) | `src/rt` value model: 16-byte Value, atoms, COW aggregates, legacy-exact numeric/equality/hash; 82 unit checks, 367k property checks per run (36.7M in a 20-seed sweep) differential vs legacy, ASan+UBSan clean; index read 1.6× legacy Ir open (`checkpoints/cp09-value-model.md`) |
+| CP09 | implemented, review round 1 fixed, awaiting re-review | `runtime-2-cp09` (local, not pushed) | `src/rt` value model: 16-byte Value, atoms, COW aggregates, legacy-exact numeric/equality/hash (exponents of any size); 82 unit + 270 regression checks, 1.87M property checks per run (46.3M in a 5-seed scale-5 sweep) differential vs legacy, ASan+UBSan clean; round-1 findings 1–3, 5–8 fixed, 4 documented; index read 1.6× legacy Ir open (`checkpoints/cp09-value-model.md`) |
 
 ### CP08 certification evidence (owner-accepted 2026-10-18)
 
