@@ -7,7 +7,7 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {},
-   "seconds": 0.03
+   "seconds": 0.35
   },
   "gen.py": {
    "files": 6587,
@@ -16,7 +16,59 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {},
-   "seconds": 0.92
+   "seconds": 0.65
+  },
+  "legacy-cases": {
+   "files": 247,
+   "legacy_accepted": 212,
+   "legacy_rejected_identical": 35,
+   "legacy_rejects": [
+    "tests/rt/legacy-cases/c1_catch_kw_only.f\t1:1: try requires catch(identifier)",
+    "tests/rt/legacy-cases/c1_crlf_if.f\t3:2: function else requires block",
+    "tests/rt/legacy-cases/c1_deep_err.f\t6:6: struct requires '(name)'",
+    "tests/rt/legacy-cases/c1_else_if_eof.f\t1:10: function else if malformed",
+    "tests/rt/legacy-cases/c1_else_noblock_semicolon.f\t1:10: function else requires block",
+    "tests/rt/legacy-cases/c1_elseif_noblock.f\t1:10: function else if requires block",
+    "tests/rt/legacy-cases/c1_elseif_noparen.f\t1:10: function else if malformed",
+    "tests/rt/legacy-cases/c1_enum_bad.f\t1:1: enum requires 'Name { members }'",
+    "tests/rt/legacy-cases/c1_enum_noblock.f\t1:1: enum requires 'Name { members }'",
+    "tests/rt/legacy-cases/c1_eof_else.f\t1:10: function else requires block",
+    "tests/rt/legacy-cases/c1_eof_if.f\t1:1: function if requires a block",
+    "tests/rt/legacy-cases/c1_eof_if2.f\t1:1: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_export_bad.f\t1:1: export requires '(binding)'",
+    "tests/rt/legacy-cases/c1_fn_async_nospace_err.f\t1:1: fn requires '(name(args))'",
+    "tests/rt/legacy-cases/c1_if_at_slash_eof.f\t1:1: function if requires a block",
+    "tests/rt/legacy-cases/c1_nested_fn_err.f\t2:3: function while requires '(...)'",
+    "tests/rt/legacy-cases/c1_nul.f\t2:1: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_shebang_err.f\t2:1: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_shebang_twice.f\t2:1: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_tabs.f\t1:3: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_throw_empty_semicolon.f\t1:1: throw requires an Error expression",
+    "tests/rt/legacy-cases/c1_throw_tab.f\t1:1: throw requires an Error expression",
+    "tests/rt/legacy-cases/c1_try_catch_bad.f\t1:1: catch requires one valid identifier",
+    "tests/rt/legacy-cases/c1_try_catch_empty.f\t1:1: catch requires one valid identifier",
+    "tests/rt/legacy-cases/c1_try_catch_noblock.f\t1:1: catch(identifier) requires a block",
+    "tests/rt/legacy-cases/c1_try_catch_two.f\t1:1: catch requires one valid identifier",
+    "tests/rt/legacy-cases/c1_try_in_while.f\t2:3: catch requires one valid identifier",
+    "tests/rt/legacy-cases/c1_try_noblock.f\t1:1: try requires a balanced block",
+    "tests/rt/legacy-cases/c1_try_nocatch.f\t1:1: try requires catch(identifier)",
+    "tests/rt/legacy-cases/c1_unterm_at_comment.f\t2:3: open comment '@/*' has no close '*/'",
+    "tests/rt/legacy-cases/c1_unterminated_comment.f\t2:1: open comment '/*' has no close '*/'",
+    "tests/rt/legacy-cases/c1_utf8_col.f\t1:16: function if requires '(...)'",
+    "tests/rt/legacy-cases/c1_utf8_col2.f\t2:3: open comment '/*' has no close '*/'",
+    "tests/rt/legacy-cases/c1_while_at_comment_open.f\t1:1: function while requires a block",
+    "tests/rt/legacy-cases/c1_while_nested_comment.f\t1:13: open comment '/*' has no close '*/'"
+   ],
+   "mismatched": 0,
+   "opaque": {
+    "deferred-translation": 3,
+    "irregular-legacy-parse": 14,
+    "legacy-runtime-error": 61,
+    "struct-body": 7,
+    "template-text": 3,
+    "units_with_opaque": 83
+   },
+   "seconds": 0.02
   },
   "rt-diff-corpus": {
    "files": 15,
@@ -25,7 +77,7 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {},
-   "seconds": 0.02
+   "seconds": 0.01
   },
   "semantics": {
    "files": 57,
@@ -34,8 +86,8 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {
-    "legacy-runtime-error": 2,
-    "units_with_opaque": 2
+    "legacy-runtime-error": 3,
+    "units_with_opaque": 3
    },
    "seconds": 0.01
   },
@@ -46,9 +98,11 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {
-    "legacy-runtime-error": 12,
+    "irregular-legacy-parse": 1,
+    "legacy-runtime-error": 40,
+    "struct-body": 2,
     "template-text": 21,
-    "units_with_opaque": 28
+    "units_with_opaque": 41
    },
    "seconds": 0.08
   },
@@ -94,7 +148,7 @@
    ],
    "mismatched": 0,
    "opaque": {},
-   "seconds": 0.02
+   "seconds": 0.01
   },
   "tests-f": {
    "files": 1,
@@ -103,7 +157,7 @@
    "legacy_rejects": [],
    "mismatched": 0,
    "opaque": {},
-   "seconds": 0.01
+   "seconds": 0.0
   },
   "vm-corpus": {
    "files": 44,
@@ -115,26 +169,32 @@
     "legacy-runtime-error": 1,
     "units_with_opaque": 1
    },
-   "seconds": 0.03
+   "seconds": 0.01
   }
  },
  "failed": [],
  "gates": {
   "error_corpus": "error corpus: 1500/1500 identical",
   "fuzz": {
-   "output": "fuzz: iterations=200000 accepted=150135 rejected=49865 worst_ms=36.062",
+   "output": "fuzz: iterations=200000 accepted=150135 rejected=49865 worst_ms=2.53885",
    "rc": 0,
-   "seconds": 6.3
+   "seconds": 2.5
+  },
+  "negative": {
+   "output": "negative gate: programs=2372 regular=1049 (case 129/247, decl 85/250, expr 677/1500, string 158/375) failures=0",
+   "rc": 0,
+   "seconds": 6.0
   },
   "paren_oracle": {
    "details": [],
    "divergent": 0,
-   "inserted_parentheses": 167754,
-   "same_and_exit0": 7094,
-   "scripts": 8566,
-   "scripts_with_insertions": 7987,
-   "seconds": 432.2,
+   "inserted_parentheses": 173626,
+   "same_and_exit0": 7206,
+   "scripts": 8813,
+   "scripts_with_insertions": 8031,
+   "seconds": 245.7,
    "skipped_nondeterministic": 17
-  }
+  },
+  "small_stack": "1 MB stack: files=22 rc=0 ['files=22 accepted=22 nesting-limit=24']"
  }
 }
