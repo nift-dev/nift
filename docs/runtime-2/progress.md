@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-17_
+_Last updated: 2026-10-18_
 
 ## Where things stand
 
@@ -14,20 +14,44 @@ _Last updated: 2026-10-17_
 | CP05 | complete — Linux, macOS, Windows (CI @c5db14d) | `runtime-2` | Flat call in loop −10.5% (top level −4.6%); review: unbounded cache memory and latched flags fixed (`checkpoints/cp05-call-path.md`) |
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 | CP07 | complete — Linux, macOS, Windows (CI @aba3a50) as leak/resource fix; launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files; pipe attempt rejected and preserved (`checkpoints/cp07-process-capture.md`) |
-| CP08 | complete (Linux); macOS/Windows: CI after push | `runtime-2` | Host-op trace, `tools/rt-diff` harness (policies, minimiser, 83 self-tests), corpus, semantics v1.1; two adversarial review rounds addressed (`checkpoints/cp08-semantics-harness.md`) |
+| CP08 | complete — Linux, macOS, Windows (evidence split across two commits, see below) | `runtime-2` | Host-op trace, `tools/rt-diff` harness (policies, minimiser, 83 self-tests), corpus, semantics v1.1; two adversarial review rounds addressed (`checkpoints/cp08-semantics-harness.md`) |
+
+### CP08 certification evidence (owner-accepted 2026-10-18)
+
+| Check | Commit | Result |
+| --- | --- | --- |
+| Checkpoint-10 cross-platform equivalence (Linux, macOS, Windows) | `bce5913` | pass |
+| v4.4/v4.5 cross-platform (Linux, macOS, Windows) | `bce5913` | pass |
+| Regression suite `runtime-2` vs core `runtime-2` | `bce5913` | pass |
+| Test integrity guards (binding gates, static scan, aggregate evidence on ubuntu and macOS, fast contract suites) | `600fe99` | pass |
+
+`bce5913..600fe99` changes no product source (`git diff -- src` is empty): the
+rt-diff `trace-async-reorder` mutant fix, the certify runner and its guard, CI
+annotations, private temp files in three tests, and docs (D-012). The integrity
+job at `bce5913` failed only on the mutant self-test fixed in `aed991b`. No full
+matrix was re-run to consolidate (D-012).
+
+### Certification levels (D-012)
+
+- **locally certified** — `make certify` on Linux with every result PASS or classified;
+- **cross-platform certified** — the CI workflows above pass on Linux, macOS and Windows;
+- **release certified** — full matrix on the exact commit to be promoted, before merge to `main`.
+
+CP09–CP11 are certified locally; the next full matrix runs at the CP09–CP11
+integration milestone.
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
 
 ## Environment
 
-- Work happens in a cloud clone of public `main` at `ce8cd36` (D-003).
-- Linux only (D-004). macOS/Windows: pending CI, which requires an
-  owner-approved push.
-- Known environmental test failures on this host (also on the baseline): the
-  sandbox runs as root (test-v43-language, test-unreadable-source,
-  test-dependency-status), lacks `/usr/bin/time` (two v48 guard tests), and
-  has no usable pty (test-progress-pty).
+- Work happens in a cloud clone of public `main` at `ce8cd36` (D-003); local
+  certification on Linux, cross-platform via GitHub Actions on `runtime-2` (D-007, D-012).
+- Known environmental failures on this host (also on the baseline) are
+  classified by `make certify` (`certification.md`): root-only failures,
+  missing `/usr/bin/time`, no usable pty.
+- Load-sensitive wall-clock guards run exclusively and keep their thresholds
+  (`certification.md` § Load-sensitive measurements).
 
 ## Local checkout divergence
 
@@ -43,14 +67,14 @@ to the owner's git repository without approval).
 
 ## Next action
 
-1. CP08 (semantics + differential harness, prioritised by
-   the owner), CP05 and CP07.
-2. CI (D-007): push `runtime-2` to `origin` once credentials are available
-   (see below) and run the cross-platform workflows.
-3. CP04 resumes after CP08 (D-006).
-3. Carried to CP16 (Host ops): reads inside `async` functions, OS (not
-   lexical) resolution of `link/..`, globs in `cp()`/`rm()`, recording
-   `@path` targets separately from presence checks.
+1. CP09 (value model) and CP10 (parser): finish local validation, adversarial
+   review and docs; promote as locally certified.
+2. CP11 (VM proof of concept, GO/NO-GO): compiled Nift programs through the VM,
+   compared with v4.12 and CPython on equivalent workloads.
+3. Full cross-platform matrix at the CP09–CP11 integration milestone.
+4. CP04 resumes after the VM decision (D-006). Carried to CP16: reads inside
+   `async` functions, OS resolution of `link/..`, globs in `cp()`/`rm()`, `@path`
+   targets, pipe-based execution (D-011).
 
 Notes on history:
 - Commit `1ecb2ae` is titled "WIP CP03"; its content is the CP03
@@ -76,12 +100,8 @@ CI: `.github/workflows/runtime2-regression-suite.yml` runs the suite's
 pagination, v45_target: timing flakes) and `incremental_new_features` is flaky
 (2/20 on v4.12.0). The suite's `runtime-2` branch encodes D-002 (D-008).
 
-## CI status (D-007)
+## CI status (D-007, D-012)
 
-Not yet pushed: this session has no GitHub credentials (the session's GitHub
-link is missing; the owner's machine cannot reach github.com over SSH from the
-sandbox). Pushing to `runtime-2` alone also does not trigger most workflows,
-which run on `push` to `main`, on `pull_request`, or on `workflow_dispatch`;
-cross-platform runs need `workflow_dispatch` on the branch:
-`checkpoint-10-cross-platform.yml`, `v44-cross-platform.yml` and
-`test-integrity.yml` all accept it.
+`runtime-2` is pushed to `origin` (certified commits only). Workflows run by
+`workflow_dispatch` on the branch, narrowest workflow first; the full matrix only
+at integration boundaries, for platform-sensitive changes, or before promotion.

@@ -48,6 +48,20 @@ EXCLUSIVE = {
     "test-minify": "writes minifypp/.build via a sub-make",
 }
 
+# Load-sensitive measurements (owner review of D-012): targets whose pass/fail
+# depends on wall-clock upper bounds. Their thresholds are unchanged; they run
+# serially, with no competing target, so that a failure reflects the product and
+# not the scheduler. A pass under exclusive execution is the evidence; an
+# intermittent failure is never recorded as resolved by a later passing run.
+LOAD_SENSITIVE = {
+    "test-v44-language-foundation": "tests/v44_perf_scaling_smoke.sh: doubling n must not quadruple wall time (map/set/push)",
+    "test-v48-map-set-scaling": "tests/v48_map_set_scaling_guard.sh: wall-clock scaling ratio",
+    "test-scripting-perf": "tests/scripting_perf_guard.sh: wall-clock budgets",
+    "test-runtime2-process-capture": "process_capture.sh: background descendant must not block (<280 ms)",
+}
+for _t, _why in LOAD_SENSITIVE.items():
+    EXCLUSIVE.setdefault(_t, "load-sensitive: " + _why)
+
 # Implementation-time tier (--quick): fast, broad smoke of the runtime and the
 # Runtime 2.0 gates. Checkpoint certification always runs the full set.
 QUICK = [
@@ -324,6 +338,13 @@ def main():
             r["status"], r["reason"] = "PASS", ""
             continue
         rc, _ = run_target(ROOT, t, logdir / f"{t}.rerun.log", a.timeout)
+        if t in LOAD_SENSITIVE:
+            # Already ran with no competing target: a later pass does not
+            # resolve the failure (owner review, D-012). Thresholds unchanged.
+            r["status"] = "FAIL"
+            r["reason"] = (f"load-sensitive guard failed under exclusive execution "
+                           f"(re-run alone: {'passed' if rc == 0 else 'failed'}); see .build/certify/{t}.log")
+            continue
         if rc == 0:
             r["status"], r["reason"] = "FLAKY", "failed in the concurrent run, passed when re-run alone"
             continue

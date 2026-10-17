@@ -64,6 +64,40 @@ the checkout and any new TMPDIR entry):
 Any target whose recipe runs a sub-make is also treated as exclusive
 automatically.
 
+### Load-sensitive measurements
+
+Three kinds of failure are kept apart: **correctness regressions** (always
+block), **performance regressions** (established by controlled measurement,
+e.g. Callgrind instruction counts) and **load-sensitive measurements** —
+wall-clock guards whose result depends on what else the machine is doing.
+These targets keep their thresholds unchanged and run exclusively, with no
+competing target:
+
+| Target | Wall-clock guard |
+| --- | --- |
+| `test-v44-language-foundation` | `v44_perf_scaling_smoke.sh`: doubling n must not quadruple time (array push, map, set) |
+| `test-v48-map-set-scaling` | `v48_map_set_scaling_guard.sh` |
+| `test-scripting-perf` | `scripting_perf_guard.sh` budgets |
+| `test-runtime2-process-capture` | background descendant must not block (< 280 ms) |
+
+A failure under exclusive execution is classified **FAIL** even if the re-run
+passes (the re-run result is recorded in the reason). A failure seen only in a
+concurrent context — `make -j test-all`, or a CI runner shared with other jobs
+— is recorded as a load-sensitive observation, not as resolved by a later pass.
+
+Open observation: `test-v44-language-foundation` failed in CI at `974dcb3`
+(`make -j2 test-all`; map n=40k 85 ms, n=80k 450 ms, ratio 5.3 > 3.5) and in one
+concurrent local certify run (0.1 s, log not retained), and passed alone and in
+CI at `600fe99`. No threshold changed. Controlled measurement (2026-10-18,
+this host, `nift` at `600fe99`): the guard's map programs execute 392.6M and
+783.0M instructions (Callgrind; ratio 1.994) with peak RSS 30.7 MB and 55.1 MB,
+so map insertion is linear in work; eight runs alone gave wall-clock ratios
+1.8–3.4 against the 3.5 bound. The excess over 2× is wall-clock variance
+(allocation, page faults, scheduling), and the margin is thin even on an idle
+machine. Still classified load-sensitive, not resolved: the guard keeps its
+bound, runs exclusively under `make certify`, and a Callgrind instruction-ratio
+companion is the candidate controlled measurement if it fails again.
+
 Every target runs with a **private TMPDIR** (removed afterwards). Many C++
 tests create fixed names under the temp directory
 (`temp_directory_path() / "nift-host-seam-pg"`, `nift-c-abi-pagination`,
