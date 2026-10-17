@@ -11,10 +11,10 @@ _Last updated: 2026-10-17_
 | CP02 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Defect D2 fixed; review findings 1–7 fixed, 8/10a/10b open for CP16, 9 documented; @input shadow probe fixed after CI (`checkpoints/cp02-dynamic-reads.md`) |
 | CP03 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | D-002 filesystem freedom; contract tests changed (incl. dependency_status escaping symlink); regression suite `runtime-2` updated (`checkpoints/cp03-filesystem-freedom.md`) |
 | CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
-| CP05 | complete (Linux); macOS/Windows: CI after push | `runtime-2` | Flat call in loop −10.5% (top level −4.6%); review: unbounded cache memory and latched flags fixed (`checkpoints/cp05-call-path.md`) |
+| CP05 | complete — Linux, macOS, Windows (CI @c5db14d) | `runtime-2` | Flat call in loop −10.5% (top level −4.6%); review: unbounded cache memory and latched flags fixed (`checkpoints/cp05-call-path.md`) |
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
-| CP07 | complete as leak/resource fix (Linux; CI after push); launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files (no leaked `/tmp/nift-proc-*`), behaviour unchanged; pipes would meet the gate but change child-visible behaviour (`checkpoints/cp07-process-capture.md`) |
-| CP08 | implemented; round-2 review findings addressed | `runtime-2-cp08` | Host-op trace, `tools/rt-diff` (byte-exact page-info, same-path A/B runs, process-group timeouts, source-bound policies), semantics v1.1 (`checkpoints/cp08-semantics-harness.md`) |
+| CP07 | complete — Linux, macOS, Windows (CI @aba3a50) as leak/resource fix; launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files; pipe attempt rejected and preserved (`checkpoints/cp07-process-capture.md`) |
+| CP08 | complete (Linux); macOS/Windows: CI after push | `runtime-2` | Host-op trace, `tools/rt-diff` harness (policies, minimiser, 83 self-tests), corpus, semantics v1.1; two adversarial review rounds addressed (`checkpoints/cp08-semantics-harness.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
