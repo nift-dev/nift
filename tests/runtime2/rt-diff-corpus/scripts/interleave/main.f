@@ -1,0 +1,5 @@
+print("out-1")
+warn("err-1")
+print("out-2")
+warn("err-2")
+print("out-3")

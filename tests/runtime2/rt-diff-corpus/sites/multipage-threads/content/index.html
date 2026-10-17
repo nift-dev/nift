@@ -1,0 +1,4 @@
+<h1>Home</h1>
+@json(d, "data/items.json")
+@for(x : d.items){<li>$[x.name]</li>}
+<a href="@pathto(p01)">p1</a>

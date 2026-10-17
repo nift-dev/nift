@@ -1,0 +1,19 @@
+nift build --all
+nift status
+sleep 1.1
+write partials/note.html note-2\n
+nift status
+nift build
+nift status
+nift info /
+nift info --names
+nift track news News templates/template.html
+write content/news.html <p>news</p>\n
+nift build
+nift cp about about-copy
+nift mv about-copy moved
+nift build
+nift info --names
+nift rm moved
+nift status
+nift build --all

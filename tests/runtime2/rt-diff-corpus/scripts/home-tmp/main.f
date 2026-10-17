@@ -1,0 +1,6 @@
+print(getenv("HOME"))
+h := getenv("HOME")
+f := file(h + "/created-in-home.txt"); f.open("w"); f.write("home"); f.save(); f.close()
+t := getenv("TMPDIR")
+g := file(t + "/created-in-tmp.txt"); g.open("w"); g.write("tmp"); g.save(); g.close()
+print("ok")

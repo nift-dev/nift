@@ -1,0 +1,14 @@
+{
+ "tracked": [
+  {
+   "name": "/",
+   "title": "Home",
+   "template": "templates/template.html"
+  },
+  {
+   "name": "about",
+   "title": "About",
+   "template": "templates/template.html"
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+nift build --all
+nift status
+write partials/a.html A2\n
+nift status
+nift build
+write partials/b.html B\n
+nift status
+nift build
+nift status

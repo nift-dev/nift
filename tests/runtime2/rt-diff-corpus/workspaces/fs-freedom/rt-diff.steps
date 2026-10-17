@@ -1,0 +1,16 @@
+symlink ../neighbour/data linked
+write content/abs.html ABS:@input("$WS/neighbour/data/note.txt")\n
+nift build --all
+nift status
+sleep 1.1
+write ../neighbour/data/note.txt NEIGHBOUR-2\n
+nift status
+nift build
+write ../neighbour/data/new.txt x\n
+nift status
+nift build
+sleep 1.1
+write ../neighbour/data/dep.txt dep-2\n
+nift status
+nift build
+nift status

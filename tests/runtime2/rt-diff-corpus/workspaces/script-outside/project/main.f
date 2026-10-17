@@ -1,0 +1,7 @@
+print(cat("../neighbour/note.txt"))
+print(exists("../neighbour/missing.txt"))
+print(ls("../neighbour").stringify())
+import("../neighbour/lib/util.f")
+print(twice(21))
+f := file("../neighbour/written.txt"); f.open("w"); f.write("written"); f.save(); f.close()
+print(cat("../neighbour/written.txt"))

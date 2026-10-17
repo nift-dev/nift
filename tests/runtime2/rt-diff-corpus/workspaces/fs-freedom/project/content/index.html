@@ -1,0 +1,7 @@
+REL:@input("../neighbour/data/note.txt")
+LINK:@input("linked/note.txt")
+@json(info, "../neighbour/data/info.json")JSON:$[info.title]
+MD:@markup("md", "../neighbour/data/doc.md")
+EXISTS:@script { return exists("../neighbour/data/note.txt") }
+LS:@script { return ls("../neighbour/data/*.txt").length() }
+@dep("../neighbour/data/dep.txt")

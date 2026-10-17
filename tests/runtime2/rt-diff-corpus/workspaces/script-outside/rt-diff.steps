@@ -1,0 +1,3 @@
+nift main.f
+write abs.f print(cat("$WS/neighbour/note.txt"))\n
+nift abs.f
