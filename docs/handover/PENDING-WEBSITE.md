@@ -47,7 +47,21 @@ Use this compact shape for new entries:
 
 ## Open items
 
-None for the current candidate. All five items targeted at v4.6.0 (native time
+### Native SHA-256 built-ins (`sha256`, `sha256_file`)
+
+- Status: pending (implemented on branch `feature-sha256`, off `runtime-2`)
+- Earliest release: the first release that includes the `feature-sha256`
+  checkpoint (not v4.12.0)
+- Website scope: scripting reference (filesystem and bytes/value built-ins),
+  the built-in index, and any release-manifest or artifact-verification example
+- Required update: document `sha256(value)` (string/bytes contents, lowercase
+  hex, no normalisation, other types are errors) and `sha256_file(path)`
+  (streamed raw file bytes, `open()`-style errors, dependency tracking in
+  builds, user definitions with the same name take precedence), following
+  `docs/HASHING-API.md`
+- Timing: describes built-ins no released Nift has
+
+None other for the current candidate. All five items targeted at v4.6.0 (native time
 functions, native secure random bytes, execution output separation, relative
 import module ownership, explicit module/package resource paths) were completed
 in the website source during v4.6 release preparation and verified against the

@@ -45,7 +45,7 @@ cannot be written, the line is dropped silently.
 | --- | --- | --- |
 | `stat` | every metadata query that goes through `Parser::inspect_path` (`exists`, `is_file`, `is_dir`, `stat`, `file().exists()`, `@input` shadowing probe, prepared-path metadata) | `file`, `directory`, `symlink`, `other`, `missing` or `error` |
 | `list` / `glob` | `ls()` of a directory / of a glob pattern, prepared-path directory listing | empty |
-| `read` | `cat`, `open`, `file().open("r")` | byte count |
+| `read` | `cat`, `open`, `file().open("r")`, `sha256_file` (successful reads only) | byte count |
 | `open` | `file(...).open(mode)` | the mode (`r`, `w`, `a`, `rw`) |
 | `save`, `touch`, `remove`, `mkdir`, `copy-to`, `move-to`, `move-from` | the corresponding write operations | empty |
 | `read-source` | template, content, `@input`, pagination template and separator, script import reads through the host | `ok`, `missing` or `error` |
