@@ -187,6 +187,10 @@ Candidates recorded (class 2, not yet changed; the VM falls back today):
 - Built-ins win over user functions of the same name, e.g. `is_int` (CP11
   review D4). Already decided as D-009 #3 (user definitions shadow built-ins);
   to be implemented as its own change with compatibility tests.
+- Inside loop bodies (and functions called from them) a declaration `b := a`
+  takes its binding type from the current value, at top level from `a`'s
+  declared type, so `a := 2.0; b := a; b = 2.5` errors only in a loop (CP11
+  review N1). CP11 refuses such declarations at compile time (round 2, `prepared-decl-type`).
 
 ## D-015 — Legacy is an oracle, not the language definition; CP11 subset narrowed (owner, 2026-10-18)
 - The legacy interpreter identifies behavioural differences; it is not the

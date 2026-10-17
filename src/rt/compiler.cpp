@@ -87,7 +87,7 @@ bool UnitCompiler::statements(const Node& block) {
     for (std::uint32_t k = 0; k < block.count; ++k) {
         // Legacy ignores a `break`/`continue` that is followed by another
         // statement in the same block and runs the rest (review D2, candidate
-        // language change D-013): such blocks are not compiled.
+        // language change D-014): such blocks are not compiled.
         const Node& node = ast_.at(list[k]);
         if ((node.kind == NodeKind::Break || node.kind == NodeKind::Continue) && k + 1 < block.count)
             return fail(node, "jump-not-last");
