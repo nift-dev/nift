@@ -56,6 +56,7 @@ private:
 
 class Parser {
     friend struct SourceTranslationTestAccess;
+    friend struct RtParserOracleAccess;  // CP10 legacy-translation oracle (tests/rt)
 public:
     // Shared filesystem type-inspection result backing exists/is_file/is_dir/stat.
     // One metadata query (std::filesystem::status) derives exists + type; size is
