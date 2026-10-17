@@ -126,11 +126,20 @@ def main():
                     lines[i], lines[i + 1] = lines[i + 1], lines[i]
                     break
         elif mode == "trace-async-reorder":
-            for i in range(len(lines) - 1):
-                a, b = json.loads(lines[i]), json.loads(lines[i + 1])
-                if "/async#" in a["ctx"] and a["ctx"] == b["ctx"] and lines[i] != lines[i + 1]:
-                    lines[i], lines[i + 1] = lines[i + 1], lines[i]
+            # Swap the first two distinct operations of one async task. They
+            # need not be adjacent: on a multi-core runner other tasks' and the
+            # parent's operations interleave between them (CI @bce5913 missed
+            # the reorder because no adjacent pair existed there).
+            seen = {}
+            for i, line in enumerate(lines):
+                ctx = json.loads(line)["ctx"]
+                if "/async#" not in ctx:
+                    continue
+                j = seen.get(ctx)
+                if j is not None and lines[j] != line:
+                    lines[i], lines[j] = lines[j], lines[i]
                     break
+                seen.setdefault(ctx, i)
         elif mode.startswith("trace-drop-op:"):
             op = mode.split(":", 1)[1]
             lines = [l for l in lines if json.loads(l).get("op") != op]

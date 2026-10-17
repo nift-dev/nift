@@ -135,3 +135,18 @@ behaviour; approved compatibility changes; deferred language improvements.
 - Principle: preserve correctness in Nift 4.x, but 4.x implementation choices
   do not constrain the VM design; every VM difference is deliberate and tested.
 
+## D-012 — Tiered CI (owner, 2026-10-17)
+Three certification levels: **locally certified** (checkpoint gates run
+locally: `make certify`, adversarial review, differential, performance and
+memory gates) → **cross-platform certified** (the GitHub Actions matrix) →
+**release certified**. Level 1 (development) runs targeted tests only. Level 2
+(checkpoint completion) does not need GitHub CI. Level 3 (the full matrix)
+runs every 3–5 checkpoints, at major compiler/VM integration boundaries, for
+changes that materially affect cross-platform behaviour (process execution,
+filesystem semantics, thread scheduling, C ABI), and before merging or
+releasing. A CI failure is captured, reproduced and fixed locally; the rerun
+uses the narrowest workflow that can show the fix, never all workflows after a
+test-helper or diagnostic change. Independent work (CP09, CP10, CP11) does not
+wait for CI. No test is weakened; untested platforms are never reported as
+passing; progress records state each checkpoint's level.
+
