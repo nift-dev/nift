@@ -2459,7 +2459,9 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     const bool shadowed = !source_path.parent_path().empty() && host_.source_exists(relative_to_source);
                     // CP02: whether a source-relative file shadows the root one
                     // decides which bytes are included; record the probe.
-                    if (!source_path.parent_path().empty() && !host_.root().empty()) observe_presence(relative_to_source, shadowed);
+                    // Only the absence needs recording: when it exists it is
+                    // included, so it is already a dependency.
+                    if (!shadowed && !source_path.parent_path().empty() && !host_.root().empty()) observe_presence(relative_to_source, false);
                     if (shadowed) {
                         input_path = relative_to_source;
                     } else if (host_.root().empty()) {
