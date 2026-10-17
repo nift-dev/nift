@@ -18,6 +18,9 @@
 
 namespace nift::rt {
 
+class Value;
+Value make_string(std::string_view text);  // rt/string.h; befriended for inline strings
+
 enum class Kind : std::uint8_t {
     Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Function, Struct, Handle, Error
 };
@@ -94,14 +97,6 @@ public:
     std::uint32_t handle_generation() const noexcept { std::uint32_t g; std::memcpy(&g, bytes_ + 8, 4); return g; }
     std::uint32_t refcount() const noexcept { return is_heap() ? heap()->refcount : 0; }
 
-    // Inline strings: up to 14 bytes in bytes_[0..13]; aux (byte 14) holds
-    // the length with kInlineFlag set (heap strings keep aux == 0).
-    static Value inline_text(std::string_view text) noexcept {
-        Value v; v.set_kind(Kind::String);
-        std::memcpy(v.bytes_, text.data(), text.size());
-        v.bytes_[14] = static_cast<unsigned char>(kInlineFlag | text.size());
-        return v;
-    }
     std::string_view inline_view() const noexcept {
         return std::string_view(reinterpret_cast<const char*>(bytes_), bytes_[14] & 0x7Fu);
     }
@@ -114,7 +109,38 @@ public:
 
     const unsigned char* raw() const noexcept { return bytes_; }
 
+    // Used by destroy_heap_object to free nested values without recursion:
+    // drops this value's reference and, if it was the last one, returns the
+    // object (now owned by the caller, not yet destroyed); the value becomes
+    // Null either way.
+    HeapObject* release_detached() noexcept {
+        HeapObject* last = nullptr;
+        if (is_heap()) {
+            HeapObject* p = heap();
+            if (p->refcount != kImmortal && --p->refcount == 0) last = p;
+        }
+        std::memset(bytes_, 0, sizeof bytes_);
+        return last;
+    }
+
+    // Refcounts saturate: an object whose count reaches kImmortal is never
+    // freed (a leak instead of a use-after-free). Reaching it needs 2^32 - 1
+    // live references to one object.
+    static constexpr std::uint32_t kImmortal = 0xFFFFFFFFu;
+
 private:
+    friend Value make_string(std::string_view text);
+    // Inline strings: up to 14 bytes in bytes_[0..13]; aux (byte 14) holds
+    // the length with kInlineFlag set (heap strings keep aux == 0). Private:
+    // only make_string (which checks the length) may build one, because a
+    // longer text would overwrite the aux and kind bytes.
+    static Value inline_text(std::string_view text) noexcept {
+        Value v; v.set_kind(Kind::String);
+        std::memcpy(v.bytes_, text.data(), text.size());
+        v.bytes_[14] = static_cast<unsigned char>(kInlineFlag | text.size());
+        return v;
+    }
+
     static constexpr unsigned char kInlineFlag = 0x80;
     static bool heap_kind(Kind k) noexcept {
         switch (k) {
@@ -127,11 +153,13 @@ private:
     void set_payload(std::uint64_t u) noexcept { std::memcpy(bytes_, &u, 8); }
     void set_pointer(HeapObject* p) noexcept { std::memcpy(bytes_, &p, sizeof p); }
     void set_kind(Kind k) noexcept { bytes_[15] = static_cast<unsigned char>(k); }
-    void retain() const noexcept { if (is_heap()) ++heap()->refcount; }
+    void retain() const noexcept {
+        if (is_heap() && heap()->refcount != kImmortal) ++heap()->refcount;
+    }
     void release() noexcept {
         if (!is_heap()) return;
         HeapObject* p = heap();
-        if (--p->refcount == 0) destroy_heap_object(p);
+        if (p->refcount != kImmortal && --p->refcount == 0) destroy_heap_object(p);
     }
 
     alignas(8) unsigned char bytes_[16];

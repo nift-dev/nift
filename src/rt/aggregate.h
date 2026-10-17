@@ -7,6 +7,25 @@
 // shared, their refcounts bumped). Copying a Value is therefore O(1), and the
 // legacy "arguments and returns are copies" semantics cost nothing until a
 // copy is actually mutated.
+//
+// Reference lifetime contract. Every reference or pointer returned here
+// (array_items, array_mut, object_entries, object_get, and references to
+// elements obtained through them) points into the aggregate's current heap
+// object and is invalidated by ANY of the following on the same Value or on
+// an alias that shares its object:
+//   * array_push, object_set, object_remove, unshare, array_mut/object_mut
+//     (which may clone the object and switch this Value to the clone, so an
+//     earlier array_mut reference keeps writing into the *other* sharer's
+//     storage, breaking copy semantics, or into freed memory once that
+//     sharer is gone);
+//   * copying the Value and then mutating either copy;
+//   * assigning to or destroying the Value (or the last alias).
+// array_push/object_set additionally reallocate storage. Callers (the VM)
+// must re-fetch after any of these and must not hold a mutable reference
+// across a copy of the aggregate. Copy a child Value out before mutating its
+// parent (`Value v = array_items(a)[0]; array_push(a, v);` is safe;
+// `array_push(a, array_items(a)[0])` is safe too because the argument is
+// copied before the call). There is no runtime check (see the CP09 record).
 #include "rt/atom.h"
 #include "rt/heap.h"
 #include "rt/value.h"

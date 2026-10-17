@@ -10,7 +10,7 @@ Value make_string(std::string_view text) {
 }
 
 Value make_string(std::string&& text) {
-    if (text.size() <= Value::kInlineStringCapacity) return Value::inline_text(text);
+    if (text.size() <= Value::kInlineStringCapacity) return make_string(std::string_view(text));
     return Value::adopt(new StringObject(std::move(text)));
 }
 

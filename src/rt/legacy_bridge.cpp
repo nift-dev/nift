@@ -37,7 +37,10 @@ bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::strin
     out = make_object();
     for (const auto& entry : legacy.object) {
         const Atom key = atom(entry.first);
-        if (object_get(out, key)) continue;  // duplicate key: legacy lookup returns the first
+        if (object_get(out, key)) {  // see legacy_bridge.h: rt objects have unique keys
+            error = "object has duplicate key '" + entry.first + "'";
+            return false;
+        }
         Value v;
         if (!from_legacy(entry.second, v, error)) return false;
         object_set(out, key, static_cast<Value&&>(v));

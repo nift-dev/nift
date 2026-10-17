@@ -18,13 +18,25 @@ double number_approx(const Value& number) {
     }
 }
 
+DecimalForm number_form(const Value& number) {
+    switch (number.kind()) {
+        case Kind::Int: return decimal_form_of_int(number.as_int());
+        case Kind::Double: return decimal_form_of_double(number.as_double());
+        default: {
+            DecimalForm form;
+            if (!parse_decimal(decimal_spelling(number), form)) return decimal_form_of_double(decimal_approx(number));
+            return form;
+        }
+    }
+}
+
 bool number_is_zero(const Value& number) {
     switch (number.kind()) {
         case Kind::Int: return number.as_int() == 0;
         case Kind::Double: return number.as_double() == 0.0;
         case Kind::Decimal: {
-            DecimalForm form;
-            return parse_decimal(decimal_spelling(number), form) && form.cls == NumericClass::Finite && form.sign == 0;
+            const DecimalForm form = number_form(number);
+            return form.cls == NumericClass::Finite && form.sign == 0;
         }
         default: return false;
     }
@@ -38,8 +50,8 @@ bool number_is_integer(const Value& number) {
             return std::isfinite(d) && std::trunc(d) == d;
         }
         case Kind::Decimal: {
-            DecimalForm form;
-            return parse_decimal(decimal_spelling(number), form) && (form.sign == 0 || form.exponent >= 0);
+            const DecimalForm form = number_form(number);
+            return form.cls == NumericClass::Finite && (form.sign == 0 || form.exponent >= 0);
         }
         default: return false;
     }
@@ -56,9 +68,8 @@ bool number_to_i64(const Value& number, std::int64_t& out) {
             return true;
         }
         case Kind::Decimal: {
-            DecimalForm form;
+            const DecimalForm form = number_form(number);
             std::string digits;
-            if (!parse_decimal(decimal_spelling(number), form)) return false;
             if (!decimal_integer_digits(form, 19, digits)) return false;
             const std::string_view maximum = form.sign < 0 ? "9223372036854775808" : "9223372036854775807";
             if (digits.size() > maximum.size() || (digits.size() == maximum.size() && digits > maximum)) return false;

@@ -14,6 +14,7 @@
 //     non-finite result is "arithmetic result is not finite".
 // Note: the legacy *prepared* (loop) AST path computes `+ - *` in doubles
 // without overflow checks; Runtime 2.0 follows the canonical path (D-009).
+#include "rt/decimal.h"
 #include "rt/value.h"
 
 #include <cstdint>
@@ -28,6 +29,10 @@ bool arithmetic(ArithOp op, const Value& left, const Value& right, Value& out, s
 Value negate(const Value& number);
 
 double number_approx(const Value& number);
+// Exact decimal form (legacy numeric_form): Int exactly, Double by its
+// shortest round-trip spelling, Decimal by its spelling at any exponent size
+// (a spelling that is not a finite JSON number falls back to its double).
+DecimalForm number_form(const Value& number);
 bool number_is_zero(const Value& number);
 bool number_is_integer(const Value& number);
 // Exact conversion (legacy runtime_number_to_i64); false if not an integer in

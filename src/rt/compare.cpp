@@ -13,22 +13,10 @@ namespace nift::rt {
 
 namespace {
 
-DecimalForm form_of(const Value& number) {
-    switch (number.kind()) {
-        case Kind::Int: return decimal_form_of_int(number.as_int());
-        case Kind::Double: return decimal_form_of_double(number.as_double());
-        default: {
-            DecimalForm form;
-            if (!parse_decimal(decimal_spelling(number), form)) return decimal_form_of_double(decimal_approx(number));
-            return form;
-        }
-    }
-}
-
 bool numbers_equal(const Value& l, const Value& r) {
     if (l.is(Kind::Int) && r.is(Kind::Int)) return l.as_int() == r.as_int();
     if (l.is(Kind::Double) && r.is(Kind::Double)) return l.as_double() == r.as_double();
-    const DecimalForm a = form_of(l), b = form_of(r);
+    const DecimalForm a = number_form(l), b = number_form(r);
     if (a.cls == NumericClass::NaN || b.cls == NumericClass::NaN) return false;
     return compare_decimal_forms(a, b) == 0;
 }
@@ -79,12 +67,32 @@ std::uint64_t hash_text(std::string_view text) {
     return h;
 }
 
+// Equality compares exact decimal forms (a Double by its shortest round-trip
+// spelling), so the hash must be a function of that form. Integers with
+// |v| <= 2^53 take a cheap shortcut that every kind reaches for the same
+// value: a Double whose shortest spelling is such an integer *is* that integer
+// (all integers up to 2^53 are representable), and Int and Decimal are exact.
+// Everything else, including integral doubles above 2^53 (2^62 spells
+// 4.611686018427388e18, not ...904), hashes the canonical fingerprint.
 std::uint64_t hash_number(const Value& number) {
-    // Integers (whatever their kind) hash by value so 1, 1.0 and "1.00" agree;
-    // other numbers hash their canonical decimal form.
+    constexpr std::int64_t kExact = std::int64_t{1} << 53;
     std::int64_t i = 0;
-    if (number_to_i64(number, i)) return mix(2, static_cast<std::uint64_t>(i));
-    return mix(3, hash_text(decimal_fingerprint(form_of(number))));
+    switch (number.kind()) {
+        case Kind::Int:
+            i = number.as_int();
+            if (i >= -kExact && i <= kExact) return mix(2, static_cast<std::uint64_t>(i));
+            break;
+        case Kind::Double: {
+            const double d = number.as_double();
+            if (std::isfinite(d) && std::trunc(d) == d && std::fabs(d) <= static_cast<double>(kExact))
+                return mix(2, static_cast<std::uint64_t>(static_cast<std::int64_t>(d)));
+            break;
+        }
+        default:
+            if (number_to_i64(number, i) && i >= -kExact && i <= kExact) return mix(2, static_cast<std::uint64_t>(i));
+            break;
+    }
+    return mix(3, hash_text(decimal_fingerprint(number_form(number))));
 }
 
 } // namespace
@@ -114,7 +122,7 @@ bool compare_relational(const Value& left, const Value& right, int& comparison) 
             comparison = left.as_int() < right.as_int() ? -1 : (left.as_int() > right.as_int() ? 1 : 0);
             return true;
         }
-        const DecimalForm a = form_of(left), b = form_of(right);
+        const DecimalForm a = number_form(left), b = number_form(right);
         if (a.cls == NumericClass::NaN || b.cls == NumericClass::NaN) return false;
         comparison = compare_decimal_forms(a, b);
         return true;
