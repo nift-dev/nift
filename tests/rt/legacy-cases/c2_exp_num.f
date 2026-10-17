@@ -1,0 +1,5 @@
+print(1e3)
+print(1.5e-2)
+print(.5)
+print(5.)
+print(007)

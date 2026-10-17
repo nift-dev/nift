@@ -131,7 +131,7 @@ void accepted_forms() {
     contains("[a, b] := pair", "Pattern @0..6");
     contains("{a, b} = o", "Pattern flags=2048");
     contains("[a, a] := pair", "Opaque [legacy-runtime-error]");
-    contains("print(42.to_string())", "Member @6..18");
+    contains("print(\"abc\".length())", "Member @6..18");
     contains("@fn[async](g(n)) {\n  return n\n}", "FnDecl flags=4100");
     contains("@fn(h()) { while x {} }", "Opaque [deferred-translation]");
     contains("@struct(P) { x := 1 }", "StructDecl");
@@ -140,6 +140,73 @@ void accepted_forms() {
     contains("@fn(h()) { } trailing", "TemplateStmt");
     contains("f := (x) => { <i>$[x]</i> }", "Opaque [template-text]");
     contains("x := " + std::string(500, '(') + "1" + std::string(500, ')'), "Opaque [nesting-limit]");
+}
+
+// Adversarial review of CP10 (cp10-parser.md, Reviews): every construct legacy
+// rejects or reads differently at run time is Opaque.
+void review_findings() {
+    const std::string lre = "Opaque [legacy-runtime-error]", irr = "Opaque [irregular-legacy-parse]";
+    // D1/D2 await
+    contains("print(await f() + 1)", irr);
+    contains("x := await f() * 2", irr);
+    contains("print(await(f()))", lre);
+    contains("x := await\tf()", lre);
+    contains("await := 1", "Opaque");
+    contains("print(1 + await f())", "Await");
+    contains("print(!await f())", "Await");
+    contains("x := await f()", "Await @5..14");
+    // D3 multi-line #! statement
+    contains("#! note (\n$[print(1)]\n)", "Opaque [template-text]");
+    contains("#! note", "Comment");
+    // D4 escapes and $ in one string; naive `]` matching in $[...]
+    contains("print(\"\\\\$[1+1]\")", irr);
+    contains("print(\"\\n$[1]\")", irr);
+    contains("print(\"a\\$b\")", irr);
+    contains("print('$[\"]\"]')", lre);
+    contains("print(\"\\q\")", "String @6..10");
+    // D5 postfix and call shapes
+    for (const char* text : {"print(x [0])", "print(o . a)", "print(o.a .b)", "print(o?. a)", "print(o.a\n.b)",
+                             "print(\"abc\"[1])", "print('r'.k)", "print(1e2[0])", "print(true.k)",
+                             "print(true.length())", "print(((x) => x)(1))", "print((f)(1))", "print(mk()(1))",
+                             "print(g[0](false))", "print(xs[0].f(5))", "print(o.a[0](3))", "print(f (1))",
+                             "print(xs[xs[0]])", "print({\"a\": 1}.a)", "print([1][0])", "print(f( ))",
+                             "print(1 + x => x)", "print((x) => {x} + 1)"})
+        contains(text, "Opaque");
+    contains("print(o.f(3))", "Call @6..12");
+    contains("print(o?.m.g(3))", "Call");
+    contains("print(xs[0].to_string())", "Call");
+    contains("print((1 + 2).to_string())", "Call @6..25");
+    contains("print(g(o).a)", "Member");
+    // D6 trailing commas
+    for (const char* text : {"print([1, 2,])", "print({\"a\": 1,})", "print(f(1,))", "[a,] := xs",
+                             "f := (a,) => a"})
+        contains(text, lre);
+    // D7 declaration checks
+    for (const char* text : {"enum E { A, A }", "enum E { }", "struct (P) { fn(P(...a)) { } }",
+                             "struct (P) {\nfn(P()) { }\nfn(P(a)) { }\n}", "fn(f( )) { }", "f := ( ) => 1",
+                             "o := {\"a\": 1, \"a\": 2}"})
+        contains(text, "Opaque");
+    contains("enum E { A, }", "EnumDecl");
+    // D8 nesting: bounded well below legacy's 96
+    contains("x := " + std::string(40, '[') + "1" + std::string(40, ']'), "Array");
+    contains("x := " + std::string(70, '[') + "1" + std::string(70, ']'), "Opaque [nesting-limit]");
+    contains("x := s" + [] { std::string t; for (int i = 0; i < 70; ++i) t += ".to_string()"; return t; }(),
+             "Opaque [nesting-limit]");
+    // D9 spans cover closing parentheses
+    contains("x := 2 * (1 + 3)", "Binary * @5..16");
+    contains("y := -(1)", "Unary neg @5..9");
+    // D10 @import vs import
+    contains("@import(\"m.f\")", "Import flags=8192");
+    contains("import(\"m.f\")", "Import @0..13");
+    // R2 escapes and interpolation in object keys and verbatim values
+    contains("o := {\"a\\tb\": 1}", lre);
+    contains("o := {\"a\": \"$[x]\"}", lre);
+    contains("o := [\"$[x]\"]", lre);
+    // `!` binds looser than arithmetic in legacy
+    contains("print(!1 + 1)", irr);
+    contains("print(!a == b)", "Binary ==");
+    // lambdas in if conditions
+    contains("if ((p) => 1) { }", irr);
 }
 
 void locations() {
@@ -154,6 +221,7 @@ int main() {
     lexer_tests();
     statement_errors();
     accepted_forms();
+    review_findings();
     locations();
     if (failures) {
         std::cerr << failures << " rt parser unit failure(s)\n";

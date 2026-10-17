@@ -1,0 +1,1 @@
+fn[async]f()

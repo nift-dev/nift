@@ -13,6 +13,10 @@ Gates (docs/runtime-2/checkpoints.md CP10):
      stderr (columns and parentheses removed) must agree. Divergence means
      this parser's precedence differs from legacy's.
   4. fuzz: random byte/structure mutations never crash or hang the parser.
+  5. negative gate (rt_parser_negative.py): generated and hand-written
+     programs rt reads with zero Opaque nodes must not hit a shape error in
+     legacy (malformed/empty expression, nesting, declaration checks, removed
+     forms) and must print rt's reading of their string literals.
 
 Usage: rt_parser_corpus.py --build .build --nift ./nift [--gen-count 5000]
        [--paren quick|full|none] [--fuzz-iters N] [--regen-errors N]
@@ -44,6 +48,7 @@ def find_f(base):
 def collect(work, gen_count, seed):
     corpora = {
         "syntax-errors": find_f(os.path.join(ROOT, "tests/rt/syntax-errors")),
+        "legacy-cases": find_f(os.path.join(ROOT, "tests/rt/legacy-cases")),
         "vm-corpus": find_f(os.path.join(ROOT, "tests/runtime2/vm-corpus")),
         "semantics": find_f(os.path.join(ROOT, "tests/runtime2/semantics")),
         "rt-diff-corpus": find_f(os.path.join(ROOT, "tests/runtime2/rt-diff-corpus")),
@@ -246,6 +251,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1010)
     ap.add_argument("--paren", choices=["none", "quick", "full"], default="quick")
     ap.add_argument("--fuzz-iters", type=int, default=20000)
+    ap.add_argument("--negative-count", type=int, default=1200, help="generated programs for gate 5 (0: skip)")
     ap.add_argument("--regen-errors", type=int, default=0, help="rebuild tests/rt/error_corpus.txt with N cases")
     ap.add_argument("--record", help="write the gate counts as JSON")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
@@ -309,8 +315,20 @@ def main():
         if r.returncode:
             failed.append("fuzz (rc=%d)" % r.returncode)
 
+        if a.negative_count:
+            t0 = time.time()
+            r = subprocess.run([sys.executable, os.path.join(ROOT, "tests/runtime2/rt_parser_negative.py"),
+                                "--dump", dump, "--nift", nift, "--seed", str(a.seed), "--count",
+                                str(a.negative_count), "--jobs", str(a.jobs)],
+                               capture_output=True, text=True, errors="replace")
+            print(r.stdout.strip()[-6000:] or r.stderr[-3000:])
+            record["gates"]["negative"] = {"output": r.stdout.strip().splitlines()[0] if r.stdout.strip() else "",
+                                           "rc": r.returncode, "seconds": round(time.time() - t0, 1)}
+            if r.returncode:
+                failed.append("negative gate")
+
         if a.paren != "none":
-            names = ["vm-corpus", "semantics", "rt-diff-corpus", "cp410-probes", "tests-f"]
+            names = ["vm-corpus", "semantics", "rt-diff-corpus", "cp410-probes", "tests-f", "legacy-cases"]
             if a.paren == "full":
                 names += ["smoke-extract", "gen.py"]
             files = [f for n in names for f in corpora[n]]

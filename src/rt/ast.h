@@ -56,6 +56,7 @@ enum : std::uint16_t {
     kFlagMethod = 1u << 10,    // FnDecl inside a struct
     kFlagObjectPattern = 1u << 11, // Pattern: {a, b} (otherwise [a, b])
     kFlagDeferredBody = 1u << 12,  // FnDecl written as template `@fn`: body translated at call time
+    kFlagTemplateImport = 1u << 13, // Import written as `@import(...)` (its run-time messages say "@import")
 };
 
 // Why an Opaque node was produced (recorded per class in cp10-parser.md).

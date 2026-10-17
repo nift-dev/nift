@@ -41,12 +41,17 @@ struct Verdict {
 
 // Opaque nodes reachable from `id` (the arena also holds nodes of abandoned
 // parse attempts, which are not part of the tree).
-inline void count_opaque(const nift::rt::Ast& ast, nift::rt::NodeId id, std::map<std::string, std::size_t>& out) {
-    if (id == nift::rt::kNoNode) return;
-    const auto& node = ast.at(id);
-    if (node.kind == nift::rt::NodeKind::Opaque) ++out[nift::rt::opaque_reason_name(node.reason)];
-    for (nift::rt::NodeId child : {node.a, node.b, node.c}) count_opaque(ast, child, out);
-    for (std::uint32_t i = 0; i < node.count; ++i) count_opaque(ast, ast.list(node)[i], out);
+inline void count_opaque(const nift::rt::Ast& ast, nift::rt::NodeId root, std::map<std::string, std::size_t>& out) {
+    std::vector<nift::rt::NodeId> stack{root};  // iterative: no recursion on deep trees
+    while (!stack.empty()) {
+        const nift::rt::NodeId id = stack.back();
+        stack.pop_back();
+        if (id == nift::rt::kNoNode) continue;
+        const auto& node = ast.at(id);
+        if (node.kind == nift::rt::NodeKind::Opaque) ++out[nift::rt::opaque_reason_name(node.reason)];
+        stack.insert(stack.end(), {node.a, node.b, node.c});
+        for (std::uint32_t i = 0; i < node.count; ++i) stack.push_back(ast.list(node)[i]);
+    }
 }
 
 inline Verdict rt_verdict(const std::string& source, std::map<std::string, std::size_t>* reasons = nullptr) {

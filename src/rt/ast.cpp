@@ -1,5 +1,7 @@
 #include "rt/ast.h"
 
+#include <utility>
+
 namespace nift::rt {
 
 NodeId Ast::add(NodeKind kind, std::uint32_t begin, std::uint32_t end) {
@@ -18,12 +20,20 @@ void Ast::set_list(NodeId id, const std::vector<NodeId>& children) {
     lists_.insert(lists_.end(), children.begin(), children.end());
 }
 
+// Iterative (explicit stack): tree depth is bounded by the parser, but tools
+// must not depend on that for their own stack use.
 std::size_t Ast::opaque_count(NodeId id) const {
-    if (id == kNoNode) return 0;
-    const Node& node = nodes_[id];
-    std::size_t total = node.kind == NodeKind::Opaque ? 1 : 0;
-    total += opaque_count(node.a) + opaque_count(node.b) + opaque_count(node.c);
-    for (std::uint32_t i = 0; i < node.count; ++i) total += opaque_count(lists_[node.list + i]);
+    std::size_t total = 0;
+    std::vector<NodeId> stack{id};
+    while (!stack.empty()) {
+        const NodeId next = stack.back();
+        stack.pop_back();
+        if (next == kNoNode) continue;
+        const Node& node = nodes_[next];
+        total += node.kind == NodeKind::Opaque ? 1 : 0;
+        stack.insert(stack.end(), {node.a, node.b, node.c});
+        stack.insert(stack.end(), lists_.begin() + node.list, lists_.begin() + node.list + node.count);
+    }
     return total;
 }
 
@@ -65,10 +75,9 @@ bool shows_text(NodeKind kind) {
     }
 }
 
-void dump_node(const Ast& ast, NodeId id, int depth, std::string& out) {
-    if (id == kNoNode) return;
+void dump_node(const Ast& ast, NodeId id, std::size_t depth, std::string& out) {
     const Node& node = ast.at(id);
-    out.append(static_cast<std::size_t>(depth) * 2, ' ');
+    out.append(depth * 2, ' ');
     out += node_kind_name(node.kind);
     if (node.op != Op::None) { out += ' '; out += op_name(node.op); }
     if (node.flags) { out += " flags="; out += std::to_string(node.flags); }
@@ -81,15 +90,23 @@ void dump_node(const Ast& ast, NodeId id, int depth, std::string& out) {
         out += " `" + text + '`';
     }
     out += '\n';
-    for (NodeId child : {node.a, node.b, node.c}) dump_node(ast, child, depth + 1, out);
-    for (std::uint32_t i = 0; i < node.count; ++i) dump_node(ast, ast.list(node)[i], depth + 1, out);
 }
 
 } // namespace
 
+// Pre-order, children a, b, c then the list; iterative (explicit stack).
 std::string dump(const Ast& ast, NodeId root) {
     std::string out;
-    dump_node(ast, root, 0, out);
+    std::vector<std::pair<NodeId, std::size_t>> stack{{root, 0}};
+    while (!stack.empty()) {
+        const auto [id, depth] = stack.back();
+        stack.pop_back();
+        if (id == kNoNode) continue;
+        dump_node(ast, id, depth, out);
+        const Node& node = ast.at(id);
+        for (std::uint32_t i = node.count; i-- > 0;) stack.push_back({ast.list(node)[i], depth + 1});
+        for (NodeId child : {node.c, node.b, node.a}) stack.push_back({child, depth + 1});
+    }
     return out;
 }
 

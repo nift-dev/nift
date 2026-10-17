@@ -36,6 +36,10 @@ std::string_view trim(std::string_view text);
 // complete, regular expression/statement; the caller then emits Opaque.
 struct ExprOptions {
     bool ternary_at_top = false;  // legacy parses `a ? b : c` regularly here
+    // `if`/`else if`/`while` condition: legacy's condition evaluator reads
+    // `=>` as an assignment, splits at comparisons inside braces and before
+    // `??`, so lambdas, objects, `??` and `?:` are Opaque there.
+    bool condition = false;
 };
 NodeId parse_expression_text(Ast& ast, std::uint32_t begin, std::uint32_t end, ExprOptions options,
                              OpaqueReason& why);
@@ -45,11 +49,18 @@ NodeId make_opaque(Ast& ast, std::uint32_t begin, std::uint32_t end, OpaqueReaso
 
 // Recursion bounds. Nesting beyond them becomes Opaque(NestingLimit): the unit
 // falls back to legacy (D-001), which then translates and reports it itself.
-// Legacy has no parse-time depth diagnostic (its translator overflows the
-// stack near 10,000 nested blocks; its evaluator reports "expression nesting
-// exceeds parser limit" at run time), so none is invented here.
-inline constexpr int kMaxBlockDepth = 4096;
-inline constexpr int kMaxExpressionDepth = 200;
+// Legacy has no parse-time depth diagnostic, so none is invented here.
+//  - Blocks: 256 keeps the whole parse (blocks plus the expression bound) well
+//    inside a 1 MB stack (the Windows main thread), also unoptimised and
+//    under ASan; tests/rt run it with `ulimit -s 1024`.
+//  - Expressions: legacy's evaluator fails at depth 97 ("expression nesting
+//    exceeds parser limit", ParserExpression.cpp:1879), one level per nested
+//    operand, argument, element, prefix operator or postfix receiver. The
+//    counter here grows at least as fast (each parse() level, prefix operator
+//    and postfix link), and 64 leaves a margin for the levels legacy adds
+//    around a unit (statement wrappers, call frames).
+inline constexpr int kMaxBlockDepth = 256;
+inline constexpr int kMaxExpressionDepth = 64;
 
 // Depth counters shared by every parser instance on the thread (string
 // interpolation and lambda bodies start nested parsers).

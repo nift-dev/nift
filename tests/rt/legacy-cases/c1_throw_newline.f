@@ -1,0 +1,2 @@
+throw
+print(1)

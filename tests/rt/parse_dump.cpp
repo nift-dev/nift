@@ -7,6 +7,9 @@
 //   parse_dump errors CORPUS          verify a stored error corpus
 //   parse_dump fuzz SEED ITERS FILE...  random byte/structure mutations
 //   parse_dump bench ITERS FILE...    parse repeatedly (callgrind)
+//   parse_dump strings FILE           rt's reading of each string literal:
+//                                     escapes decoded, $[...] segments as
+//                                     \x01text\x02 (negative gate)
 #include "rt_parser_tool.h"
 
 #include <algorithm>
@@ -82,9 +85,11 @@ struct Insert {
     std::uint32_t other;  // the far end of the node, for ordering
 };
 
+// Await is wrapped too: legacy's await takes the whole rest of its unit, so a
+// misplaced await boundary shows up as a difference.
 bool wraps(NodeKind kind) {
     return kind == NodeKind::Unary || kind == NodeKind::Binary || kind == NodeKind::Logical ||
-           kind == NodeKind::Coalesce || kind == NodeKind::Ternary;
+           kind == NodeKind::Coalesce || kind == NodeKind::Ternary || kind == NodeKind::Await;
 }
 
 bool postfix(NodeKind kind) {
@@ -92,25 +97,32 @@ bool postfix(NodeKind kind) {
            kind == NodeKind::SafeMember || kind == NodeKind::SafeIndex;
 }
 
-void collect(const Ast& ast, NodeId id, bool operand, std::vector<Insert>& out) {
-    if (id == kNoNode) return;
-    const Node& node = ast.at(id);
-    // Opaque text is legacy's; string contents are observable as literal text
-    // where legacy does not interpolate (the loop path, semantics.md), so
-    // neither is touched.
-    if (node.kind == NodeKind::Opaque || node.kind == NodeKind::String) return;
-    if (wraps(node.kind) || (operand && postfix(node.kind))) {
-        out.push_back({node.begin, true, node.end});
-        out.push_back({node.end, false, node.begin});
+void collect(const Ast& ast, NodeId root, std::vector<Insert>& out) {
+    std::vector<std::pair<NodeId, bool>> stack{{root, false}};  // (node, is an operator operand)
+    while (!stack.empty()) {
+        const auto [id, operand] = stack.back();
+        stack.pop_back();
+        if (id == kNoNode) continue;
+        const Node& node = ast.at(id);
+        // Opaque text is legacy's; string contents are observable as literal
+        // text where legacy does not interpolate (the loop path, semantics.md),
+        // so neither is touched.
+        if (node.kind == NodeKind::Opaque || node.kind == NodeKind::String) continue;
+        if (wraps(node.kind) || (operand && postfix(node.kind))) {
+            out.push_back({node.begin, true, node.end});
+            out.push_back({node.end, false, node.begin});
+        }
+        // An await operand is left alone: `await (f())` is the removed
+        // `await(...)` form in some legacy contexts (while conditions).
+        const bool child_operand = wraps(node.kind) && node.kind != NodeKind::Await;
+        for (NodeId child : {node.a, node.b, node.c}) stack.push_back({child, child_operand});
+        for (std::uint32_t i = 0; i < node.count; ++i) stack.push_back({ast.list(node)[i], false});
     }
-    const bool child_operand = wraps(node.kind);
-    for (NodeId child : {node.a, node.b, node.c}) collect(ast, child, child_operand, out);
-    for (std::uint32_t i = 0; i < node.count; ++i) collect(ast, ast.list(node)[i], false, out);
 }
 
 std::string reprint(const Ast& ast, NodeId root) {
     std::vector<Insert> inserts;
-    collect(ast, root, false, inserts);
+    collect(ast, root, inserts);
     // At one offset: closes before opens; outer opens first; inner closes first.
     std::stable_sort(inserts.begin(), inserts.end(), [](const Insert& x, const Insert& y) {
         if (x.at != y.at) return x.at < y.at;
@@ -194,6 +206,66 @@ int fuzz_mode(int argc, char** argv) {
     return 0;
 }
 
+// Legacy scalar_literal escape decoding (ParserExpression.cpp:458): \n \r \t
+// \\ \" \' map to their characters, any other escaped byte to itself.
+std::string decode_escapes(std::string_view text) {
+    std::string out;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '\\' || i + 1 >= text.size()) { out += text[i]; continue; }
+        const char c = text[++i];
+        out += c == 'n' ? '\n' : c == 'r' ? '\r' : c == 't' ? '\t' : c;
+    }
+    return out;
+}
+
+std::string escaped(const std::string& text) {
+    std::string out;
+    for (unsigned char c : text) {
+        if (c == '\\') out += "\\\\";
+        else if (c < 0x20 || c >= 0x7f) {
+            static const char hex[] = "0123456789abcdef";
+            out += "\\x";
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        } else out += static_cast<char>(c);
+    }
+    return out;
+}
+
+int strings_mode(const std::string& path) {
+    std::string source;
+    if (!load(path, source)) return 2;
+    Ast ast(source);
+    const auto result = parse_script(ast);
+    if (!result.ok) return 1;
+    std::vector<NodeId> stack{result.root};
+    std::vector<NodeId> strings;
+    while (!stack.empty()) {
+        const NodeId id = stack.back();
+        stack.pop_back();
+        if (id == kNoNode) continue;
+        const Node& node = ast.at(id);
+        if (node.kind == NodeKind::String) { strings.push_back(id); continue; }
+        for (std::uint32_t i = node.count; i-- > 0;) stack.push_back(ast.list(node)[i]);
+        for (NodeId child : {node.c, node.b, node.a}) stack.push_back(child);
+    }
+    for (NodeId id : strings) {
+        const Node& node = ast.at(id);
+        std::string text;
+        if (node.count == 0) {
+            text = decode_escapes(ast.text(node).substr(1, node.end - node.begin - 2));
+        } else {
+            for (std::uint32_t i = 0; i < node.count; ++i) {
+                const Node& part = ast.at(ast.list(node)[i]);
+                if (part.kind == NodeKind::StringPart) text += decode_escapes(ast.text(part));
+                else text += "\x01" + std::string(ast.text(part)) + "\x02";
+            }
+        }
+        std::cout << "S\t" << escaped(text) << '\n';
+    }
+    return 0;
+}
+
 int bench_mode(int argc, char** argv) {
     if (argc < 4) return usage();
     const long iterations = std::stol(argv[2]);
@@ -229,5 +301,6 @@ int main(int argc, char** argv) {
     if (mode == "errors") return errors_mode(argv[2]);
     if (mode == "fuzz") return fuzz_mode(argc, argv);
     if (mode == "bench") return bench_mode(argc, argv);
+    if (mode == "strings") return strings_mode(argv[2]);
     return usage();
 }

@@ -1,0 +1,6 @@
+print(10 - 3 - 2)
+print(64 / 4 / 2)
+print("a" + 1 + 2)
+print(1 + 2 + "a")
+print(1 == 1 == true)
+print(7 % 4 * 3)

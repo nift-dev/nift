@@ -137,7 +137,7 @@ private:
         return find_balanced(src_, open, end, a, b, close);
     }
     NodeId body_block(std::uint32_t open, std::uint32_t close, bool& ok);
-    NodeId expression(std::uint32_t begin, std::uint32_t end, bool ternary_ok);
+    NodeId expression(std::uint32_t begin, std::uint32_t end, bool ternary_ok, bool condition = false);
 
     Step fn_decl(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
     Step enum_decl(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
@@ -190,10 +190,11 @@ NodeId StatementParser::body_block(std::uint32_t open, std::uint32_t close, bool
     return id;
 }
 
-NodeId StatementParser::expression(std::uint32_t begin, std::uint32_t end, bool ternary_ok) {
+NodeId StatementParser::expression(std::uint32_t begin, std::uint32_t end, bool ternary_ok, bool condition) {
     OpaqueReason why = OpaqueReason::None;
     ExprOptions options;
     options.ternary_at_top = ternary_ok;
+    options.condition = condition;
     const NodeId id = parse_expression_text(ast_, begin, end, options, why);
     if (id != kNoNode) return id;
     return make_opaque(ast_, begin, end, why == OpaqueReason::None ? OpaqueReason::LegacyRuntimeError : why);
@@ -278,7 +279,9 @@ NodeId StatementParser::fn_signature(NodeId fn, std::uint32_t open, std::uint32_
     std::vector<std::string_view> names;
     const std::uint32_t pbegin = sig_begin + static_cast<std::uint32_t>(lp) + 1;
     const std::uint32_t pend = sig_begin + static_cast<std::uint32_t>(sig.size()) - 1;
-    if (!trim(src_.substr(pbegin, pend - pbegin)).empty()) {
+    // `f( )`: parse_callable_parameters rejects a whitespace-only list.
+    if (pend > pbegin && trim(src_.substr(pbegin, pend - pbegin)).empty()) return opaque();
+    if (pend > pbegin) {
         std::uint32_t s = pbegin;
         for (std::uint32_t k = pbegin; k <= pend; ++k) {
             if (k < pend && src_[k] != ',') continue;
@@ -325,11 +328,14 @@ Step StatementParser::enum_decl(std::uint32_t& i, std::uint32_t end, std::vector
         const std::string_view member = trim(raw);
         if (!member.empty()) {
             if (!valid_identifier(member)) regular = false;
+            for (NodeId seen : members)
+                if (ast_.text(ast_.at(seen)) == member) regular = false;  // "invalid or duplicate enum member"
             const std::uint32_t mb = static_cast<std::uint32_t>(member.data() - src_.data());
             members.push_back(ast_.add(NodeKind::Ident, mb, mb + static_cast<std::uint32_t>(member.size())));
         }
         s = k + 1;
     }
+    if (members.empty()) regular = false;  // "enum requires at least one member"
     ast_.set_list(decl, members);
     out.push_back(regular ? decl : make_opaque(ast_, i, bc + 1, OpaqueReason::LegacyRuntimeError));
     i = bc + 1;
@@ -392,6 +398,15 @@ NodeId StatementParser::struct_body(NodeId decl, std::uint32_t begin, std::uint3
             ast_.at(method).b = block_id;
             const NodeId signed_method = fn_signature(method, p + 2, mhc, true);
             if (ast_.at(signed_method).kind == NodeKind::Opaque) return opaque();
+            // A constructor (method named like the struct) must not be variadic
+            // and may appear once; a repeated method name silently replaces the
+            // earlier one in legacy. All three: Opaque.
+            const std::string_view method_name = ast_.text(ast_.at(ast_.at(method).a));
+            const bool ctor = method_name == ast_.text(ast_.at(ast_.at(decl).a));
+            const std::uint32_t count = ast_.at(method).count;
+            if (ctor && count && (ast_.at(ast_.list(ast_.at(method))[count - 1]).flags & kFlagVariadic)) return opaque();
+            for (NodeId m : members)
+                if (ast_.at(m).kind == NodeKind::FnDecl && ast_.text(ast_.at(ast_.at(m).a)) == method_name) return opaque();
             members.push_back(signed_method);
             p = mbc + 1;
             continue;
@@ -509,7 +524,7 @@ Step StatementParser::while_stmt(std::uint32_t& i, std::uint32_t end, std::vecto
     const NodeId body = body_block(bo, bc, ok);
     if (!ok) return Step::Error;
     const NodeId node = ast_.add(NodeKind::While, i, bc + 1);
-    ast_.at(node).a = expression(p + 1, pc, false);
+    ast_.at(node).a = expression(p + 1, pc, false, true);
     ast_.at(node).b = body;
     out.push_back(node);
     i = bc + 1;
@@ -639,7 +654,7 @@ Step StatementParser::if_stmt(std::uint32_t& i, std::uint32_t end, std::vector<N
     const NodeId body = body_block(bo, bc, ok);
     if (!ok) return Step::Error;
     const NodeId node = ast_.add(NodeKind::If, i, bc + 1);
-    ast_.at(node).a = expression(p + 1, pc, false);
+    ast_.at(node).a = expression(p + 1, pc, false, true);
     ast_.at(node).b = body;
     out.push_back(node);
     i = bc + 1;
@@ -668,7 +683,7 @@ Step StatementParser::else_chain(std::uint32_t& i, std::uint32_t end, NodeId hea
             if (!ok) return Step::Error;
             const NodeId elif = ast_.add(NodeKind::If, e, ec + 1);
             ast_.at(elif).flags |= kFlagElseIf;
-            ast_.at(elif).a = expression(q + 1, qc, false);
+            ast_.at(elif).a = expression(q + 1, qc, false, true);
             ast_.at(elif).b = body;
             ast_.at(tail).c = elif;
             ast_.at(head).end = ec + 1;
@@ -804,6 +819,7 @@ NodeId StatementParser::template_declaration(std::uint32_t start, std::uint32_t 
             return id != kNoNode ? id : kNoNode;
         }
         const NodeId node = ast_.add(NodeKind::Import, start, stmt_end);
+        ast_.at(node).flags |= kFlagTemplateImport;  // "@import ..." messages differ from "import ..."
         ast_.at(node).a = expression(inner, close, true);
         return node;
     }
@@ -841,7 +857,14 @@ NodeId StatementParser::template_declaration(std::uint32_t start, std::uint32_t 
 // verbatim template text, `await` expression, external command, or `$[...]`.
 NodeId StatementParser::classify_statement(std::uint32_t start, std::uint32_t stmt_end) {
     const std::string_view stmt = src_.substr(start, stmt_end - start);
-    if (stmt.substr(0, 2) == "#!") return ast_.add(NodeKind::Comment, start, stmt_end);
+    if (stmt.size() >= 2 && stmt[0] == '#' && stmt[1] == '!') {
+        // The translator emits `@//` + statement: only its first line is a
+        // comment, the rest runs as template text.
+        if (stmt.find('\n') == std::string_view::npos) return ast_.add(NodeKind::Comment, start, stmt_end);
+        const NodeId id = ast_.add(NodeKind::TemplateStmt, start, stmt_end);
+        ast_.at(id).a = make_opaque(ast_, start, stmt_end, OpaqueReason::TemplateText);
+        return id;
+    }
     if (stmt[0] == '@' || stmt[0] == '$') {
         const NodeId declaration = template_declaration(start, stmt_end);
         if (declaration != kNoNode) return declaration;
