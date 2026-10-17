@@ -47,7 +47,6 @@ private:
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
-    bool bail_statement(const Node& node);
 
     // compiler_expr.cpp: expressions
     bool expr_to(NodeId id, std::uint16_t dst);

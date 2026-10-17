@@ -23,9 +23,9 @@ const char* bail_reason_name(BailReason reason) {
         case BailReason::NumberRange: return "number-range";
         case BailReason::Aliasing: return "aliasing";
         case BailReason::RecursionBudget: return "recursion-budget";
-        case BailReason::StaticError: return "static-error";
         case BailReason::Unverified: return "unverified";
         case BailReason::OutputLimit: return "output-limit";
+        case BailReason::NestingDepth: return "nesting-depth";
         case BailReason::Internal: return "internal";
     }
     return "?";

@@ -129,12 +129,22 @@ void internal_failure(Stats& stats, const std::filesystem::path& path, const std
 
 // Test-only knob: NIFT_VM_OUTPUT_LIMIT=<bytes> lowers the output buffer limit
 // (review D7 regression tests); unset or invalid keeps the 64 MiB default.
-void output_limit_from_environment(VmOptions& options) {
-    const char* value = std::getenv("NIFT_VM_OUTPUT_LIMIT");
-    if (!value || !*value) return;
+// NIFT_VM_HEAP_BUDGET=<bytes> and NIFT_VM_EQUALITY_DEPTH=<levels> likewise
+// lower the memory budget and the equality depth (review round 2 R5/R6 tests).
+bool size_from_environment(const char* name, std::size_t& out) {
+    const char* value = std::getenv(name);
+    if (!value || !*value) return false;
     char* end = nullptr;
     const unsigned long long limit = std::strtoull(value, &end, 10);
-    if (end && *end == '\0' && limit > 0) options.output_limit = static_cast<std::size_t>(limit);
+    if (!end || *end != '\0' || limit == 0) return false;
+    out = static_cast<std::size_t>(limit);
+    return true;
+}
+
+void output_limit_from_environment(VmOptions& options) {
+    size_from_environment("NIFT_VM_OUTPUT_LIMIT", options.output_limit);
+    size_from_environment("NIFT_VM_HEAP_BUDGET", options.heap_budget);
+    size_from_environment("NIFT_VM_EQUALITY_DEPTH", options.equality_depth);
 }
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,

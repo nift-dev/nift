@@ -27,9 +27,9 @@ enum class BailReason : std::uint8_t {
     NumberRange,    // a number at or beyond 2^53, or an integer -0: legacy loop and top-level paths differ
     Aliasing,       // an aggregate bound from a place (legacy location reference)
     RecursionBudget,// the VM frame budget was exhausted
-    StaticError,    // an instruction the compiler knows always fails (e.g. redeclaration)
     Unverified,     // a case whose legacy result the VM does not reproduce (yet)
     OutputLimit,    // the output buffer reached VmOptions::output_limit without a flush hook
+    NestingDepth,   // `==`/`!=` on values nested deeper than the VM decides (legacy's recursion decides)
     Internal,       // an internal VM failure (bad opcode, unknown native): reported, never replayed
 };
 const char* bail_reason_name(BailReason reason);

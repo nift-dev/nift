@@ -28,7 +28,7 @@ kernels.f vm
 logic.f vm 
 objects.f vm 
 replay_alias.f replayed bail:aliasing
-replay_arity.f replayed bail:static-error
+replay_arity.f fallback static-error:arity
 replay_bad_index.f replayed bail:runtime-error
 replay_concat_array.f replayed bail:runtime-error
 replay_div_zero.f replayed bail:runtime-error
@@ -38,15 +38,15 @@ replay_int_overflow.f replayed bail:number-range
 typed_double_binding.f vm
 replay_large_literal_result.f replayed bail:number-range
 replay_loop_type_change.f replayed bail:runtime-error
-replay_member_assign.f replayed bail:static-error
+replay_member_assign.f fallback static-error:member-assign
 replay_missing_member.f replayed bail:runtime-error
 replay_modulo_float.f replayed bail:runtime-error
 replay_negate_string.f replayed bail:runtime-error
 replay_negative_zero.f replayed bail:number-range
 replay_ordering.f replayed bail:runtime-error
 replay_overflow.f replayed bail:runtime-error
-replay_param_redeclare.f replayed bail:static-error
-replay_redeclare.f replayed bail:static-error
+replay_param_redeclare.f fallback static-error:redeclared
+replay_redeclare.f fallback static-error:redeclared
 replay_render_array.f replayed bail:runtime-error
 replay_return_array.f replayed bail:runtime-error
 replay_return_local_array.f replayed bail:aliasing
@@ -64,4 +64,16 @@ review_d5_reserved_binding.f fallback binding-name-reserved
 review_d6_alias_argument.f fallback alias-argument
 review_d6_alias_readonly.f vm
 review_r1_frame_memory.f replayed bail:recursion-budget
-review_n1_loop_decl_type.f replayed bail:unverified
+review_n1_loop_decl_type.f fallback prepared-decl-type
+# CP11 review round 2 regressions.
+review2_m1_prepare_type.f fallback prepared-decl-type
+review2_m1_param_caller_scope.f fallback prepared-decl-type
+review2_m1_loop_global_ok.f vm
+review2_m2_dup_arg_eval.f fallback prepared-fn-unprepared
+review2_m3_string_arg_name.f fallback string-arg-type
+review2_m3_string_arg_number.f fallback string-arg-type
+review2_m3_string_arg_ok.f vm
+review2_m4_formfeed.f fallback opaque:legacy-runtime-error
+review2_m4_vtab.f fallback opaque:legacy-runtime-error
+review2_r5_hidden_frame_memory.f replayed bail:recursion-budget
+review2_r6_deep_equality.f vm

@@ -31,13 +31,6 @@ struct TextType {
 
 TextType infer_text_type(std::string_view text);
 
-// True when the result depends on another binding's declared type. Legacy
-// loop bodies (and functions called from them) do not propagate a referenced
-// binding's type into a declaration (`v2 := v1` with `v1 := 2.0` declares an
-// int binding there, a double one at top level), so the VM checks that both
-// readings agree (CheckParam after BindType) and bails otherwise.
-bool refers_to_binding(const TextType& type);
-
 // Legacy combination of the two sides of `+ - * / %`.
 inline int meet_text_types(int left, int right) {
     if (left == 3 || right == 3) return 3;

@@ -252,9 +252,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!is_native && !param_check(args[k], reg)) return false;
     }
     fb_->set_offset(node.begin);
-    if (node.count != arity) {
-        fb_->emit(OpCode::Bail, 0, static_cast<std::uint16_t>(BailReason::StaticError));  // argument count mismatch
-    } else if (is_native) {
+    if (node.count != arity) return fail(node, "static-error:arity");
+    if (is_native) {
         fb_->emit(OpCode::CallNative, base, static_cast<std::uint16_t>(native.id),
                   static_cast<std::uint16_t>(node.count));
     } else {

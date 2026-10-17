@@ -115,10 +115,4 @@ TextType infer(std::string_view source) {
 
 TextType infer_text_type(std::string_view text) { return infer(text); }
 
-bool refers_to_binding(const TextType& type) {
-    if (type.kind == TextType::Kind::Binding) return true;
-    if (type.kind == TextType::Kind::Meet) return refers_to_binding(*type.left) || refers_to_binding(*type.right);
-    return false;
-}
-
 } // namespace nift::rt

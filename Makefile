@@ -259,23 +259,31 @@ test-rt-value-sanitize:
 # engine (VM corpus expectations, generated programs, rt-diff with policies).
 RT_VM_UNIT := $(TEST_DIR)/rt/vm-unit$(EXEEXT)
 RT_VM_RUN := $(TEST_DIR)/rt/vm-run$(EXEEXT)
+RT_VM_PREPARED := $(TEST_DIR)/rt/vm-prepared-parse$(EXEEXT)
 RT_VM_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) tests/rt/rt_vm_tool.h src/RuntimeValue.cpp
 
 $(RT_VM_UNIT): tests/rt/vm_unit.cpp $(RT_VM_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# The prepared-parser port against legacy's own parser (src/Ast.cpp).
+$(RT_VM_PREPARED): tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/rt/prepared_parse.h src/Ast.cpp src/Ast.h
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$@"
+
 $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_run.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
-test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(TARGET)
+test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET)
 	"$(RT_VM_UNIT)"
+	"$(RT_VM_PREPARED)"
 	python3 tools/rt-lint.py src/rt
 	python3 tools/rt-vm/legacy_names.py --check
 	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
 	python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} --count $${RT_VM_ADV:-600}
+	python3 tests/runtime2/vm_subset.py --nift "$(CURDIR)/$(TARGET)"
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -283,6 +291,8 @@ test-rt-vm-sanitize: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-prepared-parse"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-prepared-parse" 20000
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(SAN_TARGET)" --gen $${RT_VM_GEN:-150} --seed $${RT_VM_SEED:-2} --timeout 120
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \

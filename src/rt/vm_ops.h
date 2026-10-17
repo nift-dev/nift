@@ -15,6 +15,7 @@
 #include "rt/proto.h"
 #include "rt/value.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -36,7 +37,8 @@ bool arith_slow(OpCode op, const Value& left, const Value& right, Value& out, Fa
 // `x += y`: numbers, or two strings.
 bool add_assign_slow(const Value& left, const Value& right, Value& out, Fault& fault);
 // Lt, Le, Gt, Ge, Eq, Ne.
-bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result, Fault& fault);
+// `==`/`!=` on values nested deeper than `depth` raise NestingDepth (review R6).
+bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result, std::size_t depth, Fault& fault);
 bool negate_slow(const Value& value, Value& out, Fault& fault);
 bool positive_slow(const Value& value, Value& out, Fault& fault);
 
@@ -66,9 +68,5 @@ bool push_value(Value& array, const Value& value, Fault& fault);
 // reproduced here); everything else is a legacy error (review D3).
 bool length_of(const Value& value, bool size, Value& out, Fault& fault);
 bool is_aggregate(const Value& value);
-// Approximate bytes held by the values in [begin, end): string bytes, 16 per
-// array element, 32 per object entry, two levels deep; shared heap objects are
-// counted once per reference (an over-estimate).
-std::size_t held_bytes(const Value* begin, const Value* end);
 
 } // namespace nift::rt

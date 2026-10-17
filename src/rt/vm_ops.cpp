@@ -91,9 +91,7 @@ bool add_assign_slow(const Value& left, const Value& right, Value& out, Fault& f
         // `s += t` on an unshared heap string appends in place (legacy does the
         // same when the binding holds the only reference); amortised O(len(t)).
         if (&out == &left && left.is_heap() && left.refcount() == 1) {
-            std::string& text = left.heap_as<StringObject>()->text;
-            if (right.is_heap() && right.heap() == left.heap()) text += std::string(text);
-            else text.append(string_view_of(right));
+            append_in_place(out, right);  // out is left
             return true;
         }
         return concatenate(left, right, out, fault);
@@ -103,10 +101,16 @@ bool add_assign_slow(const Value& left, const Value& right, Value& out, Fault& f
     return arith_slow(OpCode::Add, left, right, out, fault);
 }
 
-bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result, Fault& fault) {
+bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result, std::size_t depth, Fault& fault) {
     if (op == OpCode::Eq || op == OpCode::Ne) {
-        const bool same = equal(left, right);
-        result = op == OpCode::Eq ? same : !same;
+        // Legacy's recursive equality answers up to some 30,000 levels and
+        // crashes beyond; the VM decides up to `depth` (VmOptions, default
+        // 10,000: well inside what legacy answers) and hands deeper
+        // comparisons to legacy.
+        const Equality same = equal_within(left, right, depth);
+        if (same == Equality::TooDeep)
+            return raise(fault, BailReason::NestingDepth, "equality on values nested too deeply");
+        result = (same == Equality::Equal) == (op == OpCode::Eq);
         return true;
     }
     const bool numbers = left.is_number() && right.is_number();
@@ -235,32 +239,6 @@ bool length_of(const Value& value, bool size, Value& out, Fault& fault) {
         return true;
     }
     return raise(fault, BailReason::Error, "length: unsupported for this value");
-}
-
-namespace {
-
-std::size_t value_bytes(const Value& value, int depth) {
-    if (value.is(Kind::String)) return string_view_of(value).size();
-    std::size_t bytes = 0;
-    if (value.is(Kind::Array)) {
-        bytes = array_size(value) * sizeof(Value);
-        if (depth > 0)
-            for (const Value& item : array_items(value)) bytes += value_bytes(item, depth - 1);
-    } else if (value.is(Kind::Object)) {
-        bytes = object_size(value) * 2 * sizeof(Value);
-        if (depth > 0)
-            for (const auto& entry : object_entries(value)) bytes += value_bytes(entry.second, depth - 1);
-    }
-    return bytes;
-}
-
-} // namespace
-
-std::size_t held_bytes(const Value* begin, const Value* end) {
-    std::size_t bytes = 0;
-    for (const Value* v = begin; v != end; ++v)
-        if (v->is_heap()) bytes += value_bytes(*v, 1);
-    return bytes;
 }
 
 } // namespace nift::rt

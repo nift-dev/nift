@@ -17,12 +17,17 @@
 // from the start; review D7) unless a `flush` hook is set (NIFT_VM=require
 // only): then it is flushed early and the run becomes committed.
 //
-// Memory (review R1): the register stack is bounded (`max_registers`) and,
-// once the call depth passes the legacy limit of 64 frames, the bytes held by
-// live registers are measured at geometrically spaced depths; beyond
-// `frame_heap_budget` the run stops with RecursionBudget. Any bail at a depth
-// beyond 64 frames is a program legacy rejects with "callable recursion depth
-// exceeded", so the approved D-001#4 behaviour applies before memory runs out.
+// Memory (review R1, round 2 R5): the register stack is bounded
+// (`max_registers`) and the whole run is bounded by `heap_budget`: the exact
+// live rt heap of the isolate (rt/heap_account.h: every string, array,
+// object, ... however deeply nested, counted when created or resized) plus
+// the register and frame stacks. It is checked after every instruction that
+// can allocate (all on slow paths) and when the stacks grow. Exceeding it
+// deeper than legacy's 64 frames stops the run with RecursionBudget (legacy
+// rejects such a program with "callable recursion depth exceeded": the
+// approved D-001#4 behaviour); at a depth legacy also reaches it is an
+// Internal failure, reported (exit 70), never replayed. Either way the
+// process stops before the host runs out of memory.
 #include "rt/proto.h"
 #include "rt/vm_ops.h"
 
@@ -39,8 +44,9 @@ inline constexpr std::size_t kLegacyMaxDepth = 64;
 struct VmOptions {
     std::size_t max_frames = 100000;
     std::size_t max_registers = std::size_t(16) << 20;      // 16M values, 256 MiB
-    std::size_t frame_heap_budget = std::size_t(256) << 20;  // bytes held by registers, checked past depth 64
+    std::size_t heap_budget = std::size_t(1) << 30;  // live rt heap + register and frame stacks (bytes)
     std::size_t output_limit = std::size_t(64) << 20;
+    std::size_t equality_depth = 10000;  // `==` deeper than this bails (NestingDepth); legacy answers ~30k
     // Called with the buffered output when it exceeds output_limit.
     void (*flush)(std::string& output, void* context) = nullptr;
     void* flush_context = nullptr;
@@ -68,7 +74,7 @@ private:
         const Proto* proto = nullptr;
     };
     bool reserve_registers(std::size_t needed);
-    bool frame_check(std::size_t top, Fault& fault);
+    bool frame_check(Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))
 #endif
@@ -76,6 +82,12 @@ private:
     bool cold(const Instr& in, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     bool flush_if_needed(std::string& output, Fault& fault);
+    bool memory_ok(Fault& fault);
+#if defined(__GNUC__)
+    __attribute__((noinline, cold))
+#endif
+    bool memory_exceeded(Fault& fault);
+    void update_heap_limit();
 
     const Program& program_;
     VmOptions options_;
@@ -85,6 +97,7 @@ private:
     bool committed_ = false;
     bool beyond_legacy_depth_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
+    std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
 };
 
 } // namespace nift::rt

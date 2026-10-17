@@ -1,0 +1,1 @@
+error: $ROOT/review2_m3_string_arg_number.f:2:3: cannot assign string to double binding 'n'

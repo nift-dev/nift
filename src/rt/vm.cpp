@@ -2,6 +2,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
+#include "rt/heap_account.h"
 #include "rt/native.h"
 #include "rt/render.h"
 #include "rt/text_type.h"
@@ -35,6 +36,24 @@ Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(
     stack_.resize(256);
     frames_.reserve(64);
     if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
+    update_heap_limit();
+}
+
+void Vm::update_heap_limit() {
+    const std::size_t stacks = stack_.capacity() * sizeof(Value) + frames_.capacity() * sizeof(Frame);
+    heap_limit_ = stacks < options_.heap_budget ? options_.heap_budget - stacks : 0;
+}
+
+inline bool Vm::memory_ok(Fault& fault) { return live_heap_bytes() <= heap_limit_ || memory_exceeded(fault); }
+
+bool Vm::memory_exceeded(Fault& fault) {
+    update_heap_limit();
+    if (live_heap_bytes() <= heap_limit_) return true;
+    if (frames_.size() >= kLegacyMaxDepth) {
+        beyond_legacy_depth_ = true;
+        return raise(fault, BailReason::RecursionBudget, "memory budget exceeded in deep recursion");
+    }
+    return raise(fault, BailReason::Internal, "memory budget exceeded");
 }
 
 bool Vm::reserve_registers(std::size_t needed) {
@@ -43,27 +62,26 @@ bool Vm::reserve_registers(std::size_t needed) {
     std::size_t size = stack_.size() * 2;
     while (size < needed) size *= 2;
     stack_.resize(size < options_.max_registers ? size : options_.max_registers);
+    update_heap_limit();
     return true;
 }
 
 // Slow path of Call: frame checks at depth next_frame_check_, then register
 // stack growth (or its budget).
 bool Vm::call_slow(std::size_t callee_base, std::size_t nregs, Fault& fault) {
-    if (frames_.size() >= next_frame_check_ && !frame_check(callee_base, fault)) return false;
+    if (frames_.size() >= next_frame_check_ && !frame_check(fault)) return false;
     if (!reserve_registers(callee_base + nregs + 1u))
         return raise(fault, BailReason::RecursionBudget, "register stack budget exceeded");
-    return true;
+    return memory_ok(fault);
 }
 
-// Taken at depth next_frame_check_: the frame budget, the legacy depth mark
-// and the held-bytes budget (geometrically spaced scans).
-bool Vm::frame_check(std::size_t top, Fault& fault) {
+// Taken at depth next_frame_check_: the frame budget and the legacy depth
+// mark (memory is checked by memory_ok).
+bool Vm::frame_check(Fault& fault) {
     const std::size_t depth = frames_.size();
     if (depth >= options_.max_frames)
         return raise(fault, BailReason::RecursionBudget, "callable recursion depth exceeded");
     if (depth >= kLegacyMaxDepth) beyond_legacy_depth_ = true;
-    if (depth >= kLegacyMaxDepth && held_bytes(stack_.data(), stack_.data() + top) > options_.frame_heap_budget)
-        return raise(fault, BailReason::RecursionBudget, "frame memory budget exceeded");
     next_frame_check_ = depth < kLegacyMaxDepth ? kLegacyMaxDepth : depth + depth / 8 + 1;
     if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
     return true;
@@ -93,14 +111,14 @@ bool Vm::flush_if_needed(std::string& output, Fault& fault) {
         if (both_int(l, r) && !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v) extra) {       \
             R[pc->a] = Value::integer(v); NEXT();                                                    \
         }                                                                                            \
-        if (!arith_slow(OpCode::name, l, r, R[pc->a], fault)) FAIL();                                \
+        if (!arith_slow(OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();           \
         NEXT();                                                                                      \
     }
 #define COMPARE(name, base, expr, left, right, store)                                                \
     OP(name) {                                                                                       \
         const Value& l = RK(left); const Value& r = RK(right); bool res;                             \
         if (both_int(l, r)) { const std::int64_t x = l.as_int(), y = r.as_int(); res = (expr); }     \
-        else if (!compare_slow(OpCode::base, l, r, res, fault)) FAIL();                              \
+        else if (!compare_slow(OpCode::base, l, r, res, options_.equality_depth, fault)) FAIL();     \
         store;                                                                                       \
     }
 #define SET_RESULT { R[pc->a] = Value::boolean(res); NEXT(); }
@@ -165,7 +183,7 @@ VmResult Vm::run(std::string& output) {
         if (both_int(x, y) && !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
             x = Value::integer(v); NEXT();
         }
-        if (!add_assign_slow(x, y, x, fault)) FAIL();
+        if (!add_assign_slow(x, y, x, fault) || !memory_ok(fault)) FAIL();
         NEXT();
     }
     COMPARE(Eq, Eq, x == y, pc->b, pc->c, SET_RESULT)
@@ -234,7 +252,7 @@ VmResult Vm::run(std::string& output) {
     OP(Bail) { raise(fault, static_cast<BailReason>(pc->b), "the legacy engine reports an error here"); FAIL(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
     OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NoAlias) {
-        if (!cold(*pc, R, K, output, fault)) FAIL();
+        if (!cold(*pc, R, K, output, fault) || !memory_ok(fault)) FAIL();
         NEXT();
     }
 #if !NIFT_RT_COMPUTED_GOTO

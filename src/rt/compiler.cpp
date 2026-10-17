@@ -3,6 +3,7 @@
 #include "rt/compiler_expr.h"
 #include "rt/literal.h"
 #include "rt/native.h"
+#include "rt/prepared.h"
 
 namespace nift::rt {
 
@@ -118,12 +119,6 @@ bool UnitCompiler::statement(NodeId id) {
     return ok && builder_ok();
 }
 
-bool UnitCompiler::bail_statement(const Node& node) {
-    fb_->set_offset(node.begin);
-    fb_->emit(OpCode::Bail, 0, static_cast<std::uint16_t>(BailReason::StaticError));
-    return true;
-}
-
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
     if (reserved_name(name)) return fail(at, "binding-name-reserved");
     if (plan_.index.count(name)) return fail(at, "binding-shadows-fn");
@@ -154,15 +149,16 @@ bool UnitCompiler::declare(const Node& node) {
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
-    // Loop-body legacy types this declaration from the value alone (text_type.h).
-    if (refers_to_binding(inferred)) fb_->emit(OpCode::CheckParam, reg, 0, text_type);
-    if (!scopes_.declare(name, binding)) return bail_statement(node);  // "binding already declared"
+    // A declaration referring to another binding inside prepared-reachable
+    // code was refused (rt/prepared.h, review round 2 M1/N1); elsewhere legacy
+    // types it from that binding's type at run time, which BindType reproduces.
+    if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
     return true;
 }
 
 bool UnitCompiler::assign(const Node& node) {
     const Node& target = ast_.at(node.a);
-    if (target.kind == NodeKind::Member) return bail_statement(node);  // plain objects reject member assignment
+    if (target.kind == NodeKind::Member) return fail(node, "static-error:member-assign");  // plain objects reject it
     if (target.kind == NodeKind::Index) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
@@ -316,7 +312,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             std::uint16_t reg = 0, value = 0;
             if (receiver.kind != NodeKind::Ident || !local_register(receiver, reg))
                 return fail(receiver, "push-receiver");
-            if (expr.count != 1) return bail_statement(node);
+            if (expr.count != 1) return fail(node, "static-error:push-arity");
             if (!expr_any(ast_.list(expr)[0], value)) return false;
             fb_->set_offset(expr.begin);
             fb_->emit(OpCode::Push, reg, value);
@@ -338,6 +334,14 @@ CompileResult compile_unit(const Ast& ast, NodeId root) {
     if (!plan.ok) {
         result.reason = plan.reason;
         result.offset = plan.offset;
+        return result;
+    }
+    // Code whose legacy meaning depends on the prepared evaluator is refused
+    // before anything runs (rt/prepared.h).
+    const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan);
+    if (prepared.refused) {
+        result.reason = prepared.reason;
+        result.offset = prepared.offset;
         return result;
     }
     detail::UnitCompiler compiler(ast, plan);

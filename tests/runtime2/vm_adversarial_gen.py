@@ -484,3 +484,9 @@ FAMILIES = {
     "typed": typed, "context": context, "numeric": numeric, "receiver": receiver, "names": names, "alias": alias,
     "control": control, "recursion": recursion, "output": output, "malformed": malformed, "typing": typing,
 }
+
+# Review round 2 families (preptype, dupeval, strarg, bytes, memory, deepeq,
+# shadow): tests/runtime2/vm_adversarial_gen2.py.
+import vm_adversarial_gen2  # noqa: E402
+
+FAMILIES.update(vm_adversarial_gen2.FAMILIES)

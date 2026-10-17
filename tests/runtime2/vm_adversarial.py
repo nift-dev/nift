@@ -18,7 +18,9 @@ stderr and exit status must be identical, except for:
   endless    both engines hit the time limit (not compared).
 
 Any other difference, any `internal-error` outcome and any missing statistics
-line fail the gate. Exit 1 on failure.
+line fail the gate. A program may also name the outcome the VM statistics must
+show (e.g. the memory family must end in a recursion-budget bail); a
+different outcome fails the gate. Exit 1 on failure.
 """
 import argparse
 import collections
@@ -90,7 +92,8 @@ def outcome_key(st):
 
 
 def check(nift, item, work, timeout):
-    family, name, source, extra = item
+    family, name, source, extra = item[:4]
+    expect = item[4] if len(item) > 4 else None
     d = tempfile.mkdtemp(dir=work)
     path = os.path.join(d, "p.f")
     with open(path, "w") as f:
@@ -100,7 +103,8 @@ def check(nift, item, work, timeout):
         if not cst:
             return family, name, "no-stats", "fail", source, None, None
         if cst["outcome"] == "fallback":
-            return family, name, outcome_key(cst), "fallback", source, None, None
+            verdict = "fail" if expect else "fallback"
+            return family, name, outcome_key(cst), verdict, source, None, None
         t = timeout * (8 if family == "output" else 1)
         legacy, _ = run(nift, path, d, None, extra, t)
         vm, st = run(nift, path, d, "1", extra, t)
@@ -110,6 +114,8 @@ def check(nift, item, work, timeout):
             verdict = "diff"
         if not st and vm[2] != "timeout":
             verdict = "diff"
+        if expect and not key.startswith(expect):
+            verdict = "fail"
         return family, name, key, verdict, source, legacy, vm
     finally:
         shutil.rmtree(d, ignore_errors=True)

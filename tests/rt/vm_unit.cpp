@@ -109,6 +109,28 @@ void check_fallbacks() {
         {"fn(f(p)) { p.push(9) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
         {"fn(f(p)) { p[0] = 5 }\na := [[1]]\nf(a[0])\n", "alias-argument"},
         {"fn(h(z)) { z.push(8) }\nfn(f(p)) { h(p) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
+        // Review round 2: statically known errors are refused, not replayed.
+        {"x := 1\nx := 2\n", "static-error:redeclared"},
+        {"fn(f(a)) { return a }\nprint(f())\n", "static-error:arity"},
+        {"o := {\"k\": 1}\no.k = 2\n", "static-error:member-assign"},
+        {"a := [1]\na.push(1, 2)\n", "static-error:push-arity"},
+        // M1/N1: declarations typed from another binding, in prepared-reachable code.
+        {"i := 0\nwhile(i < 1) { i += 1; a := 2.0; b := a; b = 2.5 }\n", "prepared-decl-type"},
+        {"a := \"s\"\ni := 0\nwhile(i < 1) { i += 1\na := 2.5\nb := (a)\nprint(b) }\n", "prepared-decl-type"},
+        {"fn(f(a)) { b := a * 2\nreturn b }\ni := 0\nwhile(i < 1) { print(f(1)); i += 1 }\n", "prepared-decl-type"},
+        {"fn(g(a)) { b := a\nreturn b }\nfn(f(a)) { return g(a) }\ni := 0\nwhile(f(i) < 1) { i += 1 }\n",
+         "prepared-decl-type"},
+        // M2: a loop-called function legacy cannot prepare (arguments evaluated twice).
+        {"fn(f(p)) { return (true ? p : 0) }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n", "prepared-fn-unprepared"},
+        {"fn(f(p)) { if (p < 2 == true) { print(1) }\nreturn 0 }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n",
+         "prepared-fn-unprepared"},
+        {"fn(f(p)) { if (p > 1) { return }\nreturn 0 }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n",
+         "prepared-fn-unprepared"},
+        {"fn(f(p)) { return (p ?? 1) }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n", "prepared-fn-unprepared"},
+        // M3: string literal arguments typed from their text.
+        {"fn(f(s)) { return 0 }\nq := null\nprint(f(\"q\"))\n", "string-arg-type"},
+        {"fn(f(n)) { return n }\nprint(f(\"2.5\"))\n", "string-arg-type"},
+        {"fn(f(n)) { return n }\nprint(f(\"1 + 0.5\"))\n", "string-arg-type"},
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -131,8 +153,6 @@ void check_bails() {
         {"x := 0\ny := -1\nprint(x * y)\n", BailReason::NumberRange},
         {"a := [1]\nb := a\n", BailReason::Aliasing},
         {"fn(f()) { a := [1]\n return a }\nx := f()\n", BailReason::Aliasing},
-        {"x := 1\nx := 2\n", BailReason::StaticError},
-        {"fn(f(a)) { return a }\nprint(f())\n", BailReason::StaticError},
         {"a := [1]\na[0] = \"s\"\n", BailReason::Unverified},
         {"print([1])\n", BailReason::Error},
         // Review round 1. D3: receiver-specific methods.
@@ -141,8 +161,6 @@ void check_bails() {
         {"x := null\nprint(x.size())\n", BailReason::Error},
         {"o := {\"k\": 1}\nprint(o.size())\n", BailReason::Unverified},
         {"o := {\"k\": 1}\nprint(o.length())\n", BailReason::Unverified},
-        // Loop-body legacy types `b := a` from the value (int), top level from a's type (double).
-        {"i := 0\nwhile(i < 1) { i += 1; a := 2.0; b := a; b = 2.5 }\n", BailReason::Unverified},
     };
     for (const BailCase& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -257,12 +275,12 @@ void check_output_limit() {
     CHECK(!stopped.result.committed);
 }
 
-// Review R1: memory is bounded so the recursion budget triggers first.
+// Review R1 / round 2 R5: memory is bounded exactly (live rt heap + stacks).
 void check_memory_budget() {
     const char* growing =
         "fn(f(n, s)) { t := s + \"xxxxxxxx\"; if (n == 0) { return 0 } return f(n - 1, t) + 1 }\nprint(f(5000, \"a\"))\n";
     VmOptions tight;
-    tight.frame_heap_budget = 1 << 20;  // 1 MiB held by registers
+    tight.heap_budget = 8 << 20;  // 8 MiB
     rt_vm_tool::Run r = rt_vm_tool::run(growing, tight);
     CHECK(r.result.reason == BailReason::RecursionBudget);
     CHECK(r.result.beyond_legacy_depth);
@@ -276,6 +294,29 @@ void check_memory_budget() {
                .result.beyond_legacy_depth);
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(64))\n")
               .result.beyond_legacy_depth);
+    // R5: frames holding [[s]] with distinct ~400 KB strings (nested values,
+    // which the old two-level scan missed) stop at the budget, deep.
+    const char* hidden =
+        "fn(mk(n)) { s := \"B\" + n\nk := 0\nwhile(k < 16) { s += s; k += 1 }\nreturn [[s]] }\n"
+        "fn(f(n)) { if(n == 0) { return 0 }\nw := mk(n)\nreturn f(n - 1) + w.length() }\nprint(f(60000))\n";
+    VmOptions mid;
+    mid.heap_budget = 64 << 20;
+    rt_vm_tool::Run h = rt_vm_tool::run(hidden, mid);
+    CHECK(h.result.reason == BailReason::RecursionBudget && h.result.beyond_legacy_depth);
+    // Exceeding the budget at a depth legacy also reaches is an internal
+    // failure (reported, never replayed).
+    VmOptions small;
+    small.heap_budget = 4 << 20;
+    rt_vm_tool::Run flat = rt_vm_tool::run("s := \"abcdefghijklmnopq\"\nk := 0\nwhile(k < 20) { s += s; k += 1 }\n"
+                                           "print(s.length())\n", small);
+    CHECK(flat.result.reason == BailReason::Internal && !flat.result.beyond_legacy_depth);
+    // R6: equality deeper than the VM decides is handed to legacy.
+    rt_vm_tool::Run deep = rt_vm_tool::run("fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
+                                           "while(i < 10001) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n");
+    CHECK(deep.result.reason == BailReason::NestingDepth);
+    rt_vm_tool::Run shallow = rt_vm_tool::run("fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
+                                              "while(i < 9999) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n");
+    CHECK(shallow.result.reason == BailReason::None && shallow.output == "true\n");
 }
 
 void check_legacy_names() {
