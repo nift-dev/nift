@@ -37,8 +37,17 @@ Token Lexer::next() {
     return scan();
 }
 
+// A vertical tab or form feed inside statement or expression text is not
+// whitespace to legacy's textual evaluator ("unknown value or malformed
+// expression"; CP11 review round 2, M4), although its prepared loop parser
+// and the statement splitter skip it: a Bad token, so the construct is
+// Opaque. (Between statements the block scanner skips it, as the translator
+// does.)
 Token Lexer::scan() {
-    while (pos_ < end_ && is_ascii_space(src_[pos_])) ++pos_;
+    while (pos_ < end_ && is_ascii_space(src_[pos_])) {
+        if (src_[pos_] == '\v' || src_[pos_] == '\f') return {Tok::Bad, pos_, pos_ + 1};
+        ++pos_;
+    }
     const std::uint32_t start = pos_;
     if (pos_ >= end_) return {Tok::End, start, start};
     const char c = src_[pos_];

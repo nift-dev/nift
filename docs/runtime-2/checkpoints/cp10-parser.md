@@ -331,3 +331,13 @@ either Opaque in rt or accepted by legacy without a shape error (the
 remaining legacy failures on regular nodes are value errors: unbound names,
 type errors, missing files). `exprfuzz*.py` re-run: see
 `../evidence/cp10/README.md`.
+
+### Follow-up from CP11 review round 2 (2026-10-18)
+| ID | Finding | Status | Fix | Test |
+| --- | --- | --- | --- | --- |
+| M4 | A form feed (0x0C) or vertical tab (0x0B) inside a statement was whitespace to the rt lexer; legacy's textual evaluator reports "unknown value or malformed expression" (`print(1)\f`, `x := 2.5\v`), so CP11 compiled and ran a program legacy rejects | fixed (Opaque) | `Lexer::scan` returns a Bad token for `\v`/`\f` anywhere inside statement or expression text → the construct is Opaque(legacy-runtime-error). Between statements the block scanner still skips them (the translator's `isspace`), which is what legacy does. Conservative where legacy accepts them: its prepared loop parser (`Ast.cpp` `P::ws`, `isspace`) runs `x := 2.5\f` inside a loop body; rt leaves that Opaque too (fallback, not a difference) | unit `review_findings` (7 Opaque shapes, 2 accepted between statements); `legacy-cases/c3_*.f` (10 probes); the negative gate's whitespace set now includes `\f` and `\v` (with the old lexer: unit 7 failures and the gate fails) |
+
+The other byte classes legacy treats differently from a plain space were
+re-checked and are pinned by unit tests: CR (whitespace in both), NEL,
+NBSP, U+2028/U+2029, BOM, NUL, DEL and other C0 controls (`Other` bytes,
+Opaque inside a statement).

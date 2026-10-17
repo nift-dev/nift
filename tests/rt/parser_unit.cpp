@@ -218,6 +218,22 @@ void review_findings() {
     contains("while (a != (b == c)) { }", "While");
     // lambdas in if conditions
     contains("if ((p) => 1) { }", irr);
+    // CP11 review round 2, M4: a vertical tab or form feed inside a statement
+    // is not whitespace to legacy's textual evaluator (malformed expression);
+    // between statements it is skipped like any other isspace byte.
+    for (const char* text : {"print(1)\f", "x := 2.5\v\nprint(x)", "print(1 +\f2)", "x\v := 1",
+                             "if (x\f== 1) { }", "while (i < 3) { i += 1\v }", "return 5\f"})
+        contains(text, lre);
+    contains("x := 1\n\fprint(x)", "Call");
+    contains("\v\nprint(1)", "Call");
+    // Other bytes legacy treats differently from the lexer stay as before:
+    // CR is whitespace; NEL, NBSP, U+2028/9, BOM, NUL, DEL and other C0
+    // controls are `Other` bytes (Opaque) inside a statement.
+    contains("x := 1\r\nprint(x)\r\n", "Call");
+    for (const char* text : {"x := 1\xc2\x85", "x := 1\xc2\xa0", "x := 1\xe2\x80\xa8", "x := 1\xe2\x80\xa9",
+                             "x :=\xef\xbb\xbf 1", "x := 1\x7f", "x := 1\x1c", "x := 1\x1f", "x := 1\x01"})
+        contains(text, "Opaque");
+    contains(std::string("x := 1") + '\0', "Opaque");
 }
 
 void locations() {

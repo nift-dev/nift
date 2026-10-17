@@ -70,7 +70,9 @@ ATOMS = ["a", "b", "s", "xs", "o", "t", "n", "1", "2.5", '"q"', "'r'", "true", "
          "xs[0].to_string()", "s.to_upper().length()", "5.to_string()", "[1, 2]", '{"z": 1}', "(a)", "[]", "{}",
          "...xs"]
 BINARY = ["+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "??"]
-SPACE = ["", " ", "  ", "\t"]
+# "\f" and "\v" (CP11 review round 2, M4): legacy's textual evaluator rejects
+# them inside an expression, so rt must leave such programs Opaque.
+SPACE = ["", " ", "  ", "\t", "", " ", "  ", "\t", "\f", "\v"]
 # Postfix chains on receivers whose run-time type supports them.
 CHAINS = {"o": [".k", ".m", "?.k", '["k"]', ".f(1)", ".m.g(1)", "?.f(1)", ".m.n", ".size()", ".stringify()",
                 ".m.prettify()", ".highlight()", ".stringify( )"],
