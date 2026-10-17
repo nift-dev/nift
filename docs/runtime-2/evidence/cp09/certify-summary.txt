@@ -1,0 +1,20 @@
+make -k -j2 certify on runtime-2-cp09 @ 7443164, Linux x86_64 2 vCPU, root sandbox
+exit 2
+failing targets:
+[Makefile:1111: test-unreadable-source] Error 1
+[Makefile:1618: test-v44-language-foundation] Error 1
+[Makefile:2115: test-dependency-status] Error 1
+[Makefile:312: test-progress-pty] Error 1
+[Makefile:619: go-binding] Error 1
+[Makefile:622: csharp-binding] Error 127
+[Makefile:642: test-build-boundary-nondestructive] Error 1
+[Makefile:936: test-v48-prepared-object-literal-guard] Error 1
+[Makefile:942: test-v48-prepared-collection-guard] Error 1
+[Makefile:989: test-v43-language] Error 1
+CP09 targets and guard:
+rt value unit: 82 checks, 0 failures
+PASS certification guard: make certify reaches 16 required and 62 CI-run targets
+PASS rt-lint self-test: 6 fixtures
+PASS rt-lint: 0 problem(s)
+rt value property: 367200 checks, 0 failures
+PASS rt-diff self-tests

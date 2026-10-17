@@ -1,0 +1,2 @@
+PASS rt-lint self-test: 6 fixtures
+PASS rt-lint: 0 problem(s)

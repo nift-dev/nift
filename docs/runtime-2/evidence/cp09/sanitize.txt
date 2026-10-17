@@ -1,0 +1,6 @@
+rt value unit: 82 checks, 0 failures
+seed 20261017 scale 1
+rt value property: 367200 checks, 0 failures
+seed 7 scale 3
+rt value property: 1101757 checks, 0 failures
+exit 0
