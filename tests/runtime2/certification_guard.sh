@@ -18,12 +18,12 @@ for wf in workflows:
     for line in open(wf):
         for m in re.finditer(r'\bmake(?:\s+-\S+)*((?:\s+[a-z0-9][a-z0-9_.-]*)+)', line):
             ci.update(t for t in m.group(1).split() if re.match(r'^(test|bh)', t))
-db = subprocess.run(['make', '-pqn', 'certify'], capture_output=True, text=True).stdout.split('\n')
+db = subprocess.run(['make', '-pqn', 'certify-targets'], capture_output=True, text=True).stdout.split('\n')
 deps = {}
 for l in db:
     m = re.match(r'^([A-Za-z0-9_.-]+):(?!=)\s*(.*)$', l)
     if m: deps.setdefault(m.group(1), set()).update(m.group(2).split())
-seen, stack = set(), ['certify']
+seen, stack = set(), ['certify-targets']
 while stack:
     t = stack.pop()
     if t in seen: continue
@@ -31,7 +31,7 @@ while stack:
 missing = sorted(t for t in set(required) | ci if t not in seen)
 if not ci:
     print('FAIL certification guard: no make targets found in CI workflows'); sys.exit(1)
-for t in missing: print(f'FAIL certification guard: make certify does not reach {t}')
+for t in missing: print(f'FAIL certification guard: make certify-targets does not reach {t}')
 if missing: sys.exit(1)
-print(f'PASS certification guard: make certify reaches {len(required)} required and {len(ci)} CI-run targets')
+print(f'PASS certification guard: certify-targets reaches {len(required)} required and {len(ci)} CI-run targets')
 PY

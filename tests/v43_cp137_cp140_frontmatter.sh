@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BIN=$(pwd)/nift; R=$(mktemp -d); trap 'rm -rf "$R"' EXIT
+BIN=$(pwd)/nift; R=$(mktemp -d); O=$(mktemp -d); trap 'rm -rf "$R" "$O"' EXIT
 mkdir -p "$R/.nift" "$R/content" "$R/public" "$R/templates" "$R/meta"
 cat > "$R/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".md","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","incremental-mode":"modified"}}
@@ -30,8 +30,8 @@ python3 - "$R/.nift/tracked.json" <<'PY'
 import json,sys
 p=sys.argv[1];d=json.load(open(p));d['tracked'][0]['frontmatter']='meta/a.yaml';json.dump(d,open(p,'w'))
 PY
-if (cd "$R" && "$BIN" build --all >/tmp/fm.out 2>/tmp/fm.err); then echo 'expected conflict failure' >&2; exit 1; fi
-grep -q 'multiple front matter sources' /tmp/fm.err
+if (cd "$R" && "$BIN" build --all >"$O/fm.out" 2>"$O/fm.err"); then echo 'expected conflict failure' >&2; exit 1; fi
+grep -q 'multiple front matter sources' "$O/fm.err"
 rm "$R/content/a.md"; echo 'body' > "$R/content/a.md"
 [[ $(cd "$R" && "$BIN" eval --json 'project.files[0].metadata.title') == '"External"' ]]
 cat > "$R/meta/a.json" <<'JSON'
@@ -41,5 +41,5 @@ python3 - "$R/.nift/tracked.json" <<'PY'
 import json,sys
 p=sys.argv[1];d=json.load(open(p));d['tracked'][0]['frontmatter']='meta/a.json';json.dump(d,open(p,'w'))
 PY
-if (cd "$R" && "$BIN" build --all >/tmp/fm.out 2>/tmp/fm.err); then echo 'expected duplicate JSON frontmatter failure' >&2; exit 1; fi
-grep -q 'duplicate object key' /tmp/fm.err
+if (cd "$R" && "$BIN" build --all >"$O/fm.out" 2>"$O/fm.err"); then echo 'expected duplicate JSON frontmatter failure' >&2; exit 1; fi
+grep -q 'duplicate object key' "$O/fm.err"

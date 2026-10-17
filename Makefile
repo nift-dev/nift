@@ -1086,15 +1086,20 @@ test-runtime2-fs-freedom: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/fs_freedom.sh
 
 # D-010: the certification target. A checkpoint is certified locally with
-# `make -k certify` (test-all plus every suite the CI workflows run);
-# certification_guard.sh keeps it complete.
+# `make certify` (scripts/certify.py runs certify-targets: test-all plus every
+# suite the CI workflows run, isolated and classified);
+# certification_guard.sh keeps certify-targets complete.
 CERTIFY_CI_TARGETS := bh2-test-integrity test-build-boundary-nondestructive test-complexity-invariants \
 	test-crash-recovery test-filesystem-boundary test-filesystem-type test-guarantee-registry-ci \
 	test-incremental-state-transitions test-init-functional-truth test-ownership-unit \
 	test-pagination-equivalence test-parser-value-composition test-v44-automation test-v44-hooks \
 	test-v44-packages test-v45-native-runtime
-.PHONY: certify
-certify: test-all $(CERTIFY_CI_TARGETS)
+.PHONY: certify certify-targets
+# The certified set: test-all plus every suite the CI workflows run.
+certify-targets: test-all $(CERTIFY_CI_TARGETS)
+# Isolated, classified run of that set (docs/runtime-2/certification.md).
+certify:
+	python3 scripts/certify.py --jobs "$(or $(CERTIFY_JOBS),$(shell nproc))"
 
 # D-010: test-all must keep reaching the comprehensive suites.
 test-runtime2-certification-guard:

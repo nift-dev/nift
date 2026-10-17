@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BIN=$(pwd)/nift; j(){ "$BIN" eval --json "$1" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin),separators=(",",":")))'; }; R=$(mktemp -d); trap 'rm -rf "$R"' EXIT
+BIN=$(pwd)/nift; j(){ "$BIN" eval --json "$1" | python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin),separators=(",",":")))'; }; R=$(mktemp -d); O=$(mktemp -d); trap 'rm -rf "$R" "$O"' EXIT
 mkdir -p "$R/.nift" "$R/content" "$R/public" "$R/templates" "$R/model" "$R/meta"
 cat > "$R/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".md","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","incremental-mode":"modified","schemas":["model/site.schema"],"taxonomies":["model/site.tax"]}}
@@ -57,11 +57,11 @@ EOF2
 [[ $(cd "$R" && j 'project.taxonomies.section[0].parent') == '"docs"' ]]
 # tracked/frontmatter type disagreement is a hard error
 sed -i 's/type: post/type: page/' "$R/content/a.md"
-if (cd "$R" && "$BIN" build --all >/tmp/cm.out 2>/tmp/cm.err); then echo expected type conflict >&2; exit 1; fi
-grep -q 'tracked type conflicts' /tmp/cm.err
+if (cd "$R" && "$BIN" build --all >"$O/cm.out" 2>"$O/cm.err"); then echo expected type conflict >&2; exit 1; fi
+grep -q 'tracked type conflicts' "$O/cm.err"
 sed -i 's/type: page/type: post/' "$R/content/a.md"
 (cd "$R" && "$BIN" build --repair >/dev/null)
 # schema diagnostics
 sed -i 's/title: Alpha/title: 42/' "$R/content/a.md"
-if (cd "$R" && "$BIN" build --all >/tmp/cm.out 2>/tmp/cm.err); then echo expected schema failure >&2; exit 1; fi
-grep -q "schema post field 'title': expected string" /tmp/cm.err
+if (cd "$R" && "$BIN" build --all >"$O/cm.out" 2>"$O/cm.err"); then echo expected schema failure >&2; exit 1; fi
+grep -q "schema post field 'title': expected string" "$O/cm.err"
