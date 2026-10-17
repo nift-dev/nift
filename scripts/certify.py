@@ -110,15 +110,26 @@ def clean_env():
 
 
 def run_target(cwd, target, log, timeout, user=None):
+    """Run one make target with a private TMPDIR (so tests that use fixed names
+    under the temp directory, e.g. temp_directory_path()/"nift-host-seam-pg",
+    cannot collide with concurrent targets, other checkouts or other users),
+    in its own process group (killed on timeout)."""
     log.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(os.environ.get("TMPDIR", "/tmp")) / f"nift-certify-{os.getpid()}" / re.sub(r"[^\w.-]", "_", log.stem)
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    env = clean_env()
+    env["TMPDIR"] = str(tmp)
     cmd = ["make", target]
     if user:
-        cmd = ["su", user, "-s", "/bin/sh", "-c", f"cd '{cwd}' && make {target}"]
+        shutil.chown(tmp, user=user)
+        os.chmod(tmp.parent, 0o755)
+        cmd = ["su", user, "-s", "/bin/sh", "-c", f"cd '{cwd}' && TMPDIR='{tmp}' make {target}"]
     t0 = time.time()
     with open(log, "w") as f:
-        f.write(f"$ {' '.join(cmd)}  (cwd={cwd})\n")
+        f.write(f"$ {' '.join(cmd)}  (cwd={cwd}, TMPDIR={tmp})\n")
         f.flush()
-        p = subprocess.Popen(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=clean_env(),
+        p = subprocess.Popen(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=env,
                              start_new_session=True)
         try:
             rc = p.wait(timeout=timeout)
@@ -127,6 +138,7 @@ def run_target(cwd, target, log, timeout, user=None):
             p.wait()
             f.write(f"\n[certify] TIMEOUT after {timeout}s\n")
             rc = 124
+    shutil.rmtree(tmp, ignore_errors=True)
     return rc, round(time.time() - t0, 1)
 
 

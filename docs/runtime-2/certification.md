@@ -64,6 +64,14 @@ the checkout and any new TMPDIR entry):
 Any target whose recipe runs a sub-make is also treated as exclusive
 automatically.
 
+Every target runs with a **private TMPDIR** (removed afterwards). Many C++
+tests create fixed names under the temp directory
+(`temp_directory_path() / "nift-host-seam-pg"`, `nift-c-abi-pagination`,
+`nift-engine-*`, …); without a private TMPDIR they collide with concurrent
+targets, with other checkouts running the same tests, and with a different
+user's leftovers (a non-root run failed `test-c-abi` and `test-host-seam` with
+"Permission denied" on root-owned `/tmp/nift-*` directories).
+
 Audit results (2026-10-17, 159 targets): only the targets above wrote outside
 `.build/`; the only output written by two targets was `dist/embed-prefix`
 (`test-go-binding`, `test-v45-embed-staged-consumer`); no target left a
