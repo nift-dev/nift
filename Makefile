@@ -1975,9 +1975,12 @@ $(TEST_DIR)/rt-parser-unit$(EXEEXT): tests/rt/parser_unit.cpp $(RT_PARSER_SOURCE
 	mkdir -p $(TEST_DIR)
 	$(CXX) -Isrc -Itests/rt $(CXXFLAGS) tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) -o $@
 
-$(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+# The legacy objects only (CP11 links src/rt into nift; the oracle compiles the
+# parser sources itself, so the src/rt objects are left out to avoid duplicates).
+RT_LEGACY_ORACLE_OBJECTS := $(filter-out src/nift.o src/CLI.o $(RT_LINK_SOURCES:.cpp=.o),$(CLI_OBJECTS))
+$(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(RT_LEGACY_ORACLE_OBJECTS)
 	mkdir -p $(TEST_DIR)
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_LEGACY_ORACLE_OBJECTS) $(LDLIBS) -o $@
 
 .PHONY: test-rt-parser
 test-rt-parser: $(TEST_DIR)/rt-parser-unit$(EXEEXT) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TEST_DIR)/rt-legacy-oracle$(EXEEXT) $(TARGET)
