@@ -723,7 +723,7 @@ test-all: test test-embed test-bindings test-build-boundary test-host-seam test-
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-runtime2-certification-guard test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-runtime2-certification-guard test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1088,6 +1088,10 @@ test-runtime2-fs-freedom: $(TARGET)
 # D-010: test-all must keep reaching the comprehensive suites.
 test-runtime2-certification-guard:
 	bash tests/runtime2/certification_guard.sh
+
+# Runtime 2.0 CP07: process capture parity and no leaked capture files.
+test-runtime2-process-capture: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
 
 # Runtime 2.0 VM regression corpus (golden outputs from the canonical evaluator).
 test-runtime2-vm-corpus: $(TARGET)

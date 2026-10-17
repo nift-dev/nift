@@ -19,7 +19,6 @@ extern char **environ;
 #include <windows.h>
 #endif
 namespace fs=std::filesystem;
-static std::string read_all(const fs::path&p){std::ifstream f(p,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 bool nift_find_executable(const std::string& name,std::string& path){
 #ifdef _WIN32
     fs::path p=fs::u8path(name);
@@ -68,10 +67,38 @@ bool nift_find_executable(const std::string& name,std::string& path){
 #endif
 }
 #ifndef _WIN32
-static int open_temp(std::string& path, size_t stage){if(nift_process_test_fail("temp",stage))return -1;char t[]="/tmp/nift-proc-XXXXXX";int fd=mkstemp(t);if(fd>=0){fd=nift_process_owned_fd(fd);if(fd<0){int error=errno;unlink(t);errno=error;return -1;}path=t;nift_process_test_temp(path);}return fd;}
+// Runtime 2.0 CP07: capture files are anonymous regular files in /tmp (the
+// same directory and file type as before), so a crash or kill can never leave
+// one behind and no name is ever visible. Linux uses O_TMPFILE (never linked);
+// elsewhere, or if the filesystem lacks O_TMPFILE, mkstemp is unlinked at
+// once. The child still sees a seekable regular file on stdout/stderr, and
+// later writes by background descendants go to the unlinked file and are
+// dropped, exactly as before. `path` only labels the capture for test hooks.
+static int open_temp(std::string& path, size_t stage){
+    if(nift_process_test_fail("temp",stage))return -1;
+    int fd=-1;
+#if defined(__linux__) && defined(O_TMPFILE)
+    fd=open("/tmp",O_TMPFILE|O_RDWR|O_CLOEXEC,0600);
+    if(fd>=0)path="/tmp/<O_TMPFILE capture>";
+#endif
+    if(fd<0){
+        char t[]="/tmp/nift-proc-XXXXXX";fd=mkstemp(t);
+        if(fd<0)return -1;
+        unlink(t);path=t;
+    }
+    fd=nift_process_owned_fd(fd);
+    if(fd>=0)nift_process_test_temp(path);
+    return fd;
+}
+// Reads the whole capture through its descriptor, from offset 0.
+static std::string read_fd_all(int fd){
+    std::string data;char buffer[65536];off_t offset=0;
+    for(;;){ssize_t n=pread(fd,buffer,sizeof buffer,offset);if(n<0){if(errno==EINTR)continue;break;}if(n==0)break;data.append(buffer,static_cast<std::size_t>(n));offset+=n;}
+    return data;
+}
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
     std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
-    ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op,0);efd=open_temp(ep,1);if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);if(!op.empty())unlink(op.c_str());if(!ep.empty())unlink(ep.c_str());r.error="cannot create capture files";return r;}}
+    ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op,0);efd=open_temp(ep,1);if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);r.error="cannot create capture files";return r;}}
     // Interactive foreground execution: the child inherits the terminal
     // directly (no capture) and is placed in its own foreground process group
     // so terminal-aware programs and Ctrl-C behave like Bash. Only simple
@@ -116,15 +143,13 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
         status = st;
     }
     if (r.launched && r.error.empty()) r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1);
-    if (ofd >= 0) close(ofd);
-    if (efd >= 0) close(efd);
     if (capture) {
-        r.out = read_all(op);
-        r.err = read_all(ep);
-        fs::remove(op);
-        fs::remove(ep);
+        r.out = read_fd_all(ofd);
+        r.err = read_fd_all(efd);
         if (stream) { std::cout << r.out; std::cerr << r.err; }
     }
+    if (ofd >= 0) close(ofd);
+    if (efd >= 0) close(efd);
     if(foreground&&isatty(STDIN_FILENO)){ tcsetpgrp(STDIN_FILENO,getpgrp()); sigaction(SIGTTOU,&otto,nullptr);sigaction(SIGTTIN,&otin,nullptr);sigaction(SIGINT,&oint,nullptr);sigaction(SIGQUIT,&oquit,nullptr); }
     return r;
 }
@@ -191,7 +216,15 @@ HANDLE open_redirect(const std::string& path, bool read, bool append) {
     if (!read && append) { SetFilePointer(h, 0, nullptr, FILE_END); }
     return h;
 }
-std::string win_temp_file(std::wstring& out, size_t stage) {
+// Runtime 2.0 CP07: besides the named file (needed so each stage can open its
+// own inheritable write handle), a non-inheritable "keeper" handle opened with
+// FILE_FLAG_DELETE_ON_CLOSE makes Windows delete the file once the last handle
+// closes, even if Nift crashes or a background descendant still holds a
+// write handle (previously DeleteFileW failed then and the file was leaked).
+// Every other handle to the file must therefore share delete access. The
+// capture is read back through the keeper handle.
+std::string win_temp_file(std::wstring& out, size_t stage, HANDLE& keeper) {
+    keeper = INVALID_HANDLE_VALUE;
     if(nift_process_test_fail("temp",stage))return "";
     wchar_t dir[MAX_PATH]; DWORD length=GetTempPathW(MAX_PATH,dir);if(!length || length>=MAX_PATH)return "";
     wchar_t name[MAX_PATH];
@@ -201,8 +234,11 @@ std::string win_temp_file(std::wstring& out, size_t stage) {
     HANDLE h = nift_process_test_fail("temp-open",stage)?INVALID_HANDLE_VALUE:CreateFileW(name, GENERIC_WRITE, 0, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if(h==INVALID_HANDLE_VALUE){DeleteFileW(name);out.clear();return "";}
     CloseHandle(h);
+    keeper = CreateFileW(name, GENERIC_READ | DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+    if(keeper==INVALID_HANDLE_VALUE){DeleteFileW(name);out.clear();return "";}
     int n = WideCharToMultiByte(CP_UTF8, 0, name, -1, nullptr, 0, nullptr, nullptr);
-    if(n<=0){DeleteFileW(name);out.clear();return "";}
+    if(n<=0){CloseHandle(keeper);keeper=INVALID_HANDLE_VALUE;out.clear();return "";}
     std::string utf8(n, 0); WideCharToMultiByte(CP_UTF8, 0, name, -1, &utf8[0], n, nullptr, nullptr);utf8.pop_back();
     nift_process_test_temp(utf8);
     return utf8;
@@ -245,15 +281,16 @@ HANDLE child_stdio(HANDLE source,DWORD access,size_t stage) {
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture, bool stream) {
     ProcessResult r;
     if (specs.empty()) { r.error = "empty pipeline"; return r; }
-    std::wstring ow, ew; std::string op, ep;
-    if (capture) { op = win_temp_file(ow,0); ep = win_temp_file(ew,1); if (op.empty() || ep.empty()) { if(!ow.empty())DeleteFileW(ow.c_str());if(!ew.empty())DeleteFileW(ew.c_str());r.error = "cannot create capture files"; return r; } }
+    std::wstring ow, ew; std::string op, ep; HANDLE okeep = INVALID_HANDLE_VALUE, ekeep = INVALID_HANDLE_VALUE;
+    auto close_keepers = [&]() { if (okeep != INVALID_HANDLE_VALUE) CloseHandle(okeep); if (ekeep != INVALID_HANDLE_VALUE) CloseHandle(ekeep); okeep = ekeep = INVALID_HANDLE_VALUE; };
+    if (capture) { op = win_temp_file(ow,0,okeep); ep = win_temp_file(ew,1,ekeep); if (op.empty() || ep.empty()) { close_keepers(); if(!ow.empty())DeleteFileW(ow.c_str());if(!ew.empty())DeleteFileW(ew.c_str());r.error = "cannot create capture files"; return r; } }
     // All child stderr duplicates share one write-capable file object and
     // position. Append-only handles are rejected by MSYS stdio adapters;
     // reopening per stage would instead truncate or overwrite earlier bytes.
     HANDLE capture_error=INVALID_HANDLE_VALUE;
     if(capture){
-        capture_error=nift_process_test_fail("capture-file",1)?INVALID_HANDLE_VALUE:CreateFileW(ew.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
-        if(capture_error==INVALID_HANDLE_VALUE){DeleteFileW(ow.c_str());DeleteFileW(ew.c_str());r.error="cannot open stderr capture file";return r;}
+        capture_error=nift_process_test_fail("capture-file",1)?INVALID_HANDLE_VALUE:CreateFileW(ew.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(capture_error==INVALID_HANDLE_VALUE){close_keepers();DeleteFileW(ow.c_str());DeleteFileW(ew.c_str());r.error="cannot open stderr capture file";return r;}
     }
     std::vector<HANDLE> procs;
     HANDLE prev_read = INVALID_HANDLE_VALUE;
@@ -272,7 +309,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
             HANDLE wp; if (nift_process_test_fail("pipe",i)||!CreatePipe(&next_read, &wp, &sa, 0)) { if(in!=INVALID_HANDLE_VALUE && in!=prev_read)CloseHandle(in);r.error="pipe failed";ok = false; break; }
             out = wp;
         } else if (!spec.stdout_path.empty()) out = open_redirect(spec.stdout_path, false, spec.append_stdout);
-        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = nift_process_test_fail("capture-out",i)?INVALID_HANDLE_VALUE:CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
+        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = nift_process_test_fail("capture-out",i)?INVALID_HANDLE_VALUE:CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, &ca, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
         if (spec.merge_stderr) err = out;
         else if (!spec.stderr_path.empty()) err = open_redirect(spec.stderr_path, false, spec.append_stderr);
         else if(capture)err=nift_process_test_fail("capture-err",i)?INVALID_HANDLE_VALUE:capture_error;
@@ -365,7 +402,15 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     }
     if (r.launched && ok) r.exit_code = (int)exit;
     if (capture) {
-        r.out = read_all(fs::u8path(op)); r.err = read_all(fs::u8path(ep));
+        // Read through the keeper handles: the named file may not be opened
+        // again without FILE_SHARE_DELETE, and closing the keepers deletes it.
+        auto read_handle = [](HANDLE h) {
+            std::string data; LARGE_INTEGER zero{}; if (!SetFilePointerEx(h, zero, nullptr, FILE_BEGIN)) return data;
+            char buffer[65536]; DWORD got = 0;
+            while (ReadFile(h, buffer, sizeof buffer, &got, nullptr) && got > 0) data.append(buffer, got);
+            return data;
+        };
+        r.out = read_handle(okeep); r.err = read_handle(ekeep);
         // MSYS2/Cygwin children write CRLF to redirected output in text mode,
         // so normalize captured output to LF; exact-output callers (run(),
         // cmd().run(), tests comparing stdout) otherwise see trailing \r.
@@ -378,6 +423,9 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
             s = std::move(n);
         };
         normalize(r.out); normalize(r.err);
+        close_keepers();
+        // Harmless if the keepers already deleted the files; kept for the
+        // case where a keeper could not take delete ownership.
         DeleteFileW(ow.c_str()); DeleteFileW(ew.c_str());
         if (stream) { std::cout << r.out; std::cerr << r.err; }
     }

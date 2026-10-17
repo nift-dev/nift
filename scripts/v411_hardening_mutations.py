@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix='nift-v411-mutants-') as td:
  if a.family in ['process','all']:
   control=run(['make','test-process-hardening']);assert control.returncode==0,control.stderr
   process=(repo/'src/Process.cpp').read_text();job=(repo/'src/JobControl.cpp').read_text()
-  mutants=[('capture-cleanup','Process.cpp','if(ofd>=0)close(ofd);if(efd>=0)close(efd);if(!op.empty())unlink(op.c_str());if(!ep.empty())unlink(ep.c_str());','', ['temp','1']),
+  mutants=[('capture-cleanup','Process.cpp','if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);','if(ofd<0||efd<0){', ['temp','1']),
    ('partial-pipeline-kill','Process.cpp','if(!r.error.empty())for(pid_t p:pids)kill(p,SIGKILL);','', ['fork','1']),
    ('job-child-reap','JobControl.cpp','while(waitpid(p,&st,0)<0&&errno==EINTR){}','(void)st;', ['fork','1','job']),
    ('cloexec','ProcessPOSIX.h','return fcntl(fd,F_SETFD,FD_CLOEXEC)>=0;','(void)fd;return true;', []),
