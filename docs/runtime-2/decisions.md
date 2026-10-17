@@ -101,6 +101,12 @@ behaviour; approved compatibility changes; deferred language improvements.
   Amended after CI @084f09f: the certification target is `make certify`
   (`test-all` plus every suite named in the CI workflows); the guard parses
   the workflows so a newly added CI suite cannot be skipped locally.
+  Amended again (owner, 2026-10-17): `make certify` runs
+  `scripts/certify.py` — isolated (exclusive targets serialised),
+  classified results (PASS / FLAKY / SKIPPED-ENVIRONMENTAL / UNVERIFIED /
+  BASELINE-FAILURE / FAIL; only PASS counts as a pass), tiered validation
+  (quick / focused / full / CI / milestone). See
+  `docs/runtime-2/certification.md`.
 - Same-binary differential runs establish the comparison infrastructure, not
   language correctness.
 - Only certified commits are pushed, only to `runtime-2`; no force-push,

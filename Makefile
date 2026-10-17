@@ -1093,7 +1093,7 @@ CERTIFY_CI_TARGETS := bh2-test-integrity test-build-boundary-nondestructive test
 	test-crash-recovery test-filesystem-boundary test-filesystem-type test-guarantee-registry-ci \
 	test-incremental-state-transitions test-init-functional-truth test-ownership-unit \
 	test-pagination-equivalence test-parser-value-composition test-v44-automation test-v44-hooks \
-	test-v44-packages test-v45-native-runtime
+	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform
 .PHONY: certify certify-targets
 # The certified set: test-all plus every suite the CI workflows run.
 certify-targets: test-all $(CERTIFY_CI_TARGETS)

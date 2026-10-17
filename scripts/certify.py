@@ -34,9 +34,18 @@ AGGREGATE = "certify-targets"
 EXCLUSIVE = {
     "test-build-boundary-nondestructive": "snapshots the whole checkout before/after; any concurrent writer is reported as a modification",
     "test-build-boundary": "builds from a clean copy of the checkout; reads the tree while others write it",
-    "bh2-test-integrity": "aggregate evidence gate that re-runs other suites",
-    "test-bindings": "stages dist/embed-prefix and binding build trees shared with the binding targets",
-    "test-embed": "stages dist/embed-prefix shared with the binding targets",
+    # Isolation audit (docs/runtime-2/certification.md): these recipes write
+    # shared outputs outside .build/ (embedding objects, libnift_c.a, the
+    # staged dist/embed-prefix, binding build products) that other targets
+    # also build or read.
+    "test-cp18-bytes": "rebuilds src/embed/*.o in the source tree",
+    "test-cp21-bytes": "rebuilds libnift_c.a in the source tree",
+    "test-v45-embed-staged-consumer": "restages dist/embed-prefix (shared with the binding targets)",
+    "test-go-binding": "restages dist/embed-prefix; builds bindings/go products",
+    "test-csharp-binding": "restages dist/embed-prefix; builds bindings/csharp products",
+    "test-node-binding": "builds bindings/node/build (shared native module)",
+    "test-python-binding": "builds the bindings/python extension module",
+    "test-minify": "writes minifypp/.build via a sub-make",
 }
 
 # Implementation-time tier (--quick): fast, broad smoke of the runtime and the
@@ -47,7 +56,7 @@ QUICK = [
     "test-requirements", "test-dependency-status", "test-call-semantics", "test-control-flow",
 ]
 
-TEST_NAME = re.compile(r"^(test|bh)[A-Za-z0-9_.-]*$")
+TEST_NAME = re.compile(r"^(test|bh|checkpoint-[0-9])[A-Za-z0-9_.-]*$")
 
 
 def make_db(cwd, target):
@@ -217,7 +226,10 @@ def ensure_baseline(path, jobs):
     if not (path / "Makefile").exists():
         return False
     if not (path / "nift").exists():
-        subprocess.run(["make", f"-j{jobs}", "nift"], cwd=path, capture_output=True, env=clean_env())
+        built = subprocess.run(["make", f"-j{jobs}", "nift"], cwd=path, capture_output=True, env=clean_env())
+        if built.returncode != 0:
+            print(f"certify: baseline build failed in {path}; BASELINE-FAILURE cannot be classified", file=sys.stderr)
+            return False
     return (path / "nift").exists()
 
 
@@ -259,7 +271,10 @@ def main():
     logdir = ROOT / ".build" / "certify"
     logdir.mkdir(parents=True, exist_ok=True)
     if a.audit:
-        subprocess.run(["make", "-k", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, env=clean_env())
+        built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, env=clean_env())
+        if built.returncode != 0:
+            print("certify: could not build nift for the audit", file=sys.stderr)
+            return 1
         audit(planned, a.timeout, a.audit)
         return 0
     # Phase 0: build every non-test prerequisite once (binaries, objects,
