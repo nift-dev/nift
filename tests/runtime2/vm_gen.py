@@ -65,7 +65,7 @@ class Gen:
         s = self.pick(scope, "str")
         if r < 0.94 and s:
             return f"{s}.length()"
-        return f"({self.cond(scope, depth + 1)} ? {self.int_expr(scope, depth + 1)} : {self.int_expr(scope, depth + 1)})"
+        return f"({self.cond(scope, depth + 2)} ? {self.int_expr(scope, depth + 1)} : {self.int_expr(scope, depth + 1)})"
 
     def small(self, scope):
         v = self.pick(scope, "int")
@@ -92,7 +92,8 @@ class Gen:
             return f"{self.str_expr(scope, depth + 1)} {op} {self.str_expr(scope, depth + 1)}"
         if r < 0.7:
             return f"{self.cond(scope, depth + 1)} {self.r.choice(['&&', '||'])} {self.cond(scope, depth + 1)}"
-        if r < 0.8:
+        if r < 0.8 and depth == 0:
+            # Legacy applies `!` to the rest of the unit, so `!` only starts a whole condition.
             return f"!({self.cond(scope, depth + 1)})"
         v = self.pick(scope, "int") or self.pick(scope, "str")
         return v if v else "true"
