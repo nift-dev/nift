@@ -67,3 +67,41 @@ fully certified; keep baseline results to separate pre-existing failures.
 together, so `main` of each stays consistent with v4.12.0 (the suite's
 `runtime-2` encodes D-002 and fails against v4.12.0 by design).
 
+## D-009 — Language semantics decisions (owner, 2026-10-17)
+Resolves the eight `semantics.md` rows CP08 raised. The legacy interpreter is
+not changed to match; these define Runtime 2.0 behaviour, and the differential
+harness classifies the resulting differences as approved changes, each with a
+specific rule, test and justification (never a broad suppression).
+
+| # | Topic | Decision |
+| --- | --- | --- |
+| 1 | Type-error wording loop vs top level | A: one wording (top-level) everywhere |
+| 2 | `const` reassignable inside loops | A: immutable everywhere |
+| 3 | Built-in vs user-name precedence | **B: lexical bindings and user-defined functions take precedence over built-ins.** Built-ins must stay reachable when shadowed by some unambiguous mechanism (to be designed; no new standard-library namespace unless the wider language design justifies it). Compatibility change: affected existing programs are documented, with regression tests showing old and intended behaviour |
+| 4 | Built-in resolution inside loops | A: consistent with #3 everywhere |
+| 5 | Error location in called functions | A: the actual location in the function |
+| 6 | `"$[x]"` inside loops | A: interpolated everywhere |
+| 7 | Catchable runtime errors | A for now: preserve during the initial VM migration. Recorded future objective: ordinary runtime failures (undefined callable, bad index, type errors) become structured, catchable exceptions; fatal internal errors, memory exhaustion and termination stay distinct |
+| 8 | Dynamic-scope (free name) warnings | B, later: opt-in strict-mode warning |
+
+`semantics.md` distinguishes, per row: legacy behaviour; intended Runtime 2.0
+behaviour; approved compatibility changes; deferred language improvements.
+
+## D-010 — Certification process (owner, 2026-10-17)
+- Checkpoint certification requires `make test-all` (not only `make test`),
+  the `tests/runtime2` gates, the regression suite (`nift-regression-suite`
+  `runtime-2`) and, from CP08 on, the differential harness as a mandatory
+  regression gate; environmental baseline failures are listed separately from
+  regressions.
+- macOS/Windows are claimed only after the cross-platform CI workflows pass on
+  the pushed commit (`checkpoint-10-cross-platform`, `v44-cross-platform`,
+  `test-integrity`).
+- An automated guard keeps comprehensive suites (conformance, host seam,
+  C ABI) inside the certification target so they cannot be silently omitted.
+- Same-binary differential runs establish the comparison infrastructure, not
+  language correctness.
+- Only certified commits are pushed, only to `runtime-2`; no force-push,
+  no `main`, no releases. Routine checkpoint completion needs no approval;
+  escalate only consequential architecture or compatibility decisions,
+  genuine blockers, or publishing.
+
