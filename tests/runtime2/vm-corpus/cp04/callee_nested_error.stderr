@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/callee_nested_error.f:1:16: return: return: unknown value or malformed expression: x.nope()
+error: $ROOT/callee_nested_error.f:1:16: return: return: unknown value or malformed expression: x.nope()

@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/toplevel_alias.f:4:1: print: value is not directly renderable
+error: $ROOT/toplevel_alias.f:4:1: print: value is not directly renderable

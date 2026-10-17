@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/nested_calls.f:6:1: print: value is not directly renderable
+error: $ROOT/nested_calls.f:6:1: print: value is not directly renderable

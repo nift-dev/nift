@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/undefined_call.f:2:6: undefined callable: nope
+error: $ROOT/undefined_call.f:2:6: undefined callable: nope

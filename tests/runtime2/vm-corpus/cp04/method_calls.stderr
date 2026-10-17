@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/method_calls.f:4:1: print: value is not directly renderable
+error: $ROOT/method_calls.f:4:1: print: value is not directly renderable

@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/const_assign.f:2:1: cannot assign to const binding: k
+error: $ROOT/const_assign.f:2:1: cannot assign to const binding: k

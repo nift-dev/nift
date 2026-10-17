@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/callee_index_error.f:1:12: return: JSON array index 10 is out of range in 'a[10]'
+error: $ROOT/callee_index_error.f:1:12: return: JSON array index 10 is out of range in 'a[10]'

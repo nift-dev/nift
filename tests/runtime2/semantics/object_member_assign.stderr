@@ -1,0 +1,1 @@
+error: $ROOT/object_member_assign.f:2:1: member assignment requires a struct instance: o

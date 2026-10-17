@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/redeclare.f:2:1: binding already declared in this scope: z
+error: $ROOT/redeclare.f:2:1: binding already declared in this scope: z

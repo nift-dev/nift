@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/uncaught_throw.f:1:13: boom
+error: $ROOT/uncaught_throw.f:1:13: boom

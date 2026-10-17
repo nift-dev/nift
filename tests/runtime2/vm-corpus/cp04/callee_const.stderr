@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/callee_const.f:1:25: cannot assign to const binding: k
+error: $ROOT/callee_const.f:1:25: cannot assign to const binding: k

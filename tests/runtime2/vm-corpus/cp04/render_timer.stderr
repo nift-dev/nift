@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/render_timer.f:2:1: timer values cannot be rendered as text in $[f()]
+error: $ROOT/render_timer.f:2:1: timer values cannot be rendered as text in $[f()]

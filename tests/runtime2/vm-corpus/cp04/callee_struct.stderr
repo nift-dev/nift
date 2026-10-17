@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/callee_struct.f:3:7: run: expected executable and optional arguments
+error: $ROOT/callee_struct.f:3:7: run: expected executable and optional arguments

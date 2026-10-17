@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/struct_methods.f:2:6: struct constructor argument count mismatch: Point
+error: $ROOT/struct_methods.f:2:6: struct constructor argument count mismatch: Point

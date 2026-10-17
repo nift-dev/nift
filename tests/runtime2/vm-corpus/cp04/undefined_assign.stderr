@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/undefined_assign.f:1:1: assignment to undefined binding: q
+error: $ROOT/undefined_assign.f:1:1: assignment to undefined binding: q

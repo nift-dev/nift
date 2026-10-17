@@ -1,0 +1,5 @@
+print(0.1 + 0.2)
+print(1.0)
+print(1.5 * 2)
+print(1e21)
+print(-0.0)

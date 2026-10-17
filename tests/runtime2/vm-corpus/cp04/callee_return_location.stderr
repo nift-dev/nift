@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/callee_return_location.f:5:1: print: value is not directly renderable
+error: $ROOT/callee_return_location.f:5:1: print: value is not directly renderable

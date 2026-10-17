@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/render_error.f:2:1: Error values cannot be rendered as text in $[h()]
+error: $ROOT/render_error.f:2:1: Error values cannot be rendered as text in $[h()]

@@ -1,0 +1,1 @@
+error: $ROOT/assign_type_change.f:2:1: cannot assign string to int binding 'x'

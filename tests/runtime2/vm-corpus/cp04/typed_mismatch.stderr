@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/typed_mismatch.f:2:1: cannot assign string to int binding 'x'
+error: $ROOT/typed_mismatch.f:2:1: cannot assign string to int binding 'x'

@@ -1,1 +1,1 @@
-error: <CORPUS>/cp04/strings_math.f:4:1: print: expected one value
+error: $ROOT/strings_math.f:4:1: print: expected one value

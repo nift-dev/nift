@@ -1,0 +1,1 @@
+error: $ROOT/loop_type_mismatch.f:3:16: cannot change binding type: x
