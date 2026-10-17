@@ -133,7 +133,17 @@ jobs:
       - name: Clean + parallel aggregate target (make -j2 test-all)
         run: |
           make clean
-          make -j2 test-all
+          # Surface the failing recipes as annotations (readable via the API
+          # when job logs are not reachable).
+          set +e
+          make -j2 test-all > test-all.log 2>&1
+          rc=$?
+          set -e
+          tail -200 test-all.log
+          if [ "$rc" -ne 0 ]; then
+            grep -nE '^make(\[[0-9]+\])?: \*\*\*|FAIL|Error|differing|AssertionError|Traceback' test-all.log | tail -40 | sed -e 's/%/%25/g' -e 's/^/::error title=test-all::/'
+            exit "$rc"
+          fi
       - name: Build-boundary non-destructive proof (serial)
         run: make test-build-boundary-nondestructive
 
