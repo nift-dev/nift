@@ -13,11 +13,24 @@ NodeKind keyword_kind(std::string_view word) {
 NodeId ExprParser::primary() {
     const Token token = tok_;
     name_base_ = false;
+    collection_base_ = false;
     switch (token.kind) {
     case Tok::Number: advance(); return leaf(NodeKind::Number, token);
     case Tok::String: advance(); return string_literal(token);
-    case Tok::LBracket: advance(); return sequence(NodeKind::Array, Tok::RBracket, token.begin, false);
-    case Tok::LBrace: advance(); return object(token.begin);
+    case Tok::LBracket: {
+        advance();
+        const NodeId id = sequence(NodeKind::Array, Tok::RBracket, token.begin, false);
+        name_base_ = false;
+        collection_base_ = true;
+        return id;
+    }
+    case Tok::LBrace: {
+        advance();
+        const NodeId id = object(token.begin);
+        name_base_ = false;
+        collection_base_ = true;
+        return id;
+    }
     case Tok::LParen: {
         const NodeId lambda = lambda_if_any(token.begin, false);
         if (lambda != kNoNode || why_ != OpaqueReason::None) return lambda;
@@ -29,6 +42,7 @@ NodeId ExprParser::primary() {
         if (!is(Tok::RParen)) return fail(OpaqueReason::LegacyRuntimeError);
         advance();
         name_base_ = false;
+        collection_base_ = false;
         return inner;
     }
     case Tok::Ident: return primary_name(token);
@@ -57,6 +71,7 @@ NodeId ExprParser::primary_name(Token token) {
             const std::uint32_t name_end = token.end + static_cast<std::uint32_t>(type.size()) - 1;
             resume_at(name_end);
             name_base_ = true;
+            collection_base_ = false;
             return ast_.add(NodeKind::Ident, token.begin, name_end);
         }
     }
@@ -65,6 +80,7 @@ NodeId ExprParser::primary_name(Token token) {
     advance();
     const NodeKind kind = keyword_kind(word);
     name_base_ = kind == NodeKind::Ident;
+    collection_base_ = false;
     return leaf(kind, token);
 }
 

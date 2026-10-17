@@ -70,7 +70,7 @@ private:
     NodeId await_expression(Token token);
     NodeId postfix(NodeId node, std::uint32_t begin);
     NodeId call(NodeId callee, std::uint32_t begin);
-    bool callable_shape(NodeId callee, std::uint32_t last_dot) const;
+    bool callable_shape(NodeId callee, std::uint32_t last_dot, bool empty_call) const;
     bool receiver_ok(std::uint32_t begin, std::uint32_t end) const;
     NodeId primary();
     NodeId primary_name(Token token);
@@ -100,6 +100,9 @@ private:
     // What the last primary() was: a plain name (postfix chains allowed) or
     // anything else (literal, collection, parenthesised expression, lambda).
     bool name_base_ = false;
+    // The last primary() was an array or object literal (member and index
+    // links are regular on it, calls only as known or presentation methods).
+    bool collection_base_ = false;
 };
 
 } // namespace nift::rt::detail

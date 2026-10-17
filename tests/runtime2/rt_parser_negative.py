@@ -72,14 +72,17 @@ ATOMS = ["a", "b", "s", "xs", "o", "t", "n", "1", "2.5", '"q"', "'r'", "true", "
 BINARY = ["+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "??"]
 SPACE = ["", " ", "  ", "\t"]
 # Postfix chains on receivers whose run-time type supports them.
-CHAINS = {"o": [".k", ".m", "?.k", '["k"]', ".f(1)", ".m.g(1)", "?.f(1)", ".m.n", ".size()"],
+CHAINS = {"o": [".k", ".m", "?.k", '["k"]', ".f(1)", ".m.g(1)", "?.f(1)", ".m.n", ".size()", ".stringify()",
+                ".m.prettify()", ".highlight()", ".stringify( )"],
+          's.split("-")': [".stringify()", ".length()", "[0]", ".stringify().length()"],
           "xs": ["[0]", "?[0]", "[a - 3]", "[xs[0]]", "[(0)]", "[0 + 0]", ".length()", "[0].to_string()",
                  ".map((p) => p).length()"],
           "s": [".length()", ".to_upper()", ".to_upper().length()", "[0]"],
           "f": ["(1)", "(1).to_string()"], "h": ["()", "()[0]", "().length()"], "ys": ["[0][1]", "[1][0]"],
           "(o)": [".k", ".f(1)", ".size()"], "(xs)": ["[0]", ".length()"], "[1]": ["[0]", ".length()"],
-          '"s"': [".length()", "[0]", ".to_upper()"], "1": [".to_string()", "[0]"], "true": [".to_string()"],
-          '{"k": 1}': [".k", ".size()"], "(f)": ["(1)"], "f(o)": [".k", ".f(1)"], "o.m": [".g(1)", ".n"]}
+          '"s"': [".length()", "[0]", ".to_upper()", ".stringify()"], "1": [".to_string()", "[0]", ".stringify()"],
+          "true": [".to_string()", ".stringify()"], "[1, [2]]": ["[1][0]", "[0]", ".stringify()", "[1].length()", ".k"],
+          '{"k": 1}': [".k", ".size()", '["k"]', ".stringify()", ".k.to_string()"], "(1 + 2)": [".stringify()"], "(f)": ["(1)"], "f(o)": [".k", ".f(1)"], "o.m": [".g(1)", ".n"]}
 
 
 class Gen:

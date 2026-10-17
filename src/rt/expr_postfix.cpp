@@ -24,6 +24,11 @@ bool known_method(std::string_view name) {
     return std::binary_search(std::begin(kKnown), std::end(kKnown), name);
 }
 
+bool presentation_method(std::string_view name) {
+    static constexpr std::string_view kPresentation[] = {"highlight", "prettify", "stringify"};
+    return std::binary_search(std::begin(kPresentation), std::end(kPresentation), name);
+}
+
 // The receiver test of legacy final_postfix: no ":=" and no operator
 // character at depth 0 outside quotes.
 bool ExprParser::receiver_ok(std::uint32_t begin, std::uint32_t end) const {
@@ -50,13 +55,15 @@ bool ExprParser::receiver_ok(std::uint32_t begin, std::uint32_t end) const {
 // Call shapes the legacy evaluator dispatches (everything else is "unknown
 // value or malformed expression" or depends on the receiver's run-time type):
 //   name(args), name.member...member(args) (also with ?.), and
-//   receiver.known_method(args) for any receiver passing receiver_ok.
-bool ExprParser::callable_shape(NodeId callee, std::uint32_t last_dot) const {
+//   receiver.known_method(args) and receiver.presentation_method() for any
+//   receiver passing receiver_ok.
+bool ExprParser::callable_shape(NodeId callee, std::uint32_t last_dot, bool empty_call) const {
     const Node& node = ast_.at(callee);
     if (node.kind == NodeKind::Ident) return name_base_;
-    if (node.kind == NodeKind::Member && known_method(ast_.text(ast_.at(node.b))) &&
-        receiver_ok(node.begin, last_dot))
-        return true;
+    if (node.kind == NodeKind::Member && receiver_ok(node.begin, last_dot)) {
+        const std::string_view method = ast_.text(ast_.at(node.b));
+        if (known_method(method) || (empty_call && presentation_method(method))) return true;
+    }
     if (!name_base_) return false;
     NodeId link = callee;
     while (ast_.at(link).kind == NodeKind::Member || ast_.at(link).kind == NodeKind::SafeMember) link = ast_.at(link).a;
@@ -73,6 +80,7 @@ bool ExprParser::callable_shape(NodeId callee, std::uint32_t last_dot) const {
 NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
     if (node == kNoNode) return kNoNode;
     const bool name_base = name_base_;
+    const bool member_base = name_base || collection_base_;
     // `true.length()`, `1e2[0]`: legacy has no postfix on these literals.
     const NodeKind head = ast_.at(node).kind;
     const bool scalar_head = head == NodeKind::Number || head == NodeKind::True || head == NodeKind::False ||
@@ -90,7 +98,10 @@ NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
         if (++expression_depth() > kMaxExpressionDepth) return fail(OpaqueReason::NestingLimit);
         if (is(Tok::LParen)) {
             name_base_ = name_base;
-            if (!callable_shape(node, last_dot)) return fail(OpaqueReason::LegacyRuntimeError);
+            Lexer probe = lex_;
+            const Token after = probe.peek();
+            const bool empty_call = after.kind == Tok::RParen && after.begin == tok_.end;
+            if (!callable_shape(node, last_dot, empty_call)) return fail(OpaqueReason::LegacyRuntimeError);
             node = call(node, begin);
             if (node == kNoNode) return kNoNode;
             continue;
@@ -101,21 +112,24 @@ NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
             last_dot = tok_.begin;
             advance();
             if (!is(Tok::Ident) || tok_.begin != prev_end_) return fail(OpaqueReason::LegacyRuntimeError);
-            if (!name_base) {
-                // Only `.known_method(` is regular on a non-name receiver.
+            if (!member_base) {
+                // Only a known or presentation method call is regular on a
+                // literal or parenthesised receiver.
                 Lexer probe = lex_;
-                const Token after = probe.peek();
+                const Token after = probe.next();
+                const Token close = probe.next();
                 const bool called = after.kind == Tok::LParen && after.begin == tok_.end;
+                const bool empty = called && close.kind == Tok::RParen && close.begin == after.end;
                 const std::string_view method = src_.substr(tok_.begin, tok_.end - tok_.begin);
-                if (kind != NodeKind::Member || !called || !known_method(method))
-                    return fail(OpaqueReason::LegacyRuntimeError);
+                const bool regular = known_method(method) || (empty && presentation_method(method));
+                if (kind != NodeKind::Member || !called || !regular) return fail(OpaqueReason::LegacyRuntimeError);
             }
             const NodeId name = leaf(NodeKind::Ident, tok_);
             advance();
             node = node2(kind, Op::None, begin, node, name);
             continue;
         }
-        if (!name_base) return fail(OpaqueReason::LegacyRuntimeError);
+        if (!member_base) return fail(OpaqueReason::LegacyRuntimeError);
         const NodeKind kind = is(Tok::LBracket) ? NodeKind::Index : NodeKind::SafeIndex;
         safe = safe || kind == NodeKind::SafeIndex;
         const std::uint32_t open_end = tok_.end;

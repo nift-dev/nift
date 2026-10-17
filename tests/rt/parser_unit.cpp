@@ -169,7 +169,8 @@ void review_findings() {
                              "print(\"abc\"[1])", "print('r'.k)", "print(1e2[0])", "print(true.k)",
                              "print(true.length())", "print(((x) => x)(1))", "print((f)(1))", "print(mk()(1))",
                              "print(g[0](false))", "print(xs[0].f(5))", "print(o.a[0](3))", "print(f (1))",
-                             "print(xs[xs[0]])", "print({\"a\": 1}.a)", "print([1][0])", "print(f( ))",
+                             "print(xs[xs[0]])", "print(f( ))", "print(s.split(1).stringify(1))",
+                             "print(\"a\".stringify( ))", "print((xs)[0])",
                              "print(1 + x => x)", "print((x) => {x} + 1)"})
         contains(text, "Opaque");
     contains("print(o.f(3))", "Call @6..12");
@@ -177,6 +178,10 @@ void review_findings() {
     contains("print(xs[0].to_string())", "Call");
     contains("print((1 + 2).to_string())", "Call @6..25");
     contains("print(g(o).a)", "Member");
+    contains("print({\"a\": 1}.a)", "Member @6..16");
+    contains("print([1][0])", "Index @6..12");
+    contains("print(s.split(\"-\").stringify())", "Member @6..28");
+    contains("print(\"a\".prettify())", "Call");
     // D6 trailing commas
     for (const char* text : {"print([1, 2,])", "print({\"a\": 1,})", "print(f(1,))", "[a,] := xs",
                              "f := (a,) => a"})
