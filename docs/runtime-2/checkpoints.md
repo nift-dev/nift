@@ -30,7 +30,7 @@ as measured in CP00.
 | CP13 | M5 Runtime | Errors, try/catch, diagnostics parity | CP12 | Diagnostic corpus byte-identical |
 | CP14 | M5 Runtime | Built-ins batch A: collections and strings | CP12 | Batch fallback = 0; per-builtin instruction guards |
 | CP15 | M5 Runtime | Built-ins batch B: JSON, bytes, numbers, time | CP14 | As CP14 |
-| CP16 | M5 Runtime | Built-ins batch C: filesystem via Host ops | CP14, CP03 | As CP14; Host-op trace parity |
+| CP16 | M5 Runtime | Built-ins batch C: filesystem and process via Host ops; pipe-based capture/streaming with explicit ownership (D-011) | CP14, CP03, CP07 | As CP14; Host-op trace parity; pipe mode ≥ competitive with Bash on the D-011 benchmark set; no hangs/leaks |
 | CP17 | M5 Runtime | Typed handles end-to-end; registry reclamation (removes D3) | CP16 | No `\x1fnift:` strings in VM paths; handle-forgery tests fail closed |
 | CP18 | M5 Runtime | Embedding: C ABI 1.4 program API; bindings | CP13 | ABI 1.3 tests unchanged; new API tested in C and Python |
 | CP19 | M6 Shell | Command-mode front end on the shared compiler | CP12 | Shell corpus parity; mode rules specified |

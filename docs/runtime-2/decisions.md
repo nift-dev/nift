@@ -105,3 +105,30 @@ behaviour; approved compatibility changes; deferred language improvements.
   escalate only consequential architecture or compatibility decisions,
   genuine blockers, or publishing.
 
+## D-011 — CP07 outcome and pipe-based execution in CP16 (owner, 2026-10-17)
+- CP07 is certified as a correctness/resource fix: anonymous capture files,
+  no leaked `/tmp/nift-proc-*`, all existing observable behaviour preserved
+  (background-process lifetime, regular-file stdout, low-fd behaviour). The
+  launch-cost gate (≤ Bash + 15%) is recorded as **deferred, not passed**;
+  the benchmark is not weakened.
+- The rejected pipe implementation is kept as evidence (patch outside the
+  branch, `cp07-pipe-attempt/`; ~31% faster, 0.87× Bash `$()`), with the
+  reasons it was rejected (hang/unbounded memory with chatty descendants,
+  timing-dependent capture, SIGPIPE after parent exit, leaked helper
+  processes, FIFO stdout, earlier failure at low fd limits).
+- CP16 gains an explicit objective: pipe-based capture and streaming in the
+  VM process layer, with caller-selectable output modes (pipe capture, file
+  capture, streaming, background/detached), explicit pipe ownership,
+  backpressure and bounded buffering, cancellation and termination, defined
+  child lifetime, cross-platform behaviour and job control. These are
+  designed architecturally, not with idle timeouts. Existing APIs keep their
+  documented behaviour unless a compatibility change is approved.
+- Targets: pipe mode at least competitive with Bash; file-backed mode reports
+  OS overhead separately from Nift overhead (no heroic tuning of OS-bound
+  cost). CP16 benchmarks both modes over trivial launches, small and large
+  captures, simultaneous stdout/stderr, multi-stage pipelines, background and
+  long-running processes, interactive commands, cancellation, high
+  concurrency and low fd limits, measuring wall time, CPU, memory and leaks.
+- Principle: preserve correctness in Nift 4.x, but 4.x implementation choices
+  do not constrain the VM design; every VM difference is deliberate and tested.
+

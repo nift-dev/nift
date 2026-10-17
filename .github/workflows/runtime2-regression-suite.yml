@@ -1,0 +1,93 @@
+name: Runtime 2.0 core vs runtime-2 regression suite
+
+on:
+  push:
+    branches: [runtime-2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # Runtime 2.0 (D-008): the runtime-2 core is certified against the
+      # regression suite's runtime-2 branch (which encodes approved contract
+      # changes such as D-002), never accidentally against suite main.
+      - uses: actions/checkout@v5
+        with:
+          path: nift
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-dev/nift-regression-suite
+          ref: runtime-2
+          path: regression-suite
+      # The v4.4 package contracts dogfood the real nift-packages repositories,
+      # which the contracts resolve as a sibling `nift-packages/` directory.
+      # Revisions are pinned to the coherent v4.4 package set so a later package
+      # push cannot unexpectedly break an unrelated Nift regression run.
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/sqlite
+          ref: 85f59b3007c5d64ef7f600e2cf773e192757d6c2
+          path: nift-packages/sqlite
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/curl
+          ref: aa4f851bae9c65ebb17956097feada43be2c1cf4
+          path: nift-packages/curl
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/postgres
+          ref: 42873336b721a69d4132541523c05b816ba489eb
+          path: nift-packages/postgres
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/mysql
+          ref: 4526f3794bac2ad8b6d80d087d0abab974eed38c
+          path: nift-packages/mysql
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/redis
+          ref: 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+          path: nift-packages/redis
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/vips
+          ref: 735b9965d6d6c365b4195f0454ded31e577dc5f1
+          path: nift-packages/vips
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/imagemagick
+          ref: dda5437fb20ca92045cea901323c2bd2399f38a8
+          path: nift-packages/imagemagick
+      - name: Build Nift
+        run: make -C nift -j2 nift
+      - name: Stage embedding prefix
+        run: |
+          make -C nift embed-prefix
+          echo "NIFT_EMBED_PREFIX=$PWD/nift/dist/embed-prefix" >> "$GITHUB_ENV"
+      - name: Record tested revisions
+        run: |
+          echo "Nift source: $(git -C nift rev-parse HEAD)"
+          echo "Nift version: $(./nift/nift version)"
+          echo "Regression suite: $(git -C regression-suite rev-parse HEAD)"
+          # Derive the expected candidate version from the Nift checkout so the
+          # historical version assertion is release-aware rather than baked in.
+          NIFT_EXPECT_VERSION="$(grep -m1 -oE 'v[0-9]+\.[0-9]+\.[0-9]+' nift/ReleaseNotes.md | tr -d v || true)"
+          echo "Expected Nift version: ${NIFT_EXPECT_VERSION:-<unset, well-formed only>}"
+          echo "NIFT_EXPECT_VERSION=$NIFT_EXPECT_VERSION" >> "$GITHUB_ENV"
+      - name: Run independent contract suite
+        run: |
+          set +e
+          bash regression-suite/run-contract.sh "$PWD/nift/nift" > contract.log 2>&1
+          rc=$?
+          set -e
+          cat contract.log
+          if [ "$rc" -ne 0 ]; then
+            message="$(tail -30 contract.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Independent contract failure::$message"
+            exit "$rc"
+          fi

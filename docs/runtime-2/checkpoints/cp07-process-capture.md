@@ -1,6 +1,6 @@
 # CP07 — Process capture and PATH cache
 
-Status: **implemented; launch-cost gate not met — escalated** (see "Gate" below).
+Status: **certified as a leak/resource fix; launch-cost gate deferred, not passed** (owner decision D-011; pipe-based execution is a CP16 objective).
 Behaviour-preservation work (no leaked capture files) is done and verified.
 
 ## Objective (roadmap)

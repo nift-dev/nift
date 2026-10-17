@@ -13,7 +13,7 @@ _Last updated: 2026-10-17_
 | CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
 | CP05 | complete (Linux); macOS/Windows: CI after push | `runtime-2` | Flat call in loop −10.5% (top level −4.6%); review: unbounded cache memory and latched flags fixed (`checkpoints/cp05-call-path.md`) |
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
-| CP07 | implemented; launch-cost gate not met — escalated | `runtime-2-dev` | Anonymous capture files (no leaked `/tmp/nift-proc-*`), behaviour unchanged; pipes would meet the gate but change child-visible behaviour (`checkpoints/cp07-process-capture.md`) |
+| CP07 | complete as leak/resource fix (Linux; CI after push); launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files (no leaked `/tmp/nift-proc-*`), behaviour unchanged; pipes would meet the gate but change child-visible behaviour (`checkpoints/cp07-process-capture.md`) |
 | CP08 | implemented; review findings being addressed | `runtime-2-cp08` | Host-op trace, `tools/rt-diff`, semantics v1 (`checkpoints/cp08-semantics-harness.md` on that branch) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
@@ -62,14 +62,13 @@ Notes on history:
 
 ## Open escalations
 
-- CP07 launch cost (gate ≤ Bash + 15%): unattainable with capture files —
-  CPU already equals Bash `$()`, the gap is waiting for exit notification.
-  Options: (a) accept the anonymous-file CP07 without the speed gate and
-  move launch speed to the VM's Host process layer (recommended); (b) approve
-  pipe capture as a compatibility change (child stdout/stderr become FIFOs,
-  descendants' later output and survival after Nift dies change).
+None. CP07 launch cost decided by the owner (D-011, option a).
 
 ## Regression suite
+
+CI: `.github/workflows/runtime2-regression-suite.yml` runs the suite's
+`runtime-2` branch against the core `runtime-2` branch on every push to it
+(D-008: neither `main` changes until both are promoted together).
 
 `nift-dev/nift-regression-suite` is a certification gate for every checkpoint
 (`./run-contract.sh <nift>`). On this host v4.12.0 fails 4 modules
