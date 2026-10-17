@@ -1,0 +1,9 @@
+DIFF semantics/division.f stdout {"line": 5, "a": "-1", "b": "2"}
+DIFF gen/g00007/main.f stdout {"line": 10, "a": "-20", "b": "15"}
+DIFF gen/g00168/main.f stdout {"line": 7, "a": "x,y,z", "b": "null"}
+DIFF gen/g00185/main.f stdout {"line": 12, "a": "-2", "b": "5"}
+DIFF gen/g00211/main.f stdout {"line": 2, "a": "v=3!", "b": "qq"}
+DIFF gen/g00242/main.f stdout {"line": 1, "a": "[3,-4,9]", "b": "[3,3,9]"}
+DIFF gen/g00390/main.f stdout {"line": 7, "a": "0", "b": "3"}
+rt-diff: 995 entries {"script": 983, "site": 12}, 7 differing; 340 entries traced (1938 Host ops)
+rt-diff: 995 entries {"script": 983, "site": 12}, 7 differing; 340 entries traced (1938 Host ops)

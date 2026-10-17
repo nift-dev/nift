@@ -1,0 +1,9 @@
+DIFF cases/comprehensive/project files {"changed": ["public/404.html", "public/about.html", "public/index.html"], "count": 3}
+DIFF cases/getenv/project files {"changed": ["public/index.html"], "count": 1}
+DIFF cases/missing-source/project files {"changed": ["public/index.html"], "count": 1}
+DIFF cases/schema/project files {"changed": ["public/index.html"], "count": 1}
+DIFF app/site files {"changed": ["public/home.html"], "count": 1}
+DIFF app/site files {"changed": ["public/home.html"], "count": 1}
+DIFF apps/NiftAspDogfood/site files {"changed": ["public/home.html"], "count": 1}
+rt-diff: 995 entries {"script": 983, "site": 12}, 7 differing; 340 entries traced (1938 Host ops)
+rt-diff: 995 entries {"script": 983, "site": 12}, 7 differing; 340 entries traced (1938 Host ops)

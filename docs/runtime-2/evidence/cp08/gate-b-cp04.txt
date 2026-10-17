@@ -1,0 +1,61 @@
+DIFF vm-corpus/cp04/callee_index_error.f stderr {"line": 1, "a": "error: $ROOT/callee_index_error.f:1:12: return: JSON array index 10 is out of range in 'a[10]'", "b": "error: $ROOT/callee_index_error.f:1:19: return: invalid index"}
+DIFF vm-corpus/cp04/callee_nested_error.f stderr {"line": 1, "a": "error: $ROOT/callee_nested_error.f:1:16: return: return: unknown value or malformed expression: x.nope()", "b": "error: $ROOT/callee_nested_error.f:1:23: return: unknown value or malformed expression: x.nope()"}
+DIFF vm-corpus/cp04/deep_recursion.f stderr {"line": 1, "a": "error: $ROOT/deep_recursion.f:1:36: callable recursion depth exceeded: r", "b": "error: $ROOT/deep_recursion.f:1:43: callable recursion depth exceeded: r"}
+DIFF vm-corpus/cp04/interpolation.f stdout {"line": 3, "a": "loop=$[x]", "b": "loop=3"}
+DIFF vm-corpus/cp04/recursion_limit.f stderr {"line": 1, "a": "error: $ROOT/recursion_limit.f:1:15: callable recursion depth exceeded: down", "b": "error: $ROOT/recursion_limit.f:1:22: callable recursion depth exceeded: down"}
+DIFF semantics/equality.f stdout {"line": 6, "a": "true", "b": "false"}
+DIFF semantics/errors_catch_index.f stderr {"line": 1, "a": "error: $ROOT/errors_catch_index.f:1:1: JSON array index 5 is out of range in '[1][5]'", "b": "error: $ROOT/errors_catch_index.f:1:1: invalid index"}
+DIFF semantics/errors_message_member.f exit {"a": [0], "b": [1]}
+DIFF semantics/errors_message_member.f stdout {"line": 1, "a": "x", "b": "<end>"}
+DIFF semantics/errors_message_member.f stderr {"line": 1, "a": "<end>", "b": "error: $ROOT/errors_message_member.f:1:7: value has no member: message"}
+DIFF semantics/exact_numbers.f stdout {"line": 2, "a": "9007199254740994", "b": "9007199254740992"}
+DIFF semantics/handles_lambda_string.f exit {"a": [1], "b": [0]}
+DIFF semantics/handles_lambda_string.f stdout {"line": 2, "a": "<end>", "b": "true"}
+DIFF semantics/handles_lambda_string.f stderr {"line": 1, "a": "error: $ROOT/handles_lambda_string.f:3:6: string concatenation requires renderable scalar values", "b": "<end>"}
+DIFF semantics/int_overflow_mul.f exit {"a": [1], "b": [0]}
+DIFF semantics/int_overflow_mul.f stdout {"line": 1, "a": "<end>", "b": "9.22337203700025e+18"}
+DIFF semantics/int_overflow_mul.f stderr {"line": 1, "a": "error: $ROOT/int_overflow_mul.f:1:7: signed 64-bit integer overflow", "b": "<end>"}
+DIFF semantics/loop_callee_error_location.f stderr {"line": 1, "a": "error: $ROOT/loop_callee_error_location.f:3:14: unknown value or malformed expression: undefined_name", "b": "error: $ROOT/loop_callee_error_location.f:3:14: return: unknown value or malformed expression: undefined_name"}
+DIFF semantics/loop_const.f stdout {"line": 1, "a": "2", "b": "<end>"}
+DIFF semantics/loop_const.f stderr {"line": 1, "a": "error: $ROOT/loop_const.f:4:1: cannot assign to const binding: k", "b": "error: $ROOT/loop_const.f:3:30: cannot assign to const binding: c"}
+DIFF semantics/loop_interpolation.f stdout {"line": 2, "a": "loop=$[x]", "b": "loop=3"}
+DIFF semantics/loop_native_shadow.f stdout {"line": 3, "a": "0", "b": "3"}
+DIFF semantics/loop_type_mismatch.f stderr {"line": 1, "a": "error: $ROOT/loop_type_mismatch.f:3:16: cannot change binding type: x", "b": "error: $ROOT/loop_type_mismatch.f:3:16: cannot assign string to int binding 'x'"}
+DIFF semantics/recursion_limit.f stderr {"line": 1, "a": "error: $ROOT/recursion_limit.f:1:39: callable recursion depth exceeded: down", "b": "error: $ROOT/recursion_limit.f:1:46: callable recursion depth exceeded: down"}
+DIFF semantics/strings_escape.f stdout {"line": 1, "a": "tab\tend", "b": "tabend"}
+DIFF semantics/strings_index.f stderr {"line": 1, "a": "error: $ROOT/strings_index.f:1:7: unknown value or malformed expression: \"abc\"[1]", "b": "error: $ROOT/strings_index.f:1:7: invalid index"}
+DIFF semantics/toplevel_callee_error_location.f stderr {"line": 1, "a": "error: $ROOT/toplevel_callee_error_location.f:3:3: return: unknown value or malformed expression: undefined_name", "b": "error: $ROOT/toplevel_callee_error_location.f:3:14: return: unknown value or malformed expression: undefined_name"}
+DIFF gen/g00000/main.f stdout {"line": 2, "a": "item $[e3]", "b": "item 1"}
+DIFF gen/g00004/main.f stdout {"line": 6, "a": "tab\tend", "b": "tabend"}
+DIFF gen/g00007/main.f stdout {"line": 2, "a": "item $[e2]", "b": "item 1"}
+DIFF gen/g00009/main.f stdout {"line": 1, "a": "v=$[1 + 2]!", "b": "v=3!"}
+DIFF gen/g00010/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:22:40: callable recursion depth exceeded: rec11", "b": "error: $ROOT/main.f:22:51: callable recursion depth exceeded: rec11"}
+DIFF gen/g00011/main.f stdout {"line": 17, "a": "item $[e12]", "b": "item 1"}
+DIFF gen/g00013/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:2:39: callable recursion depth exceeded: rec2", "b": "error: $ROOT/main.f:2:50: callable recursion depth exceeded: rec2"}
+DIFF gen/g00015/main.f stdout {"line": 9, "a": "item $[e2]", "b": "item 1"}
+DIFF gen/g00019/main.f stdout {"line": 2, "a": "item $[e1]", "b": "item 1"}
+DIFF gen/g00020/main.f stdout {"line": 2, "a": "item $[e1]", "b": "item 1"}
+DIFF gen/g00021/main.f stdout {"line": 5, "a": "item $[e5]", "b": "item 1"}
+DIFF gen/g00027/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:27:7: JSON array index 5 is out of range in '[1][5]'", "b": "error: $ROOT/main.f:27:7: invalid index"}
+DIFF gen/g00030/main.f stdout {"line": 7, "a": "item $[e11]", "b": "item 42"}
+DIFF gen/g00034/main.f stdout {"line": 2, "a": "item $[e2]", "b": "item 1"}
+DIFF gen/g00034/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:14:39: callable recursion depth exceeded: rec8", "b": "error: $ROOT/main.f:14:50: callable recursion depth exceeded: rec8"}
+DIFF gen/g00038/main.f stdout {"line": 7, "a": "item $[e13]", "b": "item 1"}
+DIFF gen/g00040/main.f stdout {"line": 3, "a": "item $[e3]", "b": "item 0.14285714285714285"}
+DIFF gen/g00041/main.f stdout {"line": 4, "a": "item $[e4]", "b": "item 1"}
+DIFF gen/g00042/main.f stdout {"line": 5, "a": "item $[e9]", "b": "item 1"}
+DIFF gen/g00044/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:34:40: callable recursion depth exceeded: rec15", "b": "error: $ROOT/main.f:34:51: callable recursion depth exceeded: rec15"}
+DIFF gen/g00045/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:5:39: callable recursion depth exceeded: rec2", "b": "error: $ROOT/main.f:5:50: callable recursion depth exceeded: rec2"}
+DIFF gen/g00046/main.f stdout {"line": 11, "a": "item $[e4]", "b": "item 1"}
+DIFF gen/g00047/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:2:39: callable recursion depth exceeded: rec2", "b": "error: $ROOT/main.f:2:50: callable recursion depth exceeded: rec2"}
+DIFF gen/g00051/main.f stdout {"line": 3, "a": "item $[e10]", "b": "item 1"}
+DIFF gen/g00055/main.f stdout {"line": 6, "a": "item $[e9]", "b": "item 1"}
+DIFF gen/g00056/main.f stdout {"line": 6, "a": "item $[e8]", "b": "item 1"}
+DIFF gen/g00058/main.f stdout {"line": 9, "a": "item $[e5]", "b": "item 142"}
+DIFF gen/g00060/main.f stdout {"line": 3, "a": "item $[e1]", "b": "item 1"}
+DIFF gen/g00061/main.f stdout {"line": 4, "a": "item $[e5]", "b": "item 100"}
+DIFF gen/g00064/main.f stdout {"line": 6, "a": "tab\tend", "b": "tabend"}
+DIFF gen/g00065/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:38:40: callable recursion depth exceeded: rec13", "b": "error: $ROOT/main.f:38:51: callable recursion depth exceeded: rec13"}
+DIFF gen/g00067/main.f stdout {"line": 3, "a": "item $[e4]", "b": "item 1"}
+DIFF gen/g00073/main.f stdout {"line": 21, "a": "item $[e10]", "b": "item 1"}
+rt-diff: 995 entries {"script": 983, "site": 12}, 274 differing; 0 entries traced (0 Host ops)

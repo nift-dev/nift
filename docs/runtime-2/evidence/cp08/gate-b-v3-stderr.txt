@@ -1,0 +1,17 @@
+DIFF semantics/division_by_zero.f stderr {"line": 1, "a": "error: $ROOT/division_by_zero.f:1:7: division by zero", "b": "error: $ROOT/division_by_zero.f:1:7: divide by zero"}
+DIFF gen/g00072/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:42:7: division by zero", "b": "error: $ROOT/main.f:42:7: divide by zero"}
+DIFF gen/g00110/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:20:7: division by zero", "b": "error: $ROOT/main.f:20:7: divide by zero"}
+DIFF gen/g00213/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:48:7: division by zero", "b": "error: $ROOT/main.f:48:7: divide by zero"}
+DIFF gen/g00377/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:17:7: division by zero", "b": "error: $ROOT/main.f:17:7: divide by zero"}
+DIFF gen/g00404/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:11:7: division by zero", "b": "error: $ROOT/main.f:11:7: divide by zero"}
+DIFF gen/g00434/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:17:7: division by zero", "b": "error: $ROOT/main.f:17:7: divide by zero"}
+DIFF gen/g00458/main.f stderr {"line": 1, "a": "error: $ROOT/main.f:40:7: division by zero", "b": "error: $ROOT/main.f:40:7: divide by zero"}
+DIFF smoke/v45_adversarial_runtime/005-thread-error/thread-error.f stderr {"line": 1, "a": "error: $ROOT/thread-error.f:1:13: thread: return: division by zero", "b": "error: $ROOT/thread-error.f:1:13: thread: return: divide by zero"}
+DIFF smoke/v45_adversarial_runtime/006-async-error/async-error.f stderr {"line": 1, "a": "error: $ROOT/async-error.f:1:21: future: return: division by zero", "b": "error: $ROOT/async-error.f:1:21: future: return: divide by zero"}
+DIFF smoke/v45_async/004-error/error.f stderr {"line": 1, "a": "error: $ROOT/error.f:1:21: future: return: division by zero", "b": "error: $ROOT/error.f:1:21: future: return: divide by zero"}
+DIFF smoke/v45_threads/003-error/error.f stderr {"line": 1, "a": "error: $ROOT/error.f:1:13: thread: return: division by zero", "b": "error: $ROOT/error.f:1:13: thread: return: divide by zero"}
+DIFF smoke/v46_b4_cp1_characterization/005-prepared-failure/prepared-failure.f stderr {"line": 1, "a": "error: $ROOT/prepared-failure.f:2:20: division by zero", "b": "error: $ROOT/prepared-failure.f:2:20: divide by zero"}
+DIFF smoke/v46_b4_cp1_characterization/006-legacy-failure/legacy-failure.f stderr {"line": 1, "a": "error: $ROOT/legacy-failure.f:2:38: division by zero", "b": "error: $ROOT/legacy-failure.f:2:38: divide by zero"}
+DIFF smoke/v46_b4_cp3_recoverable_errors/005-fatal-worker-import/fatal-worker-import.f stderr {"line": 1, "a": "error: $ROOT/fatal-worker-import.f:3:10: division by zero", "b": "error: $ROOT/fatal-worker-import.f:3:10: divide by zero"}
+rt-diff: 995 entries {"script": 983, "site": 12}, 15 differing; 340 entries traced (1938 Host ops)
+rt-diff: 995 entries {"script": 983, "site": 12}, 15 differing; 340 entries traced (1938 Host ops)
