@@ -1,0 +1,62 @@
+PASS missing x1: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 3, 'fallbacks': 3}
+PASS missing x8: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 24, 'fallbacks': 24}
+PASS missing x32: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 96, 'fallbacks': 96}
+PASS missing x128: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x256: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x1024: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS empty-write-return-to-clean
+PASS missing/self/duplicate/cycle/type validation before mutation
+PASS caught: file-mode (files)
+PASS missing-source
+PASS caught: empty-dir (files)
+PASS caught: nift-garble (files)
+PASS caught: home-write (home)
+PASS caught: tmp-write (tmp)
+PASS caught: home-tmp-swap (stdout|combined)
+PASS caught: stdout-only (stdout)
+PASS caught: stderr-only (stderr)
+PASS caught: exit-only (exit)
+PASS caught: stdin-only (stdout)
+PASS caught: eval-key-order (stdout)
+PASS caught: number-format (stdout)
+PASS caught: interleave (combined)
+PASS caught: trace-drop (trace)
+PASS caught: trace-reorder (trace)
+PASS caught: trace-async-reorder (trace)
+PASS caught: time-word (stdout)
+PASS hidden by design: identity
+PASS hidden by design: time-number
+PASS page-info normalisation hides timing keys and fingerprint values only
+PASS trace op exercised: stat
+PASS trace op exercised: list
+PASS trace op exercised: glob
+PASS trace op exercised: read
+PASS trace op exercised: open
+PASS trace op exercised: save
+PASS trace op exercised: touch
+PASS trace op exercised: remove
+PASS trace op exercised: mkdir
+PASS trace op exercised: copy-to
+PASS trace op exercised: move-to
+PASS trace op exercised: move-from
+PASS trace op exercised: read-source
+PASS trace op exercised: read-json
+PASS trace op exercised: getenv
+PASS trace op exercised: env-all
+PASS trace op exercised: spawn
+PASS trace neutrality over the corpus
+PASS closed trace descriptor never reaches page outputs (5 x 25 pages, 4 threads)
+PASS NIFT_TRACE_HOST=1 refused (stdout unchanged)
+PASS policy approves its exact substitution
+PASS policy rejects a different substitution
+PASS policy rejects a wrong occurrence count
+PASS pattern policies are refused
+PASS D-009 policies approve exactly the intended changes (13 channels)
+PASS without policies the same changes are regressions (13 channel diffs)
+PASS missing corpus directory fails
+PASS empty corpus directory fails
+PASS minimum entry count enforced
+PASS generator deterministic by seed
+PASS programs record seed and index
+PASS differences minimised to a reproducer (8 lines) with a replay script
+PASS rt-diff self-tests

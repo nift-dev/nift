@@ -1,6 +1,6 @@
 # CP08 — Semantics and differential harness
 
-Status: see `../progress.md` (implemented, under review).
+Status: see `../progress.md` (implemented; review findings and owner CP08 requirements addressed).
 
 ## Objective
 Before any new engine runs user code, make "same behaviour" measurable: a
@@ -65,4 +65,45 @@ Eight rows are marked "Owner decision needed" for the new engine's target.
   the intended alarm.
 - The generator covers the constructs listed in `gen.py`; template-directive
   generation is limited to the committed sites.
+- Linux only; macOS/Windows pending CI (D-004/D-007).
+
+## Review and hardening (same-model adversarial pass; not independent)
+
+The review attacked the harness with 15 mutation variants and targeted probes.
+Each finding and the owner's CP08 requirements (D-009, D-010, owner note
+2026-10-17 §2 and §4) were addressed as follows. Every resolution is exercised
+by `tests/runtime2/rt_diff_selftest.sh` (`make test-runtime2-rt-diff-selftest`,
+part of `make test-all`).
+
+| # | Finding / requirement | Resolution |
+| --- | --- | --- |
+| R1 | Thin template/site coverage: 12 sites, ~9 pages, one `build --all`, no incremental, status, info, rm, mv; mostly 1 build thread | `tests/runtime2/rt-diff-corpus/`: a 25-page, 4-thread site with partials, `@json`, `@pathto` and pagination; incremental step sequences (edit → status → build → status) in modified, hash and hybrid modes; `track`, `cp`, `mv`, `rm`, `info`; generated template sites (`gen.py`: 150 per 3,000 programs, 1–4 threads) |
+| R2 | Async/thread ops untested; sorting hid reordering within a task | ops are attributed to `<owner>/async#N` / `<owner>/thread#N` (creation order on the owning thread) and compared in order per task; three async/thread probes with traced ops; `trace-async-reorder` mutation caught. The gate run found a real race (two generated async tasks writing the same file) — fixed in the generator |
+| R3 | Tracing changed behaviour: closed fd reused by page outputs; variable visible to scripts and children; fd 1/2 mixed into output | descriptor validated at startup (`fstat`/`F_GETFL`), fds 0–2 refused unless `NIFT_TRACE_HOST_ALLOW_STDIO=1`, duplicated to a private close-on-exec fd, original closed, variables removed from the environment; `--trace-neutrality` compares every channel except the trace over the corpus; closed-fd 25-page/4-thread reproducer run 5× with identical outputs; `scripts/trace-env` probe |
+| R4 | Eval output normalised (sorted keys, re-serialised numbers); no eval corpus | eval output compared byte for byte; `eval/values.eval`; `eval-key-order` and `number-format` mutations caught |
+| R5 | File modes, empty directories, `.nift/`, HOME writes, HOME/TMPDIR aliasing, stream interleaving not compared | snapshot records modes, directories and symlinks; `.nift/` compared with two documented page-info normalisations; HOME and TMPDIR are distinct and snapshotted; a combined stdout+stderr run compares write order for scripts without async/threads; all corresponding mutations caught |
+| R6 | argv/env/stdin sidecars unused; sites could not take env | sidecars for scripts, `rt-diff.env`/`.steps` for sites and workspaces (also as non-invasive sibling files); corpus uses args, env, stdin |
+| R7 | Missing or empty corpus passed | exit 2 for missing/empty corpus, duplicate ids, exclusions without reasons; `--min-entries` (make target: 600) |
+| R8 | Much of the corpus failed early: extracted scripts lacked imports; generator bugs (empty-file write, accidental int64 overflow) | extraction replays every quoted heredoc of a test into a file tree (imports and data resolve): 146 of 262 run to completion (138 before; import failures 38 → 7); the remaining failures are mostly the tests' intentional negative cases. Generator bugs fixed: 88% of generated programs run to completion, the rest end in a deliberate final error or the recursion limit |
+| R9 | Generator narrower than documented | floats, booleans, `&&`/`||`/`!`, `break`/`continue`, string methods, modules (`import`/`export`), async functions, threads, template sites; coverage per 3,000 programs in evidence |
+| R10 | `semantics.md` source references off by 1–12 lines; recursion row ambiguous | every cited line re-verified; recursion row states 64 frames (`down(63)` ok, `down(64)` fails) |
+| P | Duplicate entry id `app/site` | labels extended by parent names on collision (`python/app`, `node/app`) |
+| O1 | Approved-difference policies (owner §2) | `--policy`: decision, exact entry, channel, exact old→new substitution with count, justification, test; approved differences reported separately; patterns refused; self-tests show a policy approves only its exact difference. `tools/rt-diff/policies/d009.json` + `<probe>.r2.*` intended goldens for the D-009 rows: an engine emitting them is fully approved, and without the policies the same output is 13 channel regressions |
+| O2 | Narrow, documented nondeterminism handling | `docs/runtime-2/rt-diff.md`: five rules, each with a self-test showing it hides nothing adjacent; pids, enumeration order and scheduling deliberately not normalised |
+| O3 | Host-op coverage | `scripts/trace-coverage` exercises every op; dropping each of the 17 op categories from the candidate's trace is caught |
+| O4 | Reproducibility | programs record seed and index; `--repro-dir` delta-minimises differing generated programs (hanging candidates rejected) and writes a replay script; reports record the command line |
+| O5 | Semantics categories | `semantics.md` v1.1: legacy behaviour / Runtime 2.0 / approved change / deferred per row; D-009#3 compatibility scan (no existing program outside the two pinning probes relies on a built-in winning) |
+
+## Residual risks after hardening
+- Trace scope is still parser-level Host operations; build-engine reads, PATH
+  lookups and FFI are not traced (listed in `../trace-format.md`). CP16 moves
+  all Host access behind one layer.
+- The combined (interleaving) channel is skipped for scripts that use async or
+  threads, whose stream order is legitimately nondeterministic.
+- `.nift/` is compared as contract (owner direction: page-info is observable),
+  with two documented normalisations; a future metadata format change will
+  show up as a difference and needs a policy or a recorded decision.
+- Policies match exact text; when the new engine's diagnostics positions are
+  settled, D-009 intended goldens may need deliberate regeneration (each such
+  change is a recorded decision, never a broad suppression).
 - Linux only; macOS/Windows pending CI (D-004/D-007).
