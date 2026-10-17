@@ -1,26 +1,48 @@
 #!/usr/bin/env python3
 """rt-diff: differential runner for two nift binaries (Runtime 2.0 CP08).
 
-Runs every corpus entry with binary A and binary B in fresh temporary copies
-and compares stdout, stderr, exit code, structured diagnostics (eval entries),
-output files and the ordered Host-operation trace (NIFT_TRACE_HOST).
+Runs every corpus entry with binary A and binary B in fresh temporary copies and
+compares, channel by channel: exit codes, stdout, stderr, combined stdout+stderr
+ordering (single-threaded scripts), output files (contents, modes, directories,
+symlinks), `.nift/` metadata (page-info normalised as documented), files created
+under HOME and TMPDIR, and the Host-operation trace (NIFT_TRACE_HOST), ordered
+within each context (page, script, or async/thread task).
 
 Entry kinds (discovered under each --corpus directory, sorted):
-  *.f          standalone script, run as `nift <name>.f` in a copy of its directory
-  *.eval       one expression per line, each run as `nift eval --json <expr>`
-  <dir>/.nift  template site project, run as `nift build --all` in a copy
-Sidecars next to a script: <name>.args (one argument per line), <name>.env
-(KEY=VALUE per line), <name>.stdin (bytes fed to stdin).
-Exclusions: an `rt-diff.ignore` file in a corpus directory lists entry paths
-(relative to that directory, fnmatch patterns) with a reason after '#';
---ignore FILE adds patterns matched against entry ids (`<corpus-name>/<path>`).
-Every exclusion must name its reason (clock reads, thread interleaving, ...).
+  *.f            standalone script, run as `nift <name>.f` in a copy of its directory
+  *.eval         one expression per line, each run as `nift eval --json <expr>`
+  <dir>/.nift    template site project; default step `nift build --all`
+  <dir>/rt-diff.workspace
+                 a workspace: the whole directory is copied (so a project can use
+                 `..`, neighbour directories, external output directories and
+                 relative symlinks); the file names the project subdirectory.
+Sidecars:
+  script  <name>.args (one argument per line), <name>.env (KEY=VALUE per line),
+          <name>.stdin (bytes fed to stdin)
+  site / workspace
+          rt-diff.steps inside the directory, or <dir>.rt-diff.steps beside it:
+          one step per line (see STEPS below); rt-diff.env / <dir>.rt-diff.env
+STEPS (site and workspace entries; `$WS` expands to the copy's absolute path):
+  nift ARGS...            run nift with ARGS (shell-like quoting) in the project
+  write PATH TEXT         write TEXT (\\n escapes) to PATH (relative to the project)
+  append PATH TEXT        append TEXT
+  remove PATH             delete a file
+  symlink TARGET PATH     create a symlink
+  sleep SECONDS           wait (mtime-based incremental modes need a tick)
 
-Normalisations (the only ones applied; see docs/runtime-2/trace-format.md):
-  1. the entry's working copy path (and its realpath) -> $ROOT
-  2. the run's HOME/TMPDIR temporary path -> $TMP; their parent -> $BASE
+Exclusions (`rt-diff.ignore` in a corpus, or --ignore FILE): entry patterns, each
+with a reason after '#'. Approved semantic differences: --policy FILE (JSON, see
+docs/runtime-2/rt-diff.md); a policy matches one entry and channel and an exact
+old -> new substitution, and only that difference is reported as approved.
+
+Normalisations (the only ones; each is tested in tests/runtime2/rt_diff_selftest.sh):
+  1. the entry's working copy path (and realpath) -> $ROOT
+  2. HOME -> $HOME, TMPDIR -> $TMPDIR, their common parent -> $BASE
   3. `time taken: <number> seconds` -> `time taken: $T seconds`
-Exit status: 0 when no entry differs, 1 when any differs, 2 on usage errors.
+  4. page-info files (.nift/**/*.info.json): the keys `racy-dependencies` and
+     `tick-hashes` are removed (they record timing, not behaviour), and the
+     values (not keys) of `listings` become "$FP" (they hash absolute paths)
+Exit status: 0 when no unapproved difference, 1 otherwise, 2 on usage errors.
 """
 import argparse
 import concurrent.futures as cf
@@ -29,32 +51,66 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+CONTENT = {}   # file fingerprint -> normalised bytes (small files), for reports
 TIME_RE = re.compile(rb"time taken: [0-9.eE+-]+ seconds")
-GOLDEN_SUFFIXES = (".stdout", ".stderr", ".exit")
-UNORDERED_CONTEXTS = ("async", "thread")
+GOLDEN_SUFFIXES = (".stdout", ".stderr", ".exit", ".args", ".env", ".stdin", ".expect")
+PAGE_INFO_TIMING_KEYS = ("racy-dependencies", "tick-hashes")
+NONDETERMINISTIC_INTERLEAVE = re.compile(r"\basync\b|\bthread\s*\(|\[async\]")
 
 
-def discover(corpus_dirs, global_ignore=()):
-    entries = []
-    for root in corpus_dirs:
+# --------------------------------------------------------------------- discovery
+def discover(corpus_specs, global_ignore=()):
+    entries, seen, errors = [], {}, []
+    labels = {}
+    for spec in corpus_specs:
+        label, root = (spec.split("=", 1) if "=" in spec and not os.path.exists(spec) else (None, spec))
         root = os.path.abspath(root)
-        ignore = load_ignore(root)
-        ignore += ["@" + p for p in global_ignore]
+        if not os.path.isdir(root):
+            errors.append("corpus directory does not exist: %s" % root)
+            continue
+        if not label:
+            # The directory name, extended by parent names while it collides
+            # with another corpus (bindings/python/app vs bindings/node/app ->
+            # python/app, node/app), so ids are stable across checkouts.
+            parts = root.split(os.sep)
+            depth = 1
+            label = parts[-1]
+            while label in labels and labels[label] != root and depth < len(parts):
+                depth += 1
+                label = "/".join(parts[-depth:])
+            if label in labels and labels[label] != root:
+                errors.append("corpus label collision: %s" % root)
+                continue
+        labels[label] = root
+        ignore = load_ignore(os.path.join(root, "rt-diff.ignore")) + ["@" + p for p in global_ignore]
+        before = len(entries)
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames.sort()
             rel_dir = os.path.relpath(dirpath, root)
-            if ".nift" in dirnames and os.path.isfile(os.path.join(dirpath, ".nift", "config.json")) and dirpath != root:
-                add(entries, root, ignore, "site", dirpath, rel_dir)
+            if "rt-diff.only" in filenames:
+                # A self-contained tree with exactly one entry script (used by
+                # extracted smoke scripts: modules and data files sit beside it).
+                with open(os.path.join(dirpath, "rt-diff.only")) as handle:
+                    only = handle.read().strip()
+                add(entries, label, ignore, "script", os.path.join(dirpath, only),
+                    os.path.normpath(os.path.join(rel_dir, only)), tree=dirpath)
                 dirnames[:] = []
                 continue
-            if dirpath == root and ".nift" in dirnames:
-                add(entries, root, ignore, "site", dirpath, ".")
+            if "rt-diff.workspace" in filenames:
+                add(entries, label, ignore, "workspace", dirpath, rel_dir)
+                dirnames[:] = []
+                continue
+            if ".nift" in dirnames and os.path.isfile(os.path.join(dirpath, ".nift", "config.json")):
+                add(entries, label, ignore, "site", dirpath, rel_dir)
                 dirnames[:] = []
                 continue
             dirnames[:] = [d for d in dirnames if not d.startswith(".")]
@@ -62,36 +118,48 @@ def discover(corpus_dirs, global_ignore=()):
                 path = os.path.join(dirpath, name)
                 rel = os.path.normpath(os.path.join(rel_dir, name))
                 if name.endswith(".f"):
-                    add(entries, root, ignore, "script", path, rel)
+                    add(entries, label, ignore, "script", path, rel)
                 elif name.endswith(".eval"):
-                    add(entries, root, ignore, "eval", path, rel)
-    return entries
+                    add(entries, label, ignore, "eval", path, rel)
+        if len(entries) == before:
+            errors.append("corpus directory has no entries: %s" % root)
+    for entry in entries:
+        if entry["id"] in seen:
+            errors.append("duplicate entry id %s (%s and %s)" % (entry["id"], seen[entry["id"]], entry["path"]))
+        seen[entry["id"]] = entry["path"]
+    return entries, errors
 
 
-def load_ignore(root, path=None):
+def load_ignore(path):
     patterns = []
-    path = path or os.path.join(root, "rt-diff.ignore")
-    if os.path.isfile(path):
+    if path and os.path.isfile(path):
         with open(path) as handle:
             for line in handle:
-                pattern = line.split("#", 1)[0].strip()
+                pattern, _, reason = line.partition("#")
+                pattern = pattern.strip()
                 if pattern:
+                    if not reason.strip():
+                        raise SystemExit("rt-diff: exclusion without a reason in %s: %s" % (path, pattern))
                     patterns.append(pattern)
     return patterns
 
 
-def add(entries, root, ignore, kind, path, rel):
+def add(entries, label, ignore, kind, path, rel, tree=None):
     rel = rel.replace(os.sep, "/")
-    entry_id = os.path.basename(root) + "/" + rel
+    entry_id = label + "/" + rel
     for pattern in ignore:
         if pattern.startswith("@"):
             if fnmatch.fnmatch(entry_id, pattern[1:]):
                 return
         elif fnmatch.fnmatch(rel, pattern):
             return
-    entries.append({"kind": kind, "path": path, "id": entry_id})
+    entry = {"kind": kind, "path": path, "id": entry_id}
+    if tree:
+        entry["tree"] = tree
+    entries.append(entry)
 
 
+# --------------------------------------------------------------------- running
 def normalise(data, roots):
     """roots: (path, token) pairs, longest path first."""
     for root, token in roots:
@@ -99,89 +167,172 @@ def normalise(data, roots):
     return TIME_RE.sub(b"time taken: $T seconds", data)
 
 
-def read_sidecar(path, suffix):
-    side = path[:-len(os.path.splitext(path)[1])] + suffix
-    if os.path.isfile(side):
-        with open(side, "rb") as handle:
+def sidecar(path, suffix, kind):
+    if kind == "script":
+        candidate = path[:-len(os.path.splitext(path)[1])] + suffix
+    else:
+        inside = os.path.join(path, "rt-diff" + suffix)
+        candidate = inside if os.path.isfile(inside) else path.rstrip(os.sep) + ".rt-diff" + suffix
+    if os.path.isfile(candidate):
+        with open(candidate, "rb") as handle:
             return handle.read()
     return None
 
 
-def run_one(binary, entry, timeout, trace):
+def parse_env(data):
+    env = {}
+    for line in (data or b"").decode().splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, value = line.split("=", 1)
+            env[key.strip()] = value
+    return env
+
+
+def plan(entry, base):
+    """Returns (work, project_dir, steps) where steps are tuples."""
+    kind, path = entry["kind"], entry["path"]
+    work = os.path.join(base, "w")
+    skip = lambda d, names: [n for n in names if n.endswith(GOLDEN_SUFFIXES) or n in ("rt-diff.steps", "rt-diff.only")]
+    if kind == "script":
+        tree = entry.get("tree") or os.path.dirname(path)
+        shutil.copytree(tree, work, symlinks=True, ignore=skip)
+        cwd = os.path.join(work, os.path.relpath(os.path.dirname(path), tree))
+        extra = sidecar(path, ".args", kind)
+        args = extra.decode().splitlines() if extra else []
+        return work, os.path.normpath(cwd), [("nift", [os.path.basename(path)] + args, sidecar(path, ".stdin", kind) or b"")]
+    if kind == "eval":
+        os.makedirs(work)
+        with open(path) as handle:
+            expressions = [line.rstrip("\n") for line in handle if line.strip() and not line.startswith("#")]
+        return work, work, [("nift", ["eval", "--json", expr], b"") for expr in expressions]
+    shutil.copytree(path, work, symlinks=True, ignore=skip)
+    project = work
+    if kind == "workspace":
+        with open(os.path.join(path, "rt-diff.workspace")) as handle:
+            sub = handle.read().strip()
+        project = os.path.join(work, sub)
+        os.remove(os.path.join(work, "rt-diff.workspace"))
+    steps_data = sidecar(path, ".steps", kind)
+    steps = []
+    if steps_data:
+        for line in steps_data.decode().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            verb, _, rest = line.partition(" ")
+            rest = rest.replace("$WS", work)
+            if verb == "nift":
+                steps.append(("nift", shlex.split(rest), b""))
+            elif verb in ("write", "append"):
+                target, _, text = rest.partition(" ")
+                steps.append((verb, target, text.encode().decode("unicode_escape").encode()))
+            elif verb in ("remove", "sleep"):
+                steps.append((verb, rest))
+            elif verb == "symlink":
+                target, _, link = rest.partition(" ")
+                steps.append(("symlink", target, link))
+            else:
+                raise SystemExit("rt-diff: unknown step %r in %s" % (verb, entry["path"]))
+    else:
+        steps.append(("nift", ["build", "--all"], b""))
+    return work, project, steps
+
+
+def run_one(binary, entry, timeout, trace, interleave):
     base = tempfile.mkdtemp(prefix="rtdiff-")
     try:
-        work = os.path.join(base, "w")
-        home = os.path.join(base, "home")
+        home, tmp = os.path.join(base, "home"), os.path.join(base, "tmp")
         os.makedirs(home)
-        kind, path = entry["kind"], entry["path"]
-        if kind == "site":
-            shutil.copytree(path, work, symlinks=True)
-            argv_list = [[binary, "build", "--all"]]
-            stdin = b""
-        elif kind == "script":
-            shutil.copytree(os.path.dirname(path), work, symlinks=True,
-                            ignore=lambda d, names: [n for n in names if n.endswith(GOLDEN_SUFFIXES)])
-            extra = read_sidecar(path, ".args")
-            args = extra.decode().splitlines() if extra else []
-            argv_list = [[binary, os.path.basename(path)] + args]
-            stdin = read_sidecar(path, ".stdin") or b""
-        else:
-            os.makedirs(work)
-            with open(path) as handle:
-                expressions = [line.rstrip("\n") for line in handle if line.strip() and not line.startswith("#")]
-            argv_list = [[binary, "eval", "--json", expr] for expr in expressions]
-            stdin = b""
+        os.makedirs(tmp)
+        work, project, steps = plan(entry, base)
         env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-            "HOME": home, "TMPDIR": home, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
+            "HOME": home, "TMPDIR": tmp, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
             "TERM": "dumb", "NO_COLOR": "1",
         }
-        env_extra = read_sidecar(path, ".env") if kind == "script" else None
-        if env_extra:
-            for line in env_extra.decode().splitlines():
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    env[key] = value
+        env.update(parse_env(sidecar(entry["path"], ".env", entry["kind"])))
         pairs = {}
-        for path_value, token in ((work, b"$ROOT"), (home, b"$TMP"), (base, b"$BASE")):
+        for path_value, token in ((work, b"$ROOT"), (home, b"$HOME"), (tmp, b"$TMPDIR"), (base, b"$BASE")):
             pairs[path_value] = token
             pairs[os.path.realpath(path_value)] = token
         roots = sorted(pairs.items(), key=lambda item: len(item[0]), reverse=True)
-        result = {"stdout": b"", "stderr": b"", "exit": [], "trace": []}
-        for index, argv in enumerate(argv_list):
+        result = {"stdout": b"", "stderr": b"", "combined": b"", "exit": [], "trace": []}
+        for index, step in enumerate(steps):
+            verb = step[0]
+            if verb != "nift":
+                apply_step(step, project)
+                continue
+            argv, stdin = [binary] + step[1], step[2]
             trace_path = os.path.join(base, "trace-%d.jsonl" % index)
             trace_fd = os.open(trace_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             run_env = dict(env)
             if trace:
                 run_env["NIFT_TRACE_HOST"] = str(trace_fd)
+            marker = ("-- step %d: %s\n" % (index, " ".join(step[1][:3]))).encode() if len(steps) > 1 else b""
             try:
-                proc = subprocess.run(argv, cwd=work, env=run_env, input=stdin, capture_output=True,
+                proc = subprocess.run(argv, cwd=project, env=run_env, input=stdin, capture_output=True,
                                       timeout=timeout, pass_fds=(trace_fd,) if trace else ())
-                code = proc.returncode
-                out, err = proc.stdout, proc.stderr
+                code, out, err = proc.returncode, proc.stdout, proc.stderr
             except subprocess.TimeoutExpired as expired:
-                code = "timeout"
-                out, err = expired.stdout or b"", expired.stderr or b""
+                code, out, err = "timeout", expired.stdout or b"", expired.stderr or b""
             finally:
                 os.close(trace_fd)
-            if kind == "eval":
-                out = canonical_json(out)
-            result["stdout"] += normalise(out, roots)
-            result["stderr"] += normalise(err, roots)
+            result["stdout"] += marker + normalise(out, roots)
+            result["stderr"] += marker + normalise(err, roots)
             result["exit"].append(code)
             with open(trace_path, "rb") as handle:
                 result["trace"].extend(parse_trace(normalise(handle.read(), roots)))
+            os.remove(trace_path)
+        if interleave and entry["kind"] == "script" and interleave_is_deterministic(entry["path"]):
+            # Second run with stdout and stderr on one pipe: records the order in
+            # which the two streams were written (single-threaded scripts only).
+            work2 = os.path.join(base, "w2")
+            tree = entry.get("tree") or os.path.dirname(entry["path"])
+            shutil.copytree(tree, work2, symlinks=True,
+                            ignore=lambda d, names: [n for n in names if n.endswith(GOLDEN_SUFFIXES) or n == "rt-diff.only"])
+            cwd2 = os.path.normpath(os.path.join(work2, os.path.relpath(os.path.dirname(entry["path"]), tree)))
+            step = steps[0]
+            try:
+                proc = subprocess.run([binary] + step[1], cwd=cwd2, env=env, input=step[2],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+                combined = proc.stdout
+            except subprocess.TimeoutExpired as expired:
+                combined = expired.stdout or b""
+            pairs2 = dict(pairs)
+            pairs2[work2] = b"$ROOT"
+            pairs2[os.path.realpath(work2)] = b"$ROOT"
+            roots2 = sorted(pairs2.items(), key=lambda item: len(item[0]), reverse=True)
+            result["combined"] = normalise(combined, roots2)
+            shutil.rmtree(work2, ignore_errors=True)
         result["files"] = snapshot(work, roots)
+        result["home"] = snapshot(home, roots)
+        result["tmp"] = snapshot(tmp, roots)
         return result
     finally:
         shutil.rmtree(base, ignore_errors=True)
 
 
-def canonical_json(data):
+def apply_step(step, project):
+    verb = step[0]
+    if verb in ("write", "append"):
+        target = os.path.join(project, step[1])
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        with open(target, "ab" if verb == "append" else "wb") as handle:
+            handle.write(step[2])
+    elif verb == "remove":
+        os.remove(os.path.join(project, step[1]))
+    elif verb == "symlink":
+        os.symlink(step[1], os.path.join(project, step[2]))
+    elif verb == "sleep":
+        time.sleep(float(step[1]))
+
+
+def interleave_is_deterministic(path):
     try:
-        return (json.dumps(json.loads(data), sort_keys=True, indent=1) + "\n").encode()
-    except ValueError:
-        return data
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            return not NONDETERMINISTIC_INTERLEAVE.search(handle.read())
+    except OSError:
+        return False
 
 
 def parse_trace(data):
@@ -196,39 +347,72 @@ def parse_trace(data):
 
 
 def trace_groups(events):
+    """Operations grouped by context; order is compared within every context.
+    Contexts are pages, `script`, or `<owner>/async#N` / `<owner>/thread#N`
+    tasks numbered in creation order, so ordering across tasks is not compared
+    but ordering inside each task is."""
     groups = {}
     for ctx, op, arg, res in events:
         groups.setdefault(ctx, []).append("%s %s -> %s" % (op, arg, res))
-    for ctx in groups:
-        if ctx.startswith(UNORDERED_CONTEXTS):
-            groups[ctx].sort()
     return groups
 
 
-def snapshot(work, roots):
-    files = {}
-    for dirpath, dirnames, filenames in os.walk(work):
-        rel_dir = os.path.relpath(dirpath, work)
-        # Nift-internal build metadata records timestamps and tick hashes; the
-        # observable products are the files outside .nift/.
-        dirnames[:] = sorted(d for d in dirnames if not (rel_dir == "." and d == ".nift"))
+def normalise_page_info(data):
+    try:
+        document = json.loads(data)
+    except ValueError:
+        return data
+    if isinstance(document, dict):
+        for key in PAGE_INFO_TIMING_KEYS:
+            document.pop(key, None)
+        # Glob listing fingerprints hash the matched absolute paths, so they
+        # depend on where the copy lives; keys (what was listed) stay compared,
+        # values become "$FP". A listing change remains visible through status
+        # output and rebuild behaviour.
+        listings = document.get("listings")
+        if isinstance(listings, dict):
+            document["listings"] = {key: "$FP" for key in listings}
+    return json.dumps(document, sort_keys=False, indent=1).encode()
+
+
+def snapshot(top, roots):
+    entries = {}
+    if not os.path.isdir(top):
+        return entries
+    for dirpath, dirnames, filenames in os.walk(top):
+        dirnames.sort()
+        rel_dir = os.path.relpath(dirpath, top).replace(os.sep, "/")
+        for name in list(dirnames):
+            full = os.path.join(dirpath, name)
+            rel = os.path.normpath(os.path.join(rel_dir, name)).replace(os.sep, "/")
+            if os.path.islink(full):
+                entries[rel] = "link:" + normalise(os.readlink(full).encode(), roots).decode("utf-8", "replace")
+                dirnames.remove(name)
+                continue
+            entries[rel + "/"] = "dir:%o" % stat.S_IMODE(os.lstat(full).st_mode)
         for name in sorted(filenames):
             full = os.path.join(dirpath, name)
             rel = os.path.normpath(os.path.join(rel_dir, name)).replace(os.sep, "/")
             if os.path.islink(full):
-                files[rel] = "link:" + os.readlink(full)
+                entries[rel] = "link:" + normalise(os.readlink(full).encode(), roots).decode("utf-8", "replace")
                 continue
+            mode = stat.S_IMODE(os.lstat(full).st_mode)
             try:
                 with open(full, "rb") as handle:
                     data = normalise(handle.read(), roots)
             except OSError as error:
-                files[rel] = "unreadable:%s" % error.errno
+                entries[rel] = "unreadable:%s" % error.errno
                 continue
-            files[rel] = hashlib.sha256(data).hexdigest() + ":" + str(len(data))
-    return files
+            if ("/" + rel).find("/.nift/") >= 0 and rel.endswith(".info.json"):
+                data = normalise_page_info(data)
+            entries[rel] = "%o:%s:%d" % (mode, hashlib.sha256(data).hexdigest(), len(data))
+            if len(data) <= 8192:
+                CONTENT[entries[rel]] = data
+    return entries
 
 
-def first_difference(a, b, context=2):
+# --------------------------------------------------------------------- comparing
+def first_difference(a, b):
     a_lines = a.splitlines() if isinstance(a, (bytes, str)) else a
     b_lines = b.splitlines() if isinstance(b, (bytes, str)) else b
     for index in range(max(len(a_lines), len(b_lines))):
@@ -242,36 +426,151 @@ def first_difference(a, b, context=2):
 
 def compare(a, b, use_trace):
     diffs = []
-    for key in ("exit", "stdout", "stderr"):
+    for key in ("exit", "stdout", "stderr", "combined"):
         if a[key] != b[key]:
             diffs.append({"channel": key, "first": first_difference(a[key], b[key]) if key != "exit" else {"a": a[key], "b": b[key]}})
-    if a["files"] != b["files"]:
-        names = sorted(set(a["files"]) | set(b["files"]))
-        changed = [n for n in names if a["files"].get(n) != b["files"].get(n)]
-        diffs.append({"channel": "files", "first": {"changed": changed[:10], "count": len(changed)}})
+    for key in ("files", "home", "tmp"):
+        if a[key] != b[key]:
+            names = sorted(set(a[key]) | set(b[key]))
+            changed = [n for n in names if a[key].get(n) != b[key].get(n)]
+            first = {"changed": changed[:10], "count": len(changed),
+                     "a": [a[key].get(n) for n in changed[:3]], "b": [b[key].get(n) for n in changed[:3]]}
+            fa, fb = a[key].get(changed[0]), b[key].get(changed[0])
+            if fa in CONTENT and fb in CONTENT:
+                first["content"] = first_difference(CONTENT[fa], CONTENT[fb])
+            diffs.append({"channel": key, "first": first})
     if use_trace:
         ga, gb = trace_groups(a["trace"]), trace_groups(b["trace"])
-        if ga != gb:
-            for ctx in sorted(set(ga) | set(gb)):
-                if ga.get(ctx) != gb.get(ctx):
-                    diffs.append({"channel": "trace", "context": ctx,
-                                  "first": first_difference(ga.get(ctx, []), gb.get(ctx, []))})
-                    break
+        for ctx in sorted(set(ga) | set(gb)):
+            if ga.get(ctx) != gb.get(ctx):
+                diffs.append({"channel": "trace", "context": ctx,
+                              "first": first_difference(ga.get(ctx, []), gb.get(ctx, []))})
     return diffs
 
 
+# --------------------------------------------------------------------- policies
+def load_policies(paths):
+    """Approved semantic differences. Each rule:
+      {"id": "...", "decision": "D-009#6", "entry": "<exact entry id>",
+       "channel": "stdout|stderr|combined|exit", "old": "<exact text in A>",
+       "new": "<exact text in B>", "count": N, "justification": "...",
+       "test": "<path of the test case>"}
+    The difference is approved only if replacing exactly `count` occurrences of
+    `old` by `new` in A's channel yields B's channel byte for byte (for `exit`,
+    old/new are the exit codes as strings)."""
+    rules = []
+    required = ("id", "decision", "entry", "channel", "old", "new", "count", "justification", "test")
+    for path in paths:
+        with open(path) as handle:
+            for rule in json.load(handle):
+                missing = [k for k in required if k not in rule]
+                if missing:
+                    raise SystemExit("rt-diff: policy %s lacks %s" % (rule.get("id", "?"), ", ".join(missing)))
+                if "*" in rule["entry"] or "?" in rule["entry"]:
+                    raise SystemExit("rt-diff: policy %s: entry must be exact, not a pattern" % rule["id"])
+                rules.append(rule)
+    return rules
+
+
+def apply_policies(entry_id, a, b, diffs, rules):
+    approved, remaining = [], []
+    for diff in diffs:
+        rule = next((r for r in rules if r["entry"] == entry_id and r["channel"] == diff["channel"]
+                     and policy_matches(r, a, b)), None)
+        if rule:
+            approved.append({"channel": diff["channel"], "policy": rule["id"], "decision": rule["decision"]})
+        else:
+            remaining.append(diff)
+    return approved, remaining
+
+
+def policy_matches(rule, a, b):
+    channel = rule["channel"]
+    if channel == "exit":
+        expected = [str(x) for x in a["exit"]]
+        actual = [str(x) for x in b["exit"]]
+        hits = sum(1 for x in expected if x == rule["old"])
+        replaced = [rule["new"] if x == rule["old"] else x for x in expected]
+        return hits == rule["count"] and replaced == actual
+    if channel not in ("stdout", "stderr", "combined"):
+        return False
+    old, new = rule["old"].encode(), rule["new"].encode()
+    if a[channel].count(old) != rule["count"]:
+        return False
+    return a[channel].replace(old, new) == b[channel]
+
+
+# --------------------------------------------------------------------- minimising
+def minimise(entry, a_bin, b_bin, options, rules, out_dir):
+    """Line-based delta minimisation of a generated script while the
+    difference persists; writes the minimal program and a replay command."""
+    with open(entry["path"]) as handle:
+        lines = handle.read().splitlines()
+    scratch = tempfile.mkdtemp(prefix="rtdiff-min-")
+
+    def still_differs(candidate):
+        script = os.path.join(scratch, "main.f")
+        with open(script, "w") as handle:
+            handle.write("\n".join(candidate) + "\n")
+        probe = {"kind": "script", "path": script, "id": entry["id"]}
+        timeout = min(options.timeout, 10.0)
+        a = run_one(a_bin, probe, timeout, not options.no_trace, not options.no_interleave)
+        if "timeout" in a["exit"]:
+            return False          # a candidate that hangs is not a reproducer
+        b = run_one(b_bin, probe, timeout, not options.no_trace, not options.no_interleave)
+        if "timeout" in b["exit"]:
+            return False
+        return bool(apply_policies(entry["id"], a, b, compare(a, b, not options.no_trace), rules)[1])
+
+    try:
+        chunk = max(1, len(lines) // 2)
+        budget = 120
+        while chunk >= 1 and budget > 0:
+            index, changed = 0, False
+            while index < len(lines) and budget > 0:
+                candidate = lines[:index] + lines[index + chunk:]
+                budget -= 1
+                if candidate and still_differs(candidate):
+                    lines, changed = candidate, True
+                else:
+                    index += chunk
+            if not changed:
+                chunk //= 2
+        os.makedirs(out_dir, exist_ok=True)
+        name = entry["id"].replace("/", "_")
+        target = os.path.join(out_dir, name + ".min.f")
+        with open(target, "w") as handle:
+            handle.write("\n".join(lines) + "\n")
+        replay = "%s %s %s" % (shlex.quote(a_bin), shlex.quote(b_bin), shlex.quote(target))
+        with open(os.path.join(out_dir, name + ".replay.sh"), "w") as handle:
+            handle.write("#!/bin/sh\n# %s; minimised from %s\n" % (entry.get("origin", ""), entry["path"]))
+            handle.write("cd \"$(dirname \"$0\")\"\nfor b in %s %s; do echo \"== $b\"; \"$b\" %s; echo \"exit $?\"; done\n"
+                         % (shlex.quote(a_bin), shlex.quote(b_bin), shlex.quote(os.path.basename(target))))
+        return target, replay
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+# --------------------------------------------------------------------- main
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--a", required=True, help="reference nift binary")
     parser.add_argument("--b", required=True, help="candidate nift binary")
-    parser.add_argument("--corpus", action="append", default=[], help="corpus directory (repeatable)")
+    parser.add_argument("--corpus", action="append", default=[], help="corpus directory ([LABEL=]DIR, repeatable)")
     parser.add_argument("--gen", type=int, default=0, help="also run N generated programs (tools/rt-diff/gen.py)")
     parser.add_argument("--seed", type=int, default=1, help="generator seed")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
     parser.add_argument("--timeout", type=float, default=30.0, help="seconds per entry and binary")
     parser.add_argument("--no-trace", action="store_true", help="do not compare Host-op traces")
+    parser.add_argument("--trace-neutrality", action="store_true",
+                        help="run A with tracing and B without; compare every channel except the trace")
+    parser.add_argument("--no-interleave", action="store_true", help="skip the combined stdout+stderr run")
     parser.add_argument("--report", help="write a JSON report here")
     parser.add_argument("--ignore", action="append", default=[], help="file of entry-id patterns to skip")
+    parser.add_argument("--policy", action="append", default=[], help="approved-difference policy file (JSON)")
+    parser.add_argument("--min-entries", type=int, default=1, help="fail if fewer entries are discovered")
+    parser.add_argument("--repro-dir", help="write minimised reproducers of differing generated programs here")
+    parser.add_argument("--repro-limit", type=int, default=3, help="minimise at most this many programs")
     parser.add_argument("--extract-smoke", metavar="TESTS_DIR", help="also run scripts extracted from smoke-test heredocs")
     parser.add_argument("--quiet", action="store_true")
     options = parser.parse_args()
@@ -296,22 +595,34 @@ def main():
         return 2
     global_ignore = []
     for path in options.ignore:
-        global_ignore += load_ignore(None, path)
+        global_ignore += load_ignore(path)
+    rules = load_policies(options.policy)
     try:
-        entries = discover(corpus, global_ignore)
+        entries, errors = discover(corpus, global_ignore)
+        if len(entries) < options.min_entries:
+            errors.append("only %d entries discovered (minimum %d)" % (len(entries), options.min_entries))
+        if errors:
+            for error in errors:
+                print("rt-diff: %s" % error, file=sys.stderr)
+            return 2
         a_bin, b_bin = os.path.abspath(options.a), os.path.abspath(options.b)
-        use_trace = not options.no_trace
+        use_trace = not options.no_trace and not options.trace_neutrality
+        interleave = not options.no_interleave
 
         def job(entry):
-            a = run_one(a_bin, entry, options.timeout, use_trace)
-            b = run_one(b_bin, entry, options.timeout, use_trace)
-            return entry, compare(a, b, use_trace), len(a["trace"])
+            a = run_one(a_bin, entry, options.timeout, use_trace or options.trace_neutrality, interleave)
+            b = run_one(b_bin, entry, options.timeout, use_trace, interleave)
+            diffs = compare(a, b, use_trace)
+            approved, remaining = apply_policies(entry["id"], a, b, diffs, rules)
+            return entry, approved, remaining, len(a["trace"])
 
         results = []
         with cf.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
-            for entry, diffs, events in pool.map(job, entries):
-                results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs, "trace_events": events})
+            for entry, approved, diffs, events in pool.map(job, entries):
+                results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs,
+                                "approved": approved, "trace_events": events, "path": entry["path"]})
         differing = [r for r in results if r["diffs"]]
+        approved = [r for r in results if r["approved"]]
         counts = {}
         for r in results:
             counts[r["kind"]] = counts.get(r["kind"], 0) + 1
@@ -320,14 +631,25 @@ def main():
                 for d in r["diffs"]:
                     ctx = (" [%s]" % d["context"]) if "context" in d else ""
                     print("DIFF %s %s%s %s" % (r["id"], d["channel"], ctx, json.dumps(d["first"], ensure_ascii=False)))
+            for r in approved:
+                for d in r["approved"]:
+                    print("APPROVED %s %s %s (%s)" % (r["id"], d["channel"], d["policy"], d["decision"]))
+        if options.repro_dir:
+            generated_diffs = [r for r in differing if "/gen/" in r["path"] and r["path"].endswith(".f")]
+            for r in generated_diffs[:options.repro_limit]:
+                entry = {"kind": "script", "path": r["path"], "id": r["id"], "origin": origin_of(r["path"])}
+                target, replay = minimise(entry, a_bin, b_bin, options, rules, options.repro_dir)
+                r["reproducer"] = {"file": target, "replay": replay}
+                print("REPRO %s -> %s" % (r["id"], target))
         traced = sum(1 for r in results if r["trace_events"])
         events = sum(r["trace_events"] for r in results)
         summary = {"entries": len(results), "by_kind": counts, "differing": len(differing),
-                   "entries_with_trace": traced, "trace_events": events,
+                   "approved": len(approved), "entries_with_trace": traced, "trace_events": events,
                    "channels": sorted({d["channel"] for r in differing for d in r["diffs"]}),
-                   "trace": use_trace, "seed": options.seed, "generated": options.gen}
-        print("rt-diff: %d entries %s, %d differing; %d entries traced (%d Host ops)"
-              % (len(results), json.dumps(counts, sort_keys=True), len(differing), traced, events))
+                   "trace": use_trace, "seed": options.seed, "generated": options.gen,
+                   "command": " ".join(shlex.quote(a) for a in sys.argv)}
+        print("rt-diff: %d entries %s, %d differing, %d approved; %d entries traced (%d Host ops)"
+              % (len(results), json.dumps(counts, sort_keys=True), len(differing), len(approved), traced, events))
         if options.report:
             with open(options.report, "w") as handle:
                 json.dump({"summary": summary, "results": results}, handle, indent=1, sort_keys=True)
@@ -335,6 +657,15 @@ def main():
     finally:
         if generated:
             shutil.rmtree(generated, ignore_errors=True)
+
+
+def origin_of(path):
+    try:
+        with open(path) as handle:
+            first = handle.readline().strip()
+        return first.lstrip("/ ").strip() if first.startswith("//") else ""
+    except OSError:
+        return ""
 
 
 if __name__ == "__main__":

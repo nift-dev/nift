@@ -719,7 +719,7 @@ test-bindings: test-binding-warnings test-go-binding test-csharp-binding test-no
 # The build-boundary gate is NON-DESTRUCTIVE (it runs in a temporary clean
 # source tree, never in the caller's checkout), so it is safe under parallel
 # Make; prerequisite order carries no sequencing meaning.
-test-all: test test-embed test-bindings test-build-boundary test-host-seam test-conformance
+test-all: test test-embed test-bindings test-build-boundary test-host-seam test-conformance test-runtime2-rt-diff-selftest
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
@@ -1113,12 +1113,20 @@ test-runtime2-clock-lifecycle: $(TARGET)
 # Runtime 2.0 CP08: differential harness self-check (A = B = this binary) over
 # the committed corpora, scripts extracted from the smoke tests, and a seeded
 # generated sample. Any difference here means nondeterminism or a harness bug.
-RT_DIFF_CORPUS = --corpus tests/runtime2/vm-corpus --corpus tests/runtime2/semantics \
+RT_DIFF_CORPUS = --corpus tests/runtime2/rt-diff-corpus --corpus tests/runtime2/vm-corpus --corpus tests/runtime2/semantics \
 	--corpus docs/evidence/cp410-competitiveness/probes --corpus tests/conformance/cases \
 	--corpus bindings/python/app --corpus bindings/node/app --corpus bindings/csharp/apps
+# Same binary on both sides: every channel must agree (determinism of the
+# corpus, D-010 gate). RT_DIFF_GEN/RT_DIFF_SEED widen the generated share.
 test-runtime2-rt-diff: $(TARGET)
 	python3 tools/rt-diff/rt-diff --a "$(CURDIR)/$(TARGET)" --b "$(CURDIR)/$(TARGET)" $(RT_DIFF_CORPUS) \
-		--extract-smoke tests --ignore tools/rt-diff/ignore.txt --gen $${RT_DIFF_GEN:-200} --seed $${RT_DIFF_SEED:-1}
+		--extract-smoke tests --ignore tools/rt-diff/ignore.txt --gen $${RT_DIFF_GEN:-200} --seed $${RT_DIFF_SEED:-1} \
+		--min-entries 600
+
+# The harness catches seeded differences on every channel, hides only what its
+# normalisations document, and its policies approve only exact differences.
+test-runtime2-rt-diff-selftest: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/rt_diff_selftest.sh
 
 # Runtime 2.0 CP01 (review defect D1): modified-mode timestamp races.
 test-runtime2-modified-race: $(TARGET)

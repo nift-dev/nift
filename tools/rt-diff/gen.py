@@ -9,7 +9,13 @@ loop path's prepared evaluator), try/catch/throw, and Host operations (file
 writes/reads, exists, ls, getenv). Most programs are valid; a small share ends
 in a deliberate runtime error so diagnostics are compared too.
 
-Usage: gen.py --count N --seed S --out DIR   (writes DIR/gNNNNN.f)
+Also: floats, booleans and && || !, break/continue, string methods, modules
+(import/export), async functions and threads, and generated template sites
+(partials, @if, @for, @json, @pathto, <pre>, comments, @script; 1-4 build
+threads). Every program's first line records its seed and index.
+
+Usage: gen.py --count N --seed S --out DIR [--sites M]
+       (writes DIR/gNNNNN/main.f and DIR/siteNNNN/)
 Programs never read clocks, randomness, the process id or the network.
 """
 import argparse
@@ -29,6 +35,7 @@ class Gen:
         self.structs = []    # (name, fields)
         self.counter = 0
         self.depth = 0
+        self.files = {}      # extra files (modules) written beside main.f
 
     def name(self, prefix):
         self.counter += 1
@@ -51,8 +58,6 @@ class Gen:
             choices.append("call")
         kind = r.choice(choices)
         if kind == "lit":
-            if r.random() < 0.02:
-                return "9223372036854775806"
             return str(r.choice([0, 1, 2, 3, 5, 7, 10, 42, 100, -4]))
         if kind == "var":
             return r.choice(self.ints)
@@ -69,7 +74,11 @@ class Gen:
 
     def str_expr(self):
         r = self.r
-        kind = r.choice(["lit", "interp", "concat"] + (["var"] if self.strs else []))
+        kind = r.choice(["lit", "interp", "concat", "method"] + (["var"] if self.strs else []))
+        if kind == "method":
+            base = self.str_expr_simple()
+            return r.choice(["%s.to_upper()", '%s.replace("p", "P")', "%s.substr(0, 1)",
+                             '%s.split("-").stringify()']) % base
         if kind == "lit":
             return '"%s"' % r.choice(["a", "hello", "x,y,z", "", "Nift", "$", "tab\\tend"])
         if kind == "interp":
@@ -86,7 +95,21 @@ class Gen:
 
     def cond(self):
         a, b = self.int_expr(1), self.int_expr(1)
-        return "%s %s %s" % (a, self.r.choice(["<", ">", "==", "!=", "<=", ">="]), b)
+        simple = "%s %s %s" % (a, self.r.choice(["<", ">", "==", "!=", "<=", ">="]), b)
+        roll = self.r.random()
+        if roll < 0.15:
+            return "(%s) && (%s)" % (simple, self.cond_simple())
+        if roll < 0.3:
+            return "(%s) || !(%s)" % (simple, self.cond_simple())
+        return simple
+
+    def cond_simple(self):
+        return "%s %s %s" % (self.int_expr(1), self.r.choice(["<", "==", ">="]), self.int_expr(1))
+
+    def float_expr(self):
+        r = self.r
+        return "(%s %s %s)" % (r.choice(["0.5", "1.25", "2.0", "0.1", "3.75"]), r.choice(["+", "*", "-", "/"]),
+                               r.choice(["0.2", "2", "4.5", "1.0"]))
 
     # statements ------------------------------------------------------------
     def stmt(self):
@@ -98,8 +121,11 @@ class Gen:
             options += ["push", "alias", "index", "sort"]
         if self.depth < 2:
             options += ["while", "for", "try"]
+        if self.depth < 2:
+            options += ["float", "bool", "strmethods", "loopctl"]
         if self.depth == 0:
-            options += ["fn", "fn", "closure", "struct", "map", "fs", "env", "recursion", "copycall", "dynscope"]
+            options += ["fn", "fn", "closure", "struct", "map", "fs", "env", "recursion", "copycall", "dynscope",
+                        "module", "async", "thread"]
         getattr(self, "s_" + r.choice(options))()
 
     def s_decl_int(self):
@@ -248,12 +274,90 @@ class Gen:
         self.emit('print(%s["s"])' % m)
         self.emit("print(%s.stringify())" % m)
 
+    def s_float(self):
+        n = self.name("fl")
+        self.emit("%s := %s" % (n, self.float_expr()))
+        self.emit("print(%s)" % n)
+
+    def s_bool(self):
+        n = self.name("b")
+        self.emit("%s := %s" % (n, self.r.choice(["true", "false", "(%s)" % self.cond()])))
+        self.emit("print(%s && !%s)" % (n, self.r.choice(["false", "true", n])))
+        self.emit("print(%s || false)" % n)
+
+    def s_strmethods(self):
+        n = self.name("t")
+        self.emit('%s := "%s"' % (n, self.r.choice(["alpha-beta", "Nift", "x-y-z", "pq"])))
+        self.emit("print(%s.length())" % n)
+        self.emit("print(%s.to_upper())" % n)
+        self.emit('print(%s.contains("a"))' % n)
+        self.emit('print(%s.starts_with("N"))' % n)
+        self.emit('print(%s.split("-").stringify())' % n)
+
+    def s_loopctl(self):
+        v = self.name("lc")
+        stop = self.r.randint(1, 4)
+        skip = self.r.randint(0, 3)
+        self.emit("%s := 0" % v)
+        self.emit("while(true) {")
+        self.depth += 1
+        self.emit("%s += 1" % v)
+        self.emit("if(%s > %d) { break }" % (v, stop))
+        self.emit("if(%s == %d) { continue }" % (v, skip))
+        self.emit("print(%s)" % v)
+        self.depth -= 1
+        self.emit("}")
+        e = self.name("fe")
+        self.emit("for(%s : [1, 2, 3, 4]) {" % e)
+        self.depth += 1
+        self.emit("if(%s == %d) { continue }" % (e, self.r.randint(1, 4)))
+        self.emit("if(%s == %d) { break }" % (e, self.r.randint(2, 5)))
+        self.emit("print(%s)" % e)
+        self.depth -= 1
+        self.emit("}")
+
+    def s_module(self):
+        m = self.name("mod")
+        fname = self.name("mf")
+        self.files["%s.f" % m] = "fn(%s(x)) { return x * %d + 1 }\nexport(%s)\n" % (fname, self.r.randint(2, 5), fname)
+        self.emit('import("%s.f")' % m)
+        self.emit("print(%s(%s))" % (fname, self.int_expr(1)))
+
+    def s_async(self):
+        f = self.name("af")
+        self.emit("@fn[async](%s(n)) {" % f)
+        self.depth += 1
+        path = "async%d.txt" % self.counter
+        self.emit('h := file("%s" + n); h.open("w"); h.write("v" + n); h.save(); h.close()' % path)
+        self.emit('ok := exists("%s" + n)' % path)
+        self.emit('rm("%s" + n)' % path)
+        self.emit("return n * 2")
+        self.depth -= 1
+        self.emit("}")
+        a, b = self.name("fu"), self.name("fu")
+        # Distinct arguments: the two tasks run concurrently and must not
+        # race on the same file (a same-binary run would then differ).
+        first = self.r.randint(1, 9)
+        second = self.r.choice([k for k in range(1, 10) if k != first])
+        self.emit("%s := %s(%d)" % (a, f, first))
+        self.emit("%s := %s(%d)" % (b, f, second))
+        self.emit("print(await %s)" % a)
+        self.emit("print(await %s)" % b)
+
+    def s_thread(self):
+        f = self.name("tw")
+        self.emit("fn(%s(n)) { return is_dir(\".\") }" % f)
+        t = self.name("th")
+        self.emit("%s := thread(%s, %d)" % (t, f, self.r.randint(0, 9)))
+        self.emit("print(%s.join())" % t)
+
     def s_fs(self):
         f = "f%d.txt" % self.counter
         h = self.name("h")
         self.emit('%s := file("%s")' % (h, f))
         self.emit('%s.open("w")' % h)
-        self.emit("%s.write(%s)" % (h, self.str_expr()))
+        # A non-empty write: saving an empty buffer creates no file (review #8).
+        self.emit('%s.write("data-" + %s)' % (h, self.str_expr()))
         self.emit("%s.save()" % h)
         self.emit("%s.close()" % h)
         self.emit('print(exists("%s"))' % f)
@@ -301,11 +405,57 @@ class Gen:
         for _ in range(self.r.randint(4, 14)):
             self.stmt()
         if self.r.random() < 0.08:
+            # Deliberate final runtime error, so diagnostics are compared too.
             self.emit(self.r.choice(["print(undefined_name_%d)" % self.counter,
                                      "x%d := [1][5]" % self.counter,
                                      "print(1 / 0)",
+                                     "print(9223372036854775807 + 1)",
                                      'throw error("final")']))
         return "\n".join(self.lines) + "\n"
+
+
+def site(rng, index, seed):
+    """A generated template site: partials, conditionals, loops, JSON data,
+    interpolation, pagination-free multi-page output with 1-4 build threads.
+    (Directives inside HTML comments are executed by Nift, so comments here
+    hold plain text only.)"""
+    pages = rng.randint(1, 5)
+    files = {}
+    files[".nift/config.json"] = ('{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/",'
+                                  '"output-ext":".html","default-template":"templates/template.html",'
+                                  '"build-threads":%d,"incremental-mode":"modified"}}\n' % rng.randint(1, 4))
+    names = ["/"] + ["pg%d" % i for i in range(1, pages)]
+    files[".nift/tracked.json"] = '{"tracked":[%s]}\n' % ",".join(
+        '{"name":"%s","title":"T%d","template":"templates/template.html"}' % (n, i) for i, n in enumerate(names))
+    files["templates/template.html"] = rng.choice([
+        "<html><body>\n@content\n</body></html>\n",
+        "<html><head>@input(\"templates/head.html\")</head><body>\n  @content\n</body></html>\n"])
+    files["templates/head.html"] = "<title>$[title]</title>\n"
+    files["data/d.json"] = '{"items":[%s],"flag":%s}\n' % (
+        ",".join('{"n":%d}' % rng.randint(0, 9) for _ in range(rng.randint(0, 4))), rng.choice(["true", "false"]))
+    for i, n in enumerate(names):
+        body = []
+        for _ in range(rng.randint(2, 6)):
+            k = rng.random()
+            if k < 0.2:
+                j = "d%d" % len(body)
+                body.append('@json(%s, "data/d.json")\n@for(x : %s.items){<li>$[x.n]</li>}' % (j, j))
+            elif k < 0.35:
+                body.append('@if(%d > %d){<b>yes</b>}else{<i>no</i>}' % (rng.randint(0, 5), rng.randint(0, 5)))
+            elif k < 0.5:
+                body.append('<a href="@pathto(%s)">l</a>' % rng.choice(names))
+            elif k < 0.6:
+                body.append('@script { v := %d; return v * 2 }' % rng.randint(1, 9))
+            elif k < 0.7:
+                body.append('<pre>\n  keep  {braces}\n</pre>')
+            elif k < 0.8:
+                body.append('<!-- comment with {braces} -->')
+            elif k < 0.9:
+                body.append('@script { return exists("data/d.json") }')
+            else:
+                body.append("plain text %d" % rng.randint(0, 99))
+        files["content/%s.html" % ("index" if n == "/" else n)] = "\n".join(body) + "\n"
+    return files
 
 
 def main():
@@ -313,14 +463,32 @@ def main():
     parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--sites", type=int, default=-1, help="generated template sites (default count/20)")
     options = parser.parse_args()
     os.makedirs(options.out, exist_ok=True)
     for index in range(options.count):
         rng = random.Random("%d:%d" % (options.seed, index))
         directory = os.path.join(options.out, "g%05d" % index)
         os.makedirs(directory, exist_ok=True)
+        gen = Gen(rng)
+        program = gen.program()
+        # Every program records how to regenerate it exactly.
         with open(os.path.join(directory, "main.f"), "w") as handle:
-            handle.write(Gen(rng).program())
+            handle.write("// rt-diff gen.py --seed %d index %d\n" % (options.seed, index) + program)
+        with open(os.path.join(directory, "rt-diff.only"), "w") as handle:
+            handle.write("main.f\n")
+        for name, content in gen.files.items():
+            with open(os.path.join(directory, name), "w") as handle:
+                handle.write(content)
+    sites = options.count // 20 if options.sites < 0 else options.sites
+    for index in range(sites):
+        rng = random.Random("site:%d:%d" % (options.seed, index))
+        directory = os.path.join(options.out, "site%04d" % index)
+        for name, content in site(rng, index, options.seed).items():
+            full = os.path.join(directory, name)
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w") as handle:
+                handle.write(content)
 
 
 if __name__ == "__main__":

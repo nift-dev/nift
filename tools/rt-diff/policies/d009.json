@@ -1,0 +1,145 @@
+[
+ {
+  "id": "loop_type_mismatch-stderr",
+  "decision": "D-009#1",
+  "entry": "semantics/loop_type_mismatch.f",
+  "channel": "stderr",
+  "old": "error: $ROOT/loop_type_mismatch.f:3:16: cannot change binding type: x\n",
+  "new": "error: $ROOT/loop_type_mismatch.f:3:16: cannot assign string to int binding 'x'\n",
+  "count": 1,
+  "justification": "Type-error wording is the top-level wording everywhere.",
+  "test": "tests/runtime2/semantics/loop_type_mismatch.f (legacy golden loop_type_mismatch.stderr, intended loop_type_mismatch.r2.stderr)"
+ },
+ {
+  "id": "loop_type_mismatch-combined",
+  "decision": "D-009#1",
+  "entry": "semantics/loop_type_mismatch.f",
+  "channel": "combined",
+  "old": "error: $ROOT/loop_type_mismatch.f:3:16: cannot change binding type: x\n",
+  "new": "error: $ROOT/loop_type_mismatch.f:3:16: cannot assign string to int binding 'x'\n",
+  "count": 1,
+  "justification": "Type-error wording is the top-level wording everywhere.",
+  "test": "tests/runtime2/semantics/loop_type_mismatch.f (legacy golden loop_type_mismatch.stdout, intended loop_type_mismatch.r2.stdout)"
+ },
+ {
+  "id": "loop_const-stdout",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "channel": "stdout",
+  "old": "2\n",
+  "new": "",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stdout, intended loop_const.r2.stdout)"
+ },
+ {
+  "id": "loop_const-stderr",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "channel": "stderr",
+  "old": "error: $ROOT/loop_const.f:4:1: cannot assign to const binding: k\n",
+  "new": "error: $ROOT/loop_const.f:3:30: cannot assign to const binding: c\n",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stderr, intended loop_const.r2.stderr)"
+ },
+ {
+  "id": "loop_const-combined",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "channel": "combined",
+  "old": "2\nerror: $ROOT/loop_const.f:4:1: cannot assign to const binding: k\n",
+  "new": "error: $ROOT/loop_const.f:3:30: cannot assign to const binding: c\n",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stdout, intended loop_const.r2.stdout)"
+ },
+ {
+  "id": "natives_vs_user-stdout",
+  "decision": "D-009#3",
+  "entry": "semantics/natives_vs_user.f",
+  "channel": "stdout",
+  "old": "user:e\n3\n",
+  "new": "user:e\n0\n",
+  "count": 1,
+  "justification": "User-defined functions take precedence over built-ins (user min wins).",
+  "test": "tests/runtime2/semantics/natives_vs_user.f (legacy golden natives_vs_user.stdout, intended natives_vs_user.r2.stdout)"
+ },
+ {
+  "id": "natives_vs_user-combined",
+  "decision": "D-009#3",
+  "entry": "semantics/natives_vs_user.f",
+  "channel": "combined",
+  "old": "user:e\n3\n",
+  "new": "user:e\n0\n",
+  "count": 1,
+  "justification": "User-defined functions take precedence over built-ins (user min wins).",
+  "test": "tests/runtime2/semantics/natives_vs_user.f (legacy golden natives_vs_user.stdout, intended natives_vs_user.r2.stdout)"
+ },
+ {
+  "id": "loop_native_shadow-stdout",
+  "decision": "D-009#3,#4",
+  "entry": "semantics/loop_native_shadow.f",
+  "channel": "stdout",
+  "old": "3\nint\n0\nuser\n",
+  "new": "0\nuser\n0\nuser\n",
+  "count": 1,
+  "justification": "User definitions win over built-ins, consistently at top level and in loops.",
+  "test": "tests/runtime2/semantics/loop_native_shadow.f (legacy golden loop_native_shadow.stdout, intended loop_native_shadow.r2.stdout)"
+ },
+ {
+  "id": "loop_native_shadow-combined",
+  "decision": "D-009#3,#4",
+  "entry": "semantics/loop_native_shadow.f",
+  "channel": "combined",
+  "old": "3\nint\n0\nuser\n",
+  "new": "0\nuser\n0\nuser\n",
+  "count": 1,
+  "justification": "User definitions win over built-ins, consistently at top level and in loops.",
+  "test": "tests/runtime2/semantics/loop_native_shadow.f (legacy golden loop_native_shadow.stdout, intended loop_native_shadow.r2.stdout)"
+ },
+ {
+  "id": "toplevel_callee_error_location-stderr",
+  "decision": "D-009#5",
+  "entry": "semantics/toplevel_callee_error_location.f",
+  "channel": "stderr",
+  "old": "error: $ROOT/toplevel_callee_error_location.f:3:3: return: unknown value or malformed expression: undefined_name\n",
+  "new": "error: $ROOT/toplevel_callee_error_location.f:3:14: unknown value or malformed expression: undefined_name\n",
+  "count": 1,
+  "justification": "Errors in called functions are reported at the failing expression in the function.",
+  "test": "tests/runtime2/semantics/toplevel_callee_error_location.f (legacy golden toplevel_callee_error_location.stderr, intended toplevel_callee_error_location.r2.stderr)"
+ },
+ {
+  "id": "toplevel_callee_error_location-combined",
+  "decision": "D-009#5",
+  "entry": "semantics/toplevel_callee_error_location.f",
+  "channel": "combined",
+  "old": "error: $ROOT/toplevel_callee_error_location.f:3:3: return: unknown value or malformed expression: undefined_name\n",
+  "new": "error: $ROOT/toplevel_callee_error_location.f:3:14: unknown value or malformed expression: undefined_name\n",
+  "count": 1,
+  "justification": "Errors in called functions are reported at the failing expression in the function.",
+  "test": "tests/runtime2/semantics/toplevel_callee_error_location.f (legacy golden toplevel_callee_error_location.stdout, intended toplevel_callee_error_location.r2.stdout)"
+ },
+ {
+  "id": "loop_interpolation-stdout",
+  "decision": "D-009#6",
+  "entry": "semantics/loop_interpolation.f",
+  "channel": "stdout",
+  "old": "top=3\nloop=$[x]\nfor=$[e]\n",
+  "new": "top=3\nloop=3\nfor=1\n",
+  "count": 1,
+  "justification": "String interpolation works inside loop bodies.",
+  "test": "tests/runtime2/semantics/loop_interpolation.f (legacy golden loop_interpolation.stdout, intended loop_interpolation.r2.stdout)"
+ },
+ {
+  "id": "loop_interpolation-combined",
+  "decision": "D-009#6",
+  "entry": "semantics/loop_interpolation.f",
+  "channel": "combined",
+  "old": "top=3\nloop=$[x]\nfor=$[e]\n",
+  "new": "top=3\nloop=3\nfor=1\n",
+  "count": 1,
+  "justification": "String interpolation works inside loop bodies.",
+  "test": "tests/runtime2/semantics/loop_interpolation.f (legacy golden loop_interpolation.stdout, intended loop_interpolation.r2.stdout)"
+ }
+]
