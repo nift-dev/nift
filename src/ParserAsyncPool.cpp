@@ -25,8 +25,6 @@ NiftAsyncPool::NiftAsyncPool() {
     workers_.reserve(count);
     for (unsigned i = 0; i < count; ++i) workers_.emplace_back([this] {
         nift_async_pool_worker = true;
-        // CP08 trace: work on pool threads is unordered relative to the page.
-        if (nift::trace::enabled()) nift::trace::detail::context() = "async";
         for (;;) {
             std::function<void()> task;
             {
@@ -53,6 +51,14 @@ NiftAsyncPool::~NiftAsyncPool() {
 }
 
 void NiftAsyncPool::submit(std::function<void()> task) {
+    // CP08 trace: label the task in the submitting thread (creation order),
+    // and run it under that label on whichever worker picks it up.
+    if (nift::trace::enabled()) {
+        task = [label = nift::trace::child_label("async"), inner = std::move(task)]() mutable {
+            const nift::trace::ContextGuard guard(label);
+            inner();
+        };
+    }
     {
         std::lock_guard<std::mutex> lock(mutex_);
         queue_.push_back(std::move(task));

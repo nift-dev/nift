@@ -8,18 +8,33 @@ NIFT_TRACE_HOST=3 nift build --all 3>trace.jsonl
 {"ctx":"/","op":"read-source","arg":"/abs/site/templates/template.html","res":"ok"}
 ```
 
-The variable is read once per process (`src/HostTrace.h`). When it is unset,
-empty or not a decimal number, tracing is off and each trace point costs one
-load of a cached integer. Tracing writes nothing anywhere else and never changes
-other output. Lines are written whole under a mutex, so concurrent threads never
-interleave within a line. If the descriptor cannot be written, the line is
-dropped silently.
+The variable is read once per process, first thing in `main()`
+(`nift::trace::initialize()`, `src/HostTrace.h`; embedders get the same check
+lazily on the first trace point). Descriptor rules (CP08 review #3):
+
+- the descriptor must be open and writable at that moment (`fstat` +
+  `F_GETFL`), so a descriptor the caller closed is never confused with a file
+  Nift opens later;
+- 0, 1 and 2 are refused unless `NIFT_TRACE_HOST_ALLOW_STDIO=1`;
+- it is duplicated to a private close-on-exec descriptor (≥ 100) and the
+  original is closed: child processes never inherit it;
+- `NIFT_TRACE_HOST` and `NIFT_TRACE_HOST_ALLOW_STDIO` are removed from the
+  environment: scripts (`getenv`, `env()`) and children see the same
+  environment with and without tracing.
+
+When the variable is unset, empty, not a decimal number or fails a check,
+tracing is off and each trace point costs one load of a cached integer.
+Tracing writes nothing anywhere else and never changes other output
+(`tests/runtime2/rt_diff_selftest.sh` runs the corpus with tracing on vs off
+and compares every channel except the trace). Lines are written whole under a
+mutex, so concurrent threads never interleave within a line. If the descriptor
+cannot be written, the line is dropped silently.
 
 ## Fields
 
 | Field | Meaning |
 | --- | --- |
-| `ctx` | Where the operation ran: the tracked page's name during a build (`/`, `about`, …), `script` for a standalone script or the main thread of a REPL/eval, `async` for the async worker pool, `thread` for `thread(...)` workers. Order is meaningful within `script` and page contexts; `async` and `thread` operations are unordered relative to each other and to the page. |
+| `ctx` | Where the operation ran: the tracked page's name during a build (`/`, `about`, …), `script` for a standalone script or the main thread of a REPL/eval, and for work started from those, `<owner>/async#N` (an async call) or `<owner>/thread#N` (a `thread(...)` worker), numbered in creation order within the owner (nested: `script/async#1/async#2`). Creation happens in program order on the owning thread, so labels are stable across runs and engines. Order is meaningful within every context; contexts are unordered relative to each other. |
 | `op` | Operation (table below). |
 | `arg` | Absolute, lexically normalised path (generic separators), environment variable name, or for `spawn` the program and arguments joined by single spaces. |
 | `res` | Result class (table below). Never file contents or environment values. |
@@ -51,12 +66,5 @@ both engines must meet.
 
 ## Normalisations applied by rt-diff
 
-rt-diff replaces exactly these before comparing stdout, stderr, output files
-and traces:
-
-1. the entry's working copy path (and its `realpath`) → `$ROOT`;
-2. the run's HOME/TMPDIR directory → `$TMP`, and their common parent → `$BASE`;
-3. `time taken: <number> seconds` → `time taken: $T seconds`.
-
-Eval entries' JSON output is parsed and re-serialised with sorted keys. Nothing
-else is normalised.
+See `docs/runtime-2/rt-diff.md` (the complete list, each with the self-test
+that shows it hides nothing else).
