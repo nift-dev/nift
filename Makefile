@@ -190,6 +190,50 @@ $(RUNTIME_VALUE_TEST): tests/runtime_value.cpp src/RuntimeValue.cpp src/RuntimeV
 test-runtime-value: $(RUNTIME_VALUE_TEST)
 	"$(RUNTIME_VALUE_TEST)"
 
+# Runtime 2.0 CP09 value model (src/rt): unit, randomised differential/property
+# tests against the legacy RuntimeValue, lint, sanitizer build and benchmarks.
+RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp)
+RT_VALUE_HEADERS := $(wildcard src/rt/*.h) tests/rt/rt_test.h tests/rt/legacy_oracle.h
+RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
+RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
+RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
+RT_VALUE_BENCH := $(TEST_DIR)/rt/value-bench$(EXEEXT)
+RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
+
+$(RT_VALUE_UNIT): tests/rt/value_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+$(RT_VALUE_PROPERTY): tests/rt/value_property.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_property.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+$(RT_VALUE_BENCH): tests/rt/value_bench.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/value_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+.PHONY: test-rt-value test-rt-lint test-rt-value-sanitize bench-rt-value
+# RT_VALUE_SEED / RT_VALUE_SCALE vary the randomised suite (default seed is fixed).
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_PROPERTY)
+	"$(RT_VALUE_UNIT)"
+	"$(RT_VALUE_PROPERTY)" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
+
+test-rt-lint:
+	python3 tools/rt-lint.py --self-test
+	python3 tools/rt-lint.py src/rt
+
+# ASan+UBSan build of the rt tests (GCC/Clang on Linux or macOS).
+test-rt-value-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_property.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-property"
+	"$(TEST_DIR)/rt-san/value-unit"
+	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
+
+# Callgrind instruction counts, rt::Value vs legacy RuntimeValue (needs valgrind).
+bench-rt-value: $(RT_VALUE_BENCH)
+	tools/rt-bench.sh "$(RT_VALUE_BENCH)"
+
 $(CP17_BYTES_TEST): tests/cp17_bytes.cpp src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp17_bytes.cpp src/RuntimeValue.cpp -o "$@"
@@ -723,7 +767,7 @@ test-all: test test-embed test-bindings test-build-boundary test-host-seam test-
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-runtime2-certification-guard test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes test-runtime2-rt-diff \
+test: test-runtime2-certification-guard test-rt-value test-rt-lint test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes test-runtime2-rt-diff \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
