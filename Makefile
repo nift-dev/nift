@@ -1873,6 +1873,42 @@ test-source-translation: $(TEST_DIR)/source-translation-unit$(EXEEXT)
 
 test: test-source-translation
 
+# Runtime 2.0 CP10: script lexer/parser (src/rt). Not linked into nift yet;
+# compiled only into these test binaries.
+RT_PARSER_SOURCES := src/rt/lexer.cpp src/rt/ast.cpp src/rt/parser.cpp src/rt/expr_parser.cpp
+RT_PARSER_HEADERS := src/rt/lexer.h src/rt/ast.h src/rt/parser.h src/rt/parser_internal.h tests/rt/rt_parser_tool.h
+
+$(TEST_DIR)/rt-parse-dump$(EXEEXT): tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) -Isrc -Itests/rt $(CXXFLAGS) tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) -o $@
+
+$(TEST_DIR)/rt-parser-unit$(EXEEXT): tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) -Isrc -Itests/rt $(CXXFLAGS) tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) -o $@
+
+$(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
+
+.PHONY: test-rt-parser
+test-rt-parser: $(TEST_DIR)/rt-parser-unit$(EXEEXT) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TEST_DIR)/rt-legacy-oracle$(EXEEXT) $(TARGET)
+	$(TEST_DIR)/rt-parser-unit$(EXEEXT)
+	python3 tests/runtime2/rt_parser_corpus.py --build $(TEST_DIR) --nift ./$(TARGET)
+
+test: test-rt-parser
+
+# ASan/UBSan run of the rt parser over the script corpora plus fuzzing (CP10
+# evidence; slower, not part of `make test`).
+.PHONY: test-rt-parser-asan
+test-rt-parser-asan:
+	mkdir -p $(TEST_DIR)/rt-asan
+	$(CXX) -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+		tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) -o $(TEST_DIR)/rt-asan/rt-parser-unit
+	$(CXX) -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+		tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) -o $(TEST_DIR)/rt-asan/rt-parse-dump
+	$(TEST_DIR)/rt-asan/rt-parser-unit
+	python3 tests/runtime2/rt_parser_corpus.py --sanitized $(TEST_DIR)/rt-asan/rt-parse-dump
+
 $(TEST_DIR)/ast-source-unit$(EXEEXT): tests/ast_source_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ast_source_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
