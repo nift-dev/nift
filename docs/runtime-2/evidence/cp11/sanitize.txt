@@ -1,9 +1,29 @@
+# make test-rt-vm-sanitize at 84d9332 (ASan+UBSan, -fno-sanitize-recover=all, detect_leaks=1, halt_on_error=1), 18 min 45 s including the sanitized build
 env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 ".build/rt-san/vm-unit"
-rt vm unit: 40139 checks, 0 failures
+rt vm unit: 40206 checks, 0 failures
 env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
-	python3 tests/runtime2/vm_parity.py --nift "/home/claude/review/nift-cp11/.build/nift-sanitize" --gen ${RT_VM_GEN:-150} --seed ${RT_VM_SEED:-2} --timeout 120
-vm corpus: 56 scripts, 0 failures; outcomes {'fallback:declare-const': 1, 'fallback:expression-statement': 1, 'fallback:expression:Lambda': 1, 'fallback:fn-after-statement': 1, 'fallback:fn-flags': 1, 'fallback:fn-name-reserved': 1, 'fallback:free-name': 1, 'fallback:index-assign-order': 1, 'fallback:interpolation': 1, 'fallback:method:split': 1, 'fallback:number-literal': 1, 'fallback:parse-error': 1, 'fallback:postfix-spelling': 1, 'fallback:prefix-not-precedence': 1, 'fallback:shebang-statement': 1, 'fallback:statement:For': 1, 'fallback:statement:StructDecl': 1, 'fallback:statement:Try': 1, 'fallback:string-literal': 1, 'fallback:trailing-comma': 1, 'fallback:unresolved-name': 1, 'replayed:bail:aliasing': 3, 'replayed:bail:number-range': 3, 'replayed:bail:runtime-error': 14, 'replayed:bail:static-error': 4, 'replayed:bail:unverified': 1, 'vm': 10}
-generated: 150 programs; outcomes {'vm': 102, 'replayed:bail:runtime-error': 29, 'replayed:bail:number-range': 12, 'replayed:bail:unverified': 2, 'fallback:opaque': 2, 'no-stats': 1, 'replayed:bail:static-error': 1, 'replayed:bail:aliasing': 1}
-mutants: 150 programs; outcomes {'vm': 53, 'fallback:opaque': 30, 'replayed:bail:runtime-error': 12, 'replayed:bail:number-range': 9, 'fallback:parse-error': 6, 'fallback:shebang-statement': 6, 'fallback:statement:For': 5, 'fallback:unresolved-name': 5, 'fallback:declare-const': 4, 'fallback:postfix-spelling': 3, 'fallback:assign-free-name': 2, 'fallback:trailing-comma': 2, 'fallback:expression:Await': 2, 'fallback:expression:Lambda': 2, 'replayed:bail:static-error': 2, 'replayed:bail:unverified': 1, 'fallback:object-key': 1, 'no-stats': 1, 'fallback:fn-after-statement': 1, 'fallback:free-name': 1, 'fallback:expression-statement': 1, 'replayed:bail:aliasing': 1}
-generated programs completed on the VM: 102 of 150
+	python3 tests/runtime2/vm_parity.py --nift "/home/claude/review/nift-cp11i/.build/nift-sanitize" --gen ${RT_VM_GEN:-150} --seed ${RT_VM_SEED:-2} --timeout 120
+vm corpus: 64 scripts, 0 failures; outcomes {'fallback:alias-argument': 1, 'fallback:binding-name-reserved': 1, 'fallback:declare-const': 1, 'fallback:expression-statement': 1, 'fallback:expression:Lambda': 1, 'fallback:fn-after-statement': 1, 'fallback:fn-flags': 1, 'fallback:fn-name-reserved': 2, 'fallback:free-name': 1, 'fallback:index-assign-order': 1, 'fallback:interpolation': 1, 'fallback:ju
+generated: 150 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 97, 'vm': 37, 'replayed:bail:runtime-error': 13, 'replayed:bail:unverified': 2, 'replayed:bail:number-range': 1}
+mutants: 150 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 93, 'vm': 19, 'fallback:opaque:legacy-runtime-error': 15, 'fallback:parse-error': 6, 'replayed:bail:runtime-error': 4, 'fallback:declare-const': 2, 'fallback:unresolved-name': 2, 'replayed:bail:static-error': 2, 'fallback:shebang-statement': 2, 'replayed:bail:number-range': 1, 'replayed:bail:unverified': 1, 'fallback:object
+generated programs completed on the VM: 37 of 150
 PASS vm parity
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+	python3 tests/runtime2/vm_adversarial.py --nift "/home/claude/review/nift-cp11i/.build/nift-sanitize" --seed ${RT_VM_SEED:-2} \
+	--count ${RT_VM_ADV:-60} --per-family 250 --timeout 120
+typed: 250 programs; ran on the VM 39, replayed 85, fallback 126; same 123, approved D-001#4 1, endless 0, DIFF 0
+context: 240 programs; ran on the VM 68, replayed 100, fallback 72; same 168, approved D-001#4 0, endless 0, DIFF 0
+numeric: 250 programs; ran on the VM 155, replayed 4, fallback 91; same 159, approved D-001#4 0, endless 0, DIFF 0
+receiver: 250 programs; ran on the VM 81, replayed 169, fallback 0; same 250, approved D-001#4 0, endless 0, DIFF 0
+names: 250 programs; ran on the VM 173, replayed 0, fallback 77; same 173, approved D-001#4 0, endless 0, DIFF 0
+alias: 243 programs; ran on the VM 104, replayed 99, fallback 40; same 203, approved D-001#4 0, endless 0, DIFF 0
+control: 60 programs; ran on the VM 19, replayed 0, fallback 41; same 19, approved D-001#4 0, endless 0, DIFF 0
+recursion: 40 programs; ran on the VM 32, replayed 8, fallback 0; same 18, approved D-001#4 22, endless 0, DIFF 0
+output: 19 programs; ran on the VM 6, replayed 13, fallback 0; same 17, approved D-001#4 2, endless 0, DIFF 0
+malformed: 60 programs; ran on the VM 9, replayed 10, fallback 41; same 19, approved D-001#4 0, endless 0, DIFF 0
+typing: 250 programs; ran on the VM 65, replayed 185, fallback 0; same 250, approved D-001#4 0, endless 0, DIFF 0
+PASS vm adversarial: 1912 programs, 0 non-approved differences, 25 approved (D-001#4), 0 endless, 488 static fallbacks
+
+real	18m45.095s
+user	17m15.744s
+sys	6m53.180s

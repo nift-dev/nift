@@ -126,6 +126,19 @@ anything else is a regression. `tools/rt-diff/policies/d009.json` holds the
 D-009 rules; their intended outputs are the `<probe>.r2.*` goldens beside the
 legacy goldens (`NIFT_VM_CORPUS_EXPECT=r2 tests/runtime2/vm_corpus.sh`).
 
+Class policies (CP11 review R3) approve one narrowly defined difference on any
+entry, for generated programs that exact rules cannot name:
+`{"id": ..., "decision": "D-001#4", "class": "recursion-budget",
+"justification": ..., "test": ...}`. The only class, `recursion-budget`,
+approves the stdout/stderr/exit/combined channels when A fails with exactly
+the "callable recursion depth exceeded" diagnostic (exit 1), B exits 0 with
+no diagnostic, and A's stdout is a prefix of B's (combined channels
+consistent); file, trace and timeout differences are never approved by it.
+Exact rules are tried first; an unused class policy is not a failure.
+`tests/runtime2/vm_parity.py` additionally requires the VM statistics of each
+such approval to show a completed run beyond legacy's 64 frames
+(`tools/rt-diff/policies/cp11-vm.json`).
+
 ## Reproducibility
 
 Generated programs start with `// rt-diff gen.py --seed S index I`; the same

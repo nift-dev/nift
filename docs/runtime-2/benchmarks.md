@@ -56,32 +56,40 @@ The fib CPython figure here (353, fib(10)→fib(12)) is lower than the 509 quote
 in the design report (fib(14)→fib(16)); both are correct for their inputs. Gates
 compare like with like using this runner only.
 
-## CP11 — VM proof of concept (`runtime-2-cp11` at `25089e8`)
+## CP11 — VM proof of concept (`runtime-2-cp11i` at `84d9332`, after review round 1)
 
 Runner: `benchmarks/runtime2/vm_compare.py` (`make bench-rt-vm`): the same
 workloads and goldens on v4.12, the current legacy path, the VM with
 `NIFT_VM=require` (no legacy fallback possible) and CPython 3.13.16. Raw:
 `evidence/cp11/vm_compare.jsonl`; record: `checkpoints/cp11-vm-poc.md`.
+Re-measured on an otherwise idle host after the review fixes; "VM before"
+is the pre-review measurement at `25089e8` (loaded host).
 
-| Operation (marginal instr) | v4.12 | legacy | VM | CPython fn-local |
-| --- | ---: | ---: | ---: | ---: |
-| Loop iteration | 3,066 | 3,129 | 105 | 386 |
-| Add-assign | 4,957 | 5,002 | 177 | 625 |
-| **Flat call** | 14,994 | 13,414 | **464** | 959 |
-| Array index | 5,356 | 5,401 | 374 | 711 |
-| Array push | 4,568 | 4,613 | 277 | 506 |
-| Object member | 5,240 | 5,285 | 340 | 827 |
-| String append | 9,385 | 9,450 | 3,152 | 1,790 |
-| If + modulo | 6,006 | 6,050 | 235 | 804 |
-| fib call, top level / in loop | 184,321 / 14,766 | 158,665 / 14,760 | 459 / 459 | 492 / 442 |
+| Operation (marginal instr) | v4.12 | legacy | VM before | **VM** | CPython fn-local |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Loop iteration | 3,066 | 3,129 | 105 | 104 | 388 |
+| Add-assign | 4,957 | 5,002 | 177 | 184 | 653 |
+| **Flat call** | 14,994 | 13,414 | 464 | **467** | 980 |
+| Array index | 5,356 | 5,401 | 374 | 380 | 722 |
+| Array push | 4,568 | 4,613 | 277 | 286 | 535 |
+| Object member | 5,240 | 5,285 | 340 | 347 | 846 |
+| String append | 9,385 | 9,450 | 3,152 | 3,182 | 1,770 |
+| If + modulo | 6,006 | 6,050 | 235 | 233 | 820 |
+| fib call, top level / in loop | 184,321 / 14,766 | 158,662 / 14,760 | 459 / 459 | 465 / 465 | 629 / 512 |
 
-| Whole process (median of 5, loaded host) | v4.12 | legacy | VM | CPython |
+| Whole process (median of 5, idle host) | v4.12 | legacy | VM | CPython |
 | --- | ---: | ---: | ---: | ---: |
-| fib(22) | 1.714 s | 1.310 s | 0.0125 s | 0.032 s |
-| fib(25) | 6.170 s | 5.242 s | 0.037 s | 0.053 s |
-| 1M-iteration loop | 0.529 s | 0.551 s | 0.028 s | 0.070 s |
-| 200k calls | 0.377 s | 0.333 s | 0.012 s | 0.029 s |
-| Startup | 3.4 ms | 3.5 ms | 3.1 ms | 15.9 ms |
+| fib(22) | 1.372 s | 1.195 s | 0.0072 s | 0.018 s |
+| fib(25) | 5.834 s | 5.253 s | 0.016 s | 0.025 s |
+| 1M-iteration loop | 0.507 s | 0.527 s | 0.032 s | 0.067 s |
+| 200k calls | 0.345 s | 0.337 s | 0.012 s | 0.032 s |
+| Startup | 5.0 ms | 4.6 ms | 4.8 ms | 16.7 ms |
+
+Compilation (callgrind, inside `rt::compile_unit`): 72.5k instructions for
+`x := 1; print(x)` (72.1k before the review), 20.8M for a generated
+500-function, 66 KB program (17.4M before).
 
 CP11 gate (flat call ≥ 5× fewer than v4.12 and ≤ 2× CPython): **met**,
-32.3× fewer and 0.48× CPython.
+32.1× fewer and 0.48× CPython (before the review: 32.3×, 0.48×). The review
+fixes add no bytecode to these loops; the +3 on the flat call and +6–9 on
+some operations are code-generation effects in `Vm::run` (see the record).
