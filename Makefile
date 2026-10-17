@@ -723,7 +723,7 @@ test-all: test test-embed test-bindings test-build-boundary test-host-seam test-
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-runtime2-certification-guard test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-runtime2-certification-guard test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes test-runtime2-rt-diff \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1110,6 +1110,15 @@ test-runtime2-vm-corpus: $(TARGET)
 
 test-runtime2-clock-lifecycle: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/clock_lifecycle.sh
+# Runtime 2.0 CP08: differential harness self-check (A = B = this binary) over
+# the committed corpora, scripts extracted from the smoke tests, and a seeded
+# generated sample. Any difference here means nondeterminism or a harness bug.
+RT_DIFF_CORPUS = --corpus tests/runtime2/vm-corpus --corpus tests/runtime2/semantics \
+	--corpus docs/evidence/cp410-competitiveness/probes --corpus tests/conformance/cases \
+	--corpus bindings/python/app --corpus bindings/node/app --corpus bindings/csharp/apps
+test-runtime2-rt-diff: $(TARGET)
+	python3 tools/rt-diff/rt-diff --a "$(CURDIR)/$(TARGET)" --b "$(CURDIR)/$(TARGET)" $(RT_DIFF_CORPUS) \
+		--extract-smoke tests --ignore tools/rt-diff/ignore.txt --gen $${RT_DIFF_GEN:-200} --seed $${RT_DIFF_SEED:-1}
 
 # Runtime 2.0 CP01 (review defect D1): modified-mode timestamp races.
 test-runtime2-modified-race: $(TARGET)

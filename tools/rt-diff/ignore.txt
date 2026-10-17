@@ -1,0 +1,5 @@
+# Entries excluded from rt-diff because their output is nondeterministic by
+# design (the same binary twice gives different bytes). Patterns match entry ids
+# `<corpus-name>/<path>`. Every line names its reason.
+smoke/v48_map_set_scaling_guard/*   # prints epoch() differences (clock)
+smoke/v46_output_smoke/001-workers/* # thread/async stdout interleaving
