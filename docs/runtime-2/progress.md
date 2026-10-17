@@ -12,7 +12,7 @@ _Last updated: 2026-10-17_
 | CP03 | complete (Linux); macOS/Windows pending CI | `runtime-2` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
 | CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
 | CP05 | next after CP06 review | — | Reassessed: independent of CP04 (it trims the canonical call path: flag snapshot, no per-call body copies), so it proceeds; gate requires no behaviour change |
-| CP06 | implemented, under review | `runtime-2-dev` | Template scanner dispatch: −57.8% full-build instructions, byte-identical (`checkpoints/cp06-scanner-dispatch.md`) |
+| CP06 | complete (Linux); macOS/Windows pending CI | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
@@ -41,7 +41,7 @@ to the owner's git repository without approval).
 
 ## Next action
 
-1. Review CP06; then CP08 (semantics + differential harness, prioritised by
+1. CP08 (semantics + differential harness, prioritised by
    the owner), CP05 and CP07.
 2. CI (D-007): push `runtime-2` to `origin` once credentials are available
    (see below) and run the cross-platform workflows.
@@ -61,6 +61,14 @@ Notes on history:
 ## Open escalations
 
 None. D-006 decided by the owner (defer CP04).
+
+## Regression suite
+
+`nift-dev/nift-regression-suite` is a certification gate for every checkpoint
+(`./run-contract.sh <nift>`). On this host v4.12.0 fails 4 modules
+(unreadable_source: runs as root; v44_executable_script: needs `nift` on PATH;
+pagination, v45_target: timing flakes) and `incremental_new_features` is flaky
+(2/20 on v4.12.0). The suite's `runtime-2` branch encodes D-002 (D-008).
 
 ## CI status (D-007)
 

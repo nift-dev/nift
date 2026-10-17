@@ -28,3 +28,14 @@ test-unreadable-source, test-v43-language,
 test-v48-prepared-collection-guard, test-v48-prepared-object-literal-guard —
 exactly the environmental set recorded since CP00 (root user, no
 /usr/bin/time, no pty). All `test-runtime2-*` targets passed.
+
+## After rebase onto 8e5a792 and review fixes
+
+- `make -k -j4 test`: environmental set plus `test-v48-identifier-guard`
+  (wall-time ratio 4.46 > 4 under parallel load; passes 3/3 alone with ratios
+  2.8–3.2, same as runtime-2) and `test-runtime2-vm-corpus` (golden files held
+  absolute paths of the runtime-2 checkout; fixed in this commit by
+  normalising the corpus root, golden files regenerated, 44/44 pass on
+  v4.12.0, runtime-2 and CP06; the CP04 experiment still fails 5).
+- `scanner_parity.sh` with the 300-page site: 73 sites, 165 scripts, PASS.
+

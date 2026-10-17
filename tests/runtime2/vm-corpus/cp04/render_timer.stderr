@@ -1,1 +1,1 @@
-error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/render_timer.f:2:1: timer values cannot be rendered as text in $[f()]
+error: <CORPUS>/cp04/render_timer.f:2:1: timer values cannot be rendered as text in $[f()]

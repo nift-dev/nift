@@ -1,1 +1,1 @@
-error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/callee_struct.f:3:7: run: expected executable and optional arguments
+error: <CORPUS>/cp04/callee_struct.f:3:7: run: expected executable and optional arguments

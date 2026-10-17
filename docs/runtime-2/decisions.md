@@ -60,3 +60,10 @@ checkout's origin, which contains base `ce8cd36`). No force-push, no change to
 credentials, generated artifacts or CP04 experimental code). Run the Linux,
 macOS and Windows workflows on it and fix failures before calling a checkpoint
 fully certified; keep baseline results to separate pre-existing failures.
+
+## D-008 — Branch promotion (owner, 2026-10-17)
+`nift` and `nift-regression-suite` each carry Runtime 2.0 work on a
+`runtime-2` branch. Neither `main` changes until the owner promotes both
+together, so `main` of each stays consistent with v4.12.0 (the suite's
+`runtime-2` encodes D-002 and fails against v4.12.0 by design).
+

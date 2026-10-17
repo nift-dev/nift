@@ -1,1 +1,1 @@
-error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/const_assign.f:2:1: cannot assign to const binding: k
+error: <CORPUS>/cp04/const_assign.f:2:1: cannot assign to const binding: k

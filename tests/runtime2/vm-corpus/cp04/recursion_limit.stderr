@@ -1,1 +1,1 @@
-error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/recursion_limit.f:1:15: callable recursion depth exceeded: down
+error: <CORPUS>/cp04/recursion_limit.f:1:15: callable recursion depth exceeded: down

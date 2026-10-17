@@ -1,1 +1,1 @@
-error: /home/claude/review/nift/tests/runtime2/vm-corpus/cp04/struct_methods.f:2:6: struct constructor argument count mismatch: Point
+error: <CORPUS>/cp04/struct_methods.f:2:6: struct constructor argument count mismatch: Point
