@@ -97,7 +97,10 @@ void FunctionBuilder::drop_unread_types() {
     for (const Instr& in : code) {
         switch (in.op) {
             case OpCode::CheckType: mark_register(read, in.b); break;
-            case OpCode::CheckAssign: case OpCode::TypeMeet: mark_register(read, in.b); mark_register(read, in.c); break;
+            case OpCode::CheckAssign: case OpCode::TypeMeet:
+                mark_register(read, in.b);
+                mark_register(read, in.c);
+                break;
             case OpCode::BindType: case OpCode::CheckParam: mark_register(read, in.c); break;
             default: break;
         }
