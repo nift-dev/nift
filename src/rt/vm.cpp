@@ -46,8 +46,17 @@ bool Vm::reserve_registers(std::size_t needed) {
     return true;
 }
 
-// Slow path of Call, taken at depth next_frame_check_: the frame budget, the
-// legacy depth mark and the held-bytes budget (geometrically spaced scans).
+// Slow path of Call: frame checks at depth next_frame_check_, then register
+// stack growth (or its budget).
+bool Vm::call_slow(std::size_t callee_base, std::size_t nregs, Fault& fault) {
+    if (frames_.size() >= next_frame_check_ && !frame_check(callee_base, fault)) return false;
+    if (!reserve_registers(callee_base + nregs + 1u))
+        return raise(fault, BailReason::RecursionBudget, "register stack budget exceeded");
+    return true;
+}
+
+// Taken at depth next_frame_check_: the frame budget, the legacy depth mark
+// and the held-bytes budget (geometrically spaced scans).
 bool Vm::frame_check(std::size_t top, Fault& fault) {
     const std::size_t depth = frames_.size();
     if (depth >= options_.max_frames)
@@ -195,11 +204,10 @@ VmResult Vm::run(std::string& output) {
     OP(Call) {
         const Proto* callee = protos_[pc->b];
         const std::size_t callee_base = base + pc->a;
-        if (frames_.size() >= next_frame_check_ && !frame_check(callee_base, fault)) FAIL();
-        if (!reserve_registers(callee_base + callee->nregs + 1u)) {
-            raise(fault, BailReason::RecursionBudget, "register stack budget exceeded");
+        // One combined test on the hot path; budgets and growth are out of line.
+        if ((frames_.size() >= next_frame_check_ || callee_base + callee->nregs + 1u > stack_.size()) &&
+            !call_slow(callee_base, callee->nregs, fault))
             FAIL();
-        }
         frames_.push_back(Frame{pc + 1, base, proto});
         base = callee_base;
         proto = callee;

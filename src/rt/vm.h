@@ -69,6 +69,10 @@ private:
     };
     bool reserve_registers(std::size_t needed);
     bool frame_check(std::size_t top, Fault& fault);
+#if defined(__GNUC__)
+    __attribute__((noinline, cold))
+#endif
+    bool call_slow(std::size_t callee_base, std::size_t nregs, Fault& fault);
     bool cold(const Instr& in, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     bool flush_if_needed(std::string& output, Fault& fault);

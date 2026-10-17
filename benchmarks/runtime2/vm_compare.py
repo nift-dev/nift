@@ -199,9 +199,11 @@ def vm_stats(a, path, runs):
 def large_program(functions):
     parts = []
     for k in range(functions):
-        parts.append(f"fn(f{k}(a, b)) {{\n  x := a + {k}\n  if(x > b) {{ x = x - b }} else {{ x = x * 2 }}\n"
+        # g<k>, not f<k>: `f32`/`f64` are in the generated legacy name table
+        # (FFI type names; CP11 review D4), so f<k> would fall back.
+        parts.append(f"fn(g{k}(a, b)) {{\n  x := a + {k}\n  if(x > b) {{ x = x - b }} else {{ x = x * 2 }}\n"
                      f"  i := 0\n  while(i < 3) {{ x += i; i += 1 }}\n  return x\n}}\n")
-    parts.append("print(f0(1, 2))\n")
+    parts.append("print(g0(1, 2))\n")
     return "".join(parts), "5"
 
 
