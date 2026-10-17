@@ -1,5 +1,6 @@
 #include "rt/native.h"
 
+#include "rt/legacy_names.h"
 #include "rt/render.h"
 
 #include <unordered_set>
@@ -14,10 +15,10 @@ bool lookup_native(std::string_view name, NativeInfo& info) {
 }
 
 bool reserved_name(std::string_view name) {
-    // Union of the legacy native dispatch heads (ParserExpression.cpp
-    // native_heads and call_args), the CLI built-in list, special callable
-    // names compared by the evaluator, script invocation bindings and
-    // methods compiled here.
+    // Names extracted from the legacy evaluator source (legacy_names.cpp,
+    // generated; review D4/D5), plus the original CP11 hand list: the CLI
+    // built-in list, script invocation bindings and methods compiled here.
+    if (legacy_special_name(name)) return true;
     static const std::unordered_set<std::string_view> names = {
         "arch", "args", "async", "attr_escape", "await", "bg", "build", "build_all", "build_names",
         "build_repair", "bytes", "cat", "cd", "close", "cmd", "copy", "cp", "css", "deepcopy", "env",

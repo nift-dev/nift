@@ -61,7 +61,14 @@ bool get_index(const Value& object, const Value& key, Value& out, Fault& fault);
 bool set_index(Value& object, const Value& key, const Value& value, Fault& fault);
 bool get_member(const Value& object, Atom key, Value& out, Fault& fault);
 bool push_value(Value& array, const Value& value, Fault& fault);
-bool length_of(const Value& value, Value& out, Fault& fault);
+// `length()` (size = false) or `size()` (size = true): legacy accepts
+// length() on strings and arrays, size() on arrays (and objects: not
+// reproduced here); everything else is a legacy error (review D3).
+bool length_of(const Value& value, bool size, Value& out, Fault& fault);
 bool is_aggregate(const Value& value);
+// Approximate bytes held by the values in [begin, end): string bytes, 16 per
+// array element, 32 per object entry, two levels deep; shared heap objects are
+// counted once per reference (an over-estimate).
+std::size_t held_bytes(const Value* begin, const Value* end);
 
 } // namespace nift::rt

@@ -34,17 +34,35 @@ Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
     stack_.resize(256);
     frames_.reserve(64);
+    if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
 }
 
-void Vm::reserve_registers(std::size_t needed) {
-    if (needed <= stack_.size()) return;
+bool Vm::reserve_registers(std::size_t needed) {
+    if (needed <= stack_.size()) return true;
+    if (needed > options_.max_registers) return false;
     std::size_t size = stack_.size() * 2;
     while (size < needed) size *= 2;
-    stack_.resize(size);
+    stack_.resize(size < options_.max_registers ? size : options_.max_registers);
+    return true;
 }
 
-bool Vm::flush_if_needed(std::string& output) {
-    if (output.size() <= options_.output_limit || !options_.flush) return true;
+// Slow path of Call, taken at depth next_frame_check_: the frame budget, the
+// legacy depth mark and the held-bytes budget (geometrically spaced scans).
+bool Vm::frame_check(std::size_t top, Fault& fault) {
+    const std::size_t depth = frames_.size();
+    if (depth >= options_.max_frames)
+        return raise(fault, BailReason::RecursionBudget, "callable recursion depth exceeded");
+    if (depth >= kLegacyMaxDepth) beyond_legacy_depth_ = true;
+    if (depth >= kLegacyMaxDepth && held_bytes(stack_.data(), stack_.data() + top) > options_.frame_heap_budget)
+        return raise(fault, BailReason::RecursionBudget, "frame memory budget exceeded");
+    next_frame_check_ = depth < kLegacyMaxDepth ? kLegacyMaxDepth : depth + depth / 8 + 1;
+    if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
+    return true;
+}
+
+bool Vm::flush_if_needed(std::string& output, Fault& fault) {
+    if (output.size() <= options_.output_limit) return true;
+    if (!options_.flush) return raise(fault, BailReason::OutputLimit, "output limit reached before the run completed");
     options_.flush(output, options_.flush_context);
     committed_ = true;
     return true;
@@ -89,7 +107,10 @@ VmResult Vm::run(std::string& output) {
     Fault fault;
     const Proto* proto = protos_.front();
     std::size_t base = 0;
-    reserve_registers(proto->nregs + 1u);
+    if (!reserve_registers(proto->nregs + 1u)) {
+        result.reason = BailReason::RecursionBudget;
+        return result;
+    }
     Value* R = stack_.data();
     const Value* K = proto->constants.data();
     const Instr* pc = proto->code.data();
@@ -173,12 +194,12 @@ VmResult Vm::run(std::string& output) {
     }
     OP(Call) {
         const Proto* callee = protos_[pc->b];
-        if (frames_.size() >= options_.max_frames) {
-            raise(fault, BailReason::RecursionBudget, "callable recursion depth exceeded");
+        const std::size_t callee_base = base + pc->a;
+        if (frames_.size() >= next_frame_check_ && !frame_check(callee_base, fault)) FAIL();
+        if (!reserve_registers(callee_base + callee->nregs + 1u)) {
+            raise(fault, BailReason::RecursionBudget, "register stack budget exceeded");
             FAIL();
         }
-        const std::size_t callee_base = base + pc->a;
-        reserve_registers(callee_base + callee->nregs + 1u);
         frames_.push_back(Frame{pc + 1, base, proto});
         base = callee_base;
         proto = callee;
@@ -209,7 +230,7 @@ VmResult Vm::run(std::string& output) {
         NEXT();
     }
 #if !NIFT_RT_COMPUTED_GOTO
-    default: raise(fault, BailReason::Unverified, "bad opcode"); FAIL();
+    default: raise(fault, BailReason::Internal, "bad opcode"); FAIL();
     }
 #endif
 bail:
@@ -218,6 +239,7 @@ bail:
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
 done:
     result.committed = committed_;
+    result.beyond_legacy_depth = beyond_legacy_depth_;
     return result;
 }
 
@@ -229,9 +251,9 @@ bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
                 return false;
             }
             R[in.a] = Value();
-            return flush_if_needed(output);
+            return flush_if_needed(output, fault);
     }
-    return raise(fault, BailReason::Unverified, "unknown native");
+    return raise(fault, BailReason::Internal, "unknown native");
 }
 
 bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fault& fault) {
@@ -258,7 +280,7 @@ bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fa
         case OpCode::SetIndex: return set_index(R[in.a], RK(in.b), RK(in.c), fault);
         case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
         case OpCode::Push: return push_value(R[in.a], RK(in.b), fault);
-        case OpCode::Length: if (!length_of(R[in.b], out, fault)) return false; break;
+        case OpCode::Length: if (!length_of(R[in.b], in.c != 0, out, fault)) return false; break;
         case OpCode::TypeMeet:
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));
@@ -266,7 +288,7 @@ bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fa
         case OpCode::NoAlias:
             if (is_aggregate(R[in.a])) return raise(fault, BailReason::Aliasing, "aggregate bound from a place");
             return true;
-        default: return raise(fault, BailReason::Unverified, "unexpected opcode");
+        default: return raise(fault, BailReason::Internal, "unexpected opcode");
     }
     R[in.a] = std::move(out);
     return true;

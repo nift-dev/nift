@@ -1,5 +1,6 @@
 #include "rt/resolver.h"
 
+#include "rt/alias.h"
 #include "rt/native.h"
 
 namespace nift::rt {
@@ -63,6 +64,7 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
         if (!admit_function(ast, statements[k], plan)) return plan;
     }
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");
+    if (plan.ok) plan_escaping_params(ast, plan);
     return plan;
 }
 

@@ -218,11 +218,15 @@ bool push_value(Value& array, const Value& value, Fault& fault) {
     return true;
 }
 
-bool length_of(const Value& value, Value& out, Fault& fault) {
+bool length_of(const Value& value, bool size, Value& out, Fault& fault) {
     if (value.is(Kind::Array)) {
         out = Value::integer(static_cast<std::int64_t>(array_size(value)));
         return true;
     }
+    // Objects: size() works everywhere, length() only in loop bodies (legacy
+    // context dependence); both are replayed.
+    if (value.is(Kind::Object)) return raise(fault, BailReason::Unverified, "length/size of an object");
+    if (size) return raise(fault, BailReason::Error, "size: unsupported for this value");
     if (value.is(Kind::String)) {
         std::int64_t count = 0;
         for (char c : string_view_of(value))
@@ -230,7 +234,33 @@ bool length_of(const Value& value, Value& out, Fault& fault) {
         out = Value::integer(count);
         return true;
     }
-    return raise(fault, BailReason::Unverified, "length of this kind");
+    return raise(fault, BailReason::Error, "length: unsupported for this value");
+}
+
+namespace {
+
+std::size_t value_bytes(const Value& value, int depth) {
+    if (value.is(Kind::String)) return string_view_of(value).size();
+    std::size_t bytes = 0;
+    if (value.is(Kind::Array)) {
+        bytes = array_size(value) * sizeof(Value);
+        if (depth > 0)
+            for (const Value& item : array_items(value)) bytes += value_bytes(item, depth - 1);
+    } else if (value.is(Kind::Object)) {
+        bytes = object_size(value) * 2 * sizeof(Value);
+        if (depth > 0)
+            for (const auto& entry : object_entries(value)) bytes += value_bytes(entry.second, depth - 1);
+    }
+    return bytes;
+}
+
+} // namespace
+
+std::size_t held_bytes(const Value* begin, const Value* end) {
+    std::size_t bytes = 0;
+    for (const Value* v = begin; v != end; ++v)
+        if (v->is_heap()) bytes += value_bytes(*v, 1);
+    return bytes;
 }
 
 } // namespace nift::rt

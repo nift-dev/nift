@@ -84,8 +84,15 @@ bool UnitCompiler::compile_function(NodeId fn, std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::statements(const Node& block) {
     const NodeId* list = ast_.list(block);
-    for (std::uint32_t k = 0; k < block.count; ++k)
+    for (std::uint32_t k = 0; k < block.count; ++k) {
+        // Legacy ignores a `break`/`continue` that is followed by another
+        // statement in the same block and runs the rest (review D2, candidate
+        // language change D-013): such blocks are not compiled.
+        const Node& node = ast_.at(list[k]);
+        if ((node.kind == NodeKind::Break || node.kind == NodeKind::Continue) && k + 1 < block.count)
+            return fail(node, "jump-not-last");
         if (!statement(list[k])) return false;
+    }
     return true;
 }
 
@@ -146,6 +153,9 @@ bool UnitCompiler::declare(const Node& node) {
     if (!text_type_operand(node.b, text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
+    // Loop-body legacy types this declaration from the value alone (text_type.h).
+    if (refers_to_binding(infer_text_type(type_text(ast_.at(node.b)))))
+        fb_->emit(OpCode::CheckParam, reg, 0, text_type);
     if (!scopes_.declare(name, binding)) return bail_statement(node);  // "binding already declared"
     return true;
 }

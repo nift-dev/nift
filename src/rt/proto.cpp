@@ -26,6 +26,7 @@ const char* bail_reason_name(BailReason reason) {
         case BailReason::StaticError: return "static-error";
         case BailReason::Unverified: return "unverified";
         case BailReason::OutputLimit: return "output-limit";
+        case BailReason::Internal: return "internal";
     }
     return "?";
 }

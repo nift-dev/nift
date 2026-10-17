@@ -29,7 +29,8 @@ enum class BailReason : std::uint8_t {
     RecursionBudget,// the VM frame budget was exhausted
     StaticError,    // an instruction the compiler knows always fails (e.g. redeclaration)
     Unverified,     // a case whose legacy result the VM does not reproduce (yet)
-    OutputLimit,    // never produced by the VM itself (runner bookkeeping)
+    OutputLimit,    // the output buffer reached VmOptions::output_limit without a flush hook
+    Internal,       // an internal VM failure (bad opcode, unknown native): reported, never replayed
 };
 const char* bail_reason_name(BailReason reason);
 

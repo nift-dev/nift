@@ -61,7 +61,7 @@ namespace nift::rt {
     X(SetIndex)   /* R[a][RK[b]] = RK[c]                                        */                    \
     X(GetMember)  /* R[a] = R[b].(atom c)                                       */                    \
     X(Push)       /* R[a].push(RK[b])                                           */                    \
-    X(Length)     /* R[a] = R[b].length()                                       */                    \
+    X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
     X(NoAlias)    /* bail if R[a] is an array or object (legacy location refs)  */                    \
     X(Bail)       /* stop: the unit must run on the legacy engine (reason b)    */                    \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \

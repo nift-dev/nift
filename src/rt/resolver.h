@@ -45,6 +45,9 @@ struct UnitPlan {
     std::uint32_t offset = 0;
     std::vector<NodeId> functions;                           // FnDecl nodes, proto index = position + 1
     std::unordered_map<std::string_view, std::uint16_t> index;  // function name -> proto index
+    // escaping[f][k]: parameter k of functions[f] may be mutated or rebound
+    // through (alias.h); filled by plan_unit.
+    std::vector<std::vector<bool>> escaping;
 };
 
 // Collects the top-level functions of `root` (a Program) and checks the

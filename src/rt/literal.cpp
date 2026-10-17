@@ -82,11 +82,16 @@ bool decode_number_literal(std::string_view text, Value& out) {
     if (text.find('.') == std::string_view::npos && text.find_first_of("eE") == std::string_view::npos) return false;
     int significant = 0;
     long exponent = 0;
-    if (!scan_decimal(text, significant, exponent) || significant > 15 || exponent > 300 || exponent < -300)
+    // Legacy parses a decimal literal as JSON (jsonic json.h, number scan) and
+    // keeps its spelling as an exact StrNumber when the value is zero with a
+    // fraction (`0.0`, `0.00`, `0.0e5` print as written; review D1) or the
+    // exponent magnitude is 300 or more. Those literals are refused: every
+    // zero-valued decimal spelling and every exponent of magnitude >= 300.
+    if (!scan_decimal(text, significant, exponent) || significant > 15 || exponent >= 300 || exponent <= -300)
         return false;
     const double value = std::strtod(std::string(text).c_str(), nullptr);
     if (!std::isfinite(value) || std::fabs(value) >= static_cast<double>(kSafeInteger)) return false;
-    if (value == 0 && significant > 0) return false;  // underflow
+    if (value == 0) return false;  // zero spelling (D1) or underflow
     out = Value::number(value);
     return true;
 }
