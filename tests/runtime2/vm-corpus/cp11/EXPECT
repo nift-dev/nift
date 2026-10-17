@@ -55,4 +55,3 @@ replay_string_plus_assign.f replayed bail:runtime-error
 replay_type_change.f replayed bail:runtime-error
 strings.f vm 
 top_return.f vm 
-fallback_prefix_not.f fallback prefix-not-precedence
