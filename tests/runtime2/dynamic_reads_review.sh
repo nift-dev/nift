@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # CP02/CP03 review regressions (same-model adversarial review, 2026-10-17).
 # Each block names the finding it guards.
-set -u
+set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 ok() { echo "PASS [$mode] $1"; }
 bad() { echo "FAIL [$mode] $1"; fail=1; }
-stale() { ! "$NIFT" status 2>&1 | grep -q "up to date"; }
-fresh() { "$NIFT" status 2>&1 | grep -q "up to date"; }
+stale() { ! "$NIFT" status 2>&1 | grep "up to date" >/dev/null; }
+fresh() { "$NIFT" status 2>&1 | grep "up to date" >/dev/null; }
 for mode in modified hash; do
   T="$(mktemp -d)"; cd "$T" && "$NIFT" init >/dev/null 2>&1 || { echo "setup failed"; exit 2; }
   sed -i "s/\"incremental-mode\": \"modified\"/\"incremental-mode\": \"$mode\"/" .nift/config.json
@@ -27,7 +27,7 @@ EOF
   "$NIFT" build --all >/dev/null 2>&1
   # #1 env() fingerprint ignores per-invocation names; #7 page's own temp files.
   fresh && ok "env() and temp files leave the page up to date" || bad "spurious rebuild after build: $("$NIFT" status | sed -n 2,4p | tr '\n' ' ')"
-  (cd content && "$NIFT" status 2>&1 | grep -q "up to date") && ok "status from a subdirectory agrees" || bad "status from subdirectory reports stale"
+  (cd content && "$NIFT" status 2>&1 | grep "up to date" >/dev/null) && ok "status from a subdirectory agrees" || bad "status from subdirectory reports stale"
   # #3 unrecorded reads
   sleep 1
   echo yes > data/y.txt; stale && ok "file().exists() appearance" || bad "file().exists() missed"; "$NIFT" build >/dev/null 2>&1

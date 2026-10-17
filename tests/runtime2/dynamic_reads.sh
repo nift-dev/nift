@@ -3,14 +3,14 @@
 # dependency must invalidate the page, in every incremental mode:
 #   exists()/is_file()/is_dir() presence and absence, directory listings and
 #   globs (ls), and environment variables (getenv, @getenv, env()).
-set -u
+set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 check() { # name expected-substring
   if grep -q -- "$2" public/index.html; then echo "PASS [$mode] $1"; else echo "FAIL [$mode] $1 (expected '$2')"; sed -n '/<body>/,/<\/body>/p' public/index.html | head -12; fail=1; fi
 }
 up_to_date() { # name
-  if "$NIFT" status | grep -q "up to date"; then echo "PASS [$mode] $1 stays up to date"; else echo "FAIL [$mode] $1: spurious rebuild"; "$NIFT" status | head -6; fail=1; fi
+  if "$NIFT" status | grep "up to date" >/dev/null; then echo "PASS [$mode] $1 stays up to date"; else echo "FAIL [$mode] $1: spurious rebuild"; "$NIFT" status | head -6; fail=1; fi
 }
 for mode in modified hash hybrid; do
   T="$(mktemp -d)"

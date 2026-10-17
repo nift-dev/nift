@@ -4,7 +4,7 @@
 # project (absolute paths, '..', symlinks, neighbouring repositories); external
 # files are tracked as dependencies without perpetual rebuilds; protections for
 # Nift-owned outputs remain; --fs-root stays an explicit opt-in restriction.
-set -u
+set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 pass() { echo "PASS $1"; }
@@ -34,7 +34,7 @@ for want in "ABS:NEIGHBOUR-1" "REL:NEIGHBOUR-1" "LINK:NEIGHBOUR-1" "JSON:externa
 done
 [ "$(cat "$W/elsewhere/out.txt" 2>/dev/null)" = written ] && pass "script wrote outside the project" || bad "external write missing"
 
-if "$NIFT" status | grep -q "up to date"; then pass "external dependencies do not force rebuilds"; else bad "perpetual rebuild: $("$NIFT" status | sed -n 2,4p | tr '\n' ' ')"; fi
+if "$NIFT" status | grep "up to date" >/dev/null; then pass "external dependencies do not force rebuilds"; else bad "perpetual rebuild: $("$NIFT" status | sed -n 2,4p | tr '\n' ' ')"; fi
 sleep 1; echo 'NEIGHBOUR-2' > "$W/neighbour/data/note.txt"
 "$NIFT" build >/dev/null 2>&1
 grep -q "ABS:NEIGHBOUR-2" public/index.html && pass "external edit triggers rebuild" || bad "external edit missed"
@@ -43,7 +43,7 @@ grep -q "LS:2" public/index.html && pass "external glob change triggers rebuild"
 
 # Standalone script: absolute, parent traversal, symlinks.
 printf 'print(cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/data"))\n' "$W" > "$W/project/s.f"
-out="$("$NIFT" s.f 2>&1)"; echo "$out" | grep -q NEIGHBOUR-2 && pass "standalone absolute read" || bad "standalone read: $out"
+out="$("$NIFT" s.f 2>&1)"; echo "$out" | grep NEIGHBOUR-2 >/dev/null && pass "standalone absolute read" || bad "standalone read: $out"
 
 # --fs-root remains an explicit restriction.
 if "$NIFT" --fs-root="$W/project" s.f >/dev/null 2>&1; then bad "--fs-root did not restrict"; else pass "--fs-root still restricts when requested"; fi

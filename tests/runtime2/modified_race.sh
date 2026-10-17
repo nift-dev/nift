@@ -2,7 +2,7 @@
 # CP01: modified-mode incremental builds must not miss edits made
 #  (a) immediately after a build finishes, and
 #  (b) to a dependency while the page that read it is still rendering.
-set -u
+set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 CYCLES="${NIFT_RACE_CYCLES:-1000}"
 fail=0
@@ -35,7 +35,7 @@ mkdir -p gen
 printf 'sleep(20)\nr := cmd("sh","-c","echo CONST > gen/data.html").cwd(getenv("NIFT_HOOK_ROOT")).run()\n' > content/index.pre-build.f
 printf '@input("gen/data.html")\nhello\n' > content/index.html
 "$NIFT" build >/dev/null 2>&1; "$NIFT" build >/dev/null 2>&1
-n=0; for i in 1 2 3 4 5; do "$NIFT" build 2>&1 | grep -q "built " && n=$((n+1)); done
+n=0; for i in 1 2 3 4 5; do "$NIFT" build 2>&1 | grep "built " >/dev/null && n=$((n+1)); done
 if [ "$n" -eq 0 ]; then echo "PASS pre-build hook output is not racy"; else echo "FAIL pre-build hook output: $n/5 follow-up builds rebuilt"; fail=1; fi
 rm -f content/index.pre-build.f
 
@@ -55,7 +55,7 @@ echo A0 > content/a.html; printf '@input("public/a.html")\n' > content/index.htm
 extra=0
 for i in $(seq 1 10); do
   echo "A$i" > content/a.html; "$NIFT" build >/dev/null 2>&1
-  "$NIFT" build 2>&1 | grep -q "racy\|while the page was being built" && extra=$((extra+1))
+  "$NIFT" build 2>&1 | grep "racy\|while the page was being built" >/dev/null && extra=$((extra+1))
   grep -q "A$i" public/index.html || { echo "FAIL depends: stale dependant at step $i"; fail=1; }
 done
 if [ "$extra" -eq 0 ]; then echo "PASS prerequisite outputs are not racy"; else echo "FAIL prerequisite outputs flagged racy in $extra/10 builds"; fail=1; fi

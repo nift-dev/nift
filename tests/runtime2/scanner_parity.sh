@@ -11,8 +11,10 @@ set -u
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 REF="${NIFT_REF:-}"
 REPO="$(pwd)"
+# A parity check without a reference proves nothing, so it is an error rather
+# than a skip; the target is therefore not part of plain `make test`.
 if [ -z "$REF" ]; then
-  echo "SKIP scanner parity: set NIFT_REF to a reference nift binary (not part of plain make test)"; exit 0
+  echo "ERROR scanner parity: NIFT_REF must name a reference nift binary" >&2; exit 2
 fi
 if [ ! -x "$REF" ]; then echo "FAIL scanner parity: NIFT_REF is not an executable: $REF"; exit 2; fi
 W="${NIFT_PARITY_WORK:-$(mktemp -d)}"; [ -n "${NIFT_PARITY_WORK:-}" ] || trap 'rm -rf "$W"' EXIT
