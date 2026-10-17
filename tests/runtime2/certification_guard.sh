@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
-# D-010: the certification target must keep the comprehensive suites. Fails if
-# `make test-all` stops reaching any required target (checked by asking make
-# for the prerequisite closure, without running anything).
+# D-010: `make certify` (certification target) must reach every suite the CI
+# workflows run, plus the comprehensive suites, so a checkpoint cannot be
+# certified locally while skipping something CI will run. Checked by asking
+# make for the prerequisite closure, without running anything.
 set -u -o pipefail
-REQUIRED=(test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom)
-DB="$(make -pqn test-all 2>/dev/null)"
-missing=0
-reach() { # breadth-first walk of prerequisites from test-all
-  local -A seen=(); local queue=(test-all) t deps
-  while [ ${#queue[@]} -gt 0 ]; do
-    t="${queue[0]}"; queue=("${queue[@]:1}")
-    [ -n "${seen[$t]:-}" ] && continue; seen[$t]=1
-    deps="$(printf '%s\n' "$DB" | awk -v t="$t" '$0 ~ "^"t":" && $0 !~ /:=/ {sub("^"t":[ \t]*",""); print}' | tr ' ' '\n' | grep -E '^test(-|$)' || true)"
-    for d in $deps; do queue+=("$d"); done
-  done
-  for t in "${!seen[@]}"; do echo "$t"; done
-}
-REACHED="$(reach)"
-for t in "${REQUIRED[@]}"; do
-  if ! printf '%s\n' "$REACHED" | grep -Fxq "$t"; then echo "FAIL certification guard: test-all no longer reaches $t"; missing=1; fi
-done
-[ "$missing" -eq 0 ] && echo "PASS certification guard: test-all reaches all ${#REQUIRED[@]} required suites"
-exit $missing
+WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
+python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
+import re, subprocess, sys
+args = sys.argv[1:]; sep = args.index('--')
+workflows, required = args[:sep], args[sep + 1:]
+ci = set()
+for wf in workflows:
+    for line in open(wf):
+        for m in re.finditer(r'\bmake(?:\s+-\S+)*((?:\s+[a-z0-9][a-z0-9_.-]*)+)', line):
+            ci.update(t for t in m.group(1).split() if re.match(r'^(test|bh)', t))
+db = subprocess.run(['make', '-pqn', 'certify'], capture_output=True, text=True).stdout.split('\n')
+deps = {}
+for l in db:
+    m = re.match(r'^([A-Za-z0-9_.-]+):(?!=)\s*(.*)$', l)
+    if m: deps.setdefault(m.group(1), set()).update(m.group(2).split())
+seen, stack = set(), ['certify']
+while stack:
+    t = stack.pop()
+    if t in seen: continue
+    seen.add(t); stack.extend(deps.get(t, ()))
+missing = sorted(t for t in set(required) | ci if t not in seen)
+if not ci:
+    print('FAIL certification guard: no make targets found in CI workflows'); sys.exit(1)
+for t in missing: print(f'FAIL certification guard: make certify does not reach {t}')
+if missing: sys.exit(1)
+print(f'PASS certification guard: make certify reaches {len(required)} required and {len(ci)} CI-run targets')
+PY

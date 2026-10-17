@@ -691,8 +691,17 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         return reasons;
     }
 
-    if (document.has("racy-dependencies") && document["racy-dependencies"].is_array()) {
-        for (const auto& value : document["racy-dependencies"].array)
+    json::Document clock_record;
+    bool have_clock_record = false;
+    if (config.incremental_mode == "modified") {
+        const fs::path clock_path = render_clock_path(info);
+        if (filesystem::path_exists(clock_path)) {
+            std::string clock_error;
+            have_clock_record = load_json_file(clock_path, clock_record, clock_error) && clock_record.is_object();
+        }
+    }
+    if (have_clock_record && clock_record.has("racy-dependencies") && clock_record["racy-dependencies"].is_array()) {
+        for (const auto& value : clock_record["racy-dependencies"].array)
             if (value.is_string())
                 reasons.push_back("dependency was modified while the page was being built: " + value.string);
     }
@@ -759,7 +768,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
 
     bool saved_edges_clean=true;
     const fs::path normalized_root = root.lexically_normal();
-    const json::Document* tick_hashes = document.has("tick-hashes") && document["tick-hashes"].is_object() ? &document["tick-hashes"] : nullptr;
+    const json::Document* tick_hashes = have_clock_record && clock_record.has("tick-hashes") && clock_record["tick-hashes"].is_object() ? &clock_record["tick-hashes"] : nullptr;
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
             saved_edges_clean=false;
@@ -1072,6 +1081,42 @@ void ProjectInfo::read_observation_reasons(const json::Document& document, std::
         reasons.push_back("environment changed");
 }
 
+// Runtime 2.0 CP01: modified-mode race records ("racy-dependencies" and
+// "tick-hashes") depend on timing, so they are kept out of page-info, whose
+// bytes must be reproducible (a clean rebuild reproduces init'd metadata;
+// BH6). They live in .nift/clock/<page-info path>, written only when
+// non-empty and removed otherwise.
+fs::path ProjectInfo::render_clock_path(const TrackedInfo& info) const {
+    const fs::path page_info = info_path(info).lexically_normal();
+    const fs::path meta = (root / ".nift").lexically_normal();
+    const fs::path below = page_info.lexically_relative(meta);
+    return meta / "clock" / below;
+}
+
+bool ProjectInfo::write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const {
+    const fs::path path = render_clock_path(info);
+    const bool empty = !render_clock || config.incremental_mode != "modified" ||
+                       (render_clock->racy.empty() && render_clock->tick_hashes.empty());
+    std::error_code error;
+    if (empty) { fs::remove(path, error); return true; }
+    std::string output = "{\n  \"racy-dependencies\": [";
+    for (std::size_t i = 0; i < render_clock->racy.size(); ++i) {
+        output += i ? ", \"" : "\"";
+        json::Document::append_escaped_string(output, render_clock->racy[i]);
+        output += "\"";
+    }
+    output += "],\n  \"tick-hashes\": {";
+    std::size_t i = 0;
+    for (const auto& [dependency, hash] : render_clock->tick_hashes) {
+        output += i++ ? ", \"" : "\"";
+        json::Document::append_escaped_string(output, dependency);
+        output += "\": \"" + hash + "\"";
+    }
+    output += "}\n}\n";
+    fs::create_directories(path.parent_path(), error);
+    return filesystem::write_file(path, output);
+}
+
 bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation,
                                   const RenderClockObservation* render_clock,
                                   const ReadObservations* observed) const {
@@ -1172,32 +1217,6 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
         output += "\": \"" + hash + "\"";
     }
     output += "\n  }";
-    // Racy dependencies (modified mode): dependencies stamped strictly later
-    // than the moment this page started rendering may have changed after they
-    // were read. The page-info file is written after that edit, so the plain
-    // "dependency mtime >= page-info mtime" test would miss it. Record them so
-    // the next build re-renders the page once.
-    if (render_clock && config.incremental_mode == "modified") {
-        if (!render_clock->racy.empty()) {
-            output += ",\n  \"racy-dependencies\": [";
-            for (std::size_t i = 0; i < render_clock->racy.size(); ++i) {
-                output += i ? ", \"" : "\"";
-                json::Document::append_escaped_string(output, render_clock->racy[i]);
-                output += "\"";
-            }
-            output += "]";
-        }
-        if (!render_clock->tick_hashes.empty()) {
-            output += ",\n  \"tick-hashes\": {";
-            std::size_t i = 0;
-            for (const auto& [path, hash] : render_clock->tick_hashes) {
-                output += i++ ? ", \"" : "\"";
-                json::Document::append_escaped_string(output, path);
-                output += "\": \"" + hash + "\"";
-            }
-            output += "}";
-        }
-    }
     if (observed && !observed->empty()) append_read_observations(output, *observed);
     if(observation){
         output += ",\n  \"sidecar-state\": {\"version\":1,\"platform\":\"";
@@ -1218,7 +1237,8 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     output += "\n}\n";
 
     // Certification metadata uses the existing atomic readonly replacement.
-    return filesystem::write_readonly_file(info_path(info), output);
+    if (!filesystem::write_readonly_file(info_path(info), output)) return false;
+    return write_render_clock_record(info, render_clock);
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error, std::vector<std::string>* identities) {

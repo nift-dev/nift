@@ -98,6 +98,9 @@ behaviour; approved compatibility changes; deferred language improvements.
   `test-integrity`).
 - An automated guard keeps comprehensive suites (conformance, host seam,
   C ABI) inside the certification target so they cannot be silently omitted.
+  Amended after CI @084f09f: the certification target is `make certify`
+  (`test-all` plus every suite named in the CI workflows); the guard parses
+  the workflows so a newly added CI suite cannot be skipped locally.
 - Same-binary differential runs establish the comparison infrastructure, not
   language correctness.
 - Only certified commits are pushed, only to `runtime-2`; no force-push,

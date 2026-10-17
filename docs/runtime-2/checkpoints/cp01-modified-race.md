@@ -87,3 +87,15 @@ written files (broke `test-dependency-path-identity`), so it was rejected.
 
 ## Commit strategy
 1. Failing test. 2. Fix + this record. 3. Evidence/progress update.
+
+## Post-certification fix (CI @084f09f): reproducible page-info
+`racy-dependencies` and `tick-hashes` depend on timing, and writing them into
+page-info made its bytes nondeterministic: BH6 (`test-init-functional-truth`,
+"clean rebuild does not reproduce init'd page metadata") failed 4/5 locally
+and in CI on Linux (and plausibly the Windows v4.9/v4.10 contracts). They now
+live in `.nift/clock/<page-info path>` (written only when non-empty, removed
+otherwise); page-info is byte-reproducible again (BH6 6/6). The miss was not
+caught locally because BH6 is not in `make test-all`; D-010's certification
+target is now `make certify` (test-all plus every suite the CI workflows run),
+kept complete by `tests/runtime2/certification_guard.sh`.
+

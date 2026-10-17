@@ -180,6 +180,8 @@ private:
                          const RenderClockObservation* render_clock = nullptr,
                          const ReadObservations* observed = nullptr) const;
     void append_read_observations(std::string& output, const ReadObservations& observed) const;
+    std::filesystem::path render_clock_path(const TrackedInfo& info) const;
+    bool write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const;
     void read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const;
     mutable std::mutex listing_cache_mutex_;
     mutable std::unordered_map<std::string, std::string> listing_cache_;
