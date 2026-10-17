@@ -69,6 +69,7 @@ done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$BUNDLE_STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$BUNDLE_STAGE/install-embed.sh"
 cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$BUNDLE_STAGE/share/licenses/nift/"
+cp third_party/bitcoin-sha256/COPYING "$BUNDLE_STAGE/share/licenses/nift/LICENSE-bitcoin-sha256"
 bash scripts/audit_no_dynamic_libffi.sh "$STAGED_CLI" "$BUNDLE_STAGE/lib/$BUNDLE_SHARED"
 bash scripts/audit_private_libffi.sh "$BUNDLE_STAGE/lib/$BUNDLE_SHARED"
 tar czf "$STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$BUNDLE_STAGE" include lib share install-embed.sh
@@ -84,6 +85,7 @@ cp -r markuppp bindings/python/native/markuppp
 cp -r jsonic bindings/python/native/jsonic
 mkdir -p bindings/python/native/third_party bindings/python/native/scripts
 cp -r third_party/libffi bindings/python/native/third_party/libffi
+cp -r third_party/bitcoin-sha256 bindings/python/native/third_party/bitcoin-sha256
 cp scripts/build_vendored_libffi.sh bindings/python/native/scripts/
 cp scripts/check_vendored_libffi.py bindings/python/native/scripts/
 ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir "$STAGE_OUT" >/dev/null 2>&1 )

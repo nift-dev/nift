@@ -547,6 +547,13 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             if(attempted.ok){output+=attempted.output;i=catch_close+1;continue;}
             if(!active_recoverable_){result_=std::move(attempted);break;}
             nift::RuntimeValue caught=std::move(*active_recoverable_);active_recoverable_.reset();active_diagnostic_.reset();result_=saved_result;
+            // feature-sha256 review: the failed try block's output is discarded,
+            // but the reads it made before failing (and the failed probe itself,
+            // e.g. a missing sha256_file path recorded as absent) still shaped
+            // bindings the program keeps. Keep them as dependencies.
+            result_.dependencies.insert(attempted.dependencies.begin(),attempted.dependencies.end());
+            result_.reqs.insert(attempted.reqs.begin(),attempted.reqs.end());
+            result_.observed.merge(attempted.observed);
             push_json_scope();
             auto caught_value=std::make_shared<nift::RuntimeValue>(std::move(caught));
             variable_scopes_.back()[binding]=VariableBinding{caught_value,nift_binding_type(*caught_value),false,true};

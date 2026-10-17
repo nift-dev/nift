@@ -143,6 +143,13 @@ private:
     // Runtime 2.0 CP08: Host-operation trace (no-op unless NIFT_TRACE_HOST is set).
     void trace_host(const char* op, const std::filesystem::path& path, const std::string& result) const;
     void observe_metadata_read(const std::filesystem::path& path);
+    // A file the page consumed by streaming (sha256_file): the same dependency
+    // as observe_read, with the hash/hybrid snapshot computed by the caller
+    // from the streamed bytes (`snapshot` null when not wanted).
+    void observe_streamed_read(const std::filesystem::path& path, std::uint64_t size, const std::uint64_t* snapshot);
+    // True when a read must produce a dependency snapshot (page render in a
+    // hash/hybrid build); lets streaming readers skip computing it otherwise.
+    bool read_snapshot_wanted() const;
     void observe_listing(const std::string& key, const std::filesystem::path& path);
     void observe_environment(const std::string& name, const nift::HostResult& value);
     // Consume a callable's return into `out`, propagating any location that the

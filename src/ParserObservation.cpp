@@ -49,6 +49,17 @@ void Parser::observe_read(const fs::path& path, const std::string& bytes) {
     host_.observe_dependency(path, bytes);
 }
 
+void Parser::observe_streamed_read(const fs::path& path, std::uint64_t size, const std::uint64_t* snapshot) {
+    if (nift::trace::enabled()) trace_host("read", path, std::to_string(size));
+    if (standalone_script_host_ || host_.root().empty()) return;
+    result_.dependencies.insert(host_.relative(path));
+    if (snapshot) host_.observe_dependency_hash(path, *snapshot);
+}
+
+bool Parser::read_snapshot_wanted() const {
+    return !standalone_script_host_ && !host_.root().empty() && host_.observe_dependencies;
+}
+
 void Parser::observe_metadata_read(const fs::path& path) {
     if (standalone_script_host_ || host_.root().empty()) return;
     result_.dependencies.insert(host_.relative(path));

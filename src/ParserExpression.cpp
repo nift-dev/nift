@@ -22,6 +22,7 @@
 #include "Json.h"
 #include "JsonSchema.h"
 #include "RenderHost.h"
+#include "Sha256.h"
 #include <markup/Markup.h>
 #include <minify/Minify.h>
 #include <nift/context.h>
@@ -258,6 +259,16 @@ private:
     std::string old_error_;
     bool active_ = false;
 };
+// Strings carrying an internal handle tag (callables, structs, files, ...)
+// are not text: `type()` reports them as their handle kind. Natives that
+// consume string *content* refuse them rather than hashing the tag.
+static bool nift_runtime_handle_string(const std::string& s){
+    if(s.rfind("\x1fnift:",0)!=0)return false;
+    static const char* const kinds[]={"struct:","callable:","thread:","mutex:","atomic:","async:","collection:","file:","stream:","page:","enum:"};
+    for(const char* kind:kinds)if(s.compare(6,std::strlen(kind),kind)==0)return true;
+    return false;
+}
+
 // Filesystem-root restriction uses the invocation snapshot, never the mutable cwd.
 static bool nift_fs_root_allowed(const fs::path& p, const fs::path& root, std::string& err){
     if (root.empty()) return true;
@@ -1474,11 +1485,14 @@ bool Parser::canonical_native_call(const std::string& name) {
         "setenv","sleep","stat","status","thread","timer","touch","track","tracked","type",
         "unsetenv","untrack","url_encode","warn","which"
     };
-    if(name=="error"){
-        for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find("error");if(it!=scope->end()){it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:callable:",0)==0)return false;break;}}
-        if(active_module_env_&&active_module_env_->callables.count("error"))return false;
-        if(callables_.count("error"))return false;
-        if(host_.has_host_callable("error"))return false;
+    // `error` and the natives added after Runtime 2.0 D-009#3 (`sha256`,
+    // `sha256_file`) yield to a same-named user, module or host callable, so a
+    // program that already defines one keeps calling its own definition.
+    if(name=="error"||name=="sha256"||name=="sha256_file"){
+        for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(name);if(it!=scope->end()){it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:callable:",0)==0)return false;break;}}
+        if(active_module_env_&&active_module_env_->callables.count(name))return false;
+        if(callables_.count(name))return false;
+        if(host_.has_host_callable(name))return false;
         return true;
     }
     return native_heads.count(name)!=0;
@@ -2830,6 +2844,44 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             }observe_listing(nift::observe::directory_key(host_.root(),p),p);std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();observe_read(p,ss.str());out=nift::RuntimeValue(ss.str());return true;}
             if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open_bytes: cannot open path",error);constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);nift::RuntimeBytes data;while(f){f.read(chunk.data(),static_cast<std::streamsize>(chunk.size()));const auto received=f.gcount();if(received>0)data.insert(data.end(),chunk.begin(),chunk.begin()+received);if(f.bad())return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open_bytes: input failure",error);if(received<static_cast<std::streamsize>(chunk.size()))break;}out=nift::RuntimeValue(std::move(data));return true;}
+            // feature-sha256: native SHA-256 of a string/bytes value or of a
+            // file's raw bytes (streamed). Both yield to a same-named user
+            // callable (see canonical_native_call), unlike older natives.
+            if(text.rfind("sha256(",0)==0&&canonical_native_call("sha256")&&call_args("sha256",args,q)){
+                if(args.size()!=1){error="sha256: expected one string or bytes value";return false;}
+                nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;
+                nift::crypto::Sha256Digest digest;
+                if(v.is_bytes())digest=nift::crypto::sha256_bytes(v.bytes->data(),v.bytes->size());
+                else if(v.is_string()&&!nift_runtime_handle_string(v.string))digest=nift::crypto::sha256_bytes(v.string.data(),v.string.size());
+                else{error="sha256: expected a string or bytes value";return false;}
+                out=nift::RuntimeValue(nift::crypto::sha256_hex(digest));return true;
+            }
+            if(text.rfind("sha256_file(",0)==0&&canonical_native_call("sha256_file")&&call_args("sha256_file",args,q)){
+                if(args.size()!=1){error="sha256_file: expected one path";return false;}
+                fs::path p;if(!checked_path("sha256_file",args,q,0,p))return false;
+                // Hash/hybrid builds snapshot the bytes a page consumed; derive
+                // that snapshot from the same streamed chunks (no second read).
+                struct Snapshot{std::uint64_t hash=filesystem::kHashBytesSeed;} snapshot;
+                const bool want_snapshot=read_snapshot_wanted();
+                const nift::crypto::Sha256ChunkObserver observer=want_snapshot?static_cast<nift::crypto::Sha256ChunkObserver>([](void* context,const std::uint8_t* data,std::size_t size){auto* s=static_cast<Snapshot*>(context);s->hash=filesystem::hash_bytes_update(s->hash,data,size);}):nullptr;
+                const auto result=nift::crypto::sha256_file(p,observer,&snapshot);
+                switch(result.status){
+                    case nift::crypto::Sha256FileStatus::Ok:
+                        observe_streamed_read(p,result.size,want_snapshot?&snapshot.hash:nullptr);
+                        out=nift::RuntimeValue(nift::crypto::sha256_hex(result.digest));return true;
+                    case nift::crypto::Sha256FileStatus::NotFound:
+                        // A page that catches this must rebuild when the file appears.
+                        observe_presence(p,false);
+                        return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"sha256_file: cannot open path",error);
+                    case nift::crypto::Sha256FileStatus::IsDirectory:
+                        error="sha256_file: path is a directory";return false;
+                    case nift::crypto::Sha256FileStatus::OpenFailed:
+                        return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"sha256_file: cannot open path",error);
+                    case nift::crypto::Sha256FileStatus::ReadFailed:
+                        return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"sha256_file: input failure",error);
+                }
+                error="sha256_file: internal error";return false;
+            }
 #ifdef NIFT_COMPAT_SPLIT_FRAMES
                 group_handled = false;return false;
             };

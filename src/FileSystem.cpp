@@ -744,10 +744,14 @@ fs::file_time_type modified_time(const fs::path& path) {
     return error ? fs::file_time_type::min() : value;
 }
 
-std::uint64_t hash_bytes(const std::string& contents) {
-    std::uint64_t hash = 14695981039346656037ull;
-    for (unsigned char c : contents) { hash ^= c; hash *= 1099511628211ull; }
+std::uint64_t hash_bytes_update(std::uint64_t hash, const void* data, std::size_t size) {
+    const auto* bytes = static_cast<const unsigned char*>(data);
+    for (std::size_t i = 0; i < size; ++i) { hash ^= bytes[i]; hash *= 1099511628211ull; }
     return hash;
+}
+
+std::uint64_t hash_bytes(const std::string& contents) {
+    return hash_bytes_update(kHashBytesSeed, contents.data(), contents.size());
 }
 
 static std::uint64_t hash_directory(const fs::path& directory) {

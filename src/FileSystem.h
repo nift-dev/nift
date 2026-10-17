@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -73,6 +74,10 @@ NativeLeafState dependency_leaf_native(const std::filesystem::path::value_type* 
 DependencyStatus dependency_status(const std::filesystem::path& path);
 
 std::uint64_t hash_bytes(const std::string& contents);
+// Streaming form of hash_bytes (FNV-1a 64): hash_bytes(a + b) ==
+// hash_bytes_update(hash_bytes_update(kHashBytesSeed, a), b).
+inline constexpr std::uint64_t kHashBytesSeed = 14695981039346656037ull;
+std::uint64_t hash_bytes_update(std::uint64_t hash, const void* data, std::size_t size);
 std::uint64_t hash_path(const std::filesystem::path& path);
 std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);
 bool stored_hash_changed(const std::filesystem::path& root, const std::filesystem::path& path);

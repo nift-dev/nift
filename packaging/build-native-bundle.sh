@@ -15,6 +15,7 @@ cp "$ROOT/libnift_c.a" "$ROOT/libnift_c.so" "$STAGE/lib/"
 cp "$ROOT/packaging/nift.pc" "$STAGE/lib/pkgconfig/nift.pc"
 cp "$ROOT/packaging/install-embed.sh" "$STAGE/install-embed.sh"
 cp "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT/third_party/libffi/LICENSE" "$ROOT/third_party/libffi/LICENSE-BUILDTOOLS" "$ROOT/third_party/libffi/NIFT-PROVENANCE.md" "$STAGE/share/licenses/nift/"
+cp "$ROOT/third_party/bitcoin-sha256/COPYING" "$STAGE/share/licenses/nift/LICENSE-bitcoin-sha256"
 mkdir -p "$OUT"
 tar czf "$OUT/nift-embed-$TARGET.tar.gz" -C "$STAGE" include lib share install-embed.sh
 echo "staged $OUT/nift-embed-$TARGET.tar.gz"

@@ -8,7 +8,7 @@ LDLIBS ?=
 
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
 PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -1136,6 +1136,41 @@ test-runtime2-dynamic-reads: $(TARGET)
 
 test-runtime2-fs-freedom: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/fs_freedom.sh
+
+# feature-sha256: native SHA-256 (src/Sha256.*, vendored subset in
+# third_party/bitcoin-sha256). Vendored-block check, module unit tests (normal
+# and ASan+UBSan, each against the portable and, when the CPU has it, the
+# x86 SHA-NI transform) and language/build tests of sha256()/sha256_file().
+SHA256_DEPS := src/Sha256.cpp src/Sha256.h third_party/bitcoin-sha256/sha256_bitcoin.h
+SHA256_UNIT := $(TEST_DIR)/sha256-unit$(EXEEXT)
+SHA256_UNIT_SAN := $(TEST_DIR)/sha256-unit-san$(EXEEXT)
+# Portable-only build (the configuration non-x86 targets get).
+SHA256_UNIT_PORTABLE := $(TEST_DIR)/sha256-unit-portable$(EXEEXT)
+SHA256_BENCH := $(TEST_DIR)/sha256-bench$(EXEEXT)
+$(SHA256_UNIT): tests/sha256_unit.cpp $(SHA256_DEPS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -Isrc $(CXXFLAGS) tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
+$(SHA256_UNIT_SAN): tests/sha256_unit.cpp $(SHA256_DEPS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -Isrc -std=c++17 -pthread $(SANITIZER_FLAGS) -fno-sanitize-recover=undefined tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
+$(SHA256_UNIT_PORTABLE): tests/sha256_unit.cpp $(SHA256_DEPS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -Isrc $(CXXFLAGS) -DNIFT_SHA256_DISABLE_X86_SHANI tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
+$(SHA256_BENCH): tests/sha256_bench.cpp $(SHA256_DEPS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -Isrc $(CXXFLAGS) tests/sha256_bench.cpp src/Sha256.cpp -o "$@"
+.PHONY: test-sha256 benchmark-sha256
+test-sha256: $(SHA256_UNIT) $(SHA256_UNIT_SAN) $(SHA256_UNIT_PORTABLE) $(TARGET)
+	python3 scripts/check_vendored_sha256.py
+	"$(SHA256_UNIT)"
+	"$(SHA256_UNIT_SAN)"
+	"$(SHA256_UNIT_PORTABLE)"
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/sha256_builtins.sh
+test: test-sha256
+# Throughput evidence (not a test): native module alone, in memory and from
+# warm files. See docs/runtime-2/checkpoints/feature-sha256.md.
+benchmark-sha256: $(SHA256_BENCH)
+	"$(SHA256_BENCH)"
 
 # D-010: the certification target. A checkpoint is certified locally with
 # `make certify` (scripts/certify.py runs certify-targets: test-all plus every

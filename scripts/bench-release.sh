@@ -36,6 +36,7 @@ SOURCES="
   src/RuntimeValue.cpp
   src/Value.cpp
   src/FileSystem.cpp
+  src/Sha256.cpp
   src/JsonFile.cpp
   src/JsonSchema.cpp
   minifypp/src/Minify.cpp

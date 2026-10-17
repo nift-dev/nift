@@ -59,6 +59,7 @@ done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
 cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$STAGE/share/licenses/nift/"
+cp third_party/bitcoin-sha256/COPYING "$STAGE/share/licenses/nift/LICENSE-bitcoin-sha256"
 bash scripts/audit_no_dynamic_libffi.sh "$OUT/nift-$OS-$ARCH" "$STAGE/lib/$SHARED_FILE"
 bash scripts/audit_private_libffi.sh "$STAGE/lib/$SHARED_FILE"
 tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib share install-embed.sh
