@@ -11,7 +11,7 @@ _Last updated: 2026-10-17_
 | CP02 | complete (Linux); macOS/Windows pending CI | `runtime-2` | Defect D2 fixed; review findings 1–7 fixed, 8/10a/10b open for CP16, 9 documented (`checkpoints/cp02-dynamic-reads.md`) |
 | CP03 | complete (Linux); macOS/Windows pending CI | `runtime-2` | D-002 filesystem freedom; six contract tests changed (`checkpoints/cp03-filesystem-freedom.md`) |
 | CP04 | deferred (owner, D-006) | not committed | 12.4× met but behaviour diverges; probes in `tests/runtime2/vm-corpus/cp04/`; patch kept outside the branch |
-| CP05 | next after CP06 review | — | Reassessed: independent of CP04 (it trims the canonical call path: flag snapshot, no per-call body copies), so it proceeds; gate requires no behaviour change |
+| CP05 | implemented, under review | `runtime-2-dev` | Call-path hygiene: flat call −11.0% (loop) / −10.2% (top level), fib −14.3%; rt-diff 1,695 entries 0 differing (`checkpoints/cp05-call-path.md`) |
 | CP06 | complete (Linux); macOS/Windows pending CI | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work

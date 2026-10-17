@@ -1,6 +1,7 @@
 #include "P4Plan.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "FeatureFlags.h"
 #include "ParserHelpers.h"
 #include "FrontMatter.h"
 #include "FileSystem.h"
@@ -1338,7 +1339,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 if(!prepare_loop_body(program,prep.stmts))return false;
                 prep.source_path=std::make_shared<const std::filesystem::path>(callee->source_path);
                 prep.ready=true;
-                if(std::getenv("NIFT_P4_SHAPE")){
+                if(nift::flags::p4_shape()){
                     std::function<void(const std::vector<std::unique_ptr<nift::ast::Stmt>>&,int)> dump;
                     dump=[&](const auto& body,int level){for(const auto& st:body){std::fprintf(stderr,"P4_ST %d %d name=%s op=%s expr=%d/%s iterable=%d/%s text=%s\n",level,(int)st->kind,st->name.c_str(),st->op.c_str(),st->expr?(int)st->expr->kind:-1,st->expr?st->expr->name.c_str():"",st->iterable?(int)st->iterable->kind:-1,st->iterable?st->iterable->name.c_str():"",st->text.substr(0,100).c_str());dump(st->body,level+1);dump(st->else_body,level+1);}};
                     std::fprintf(stderr,"P4_FN %s\n",name.c_str());dump(prep.stmts,0);
@@ -1352,11 +1353,11 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
             };
             const bool p4_shape=args.size()==2||args.size()==5;
             bool p4_self_alias=false;if(p4_shape)for(const auto& frame:variable_scopes_)if(frame.count(name))p4_self_alias=true;
-            const bool p4_enabled=p4_shape&&!p4_self_alias&&standalone_script_host_&&!std::getenv("NIFT_P4_DISABLE")&&!active_module_env_&&!callee_env&&!callee->module_env&&callee->variadic_param.empty();
+            const bool p4_enabled=p4_shape&&!p4_self_alias&&standalone_script_host_&&!nift::flags::p4_disable()&&!active_module_env_&&!callee_env&&!callee->module_env&&callee->variadic_param.empty();
             nift::p4::Walker walker_plan;
             const bool p4_walker=p4_enabled&&args.size()==2&&args[0].is_string()&&args[1].is_string()&&args[0].string.rfind("\x1fnift:",0)!=0&&args[1].string.rfind("\x1fnift:",0)!=0&&unshadowed("ls")&&unshadowed("is_dir")&&nift::p4::walker(prep.stmts,callee->params,name,walker_plan);
             if(p4_walker){
-                if(std::getenv("NIFT_P4_TRACE"))std::fprintf(stderr,"P4_ADMIT walker %s\n",name.c_str());
+                if(nift::flags::p4_trace())std::fprintf(stderr,"P4_ADMIT walker %s\n",name.c_str());
                 if(callable_call_depth_>=kMaxCallableDepth){e="callable recursion depth exceeded: "+name;return false;}
                 last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();
                 ++callable_call_depth_;
@@ -1382,7 +1383,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 ~P4ConditionsGuard(){if(active)current=std::move(previous);}
             } p4_conditions_guard{p4_conditions_,{},p4_consumer};
             if(p4_consumer){
-                if(std::getenv("NIFT_P4_TRACE"))std::fprintf(stderr,"P4_ADMIT consumer %s %zu\n",name.c_str(),consumer_plan.conditions.size());
+                if(nift::flags::p4_trace())std::fprintf(stderr,"P4_ADMIT consumer %s %zu\n",name.c_str(),consumer_plan.conditions.size());
                 p4_conditions_guard.previous=std::move(p4_conditions_);p4_conditions_=std::move(consumer_plan.conditions);
             }
             if(callable_call_depth_>=kMaxCallableDepth){e="callable recursion depth exceeded: "+name;return false;}

@@ -64,6 +64,16 @@ public:
                           0, size, eof);
     }
     explicit operator bool() const { return static_cast<bool>(document_); }
+    // Identity of the coordinate mapping (not of the text): two views with the
+    // same key map every offset to the same original position.
+    struct Key {
+        const void* document = nullptr; const void* spans = nullptr;
+        std::size_t base = 0, size = 0, eof = 0;
+        bool operator==(const Key& o) const {
+            return document == o.document && spans == o.spans && base == o.base && size == o.size && eof == o.eof;
+        }
+    };
+    Key key() const { return {document_.get(), spans_.get(), base_, size_, eof_}; }
     const std::shared_ptr<const SourceDocument>& document() const { return document_; }
     std::size_t size() const { return size_; }
     std::size_t span_count() const { return spans_ ? spans_->size() : (size_ ? 1 : 0); }

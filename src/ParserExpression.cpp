@@ -6,6 +6,7 @@
 #include "ReadObservation.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "FeatureFlags.h"
 #include "ParserAsyncPool.h"
 #include "ParserHelpers.h"
 #include "FrontMatter.h"
@@ -5171,7 +5172,7 @@ bool Parser::p4_walk(const std::string& root_raw,const std::string& relative,nif
                 };
                 if(!acquire(relative,0))return false;
 
-    const bool bridge_trace=std::getenv("NIFT_P4_BRIDGE")!=nullptr;
+    const bool bridge_trace=nift::flags::p4_bridge();
     const auto bridge_start=bridge_trace?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
     out=nift::RuntimeValue::make_array();out.array.reserve(entries.size());
     for(auto& entry:entries){auto row=nift::RuntimeValue::make_array();row.array.reserve(2);row.array.emplace_back(std::move(entry.relative));row.array.emplace_back(entry.directory);out.array.push_back(std::move(row));}

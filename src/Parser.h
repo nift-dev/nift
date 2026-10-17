@@ -288,6 +288,26 @@ private:
     bool p4_walk(const std::string& root,const std::string& relative,nift::RuntimeValue& out,std::string& error,const nift::detail::SourceView& list_view,const nift::detail::SourceView& predicate_view,const nift::detail::SourceView& recursion_view,const std::string& self);
     struct PreparedCallable { std::shared_ptr<const std::filesystem::path> source_path; nift::detail::SourceView view; bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
     std::unordered_map<const Callable*, PreparedCallable> prepared_callables_;
+    // Runtime 2.0 CP05: translate_function_program is a pure function of
+    // (source text, source view). Function bodies are re-executed through
+    // execute_native_program on every call; their translation is cached here.
+    // An entry keeps its view's document alive, so a key's pointers can never
+    // be reused by different text while the entry exists; the source text is
+    // still compared on every hit.
+    struct TranslatedProgram {
+        std::string source;
+        nift::detail::SourceView input_view;
+        std::string program;
+        nift::detail::SourceView program_view;
+    };
+    struct SourceViewKeyHash {
+        std::size_t operator()(const nift::detail::SourceView::Key& k) const {
+            std::size_t h = std::hash<const void*>()(k.document);
+            for (std::size_t v : {std::hash<const void*>()(k.spans), k.base, k.size, k.eof}) h = h * 1099511628211ull ^ v;
+            return h;
+        }
+    };
+    std::unordered_map<nift::detail::SourceView::Key, std::shared_ptr<const TranslatedProgram>, SourceViewKeyHash> translated_programs_;
     enum class CompletionPhase { Untouched, Evaluating, Evaluated, Completed, Failed };
     struct CompletionSite {
         nift::detail::SourceText source;

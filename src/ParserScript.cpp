@@ -402,11 +402,22 @@ void Parser::reset_script_control() { pending_control_={}; active_recoverable_.r
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth,
                                             SourceProvenance source_provenance, bool rollback_files_on_failure, nift::detail::SourceView view) {
     const std::uint64_t file_checkpoint = begin_file_operation();
+    // Only a caller-supplied view (function bodies, nested blocks) can repeat;
+    // a fresh identity view is unique per call and is never cached.
+    const bool cacheable=static_cast<bool>(view);
     if(!view)view=nift::detail::SourceView::identity(source_path,source);
-    std::string program, error;nift::detail::SourceView program_view;nift::detail::DiagnosticOrigin translation_origin;
-    if (!translate_function_program(source, program, error,view,&program_view,&translation_origin)) {
+    std::shared_ptr<const TranslatedProgram> cached;
+    if(cacheable){auto hit=translated_programs_.find(view.key());if(hit!=translated_programs_.end()&&hit->second->source==source)cached=hit->second;}
+    std::string translated_text, error;nift::detail::SourceView translated_view;nift::detail::DiagnosticOrigin translation_origin;
+    if (!cached && !translate_function_program(source, translated_text, error,view,&translated_view,&translation_origin)) {
         RenderResult failed; failed.ok=false; failed.error.message=error;failed.error.source_file=translation_origin.source;failed.error.line=translation_origin.line;failed.error.column=translation_origin.column;failed.error.source_length=translation_origin.source_length;failed.error.source_line=translation_origin.source_line;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error,std::move(translation_origin));if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
+    if(!cached){
+        auto entry=std::make_shared<TranslatedProgram>(TranslatedProgram{source,view,std::move(translated_text),std::move(translated_view)});
+        if(cacheable){if(translated_programs_.size()>=4096)translated_programs_.clear();translated_programs_[view.key()]=entry;}
+        cached=std::move(entry);
+    }
+    const std::string& program=cached->program;const nift::detail::SourceView& program_view=cached->program_view;
     RenderResult rr;
     try {
         rr=parse(program, source_path, depth, source_provenance,program_view);
