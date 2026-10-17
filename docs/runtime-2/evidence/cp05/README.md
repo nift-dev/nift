@@ -34,3 +34,16 @@ no-op 114,807,695 → 114,807,908 (+0.0002%). Gate ≤ +1%.
   failures only `unreadable_source` (root) and `v44_executable_script` (no
   `nift` on PATH).
 - `scripts/test_integrity_check.py tests scripts`: 0 findings.
+
+## Certification after review fixes (rebased on 262d3ec)
+- rt-diff (CP08 harness snapshot 2fae2d2, traces off: reference has no hook):
+  runtime-2 vs CP05, committed corpora + extracted smoke + 2,000 generated
+  (seed 505): 2,417 entries, 0 differing.
+- `make test-all`: known environmental set (root, /usr/bin/time, Go toolchain
+  download blocked, no dotnet) plus `test-v44-language-foundation`
+  (v44_perf_scaling_smoke wall-time ratio under parallel load; passes 3/3 alone
+  with both the reference and CP05).
+- `tests/runtime2/*.sh`: all pass. Regression suite: 93/94 (unreadable_source:
+  root).
+- Memory reproducers (review #1): 11.4 MB, equal to the reference.
+
