@@ -1,0 +1,38 @@
+# callgrind_annotate, flat call workload (run.py ops 'call'), NIFT_VM=require, N=8000 then N=4000
+# marginal per iteration = (Ir(8000) - Ir(4000)) / 4000
+6,321,901 (100.0%)  PROGRAM TOTALS
+
+Ir                  file:function
+--------------------------------------------------------------------------------
+3,280,282 (51.89%)  ???:nift::rt::Vm::run(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) [/home/claude/review/nift-cp11/nift]
+  612,168 ( 9.68%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  574,176 ( 9.08%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+  222,612 ( 3.52%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  208,000 ( 3.29%)  ???:nift::rt::Value::operator=(nift::rt::Value&&) [clone .part.0] [/home/claude/review/nift-cp11/nift]
+  169,465 ( 2.68%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  168,000 ( 2.66%)  ???:nift::rt::Value::release() [/home/claude/review/nift-cp11/nift]
+  140,421 ( 2.22%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object
+  138,255 ( 2.19%)  ./elf/./elf/dl-tunables.c:__GI___tunables_init [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  138,234 ( 2.19%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  134,399 ( 2.13%)  ./elf/./elf/do-rel.h:_dl_relocate_object
+  114,190 ( 1.81%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   56,007 ( 0.89%)  ???:nift::rt::Vm::reserve_registers(unsigned long) [/home/claude/review/nift-cp11/nift]
+
+## N=4000
+4,465,894 (100.0%)  PROGRAM TOTALS
+
+Ir                  file:function
+--------------------------------------------------------------------------------
+1,640,282 (36.73%)  ???:nift::rt::Vm::run(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) [/home/claude/review/nift-cp11/nift]
+  612,168 (13.71%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  574,176 (12.86%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+  222,612 ( 4.98%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  169,465 ( 3.79%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  140,421 ( 3.14%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object
+  138,255 ( 3.10%)  ./elf/./elf/dl-tunables.c:__GI___tunables_init [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  138,234 ( 3.10%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  134,399 ( 3.01%)  ./elf/./elf/do-rel.h:_dl_relocate_object
+  114,190 ( 2.56%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  104,000 ( 2.33%)  ???:nift::rt::Value::operator=(nift::rt::Value&&) [clone .part.0] [/home/claude/review/nift-cp11/nift]
+   84,000 ( 1.88%)  ???:nift::rt::Value::release() [/home/claude/review/nift-cp11/nift]
+   28,007 ( 0.63%)  ???:nift::rt::Vm::reserve_registers(unsigned long) [/home/claude/review/nift-cp11/nift]

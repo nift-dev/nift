@@ -92,6 +92,15 @@ def compare(nift, text, name, work, timeout, require=False):
     return a == b, a, b, st, c
 
 
+LIMIT_EXITS = ("timeout", -25, -9)  # timeout, SIGXFSZ (output limit), SIGKILL
+
+
+def nonterminating(a, b):
+    """Both runs hit the time or output limit: an endless program (seen with
+    mutants such as `c += 1` -> `c -= 1`); its output prefix depends on speed."""
+    return a[2] in LIMIT_EXITS and b[2] in LIMIT_EXITS
+
+
 def outcome_key(st):
     if not st:
         return "no-stats"
@@ -146,16 +155,16 @@ def generated(args, work):
     for i in range(args.gen):
         text = vm_gen.program(args.seed, i)
         same, a, b, st, _ = compare(args.nift, text, "gen.f", work, args.timeout)
-        tally[outcome_key(st)] += 1
-        if not same:
+        tally["nonterminating" if not same and nonterminating(a, b) else outcome_key(st)] += 1
+        if not same and not nonterminating(a, b):
             show(f"generated seed {args.seed} index {i}", a, b)
             failures += 1
             if failures > 20:
                 break
         mtext, kind = vm_gen.mutate(text, args.seed, i)
         same, a, b, st, _ = compare(args.nift, mtext, "mut.f", work, args.timeout)
-        mtally[outcome_key(st)] += 1
-        if not same:
+        mtally["nonterminating" if not same and nonterminating(a, b) else outcome_key(st)] += 1
+        if not same and not nonterminating(a, b):
             show(f"mutant ({kind}) seed {args.seed} index {i}", a, b)
             print("  program:\n" + "\n".join("    " + l for l in mtext.splitlines()))
             failures += 1
