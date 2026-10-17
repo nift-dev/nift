@@ -44,6 +44,15 @@ def main():
         os.remove(trace_tmp)
     cwd = os.getcwd()
 
+    def overwrite(path, data):
+        # Page-info files are read-only (0444); as a non-root user (CI) a plain
+        # open(..., "wb") fails. Keep the original mode afterwards.
+        mode = os.stat(path).st_mode
+        os.chmod(path, mode | 0o200)
+        with open(path, "wb") as handle:
+            handle.write(data)
+        os.chmod(path, mode)
+
     def walk_files(top):
         for d, _, names in os.walk(top):
             for n in names:
@@ -61,8 +70,7 @@ def main():
             if path.endswith(".info.json"):
                 with open(path, "rb") as handle:
                     data = handle.read()
-                with open(path, "wb") as handle:
-                    handle.write(data.replace(b'"reqs"', b'"reqs" ', 1).replace(b"templates/", b"Templates/", 1))
+                overwrite(path, data.replace(b'"reqs"', b'"reqs" ', 1).replace(b"templates/", b"Templates/", 1))
     elif mode == "home-write":
         with open(os.path.join(env["HOME"], "rt-mutant.txt"), "w") as handle:
             handle.write("x")
@@ -151,7 +159,7 @@ def main():
         def rewrite(fn):
             for p in infos:
                 d = open(p, "rb").read(); n = fn(d)
-                if n != d: open(p, "wb").write(n)
+                if n != d: overwrite(p, n)
         if mode == "x-racy-drop":
             rewrite(lambda d: re.sub(rb',\n  "racy-dependencies": \[[^\]]*\]', b"", d))
         elif mode == "x-tick-drop":
