@@ -121,6 +121,8 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--count", type=int, default=100, help="programs per random family (typed, context, ...)")
     ap.add_argument("--families", default=",".join(gen.FAMILIES))
+    ap.add_argument("--per-family", type=int, default=0,
+                    help="keep an evenly spaced sample of at most this many programs per family (sanitizer runs)")
     ap.add_argument("--jobs", type=int, default=2)
     ap.add_argument("--timeout", type=float, default=5)
     ap.add_argument("--keep", help="directory to keep failing programs in")
@@ -128,7 +130,13 @@ def main():
     args = ap.parse_args()
     nift = os.path.abspath(args.nift)
     families = [f for f in args.families.split(",") if f]
-    items = [item for f in families for item in gen.FAMILIES[f](args.seed, args.count)]
+    items = []
+    for f in families:
+        programs = list(gen.FAMILIES[f](args.seed, args.count))
+        if args.per_family and len(programs) > args.per_family:
+            stride = len(programs) / args.per_family
+            programs = [programs[int(k * stride)] for k in range(args.per_family)]
+        items += programs
     work = tempfile.mkdtemp(prefix="nift-vm-adv-")
     tally = collections.defaultdict(collections.Counter)
     verdicts = collections.defaultdict(collections.Counter)
