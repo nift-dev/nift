@@ -22,3 +22,5 @@ Must not change unless a decision in `decisions.md` approves it.
 | String-encoded handles stop working | Design report; D-001 | CP17 |
 | Reconstructed handle tags no longer resolve after release | Design report; D-001 | CP17 |
 | Recursion limit raised from 64 | Design report; D-001 | CP11–CP12 |
+| Candidate: statements after `break`/`continue` no longer run | D-014 (not yet approved as a change) | — |
+| User functions shadow built-ins of the same name | D-009 #3, D-014 | to be scheduled |

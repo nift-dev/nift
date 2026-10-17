@@ -26,7 +26,7 @@ as measured in CP00.
 | CP09 | M4 VM proof | Value model library (`rt/value`) | CP08 | Unit + property tests; ASan/UBSan clean; lint rules enforced |
 | CP10 | M4 VM proof | Lexer + parser for full script grammar | CP08 | Parses 100% of corpus scripts; diagnostics identical on the error corpus |
 | CP11 | M4 VM proof | **VM proof of concept** (subset, whole-unit fallback) | CP09, CP10 | **GO/NO-GO**: flat call ≥ 5× fewer instructions than today and ≤ 2× CPython; parity on every compiled unit |
-| CP12 | M5 Runtime | Resolver complete: globals, `GETDYN`, modules, structs, enums | CP11 | Fallback count for scoping constructs = 0 on corpus |
+| CP12 | M5 Runtime | Resolver complete: globals, `GETDYN`, modules, structs, enums; bail-and-replay removed (D-013) | CP11 | Fallback count for scoping constructs = 0 on corpus; no runtime replay path remains |
 | CP13 | M5 Runtime | Errors, try/catch, diagnostics parity | CP12 | Diagnostic corpus byte-identical |
 | CP14 | M5 Runtime | Built-ins batch A: collections and strings | CP12 | Batch fallback = 0; per-builtin instruction guards |
 | CP15 | M5 Runtime | Built-ins batch B: JSON, bytes, numbers, time | CP14 | As CP14 |

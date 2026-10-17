@@ -156,3 +156,34 @@ test-helper or diagnostic change. Independent work (CP09, CP10, CP11) does not
 wait for CI. No test is weakened; untested platforms are never reported as
 passing; progress records state each checkpoint's level.
 
+
+## D-013 — Engine selection before execution; replay is temporary (owner, 2026-10-18)
+- Architecture rule: the engine for a compilation unit is selected **before** it
+  executes. A unit runs entirely on the VM or entirely on legacy (D-001). The
+  compiler refuses any unit whose behaviour it cannot reproduce exactly.
+- CP11 only: bail-and-replay is allowed for enumerated, side-effect-free bail
+  reasons (the VM's only effect is buffered stdout). No filesystem, process,
+  environment or other host effect may happen before a replay; output is never
+  committed before completion, so large output cannot truncate or change the
+  exit status; deep recursion fails safely, never by crashing.
+- Unexpected VM failures (internal errors, allocation failure, any unexpected
+  exception) are reported as VM failures, never replayed as if legacy had run.
+- Removal gate: replay is eliminated (every bail reason replaced by static
+  refusal or exact VM behaviour) as an exit criterion of **CP12**, and no
+  checkpoint may add an effectful VM operation while replay exists. It is not
+  deferred to CP16.
+
+## D-014 — Legacy behaviour the VM meets: three classes (owner, 2026-10-18)
+Every legacy behaviour found during migration is classified as one of:
+1. **VM defect** — the VM is wrong; fix it.
+2. **Historical quirk to correct deliberately** — preserved (or refused, falling
+   back) until a recorded compatibility change replaces it, with regression
+   tests showing old and intended behaviour. Never changed silently.
+3. **Semantics needing a design decision** — escalated to the owner.
+
+Candidates recorded (class 2, not yet changed; the VM falls back today):
+- Statements after `break`/`continue` in the same block run, and the jump is
+  ignored (CP11 review D2).
+- Built-ins win over user functions of the same name, e.g. `is_int` (CP11
+  review D4). Already decided as D-009 #3 (user definitions shadow built-ins);
+  to be implemented as its own change with compatibility tests.
