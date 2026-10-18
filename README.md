@@ -119,6 +119,30 @@ Or watch continuously:
 nift build --auto
 ```
 
+### Previewing locally with `nift serve`
+
+Build, then serve the output directory over HTTP:
+
+```bash
+nift build
+nift serve                  # http://127.0.0.1:8000/
+nift serve --port 8080 --host 0.0.0.0
+nift serve --dir dist       # any directory, inside or outside the project
+```
+
+`nift serve` is a convenience wrapper for
+`python3 -m http.server PORT --bind HOST --directory DIR`. It requires
+**Python 3.7 or newer** on `PATH` (`python3` or `python`, or `py -3` on Windows);
+Nift never installs it. It serves the project's configured output directory,
+reports a clear error if that directory does not exist yet (run `nift build`)
+or if the port is in use, and stops with Ctrl+C. It does not build, watch or
+reload: run `nift build` (or `nift build --auto` in another terminal) to
+update the files it serves.
+
+It is for **local development only**. Python's `http.server` is not a
+production server; deploy the output directory with a real web server or
+static host.
+
 Run:
 
 ```bash
