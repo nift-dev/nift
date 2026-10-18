@@ -472,3 +472,17 @@ must be removed or justified when build recovery integrates.
   Windows guarantees no orphaned server only when the kill-on-close job object
   is in place; otherwise it warns. The cross-platform gate tests process
   termination and child cleanup, not only compilation.
+- **Strict follows substitution (refinement).** If Nift evaluates a `$[...]`,
+  strict validates it wherever it appears; context only quiets speculative
+  warnings; heuristic (similarity) warnings are never fatal; missing or invalid
+  unknown-value metadata counts as unverified. `\$[` and the exact `$[name]$`
+  maths exception are the literal mechanisms; a raw-content mechanism is a
+  possible later design, not part of site-DX.
+- **Watcher contract.** `--auto` never swallows an edit made during a build or
+  retry (including rapid and atomic saves) and never loops on a build's own
+  writes; tested deterministically with slow hooks.
+- **Critical path on the heavy lock.** CP12 jobs take the lock with priority
+  (`heavy.sh --priority`); other jobs wait while a priority job is queued.
+- **Dogfooding re-assessment.** After build recovery and site-DX are certified,
+  repeat the website-generation dogfooding assessment to check whether the
+  original problems are actually gone (not to chase a score).
