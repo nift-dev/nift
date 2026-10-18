@@ -38,20 +38,25 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import vm_policies  # noqa: E402
 
-# (name, source, policy or None for identical, [(engine, channel, expected substring), ...])
+W = 9007199254740991  # Python ints: the pinned (D-018a) VM results below
+
+# (name, source, policy, "pinned" (the VM result is checked exactly, legacy differs, no policy approves) or None
+# for identical, [(engine, channel, expected substring), ...])
 LIVE = [
     ("numbers-reevaluation",
      'fn(loud(x)) { print("loud " + x)\nreturn x }\nw := 9007199254740991\ni := 0\n'
-     'while (i < 1) { t := loud(w + i) + 2\nprint(t)\ni += 1 }\n', "D-018a numbers",
+     'while (i < 1) { t := loud(w + i) + 2\nprint(t)\ni += 1 }\n', "pinned",
      [("legacy", "out", "loud 9007199254740991\nloud 9007199254740991\n9007199254740993\n"),
-      ("vm", "out", "loud 9007199254740991\n9007199254740993\n")]),
+      ("vm", "out=", "loud %d\n%d\n" % (W, W + 2)), ("vm", "err=", "")]),
     ("numbers-loop-double",
-     "w := 9007199254740991\ni := 0\nwhile (i < 1) { i += 1\nprint(w + 2) }\nprint(w + 2)\n", "D-018a numbers",
+     "w := 9007199254740991\ni := 0\nwhile (i < 1) { i += 1\nprint(w + 2) }\nprint(w + 2)\n", "pinned",
      [("legacy", "out", "9007199254740992\n9007199254740993\n"),
-      ("vm", "out", "9007199254740993\n9007199254740993\n")]),
+      ("vm", "out=", "%d\n%d\n" % (W + 2, W + 2)), ("vm", "err=", "")]),
     ("numbers-overflow-in-loop-call",
-     "fn(cube(b)) { return b * b * b }\ni := 0\nwhile (i < 1) { i += 1\nprint(cube(4000000)) }\n", "D-018a numbers",
-     [("legacy", "out", "6.4e+19\n"), ("vm", "err", ":1:22: signed 64-bit integer overflow")]),
+     "fn(cube(b)) { return b * b * b }\ni := 0\nwhile (i < 1) { i += 1\nprint(cube(4000000)) }\n", "pinned",
+     # 4000000^3 = 6.4e19 > 2^63 - 1: (b * b) * b fails; it starts at column 22
+     [("legacy", "out", "6.4e+19\n"), ("vm", "out=", ""),
+      ("vm", "err", ":1:22: signed 64-bit integer overflow\n")]),
     # The same function called directly: legacy's canonical overflow too
     # (reported at the `return`, prefixed); the VM's error is the same as in
     # the loop.
@@ -63,15 +68,11 @@ LIVE = [
       ("vm", "err", ":1:19: JSON array index 2 is out of range in 'a[2]'")]),
     ("diagnostics-if", "x := 0\nif (1 / x > 0) { print(1) }\n", "D-018c diagnostics",
      [("legacy", "err", ":2:1: division by zero"), ("vm", "err", ":2:5: division by zero")]),
-    ("diagnostics-loop-binding",
-     'fn(f(a)) {\nx := 1\nx = a\nreturn x }\ni := 0\nwhile (i < 1) { i += 1\nprint(f("s")) }\n',
-     "D-018c diagnostics",
-     [("legacy", "err", ":7:7: cannot change binding type: x"),
-      ("vm", "err", ":3:1: cannot assign string to int binding 'x'")]),
-    ("diagnostics-loop-index",
+    ("diagnostics-loop-index",  # g(a, 2): legacy's loop wording omits the index a parameter carries: pinned
      "fn(g(a, k)) { return a[k] }\na := [1, 2]\nk := 0\nwhile (k < 4) { print(g(a, k))\nk += 1 }\n",
-     "D-018c diagnostics",
-     [("legacy", "err", "invalid index"), ("vm", "err", "JSON array index 2 is out of range in 'a[k]'")]),
+     "pinned",
+     [("legacy", "err", "invalid index"), ("vm", "out=", "1\n2\n"),
+      ("vm", "err", ":1:22: JSON array index 2 is out of range in 'a[k]'\n")]),
     ("diagnostics-nested-loop-statement",
      "a := [1]\ni := 0\nwhile (i < 1) { i += 1\nj := 0\nwhile (j < 1) { j += 1\na[3] = 1 } }\n",
      "D-018c diagnostics",
@@ -112,8 +113,12 @@ SYNTHETIC = [
      (b"b\n", diag(2, 8, b"division by zero"), 1), {"outcome": "vm-error"}, "diff", None),
     ("diagnostics-other-message", (b"", diag(2, 1, b"division by zero"), 1),
      (b"", diag(2, 8, b"modulo by zero"), 1), {"outcome": "vm-error", "error_in_loop_path": True}, "diff", None),
-    ("diagnostics-loop-wording-without-evidence", (b"", diag(2, 1, b"invalid index"), 1),
+    ("diagnostics-loop-wording-no-vm-evidence-needed", (b"", diag(2, 1, b"invalid index"), 1),
      (b"", diag(2, 1, b"JSON array index 2 is out of range in 'a[2]'"), 1), {"outcome": "vm-error", "line": 2,
+                                                                           "column": 1}, "approved",
+     "D-018c diagnostics", SRC_IDX),
+    ("diagnostics-loop-wording-wrong-index", (b"", diag(2, 1, b"invalid index"), 1),
+     (b"", diag(2, 1, b"JSON array index 3 is out of range in 'a[2]'"), 1), {"outcome": "vm-error", "line": 2,
                                                                            "column": 1}, "diff", None, SRC_IDX),
     ("diagnostics-loop-wording-with-evidence", (b"", diag(2, 1, b"invalid index"), 1),
      (b"", diag(2, 1, b"JSON array index 2 is out of range in 'a[2]'"), 1),
@@ -129,7 +134,7 @@ SYNTHETIC = [
     ("diagnostics-fallback", (b"", diag(2, 1, b"x"), 1), (b"", diag(2, 2, b"x"), 1), {"outcome": "fallback"},
      "diff", None),
     ("numbers-approved", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
-     {"outcome": "vm", "large_in_loop_path": 1, "large_lines": [0]}, "approved", "D-018a numbers"),
+     {"outcome": "vm", "large_in_loop_path": 1, "large_lines": [0]}, "diff", None),  # no D-018a policy (round 2)
     ("numbers-unattributed-line", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
      {"outcome": "vm", "large_in_loop_path": 1, "large_lines": [1]}, "diff", None),
     ("numbers-without-evidence", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
@@ -144,7 +149,7 @@ SYNTHETIC = [
      {"outcome": "vm-error", "large_in_loop_path": 1}, "diff", None),
     ("numbers-overflow-stop", (b"a\n6.4e+19\nb\n", b"", 0), (b"a\n", diag(1, 1, b"signed 64-bit integer overflow"), 1),
      {"outcome": "vm-error", "large_in_loop_path": 1, "error_in_loop_path": True, "large_lines": [1], "line": 1,
-      "column": 1}, "approved", "D-018a numbers"),
+      "column": 1}, "diff", None),
     ("numbers-overflow-stop-unattributed", (b"a\n6.4e+19\nb\n", b"", 0),
      (b"a\n", diag(1, 1, b"signed 64-bit integer overflow"), 1),
      {"outcome": "vm-error", "large_in_loop_path": 1, "error_in_loop_path": True, "large_lines": [0], "line": 1,
@@ -194,13 +199,13 @@ def main():
                 failures.append(f"{name}: did not run on the VM ({st and st['outcome']} {st and st.get('reason')})")
                 continue
             verdict, got = vm_policies.classify(legacy, vm, st)
-            want = ("approved", policy) if policy else ("same", None)
+            want = ("diff", None) if policy == "pinned" else ("approved", policy) if policy else ("same", None)
             if (verdict, got) != want:
                 failures.append(f"{name}: classified {verdict} {got}, expected {want[0]} {want[1]}")
             for engine, channel, text in expects:
                 result = legacy if engine == "legacy" else vm
-                data = (result[0] if channel == "out" else result[1]).decode()
-                if text not in data:
+                data = (result[0] if channel.startswith("out") else result[1]).decode()
+                if (data != text) if channel.endswith("=") else (text not in data):
                     failures.append(f"{name}: {engine} {channel} lacks {text!r}: {data[-300:]!r}")
             if args.show or any(f.startswith(name + ":") for f in failures):
                 print(f"--- {name} [{policy or 'identical'}]")

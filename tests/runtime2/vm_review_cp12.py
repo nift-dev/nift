@@ -28,6 +28,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import vm_policies  # noqa: E402
+import vm_sites  # noqa: E402
 from vm_adversarial import run  # noqa: E402
 
 
@@ -90,6 +91,37 @@ def programs():
     return out
 
 
+# D4 programs where legacy (loop code, doubles) and the VM (CP09 exact
+# integers) differ by D-018a: the VM's result is pinned, computed here with
+# Python ints (review round 2: no policy approves numbers). An error is
+# (expression text whose node fails, message); its position comes from the
+# CP10 AST (vm_sites), never from the VM.
+M, H = -(1 << 63), 1 << 62
+WW = 9007199254740991
+OVF = "signed 64-bit integer overflow"
+EXACT = {
+    "loop m * n": ("", ("m * n", OVF)),        # (-2^63) * -1 = 2^63
+    "loop 0 - m": ("", ("0 - m", OVF)),        # 2^63
+    "loop m - 1": ("", ("m - 1", OVF)),        # -2^63 - 1
+    "loop m + m": ("", ("m + m", OVF)),        # -2^64
+    "loop h * 2 - 1": ("", ("h * 2", OVF)),    # h * 2 = 2^63 fails before the subtraction
+    "loop (h - 1) * 2 + 1": (f"{(H - 1) * 2 + 1}\n", None),
+    "loop m == m + 0": (f"{str(M == M + 0).lower()}\n", None),
+    "big print(big - big2)": (f"{(WW + 2) - (WW + 1)}\n", None),
+    "big print(a[0] - 1)": (f"{(WW + 2) - 1}\n", None),
+}
+
+
+def exact_result(name, source, path):
+    out, error = EXACT[name]
+    if error is None:
+        return out.encode(), b"", 0
+    line, column = vm_sites.position(source.encode(), min(
+        n.begin for n in vm_sites.parse(source.encode()).walk()
+        if vm_sites.text(source.encode(), n) == error[0].encode()))
+    return out.encode(), f"error: {path}:{line}:{column}: {error[1]}\n".encode(), 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -108,13 +140,16 @@ def main():
             vm, st = run(nift, path, d, "1", {}, args.timeout)
             verdict, policy = vm_policies.classify(legacy, vm, st, source)
             outcome = st and st["outcome"]
+            if name in EXACT and group == "D4":
+                pinned = exact_result(name, source, path)
+                verdict, policy = ("pinned", "exact") if vm == pinned else ("diff", None)
             key = f"{group} {outcome}" + (f" {policy}" if policy else "")
             tally[key] = tally.get(key, 0) + 1
             if reason is not None and (outcome != "fallback" or st.get("reason") != reason):
                 failures.append(f"{group} {name}: expected refusal {reason}, got {outcome} {st and st.get('reason')}")
             elif not isinstance(vm[2], int) or vm[2] < 0 or vm[2] == 70 or outcome in ("internal-error", None):
                 failures.append(f"{group} {name}: crash or internal failure (exit {vm[2]}, {outcome})")
-            elif verdict not in ("same", "approved"):
+            elif verdict not in ("same", "approved", "pinned"):
                 failures.append(f"{group} {name}: {verdict} ({outcome} {st and st.get('reason')}): legacy {legacy!r} "
                                 f"vm {vm!r}")
             shutil.rmtree(d, ignore_errors=True)

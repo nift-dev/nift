@@ -626,12 +626,12 @@ def _single_outcome(a, b):
     return (a["stdout"], a["stderr"], a["exit"][0]), (b["stdout"], b["stderr"], b["exit"][0])
 
 
-def _d018(policy, loop):
-    """A D-018 policy of vm_policies.py with the entry's own VM statistics
-    (rt-diff --b-vm-stats): one script run on the VM, classified by
-    vm_policies.classify with its evidence and source, exactly as the other
-    harnesses do (review CP12 round 1: no assumed evidence). `loop`: the
-    diagnostics class for errors in loop-evaluator code (else outside)."""
+def _d018(policy):
+    """A D-018 policy of vm_policies.py with the entry's own VM statistics and
+    program (rt-diff --b-vm-stats): one script run on the VM, classified by
+    vm_policies.classify exactly as the other harnesses do. The policy checks
+    the VM's diagnostic against the program's AST, never against the VM's own
+    evidence (review CP12 round 2)."""
     def matches(a, b):
         runs = _single_outcome(a, b)
         stats = b.get("vm_stats") or []
@@ -639,17 +639,13 @@ def _d018(policy, loop):
             return False
         st = stats[0]
         legacy, vm = runs
-        if policy == "D-018c diagnostics" and bool(st.get("error_in_loop_path")) != loop:
-            return False
         return vm_policies.classify(legacy, vm, st, st.get("_source")) == ("approved", policy)
     return matches
 
 
 CLASS_RULES = {
     "recursion-budget": recursion_budget_matches,
-    "d018-diagnostics": _d018("D-018c diagnostics", False),
-    "d018-diagnostics-loop": _d018("D-018c diagnostics", True),
-    "d018-numbers": _d018("D-018a numbers", True),
+    "d018-diagnostics": _d018("D-018c diagnostics"),
 }
 
 

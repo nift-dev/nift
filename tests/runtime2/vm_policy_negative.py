@@ -58,24 +58,24 @@ LOOP_ERR = st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0,
 
 CASES = [
     # --- positive controls (genuine shapes) ---
-    ("numbers: large values on attributed lines", (LEG, b"", 0), (VM, b"", 0), EVID, None, A, NUM),
-    ("numbers: re-evaluated call printed twice", (RE_LEG, b"", 0), (RE_VM, b"", 0), RE_EVID, None, A, NUM),
-    ("numbers: small consequence of a large operand", (b"0\n", b"", 0), (b"1\n", b"", 0),
-     st(large_lines=[0], derived_lines=[0]), None, A, NUM),
-    ("numbers: boolean consequence of a large operand", (b"false\n", b"", 0), (b"true\n", b"", 0),
-     st(large_lines=[0], derived_lines=[0]), None, A, NUM),
-    ("numbers: overflow stop, legacy went on", (b"before\n6.4e+19\nafter\n", b"", 0), STOP_VM, STOP_EVID,
-     STOP_SRC, A, NUM),
-    ("numbers: overflow stop, legacy failed later", (b"before\n6.4e+19\n", d(9, 1, b"invalid index"), 1), STOP_VM,
-     STOP_EVID, STOP_SRC, A, NUM),
+    ("numbers: large values on attributed lines (no policy: pinned in vm_golden.py)", (LEG, b"", 0), (VM, b"", 0), EVID, None, C, None),
+    ("numbers: re-evaluated call printed twice (no policy: pinned in vm_golden.py)", (RE_LEG, b"", 0), (RE_VM, b"", 0), RE_EVID, None, C, None),
+    ("numbers: small consequence of a large operand (no policy: pinned in vm_golden.py)", (b"0\n", b"", 0), (b"1\n", b"", 0),
+     st(large_lines=[0], derived_lines=[0]), None, C, None),
+    ("numbers: boolean consequence of a large operand (no policy: pinned in vm_golden.py)", (b"false\n", b"", 0), (b"true\n", b"", 0),
+     st(large_lines=[0], derived_lines=[0]), None, C, None),
+    ("numbers: overflow stop, legacy went on (no policy: pinned in vm_golden.py)", (b"before\n6.4e+19\nafter\n", b"", 0), STOP_VM, STOP_EVID,
+     STOP_SRC, C, None),
+    ("numbers: overflow stop, legacy failed later (no policy: pinned in vm_golden.py)", (b"before\n6.4e+19\n", d(9, 1, b"invalid index"), 1), STOP_VM,
+     STOP_EVID, STOP_SRC, C, None),
     ("diagnostics: return prefix, same line", (b"", d(1, 12, b"return: JSON array index 2 is out of range in 'a[2]'"), 1),
      (b"", d(1, 19, b"JSON array index 2 is out of range in 'a[2]'"), 1),
      st(outcome="vm-error", large_in_loop_path=0, line=1, column=19), SRC_RET, A, DIAG),
-    ("diagnostics: loop wording at the call site", (b"", d(6, 23, b"invalid index"), 1),
-     (b"", d(2, 8, b"JSON array index 2 is out of range in 'a[k]'"), 1), LOOP_ERR, SRC_LOOP, A, DIAG),
-    ("diagnostics: loop binding wording", (b"", d(7, 7, b"cannot change binding type: x"), 1),
+    ("diagnostics: loop wording, index carried by a parameter (unverifiable)", (b"", d(6, 23, b"invalid index"), 1),
+     (b"", d(2, 8, b"JSON array index 2 is out of range in 'a[k]'"), 1), LOOP_ERR, SRC_LOOP, C, None),
+    ("diagnostics: loop binding wording (refused at compile time instead)", (b"", d(7, 7, b"cannot change binding type: x"), 1),
      (b"", d(3, 1, b"cannot assign string to int binding 'x'"), 1),
-     st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0, line=3, column=1), SRC_BIND, A, DIAG),
+     st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0, line=3, column=1), SRC_BIND, C, None),
     ("recursion beyond legacy's depth", (b"0\n", d(1, 1, b"callable recursion depth exceeded: d"), 1),
      (b"0\n1\n", b"", 0), st(beyond_legacy_depth=True, large_in_loop_path=0), None, A, REC),
 
@@ -131,10 +131,10 @@ CASES = [
      (b"", d(2, 8, b"modulo by zero"), 1), LOOP_ERR, SRC_LOOP, C, None),
     ("diagnostics: later position on another line, not loop code", (b"", d(1, 12, b"return: division by zero"), 1),
      (b"", d(2, 7, b"division by zero"), 1), st(outcome="vm-error", line=2, column=7), b"x\nprint(1 / 0)\n", C, None),
-    ("diagnostics: statistics locate another position", (b"", d(1, 12, b"return: JSON array index 2 is out of range "
+    ("diagnostics: VM statistics are not consulted", (b"", d(1, 12, b"return: JSON array index 2 is out of range "
                                                               b"in 'a[2]'"), 1),
      (b"", d(1, 19, b"JSON array index 2 is out of range in 'a[2]'"), 1),
-     st(outcome="vm-error", large_in_loop_path=0, line=1, column=12), SRC_RET, C, None),
+     st(outcome="vm-error", large_in_loop_path=0, line=1, column=12), SRC_RET, A, DIAG),
     ("diagnostics: binding name changed", (b"", d(7, 7, b"cannot change binding type: x"), 1),
      (b"", d(3, 1, b"cannot assign string to int binding 'y'"), 1),
      st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0, line=3, column=1), SRC_BIND, C, None),
@@ -152,6 +152,42 @@ CASES = [
      st(large_in_loop_path=0), None, C, None),
     ("fallback outcome", (b"", d(2, 1, b"x"), 1), (b"", d(2, 2, b"x"), 1), {"outcome": "fallback"}, None, C, None),
 ]
+
+SRC_LOOPC = b"fn(g(a)) {\nreturn a[2]\n}\na := [1, 2]\nk := 0\nwhile (k < 4) { print(g(a))\nk += 1 }\n"
+SRC_DIV2 = b"z := 0\nx := 4 / 2 + 1 / z\n"
+SRC_MOD = b"x := 7\nm := 0 - 7\nprint(x % 3)\nprint(m % 3)\n"
+MASK2 = [  # review round 2 (mask2.py): the evidence the *buggy* VM emits itself
+    ("spurious overflow on small operands, self-attributed", (b"before\n3000\nafter\nDONE\n", b"", 0),
+     (b"before\n", d(3, 7, b"signed 64-bit integer overflow"), 1),
+     st(outcome="vm-error", error_in_loop_path=True, large_lines=[1], line=3, column=7),
+     b"print(\"before\")\ni := 0\nwhile (i < 1) { i += 1\nprint(i * 3000) }\nprint(\"after\")\n", C, None),
+    ("10 - 3 -> 13 on a derived line", (b"0 7\n", b"", 0), (b"0 13\n", b"", 0), st(large_lines=[0], derived_lines=[0]),
+     None, C, None),
+    ("2 + 2 -> 2^60, self-attested large result", (b"x 4\n", b"", 0), (b"x 1152921504606846976\n", b"", 0),
+     st(large_lines=[0]), None, C, None),
+    ("0.5 * 4 -> 1e+300", (b"2\n", b"", 0), (b"1e+300\n", b"", 0), st(large_lines=[0]), None, C, None),
+    ("dropped one of three identical lines", (b"tick\ntick\ntick\nend\n", b"", 0), (b"tick\ntick\nend\n", b"", 0),
+     st(large_lines=[0, 1, 2]), None, C, None),
+    ("division by zero at the wrong '/' on the line", (b"", d(2, 1, b"division by zero"), 1),
+     (b"", d(2, 6, b"division by zero"), 1), st(outcome="vm-error", large_in_loop_path=0, line=2, column=6), SRC_DIV2,
+     C, None),
+    ("division by zero at the right '/'", (b"", d(2, 1, b"division by zero"), 1),
+     (b"", d(2, 14, b"division by zero"), 1), st(outcome="vm-error", large_in_loop_path=0, line=2, column=14), SRC_DIV2,
+     A, DIAG),
+    ("invalid index -> wrong index number", (b"", d(6, 23, b"invalid index"), 1),
+     (b"", d(2, 8, b"JSON array index 7 is out of range in 'a[2]'"), 1), LOOP_ERR, SRC_LOOPC, C, None),
+    ("invalid index -> right index number", (b"", d(6, 23, b"invalid index"), 1),
+     (b"", d(2, 8, b"JSON array index 2 is out of range in 'a[2]'"), 1), LOOP_ERR, SRC_LOOPC, A, DIAG),
+    ("binding message, right name, wrong types", (b"", d(7, 7, b"cannot change binding type: x"), 1),
+     (b"", d(3, 1, b"cannot assign bool to array binding 'x'"), 1),
+     st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0, line=3, column=1), SRC_BIND, C, None),
+    ("invalid index target -> other key text", (b"", d(1, 17, b"invalid index target"), 1),
+     (b"", d(1, 17, b"index out of range: k"), 1),
+     st(outcome="vm-error", error_in_loop_path=True, large_in_loop_path=0, line=1, column=17),
+     b"while (i < 1) { a[k] = 1 }\n", C, None),
+    ("Mod fast path sign", (b"1\n-1\n", b"", 0), (b"1\n1\n", b"", 0), st(large_in_loop_path=0), SRC_MOD, C, None),
+]
+CASES += MASK2
 
 
 def main():

@@ -71,9 +71,20 @@ CASES = [
 
 
 APPROVED = {
-    "vm-error-in-function": "D-018c diagnostics",  # legacy's loop wording "invalid index"
-    "vm-large-reevaluation": "D-018a numbers",
     "vm-recursion-budget": "D-001#4 recursion",
+}
+# Approved differences no policy can verify (review round 2): the VM's whole
+# result is pinned, derived by hand / with Python ints, never from the VM.
+#   vm-error-in-function: g(a, 2) indexes [1, 2] at 2 (legacy's loop wording
+#     "invalid index" at the call site omits the index): canonical message at
+#     `a[k]`, line 2 column 8.
+#   vm-large-reevaluation: t = (w + i) + 2 exactly, loud printed once per
+#     iteration (legacy re-evaluates and prints it twice).
+W = 9007199254740991
+GOLDEN = {
+    "vm-error-in-function": (b"g 0\n1\ng 1\n2\ng 2\n",
+                             b"error: {path}:2:8: JSON array index 2 is out of range in 'a[k]'\n", 1),
+    "vm-large-reevaluation": (("loud %d\n%d\nloud %d\n%d\n" % (W, W + 2, W + 1, W + 3)).encode(), b"", 0),
 }
 # Lines the VM must print exactly once per iteration where legacy printed them
 # twice (exactly-once evaluation).
@@ -156,7 +167,12 @@ def main():
                     fail(name, "output after an internal failure differs (legacy must not have run)")
                 continue
             # A, C, D: identical observable behaviour, every effect once.
-            if vm != legacy:
+            if name in GOLDEN:
+                out, err, code = GOLDEN[name]
+                expected = (out, err.replace(b"{path}", os.path.join(d, "p.f").encode()), code)
+                if vm != expected:
+                    fail(name, f"VM result {vm!r} differs from the pinned expectation {expected!r}")
+            elif vm != legacy:
                 verdict, policy = vm_policies.classify(legacy, vm, st)
                 if verdict != "approved" or policy != APPROVED.get(name):
                     fail(name, f"differs from legacy ({verdict} {policy}): exit {legacy[2]}/{vm[2]} "

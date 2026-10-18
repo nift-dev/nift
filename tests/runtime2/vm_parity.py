@@ -21,7 +21,7 @@
    approval must be confirmed by the evidence in the VM statistics.
 
 A difference is approved only through a named policy of vm_policies.py
-(D-001#4 recursion budget, D-018a numbers, D-018c diagnostics), each keyed to evidence in the VM statistics. Exit 1 on any
+(D-001#4 recursion budget; D-018c diagnostics checked against the program; no D-018a numbers policy, review round 2). Exit 1 on any
 other difference or expectation mismatch.
 """
 import argparse, collections, json, os, resource, shutil, subprocess, sys, tempfile
@@ -268,8 +268,6 @@ def rt_diff(args, work):
     evidence = {
         "cp11-recursion-budget-class": lambda v: v.get("beyond_legacy_depth"),
         "cp12-d018-diagnostics": lambda v: v["outcome"] == "vm-error",
-        "cp12-d018-diagnostics-loop": lambda v: v["outcome"] == "vm-error" and v.get("error_in_loop_path"),
-        "cp12-d018-numbers": lambda v: v.get("large_in_loop_path", 0) > 0,
     }
     approvals = collections.Counter()
     for r in report["results"]:
