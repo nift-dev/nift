@@ -337,3 +337,20 @@ heavy builds, sanitizer campaigns and wall-clock measurements do not.
 Certification discipline is unchanged: work developed on an earlier base is
 re-integrated and re-certified on the final base; only certified work enters
 `runtime-2`. Status updates show the pipeline and explain any idle capacity.
+
+## D-022 — CP13 diagnostics decisions (owner, 2026-10-18)
+1. Opt-in machine-readable diagnostics: `--format=json` / `NIFT_FORMAT=json`
+   with a versioned schema (code, severity, message, primary span, context,
+   full call chain, and the exact text line). `eval --json` errors are JSON.
+   Normal text output stays byte-identical (the CP13 gate); call chains appear
+   in JSON only.
+2. Catchable errors are staged: CP13 reproduces today's caught/fatal split
+   exactly; widening what is catchable is a later approved language change for
+   both engines (never VM-only, D-018). Specific error codes are added now for
+   index, type and other language errors instead of `internal.legacy_failure`.
+3. Syntax errors are reported before anything runs (no partial output) — an
+   approved change with old/new regression tests.
+Coordinator decisions within existing rules: try/catch body positions are fixed
+in legacy too (feature-site-dx; one meaning, D-018/D-020); legacy message
+prefixes other than `return:` stay for parity until the JSON mode carries the
+structure; the VM's missing colour on `error:` is a defect to fix.
