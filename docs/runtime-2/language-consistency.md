@@ -38,3 +38,4 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L23 | Unknown-method messages differ by receiver kind; mutating methods only on bare bindings | Uniform messages; documented mutation rules | medium | R | CP14 Q12, Q13 |
 | L24 | `1 + "s"` silently concatenates | Decide: keep documented coercion or require explicit conversion | medium | R | Assessment A |
 | L25 | Dynamic scoping of free names | Lexical scoping; strict mode warning first | correctness | R | D-009 #8, Assessment A |
+| L26 | Chained presentation methods (`o.stringify().stringify()`) idempotent at top level but re-encode in loop code | One behaviour | correctness | X | CP14 Q14 |
