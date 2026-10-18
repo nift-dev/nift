@@ -1,7 +1,7 @@
 # CP12 phase A — Engine selection before execution (bail-and-replay removed, D-018)
 
 Status: see `../progress.md`. Branch `runtime-2-cp12-dev` (local, not
-pushed), rebased on `runtime-2` @`8957559` (site-dx integrated; earlier bases
+pushed), rebased on `runtime-2` @`b411f3f` (site-dx and serve integrated; earlier bases `8957559`,
 `825c90a`, `b61e3a5`; CP11 certified, D-018/D-019
 recorded in `../decisions.md`). Phase B
 (resolver coverage: globals, `GETDYN`, modules, structs, enums;
