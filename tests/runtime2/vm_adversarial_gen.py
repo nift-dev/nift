@@ -40,9 +40,11 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 
-INTS = ["0", "1", "2", "3", "5", "10", "7", "100", "12", "1000000", "65535", "32768", "40000"]
+# Review round 2: magnitudes keep generated values within +-2^53 (no D-018a
+# difference can arise; numbers beyond it are pinned in vm_golden.py).
+INTS = ["0", "1", "2", "3", "5", "10", "7", "100", "12", "1000", "255", "32768", "400"]
 NINTS = ["-1", "-2", "-7", "-32769"]
-DBLS = ["0.0", "0.5", "1.5", "2.0", "0.1", "0.2", "1e3", "3.25", "1.0", "1e-3", "0.3", "2.5e2", "100.25", "1e15",
+DBLS = ["0.0", "0.5", "1.5", "2.0", "0.1", "0.2", "1e3", "3.25", "1.0", "1e-3", "0.3", "2.5e2", "100.25", "1e2",
         "0.125", "0.00", "0.0e0"]
 NDBLS = ["-0.5", "-2.5", "-0.0", "-1.0"]
 STRS = ['"a"', '"b"', '""', '"0"', '"1.5"', '"é"', '"ab"', '"A"', '"null"', "'z'", '"false"', '" "', '"✓x"']

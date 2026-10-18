@@ -33,8 +33,9 @@ top level, from loops, from both, nested calls, a function's own loop):
 
 Every program must either run on the VM (outcome vm or vm-error) with
 stdout, stderr and exit status identical to legacy's (or a difference
-approved by a named policy of vm_policies.py: D-001#4 recursion, D-018a
-numbers, D-018c diagnostics), or be refused before execution (outcome
+approved by a named policy of vm_policies.py: D-001#4 recursion, D-018c
+diagnostics; review round 2: no D-018a policy, the programs needing it are
+pinned in vm_golden.py and not generated here), or be refused before execution (outcome
 fallback, vm_executions 0, execute_us 0) with legacy's output. A `replayed`
 outcome, a unit executed other than exactly once, an internal error or any
 other difference fails. The outcome shares are reported.
@@ -132,6 +133,31 @@ def contexts(st, fns=""):
                      + "while (i0 < 1) { i0 += 1\nprint(w0()) }\n")
 
 
+# Review round 2: the differential gate approves no D-018a difference. Where
+# legacy runs code on its loop evaluator (a loop context, or a `while`
+# condition) it computes large numbers in doubles and the VM exactly, so
+# programs with numbers beyond 2^53 there are not generated here; the
+# reviewed ones are pinned in vm_golden.py with independently computed
+# results. Likewise recursion beyond legacy's 64 frames (D-001#4) and an
+# index error whose index legacy's loop wording omits and the source does
+# not fix (`c3(a, i)` in loop code).
+LOOP_CONTEXTS = ("loop", "fnloop", "fnown", "fnnestloop", "fnboth")
+LARGE_ERRORS = ("ovf", "ovf2", "sub", "large", "largem")
+LARGE_TEXT = ("big", "w", "loud(w)", "4611686018427387904", "1000000000000000")
+
+
+def needs_golden(family, key, statement, context):
+    import re
+    loop = context in LOOP_CONTEXTS or statement.startswith("while")
+    if family == "errors":  # arr[o.size()]: the index (2) is not a constant of the source
+        return loop and (key in LARGE_ERRORS or "arr[o.size()]" in statement)
+    if family in ("numbers", "loops"):
+        return loop and any(re.search(r"(?<![\w.])" + re.escape(t) + r"(?![\w])", statement) for t in LARGE_TEXT)
+    if family == "calls":
+        return statement in ("print(c6(70))",) or (loop and statement.startswith("print(c3(arr, k5))"))
+    return False
+
+
 def programs(seed):
     for ek, e in ERRORS.items():
         for wrap in WRAPS:
@@ -140,20 +166,23 @@ def programs(seed):
                 for c, src in contexts(st):
                     if sk == "ret" and c in ("topif", "loop"):
                         continue
+                    if needs_golden("errors", ek, st, c):
+                        continue
                     yield "errors", f"errors-{ek}-{sk}-{c}-{WRAPS.index(wrap)}", src
     for family, items, fns in (("types", TYPES, ""), ("numbers", NUMBERS, CALL_FNS), ("aggregates", AGGREGATES, CALL_FNS),
                                ("methods", METHODS, ""), ("calls", CALLS, CALL_FNS), ("loops", LOOPS, "")):
         for k, st in enumerate(items):
             for c, src in contexts(st, fns):
-                yield family, f"{family}-{k}-{c}", src
+                if not needs_golden(family, k, st, c):
+                    yield family, f"{family}-{k}-{c}", src
     for k, template in enumerate(RECURSION):
-        for n in (63, 64, 65, 1000, 99990, 100005):
+        for n in (10, 62, 63):  # deeper: vm_golden.py (D-001#4)
             yield "recursion", f"recursion-{k}-{n}", template.format(n=n)
     loop = 'p := "{line}"\ni0 := 0\nwhile (i0 < {n}) {{ print(p + i0); i0 += 1 }}\n'
     rec = "fn(d(n)) { if (n == 0) { return 0 }\nreturn d(n - 1) }\n"
     for n in (60000, 200000):
         for tail, label in (("", "end"), ("print(1 / 0)\n", "error"), ("x9 := 9007199254740991\nprint(x9 + 2)\n", "large"),
-                            ("print(d(70))\n", "recursion"), ("print(d(100005))\n", "budget"), ('return "done"\n', "return")):
+                            ('return "done"\n', "return")):  # recursion tails: vm_golden.py
             yield "output", f"output-{n}-{label}", rec + loop.format(line="x" * 20, n=n) + tail
 
 

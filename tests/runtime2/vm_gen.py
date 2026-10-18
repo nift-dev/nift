@@ -13,7 +13,9 @@ Same seed, same programs. Used by tests/runtime2/vm_parity.py.
 """
 import random
 
-INT_LITS = ["0", "1", "2", "3", "7", "10", "-1", "-5", "100", "65536", "123456789", "4000000000"]
+# Review round 2: constants small enough that generated values stay within
+# +-2^53 (D-018a differences are pinned in vm_golden.py, not generated).
+INT_LITS = ["0", "1", "2", "3", "7", "10", "-1", "-5", "100", "65536", "12345", "40000"]
 DBL_LITS = ["0.5", "1.5", "2.25", "-0.75", "3.0", "1e3", ".5", "0.1"]
 STR_LITS = ['"a"', '"bc"', '""', '"x y"', "'q'", '"héllo"', '"longer than fourteen bytes"', '"0"']
 
