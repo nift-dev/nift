@@ -251,7 +251,12 @@ EOF
   has "caught missing file" "M:none"
   has "read kept by a failed try block" "T:t1-caught"
   if [ "$IS_WINDOWS" -eq 1 ]; then echo "SKIP [$mode] trace descriptor inheritance under MSYS"
-  else grep -q "\"op\":\"read\",\"arg\":\"$P/data/x.bin\",\"res\":\"2\"" trace.jsonl && pass "[$mode] Host-op trace records the read" || bad "[$mode] trace: $(grep x.bin trace.jsonl)"; fi
+  else
+    # The trace records the canonical path: on macOS $TMPDIR (/var/...) is a
+    # symlink to /private/var/..., so accept the project path in either form.
+    P_real="$(cd "$P" && pwd -P)"
+    { grep -qF "\"op\":\"read\",\"arg\":\"$P/data/x.bin\",\"res\":\"2\"" trace.jsonl ||
+      grep -qF "\"op\":\"read\",\"arg\":\"$P_real/data/x.bin\",\"res\":\"2\"" trace.jsonl; } && pass "[$mode] Host-op trace records the read" || bad "[$mode] trace: $(grep x.bin trace.jsonl)"; fi
   up_to_date "unchanged inputs stay up to date"
   sleep 1.1
   printf 'v2' > data/x.bin; "$NIFT" build >/dev/null 2>&1

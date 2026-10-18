@@ -72,6 +72,9 @@ def main():
     copying = hashlib.sha256((VENDOR / "COPYING").read_bytes()).hexdigest()
     if f"`{copying}`" not in provenance:
         failures.append(f"COPYING hash {copying} not recorded in NIFT-PROVENANCE.md")
+        if b"\r\n" in (VENDOR / "COPYING").read_bytes():
+            failures.append("COPYING has CRLF line endings: the checkout converted them "
+                            "(third_party/bitcoin-sha256/** must be -text in .gitattributes)")
     for failure in failures:
         print("FAIL", failure)
     if failures:

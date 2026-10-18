@@ -1,4 +1,7 @@
 third_party/libffi/** -text
+# Vendored SHA-256 subset: checked byte-for-byte against recorded hashes
+# (scripts/check_vendored_sha256.py), so never convert line endings.
+third_party/bitcoin-sha256/** -text
 
 # Canonical workbook bytes are a cross-platform public contract.
 tests/fixtures/HANDOVER.md text eol=lf
