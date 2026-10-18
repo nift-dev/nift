@@ -1,0 +1,1 @@
+error: $ROOT/type_compare_string_int.f:1:1: @if ordering comparisons require two numbers or two strings of the same type

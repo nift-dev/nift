@@ -1,0 +1,1 @@
+error: $ROOT/idx_object_missing_key.f:2:7: JSON object has no key 'b'

@@ -1,0 +1,1 @@
+error: $ROOT/loop_error_in_body.f:4:9: JSON array index 3 is out of range in 'a[i]'

@@ -1,0 +1,1 @@
+error: $ROOT/type_binding_mismatch.f:2:1: cannot assign string to int binding 'x'

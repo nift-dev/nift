@@ -1,0 +1,1 @@
+error: $ROOT/try_uncatchable_binding_type.f:1:1: cannot assign string to int binding 'x'

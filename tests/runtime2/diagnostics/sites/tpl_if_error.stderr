@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:3:4
+  value has no member: missing
+    <p>$[site.missing]</p>
+       ^~~~~~~~~~~~~~~

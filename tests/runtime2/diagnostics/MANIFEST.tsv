@@ -1,0 +1,90 @@
+# case	class	inventory	note
+syn_unclosed_paren	parity	S1	control for A-1: unclosed ( errors at the opening token; message quotes the rest of the file (multi-line)
+syn_unterminated_string	site-dx	S1	Assessment A silent failure #1 (string): exit 0, rest of file dropped; to change under site-dx/D-020
+syn_unterminated_array	site-dx	S1	Assessment A silent failure #1 (array): exit 0, rest of file dropped; to change under site-dx/D-020
+syn_dollar_line_silent	investigate	S1	new (CP13): a script line starting with $ is template text and is silently dropped, exit 0; investigate under D-019 before any change
+syn_fn_wrong_form	parity	S1	fn add(a,b): message names the canonical form
+syn_if_no_block	parity	S1	"function if requires a block"
+syn_stray_brace	parity	S1	stray } : message quotes the rest of the file (multi-line)
+name_undefined_value	parity	S2	
+name_undefined_callable	parity	S2	
+name_assign_undeclared	parity	S2	
+name_redeclare	parity	S2	
+name_assert_missing	parity	S2	Assessment A: no assert
+type_binding_mismatch	parity	S3	
+type_const_assign	parity	S3	
+type_concat_callable	parity	S3	
+type_add_int_string	site-dx	S3	Assessment A silent failure #3: 1 + "s" is "1s"; documented coercion or defect is for site-dx/D-019 to establish before any change
+type_print_array	parity	S3	
+type_compare_string_int	parity	S3	message leaks the internal "@if" directive name
+type_member_on_int	parity	S3	
+type_method_unknown	parity	S3	unknown method reported as "unknown value or malformed expression"
+type_negate_string	parity	S3	
+arith_div_zero	parity	S4	
+arith_int_overflow	parity	S4	
+arith_mod_fraction	parity	S4	
+arith_mod_zero	parity	S4	
+idx_array_range	parity	S5	
+idx_negative	parity	S5	
+idx_object_missing_key	parity	S5	
+idx_member_missing	parity	S5	
+idx_string_index	parity	S5	
+idx_member_assign_plain	parity	S5	
+idx_element_assign_range	parity	S5	
+call_arity_user	parity	S6	
+call_print_arity	parity	S6	
+call_error_in_callee	approved:D-018c	S6	legacy: return statement + "return: " prefix; r2: failing expression, no prefix
+call_error_two_deep	approved:D-018c	S6	legacy: "return: return: " at the inner return; r2 (CP12 VM, verified): 2:10, no prefix
+call_error_stmt_in_callee	parity	S6	already reported at the failing expression
+call_error_in_loop_callee	parity	S6	loop-called: legacy already reports the failing expression
+call_error_lambda	parity	S6	"lambda body error: " prefix kept (frame prefix, not a return prefix)
+call_error_struct_method	approved:D-018c	S6	method: return prefix removed, failing expression
+call_error_in_if_condition	approved:D-018c	S6	callee in an if condition
+call_recursion_limit	approved:D-001#4	S6	legacy 64 frames; r2 (CP12 VM, verified): completes
+loop_error_in_body	parity	S7	output before the error is kept
+loop_error_in_for	parity	S7	
+loop_type_wording	approved:D-009#1	S7	legacy loop wording "cannot change binding type"; r2 (CP12 VM, verified): canonical wording
+loop_error_nested	parity	S7	
+throw_uncaught_top	parity	S8	
+throw_uncaught_in_function	parity	S8	throw position baked in at translation: accurate
+throw_uncaught_in_loop	parity	S8	
+throw_non_error	parity	S8	reported at the try (1:1) since the throw is in the try body
+throw_custom_code_invalid	parity	S8	
+try_catch_fields	parity	S9	message, code, category, line, column, stringify (source = absolute path)
+try_custom_code_cause	parity	S9	custom user.* code and cause chain
+try_rethrow	parity	S9	rethrow keeps the original origin (2:3), not the rethrow site
+try_nested	parity	S9	
+try_in_function	parity	S9	return from try/catch inside a function
+try_throw_from_function	parity	S9	origin is the throw inside the callee
+try_in_loop	parity	S9	
+try_error_in_catch	defect	S9	error in a catch body: position relative to the catch body (1:21); r2 = 5:9 (site review part 2 #3, same mechanism)
+try_output_before_throw	parity	S9	output printed before the throw is kept
+try_catch_binding_scope	parity	S9	catch binding not visible after the catch
+try_break_in_try	parity	S9	break inside try leaves the loop
+try_return_in_try	parity	S9	
+try_error_after_output_in_function	approved:D-018c	S9	uncatchable error in a callee inside try; output kept; return prefix removed in r2
+try_uncatchable_undefined_callable	catchability	S10	D-009#7: fatal inside try; legacy position is body-relative (1:10); r2 = accurate 4:3, still fatal
+try_uncatchable_index	catchability	S10	D-009#7; legacy 1:12 body-relative; r2 3:8
+try_uncatchable_binding_type	catchability	S10	D-009#7; legacy 1:1; r2 3:3
+try_uncatchable_div_zero	catchability	S10	D-009#7; legacy 1:1; r2 2:9
+try_uncatchable_in_callee	catchability	S10	D-009#7; callee error inside try (D-018c applies)
+try_catch_io_direct	defect	S10	site review part 2 #3: caught io error carries a body-relative origin (1:10, 1:1); r2 = 5:10, 10:12
+try_catch_io_in_callee	parity	S10	origin correct when raised in a callee (3:13)
+try_catch_json_parse	parity	S10	@json parse failure is recoverable (json.parse_failed)
+import_error_in_module	parity	S11	"import: " frame prefix, module's own location
+import_missing_caught	parity	S11	io.import_source_unreadable is recoverable
+thread_error_join	parity	S11	"thread: return: " prefixes; whether D-018c drops the inner "return: " here is open (design doc)
+run_missing_command	site-dx	S11	Assessment A silent failure #4: launched:true, empty stderr; to change under site-dx/D-020
+eval_e_error	parity	S12	nift -e: <command-line> origin
+eval_e_undefined	parity	S12	
+eval_json_error	parity	S12	eval --json: plain-text error, exit 2 (not JSON)
+eval_json_undefined	parity	S12	
+tpl_member_typo	parity	S13	build diagnostic with excerpt and caret (control for A-2)
+tpl_unknown_root	site-dx	S13	Assessment A silent failure #2: $[nosuch] published literally, exit 0; to change under site-dx/D-020 (study legitimate uses first, D-019)
+tpl_undefined_callable	parity	S13	
+tpl_div_zero	parity	S13	
+tpl_script_throw	parity	S13	
+tpl_script_try_catch	parity	S13	v4.12 differs (D-002 filesystem freedom): .v412 goldens
+tpl_if_error	parity	S13	
+tpl_input_missing	parity	S13	
+tpl_unknown_directive	parity	S13	unknown @directive passes through (documented for CSS @media); typo warning is a site-dx candidate

@@ -1,0 +1,1 @@
+error: $ROOT/type_concat_callable.f:2:7: string concatenation requires renderable scalar values

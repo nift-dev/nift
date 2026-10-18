@@ -1,0 +1,3 @@
+eval
+--json
+nosuch(1)

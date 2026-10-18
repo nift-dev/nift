@@ -1,0 +1,1 @@
+error: $ROOT/name_redeclare.f:2:1: binding already declared in this scope: r

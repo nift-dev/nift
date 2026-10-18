@@ -1,0 +1,6 @@
+boom
+user.raised
+user
+4
+3
+{"message":"boom","code":"user.raised","category":"user","source":"$ROOT/try_catch_fields.f","line":4,"column":3,"cause":null}

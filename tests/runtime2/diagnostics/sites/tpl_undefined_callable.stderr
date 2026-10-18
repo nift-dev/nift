@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:2:4
+  undefined callable: nosuch
+    <p>$[nosuch(1)]</p>
+       ^~~~~~~~~~~~

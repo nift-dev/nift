@@ -1,0 +1,7 @@
+@script {
+  try {
+    t := cat("/nonexistent/nift-cp13")
+  } catch(e) {
+    return e.code
+  }
+}

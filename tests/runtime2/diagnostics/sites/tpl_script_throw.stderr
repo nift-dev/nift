@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:4:3
+  thrown in @script
+      throw error("thrown in @script")
+      ^

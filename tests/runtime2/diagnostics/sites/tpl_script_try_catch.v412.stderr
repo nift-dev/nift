@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:1:1
+  cat: path must stay inside the Nift project
+    $[t := cat("/nonexistent/nift-cp13")]
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

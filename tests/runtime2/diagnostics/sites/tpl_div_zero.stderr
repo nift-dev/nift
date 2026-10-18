@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:2:4
+  division by zero
+    <p>$[1 / 0]</p>
+       ^~~~~~~~

@@ -1,0 +1,5 @@
+error: while building /
+  content/index.html:2:1
+  @input path does not exist: nosuch-partial.html
+    @input('nosuch-partial.html')
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~

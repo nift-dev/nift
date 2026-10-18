@@ -1,0 +1,1 @@
+error: $ROOT/lib/bad_module.f:2:6: import: unknown value or malformed expression: nosuch_in_module

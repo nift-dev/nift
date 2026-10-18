@@ -1,0 +1,1 @@
+error: $ROOT/idx_member_assign_plain.f:2:1: member assignment requires a struct instance: o

@@ -1,0 +1,2 @@
+error: $ROOT/syn_unclosed_paren.f:2:6: unknown value or malformed expression: (1 + 2
+print("after")

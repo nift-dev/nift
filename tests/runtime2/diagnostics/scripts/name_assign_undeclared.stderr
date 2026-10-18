@@ -1,0 +1,1 @@
+error: $ROOT/name_assign_undeclared.f:1:1: assignment to undefined binding: zz

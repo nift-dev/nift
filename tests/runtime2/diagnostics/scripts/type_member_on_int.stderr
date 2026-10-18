@@ -1,0 +1,1 @@
+error: $ROOT/type_member_on_int.f:2:7: value has no member: foo

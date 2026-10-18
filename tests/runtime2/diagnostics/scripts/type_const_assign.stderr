@@ -1,0 +1,1 @@
+error: $ROOT/type_const_assign.f:2:1: cannot assign to const binding: k
