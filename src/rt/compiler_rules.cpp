@@ -1,5 +1,6 @@
 #include "rt/compiler_rules.h"
 
+#include "rt/prepared_parse.h"
 #include "rt/text_type.h"
 
 namespace nift::rt::detail {
@@ -86,18 +87,174 @@ bool UnitCompiler::text_type_operand(NodeId value, std::uint16_t& operand) {
     return text_type_of(infer_text_type(type_text(node)), node, operand);
 }
 
-// Legacy types a callee parameter from the argument's text; the VM requires
-// that to agree with the value's own type (else it bails).
-bool UnitCompiler::param_check(NodeId arg, std::uint16_t reg) {
-    const Node& node = ast_.at(arg);
-    const TextType type = infer_text_type(type_text(node));
-    if (type.kind == TextType::Kind::Known && (type.known == -1 || type.known == 2)) return true;
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t operand = 0;
-    if (!text_type_of(type, node, operand)) return false;
-    fb_->emit(OpCode::CheckParam, reg, 0, operand);
-    fb_->release_to(mark);
-    return true;
+// A textual call: legacy's bind_call_param types each parameter from the
+// argument's text (P5). For every parameter whose type the callee can
+// observe, the caller leaves that text type in the callee's type register
+// (frame register nparams + k, just above the arguments); the callee's
+// BindType combines it with the value exactly as legacy does.
+bool UnitCompiler::pass_param_types(std::size_t f, std::uint32_t argc, const NodeId* args, std::uint16_t base) {
+    bool any = false;
+    for (std::uint32_t k = 0; k < argc; ++k) any = any || observable_[f][k];
+    if (!any) return true;
+    while (fb_->top() < base + 2u * argc) {
+        std::uint16_t reg = 0;
+        if (!temp(reg)) return false;
+    }
+    for (std::uint32_t k = 0; k < argc; ++k) {
+        if (!observable_[f][k]) continue;
+        const Node& arg = ast_.at(args[k]);
+        const std::uint16_t mark = fb_->top();
+        std::uint16_t operand = 0;
+        if (!text_type_of(infer_text_type(type_text(arg)), arg, operand)) return false;
+        const auto dst = static_cast<std::uint16_t>(base + argc + k);
+        if (operand & kConstantBit) fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(operand & ~kConstantBit));
+        else if (operand != dst) fb_->emit(OpCode::Move, dst, operand);
+        fb_->release_to(mark);
+    }
+    return builder_ok();
+}
+
+void UnitCompiler::update_flags() {
+    if (!fb_) return;
+    std::uint8_t flags = prepared() ? kInstrPrepared : 0;
+    if (return_site_ != kNoSite) flags |= kInstrReturnPrefix;
+    fb_->set_flags(flags);
+}
+
+namespace {
+
+bool space(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+bool word(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+// [open, close] enclose a balanced text (quotes respected).
+bool balanced_between(std::string_view src, std::uint32_t open, std::uint32_t close) {
+    int depth = 0;
+    char quote = 0;
+    for (std::uint32_t i = open + 1; i < close; ++i) {
+        const char c = src[i];
+        if (quote) {
+            if (c == '\\') ++i;
+            else if (c == quote) quote = 0;
+            continue;
+        }
+        if (c == '"' || c == '\'') quote = c;
+        else if (c == '(') ++depth;
+        else if (c == ')' && --depth < 0) return false;
+    }
+    return depth == 0 && !quote;
+}
+
+struct Span {
+    std::uint32_t begin, end;
+};
+
+// Legacy's prepared parser gives a parenthesised expression the span of its
+// parentheses, and an operator node the span of its operands.
+Span legacy_span(const Ast& ast, const Node& n) {
+    Span s{n.begin, n.end};
+    switch (n.kind) {
+        case NodeKind::Binary: case NodeKind::Logical: case NodeKind::Coalesce:
+            s.begin = legacy_span(ast, ast.at(n.a)).begin;
+            s.end = legacy_span(ast, ast.at(n.b)).end;
+            break;
+        case NodeKind::Ternary:
+            s.begin = legacy_span(ast, ast.at(n.a)).begin;
+            s.end = legacy_span(ast, ast.at(n.c)).end;
+            break;
+        case NodeKind::Index: case NodeKind::Member: s.begin = legacy_span(ast, ast.at(n.a)).begin; break;
+        case NodeKind::Call:
+            if (ast.at(n.a).kind == NodeKind::Member) s.begin = legacy_span(ast, ast.at(ast.at(n.a).a)).begin;
+            break;
+        case NodeKind::Unary: s.end = legacy_span(ast, ast.at(n.a)).end; break;
+        default: break;
+    }
+    const std::string_view src = ast.source();
+    while (true) {
+        std::uint32_t p = s.begin;
+        while (p > 0 && space(src[p - 1])) --p;
+        if (p == 0 || src[p - 1] != '(') break;
+        const std::uint32_t open = p - 1;
+        std::uint32_t q = open;
+        while (q > 0 && space(src[q - 1])) --q;
+        if (q > 0 && (word(src[q - 1]) || src[q - 1] == ')' || src[q - 1] == ']')) {
+            // A call, `if (`/`while (`: not a group; `return (` is one.
+            const std::string_view before = q >= 6 ? src.substr(q - 6, 6) : std::string_view();
+            const bool keyword = before == "return";  // rt-lint: allow-string-compare compile time
+            const bool after_return = keyword && (q == 6 || !word(src[q - 7]));
+            if (!after_return) break;
+        }
+        std::uint32_t r = s.end;
+        while (r < src.size() && space(src[r])) ++r;
+        if (r >= src.size() || src[r] != ')' || !balanced_between(src, open, r)) break;
+        s.begin = open;
+        s.end = r + 1;
+    }
+    return s;
+}
+
+} // namespace
+
+std::uint32_t UnitCompiler::prepared_begin(const Node& node) const { return legacy_span(ast_, node).begin; }
+std::uint32_t UnitCompiler::prepared_end(const Node& node) const { return legacy_span(ast_, node).end; }
+
+// The source offset legacy reports for an error raised by `node` (CP12):
+//  * prepared evaluator: the start of the failing node's span, parentheses
+//    around it included (src/Ast.cpp failure_origin);
+//  * textual evaluator: the start of the failing expression (parentheses
+//    excluded), except inside an `if`/`else if` condition (the `if`), a
+//    `return` expression (the `return`, message prefixed "return: ") and
+//    index brackets (the index expression).
+std::uint32_t UnitCompiler::site(const Node& node) const {
+    if (prepared()) return prepared_begin(node);
+    if (if_site_ != kNoSite) return if_site_;
+    if (return_site_ != kNoSite) return return_site_;
+    if (index_site_ != kNoSite) return index_site_;
+    return node.begin;
+}
+
+// Does legacy's prepared evaluator run this statement (parse_statement
+// accepts it), or its textual one (StmtKind::Legacy)?
+bool UnitCompiler::statement_preparable(const Node& node) const {
+    const auto accepts = [this](NodeId id) {
+        if (id == kNoNode) return true;
+        const Node& n = ast_.at(id);
+        const std::uint32_t b = prepared_begin(n);
+        return legacy_prepared_parse_accepts(ast_.source().substr(b, prepared_end(n) - b));
+    };
+    switch (node.kind) {
+        case NodeKind::Declare: case NodeKind::Assign: case NodeKind::CompoundAssign: return accepts(node.b);
+        case NodeKind::If: case NodeKind::While: return accepts(node.a);
+        case NodeKind::Return: return (node.flags & kFlagBare) || accepts(node.a);
+        case NodeKind::ExprStmt: {
+            const Node& e = ast_.at(node.a);
+            if (!accepts(node.a)) return false;
+            if (e.kind != NodeKind::Call) return true;
+            const NodeId* args = ast_.list(e);
+            // A rejected argument sends the call to the textual path.
+            for (std::uint32_t k = 0; k < e.count; ++k)
+                if (!accepts(args[k])) return false;
+            return true;
+        }
+        default: return true;
+    }
+}
+
+bool UnitCompiler::kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason) {
+    if ((kinds(id) & kKindUnknown) || (kinds(id) & ~allowed) == 0) return true;
+    return fail(at, reason);
+}
+
+// Legacy binds a declaration, assignment, return, element or literal item
+// written as a place (name, member or index) to an aggregate as a location
+// reference (P8); the VM copies. Refused when the place can hold an array or
+// object.
+bool UnitCompiler::no_alias(NodeId value, const Node& at) {
+    const NodeKind kind = ast_.at(value).kind;
+    if (kind != NodeKind::Ident && kind != NodeKind::Member && kind != NodeKind::Index) return true;
+    if ((kinds(value) & kKindUnknown) || (kinds(value) & kKindAggregate) == 0) return true;
+    return fail(at, "aliasing");
 }
 
 // Legacy applies a prefix `!` to the rest of the evaluation unit (`!x + 1`

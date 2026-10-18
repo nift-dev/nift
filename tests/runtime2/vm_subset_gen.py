@@ -164,16 +164,21 @@ SLIT = ['"a"', '"bc"', '""', "'q'", '"x y"', '"é"', '"zz"', '"1"']
 CMP = ["<", "<=", ">", ">=", "==", "!="]
 KINDS = ["i", "d", "s", "b", "a", "o"]
 
-# Deliberate run-time conditions (documented replay reasons), appended to a
-# small share of programs: (statement, expected outcome key).
+# Deliberate run-time conditions, appended to a share of programs: the CP11
+# replay reasons (runtime-error, unverified, number-range, aliasing). CP12
+# removed replay: each now either runs on the VM with legacy's exact
+# behaviour (outcome vm, or vm-error: the VM reports legacy's error itself) or
+# is refused before execution: (statement, acceptable outcome keys).
 TRIGGERS = [
-    ("print(1 / 0)", "replayed:bail:runtime-error"),
-    ('print("a" < 1)', "replayed:bail:runtime-error"),
-    ('print(-"a")', "replayed:bail:runtime-error"),
-    ("tq := [1]\nprint(tq[5])", "replayed:bail:runtime-error"),
-    ('tq := {"k": 1}\nprint(tq.length())', "replayed:bail:unverified"),
-    ("tq := 9007199254740991\nprint(tq + 1)", "replayed:bail:number-range"),
-    ("tq := [1]\ntr := tq\nprint(tr)", "replayed:bail:aliasing"),
+    ("print(1 / 0)", ("vm-error",)),
+    ('print("a" < 1)', ("fallback:type:<",)),
+    ('print(-"a")', ("fallback:type:unary",)),
+    ("tq := [1]\nprint(tq[5])", ("vm-error",)),
+    ('tq := {"k": 1}\nprint(tq.length())', ("vm-error", "vm")),  # textual: legacy error; prepared: 1
+    ("tq := 9007199254740991\nprint(tq + 1)", ("vm",)),
+    ("tq := [1]\ntr := tq\nprint(tr)", ("fallback:aliasing",)),
+    ("tq := 4000000000\ntq = tq * tq\nprint(tq)", ("vm-error",)),  # textual overflow; prepared re-evaluation
+    ("tq := 1\ntq = tq / 2", ("vm-error",)),  # binding type error (wording per evaluator)
 ]
 
 
@@ -198,6 +203,7 @@ class Supported:
         self.fn_names = set()
         self.in_fn = False
         self.restricted = False  # inside a function condition / return
+        self.in_arg = 0  # inside the arguments of a user call
         self.features = collections.Counter()
         self.bt = {}  # binding name -> legacy binding type (kind letter)
 
@@ -254,16 +260,15 @@ class Supported:
             return None
         name, params, _ = self.r.choice(c)
         self.features["call:" + kind] += 1
-        return f"{name}({', '.join(self.arg(scope, pk, d + 1) for pk in params)})"
+        # CP12: no member or index read inside the arguments of a user call
+        # (legacy resolves them as locations; their diagnostics are not
+        # reproduced, so the compiler refuses them: path-in-call-argument).
+        self.in_arg += 1
+        args = ', '.join(self.arg(scope, pk, d + 1) for pk in params)
+        self.in_arg -= 1
+        return f"{name}({args})"
 
     def arg(self, scope, k, d):
-        # Places (`a[0]`, `o.n`) only for scalars: parameters are never mutated.
-        if k == "i" and self.r.random() < 0.2:
-            a, o = self.var(scope, "a"), self.var(scope, "o")
-            opts = ([f"{a}[0]"] if a else []) + ([f"{o}.n", f'{o}["n"]'] if o else [])
-            if opts:
-                self.features["arg:place"] += 1
-                return self.r.choice(opts)
         if k == "o" and self.restricted:
             return self.var(scope, "o")
         return self.typed(scope, k, d)
@@ -284,7 +289,7 @@ class Supported:
             return f"{self.par(self.ie(scope, d + 1))} * {self.ch('2', '3')}"
         if r < 0.72:
             return f"{self.ch('7', '10', '42')} % {self.ch('3', '4')}"
-        if r < 0.84:
+        if r < 0.84 and not self.in_arg:
             a, o, s = self.var(scope, "a"), self.var(scope, "o"), self.var(scope, "s")
             opts = ([f"{a}.length()", f"{a}.size()", f"{a}[0]", f"{a}[{a}.length() - 1]"] if a else []) + \
                    ([f"{o}.n", f'{o}["n"]'] if o else []) + ([f"{s}.length()"] if s else [])
@@ -314,7 +319,7 @@ class Supported:
             return f"{self.par(self.de(scope, d + 1))} * 1.5"
         if r < 0.78:
             return f"{self.par(self.de(scope, d + 1))} / 2"
-        if r < 0.86:
+        if r < 0.86 and not self.in_arg:
             o = self.var(scope, "o")
             if o:
                 return self.ch(f"{o}.x", f'{o}["x"]')
@@ -335,7 +340,7 @@ class Supported:
         if r < 0.75:
             right = self.ch(self.r.choice(SLIT), self.par(self.ie(scope, d + 1)), "true", "null")
             return f"{self.r.choice(SLIT) if self.r.random() < 0.3 else self.par(self.se(scope, d + 1))} + {right}"
-        if r < 0.85:
+        if r < 0.85 and not self.in_arg:
             o = self.var(scope, "o")
             if o:
                 return f"{o}.s"
@@ -668,10 +673,10 @@ def supported_program(seed, index):
     return src, "vm", g.features
 
 
-def replay_program(seed, index):
-    """(source, expected replay key, features): a supported program ending in one
-    deliberate documented run-time condition (TRIGGERS), cycled so every reason
-    is exercised. Tracked separately: CP12 must remove every replay (D-013)."""
+def former_program(seed, index):
+    """(source, acceptable outcome keys, features): a supported program ending in
+    one deliberate former replay condition (TRIGGERS), cycled so every reason
+    is exercised (CP12: no replay may remain, D-013)."""
     trigger, expect = TRIGGERS[index % len(TRIGGERS)]
     for attempt in range(50):
         rng = random.Random(seed * 15485863 + index * 101 + attempt)
@@ -818,7 +823,7 @@ def run(nift, d, mode, timeout):
 def key_of(st):
     if not st:
         return "no-stats"
-    return st["outcome"] if st["outcome"] in ("vm", "compiled") else f"{st['outcome']}:{st['reason']}"
+    return st["outcome"] if st["outcome"] in ("vm", "compiled", "vm-error") else f"{st['outcome']}:{st['reason']}"
 
 
 def check_supported(nift, work, item, timeout):
@@ -832,8 +837,20 @@ def check_supported(nift, work, item, timeout):
         problem = None
         if vm != legacy:
             problem = "output differs"
+        elif isinstance(expect, tuple):
+            if not any(key == e or key.startswith(e + ":") or (e.startswith("fallback:") and key.startswith(e))
+                       for e in expect):
+                problem = f"expected one of {expect}, got {key}"
         elif (key != expect) if expect == "vm" else not key.startswith(expect):
             problem = f"expected {expect}, got {key}"
+        # CP12 invariants: one engine, once, selected before execution.
+        if not problem and st:
+            if st["outcome"] == "replayed":
+                problem = "replayed (replay no longer exists)"
+            elif st.get("vm_executions", 0) + st.get("legacy_executions", 0) != 1:
+                problem = f"executions vm={st.get('vm_executions')} legacy={st.get('legacy_executions')}"
+            elif st["outcome"] == "fallback" and (st.get("execute_us", 0) != 0 or st.get("vm_executions", 0)):
+                problem = "fallback after execution started"
         return i, key, problem, src, legacy, vm
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -896,14 +913,15 @@ def suite_supported(args, work, out):
     return len(failures)
 
 
-def suite_replay(args, work, out):
-    """Runtime replay cases (CP11 only, D-013; CP12 removes them): each must
-    replay with its documented reason and match legacy exactly (stdout, stderr,
-    exit status), so the replay duplicated nothing."""
+def suite_former(args, work, out):
+    """Former replay cases (CP12, D-013): each must run on the VM with legacy's
+    exact stdout, stderr and exit status (the VM reports legacy's error
+    itself), or be refused before execution; never a replay, and the unit
+    executes exactly once."""
     count = max(len(TRIGGERS), args.count // 10)
     items = []
     for i in range(count):
-        src, expect, feats = replay_program(args.seed, i)
+        src, expect, feats = former_program(args.seed, i)
         items.append((i, src, expect, feats))
     tally, failures = collections.Counter(), []
     with cf.ThreadPoolExecutor(args.jobs) as pool:
@@ -911,11 +929,11 @@ def suite_replay(args, work, out):
                                                                                       args.timeout), items):
             tally[key] += 1
             if problem:
-                failures.append((f"replay seed {args.seed} index {i}", problem, src, legacy, vm))
+                failures.append((f"former-replay seed {args.seed} index {i}", problem, src, legacy, vm))
     report_failures(failures)
-    print(f"runtime-replay cases (CP12 backlog): {count} programs (seed {args.seed}); outcomes {dict(tally)}; "
-          f"{len(failures)} failure(s)")
-    out["replay"] = {"seed": args.seed, "count": count, "outcomes": dict(tally), "failures": len(failures)}
+    print(f"former replay cases: {count} programs (seed {args.seed}); outcomes {dict(tally)}; "
+          f"replayed {tally.get('replayed', 0)}; {len(failures)} failure(s)")
+    out["former"] = {"seed": args.seed, "count": count, "outcomes": dict(tally), "failures": len(failures)}
     return len(failures)
 
 
@@ -923,7 +941,7 @@ REQUIRED_FEATURES = [
     "decl:i", "decl:d", "decl:s", "decl:b", "decl:a", "decl:o", "decl:call", "assign:call", "assign:a",
     "compound:i", "compound:d", "compound:s", "push", "element:name", "element:literal", "print", "if",
     "loop:top", "loop:top:nested", "loop:fn", "jump", "while:mutual", "while:call", "recursion",
-    "recursion:mutual", "call:recursive", "jump:fn", "jump:top", "arg:place", "param:i", "param:d", "param:s", "param:b", "param:a",
+    "recursion:mutual", "call:recursive", "jump:fn", "jump:top", "param:i", "param:d", "param:s", "param:b", "param:a",
     "param:o", "param:push", "return:i", "return:d", "return:s", "return:b", "return:a", "ternary", "coalesce",
     "logical", "not", "access", "top-return", "loop:calls-every-function",
 ] + [f"cmp:{k}:{op}" for k in ("i", "d", "s") for op in CMP] + [
@@ -956,7 +974,7 @@ def suite_unsupported(args, work, out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
-    ap.add_argument("--suite", default="both", choices=["supported", "replay", "unsupported", "both"])
+    ap.add_argument("--suite", default="both", choices=["supported", "former", "unsupported", "both"])
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--count", type=int, default=400)
     ap.add_argument("--jobs", type=int, default=2)
@@ -974,8 +992,8 @@ def main():
         failures = 0
         if args.suite in ("supported", "both"):
             failures += suite_supported(args, work, out)
-        if args.suite in ("replay", "both"):
-            failures += suite_replay(args, work, out)
+        if args.suite in ("former", "both"):
+            failures += suite_former(args, work, out)
         if args.suite in ("unsupported", "both"):
             failures += suite_unsupported(args, work, out)
     finally:

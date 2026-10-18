@@ -17,22 +17,35 @@
 
 namespace nift::rt {
 
-// Why execution stopped before the end of the program. Every reason other
-// than None means "this run is not committed": the script is re-run on the
-// legacy engine, which then produces the observable behaviour (D-001
-// whole-unit fallback; see vm.h).
-enum class BailReason : std::uint8_t {
-    None,
-    Error,          // a run-time error (legacy reports its own diagnostic)
-    NumberRange,    // a number at or beyond 2^53, or an integer -0: legacy loop and top-level paths differ
-    Aliasing,       // an aggregate bound from a place (legacy location reference)
-    RecursionBudget,// the VM frame budget was exhausted
-    Unverified,     // a case whose legacy result the VM does not reproduce (yet)
-    OutputLimit,    // the output buffer reached VmOptions::output_limit without a flush hook
-    NestingDepth,   // `==`/`!=` on values nested deeper than the VM decides (legacy's recursion decides)
-    Internal,       // an internal VM failure (bad opcode, unknown native): reported, never replayed
+// Why execution stopped before the end of the program (CP12: there is no
+// replay; engine selection is final before the first instruction runs).
+//   Error     a run-time error of the program, reported like legacy reports it
+//             (message, position, exit status 1): the VM reproduces every
+//             run-time error the compiled subset can reach (the compiler
+//             refuses constructs whose legacy error it cannot reproduce).
+//   Internal  an unexpected VM failure (bad opcode, broken invariant):
+//             reported as such (exit 70), never disguised as a legacy run.
+//   Reeval    internal only, never returned by Vm::run: a prepared-context
+//             statement produced a number legacy re-evaluates textually.
+enum class StopReason : std::uint8_t { None, Error, Internal, Reeval };
+const char* stop_reason_name(StopReason reason);
+
+// Instruction flags (Instr::flags). Read only on slow and error paths.
+enum : std::uint8_t {
+    kInstrPrepared = 1u << 0,      // legacy's prepared (loop) evaluator semantics, else textual
+    kInstrReeval = 1u << 1,        // prepared compound/increment: a large operand re-evaluates the statement
+    kInstrPathText = 1u << 2,      // index/member/length errors use the textual (JSON path) message
+    kInstrReturnPrefix = 1u << 3,  // inside a textual `return` statement: errors get a "return: " prefix
+    kInstrCallerSite = 1u << 4,    // a statement-level error of a prepared function: reported at its call
 };
-const char* bail_reason_name(BailReason reason);
+
+// Per-instruction note (cold): text used by error messages (an expression's
+// source, a binding or function name) and the re-evaluation target of a
+// kInstrReeval instruction.
+struct Note {
+    std::string text;
+    std::uint32_t alt = 0;  // re-evaluation target (pc)
+};
 
 struct Proto {
     std::string name;
@@ -41,6 +54,9 @@ struct Proto {
     std::vector<Instr> code;
     std::vector<std::uint32_t> offsets;
     std::vector<Value> constants;
+    std::vector<std::uint32_t> notes;  // parallel to code: index into note_table + 1, 0 = none
+    std::vector<Note> note_table;
+    const Note* note(std::size_t pc) const { return notes[pc] ? &note_table[notes[pc] - 1] : nullptr; }
 };
 
 struct Program {

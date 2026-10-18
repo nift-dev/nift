@@ -1,5 +1,7 @@
 # CP11 VM corpus: expected NIFT_VM=1 outcome per script (tests/runtime2/vm_parity.py).
-# <script> <vm|fallback|replayed> [reason prefix]. Every script must also match legacy byte for byte.
+# <script> <vm|vm-error|fallback> [reason or message prefix]. Every script must also match legacy byte
+# for byte. CP12: the former `replayed` outcomes (replay_*.f, review_r1/r5) are now `vm` or `vm-error`
+# (the VM reproduces legacy's result or error itself) or a static `fallback` (refused before execution).
 arith.f vm 
 arrays.f vm 
 control.f vm 
@@ -26,44 +28,44 @@ fallback_try.f fallback statement:Try
 functions.f vm 
 kernels.f vm 
 logic.f vm 
-objects.f vm 
-replay_alias.f replayed bail:aliasing
+objects.f fallback type:print
+replay_alias.f fallback aliasing
 replay_arity.f fallback static-error:arity
-replay_bad_index.f replayed bail:runtime-error
-replay_concat_array.f replayed bail:runtime-error
-replay_div_zero.f replayed bail:runtime-error
-replay_increment_string.f replayed bail:runtime-error
-replay_index_assign_type.f replayed bail:unverified
-replay_int_overflow.f replayed bail:number-range
+replay_bad_index.f vm-error JSON array index 2 is out of range
+replay_concat_array.f fallback type:+
+replay_div_zero.f vm-error division by zero
+replay_increment_string.f fallback type:increment
+replay_index_assign_type.f vm-error index out of range: 5
+replay_int_overflow.f vm-error signed 64-bit integer overflow
 typed_double_binding.f vm
-replay_large_literal_result.f replayed bail:number-range
-replay_loop_type_change.f replayed bail:runtime-error
+replay_large_literal_result.f vm
+replay_loop_type_change.f vm-error cannot change binding type: x
 replay_member_assign.f fallback static-error:member-assign
-replay_missing_member.f replayed bail:runtime-error
-replay_modulo_float.f replayed bail:runtime-error
-replay_negate_string.f replayed bail:runtime-error
-replay_negative_zero.f replayed bail:number-range
-replay_ordering.f replayed bail:runtime-error
-replay_overflow.f replayed bail:runtime-error
+replay_missing_member.f vm-error value has no member: b
+replay_modulo_float.f vm-error modulo requires integer-valued operands
+replay_negate_string.f fallback type:unary
+replay_negative_zero.f vm
+replay_ordering.f fallback type:<
+replay_overflow.f vm-error signed 64-bit integer overflow
 replay_param_redeclare.f fallback static-error:redeclared
 replay_redeclare.f fallback static-error:redeclared
-replay_render_array.f replayed bail:runtime-error
-replay_return_array.f replayed bail:runtime-error
-replay_return_local_array.f replayed bail:aliasing
-replay_return_place.f replayed bail:aliasing
-replay_string_plus_assign.f replayed bail:runtime-error
-replay_type_change.f replayed bail:runtime-error
+replay_render_array.f fallback type:print
+replay_return_array.f fallback type:script-return
+replay_return_local_array.f fallback aliasing
+replay_return_place.f fallback aliasing
+replay_string_plus_assign.f fallback type:compound-assignment
+replay_type_change.f vm-error cannot assign string to int binding 'x'
 strings.f vm 
 top_return.f vm 
 # CP11 review round 1 regressions.
 review_d1_zero_literals.f fallback number-literal
 review_d2_jump_not_last.f fallback jump-not-last
-review_d3_string_size.f replayed bail:runtime-error
+review_d3_string_size.f fallback type:length
 review_d4_builtin_name.f fallback fn-name-reserved
 review_d5_reserved_binding.f fallback binding-name-reserved
 review_d6_alias_argument.f fallback alias-argument
-review_d6_alias_readonly.f vm
-review_r1_frame_memory.f replayed bail:recursion-budget
+review_d6_alias_readonly.f fallback path-in-call-argument
+review_r1_frame_memory.f vm-error callable recursion depth exceeded
 review_n1_loop_decl_type.f fallback prepared-decl-type
 # CP11 review round 2 regressions.
 review2_m1_prepare_type.f fallback prepared-decl-type
@@ -75,7 +77,7 @@ review2_m3_string_arg_number.f fallback string-arg-type
 review2_m3_string_arg_ok.f vm
 review2_m4_formfeed.f fallback opaque:legacy-runtime-error
 review2_m4_vtab.f fallback opaque:legacy-runtime-error
-review2_r5_hidden_frame_memory.f replayed bail:recursion-budget
+review2_r5_hidden_frame_memory.f vm-error callable recursion depth exceeded
 review2_r6_deep_equality.f vm
 # CP11 review round 3 regressions.
 review3_f1_member_index.f fallback index-target

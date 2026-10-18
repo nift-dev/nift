@@ -51,9 +51,9 @@ bool Vm::memory_exceeded(Fault& fault) {
     if (live_heap_bytes() <= heap_limit_) return true;
     if (frames_.size() >= kLegacyMaxDepth) {
         beyond_legacy_depth_ = true;
-        return raise(fault, BailReason::RecursionBudget, "memory budget exceeded in deep recursion");
+        return raise(fault, StopReason::Error, "callable recursion depth exceeded (memory budget)");
     }
-    return raise(fault, BailReason::Internal, "memory budget exceeded");
+    return raise(fault, StopReason::Internal, "memory budget exceeded");
 }
 
 bool Vm::reserve_registers(std::size_t needed) {
@@ -68,32 +68,42 @@ bool Vm::reserve_registers(std::size_t needed) {
 
 // Slow path of Call: frame checks at depth next_frame_check_, then register
 // stack growth (or its budget).
-bool Vm::call_slow(std::size_t callee_base, std::size_t nregs, Fault& fault) {
-    if (frames_.size() >= next_frame_check_ && !frame_check(fault)) return false;
-    if (!reserve_registers(callee_base + nregs + 1u))
-        return raise(fault, BailReason::RecursionBudget, "register stack budget exceeded");
+bool Vm::call_slow(const Proto* callee, std::size_t callee_base, Fault& fault) {
+    if (frames_.size() >= next_frame_check_ && !frame_check(callee, fault)) return false;
+    if (!reserve_registers(callee_base + callee->nregs + 1u)) {
+        if (frames_.size() >= kLegacyMaxDepth) {
+            beyond_legacy_depth_ = true;
+            return raise(fault, StopReason::Error, "callable recursion depth exceeded: " + callee->name);
+        }
+        return raise(fault, StopReason::Internal, "register stack budget exceeded");
+    }
     return memory_ok(fault);
 }
 
 // Taken at depth next_frame_check_: the frame budget and the legacy depth
 // mark (memory is checked by memory_ok).
-bool Vm::frame_check(Fault& fault) {
+bool Vm::frame_check(const Proto* callee, Fault& fault) {
     const std::size_t depth = frames_.size();
-    if (depth >= options_.max_frames)
-        return raise(fault, BailReason::RecursionBudget, "callable recursion depth exceeded");
+    if (depth >= options_.max_frames) {
+        beyond_legacy_depth_ = true;
+        return raise(fault, StopReason::Error, "callable recursion depth exceeded: " + callee->name);
+    }
     if (depth >= kLegacyMaxDepth) beyond_legacy_depth_ = true;
     next_frame_check_ = depth < kLegacyMaxDepth ? kLegacyMaxDepth : depth + depth / 8 + 1;
     if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
     return true;
 }
 
-bool Vm::flush_if_needed(std::string& output, Fault& fault) {
-    if (output.size() <= options_.output_limit) return true;
-    if (!options_.flush) return raise(fault, BailReason::OutputLimit, "output limit reached before the run completed");
-    options_.flush(output, options_.flush_context);
-    committed_ = true;
-    return true;
+void Vm::flush_if_needed(std::string& output) {
+    if (output.size() > options_.flush_threshold && options_.flush) options_.flush(output, options_.flush_context);
 }
+
+namespace {
+inline bool large_number(const Value& v) { return v.is(Kind::Int) ? !safe_integer(v.as_int()) : is_large(v); }
+inline const Note* note_at(const Proto* proto, const Instr* pc) {
+    return proto->note(static_cast<std::size_t>(pc - proto->code.data()));
+}
+} // namespace
 
 #define RK(x) (((x) & kConstantBit) ? K[(x) & 0x7fffu] : R[(x)])
 #if NIFT_RT_COMPUTED_GOTO
@@ -111,14 +121,14 @@ bool Vm::flush_if_needed(std::string& output, Fault& fault) {
         if (both_int(l, r) && !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v) extra) {       \
             R[pc->a] = Value::integer(v); NEXT();                                                    \
         }                                                                                            \
-        if (!arith_slow(OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();           \
+        if (!arith_slow(*pc, OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();      \
         NEXT();                                                                                      \
     }
 #define COMPARE(name, base, expr, left, right, store)                                                \
     OP(name) {                                                                                       \
         const Value& l = RK(left); const Value& r = RK(right); bool res;                             \
         if (both_int(l, r)) { const std::int64_t x = l.as_int(), y = r.as_int(); res = (expr); }     \
-        else if (!compare_slow(OpCode::base, l, r, res, options_.equality_depth, fault)) FAIL();     \
+        else if (!compare_slow(OpCode::base, l, r, res, fault)) FAIL();                              \
         store;                                                                                       \
     }
 #define SET_RESULT { R[pc->a] = Value::boolean(res); NEXT(); }
@@ -135,7 +145,8 @@ VmResult Vm::run(std::string& output) {
     const Proto* proto = protos_.front();
     std::size_t base = 0;
     if (!reserve_registers(proto->nregs + 1u)) {
-        result.reason = BailReason::RecursionBudget;
+        result.reason = StopReason::Internal;
+        result.message = "register stack budget exceeded";
         return result;
     }
     Value* R = stack_.data();
@@ -163,7 +174,7 @@ VmResult Vm::run(std::string& output) {
             const std::int64_t v = l.as_int() % r.as_int();
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
         }
-        if (!arith_slow(OpCode::Mod, l, r, R[pc->a], fault)) FAIL();
+        if (!arith_slow(*pc, OpCode::Mod, l, r, R[pc->a], fault)) FAIL();
         NEXT();
     }
     OP(AddI) {
@@ -171,11 +182,7 @@ VmResult Vm::run(std::string& output) {
         if (x.is(Kind::Int) && safe_integer(x.as_int() + jump_offset(pc->c))) {
             R[pc->a] = Value::integer(x.as_int() + jump_offset(pc->c)); NEXT();
         }
-        if (!x.is_number()) {
-            raise(fault, BailReason::Error, "increment/decrement requires a numeric lvalue");
-            FAIL();
-        }
-        if (!arith_slow(OpCode::Add, x, Value::integer(jump_offset(pc->c)), R[pc->a], fault)) FAIL();
+        if (!arith_slow(*pc, OpCode::Add, x, Value::integer(jump_offset(pc->c)), R[pc->a], fault)) FAIL();
         NEXT();
     }
     OP(AddAssign) {
@@ -183,7 +190,7 @@ VmResult Vm::run(std::string& output) {
         if (both_int(x, y) && !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
             x = Value::integer(v); NEXT();
         }
-        if (!add_assign_slow(x, y, x, fault) || !memory_ok(fault)) FAIL();
+        if (!add_assign_slow(*pc, x, y, fault) || !memory_ok(fault)) FAIL();
         NEXT();
     }
     COMPARE(Eq, Eq, x == y, pc->b, pc->c, SET_RESULT)
@@ -203,28 +210,26 @@ VmResult Vm::run(std::string& output) {
     OP(JmpTrue) { pc += truth(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(JmpNotNull) { pc += R[pc->a].is_null() ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
     OP(BindType) { R[pc->a] = Value::integer(text_binding_type(RK(pc->c).as_int(), R[pc->b])); NEXT(); }
-    OP(CheckAssign) {
-        if (!check_assign(R[pc->a], R[pc->b].as_int(), RK(pc->c).as_int(), fault)) FAIL();
-        NEXT();
-    }
-    OP(CheckParam) {
-        const std::int64_t text = RK(pc->c).as_int();
-        if (text_binding_type(text, R[pc->a]) == fast_tag(R[pc->a])) NEXT();
-        raise(fault, BailReason::Unverified, "parameter type differs between legacy paths");
+    OP(CheckAssign) {  // textual `x = e`: the type legacy derives from the text and the value
+        const std::int64_t assigned = text_binding_type(RK(pc->c).as_int(), R[pc->a]);
+        if (tag_assignable(assigned, R[pc->b].as_int())) NEXT();
+        binding_type_error(*pc, assigned, R[pc->b].as_int(), note_at(proto, pc), fault);
         FAIL();
     }
     OP(CheckType) {
         const std::int64_t to = R[pc->b].as_int();
-        if (tag_assignable(fast_tag(R[pc->a]), to)) NEXT();
-        raise(fault, BailReason::Error, "cannot assign a value of another type to a typed binding");
+        const std::int64_t tag = fast_tag(R[pc->a]);
+        if (tag_assignable(tag, to)) NEXT();
+        binding_type_error(*pc, tag, to, note_at(proto, pc), fault);
         FAIL();
     }
+    OP(JmpLarge) { pc += large_number(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(Call) {
         const Proto* callee = protos_[pc->b];
         const std::size_t callee_base = base + pc->a;
         // One combined test on the hot path; budgets and growth are out of line.
         if ((frames_.size() >= next_frame_check_ || callee_base + callee->nregs + 1u > stack_.size()) &&
-            !call_slow(callee_base, callee->nregs, fault))
+            !call_slow(callee, callee_base, fault))
             FAIL();
         frames_.push_back(Frame{pc + 1, base, proto});
         base = callee_base;
@@ -235,61 +240,95 @@ VmResult Vm::run(std::string& output) {
         DISPATCH();
     }
     OP(Return) {
-        if (pc->c != 0 && is_aggregate(R[pc->a])) { raise(fault, BailReason::Aliasing, "aggregate return"); FAIL(); }
         if (pc->a != 0) R[0] = R[pc->a];
         RETURN_TO_CALLER
     }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
         if (!append_rendered(R[pc->a], result.return_text)) {
-            raise(fault, BailReason::Error, "script return value is not directly renderable");
+            internal(fault, "script return value");
             FAIL();
         }
         result.returned = true;
         goto done;
     }
     OP(Halt) { goto done; }
-    OP(Bail) { raise(fault, static_cast<BailReason>(pc->b), "the legacy engine reports an error here"); FAIL(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
-    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NoAlias) {
-        if (!cold(*pc, R, K, output, fault) || !memory_ok(fault)) FAIL();
+    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) {
+        if (!cold(*pc, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
+            FAIL();
         NEXT();
     }
 #if !NIFT_RT_COMPUTED_GOTO
-    default: raise(fault, BailReason::Internal, "bad opcode"); FAIL();
+    default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
 #endif
 bail:
+    if (fault.reason == StopReason::Reeval) {
+        if (const Instr* target = reeval_target(proto, pc, fault)) {
+            pc = target;
+            DISPATCH();
+        }
+    }
+    error_result(result, fault, proto, pc);
+done:
+    result.beyond_legacy_depth = beyond_legacy_depth_;
+    result.reevaluations = reevaluations_;
+    return result;
+}
+
+// Legacy re-evaluates this prepared statement on its textual path: the run
+// continues at the statement's textual code (compiled next to it).
+const Instr* Vm::reeval_target(const Proto* proto, const Instr* pc, Fault& fault) {
+    const Note* note = proto->note(static_cast<std::size_t>(pc - proto->code.data()));
+    if (!note) {
+        fault.reason = StopReason::Internal;
+        fault.message = "re-evaluation without a target";
+        return nullptr;
+    }
+    ++reevaluations_;
+    fault = Fault();
+    return proto->code.data() + note->alt;
+}
+
+void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const {
     result.reason = fault.reason;
     result.message = fault.message;
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
-done:
-    result.committed = committed_;
-    result.beyond_legacy_depth = beyond_legacy_depth_;
-    return result;
+    // A statement-level error of a function legacy runs prepared carries no
+    // expression of its own: legacy reports it at the call in the caller.
+    if ((pc->flags & kInstrCallerSite) && !frames_.empty()) {
+        const Frame& caller = frames_.back();
+        result.offset = caller.proto->offsets[static_cast<std::size_t>(caller.ret - 1 - caller.proto->code.data())];
+    }
+    // Legacy prefixes "return: " once per textual `return` the error passes
+    // through, except for its recursion-depth error (ParserTemplate.cpp).
+    if (!beyond_legacy_depth_) {
+        result.return_prefixes = (pc->flags & kInstrReturnPrefix) ? 1u : 0u;
+        for (const Frame& frame : frames_)
+            if ((frame.ret - 1)->flags & kInstrReturnPrefix) ++result.return_prefixes;
+    }
 }
 
 bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
     switch (static_cast<NativeId>(in.b)) {
         case NativeId::Print:
-            if (!native_print(R[in.a], output, fault.message)) {
-                fault.reason = BailReason::Error;
-                return false;
-            }
+            if (!native_print(R[in.a], output, fault.message)) return internal(fault, "print");
             R[in.a] = Value();
-            return flush_if_needed(output, fault);
+            flush_if_needed(output);
+            return true;
     }
-    return raise(fault, BailReason::Internal, "unknown native");
+    return raise(fault, StopReason::Internal, "unknown native");
 }
 
-bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fault& fault) {
+bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault) {
     Value out;
     switch (in.op) {
         case OpCode::Nop: return true;
-        case OpCode::Div: if (!arith_slow(OpCode::Div, RK(in.b), RK(in.c), out, fault)) return false; break;
+        case OpCode::Div: if (!arith_slow(in, OpCode::Div, RK(in.b), RK(in.c), out, fault)) return false; break;
         case OpCode::Not: out = Value::boolean(!truth(R[in.b])); break;
         case OpCode::Truth: out = Value::boolean(truth(R[in.b])); break;
-        case OpCode::Neg: if (!negate_slow(R[in.b], out, fault)) return false; break;
+        case OpCode::Neg: if (!negate_slow(in, R[in.b], out, fault)) return false; break;
         case OpCode::Pos: if (!positive_slow(R[in.b], out, fault)) return false; break;
         case OpCode::CallNative: return native(in, R, output, fault);
         case OpCode::NewArray:
@@ -302,19 +341,16 @@ bool Vm::cold(const Instr& in, Value* R, const Value* K, std::string& output, Fa
             object_set(R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
-        case OpCode::GetIndex: if (!get_index(R[in.b], RK(in.c), out, fault)) return false; break;
-        case OpCode::SetIndex: return set_index(R[in.a], RK(in.b), RK(in.c), fault);
-        case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
+        case OpCode::GetIndex: if (!get_index(in, note, R[in.b], RK(in.c), out, fault)) return false; break;
+        case OpCode::SetIndex: return set_index(in, note, R[in.a], RK(in.b), RK(in.c), fault);
+        case OpCode::GetMember: if (!get_member(in, R[in.b], Atom{in.c}, out, fault)) return false; break;
         case OpCode::Push: return push_value(R[in.a], RK(in.b), fault);
-        case OpCode::Length: if (!length_of(R[in.b], in.c != 0, out, fault)) return false; break;
+        case OpCode::Length: if (!length_of(in, note, R[in.b], in.c != 0, out, fault)) return false; break;
         case OpCode::TypeMeet:
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));
             break;
-        case OpCode::NoAlias:
-            if (is_aggregate(R[in.a])) return raise(fault, BailReason::Aliasing, "aggregate bound from a place");
-            return true;
-        default: return raise(fault, BailReason::Internal, "unexpected opcode");
+        default: return raise(fault, StopReason::Internal, "unexpected opcode");
     }
     R[in.a] = std::move(out);
     return true;

@@ -45,8 +45,8 @@ int main(int argc, char** argv) {
         nift::rt::Vm vm(*compiled.program);
         const nift::rt::VmResult result = vm.run(output);
         runs.push_back(std::chrono::duration<double, std::micro>(Clock::now() - s).count());
-        if (result.reason != nift::rt::BailReason::None) {
-            std::fprintf(stderr, "bail: %s (%s)\n", nift::rt::bail_reason_name(result.reason), result.message.c_str());
+        if (result.reason != nift::rt::StopReason::None) {
+            std::fprintf(stderr, "stop: %s (%s)\n", nift::rt::stop_reason_name(result.reason), result.message.c_str());
             return 2;
         }
         if (k == 0) {

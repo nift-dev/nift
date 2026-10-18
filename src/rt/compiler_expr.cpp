@@ -4,12 +4,11 @@
 #include "rt/atom.h"
 #include "rt/literal.h"
 #include "rt/native.h"
+#include "rt/prepared_parse.h"
 
 namespace nift::rt::detail {
 
 namespace {
-
-bool is_place(NodeKind kind) { return kind == NodeKind::Ident || kind == NodeKind::Member || kind == NodeKind::Index; }
 
 OpCode binary_opcode(Op op) {
     switch (op) {
@@ -40,6 +39,31 @@ OpCode fused_not_jump(Op op) {
     }
 }
 
+
+// Kinds an arithmetic operator accepts without a legacy type error (or a
+// prepared-path rendering of aggregates in `+`).
+bool arithmetic_kinds_ok(Op op, std::uint8_t l, std::uint8_t r) {
+    if ((l | r) & kKindUnknown) return true;  // refused for its own reason
+    const auto only = [](std::uint8_t k, std::uint8_t allowed) { return (k & ~allowed) == 0; };
+    if (op == Op::Add) {
+        if (only(l, kKindNumber) && only(r, kKindNumber)) return true;
+        // Concatenation: one side is a string, the other a scalar.
+        if (only(l, kKindScalar) && only(r, kKindScalar)) {
+            for (std::uint8_t a = 1; a < 0x80; a <<= 1)
+                for (std::uint8_t b = 1; b < 0x80; b <<= 1)
+                    if ((l & a) && (r & b) && !((a | b) & kKindString) && !((a & kKindNumber) && (b & kKindNumber)))
+                        return false;
+            return true;
+        }
+        return false;
+    }
+    return only(l, kKindNumber) && only(r, kKindNumber);
+}
+
+bool ordering_kinds_ok(std::uint8_t l, std::uint8_t r) {
+    if ((l | r) & kKindUnknown) return true;
+    return ((l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0) || ((l & ~kKindString) == 0 && (r & ~kKindString) == 0);
+}
 
 } // namespace
 
@@ -162,10 +186,20 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
+    const std::uint8_t l = kinds(node.a), r = kinds(node.b);
+    switch (op) {
+        case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
+            if (!arithmetic_kinds_ok(node.op, l, r)) return fail(node, std::string("type:") + op_name(node.op));
+            break;
+        case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
+            if (!ordering_kinds_ok(l, r)) return fail(node, std::string("type:") + op_name(node.op));
+            break;
+        default: break;
+    }
     const std::uint16_t mark = fb_->top();
     std::uint16_t left = 0, right = 0;
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
-    fb_->set_offset(node.begin);
+    fb_->set_offset(site(node));
     fb_->emit(op, dst, left, right);
     fb_->release_to(mark);
     return true;
@@ -208,100 +242,17 @@ bool UnitCompiler::ternary(const Node& node, std::uint16_t dst) {
 }
 
 bool UnitCompiler::unary(const Node& node, std::uint16_t dst) {
+    if (node.op != Op::Not && !kinds_within(node.a, kKindNumber, node, "type:unary")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t operand = 0;
     if (!reg_any(node.a, operand)) return false;
-    fb_->set_offset(node.begin);
+    fb_->set_offset(site(node));
     switch (node.op) {
         case Op::Not: fb_->emit(OpCode::Not, dst, operand); break;
         case Op::Neg: fb_->emit(OpCode::Neg, dst, operand); break;
         case Op::Pos: fb_->emit(OpCode::Pos, dst, operand); break;
         default: return fail(node, "unary-operator");
     }
-    fb_->release_to(mark);
-    return true;
-}
-
-bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
-    const Node& callee = ast_.at(node.a);
-    if (callee.kind == NodeKind::Member) return method_call(node, dst);
-    if (callee.kind != NodeKind::Ident) return fail(callee, "callee");
-    if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
-    const std::string_view name = text(callee);
-    if (scopes_.find(name)) return fail(callee, "call-binding");
-    const auto fn = plan_.index.find(name);
-    NativeInfo native{};
-    const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
-    if (fn == plan_.index.end() && !is_native) return fail(callee, "callable:" + std::string(name));
-    const std::uint16_t arity = is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
-    // When `dst` is the newest register nothing above it is live, so the call
-    // window (arguments, then the callee frame) starts at `dst` and the result
-    // lands in place; otherwise it starts at the first free register.
-    const bool in_place = dst + 1u == fb_->top();
-    const std::uint16_t base = in_place ? dst : fb_->top();
-    const NodeId* args = ast_.list(node);
-    for (std::uint32_t k = 0; k < node.count; ++k) {
-        std::uint16_t reg = base;
-        if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        // A place argument is a legacy location reference (review D6).
-        if (!is_native && is_place_argument(ast_, args[k]) && fn->second - 1u < plan_.escaping.size() &&
-            k < plan_.escaping[fn->second - 1u].size() && plan_.escaping[fn->second - 1u][k])
-            return fail(ast_.at(args[k]), "alias-argument");
-        if (!(in_place && k == 0) && !temp(reg)) return false;
-        if (!expr_to(args[k], reg)) return false;
-        if (!is_native && !param_check(args[k], reg)) return false;
-    }
-    fb_->set_offset(node.begin);
-    if (node.count != arity) return fail(node, "static-error:arity");
-    if (is_native) {
-        fb_->emit(OpCode::CallNative, base, static_cast<std::uint16_t>(native.id),
-                  static_cast<std::uint16_t>(node.count));
-    } else {
-        fb_->emit(OpCode::Call, base, fn->second, static_cast<std::uint16_t>(node.count));
-    }
-    std::uint16_t slot = base;
-    if (node.count == 0 && !in_place && !temp(slot)) return false;  // the result slot exists even without arguments
-    if (dst != base) fb_->emit(OpCode::Move, dst, base);
-    fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
-    return builder_ok();
-}
-
-bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
-    const Node& callee = ast_.at(node.a);
-    if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
-    const std::string_view name = text(ast_.at(callee.b));
-    if (name != "length" && name != "size")  // rt-lint: allow-string-compare compile time
-        return fail(callee, "method:" + std::string(name));
-    if (node.count != 0) return fail(node, "method-arity");
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t receiver = 0;
-    if (!reg_any(callee.a, receiver)) return false;
-    fb_->set_offset(node.begin);
-    fb_->emit(OpCode::Length, dst, receiver, name == "size" ? 1 : 0);  // rt-lint: allow-string-compare compile time
-    fb_->release_to(mark);
-    return true;
-}
-
-bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
-    if (!plain_postfix(node)) return false;
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t object = 0;
-    if (!reg_any(node.a, object)) return false;
-    const Atom key = atom(text(ast_.at(node.b)));
-    if (key.id > 0xffff) return fail(node, "limit:atoms");
-    fb_->set_offset(node.begin);
-    fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
-    fb_->release_to(mark);
-    return true;
-}
-
-bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
-    if (!plain_postfix(node)) return false;
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t object = 0, key = 0;
-    if (!reg_any(node.a, object) || !expr_any(node.b, key)) return false;
-    fb_->set_offset(node.begin);
-    fb_->emit(OpCode::GetIndex, dst, object, key);
     fb_->release_to(mark);
     return true;
 }
@@ -313,8 +264,8 @@ bool UnitCompiler::array_literal(const Node& node, std::uint16_t dst) {
     for (std::uint32_t k = 0; k < node.count; ++k) {
         std::uint16_t reg = 0;
         if (ast_.at(items[k]).kind == NodeKind::Spread) return fail(ast_.at(items[k]), "spread");
+        if (!no_alias(items[k], ast_.at(items[k]))) return false;
         if (!temp(reg) || !expr_to(items[k], reg)) return false;
-        if (is_place(ast_.at(items[k]).kind)) fb_->emit(OpCode::NoAlias, reg);
     }
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::NewArray, dst, base, static_cast<std::uint16_t>(node.count));
@@ -340,9 +291,9 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
             if (s == key.id) return fail(prop, "object-duplicate-key");
         seen.push_back(key.id);
         std::uint16_t value = 0;
+        if (!no_alias(prop.b, prop)) return false;
         if (!expr_any(prop.b, value)) return false;
         fb_->set_offset(prop.begin);
-        if (is_place(ast_.at(prop.b).kind)) fb_->emit(OpCode::NoAlias, value);
         fb_->emit(OpCode::ObjectSet, object, static_cast<std::uint16_t>(key.id), value);
     }
     fb_->emit(OpCode::Move, dst, object);

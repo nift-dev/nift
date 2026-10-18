@@ -5,23 +5,25 @@
 
 1. VM corpus (tests/runtime2/vm-corpus/cp11): every script runs on legacy and
    with NIFT_VM=1; stdout, stderr and exit status must be identical, and the
-   VM outcome (vm / fallback / replayed, with reason) must match the EXPECT
+   VM outcome (vm / vm-error / fallback, with reason) must match the EXPECT
    manifest. Scripts expected to run on the VM must also produce the same
    output under NIFT_VM=require (genuine VM execution, no legacy at all).
 2. Generated programs (vm_gen.py, the general-language generator: original
    distribution, representative Nift including unsupported constructs) and
    mutated near-miss programs: legacy vs NIFT_VM=1, all three channels
-   identical. The VM-execution, replay and fallback shares (by reason) are
-   reported as the coverage metric; there is no coverage threshold (D-016).
+   identical. The VM-execution and fallback shares (by reason) are reported
+   as the coverage metric; there is no coverage threshold (D-016). CP12: a
+   `replayed` outcome cannot occur any more and fails the run; every unit
+   must have executed exactly once (vm_executions + legacy_executions = 1).
 3. --rt-diff: tools/rt-diff over the shared corpora with the CP11 policy file
    (approved D-001 recursion-budget differences only); per-script outcomes
    are collected through tools/rt-vm/nift-vm.
 
 A difference is approved only when it is the D-001#4 recursion budget
 (vm_adversarial.classify_difference: legacy fails with "callable recursion
-depth exceeded", the VM completed past legacy's 64-frame limit, legacy's
-output is a prefix of the VM's). Exit 1 on any other difference or
-expectation mismatch.
+depth exceeded", the VM went past legacy's 64-frame limit and completed or
+stopped with its own recursion error, legacy's output is a prefix of the
+VM's). Exit 1 on any other difference or expectation mismatch.
 """
 import argparse, collections, json, os, resource, shutil, subprocess, sys, tempfile
 
@@ -112,13 +114,21 @@ def nonterminating(a, b):
 def outcome_key(st):
     if not st:
         return "no-stats"
-    if st["outcome"] == "vm":
-        return "vm"
+    if st["outcome"] in ("vm", "vm-error"):
+        return st["outcome"]
     return f"{st['outcome']}:{st['reason']}"
+
+
+def single_execution(st):
+    """CP12 invariants A-C: one engine, once, chosen before execution."""
+    return st is not None and st["outcome"] != "replayed" and \
+        st.get("vm_executions", 0) + st.get("legacy_executions", 0) == 1
 
 
 def verdict(same, a, b, st):
     """'same', 'approved' (D-001#4), 'endless' or 'diff'."""
+    if st is not None and not single_execution(st):
+        return "diff"
     if same:
         return "same"
     if nonterminating(a, b):
@@ -147,7 +157,7 @@ def corpus(args, work):
         want = expect.get(name)
         text = open(os.path.join(CORPUS, name)).read()
         same, a, b, st, c = compare(args.nift, text, name, work, args.timeout,
-                                    require=bool(want and want[0] == "vm"))
+                                    require=bool(want and want[0] in ("vm", "vm-error")))
         got = outcome_key(st)
         tally[got] += 1
         v = verdict(same, a, b, st)
@@ -162,7 +172,7 @@ def corpus(args, work):
         elif st is None or st["outcome"] != want[0] or not st["reason"].startswith(want[1]):
             print(f"FAIL corpus {name}: expected {want[0]} {want[1]}, got {got}")
             failures += 1
-        elif c is not None and c != a:
+        elif c is not None and c != a and classify_difference(a, c, st) != "approved":
             show(f"corpus {name} (NIFT_VM=require)", a, c)
             failures += 1
     print(f"vm corpus: {len(names)} scripts, {failures} failures; outcomes {dict(sorted(tally.items()))}")
@@ -196,9 +206,8 @@ def generated(args, work):
     # threshold (D-016): report the shares, fail only on differences.
     share = coverage_shares(tally, args.gen)
     print(f"general generator coverage (seed {args.seed}): ran on the VM {share['vm']} of {args.gen} "
-          f"({share['vm_pct']:.1f} %), replayed {share['replayed']} ({share['replayed_pct']:.1f} %), "
+          f"({share['vm_pct']:.1f} %; {share['vm_error']} of them ending in a program error), "
           f"fell back {share['fallback']} ({share['fallback_pct']:.1f} %)")
-    print(f"  replay reasons: {share['replay_reasons']}")
     print(f"  fallback reasons: {share['fallback_reasons']}")
     if args.gen_report:
         with open(args.gen_report, "w") as f:
@@ -208,14 +217,13 @@ def generated(args, work):
 
 
 def coverage_shares(tally, total):
-    replay = collections.Counter({k.split(":", 1)[1]: n for k, n in tally.items() if k.startswith("replayed:")})
     fallback = collections.Counter({k.split(":", 1)[1]: n for k, n in tally.items() if k.startswith("fallback:")})
-    vm = tally.get("vm", 0)
+    vm = tally.get("vm", 0) + tally.get("vm-error", 0)
     pct = lambda n: 100.0 * n / max(1, total)  # noqa: E731
-    return {"vm": vm, "vm_pct": pct(vm), "replayed": sum(replay.values()), "replayed_pct": pct(sum(replay.values())),
+    return {"vm": vm, "vm_pct": pct(vm), "vm_error": tally.get("vm-error", 0),
             "fallback": sum(fallback.values()), "fallback_pct": pct(sum(fallback.values())),
-            "replay_reasons": dict(replay.most_common()), "fallback_reasons": dict(fallback.most_common()),
-            "other": {k: n for k, n in tally.items() if k != "vm" and not k.startswith(("replayed:", "fallback:"))}}
+            "fallback_reasons": dict(fallback.most_common()),
+            "other": {k: n for k, n in tally.items() if k not in ("vm", "vm-error") and not k.startswith("fallback:")}}
 
 
 def rt_diff(args, work):
@@ -254,7 +262,7 @@ def rt_diff(args, work):
             continue
         # rt-diff runs copies of the entry, so statistics are matched by file name.
         same_name = [v for k, v in raw.items() if os.path.basename(k) == os.path.basename(r["path"])]
-        if not any(v["outcome"] == "vm" and v.get("beyond_legacy_depth") for v in same_name):
+        if not any(v["outcome"] in ("vm", "vm-error") and v.get("beyond_legacy_depth") for v in same_name):
             print(f"FAIL rt-diff class approval for {r['id']} not confirmed by VM statistics")
             bad_class += 1
     if bad_class:

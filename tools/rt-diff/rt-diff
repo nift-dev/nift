@@ -566,22 +566,29 @@ def source_hash(entry):
 # is a function of (a, b) below. Unlike exact rules, a class rule that
 # approves nothing in a run is not a failure.
 RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
+VM_RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded[^\n]*\n\Z")
 CLASS_CHANNELS = ("stdout", "stderr", "exit", "combined")
 
 
 def recursion_budget_matches(a, b):
     """D-001#4: A (legacy) fails only with "callable recursion depth exceeded"
-    (exit 1, that one diagnostic line), B completes (exit 0, empty stderr) and
-    A's stdout is a prefix of B's; on the combined channel A is its stdout
-    then the diagnostic and B is its stdout. The caller (vm_parity.py) also
-    checks the VM statistics (completed beyond legacy's 64 frames)."""
-    if not a["exit"] or not b["exit"] or any(x != 1 for x in a["exit"]) or any(x != 0 for x in b["exit"]):
+    (exit 1, that one diagnostic line), A's stdout is a prefix of B's, and B
+    either completes (exit 0, empty stderr) or, past its own frame or memory
+    budget, fails with its own "callable recursion depth exceeded" diagnostic
+    (exit 1; CP12: never a replay). On the combined channel each side is its
+    stdout then its diagnostic. The caller (vm_parity.py) also checks the VM
+    statistics (beyond legacy's 64 frames)."""
+    if not a["exit"] or not b["exit"] or any(x != 1 for x in a["exit"]):
         return False
-    if b["stderr"] != b"" or not RECURSION_ERROR.match(a["stderr"]) or not b["stdout"].startswith(a["stdout"]):
+    if not RECURSION_ERROR.match(a["stderr"]) or not b["stdout"].startswith(a["stdout"]):
+        return False
+    completed = all(x == 0 for x in b["exit"]) and b["stderr"] == b""
+    stopped = all(x == 1 for x in b["exit"]) and VM_RECURSION_ERROR.match(b["stderr"])
+    if not completed and not stopped:
         return False
     if a["combined"] and any(run != a["stdout"] + a["stderr"] for run in a["combined"]):
         return False
-    if b["combined"] and any(run != b["stdout"] for run in b["combined"]):
+    if b["combined"] and any(run != b["stdout"] + b["stderr"] for run in b["combined"]):
         return False
     return True
 

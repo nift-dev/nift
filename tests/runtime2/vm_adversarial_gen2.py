@@ -200,14 +200,15 @@ def memory(_seed, _count):
             src = (f'fn(mk(n)) {{\ns := "B" + n\n{build}return {holder}\n}}\n'
                    "fn(f(n)) {\nif(n == 0) { return 0 }\nw := mk(n)\nreturn f(n - 1) + 1\n}\n"
                    'print("start")\nprint(f(3000))\n')
-            yield "memory", f"memory-{hn}-{grow}", src, env, "replayed:bail:recursion-budget"
+            yield "memory", f"memory-{hn}-{grow}", src, env, "vm-error"  # CP12: the VM's recursion error
     # Within the budget and within legacy's depth: runs on the VM.
     yield "memory", "memory-shallow", ('fn(f(n)) { s := "x" + n\nif(n == 0) { return 0 }\nreturn f(n - 1) + 1 }\n'
                                        "print(f(50))\n"), env, "vm"
 
 
 def deepeq(_seed, _count):
-    env = {"NIFT_VM_EQUALITY_DEPTH": "50"}
+    # CP12: no replay, so the VM decides `==` at every depth (iteratively).
+    env = {}
     shapes = {"array": ("fn(w(p)) { return [p ?? 0] }\n", "[1]"),
               "object": ('fn(w(p)) { return {"k": p ?? 0} }\n', "{}"),
               "pair": ("fn(w(p)) { return [0, p ?? 0] }\n", "[1]")}
@@ -217,8 +218,7 @@ def deepeq(_seed, _count):
                 y_seed = seed.replace("1", leaf) if seed != "{}" else ('{"z": 1}' if leaf == "2" else "{}")
                 src = (fn + f"x := {seed}\ny := {y_seed}\ni := 0\n"
                        f"while(i < {depth}) {{ x = w(x); y = w(y); i += 1 }}\nprint(x {op} y)\nprint(x {op} x)\n")
-                expect = "replayed:bail:nesting-depth" if depth >= 50 else "vm"
-                yield "deepeq", f"deepeq-{sn}-{depth}-{leaf}-{op}", src, env, expect
+                yield "deepeq", f"deepeq-{sn}-{depth}-{leaf}-{op}", src, env, "vm"
 
 
 def shadow(seed, count):

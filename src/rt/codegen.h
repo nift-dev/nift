@@ -29,6 +29,16 @@ public:
     // Returns false when the distance does not fit 16 bits.
     bool patch(std::size_t at, std::size_t target);
     void set_offset(std::uint32_t offset) { offset_ = offset; }
+    std::uint32_t offset() const { return offset_; }
+    // Flags (kInstr*) given to every instruction emitted from now on.
+    void set_flags(std::uint8_t flags) { flags_ = flags; }
+    std::uint8_t flags() const { return flags_; }
+    // Attaches a note (error-message text, re-evaluation target) to the
+    // instruction at `at`; returns the note's index for set_note_alt.
+    std::size_t note(std::size_t at, std::string text);
+    void set_note_alt(std::size_t note_index, std::size_t target);
+    std::size_t note_index(std::size_t at) const { return proto_->notes[at] - 1u; }
+    Instr& at(std::size_t index) { return proto_->code[index]; }
     void set_params(std::uint16_t count) { proto_->nparams = count; }
 
     // True when `operand` is a constant -1 or 2 (a text type that defers to the value).
@@ -44,6 +54,7 @@ private:
     std::unique_ptr<Proto> proto_;
     std::uint16_t top_ = 0;
     std::uint32_t offset_ = 0;
+    std::uint8_t flags_ = 0;
     std::string error_;
 };
 

@@ -36,10 +36,9 @@ namespace nift::rt {
     X(Neg)        /* R[a] = -R[b]                                               */                    \
     X(Pos)        /* R[a] = +R[b] (numeric check)                               */                    \
     X(BindType)   /* R[a] = legacy binding type of value R[b], text type RK[c]  */                    \
-    X(CheckType)  /* bail unless R[a]'s type may be assigned to tag R[b]        */                    \
-    X(CheckAssign)/* as CheckType for `x = e` (text type RK[c], both paths)     */                    \
-    X(CheckParam) /* bail unless text type RK[c] agrees with R[a]'s value type  */                    \
-    X(TypeMeet)   /* R[a] = legacy meet of text types RK[b], RK[c]              */                    \
+    X(CheckType)  /* error unless R[a]'s value type may be assigned to tag R[b] */                    \
+    X(CheckAssign)/* as CheckType for a textual `x = e` (text type RK[c])       */                    \
+        X(TypeMeet)   /* R[a] = legacy meet of text types RK[b], RK[c]              */                    \
     X(Jmp)        /* pc += int16 c                                              */                    \
     X(JmpFalse)   /* if !truthy(R[a]) pc += int16 c                             */                    \
     X(JmpTrue)    /* if truthy(R[a]) pc += int16 c                              */                    \
@@ -62,8 +61,7 @@ namespace nift::rt {
     X(GetMember)  /* R[a] = R[b].(atom c)                                       */                    \
     X(Push)       /* R[a].push(RK[b])                                           */                    \
     X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
-    X(NoAlias)    /* bail if R[a] is an array or object (legacy location refs)  */                    \
-    X(Bail)       /* stop: the unit must run on the legacy engine (reason b)    */                    \
+    X(JmpLarge)   /* if R[a] is a number legacy calls large, pc += int16 c      */                    \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */
 
@@ -76,7 +74,7 @@ enum class OpCode : std::uint8_t {
 
 struct Instr {
     OpCode op = OpCode::Nop;
-    std::uint8_t unused = 0;
+    std::uint8_t flags = 0;  // kInstr* (proto.h)
     std::uint16_t a = 0;
     std::uint16_t b = 0;
     std::uint16_t c = 0;

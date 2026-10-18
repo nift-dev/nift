@@ -16,17 +16,12 @@ const char* opcode_name(OpCode op) {
     return index < sizeof names / sizeof names[0] ? names[index] : "?";
 }
 
-const char* bail_reason_name(BailReason reason) {
+const char* stop_reason_name(StopReason reason) {
     switch (reason) {
-        case BailReason::None: return "none";
-        case BailReason::Error: return "runtime-error";
-        case BailReason::NumberRange: return "number-range";
-        case BailReason::Aliasing: return "aliasing";
-        case BailReason::RecursionBudget: return "recursion-budget";
-        case BailReason::Unverified: return "unverified";
-        case BailReason::OutputLimit: return "output-limit";
-        case BailReason::NestingDepth: return "nesting-depth";
-        case BailReason::Internal: return "internal";
+        case StopReason::None: return "none";
+        case StopReason::Error: return "error";
+        case StopReason::Internal: return "internal";
+        case StopReason::Reeval: return "reeval";
     }
     return "?";
 }
@@ -57,7 +52,9 @@ std::string disassemble(const Program& program) {
         }
         for (std::size_t i = 0; i < proto.code.size(); ++i) {
             const Instr& in = proto.code[i];
-            out << "  " << i << ": " << opcode_name(in.op) << ' ' << in.a << ' ' << in.b << ' ' << in.c << '\n';
+            out << "  " << i << ": " << opcode_name(in.op) << ' ' << in.a << ' ' << in.b << ' ' << in.c;
+            if (in.flags) out << " flags=" << unsigned(in.flags);
+            out << '\n';
         }
     }
     return out.str();

@@ -11,14 +11,17 @@ Every program that compiles is run on legacy and with NIFT_VM=1; stdout,
 stderr and exit status must be identical, except for:
 
   approved   the D-001#4 recursion budget (classify_difference): legacy
-             fails with "callable recursion depth exceeded", the VM ran the
-             program to completion past legacy's 64-frame limit
-             (beyond_legacy_depth in its statistics), with legacy's output
-             as a prefix of the VM's and no diagnostic.
+             fails with "callable recursion depth exceeded", the VM went past
+             legacy's 64-frame limit (beyond_legacy_depth in its statistics),
+             with legacy's output as a prefix of the VM's, and either
+             completed without a diagnostic or stopped with its own
+             "callable recursion depth exceeded" error at its frame or memory
+             budget (CP12: never a replay).
   endless    both engines hit the time limit (not compared).
 
-Any other difference, any `internal-error` outcome and any missing statistics
-line fail the gate. A program may also name the outcome the VM statistics must
+Any other difference, any `internal-error` outcome, any missing statistics
+line and any `replayed` outcome (CP12: replay no longer exists) fail the
+gate. A program may also name the outcome the VM statistics must
 show (e.g. the memory family must end in a recursion-budget bail), or a
 tuple of acceptable outcome prefixes; `fallback:<reason>` requires a static
 refusal with that reason before execution (review round 3). A different
@@ -40,6 +43,7 @@ sys.path.insert(0, HERE)
 import vm_adversarial_gen as gen  # noqa: E402
 
 RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
+VM_RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded[^\n]*\n\Z")
 
 
 def base_env(cwd, extra):
@@ -79,8 +83,10 @@ def classify_difference(legacy, vm, st):
         return "same"
     if legacy[2] == "timeout" and vm[2] == "timeout":
         return "endless"
-    if (st and st.get("outcome") == "vm" and st.get("beyond_legacy_depth") and legacy[2] == 1 and vm[2] == 0
-            and vm[1] == b"" and RECURSION_ERROR.match(legacy[1]) and vm[0].startswith(legacy[0])):
+    if (st and st.get("beyond_legacy_depth") and legacy[2] == 1 and RECURSION_ERROR.match(legacy[1])
+            and vm[0].startswith(legacy[0])
+            and ((st.get("outcome") == "vm" and vm[2] == 0 and vm[1] == b"")
+                 or (st.get("outcome") == "vm-error" and vm[2] == 1 and VM_RECURSION_ERROR.match(vm[1])))):
         return "approved"
     return "diff"
 
@@ -88,7 +94,7 @@ def classify_difference(legacy, vm, st):
 def outcome_key(st):
     if not st:
         return "no-stats"
-    if st["outcome"] in ("vm", "compiled"):
+    if st["outcome"] in ("vm", "compiled", "vm-error"):
         return st["outcome"]
     return f"{st['outcome']}:{st['reason']}"
 
@@ -114,7 +120,10 @@ def check(nift, item, work, timeout):
         vm, st = run(nift, path, d, "1", extra, t)
         verdict = classify_difference(legacy, vm, st)
         key = outcome_key(st) if vm[2] != "timeout" else "timeout"
-        if st and st["outcome"] == "internal-error":
+        if st and st["outcome"] in ("internal-error", "replayed"):
+            verdict = "diff"
+        # Single execution: the unit ran on exactly one engine, once.
+        if st and (st.get("vm_executions", 0) + st.get("legacy_executions", 0)) != 1:
             verdict = "diff"
         if not st and vm[2] != "timeout":
             verdict = "diff"
@@ -176,9 +185,9 @@ def main():
     for family in families:
         v = verdicts[family]
         total.update(v)
-        ran = sum(n for k, n in tally[family].items() if k == "vm")
-        replay = sum(n for k, n in tally[family].items() if k.startswith("replayed"))
-        print(f"{family}: {sum(v.values())} programs; ran on the VM {ran}, replayed {replay}, "
+        ran = sum(n for k, n in tally[family].items() if k in ("vm", "vm-error"))
+        errors = sum(n for k, n in tally[family].items() if k == "vm-error")
+        print(f"{family}: {sum(v.values())} programs; ran on the VM {ran} ({errors} ending in a program error), "
               f"fallback {v['fallback']}; same {v['same']}, approved D-001#4 {v['approved']}, "
               f"endless {v['endless']}, DIFF {v['diff'] + v['fail']}")
         top = ", ".join(f"{k} {n}" for k, n in tally[family].most_common(8))

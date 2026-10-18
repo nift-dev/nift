@@ -47,7 +47,7 @@ void check_outputs() {
         // `a = t` reads t's binding type (text type of a bare name): its BindType must survive.
         {"fn(g(a, b)) { while(b != 0) { t := b; b = a % b; a = t } return a }\nprint(g(1071, 462))\n", "21\n"},
         {"a := [1, 2]\na.push(3)\na[0] = 9\nprint(a[0] + a.length())\n", "12\n"},
-        {"o := {\"k\": [1, {\"z\": 4}]}\nprint(o.k[1].z)\nprint(o[\"k\"][0])\n", "4\n1\n"},
+        {"o := {\"k\": [{\"z\": 4}, {\"z\": 5}]}\nprint(o.k[1].z)\nprint(o[\"k\"][0].z)\n", "5\n4\n"},
         {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n", "2\n1\n"},
         {"i := 0\nwhile(i < 9) { i += 1; if(i == 3) { return i } }\n", "3\n"},
         {"k := 1\nif(true) { k := 2; print(k) }\nprint(k)\n", "2\n1\n"},
@@ -55,12 +55,12 @@ void check_outputs() {
         {"a := [1, 2]\nprint(a.size())\n", "2\n"},                                       // D3: size() on arrays
         {"x := 0.5 - 0.5\nprint(-x)\nprint(x)\n", "0\n0\n"},                            // D1: a computed zero
         {"i := 0\nwhile(i < 3) { i += 1; if(i == 2) { break } }\nprint(i)\n", "2\n"},   // D2: jump last
-        {"fn(f(p)) { return p.length() }\no := {\"k\": [1, 2]}\nprint(f(o.k))\n", "2\n"},  // D6: read-only callee
+        {"fn(f(p)) { return p.length() }\nprint(f([1, 2]))\n", "2\n"},
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
         CHECK(r.reason.empty());
-        CHECK(r.result.reason == BailReason::None);
+        CHECK(r.result.reason == StopReason::None);
         CHECK(r.output == c.output);
         if (r.output != c.output || !r.reason.empty())
             std::fprintf(stderr, "  program: %s  got [%s] reason [%s]\n", c.source, r.output.c_str(), r.reason.c_str());
@@ -139,35 +139,60 @@ void check_fallbacks() {
     }
 }
 
-void check_bails() {
-    struct BailCase {
+// CP12: run-time errors are reported by the VM itself (legacy's message);
+// nothing is replayed. Shapes whose legacy behaviour depends on a run-time
+// kind are refused before execution instead (former replay reasons).
+void check_errors() {
+    struct ErrorCase {
         const char* source;
-        BailReason reason;
+        StopReason reason;
+        const char* message;  // for Error; for None, the output
     };
-    const BailCase cases[] = {
-        {"print(1 / 0)\n", BailReason::Error},
-        {"x := 1\nx = \"s\"\n", BailReason::Error},
-        {"a := [1]\nprint(a[3])\n", BailReason::Error},
-        {"x := 4000000000\nprint(x * x)\n", BailReason::Error},
-        {"x := 100000000\nprint(x * x)\n", BailReason::NumberRange},
-        {"x := 0\ny := -1\nprint(x * y)\n", BailReason::NumberRange},
-        {"a := [1]\nb := a\n", BailReason::Aliasing},
-        {"fn(f()) { a := [1]\n return a }\nx := f()\n", BailReason::Aliasing},
-        {"a := [1]\na[0] = \"s\"\n", BailReason::Unverified},
-        {"print([1])\n", BailReason::Error},
-        // Review round 1. D3: receiver-specific methods.
-        {"s := \"abc\"\nprint(s.size())\n", BailReason::Error},
-        {"x := 5\nprint(x.length())\n", BailReason::Error},
-        {"x := null\nprint(x.size())\n", BailReason::Error},
-        {"o := {\"k\": 1}\nprint(o.size())\n", BailReason::Unverified},
-        {"o := {\"k\": 1}\nprint(o.length())\n", BailReason::Unverified},
+    const ErrorCase cases[] = {
+        {"print(1 / 0)\n", StopReason::Error, "division by zero"},
+        {"x := 1\nx = \"s\"\n", StopReason::Error, "cannot assign string to int binding 'x'"},
+        {"a := [1]\nprint(a[3])\n", StopReason::Error, "JSON array index 3 is out of range in 'a[3]'"},
+        {"x := 4000000000\nprint(x * x)\n", StopReason::Error, "signed 64-bit integer overflow"},
+        {"x := 100000000\nprint(x * x)\n", StopReason::None, "10000000000000000\n"},
+        {"x := 0\ny := -1\nprint(x * y)\n", StopReason::None, "0\n"},
+        {"a := [1]\na[0] = \"s\"\nprint(a[0])\n", StopReason::None, "s\n"},
+        {"o := {\"k\": 1}\nprint(o.size())\n", StopReason::None, "1\n"},
+        {"o := {\"k\": 1}\nprint(o.length())\n", StopReason::Error, "unknown value or malformed expression: o.length()"},
+        {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", StopReason::None, "1\n"},
+        {"x := 1\ni := 0\nwhile(i < 2) { x = x + 0.5; i += 1 }\n", StopReason::Error, "cannot change binding type: x"},
+        // Prepared statement with a large value: legacy re-evaluates it textually.
+        {"w := 9007199254740991\ni := 0\nwhile(i < 1) { i += 1; q := w + 2; print(q); print(w + 2) }\n",
+         StopReason::None, "9007199254740993\n9007199254740992\n"},
     };
-    for (const BailCase& c : cases) {
+    for (const ErrorCase& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
         CHECK(r.reason.empty());
         CHECK(r.result.reason == c.reason);
-        if (r.result.reason != c.reason)
-            std::fprintf(stderr, "  program: %s  bail [%s]\n", c.source, bail_reason_name(r.result.reason));
+        if (c.reason == StopReason::Error) CHECK(r.result.message == c.message);
+        else CHECK(r.output == c.message);
+        if (r.result.reason != c.reason || (c.reason == StopReason::Error && r.result.message != c.message))
+            std::fprintf(stderr, "  program: %s  stop [%s] %s\n", c.source, stop_reason_name(r.result.reason),
+                         r.result.message.c_str());
+    }
+    // Former replay reasons now refused before execution.
+    const Case refused[] = {
+        {"a := [1]\nb := a\n", "aliasing"},
+        {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
+        {"print([1])\n", "type:print"},
+        {"s := \"abc\"\nprint(s.size())\n", "type:length"},
+        {"x := 5\nprint(x.length())\n", "type:length"},
+        {"x := null\nprint(x.size())\n", "type:length"},
+        {"print(\"a\" < 1)\n", "type:<"},
+        {"s := \"a\"\nprint(-s)\n", "type:unary"},
+        {"s := \"a\"\ns += 1\n", "type:compound-assignment"},
+        {"print(\"a\" + [1])\n", "type:+"},
+        {"o := {\"k\": [1, {\"z\": 4}]}\ni := 1\nprint(o.k[i].z)\n", "type:member"},  // positions only for literal indexes
+        {"fn(f(p)) { return p.length() }\no := {\"k\": [1, 2]}\nprint(f(o.k))\n", "path-in-call-argument"},
+    };
+    for (const Case& c : refused) {
+        const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
+        CHECK(r.reason == c.output);
+        if (r.reason != c.output) std::fprintf(stderr, "  program: %s  reason [%s]\n", c.source, r.reason.c_str());
     }
 }
 
@@ -209,15 +234,17 @@ void check_rendering() {
 void check_frame_budget() {
     const char* deep = "fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(99990))\n";
     rt_vm_tool::Run ok = rt_vm_tool::run(deep);
-    CHECK(ok.result.reason == BailReason::None && ok.output == "99990\n");
+    CHECK(ok.result.reason == StopReason::None && ok.output == "99990\n");
     const char* deeper = "fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(100000))\n";
-    CHECK(rt_vm_tool::run(deeper).result.reason == BailReason::RecursionBudget);
+    const rt_vm_tool::Run too_deep = rt_vm_tool::run(deeper);
+    CHECK(too_deep.result.reason == StopReason::Error && too_deep.result.beyond_legacy_depth);
+    CHECK(too_deep.result.message == "callable recursion depth exceeded: d" && too_deep.result.return_prefixes == 0);
     VmOptions small;
     small.max_frames = 10;
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(9))\n", small).result.reason ==
-          BailReason::None);
+          StopReason::None);
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(10))\n", small).result.reason ==
-          BailReason::RecursionBudget);
+          StopReason::Error);
 }
 
 // Nift-to-Nift calls must not recurse on the C++ stack: 90,000 nested calls
@@ -225,7 +252,7 @@ void check_frame_budget() {
 void* deep_on_small_stack(void* out) {
     const rt_vm_tool::Run r = rt_vm_tool::run(
         "fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(90000))\n");
-    *static_cast<bool*>(out) = r.result.reason == BailReason::None && r.output == "90000\n";
+    *static_cast<bool*>(out) = r.result.reason == StopReason::None && r.output == "90000\n";
     return nullptr;
 }
 
@@ -253,26 +280,22 @@ void flush_into(std::string& output, void* context) {
     output.clear();
 }
 
-void check_output_limit() {
+// CP12: output streams through the flush hook (nothing is ever replayed).
+void check_streaming() {
     Flushed flushed;
     VmOptions options;
-    options.output_limit = 16;
+    options.flush_threshold = 16;
     options.flush = &flush_into;
     options.flush_context = &flushed;
     rt_vm_tool::Run r = rt_vm_tool::run("i := 0\nwhile(i < 10) { print(\"line\"); i += 1 }\n", options);
-    CHECK(r.result.reason == BailReason::None);
-    CHECK(r.result.committed);
+    CHECK(r.result.reason == StopReason::None);
     CHECK(flushed.calls > 0);
     CHECK(flushed.text.size() + r.output.size() == 50);
-    rt_vm_tool::Run quiet = rt_vm_tool::run("print(1)\n");
-    CHECK(!quiet.result.committed);
-    // Review D7: without a flush hook (NIFT_VM=1) the run stops at the limit,
-    // nothing is committed and the runner replays the unit on legacy.
-    VmOptions bounded;
-    bounded.output_limit = 16;
-    rt_vm_tool::Run stopped = rt_vm_tool::run("i := 0\nwhile(i < 10) { print(\"line\"); i += 1 }\n", bounded);
-    CHECK(stopped.result.reason == BailReason::OutputLimit);
-    CHECK(!stopped.result.committed);
+    // Output before an error stays written (legacy streams it too).
+    Flushed before;
+    options.flush_context = &before;
+    rt_vm_tool::Run e = rt_vm_tool::run("i := 0\nwhile(i < 10) { print(\"line\"); i += 1 }\nprint(1 / 0)\n", options);
+    CHECK(e.result.reason == StopReason::Error && before.text.size() + e.output.size() == 50);
 }
 
 // Review R1 / round 2 R5: memory is bounded exactly (live rt heap + stacks).
@@ -282,14 +305,14 @@ void check_memory_budget() {
     VmOptions tight;
     tight.heap_budget = 8 << 20;  // 8 MiB
     rt_vm_tool::Run r = rt_vm_tool::run(growing, tight);
-    CHECK(r.result.reason == BailReason::RecursionBudget);
+    CHECK(r.result.reason == StopReason::Error);
     CHECK(r.result.beyond_legacy_depth);
     rt_vm_tool::Run fine = rt_vm_tool::run(growing);
-    CHECK(fine.result.reason == BailReason::None && fine.output == "5000\n" && fine.result.beyond_legacy_depth);
+    CHECK(fine.result.reason == StopReason::None && fine.output == "5000\n" && fine.result.beyond_legacy_depth);
     VmOptions few;
     few.max_registers = 4096;
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(5000))\n", few)
-              .result.reason == BailReason::RecursionBudget);
+              .result.reason == StopReason::Error);
     CHECK(!rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(63))\n")
                .result.beyond_legacy_depth);
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(64))\n")
@@ -302,21 +325,17 @@ void check_memory_budget() {
     VmOptions mid;
     mid.heap_budget = 64 << 20;
     rt_vm_tool::Run h = rt_vm_tool::run(hidden, mid);
-    CHECK(h.result.reason == BailReason::RecursionBudget && h.result.beyond_legacy_depth);
+    CHECK(h.result.reason == StopReason::Error && h.result.beyond_legacy_depth);
     // Exceeding the budget at a depth legacy also reaches is an internal
     // failure (reported, never replayed).
     VmOptions small;
     small.heap_budget = 4 << 20;
     rt_vm_tool::Run flat = rt_vm_tool::run("s := \"abcdefghijklmnopq\"\nk := 0\nwhile(k < 20) { s += s; k += 1 }\n"
                                            "print(s.length())\n", small);
-    CHECK(flat.result.reason == BailReason::Internal && !flat.result.beyond_legacy_depth);
-    // R6: equality deeper than the VM decides is handed to legacy.
-    rt_vm_tool::Run deep = rt_vm_tool::run("fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
-                                           "while(i < 10001) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n");
-    CHECK(deep.result.reason == BailReason::NestingDepth);
-    rt_vm_tool::Run shallow = rt_vm_tool::run("fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
-                                              "while(i < 9999) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n");
-    CHECK(shallow.result.reason == BailReason::None && shallow.output == "true\n");
+    CHECK(flat.result.reason == StopReason::Internal && !flat.result.beyond_legacy_depth);
+    // R6 (CP12): values nested deeper than the source's own literals cannot
+    // be built any more (a place holding an aggregate is not copied into a
+    // literal: aliasing), so `==` needs no depth bound.
 }
 
 // Review round 3. F1: element-assignment targets; F2: comparison chains; F3:
@@ -413,10 +432,12 @@ void check_code_shape() {
     CHECK(c.program != nullptr);
     if (!c.program) return;
     const std::string text = disassemble(*c.program);
-    CHECK(text.find("Call 4 1 2") != std::string::npos);    // arguments passed in place
-    CHECK(text.find("JmpNotLt") != std::string::npos);      // fused loop condition
-    CHECK(text.find("AddI 1 1 1") != std::string::npos);    // i += 1
-    CHECK(c.program->protos.size() == 2);
+    CHECK(text.find("Call 4 1 2 flags=1") != std::string::npos);  // prepared variant, arguments in place
+    CHECK(text.find("Call 4 2 2") != std::string::npos);          // textual variant (re-evaluation code)
+    CHECK(text.find("JmpLarge 4") != std::string::npos);          // large value: textual re-evaluation
+    CHECK(text.find("JmpNotLt") != std::string::npos);            // fused loop condition
+    CHECK(text.find("AddI 1 1 1 flags=3") != std::string::npos);  // i += 1, prepared, re-evaluable
+    CHECK(c.program->protos.size() == 3);
     CHECK(c.program->protos[1]->nparams == 2);
 }
 
@@ -425,12 +446,12 @@ void check_code_shape() {
 int main() {
     check_outputs();
     check_fallbacks();
-    check_bails();
+    check_errors();
     check_literals();
     check_rendering();
     check_frame_budget();
     check_no_native_recursion();
-    check_output_limit();
+    check_streaming();
     check_memory_budget();
     check_legacy_names();
     check_code_shape();

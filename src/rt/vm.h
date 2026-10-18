@@ -8,14 +8,18 @@
 // window (arguments are passed without copying). Recursion depth is a frame
 // budget (semantics.md "Recursion", approved change D-001).
 //
-// A run either completes or stops with a BailReason. Output is appended to a
-// buffer and only committed by the caller after the run (script_runner.h);
-// together with the subset having no other effects, this makes a bail
-// unobservable: the caller re-runs the unit on the legacy engine (D-001
-// whole-unit fallback, decided at run time). If the buffer exceeds
-// `output_limit` the run stops with BailReason::OutputLimit (and is replayed
-// from the start; review D7) unless a `flush` hook is set (NIFT_VM=require
-// only): then it is flushed early and the run becomes committed.
+// CP12: a run either completes or stops with a program error that the VM
+// reports itself, exactly as legacy would (message, source position, the
+// "return: " prefixes legacy adds through textual `return` statements, exit
+// status 1), or with an internal failure (exit 70). Nothing is ever re-run
+// on the legacy engine: the engine was selected before the first
+// instruction. Output is streamed: the buffer is handed to `flush` whenever
+// it grows past `flush_threshold` and at the end of the run.
+//
+// Recursion (approved change D-001#4): the frame budget replaces legacy's
+// 64-frame limit; beyond it the run stops with the error "callable recursion
+// depth exceeded: <function>" (legacy fails the same program at depth 64
+// with that error family).
 //
 // Memory (review R1, round 2 R5): the register stack is bounded
 // (`max_registers`) and the whole run is bounded by `heap_budget`: the exact
@@ -23,10 +27,8 @@
 // object, ... however deeply nested, counted when created or resized) plus
 // the register and frame stacks. It is checked after every instruction that
 // can allocate (all on slow paths) and when the stacks grow. Exceeding it
-// deeper than legacy's 64 frames stops the run with RecursionBudget (legacy
-// rejects such a program with "callable recursion depth exceeded": the
-// approved D-001#4 behaviour); at a depth legacy also reaches it is an
-// Internal failure, reported (exit 70), never replayed. Either way the
+// deeper than legacy's 64 frames is the recursion error above; at a depth
+// legacy also reaches it is an Internal failure (exit 70). Either way the
 // process stops before the host runs out of memory.
 #include "rt/proto.h"
 #include "rt/vm_ops.h"
@@ -45,21 +47,22 @@ struct VmOptions {
     std::size_t max_frames = 100000;
     std::size_t max_registers = std::size_t(16) << 20;      // 16M values, 256 MiB
     std::size_t heap_budget = std::size_t(1) << 30;  // live rt heap + register and frame stacks (bytes)
-    std::size_t output_limit = std::size_t(64) << 20;
-    std::size_t equality_depth = 10000;  // `==` deeper than this bails (NestingDepth); legacy answers ~30k
-    // Called with the buffered output when it exceeds output_limit.
+    std::size_t flush_threshold = std::size_t(64) << 10;
+    // Called with the buffered output when it exceeds flush_threshold (and
+    // by the caller at the end). Null: everything stays in the buffer.
     void (*flush)(std::string& output, void* context) = nullptr;
     void* flush_context = nullptr;
 };
 
 struct VmResult {
-    BailReason reason = BailReason::None;  // None: the program completed
-    std::string message;                   // fault description (legacy wording where known)
-    std::uint32_t offset = 0;              // source offset of the faulting instruction
+    StopReason reason = StopReason::None;  // None: the program completed
+    std::string message;                   // legacy's message (Error) or the failure (Internal)
+    std::uint32_t offset = 0;              // source offset legacy reports for the error
+    std::uint32_t return_prefixes = 0;     // "return: " prefixes legacy adds to the message
     bool returned = false;                 // the script ended with `return value`
     std::string return_text;               // rendering of that value
-    bool committed = false;                // output was flushed before the run ended
     bool beyond_legacy_depth = false;      // the call depth exceeded legacy's 64 frames
+    std::uint64_t reevaluations = 0;       // prepared statements re-run on their textual code
 };
 
 class Vm {
@@ -74,14 +77,16 @@ private:
         const Proto* proto = nullptr;
     };
     bool reserve_registers(std::size_t needed);
-    bool frame_check(Fault& fault);
+    bool frame_check(const Proto* callee, Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))
 #endif
-    bool call_slow(std::size_t callee_base, std::size_t nregs, Fault& fault);
-    bool cold(const Instr& in, Value* R, const Value* K, std::string& output, Fault& fault);
+    bool call_slow(const Proto* callee, std::size_t callee_base, Fault& fault);
+    bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
-    bool flush_if_needed(std::string& output, Fault& fault);
+    void flush_if_needed(std::string& output);
+    const Instr* reeval_target(const Proto* proto, const Instr* pc, Fault& fault);
+    void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
     bool memory_ok(Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))
@@ -94,7 +99,7 @@ private:
     std::vector<Value> stack_;
     std::vector<Frame> frames_;
     std::vector<const Proto*> protos_;
-    bool committed_ = false;
+    std::uint64_t reevaluations_ = 0;
     bool beyond_legacy_depth_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound

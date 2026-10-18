@@ -6,6 +6,8 @@
 #include "rt/prepared.h"
 #include "rt/unit_check.h"
 
+#include <unordered_set>
+
 namespace nift::rt {
 
 namespace detail {
@@ -29,8 +31,14 @@ bool UnitCompiler::begin(std::string name, NodeId body) {
     scopes_ = Scopes();
     scopes_.push();
     loops_.clear();
+    loop_depth_ = 0;
+    textual_statement_ = false;
+    return_site_ = if_site_ = index_site_ = kNoSite;
+    call_args_ = 0;
+    index_depth_ = 0;
     assigned_.clear();
     collect_assigned(ast_, body, assigned_);
+    update_flags();
     return true;
 }
 
@@ -42,6 +50,7 @@ bool UnitCompiler::finish(std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     in_function_ = false;
+    variant_ = Variant::Textual;
     begin("", program);
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
@@ -50,36 +59,6 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
         if (!statement(list[k])) return false;
     }
     fb_->emit(OpCode::Halt);
-    fb_->drop_unread_types();
-    return finish(out);
-}
-
-bool UnitCompiler::compile_function(NodeId fn, std::unique_ptr<Proto>& out) {
-    in_function_ = true;
-    const Node& node = ast_.at(fn);
-    begin(std::string(text(ast_.at(node.a))), node.b);
-    const NodeId* params = ast_.list(node);
-    std::vector<std::uint16_t> regs(node.count);
-    for (std::uint32_t k = 0; k < node.count; ++k)
-        if (!fb_->alloc(regs[k])) return builder_ok();
-    fb_->set_params(static_cast<std::uint16_t>(node.count));
-    for (std::uint32_t k = 0; k < node.count; ++k) {
-        const Node& param = ast_.at(params[k]);
-        const std::string_view name = text(param);
-        if (plan_.index.count(name)) return fail(param, "param-shadows-fn");
-        Binding binding;
-        binding.reg = regs[k];
-        binding.typed = true;
-        std::uint16_t untyped = 0;
-        if (!fb_->alloc(binding.type_reg) || !fb_->constant(Value::integer(-1), untyped)) return builder_ok();
-        fb_->set_offset(param.begin);
-        // Call sites check that the argument's text type agrees with its value (CheckParam).
-        fb_->emit(OpCode::BindType, binding.type_reg, binding.reg, untyped);
-        if (!scopes_.declare(name, binding)) return fail(param, "param-duplicate");
-    }
-    // The body shares the parameters' scope: `p := ...` redeclares a parameter.
-    if (!statements(ast_.at(node.b))) return false;
-    fb_->emit(OpCode::ReturnNull);
     fb_->drop_unread_types();
     return finish(out);
 }
@@ -101,11 +80,24 @@ bool UnitCompiler::statements(const Node& block) {
 bool UnitCompiler::statement(NodeId id) {
     const Node& node = ast_.at(id);
     const std::uint16_t mark = fb_->top();
+    // Inside prepared code, a statement legacy's prepared parser rejects is
+    // run by legacy's textual evaluator (StmtKind::Legacy).
+    const bool saved_textual = textual_statement_;
+    if (prepared() && !statement_preparable(node)) {
+        if (node.kind == NodeKind::If || node.kind == NodeKind::While || node.kind == NodeKind::Return)
+            return fail(node, "prepared-unpreparable");
+        textual_statement_ = true;
+    }
+    update_flags();
     fb_->set_offset(node.begin);
     bool ok = false;
     switch (node.kind) {
-        case NodeKind::Comment: return fail(node, "shebang-statement");  // only `#!` statements reach the AST
-        case NodeKind::Declare: return declare(node) && builder_ok();  // keeps its binding registers
+        case NodeKind::Comment: ok = fail(node, "shebang-statement"); break;  // only `#!` statements reach the AST
+        case NodeKind::Declare:
+            ok = declare(node) && builder_ok();
+            textual_statement_ = saved_textual;
+            update_flags();
+            return ok;  // keeps its binding registers
         case NodeKind::ExprStmt: ok = expression_statement(node); break;
         case NodeKind::Assign: ok = assign(node); break;
         case NodeKind::CompoundAssign: ok = compound_assign(node); break;
@@ -114,125 +106,22 @@ bool UnitCompiler::statement(NodeId id) {
         case NodeKind::While: ok = while_loop(node); break;
         case NodeKind::Return: ok = return_statement(node); break;
         case NodeKind::Break: case NodeKind::Continue: ok = loop_jump(node); break;
-        default: return fail(node, std::string("statement:") + node_kind_name(node.kind));
+        default: ok = fail(node, std::string("statement:") + node_kind_name(node.kind)); break;
     }
+    textual_statement_ = saved_textual;
+    update_flags();
     fb_->release_to(mark);
     return ok && builder_ok();
 }
 
-bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
-    if (reserved_name(name)) return fail(at, "binding-name-reserved");
-    if (plan_.index.count(name)) return fail(at, "binding-shadows-fn");
-    // The type register comes first so the value register is the newest one
-    // (a call initialiser then returns in place).
-    binding.typed = true;  // every binding: assignments check it, bare references propagate it
-    if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
-    binding.reg = reg;
-    return true;
-}
-
-bool UnitCompiler::declare(const Node& node) {
-    if (node.flags & (kFlagConst | kFlagImmut)) return fail(node, "declare-const");
-    const Node& target = ast_.at(node.a);
-    if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
-    const std::string_view name = text(target);
-    std::uint16_t reg = 0;
-    Binding binding;
-    if (!new_binding(name, target, reg, binding)) return false;
-    if (!expr_to(node.b, reg)) return false;
-    const NodeKind value_kind = ast_.at(node.b).kind;
-    fb_->set_offset(node.begin);
-    // Declaring from a place makes a legacy location reference to aggregates.
-    if (value_kind == NodeKind::Ident || value_kind == NodeKind::Member || value_kind == NodeKind::Index)
-        fb_->emit(OpCode::NoAlias, reg);
-    std::uint16_t text_type = 0;
-    const TextType inferred = infer_text_type(type_text(ast_.at(node.b)));
-    if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
-    fb_->set_offset(node.begin);
-    fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
-    // A declaration referring to another binding inside prepared-reachable
-    // code was refused (rt/prepared.h, review round 2 M1/N1); elsewhere legacy
-    // types it from that binding's type at run time, which BindType reproduces.
-    if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
-    return true;
-}
-
-bool UnitCompiler::assign(const Node& node) {
-    const Node& target = ast_.at(node.a);
-    if (target.kind == NodeKind::Member) return fail(node, "static-error:member-assign");  // plain objects reject it
-    if (target.kind == NodeKind::Index) {
-        const Node& object = ast_.at(target.a);
-        std::uint16_t reg = 0, key = 0, value = 0;
-        if (object.kind != NodeKind::Ident || !local_register(object, reg)) return fail(target, "index-assign-target");
-        if (!element_target_ok(target)) return false;
-        if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
-        fb_->set_offset(node.begin);
-        fb_->emit(OpCode::SetIndex, reg, key, value);
-        return true;
-    }
-    if (target.kind != NodeKind::Ident) return fail(target, "assign-target");
-    const Binding* binding = scopes_.find(text(target));
-    if (!binding) return fail(target, "assign-free-name");
-    const Binding b = *binding;
-    std::uint16_t value = 0;
-    if (!temp(value) || !expr_to(node.b, value)) return false;
-    const NodeKind value_kind = ast_.at(node.b).kind;
-    fb_->set_offset(node.begin);
-    if (value_kind == NodeKind::Ident || value_kind == NodeKind::Member || value_kind == NodeKind::Index)
-        fb_->emit(OpCode::NoAlias, value);
-    std::uint16_t text_type = 0;
-    if (!text_type_operand(node.b, text_type)) return false;
-    fb_->set_offset(node.begin);
-    // With a text type of none or int both legacy paths check the value's own type.
-    if (fb_->is_untyped_constant(text_type)) fb_->emit(OpCode::CheckType, value, b.type_reg);
-    else fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
-    fb_->emit(OpCode::Move, b.reg, value);
-    return true;
-}
-
-bool UnitCompiler::compound_assign(const Node& node) {
-    const Node& target = ast_.at(node.a);
-    if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
-    const Binding* binding = scopes_.find(text(target));
-    if (!binding) return fail(target, "assign-free-name");
-    const Binding b = *binding;
-    std::uint16_t value = 0;
-    const Node& rhs = ast_.at(node.b);
-    Value small;
-    if (node.op == Op::AddAssign && rhs.kind == NodeKind::Number && decode_number_literal(text(rhs), small) &&
-        small.is(Kind::Int) && small.as_int() <= 32767) {
-        fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(static_cast<int>(small.as_int())));
-        fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
-        return true;
-    }
-    if (!expr_any(node.b, value)) return false;
-    fb_->set_offset(node.begin);
-    switch (node.op) {
-        case Op::AddAssign: fb_->emit(OpCode::AddAssign, b.reg, value); break;
-        case Op::SubAssign: fb_->emit(OpCode::Sub, b.reg, b.reg, value); break;
-        case Op::MulAssign: fb_->emit(OpCode::Mul, b.reg, b.reg, value); break;
-        case Op::DivAssign: fb_->emit(OpCode::Div, b.reg, b.reg, value); break;
-        case Op::ModAssign: fb_->emit(OpCode::Mod, b.reg, b.reg, value); break;
-        default: return fail(node, "compound-operator");
-    }
-    fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
-    return true;
-}
-
-bool UnitCompiler::inc_dec(const Node& node) {
-    const Node& target = ast_.at(node.a);
-    if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
-    const Binding* binding = scopes_.find(text(target));
-    if (!binding) return fail(target, "assign-free-name");
-    const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
-    fb_->emit(OpCode::AddI, binding->reg, binding->reg, jump_operand(up ? 1 : -1));
-    fb_->emit(OpCode::CheckType, binding->reg, binding->type_reg);
-    return true;
-}
-
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
-    if (!false_jump(node.a, to_else)) return false;
+    // Textual `if`: legacy reports an error of the condition at the `if`.
+    const std::uint32_t saved_if = if_site_;
+    if (!prepared()) if_site_ = node.begin;
+    const bool cond_ok = false_jump(node.a, to_else);
+    if_site_ = saved_if;
+    if (!cond_ok) return false;
     const Node& body = ast_.at(node.b);
     scopes_.push();
     const bool ok = statements(body);
@@ -247,6 +136,7 @@ bool UnitCompiler::if_chain(const Node& node) {
     const Node& other = ast_.at(node.c);
     bool other_ok = false;
     if (other.kind == NodeKind::If) {
+        if (prepared() && !statement_preparable(other)) return fail(other, "prepared-unpreparable");
         other_ok = if_chain(other);
     } else {
         scopes_.push();
@@ -260,24 +150,42 @@ bool UnitCompiler::if_chain(const Node& node) {
 }
 
 bool UnitCompiler::while_loop(const Node& node) {
+    // A `while` always runs on legacy's prepared evaluator (its condition and
+    // body), wherever it is; its condition must be one that evaluator accepts.
+    ++loop_depth_;
+    const bool saved_textual = textual_statement_;
+    textual_statement_ = false;
+    update_flags();
+    if (!statement_preparable(node)) {
+        --loop_depth_;
+        textual_statement_ = saved_textual;
+        update_flags();
+        return fail(node, "prepared-unpreparable");
+    }
     Loop loop;
     loop.start = fb_->here();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
-    if (!false_jump(node.a, exits)) return false;
-    scopes_.push();
-    const std::uint16_t mark = fb_->top();
-    const bool ok = statements(ast_.at(node.b));
-    fb_->release_to(mark);
-    scopes_.pop();
-    if (!ok) return false;
-    fb_->set_offset(node.begin);
-    const std::size_t back = fb_->emit(OpCode::Jmp);
-    fb_->patch(back, loops_.back().start);
-    for (std::size_t at : exits) fb_->patch(at, fb_->here());
-    for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
+    bool ok = false_jump(node.a, exits);
+    if (ok) {
+        scopes_.push();
+        const std::uint16_t mark = fb_->top();
+        ok = statements(ast_.at(node.b));
+        fb_->release_to(mark);
+        scopes_.pop();
+    }
+    if (ok) {
+        fb_->set_offset(node.begin);
+        const std::size_t back = fb_->emit(OpCode::Jmp);
+        fb_->patch(back, loops_.back().start);
+        for (std::size_t at : exits) fb_->patch(at, fb_->here());
+        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
+    }
     loops_.pop_back();
-    return builder_ok();
+    --loop_depth_;
+    textual_statement_ = saved_textual;
+    update_flags();
+    return ok && builder_ok();
 }
 
 bool UnitCompiler::return_statement(const Node& node) {
@@ -285,14 +193,22 @@ bool UnitCompiler::return_statement(const Node& node) {
         fb_->emit(in_function_ ? OpCode::ReturnNull : OpCode::Halt);
         return true;
     }
+    if (!no_alias(node.a, node)) return false;
+    if (!in_function_ && !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
+    // Textual `return`: legacy reports errors of the expression at the
+    // statement, prefixed "return: " (also for errors in calls made there).
+    const std::uint32_t saved = return_site_;
+    if (!prepared()) return_site_ = node.begin;
+    update_flags();
     std::uint16_t value = 0;
-    if (!temp(value) || !expr_to(node.a, value)) return false;
-    fb_->set_offset(node.begin);
-    const NodeKind kind = ast_.at(node.a).kind;
-    const bool place = kind == NodeKind::Ident || kind == NodeKind::Member || kind == NodeKind::Index;
-    // Returning a place makes a legacy location reference to an aggregate (c = 1: check).
-    fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value, 0, place ? 1 : 0);
-    return true;
+    const bool ok = temp(value) && expr_to(node.a, value);
+    if (ok) {
+        fb_->set_offset(node.begin);
+        fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
+    }
+    return_site_ = saved;
+    update_flags();
+    return ok;
 }
 
 bool UnitCompiler::loop_jump(const Node& node) {
@@ -314,7 +230,11 @@ bool UnitCompiler::expression_statement(const Node& node) {
             if (receiver.kind != NodeKind::Ident || !local_register(receiver, reg))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) return fail(node, "static-error:push-arity");
-            if (!expr_any(ast_.list(expr)[0], value)) return false;
+            const NodeId arg = ast_.list(expr)[0];
+            if (!kinds_within(callee.a, kKindArray, receiver, "type:push") ||
+                !kinds_within(arg, kKindScalar, ast_.at(arg), "aliasing"))
+                return false;
+            if (!expr_any(arg, value)) return false;
             fb_->set_offset(expr.begin);
             fb_->emit(OpCode::Push, reg, value);
             return true;
@@ -324,7 +244,34 @@ bool UnitCompiler::expression_statement(const Node& node) {
     // aggregate value is an error there); only calls are compiled.
     if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
     std::uint16_t scratch = 0;
-    return temp(scratch) && expr_to(node.a, scratch);
+    if (!temp(scratch)) return false;
+    // print(path) on the prepared path: when the location does not exist
+    // legacy resolves the statement again on its textual path (its message,
+    // its evaluation of the keys): that code is compiled next to it and the
+    // lookup continues there (kInstrPathText, StopReason::Reeval).
+    const Node& callee = ast_.at(expr.a);
+    const bool path_print = prepared() && callee.kind == NodeKind::Ident && expr.count == 1 &&
+                            (ast_.at(ast_.list(expr)[0]).kind == NodeKind::Index ||
+                             ast_.at(ast_.list(expr)[0]).kind == NodeKind::Member);
+    if (!path_print) return expr_to(node.a, scratch);
+    const std::size_t first = fb_->here();
+    print_statement_ = true;
+    const bool ok = expr_to(node.a, scratch);
+    print_statement_ = false;
+    if (!ok) return false;
+    std::size_t lookup = fb_->here();
+    for (std::size_t i = first; i < fb_->here(); ++i)
+        if (fb_->at(i).flags & kInstrPathText) lookup = i;
+    if (lookup == fb_->here()) return expr_to(node.a, scratch);  // not a call of print
+    const std::size_t done = fb_->emit(OpCode::Jmp);
+    fb_->set_note_alt(fb_->note_index(lookup), fb_->here());
+    textual_statement_ = true;
+    update_flags();
+    const bool alt_ok = expr_to(node.a, scratch);
+    textual_statement_ = false;
+    update_flags();
+    fb_->patch(done, fb_->here());
+    return alt_ok && builder_ok();
 }
 
 } // namespace detail
@@ -353,13 +300,10 @@ CompileResult compile_unit(const Ast& ast, NodeId root) {
         result.offset = prepared.offset;
         return result;
     }
-    detail::UnitCompiler compiler(ast, plan);
+    const UnitKinds kinds = infer_unit_kinds(ast, root, plan);
+    detail::UnitCompiler compiler(ast, plan, kinds);
     auto program = std::make_unique<Program>();
-    program->protos.resize(plan.functions.size() + 1);
-    bool ok = compiler.compile_main(root, program->protos[0]);
-    for (std::size_t k = 0; ok && k < plan.functions.size(); ++k)
-        ok = compiler.compile_function(plan.functions[k], program->protos[k + 1]);
-    if (!ok) {
+    if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
         result.offset = compiler.offset();
         return result;

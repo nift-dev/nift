@@ -56,9 +56,21 @@ std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, s
     in.a = a;
     in.b = b;
     in.c = c;
+    in.flags = flags_;
     proto_->code.push_back(in);
     proto_->offsets.push_back(offset_);
+    proto_->notes.push_back(0);
     return proto_->code.size() - 1;
+}
+
+std::size_t FunctionBuilder::note(std::size_t at, std::string text) {
+    proto_->note_table.push_back(Note{std::move(text), 0});
+    proto_->notes[at] = static_cast<std::uint32_t>(proto_->note_table.size());
+    return proto_->note_table.size() - 1;
+}
+
+void FunctionBuilder::set_note_alt(std::size_t note_index, std::size_t target) {
+    proto_->note_table[note_index].alt = static_cast<std::uint32_t>(target);
 }
 
 bool FunctionBuilder::patch(std::size_t at, std::size_t target) {
@@ -80,7 +92,7 @@ bool is_jump(OpCode op) {
     switch (op) {
         case OpCode::Jmp: case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull:
         case OpCode::JmpNotLt: case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe:
-        case OpCode::JmpNotEq: case OpCode::JmpNotNe: return true;
+        case OpCode::JmpNotEq: case OpCode::JmpNotNe: case OpCode::JmpLarge: return true;
         default: return false;
     }
 }
@@ -101,7 +113,7 @@ void FunctionBuilder::drop_unread_types() {
                 mark_register(read, in.b);
                 mark_register(read, in.c);
                 break;
-            case OpCode::BindType: case OpCode::CheckParam: mark_register(read, in.c); break;
+            case OpCode::BindType: mark_register(read, in.c); break;
             default: break;
         }
     }
@@ -114,7 +126,7 @@ void FunctionBuilder::drop_unread_types() {
     position[code.size()] = kept;
     if (kept == code.size()) return;
     std::vector<Instr> out;
-    std::vector<std::uint32_t> offsets;
+    std::vector<std::uint32_t> offsets, notes;
     out.reserve(kept);
     for (std::size_t i = 0; i < code.size(); ++i) {
         if (code[i].op == OpCode::BindType && !read[code[i].a]) continue;
@@ -126,9 +138,12 @@ void FunctionBuilder::drop_unread_types() {
         }
         out.push_back(in);
         offsets.push_back(proto_->offsets[i]);
+        notes.push_back(proto_->notes[i]);
     }
     code = std::move(out);
     proto_->offsets = std::move(offsets);
+    proto_->notes = std::move(notes);
+    for (Note& note : proto_->note_table) note.alt = static_cast<std::uint32_t>(position[note.alt]);
 }
 
 std::unique_ptr<Proto> FunctionBuilder::finish() { return std::move(proto_); }

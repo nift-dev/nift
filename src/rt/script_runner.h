@@ -3,21 +3,24 @@
 //
 // Environment:
 //   NIFT_VM=1        compile and run eligible scripts on the VM; everything
-//                    else (parse errors, Opaque nodes, unsupported constructs,
-//                    run-time bails) runs on the legacy engine unchanged.
+//                    else (parse errors, Opaque nodes, unsupported constructs)
+//                    runs on the legacy engine unchanged. The choice is made
+//                    before anything executes and is final (CP12, D-013): a
+//                    unit runs entirely on one engine, exactly once; program
+//                    errors on the VM are reported by the VM as legacy would.
 //   NIFT_VM=require  as 1, but never use the legacy engine: an ineligible
-//                    script or a run-time bail is reported as an error
-//                    (honest benchmarking; diagnostics are VM-native).
+//                    script is reported as an error (honest benchmarking).
 //   NIFT_VM=classify test tooling: parse and compile only, report the outcome
 //                    (`compiled` or `fallback`, NIFT_VM_STATS) and exit 0
 //                    without running the script on either engine.
-//   NIFT_VM_OUTPUT_LIMIT=<bytes>  test-only: lowers the 64 MiB output buffer
-//                    limit at which a NIFT_VM=1 run stops and is replayed.
+//   NIFT_VM_FLUSH=<bytes>  test-only: the output streaming threshold (64 KiB).
 //   An unexpected VM failure (internal error, std::bad_alloc, any C++
 //   exception) is reported as "NIFT_VM internal failure" with exit status 70;
-//   it is never replayed on the legacy engine.
-//   NIFT_VM_STATS=1  one JSON line on stderr per script: outcome, fallback or
-//                    bail reason, parse/compile/execute microseconds.
+//   it is never disguised as a legacy run.
+//   NIFT_VM_STATS=1  one JSON line on stderr per script: outcome, fallback
+//                    reason, parse/compile/execute microseconds, how often the
+//                    unit executed on each engine (vm_executions,
+//                    legacy_executions: 0 or 1, never both).
 //   NIFT_VM_STATS=<path>  the same line appended to <path> instead.
 //   NIFT_VM_DUMP=1   the compiled bytecode on stderr.
 // Unset (or 0), nothing here runs and nift behaves exactly as before.

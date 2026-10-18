@@ -24,8 +24,10 @@ INTERACTIONS where a compiled program could silently differ from legacy:
   control      jumps and returns at every position of nested blocks.
   recursion    depths around the legacy limit (64) and the VM budget, with
                growing strings (deep recursion, memory budget).
-  output       large output with and without a later bail (small test limit
-               through NIFT_VM_OUTPUT_LIMIT, and one run past the real 64 MiB).
+  output       large output followed by a normal end, a run-time error, a
+               large number, the recursion limit or the recursion budget
+               (CP12: the VM streams its output; NIFT_VM_FLUSH lowers the
+               streaming threshold), and one run of ~70 MiB ending in an error.
   malformed    near-miss mutants of typed programs (vm_gen.mutate).
   typing       binding types from declaration text referring to other
                bindings, then every kind of assignment, in every context.
@@ -434,7 +436,7 @@ def recursion(_seed, _count):
 
 
 def output(_seed, _count):
-    small = {"NIFT_VM_OUTPUT_LIMIT": "4096"}
+    small = {"NIFT_VM_FLUSH": "4096"}
     loop = 'i0 := 0\nwhile (i0 < {n}) {{ print("line " + i0); i0 += 1 }}\n'
     for n in (10, 400, 1000):
         rec = "fn(d(n)) { if (n == 0) { return 0 } return d(n - 1) }\n"

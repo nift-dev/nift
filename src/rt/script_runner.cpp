@@ -25,12 +25,15 @@ double micros(Clock::time_point from, Clock::time_point to) {
 }
 
 struct Stats {
-    std::string outcome;  // vm | fallback | replayed | require-error | internal-error
+    std::string outcome;  // vm | vm-error | fallback | require-error | internal-error | compiled
     std::string reason;
     std::size_t line = 0, column = 0;
     double parse_us = 0, compile_us = 0, execute_us = 0;
     std::size_t protos = 0, instructions = 0, source_bytes = 0;
     bool beyond_legacy_depth = false;
+    int executions = 0;         // times the unit started executing on the VM (0 or 1)
+    int legacy_executions = 0;  // 1 when the unit was handed to legacy (before anything executed)
+    std::uint64_t reevaluations = 0;
     std::string path;
 };
 
@@ -52,7 +55,9 @@ void report(const Stats& s) {
          << "\",\"line\":" << s.line << ",\"column\":" << s.column << ",\"parse_us\":" << s.parse_us
          << ",\"compile_us\":" << s.compile_us << ",\"execute_us\":" << s.execute_us << ",\"protos\":" << s.protos
          << ",\"instructions\":" << s.instructions << ",\"source_bytes\":" << s.source_bytes
-         << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false") << ",\"path\":\""
+         << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
+         << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
+         << ",\"reevaluations\":" << s.reevaluations << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
         std::cerr << line.str() << std::flush;
@@ -90,6 +95,7 @@ bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, 
     }
     if (mode != VmMode::Require) {
         stats.outcome = "fallback";
+        stats.legacy_executions = 1;  // the caller runs the unit on legacy, which nothing has touched
         report(stats);
         return false;
     }
@@ -112,10 +118,8 @@ void internal_failure(Stats& stats, const std::filesystem::path& path, const std
     exit_code = 70;
 }
 
-// Test-only knob: NIFT_VM_OUTPUT_LIMIT=<bytes> lowers the output buffer limit
-// (review D7 regression tests); unset or invalid keeps the 64 MiB default.
-// NIFT_VM_HEAP_BUDGET=<bytes> and NIFT_VM_EQUALITY_DEPTH=<levels> likewise
-// lower the memory budget and the equality depth (review round 2 R5/R6 tests).
+// Test-only knobs: NIFT_VM_HEAP_BUDGET=<bytes> lowers the memory budget
+// (review round 2 R5 tests); NIFT_VM_FLUSH=<bytes> the streaming threshold.
 bool size_from_environment(const char* name, std::size_t& out) {
     const char* value = std::getenv(name);
     if (!value || !*value) return false;
@@ -126,10 +130,9 @@ bool size_from_environment(const char* name, std::size_t& out) {
     return true;
 }
 
-void output_limit_from_environment(VmOptions& options) {
-    size_from_environment("NIFT_VM_OUTPUT_LIMIT", options.output_limit);
+void limits_from_environment(VmOptions& options) {
     size_from_environment("NIFT_VM_HEAP_BUDGET", options.heap_budget);
-    size_from_environment("NIFT_VM_EQUALITY_DEPTH", options.equality_depth);
+    size_from_environment("NIFT_VM_FLUSH", options.flush_threshold);
 }
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
@@ -203,22 +206,19 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     if (dump && std::string(dump) == "1") std::cerr << disassemble(*compiled.program);
 
     VmOptions options;
-    output_limit_from_environment(options);
-    // Only NIFT_VM=require (never replays) may flush before completion; under
-    // NIFT_VM=1 reaching the limit stops the run and legacy replays it (D7).
-    if (mode == VmMode::Require) options.flush = &write_stdout;
+    limits_from_environment(options);
+    options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
+    // From here on the unit runs on the VM and only on the VM: whatever
+    // happens, the legacy engine never runs it (engine selection is final).
+    stats.executions = 1;
     Vm vm(*compiled.program, options);
     std::string output;
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
     stats.beyond_legacy_depth = result.beyond_legacy_depth;
-    if (result.reason == BailReason::Internal) {
-        locate_into(stats, source, result.offset);
-        internal_failure(stats, source_path, result.message, exit_code);
-        return true;
-    }
-    if (result.reason == BailReason::None) {
-        write_stdout(output, nullptr);
+    stats.reevaluations = result.reevaluations;
+    write_stdout(output, nullptr);
+    if (result.reason == StopReason::None) {
         if (result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
         std::cout.flush();
         stats.outcome = "vm";
@@ -226,22 +226,20 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         exit_code = 0;
         return true;
     }
-    stats.reason = std::string("bail:") + bail_reason_name(result.reason);
     locate_into(stats, source, result.offset);
-    if (!result.committed && mode != VmMode::Require) {
-        stats.outcome = "replayed";  // nothing was written: legacy runs the unit from the start
+    if (result.reason == StopReason::Error) {
+        // A program error, reported exactly as legacy reports it.
+        stats.outcome = "vm-error";
+        stats.reason = result.message;
         report(stats);
-        return false;
-    }
-    if (result.committed && mode != VmMode::Require) {  // unreachable: only require mode flushes early
-        internal_failure(stats, source_path, "output committed before a bail", exit_code);
+        std::string message;
+        for (std::uint32_t k = 0; k < result.return_prefixes; ++k) message += "return: ";
+        message += result.message;
+        error_line(source_path, stats, message);
+        exit_code = 1;
         return true;
     }
-    write_stdout(output, nullptr);
-    stats.outcome = "require-error";
-    report(stats);
-    error_line(source_path, stats, result.message);
-    exit_code = 1;
+    internal_failure(stats, source_path, result.message, exit_code);
     return true;
 }
 

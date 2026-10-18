@@ -151,7 +151,7 @@ def deeptree(_seed, _count):
     yield "deeptree", "deeptree-statements", "x := 0\n" + "x += 1\n" * 50000 + "print(x)\n", {}, "vm"
     fns = "".join(f"fn(h{k}(x)) {{ return h{k + 1}(x) + 1 }}\n" for k in range(3000))
     yield "deeptree", "deeptree-function-chain", fns + "fn(h3000(x)) { return x }\nprint(h0(1))\n", {}, (
-        "vm", "replayed:bail:recursion-budget", "fallback:")
+        "vm", "vm-error", "fallback:")
 
 
 FAMILIES = {"elemtarget": elemtarget, "cmpchain": cmpchain, "deeptree": deeptree}
