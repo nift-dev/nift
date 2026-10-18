@@ -146,7 +146,12 @@ class Gen:
         if r < 0.22 or not scope:
             kind = self.r.choice(["int", "int", "int", "str", "arr", "obj"])
             v = self.name("v")
-            line = f"{ind}{v} := {self.value_of(kind, scope)}"
+            # CP11 review round 2: inside functions (which may be called from
+            # loops) a declaration referring to another binding is refused
+            # (prepared-decl-type); most take literal-only values so the
+            # generator keeps exercising the narrowed subset.
+            source = [] if in_fn and self.r.random() < 0.7 else scope
+            line = f"{ind}{v} := {self.value_of(kind, source)}"
             scope.append((v, kind))
             return [line]
         if r < 0.40:
