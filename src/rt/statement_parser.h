@@ -43,7 +43,7 @@ private:
     Step return_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
     Step throw_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
     Step jump_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out, std::string_view kw, NodeKind kind);
-    void general_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
+    bool general_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out);
     NodeId classify_statement(std::uint32_t start, std::uint32_t stmt_end);
     NodeId template_declaration(std::uint32_t start, std::uint32_t stmt_end);
     NodeId for_header(std::uint32_t begin, std::uint32_t end);

@@ -440,8 +440,8 @@ i8 = i8 + 1
 print(cl17(1))
 print(1 / 0)
 
-#case 435 13 1
-fn requires '(name(args))'
+#case 435 5 12
+unterminated array literal or index: '[' opened at 5:12 has no closing ']'
 // rt-diff gen.py --seed 1010 index 2602
 try {
   print(10)
@@ -2935,8 +2935,8 @@ export(exported_future_timer)
 #case 43 1 32
 export requires '(binding)'
 fn(mf9(x)) { return x * 4 + 1 }export((mf9)
-#case 914 29 1
-function if has no matching ')'
+#case 914 26 5
+unterminated array literal or index: '[' opened at 26:5 has no closing ']'
 // rt-diff gen.py --seed 1010 index 395
 print("q" + "q")
 fn(mk1(k)) { return (x) => 
@@ -16930,8 +16930,8 @@ print(cl26(1))
 export requires '(binding)'
 fn(mf7(x)) { return x * 4 + 1 }export((mf7
 
-#case 136 1 68
-export requires '(binding)'
+#case 136 1 43
+unterminated array literal or index: '[' opened at 1:43 has no closing ']'
 a := []; i := 0; while(i < 2000) { a.push([i,i+1); i += 1 }; i = 0;export( s:= 0; while(i < 2000) { s += a[i][1]; i += 1 }; print(s)
 ; 
 

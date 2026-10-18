@@ -6,6 +6,7 @@
 #include "rt/control_flow.h"
 
 #include <algorithm>
+#include <string>
 
 namespace nift::rt::detail {
 
@@ -54,7 +55,7 @@ bool StatementParser::block(std::uint32_t begin, std::uint32_t end, std::vector<
         i = skip_space(src_, i, end);
         if (i >= end) break;
         if (!may_start_keyword(src_[i])) {
-            general_stmt(i, end, out);
+            if (!general_stmt(i, end, out)) return false;
             continue;
         }
         bool stop = false;
@@ -74,7 +75,7 @@ bool StatementParser::block(std::uint32_t begin, std::uint32_t end, std::vector<
         if (step == Step::NoMatch) step = jump_stmt(i, end, out, "continue", NodeKind::Continue);
         if (step == Step::Error) return false;
         if (stop) return true;
-        if (step == Step::NoMatch) general_stmt(i, end, out);
+        if (step == Step::NoMatch && !general_stmt(i, end, out)) return false;
     }
     return true;
 }
@@ -82,13 +83,35 @@ bool StatementParser::block(std::uint32_t begin, std::uint32_t end, std::vector<
 // Any other statement: text up to ';' or newline at bracket depth 0 outside
 // quotes. Depth may go negative, which suppresses splitting until it returns
 // to zero, exactly as in the translator.
-void StatementParser::general_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out) {
+bool StatementParser::general_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out) {
     const std::uint32_t start = i;
-    i = statement_end(src_, i, end);
+    StatementScan scan;
+    i = statement_end(src_, i, end, &scan);
     const std::uint32_t stop = std::min(i, end);
     const std::string_view stmt = trim(src_.substr(start, stop - start));
+    // feature-site-dx: the translator rejects a statement whose scan reaches
+    // the end of its block inside a quote or an unclosed '[' (the rest of the
+    // block would otherwise be swallowed). Same rule, opener and wording.
+    const bool shebang = stmt.size() >= 2 && stmt[0] == '#' && stmt[1] == '!';
+    const bool open_literal = scan.quoted || (scan.brackets > 0 && scan.first_bracket != kNoOffset);
+    if (i >= end && !stmt.empty() && stmt[0] != '@' && stmt[0] != '$' && !shebang && open_literal) {
+        const std::uint32_t opener = scan.quoted
+            ? (scan.first_multiline_quote != kNoOffset ? scan.first_multiline_quote : scan.quote_open)
+            : scan.first_bracket;
+        std::uint32_t line = 1, line_start = 0;
+        for (std::uint32_t k = 0; k < opener; ++k) if (src_[k] == '\n') { ++line; line_start = k + 1; }
+        const std::string where = std::to_string(line) + ":" + std::to_string(opener - line_start + 1);
+        if (scan.quoted)
+            error_.message = "unterminated string literal opened at " + where + " (no closing " +
+                             std::string(1, src_[opener]) + " on that line)";
+        else
+            error_.message = "unterminated array literal or index: '[' opened at " + where + " has no closing ']'";
+        error_.offset = opener;
+        return false;
+    }
     if (!stmt.empty()) out.push_back(classify_statement(start, start + static_cast<std::uint32_t>(stmt.size())));
     if (i < end) ++i;
+    return true;
 }
 
 // The translator's choice for a general statement: shebang comment,

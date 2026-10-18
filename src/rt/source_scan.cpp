@@ -4,6 +4,7 @@
 #include "rt/lexer.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace nift::rt::detail {
 
@@ -82,18 +83,37 @@ bool find_balanced(std::string_view src, std::uint32_t open, std::uint32_t end,
     return false;
 }
 
-std::uint32_t statement_end(std::string_view src, std::uint32_t from, std::uint32_t end) {
+std::uint32_t statement_end(std::string_view src, std::uint32_t from, std::uint32_t end, StatementScan* scan) {
     bool quoted = false;
     char quote = 0;
     int par = 0, br = 0, bc = 0;
+    std::uint32_t quote_open = kNoOffset, first_multiline_quote = kNoOffset;
+    std::vector<std::uint32_t> bracket_opens;
     std::uint32_t i = from;
     for (; i < end; ++i) {
         const char c = src[i];
-        if (quoted) { if (c == '\\' && i + 1 < end) ++i; else if (c == quote) quoted = false; continue; }
-        if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
-        if (c == '(') ++par; else if (c == ')') --par; else if (c == '[') ++br; else if (c == ']') --br;
+        if (quoted) {
+            if (c == '\\' && i + 1 < end) ++i;
+            else if (c == quote) {
+                quoted = false;
+                const bool multiline = src.substr(quote_open, i - quote_open).find('\n') != std::string_view::npos;
+                if (first_multiline_quote == kNoOffset && multiline) first_multiline_quote = quote_open;
+            }
+            continue;
+        }
+        if (c == '\'' || c == '"') { quoted = true; quote = c; quote_open = i; continue; }
+        if (c == '(') ++par; else if (c == ')') --par;
+        else if (c == '[') { ++br; if (scan) bracket_opens.push_back(i); }
+        else if (c == ']') { --br; if (scan && !bracket_opens.empty()) bracket_opens.pop_back(); }
         else if (c == '{') ++bc; else if (c == '}') --bc;
         if (!par && !br && !bc && (c == ';' || c == '\n')) break;
+    }
+    if (scan) {
+        scan->quoted = quoted;
+        scan->quote_open = quote_open;
+        scan->first_multiline_quote = first_multiline_quote;
+        scan->brackets = br;
+        scan->first_bracket = bracket_opens.empty() ? kNoOffset : bracket_opens.front();
     }
     return i;
 }

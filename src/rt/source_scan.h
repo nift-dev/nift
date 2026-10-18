@@ -25,6 +25,16 @@ bool find_balanced(std::string_view src, std::uint32_t open, std::uint32_t end,
 // End of a translator statement starting at `from`: the first ';' or newline
 // at bracket depth 0 outside quotes (depth may go negative, which suppresses
 // splitting until it returns to zero), or `end`.
-std::uint32_t statement_end(std::string_view src, std::uint32_t from, std::uint32_t end);
+// Scan state at the end of statement_end, for the translator's
+// unterminated-literal rule (feature-site-dx).
+constexpr std::uint32_t kNoOffset = 0xffffffffu;
+struct StatementScan {
+    bool quoted = false;
+    std::uint32_t quote_open = kNoOffset;            // last opening quote
+    std::uint32_t first_multiline_quote = kNoOffset; // first quote closed on a later line
+    int brackets = 0;
+    std::uint32_t first_bracket = kNoOffset;         // outermost unclosed '['
+};
+std::uint32_t statement_end(std::string_view src, std::uint32_t from, std::uint32_t end, StatementScan* scan = nullptr);
 
 } // namespace nift::rt::detail
