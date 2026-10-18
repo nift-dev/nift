@@ -1,0 +1,61 @@
+{
+ "step 18: public/index": {
+  "dependencies": [
+   "content/index.html",
+   "data/kind",
+   "templates/template.html"
+  ],
+  "dependency-hashes": {
+   "content/index.html": "15102705911069368784",
+   "data/kind": "629892652474679424",
+   "templates/template.html": "10848694574074810746"
+  },
+  "environment": {
+   "CP16_OBS": "set"
+  },
+  "environment-snapshot": "$FP",
+  "kinds": {
+   "data/appears.txt": "file",
+   "data/kind": "file"
+  },
+  "listings": {
+   "dir:data": "$FP",
+   "glob:data/*.txt": "$FP"
+  },
+  "platform": "ios",
+  "reqs": [
+   "data/appears.txt",
+   "data/kind"
+  ]
+ },
+ "step 2: public/index": {
+  "absent": [
+   "data/appears.txt"
+  ],
+  "dependencies": [
+   "content/index.html",
+   "data/kind",
+   "templates/template.html"
+  ],
+  "dependency-hashes": {
+   "content/index.html": "15102705911069368784",
+   "data/kind": "629892652474679424",
+   "templates/template.html": "10848694574074810746"
+  },
+  "environment": {
+   "CP16_OBS": null
+  },
+  "environment-snapshot": "$FP",
+  "kinds": {
+   "data/kind": "file"
+  },
+  "listings": {
+   "dir:data": "$FP",
+   "glob:data/*.txt": "$FP"
+  },
+  "platform": "native",
+  "reqs": [
+   "data/kind"
+  ]
+ }
+}

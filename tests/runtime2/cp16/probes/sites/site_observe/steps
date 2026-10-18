@@ -1,0 +1,19 @@
+nift build --all
+info public/index
+nift status
+write data/appears.txt now\n
+nift status
+nift build
+write data/g2.txt g2\n
+nift status
+nift build
+setenv CP16_OBS set
+nift status
+nift build
+setenv CP16_SNAP 1
+nift status
+nift build
+nift status
+nift build --platform=ios
+info public/index
+nift status

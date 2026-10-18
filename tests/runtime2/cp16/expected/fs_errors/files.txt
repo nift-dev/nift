@@ -1,0 +1,8 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/a.txt 644 2 06f961b802bc46ee
+d w/dir/ 755
+f w/main.f 644 1311 f2ede362c9a064db
+f w/notdir 644 1 2d711642b726b044

@@ -1,0 +1,4 @@
+nift build --all
+info public/index
+write data/x.txt created\n
+nift status

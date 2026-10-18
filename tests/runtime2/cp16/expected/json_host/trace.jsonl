@@ -1,0 +1,3 @@
+{"ctx":"script","op":"open","arg":"$BASE/w/o.txt","res":"w"}
+{"ctx":"script","op":"save","arg":"$BASE/w/o.txt","res":""}
+{"ctx":"script","op":"read","arg":"$BASE/w/o.txt","res":"46"}

@@ -1,0 +1,14 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f ext/e1.txt 644 1 3f79bb7b435b0532
+f ext/e2.md 644 1 3f79bb7b435b0532
+d w/d/ 755
+f w/main.f 644 366 849617f4ad7a9009
+f w/d/.hidden 644 0 e3b0c44298fc1c14
+f w/d/B.txt 644 0 e3b0c44298fc1c14
+f w/d/_c.txt 644 0 e3b0c44298fc1c14
+f w/d/a.txt 644 0 e3b0c44298fc1c14
+d w/d/sub/ 755
+f w/d/sub/x.txt 644 0 e3b0c44298fc1c14

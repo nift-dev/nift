@@ -1,0 +1,10 @@
+{"ctx":"script","op":"open","arg":"$BASE/w/missing.txt","res":"r"}
+{"ctx":"script","op":"list","arg":"$BASE/w/missing-dir","res":""}
+{"ctx":"script","op":"copy-to","arg":"$BASE/w/z.txt","res":""}
+{"ctx":"script","op":"move-to","arg":"$BASE/w/z.txt","res":""}
+{"ctx":"script","op":"move-from","arg":"$BASE/w/missing.txt","res":""}
+{"ctx":"script","op":"mkdir","arg":"$BASE/w/notdir/sub","res":""}
+{"ctx":"script","op":"touch","arg":"$BASE/w/missing-dir/t.txt","res":""}
+{"ctx":"script","op":"open","arg":"$BASE/w/missing-dir/x.txt","res":"w"}
+{"ctx":"script","op":"save","arg":"$BASE/w/missing-dir/x.txt","res":""}
+{"ctx":"script","op":"remove","arg":"$BASE/w/missing.txt","res":""}

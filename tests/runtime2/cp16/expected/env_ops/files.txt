@@ -1,0 +1,7 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/main.f 644 881 2330049d0a11bdb4
+d w/sub/ 755
+f w/sub/made-in-sub.txt 644 0 e3b0c44298fc1c14

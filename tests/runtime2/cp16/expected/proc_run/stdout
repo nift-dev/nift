@@ -1,0 +1,18 @@
+{"exit_code":3,"stdout":"out\n","stderr":"err\n","launched":true}
+{"exit_code":0,"stdout":"args:3:a b|1|true\n","stderr":"","launched":true}
+{"exit_code":0,"stdout":"args:3:x|2.5|false\n","stderr":"","launched":true}
+{"exit_code":0,"stdout":"args:3:*|$HOME|a;b\n","stderr":"","launched":true}
+{"exit_code":127,"stdout":"","stderr":"","launched":false,"error":"executable not found: definitely-missing-cp16"}
+{"exit_code":126,"stdout":"","stderr":"","launched":false,"error":"permission denied: ./noexec.sh"}
+{"exit_code":127,"stdout":"","stderr":"","launched":false,"error":"executable not found: ./badinterp.sh"}
+{"exit_code":143,"stdout":"","stderr":"","launched":true}
+{"exit_code":137,"stdout":"","stderr":"","launched":true}
+{"exit_code":255,"stdout":"","stderr":"","launched":true}
+3000000
+e55b8bdf621ddaa8f462c74745db9680d3bb7536a9cf854f8d6668b34a287890
+3
+early
+
+notty
+regular
+

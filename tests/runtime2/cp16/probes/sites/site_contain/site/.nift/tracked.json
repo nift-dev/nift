@@ -1,0 +1,9 @@
+{
+ "tracked": [
+  {
+   "name": "/",
+   "title": "Home",
+   "template": "templates/template.html"
+  }
+ ]
+}

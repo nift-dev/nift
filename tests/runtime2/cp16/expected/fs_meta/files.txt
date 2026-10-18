@@ -1,0 +1,12 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+l w/chain -> lfile
+l w/dangling -> nowhere
+d w/dir/ 755
+o w/fifo (special)
+f w/file.txt 644 1 2d711642b726b044
+l w/ldir -> dir
+l w/lfile -> file.txt
+f w/main.f 644 500 ec643438e41f90ac

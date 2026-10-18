@@ -1,0 +1,14 @@
+{"ctx":"script","op":"getenv","arg":"CP16_PRESENT","res":"found"}
+{"ctx":"script","op":"getenv","arg":"CP16_EMPTY","res":"found"}
+{"ctx":"script","op":"getenv","arg":"CP16_ABSENT","res":"unset"}
+{"ctx":"script","op":"env-all","arg":"","res":""}
+{"ctx":"script","op":"env-all","arg":"","res":""}
+{"ctx":"script","op":"getenv","arg":"CP16_SET","res":"found"}
+{"ctx":"script","op":"spawn","arg":"sh -c echo ${CP16_SET:-unset}","res":""}
+{"ctx":"script","op":"getenv","arg":"CP16_SET","res":"unset"}
+{"ctx":"script","op":"spawn","arg":"sh -c echo ${CP16_SET:-unset}","res":""}
+{"ctx":"script","op":"getenv","arg":"BASE","res":"found"}
+{"ctx":"script","op":"mkdir","arg":"$BASE/w/sub","res":""}
+{"ctx":"script","op":"touch","arg":"$BASE/w/sub/made-in-sub.txt","res":""}
+{"ctx":"script","op":"spawn","arg":"pwd","res":""}
+{"ctx":"script","op":"stat","arg":"$BASE/w/sub/made-in-sub.txt","res":"file"}

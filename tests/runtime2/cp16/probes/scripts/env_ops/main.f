@@ -1,0 +1,12 @@
+// getenv/setenv/unsetenv/env(); children see setenv; cd/pwd; platform queries.
+print(getenv("CP16_PRESENT")); print(getenv("CP16_EMPTY") == ""); print(getenv("CP16_ABSENT") == null)
+print(env().CP16_PRESENT)
+print(env().has("NIFT_TRACE_HOST"))
+setenv("CP16_SET", "v1"); print(getenv("CP16_SET"))
+print(run("sh", "-c", "echo ${CP16_SET:-unset}").stdout)
+unsetenv("CP16_SET"); print(getenv("CP16_SET") == null)
+print(run("sh", "-c", "echo ${CP16_SET:-unset}").stdout)
+start := pwd(); print(start == getenv("BASE") + "/w")
+mkdir("sub"); cd("sub"); print(pwd() == start + "/sub"); touch("made-in-sub.txt"); print(run("pwd").stdout == start + "/sub\n"); cd(".."); print(exists("sub/made-in-sub.txt"))
+print(os()); print(arch() != ""); print(platform()); print(hardware_concurrency() >= 1)
+print(which("sh") != null); print(which("cp")); print(which("definitely-missing-cp16") == null)

@@ -1,0 +1,2 @@
+{"ctx":"script","op":"copy-to","arg":"$BASE/w/b.txt","res":""}
+{"ctx":"script","op":"read","arg":"$BASE/w/b.txt","res":"2"}

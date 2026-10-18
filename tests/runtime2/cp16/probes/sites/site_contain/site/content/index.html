@@ -1,0 +1,2 @@
+A:@script { cp("data/p.txt", "../ext/by-cp.txt"); return exists("../ext/by-cp.txt") }
+B:@script { fb := file("data/p.txt"); fc := fb.copy("../ext/by-file-copy.txt"); return "copied" }

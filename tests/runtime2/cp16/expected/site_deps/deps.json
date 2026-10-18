@@ -1,0 +1,76 @@
+{
+ "step 27: public/index": {
+  "absent": [
+   "content/data/part.html"
+  ],
+  "dependencies": [
+   "content/index.html",
+   "data/at.json",
+   "data/cat.txt",
+   "data/file.txt",
+   "data/inj.json",
+   "data/open.txt",
+   "data/part.html",
+   "data/readval.txt",
+   "data/sha.txt",
+   "data/stat.txt",
+   "templates/template.html"
+  ],
+  "dependency-hashes": {
+   "content/index.html": "908104364561598654",
+   "data/at.json": "8686831917336683803",
+   "data/cat.txt": "1640639993685903018",
+   "data/file.txt": "504985901252051590",
+   "data/inj.json": "4019507551379446311",
+   "data/open.txt": "4989352667989678064",
+   "data/part.html": "13642413092450587795",
+   "data/readval.txt": "6937107035428441149",
+   "data/sha.txt": "2752026406333641844",
+   "data/stat.txt": "3587705715134841224",
+   "templates/template.html": "10848694574074810746"
+  },
+  "kinds": {
+   "data/stat.txt": "file"
+  },
+  "reqs": [
+   "data/stat.txt"
+  ]
+ },
+ "step 2: public/index": {
+  "absent": [
+   "content/data/part.html"
+  ],
+  "dependencies": [
+   "content/index.html",
+   "data/at.json",
+   "data/cat.txt",
+   "data/file.txt",
+   "data/inj.json",
+   "data/open.txt",
+   "data/part.html",
+   "data/readval.txt",
+   "data/sha.txt",
+   "data/stat.txt",
+   "templates/template.html"
+  ],
+  "dependency-hashes": {
+   "content/index.html": "908104364561598654",
+   "data/at.json": "10511485757519589046",
+   "data/cat.txt": "1643492126848914677",
+   "data/file.txt": "507873218787166001",
+   "data/inj.json": "5844161391562351554",
+   "data/open.txt": "4988413685059375095",
+   "data/part.html": "13643369667566942140",
+   "data/readval.txt": "5002429464678734855",
+   "data/sha.txt": "2751069831217287499",
+   "data/stat.txt": "3670682123603027205",
+   "templates/template.html": "10848694574074810746"
+  },
+  "kinds": {
+   "data/stat.txt": "file"
+  },
+  "reqs": [
+   "data/stat.txt"
+  ]
+ }
+}

@@ -1,0 +1,127 @@
+== step 1: nift build --all
+exit 0
+-- stdout
+📦 1 file built successfully
+time taken: $T seconds
+-- stderr
+== step 2: info public/index
+== step 3: nift status
+exit 0
+-- stdout
+Nift status
+✓ all 1 tracked file is up to date
+-- stderr
+== step 4: write data/appears.txt now\n
+== step 5: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ path that was absent now exists: data/appears.txt
+  ↳ directory listing changed: data
+  ↳ directory listing changed: data/*.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 6: nift build
+exit 0
+-- stdout
+built /
+    ↳ path that was absent now exists: data/appears.txt
+    ↳ directory listing changed: data
+    ↳ directory listing changed: data/*.txt
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 7: write data/g2.txt g2\n
+== step 8: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ directory listing changed: data
+  ↳ directory listing changed: data/*.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 9: nift build
+exit 0
+-- stdout
+built /
+    ↳ directory listing changed: data
+    ↳ directory listing changed: data/*.txt
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 10: setenv CP16_OBS set
+== step 11: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ environment variable changed: CP16_OBS
+  ↳ environment changed
+
+run nift build to rebuild this file
+-- stderr
+== step 12: nift build
+exit 0
+-- stdout
+built /
+    ↳ environment variable changed: CP16_OBS
+    ↳ environment changed
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 13: setenv CP16_SNAP 1
+== step 14: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ environment changed
+
+run nift build to rebuild this file
+-- stderr
+== step 15: nift build
+exit 0
+-- stdout
+built /
+    ↳ environment changed
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 16: nift status
+exit 0
+-- stdout
+Nift status
+✓ all 1 tracked file is up to date
+-- stderr
+== step 17: nift build --platform=ios
+exit 0
+-- stdout
+built /
+    ↳ platform changed
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 18: info public/index
+== step 19: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ platform changed
+
+run nift build to rebuild this file
+-- stderr

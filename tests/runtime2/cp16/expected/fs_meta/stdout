@@ -1,0 +1,15 @@
+file.txt true true false {"exists":true,"type":"file","size":1}
+dir true false true {"exists":true,"type":"directory"}
+lfile true true false {"exists":true,"type":"file","size":1}
+ldir true false true {"exists":true,"type":"directory"}
+dangling false false false {"exists":false}
+chain true true false {"exists":true,"type":"file","size":1}
+fifo true false false {"exists":true,"type":"other"}
+missing false false false {"exists":false}
+dir/ true false true {"exists":true,"type":"directory"}
+./file.txt true true false {"exists":true,"type":"file","size":1}
+dir/../file.txt true true false {"exists":true,"type":"file","size":1}
+true
+true
+false
+true

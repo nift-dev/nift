@@ -1,0 +1,6 @@
+stream.flush_failed | flush: output failure
+stream.close_failed | close: output flush failed
+stream.close_failed | close: output flush failed
+{"exit_code":1,"stdout":"","stderr":"sh: 1: echo: echo: I/O error\n","launched":true}
+{"exit_code":1,"stdout":"","stderr":"sh: 1: echo: echo: I/O error\n","launched":true}
+end

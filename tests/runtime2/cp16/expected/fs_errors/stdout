@@ -1,0 +1,16 @@
+io.open_failed | open: cannot open path
+io.open_failed | cat: cannot open path
+io.open_failed | open_bytes: cannot open path
+io.open_failed | sha256_file: cannot open path
+stream.open_failed | ifstream: cannot open path
+io.open_failed | open: file does not exist
+io.directory_read_failed | ls: No such file or directory
+io.change_directory_failed | cd: No such file or directory
+io.copy_failed | copy: No such file or directory
+io.move_failed | move: No such file or directory
+io.create_failed | make_dir: Not a directory
+io.create_failed | touch: cannot open path
+io.write_failed | save: parent directory does not exist
+stream.open_failed | ofstream: cannot open path
+file.remove missing: ok
+rm missing: ok

@@ -1,0 +1,28 @@
+nift build --all
+info public/index
+nift status
+write data/open.txt open-2\n
+nift status
+write data/cat.txt cat-2\n
+nift status
+write data/file.txt file-2\n
+nift status
+write data/bytes.txt bytes-22\n
+nift status
+write data/ifstream.txt ifstream-2\n
+nift status
+write data/sha.txt sha-2\n
+nift status
+write data/inj.json {"v": 2}\n
+nift status
+write data/stat.txt stat-22\n
+nift status
+write data/readval.txt 22\n
+nift status
+write data/at.json {"j": 2}\n
+nift status
+write data/part.html part-2\n
+nift status
+nift build
+info public/index
+nift status

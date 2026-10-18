@@ -1,0 +1,11 @@
+{"ctx":"script","op":"open","arg":"$BASE/w/link.txt","res":"w"}
+{"ctx":"script","op":"save","arg":"$BASE/w/link.txt","res":""}
+{"ctx":"script","op":"copy-to","arg":"$BASE/w/link2.txt","res":""}
+{"ctx":"script","op":"touch","arg":"$BASE/w/linkdir/inside.txt","res":""}
+{"ctx":"script","op":"mkdir","arg":"$BASE/w/linkdir/made","res":""}
+{"ctx":"script","op":"remove","arg":"$BASE/w/dangling","res":""}
+{"ctx":"script","op":"stat","arg":"$BASE/w/link.txt","res":"file"}
+{"ctx":"script","op":"read","arg":"$BASE/w/real.txt","res":"7"}
+{"ctx":"script","op":"read","arg":"$BASE/w/real2.txt","res":"4"}
+{"ctx":"script","op":"read","arg":"$BASE/w/real3.txt","res":"9"}
+{"ctx":"script","op":"list","arg":"$BASE/w/linkdir","res":""}

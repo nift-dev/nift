@@ -1,0 +1,8 @@
+[".hidden","B.txt","_c.txt","a.txt","sub"]
+["d/B.txt","d/_c.txt","d/a.txt"]
+["d/B.txt","d/_c.txt","d/a.txt","d/sub"]
+["d/B.txt","d/_c.txt","d/a.txt","d/sub/x.txt"]
+["../ext/e1.txt","../ext/e2.md"]
+["$BASE/ext/e2.md"]
+[]
+[".hidden","B.txt","_c.txt","a.txt","sub"]

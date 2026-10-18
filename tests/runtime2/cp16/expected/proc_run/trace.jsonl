@@ -1,0 +1,14 @@
+{"ctx":"script","op":"spawn","arg":"sh -c echo out; echo err >&2; exit 3","res":""}
+{"ctx":"script","op":"spawn","arg":"./args.sh a b 1 true","res":""}
+{"ctx":"script","op":"spawn","arg":"./args.sh x 2.5 false","res":""}
+{"ctx":"script","op":"spawn","arg":"./args.sh * $HOME a;b","res":""}
+{"ctx":"script","op":"spawn","arg":"definitely-missing-cp16","res":""}
+{"ctx":"script","op":"spawn","arg":"./noexec.sh","res":""}
+{"ctx":"script","op":"spawn","arg":"./badinterp.sh","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c kill -TERM $$","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c kill -KILL $$","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c exit 255","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c head -c 3000000 /dev/zero | tr '\\0' 'x'","res":""}
+{"ctx":"script","op":"spawn","arg":"printf a\\000b","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c (sleep 0.3; echo late) & echo early","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c test -t 1 && echo tty || echo notty; test -f /dev/stdout && echo regular","res":""}

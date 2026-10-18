@@ -1,0 +1,6 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/bad.json 644 9 67babd398b32a133
+f w/main.f 644 134 7e2b7a425290fee4

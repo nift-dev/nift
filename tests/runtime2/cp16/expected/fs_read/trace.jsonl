@@ -1,0 +1,13 @@
+{"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+{"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+{"ctx":"script","op":"open","arg":"$BASE/w/text.txt","res":"r"}
+{"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+{"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+{"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
+{"ctx":"script","op":"open","arg":"$BASE/w/bin.dat","res":"r"}
+{"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
+{"ctx":"script","op":"open","arg":"$BASE/w/vals.txt","res":"r"}
+{"ctx":"script","op":"read","arg":"$BASE/w/vals.txt","res":"33"}
+{"ctx":"script","op":"read","arg":"$BASE/ext/out.txt","res":"8"}
+{"ctx":"script","op":"getenv","arg":"BASE","res":"found"}
+{"ctx":"script","op":"read","arg":"$BASE/ext/out.txt","res":"8"}

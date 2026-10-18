@@ -1,0 +1,2 @@
+{"ctx":"script","op":"spawn","arg":"sh -c echo data","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c echo data > /dev/full","res":""}

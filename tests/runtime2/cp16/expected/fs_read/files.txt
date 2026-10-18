@@ -1,0 +1,11 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f ext/out.txt 644 8 92a214fa61579091
+f w/bin.dat 644 7 686922df68efa893
+f w/data.json 644 37 0dafec4d7482054e
+f w/main.f 644 1069 3192e81755461f18
+f w/sum.expr 644 5 6212702c7a0d68f0
+f w/text.txt 644 24 22b09be409572ff7
+f w/vals.txt 644 33 78f4b401e3991520

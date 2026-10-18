@@ -1,0 +1,8 @@
+E:@script { return exists("data/appears.txt") }
+L:@script { return ls("data/*.txt").length() }
+D:@script { return ls("data").length() }
+K:@script { return stat("data/kind").type }
+V:@script { return getenv("CP16_OBS") == null }
+N:@script { return env().has("CP16_SNAP") }
+P:@script { return platform() }
+W:@script { touch("data/scratch.tmp"); w := exists("data/scratch.tmp"); rm("data/scratch.tmp"); return w }

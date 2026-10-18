@@ -1,0 +1,5 @@
+{"step": 1, "cmd": "nift build --all"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"spawn","arg":"sh -c cat data/x.txt 2>/dev/null || echo none","res":""}
+{"step": 4, "cmd": "nift status"}

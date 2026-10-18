@@ -1,0 +1,10 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/arr.expr 644 10 9df973e30594a25b
+f w/exact.json 644 54 9b4cd91524253aa9
+f w/main.f 644 354 03ff3890798cd438
+f w/o.txt 644 46 900ab96395231b36
+f w/self.expr 644 19 ba6f66b5e65a38e2
+f w/str.json 644 17 25d455fe609d4b67

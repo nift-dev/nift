@@ -1,0 +1,3 @@
+nift build --all
+info public/index
+nift status

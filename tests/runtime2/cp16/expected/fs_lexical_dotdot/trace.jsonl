@@ -1,0 +1,3 @@
+{"ctx":"script","op":"read","arg":"$BASE/w/u.txt","res":"8"}
+{"ctx":"script","op":"spawn","arg":"cat link/../u.txt","res":""}
+{"ctx":"script","op":"stat","arg":"$BASE/w/inner","res":"missing"}

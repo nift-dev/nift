@@ -1,0 +1,13 @@
+{
+ "step 2: public/index": {
+  "dependencies": [
+   "content/index.html",
+   "templates/template.html"
+  ],
+  "dependency-hashes": {
+   "content/index.html": "18050558172879742060",
+   "templates/template.html": "10848694574074810746"
+  },
+  "reqs": []
+ }
+}

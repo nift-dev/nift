@@ -1,0 +1,2 @@
+nift build --all
+nift status

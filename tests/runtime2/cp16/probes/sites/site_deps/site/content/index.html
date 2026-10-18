@@ -1,0 +1,12 @@
+@json("at", "data/at.json")
+@input("data/part.html")
+O:@script { return open("data/open.txt") }
+C:@script { cat("data/cat.txt"); return "" }
+F:@script { fa := file("data/file.txt"); fa.open("r"); fs1 := fa.read(); fa.close(); return fs1 }
+B:@script { return open_bytes("data/bytes.txt").length() }
+I:@script { st := ifstream("data/ifstream.txt"); ln := st.read_line(); close(st); return ln }
+H:@script { return sha256_file("data/sha.txt") }
+J:@script { return inject("data/inj.json").v }
+S:@script { return stat("data/stat.txt").size }
+R:@script { rv := file("data/readval.txt"); rv.open("r"); x := rv.read_val(); rv.close(); return x }
+A:$[at.j]

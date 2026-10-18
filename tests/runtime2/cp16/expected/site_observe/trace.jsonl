@@ -1,0 +1,79 @@
+{"step": 1, "cmd": "nift build --all"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"missing"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"unset"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 3, "cmd": "nift status"}
+{"step": 5, "cmd": "nift status"}
+{"step": 6, "cmd": "nift build"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"file"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"unset"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 8, "cmd": "nift status"}
+{"step": 9, "cmd": "nift build"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"file"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"unset"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 11, "cmd": "nift status"}
+{"step": 12, "cmd": "nift build"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"file"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"found"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 14, "cmd": "nift status"}
+{"step": 15, "cmd": "nift build"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"file"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"found"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 16, "cmd": "nift status"}
+{"step": 17, "cmd": "nift build --platform=ios"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/appears.txt","res":"file"}
+{"ctx":"/","op":"glob","arg":"$BASE/w/data/*.txt","res":""}
+{"ctx":"/","op":"list","arg":"$BASE/w/data","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/kind","res":"file"}
+{"ctx":"/","op":"getenv","arg":"CP16_OBS","res":"found"}
+{"ctx":"/","op":"env-all","arg":"","res":""}
+{"ctx":"/","op":"touch","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/w/data/scratch.tmp","res":"file"}
+{"ctx":"/","op":"remove","arg":"$BASE/w/data/scratch.tmp","res":""}
+{"step": 19, "cmd": "nift status"}

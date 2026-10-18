@@ -1,0 +1,9 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/err.txt 644 4 2ccde4875ec59575
+f w/input.txt 644 10 546e4f020c4d2de9
+f w/main.f 644 1144 1d52b09c20c913d7
+f w/out.txt 644 6 5eef8098ed6ec0a1
+d w/wd/ 755

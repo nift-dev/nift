@@ -1,0 +1,20 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f ext/outside.txt 644 25 af42af700b362398
+d w/a/ 755
+f w/filemoved.txt 644 25 af42af700b362398
+d w/globdst/ 755
+f w/main.f 644 1428 d1663eb26a3e0b12
+f w/stream.txt 644 18 713700e1adac9069
+f w/vals.txt 644 33 f3a6b5e683d35198
+f w/w.txt 644 25 af42af700b362398
+d w/a/b/ 755
+f w/a/moved.txt 644 25 af42af700b362398
+f w/a/stream.txt 644 18 713700e1adac9069
+f w/a/vals.txt 644 33 f3a6b5e683d35198
+d w/a/b/c/ 755
+f w/a/b/copy2.txt 644 25 af42af700b362398
+f w/globdst/vals.txt 644 33 f3a6b5e683d35198
+f w/globdst/w.txt 644 25 af42af700b362398

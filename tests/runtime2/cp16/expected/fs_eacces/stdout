@@ -1,0 +1,18 @@
+io.open_failed | open: cannot open path
+io.open_failed | cat: cannot open path
+io.open_failed | open_bytes: cannot open path
+io.open_failed | sha256_file: cannot open path
+stream.open_failed | ifstream: cannot open path
+io.create_failed | touch: cannot open path
+io.create_failed | make_dir: Permission denied
+io.write_failed | save: cannot create temporary file
+io.copy_failed | copy: Permission denied
+io.copy_failed | copy: Permission denied
+io.move_failed | move: Permission denied
+io.remove_failed | remove: Permission denied
+io.directory_read_failed | ls: Permission denied
+io.metadata_failed | exists: Permission denied
+io.metadata_failed | stat: Permission denied
+io.change_directory_failed | cd: Permission denied
+{"exit_code":126,"stdout":"","stderr":"","launched":false,"error":"permission denied: ./noread.txt"}
+end

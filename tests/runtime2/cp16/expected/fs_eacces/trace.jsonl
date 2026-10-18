@@ -1,0 +1,13 @@
+{"ctx":"script","op":"touch","arg":"$BASE/w/ro/new.txt","res":""}
+{"ctx":"script","op":"mkdir","arg":"$BASE/w/ro/sub","res":""}
+{"ctx":"script","op":"open","arg":"$BASE/w/ro/in.txt","res":"rw"}
+{"ctx":"script","op":"save","arg":"$BASE/w/ro/in.txt","res":""}
+{"ctx":"script","op":"copy-to","arg":"$BASE/w/copy.txt","res":""}
+{"ctx":"script","op":"copy-to","arg":"$BASE/w/ro/copy.txt","res":""}
+{"ctx":"script","op":"move-to","arg":"$BASE/w/moved.txt","res":""}
+{"ctx":"script","op":"move-from","arg":"$BASE/w/ro/in.txt","res":""}
+{"ctx":"script","op":"remove","arg":"$BASE/w/ro/in.txt","res":""}
+{"ctx":"script","op":"list","arg":"$BASE/w/nox","res":""}
+{"ctx":"script","op":"stat","arg":"$BASE/w/nox/hidden.txt","res":"error"}
+{"ctx":"script","op":"stat","arg":"$BASE/w/nox/hidden.txt","res":"error"}
+{"ctx":"script","op":"spawn","arg":"./noread.txt","res":""}

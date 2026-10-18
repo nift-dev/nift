@@ -1,0 +1,19 @@
+{"exit_code":0,"stdout":"01\n","stderr":"e1\n","launched":true,"stages":[{"launched":true,"exit_code":0},{"launched":true,"exit_code":0}]}
+{"exit_code":0,"stdout":"","stderr":"","launched":true,"stages":[{"launched":true,"exit_code":0},{"launched":false,"exit_code":127,"error":"executable not found: definitely-missing-cp16"},{"launched":true,"exit_code":0}]}
+{"exit_code":0,"stdout":"","stderr":"","launched":true,"stages":[{"launched":true,"exit_code":4},{"launched":true,"exit_code":0}]}
+{"exit_code":5,"stdout":"","stderr":"","launched":true,"stages":[{"launched":true,"exit_code":0},{"launched":true,"exit_code":5}]}
+{"exit_code":0,"stdout":"$BASE/w/wd\n","stderr":"","launched":true}
+{"exit_code":126,"stdout":"","stderr":"","launched":false,"error":"cannot change directory to missing-wd: No such file or directory"}
+{"exit_code":0,"stdout":"1-2\n","stderr":"","launched":true}
+{"exit_code":0,"stdout":"from file\n","stderr":"","launched":true}
+{"exit_code":126,"stdout":"","stderr":"","launched":false,"error":"cannot open stdin missing-input.txt: No such file or directory"}
+{"exit_code":0,"stdout":"","stderr":"","launched":true}
+{"exit_code":0,"stdout":"","stderr":"","launched":true}
+{"exit_code":0,"stdout":"","stderr":"","launched":true}
+{"exit_code":0,"stdout":"","stderr":"","launched":true}
+third
+err
+reuse
+
+reuse
+

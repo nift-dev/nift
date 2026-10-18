@@ -1,0 +1,14 @@
+== step 1: nift build --all
+exit 0
+-- stdout
+📦 1 file built successfully
+time taken: $T seconds
+-- stderr
+== step 2: info public/index
+== step 3: write data/x.txt created\n
+== step 4: nift status
+exit 0
+-- stdout
+Nift status
+✓ all 1 tracked file is up to date
+-- stderr

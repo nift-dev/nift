@@ -1,0 +1,9 @@
+{"ctx":"script","op":"list","arg":"$BASE/w/d","res":""}
+{"ctx":"script","op":"glob","arg":"$BASE/w/d/*.txt","res":""}
+{"ctx":"script","op":"glob","arg":"$BASE/w/d/*","res":""}
+{"ctx":"script","op":"glob","arg":"$BASE/w/d/**/*.txt","res":""}
+{"ctx":"script","op":"glob","arg":"$BASE/ext/*","res":""}
+{"ctx":"script","op":"getenv","arg":"BASE","res":"found"}
+{"ctx":"script","op":"glob","arg":"$BASE/ext/*.md","res":""}
+{"ctx":"script","op":"glob","arg":"$BASE/w/d/*.none","res":""}
+{"ctx":"script","op":"list","arg":"$BASE/w/d","res":""}

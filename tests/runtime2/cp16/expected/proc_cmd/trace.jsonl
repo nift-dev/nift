@@ -1,0 +1,22 @@
+{"ctx":"script","op":"spawn","arg":"sh -c echo e1 >&2; echo o1","res":""}
+{"ctx":"script","op":"spawn","arg":"tr o 0","res":""}
+{"ctx":"script","op":"spawn","arg":"true","res":""}
+{"ctx":"script","op":"spawn","arg":"definitely-missing-cp16","res":""}
+{"ctx":"script","op":"spawn","arg":"cat","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c exit 4","res":""}
+{"ctx":"script","op":"spawn","arg":"cat","res":""}
+{"ctx":"script","op":"spawn","arg":"cat","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c exit 5","res":""}
+{"ctx":"script","op":"spawn","arg":"pwd","res":"wd"}
+{"ctx":"script","op":"spawn","arg":"pwd","res":"missing-wd"}
+{"ctx":"script","op":"spawn","arg":"sh -c echo $CP16_A-$CP16_B","res":""}
+{"ctx":"script","op":"spawn","arg":"cat","res":""}
+{"ctx":"script","op":"spawn","arg":"cat","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c echo first","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c echo second","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c echo third","res":""}
+{"ctx":"script","op":"spawn","arg":"sh -c echo err >&2","res":""}
+{"ctx":"script","op":"read","arg":"$BASE/w/out.txt","res":"6"}
+{"ctx":"script","op":"read","arg":"$BASE/w/err.txt","res":"4"}
+{"ctx":"script","op":"spawn","arg":"echo reuse","res":""}
+{"ctx":"script","op":"spawn","arg":"echo reuse","res":""}

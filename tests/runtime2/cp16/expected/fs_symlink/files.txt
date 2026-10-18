@@ -1,0 +1,16 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/link.txt 644 6 2f0bc36d997d0234
+l w/link2.txt -> real2.txt
+l w/link3.txt -> real3.txt
+l w/linkdir -> realdir
+f w/main.f 644 497 801a6d29fc9c097b
+f w/real.txt 644 7 c97ecfda4d205190
+f w/real2.txt 644 4 ef8aed55fba64258
+f w/real3.txt 644 9 d61963faab0bc500
+d w/realdir/ 755
+f w/src.txt 644 4 ef8aed55fba64258
+f w/realdir/inside.txt 644 0 e3b0c44298fc1c14
+d w/realdir/made/ 755

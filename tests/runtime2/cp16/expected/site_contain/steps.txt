@@ -1,0 +1,24 @@
+== step 1: nift build --all
+exit 1
+-- stdout
+0 of 1 files built successfully
+time taken: $T seconds
+-- stderr
+error: while building /
+  content/index.html:2:45
+  copy: path must stay inside the Nift project
+    B:@script { fb := file("data/p.txt"); fc := fb.copy("../ext/by-file-copy.txt"); return "copied" }
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+== step 2: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ previous build of this page failed
+  ↳ generated output is missing
+  ↳ page build metadata is missing
+
+run nift build to rebuild this file
+-- stderr

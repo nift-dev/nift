@@ -1,0 +1,10 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+l w/link -> real/inner
+f w/main.f 644 231 58ee8e52ba93bc98
+d w/real/ 755
+f w/u.txt 644 8 ce06e251b45a8b81
+d w/real/inner/ 755
+f w/real/u.txt 644 7 a19dbd272759e5cf

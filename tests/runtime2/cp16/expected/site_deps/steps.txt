@@ -1,0 +1,210 @@
+== step 1: nift build --all
+exit 0
+-- stdout
+cat-1
+📦 1 file built successfully
+time taken: $T seconds
+-- stderr
+== step 2: info public/index
+== step 3: nift status
+exit 0
+-- stdout
+Nift status
+✓ all 1 tracked file is up to date
+-- stderr
+== step 4: write data/open.txt open-2\n
+== step 5: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/open.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 6: write data/cat.txt cat-2\n
+== step 7: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/open.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 8: write data/file.txt file-2\n
+== step 9: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/open.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 10: write data/bytes.txt bytes-22\n
+== step 11: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/open.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 12: write data/ifstream.txt ifstream-2\n
+== step 13: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/open.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 14: write data/sha.txt sha-2\n
+== step 15: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/sha.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 16: write data/inj.json {"v": 2}\n
+== step 17: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/inj.json
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/sha.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 18: write data/stat.txt stat-22\n
+== step 19: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/inj.json
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/sha.txt
+  ↳ dependency changed: data/stat.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 20: write data/readval.txt 22\n
+== step 21: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/inj.json
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/readval.txt
+  ↳ dependency changed: data/sha.txt
+  ↳ dependency changed: data/stat.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 22: write data/at.json {"j": 2}\n
+== step 23: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/at.json
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/inj.json
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/readval.txt
+  ↳ dependency changed: data/sha.txt
+  ↳ dependency changed: data/stat.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 24: write data/part.html part-2\n
+== step 25: nift status
+exit 0
+-- stdout
+Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data/at.json
+  ↳ dependency changed: data/cat.txt
+  ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/inj.json
+  ↳ dependency changed: data/open.txt
+  ↳ dependency changed: data/part.html
+  ↳ dependency changed: data/readval.txt
+  ↳ dependency changed: data/sha.txt
+  ↳ dependency changed: data/stat.txt
+
+run nift build to rebuild this file
+-- stderr
+== step 26: nift build
+exit 0
+-- stdout
+cat-2
+built /
+    ↳ dependency changed: data/at.json
+    ↳ dependency changed: data/cat.txt
+    ↳ dependency changed: data/file.txt
+    ↳ dependency changed: data/inj.json
+    ↳ dependency changed: data/open.txt
+    ↳ dependency changed: data/part.html
+    ↳ dependency changed: data/readval.txt
+    ↳ dependency changed: data/sha.txt
+    ↳ dependency changed: data/stat.txt
+📦 1 file rebuilt successfully
+time taken: $T seconds
+-- stderr
+== step 27: info public/index
+== step 28: nift status
+exit 0
+-- stdout
+Nift status
+✓ all 1 tracked file is up to date
+-- stderr

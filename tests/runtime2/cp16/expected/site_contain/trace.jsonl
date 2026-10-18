@@ -1,0 +1,6 @@
+{"step": 1, "cmd": "nift build --all"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/templates/template.html","res":"ok"}
+{"ctx":"/","op":"read-source","arg":"$BASE/w/content/index.html","res":"ok"}
+{"ctx":"/","op":"copy-to","arg":"$BASE/ext/by-cp.txt","res":""}
+{"ctx":"/","op":"stat","arg":"$BASE/ext/by-cp.txt","res":"file"}
+{"step": 2, "cmd": "nift status"}

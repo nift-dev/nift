@@ -1,0 +1,10 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/main.f 644 1042 3298fd8630ed6eda
+f w/noread.txt 0 7 b37e50cedcd3e3f1
+d w/nox/ 0
+d w/ro/ 555
+f w/nox/hidden.txt 644 2 91ee5e9f42ba3d34
+f w/ro/in.txt 644 2 8e54b0ca18020275

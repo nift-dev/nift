@@ -1,0 +1,3 @@
+{"ctx":"script","op":"spawn","arg":"echo b","res":""}
+{"ctx":"script","op":"spawn","arg":"definitely-missing-cp16 arg","res":""}
+{"ctx":"script","op":"spawn","arg":"ls | wc","res":""}

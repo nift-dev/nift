@@ -1,0 +1,5 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+f w/main.f 644 182 dacbaad3cf8e5888

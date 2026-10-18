@@ -1,0 +1,6 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+d w/dir/ 755
+f w/main.f 644 172 ba8686bfc7865645

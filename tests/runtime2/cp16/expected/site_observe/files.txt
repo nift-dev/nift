@@ -1,0 +1,27 @@
+d ext/ 755
+d home/ 755
+d tmp/ 755
+d w/ 755
+d w/.nift/ 755
+d w/content/ 755
+d w/data/ 755
+d w/public/ 755
+d w/templates/ 755
+f w/.nift/.lock (nift metadata)
+f w/.nift/config.json (nift metadata)
+d w/.nift/content/ 755
+d w/.nift/data/ 755
+d w/.nift/public/ 755
+d w/.nift/templates/ 755
+f w/.nift/tracked.json (nift metadata)
+f w/.nift/content/index.html.hash (nift metadata)
+f w/.nift/data/kind.hash (nift metadata)
+f w/.nift/public/index.info.json (nift metadata)
+f w/.nift/templates/template.html.hash (nift metadata)
+f w/content/index.html 644 411 70f5bae7c66e913b
+f w/data/appears.txt 644 4 4ebabbd77cf9141d
+f w/data/g1.txt 644 3 701e086a16e749fb
+f w/data/g2.txt 644 3 9550b4b24ad47cb5
+f w/data/kind 644 2 19732980d68fbd00
+f w/public/index.html 644 78 2d480e74b8133644
+f w/templates/template.html 644 37 12c5e448e367a89a

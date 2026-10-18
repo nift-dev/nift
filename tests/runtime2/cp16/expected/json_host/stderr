@@ -1,0 +1,1 @@
+error: $BASE/w/main.f:7:7: inject: inject: source cycle through $BASE/w/self.expr

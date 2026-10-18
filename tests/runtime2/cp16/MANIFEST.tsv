@@ -1,0 +1,32 @@
+# CP16 legacy probes (design fixtures). Columns: probe<TAB>kind<TAB>inventory rows<TAB>CP15 deferral covered<TAB>what it pins
+# Oracle: /home/claude/review/nift-serve/nift (built from sources identical to runtime-2 b411f3f; see cp16-host-ops-design.md "Fixtures").
+fs_read	script	FS-01..FS-09, FS-17, FS-18	host bytes (open_bytes, read_bytes, sha256_file), inject, read_val	every read path; trace gaps for open_bytes, ifstream, inject (Q-H1)
+fs_meta	script	FS-10..FS-13	-	exists/is_file/is_dir/stat over files, dirs, symlinks, dangling, fifo, `~`, trailing slash
+fs_list	script	FS-14	-	ls() ordering, glob display paths, dot files, outside-project glob, cd + ls()
+fs_write	script	FS-19..FS-30	write_val	write family, file-object editing methods, streams, cp/mv/rm incl. globs; final tree in files.txt
+fs_symlink	script	FS-21, FS-26..FS-28	-	save() replaces a symlink (Q-H3); cp/ofstream/touch write through links; rm removes the link
+fs_errors	script	all FS rows	-	recoverable codes and messages; trace-before-attempt for writes; glob-no-match is fatal
+fs_eacces	script	all FS rows	-	EACCES as root without CAP_DAC_* (priv=nodac); end-of-script dirty-file error
+fs_enospc	script	FS-29, PR-02	-	ENOSPC via /dev/full on streams and child redirection
+fs_fatal_open_dir	script	FS-01	-	directory where a file is expected: fatal
+fs_fatal_rm_dir	script	FS-25	-	rm(dir): fatal
+fs_fatal_inject_missing	script	FS-17	inject	missing inject source: fatal, unlike open() (Q-H5)
+fs_fatal_close_dirty	script	FS-20	-	close() with unsaved changes: fatal
+fs_lexical_dotdot	script	path resolution	-	`link/..` resolved lexically (CP02 10a, Q-H6)
+env_ops	script	EN-01..EN-09	-	getenv/setenv/unsetenv/env(); child sees setenv; cd/pwd; os/arch/platform/which
+proc_run	script	PR-01	-	run(): argv rendering, exit conventions (127/126/128+sig), launch errors, 3 MB and NUL capture, background child, regular-file stdout
+proc_cmd	script	PR-02	-	cmd(): pipelines with stages, cwd, env, stdin/stdout/stderr routing and setup failures
+proc_disabled	script	PR-01, PR-02	-	NIFT_NO_PROCESS: run() fatal, cmd() builds
+proc_command_style	script	PR-04	-	command-style statements (CP19/CP20 scope; recorded only)
+proc_stdin	script	PR-01	-	child inherits stdin
+time_ops	script	TI-01..TI-03	epoch, sleep, timer and methods	clock-independent facts only
+time_fatal_sleep	script	TI-02	sleep	negative duration: fatal
+random_ops	script	RN-01	secure_random_bytes	lengths, inequality, limit 10,000,000
+json_host	script	FS-17, FS-18	inject, read_val, write_val	JSON fast path, Nift fallback, interpolating string, cycle (fatal)
+json_host_bad	script	FS-17	inject	invalid JSON -> Nift literal evaluator error (fatal)
+copy_overload	script	FS-23	-	copy(v) value copy vs copy(src, dst) file copy by arity (Q-H9)
+site_deps	site	every read row	host bytes, inject, @json, read_val	dependency recording per read API; which edits `status` detects (open_bytes, ifstream: not detected, Q-H2)
+site_observe	site	FS-10..FS-14, EN-01..EN-03, EN-07	-	absent/listing/env/env-snapshot/platform observations; own writes not recorded
+site_contain	site	FS-23	-	cp() outside the project works, file().copy() outside is refused (Q-H4)
+site_buildvars	site	TI-04	build-time template variables	build-* variables (normalised), not dependencies
+site_run	site	PR-01	-	run() in a page: traced, never a dependency
