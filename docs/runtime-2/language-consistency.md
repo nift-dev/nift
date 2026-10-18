@@ -39,3 +39,4 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L24 | `1 + "s"` silently concatenates | Decide: keep documented coercion or require explicit conversion | medium | R | Assessment A |
 | L25 | Dynamic scoping of free names | Lexical scoping; strict mode warning first | correctness | R | D-009 #8, Assessment A |
 | L26 | Chained presentation methods (`o.stringify().stringify()`) idempotent at top level but re-encode in loop code | One behaviour | correctness | X | CP14 Q14 |
+| L27 | `return` ends at the line break, so `return {` + multi-line literal fails | Multi-line return values continue to the matching close | correctness | A (CP13) | D-025 |

@@ -398,3 +398,15 @@ Site-DX warnings stay conservative (no speculative warnings where Nift cannot
 tell its syntax from legitimate content); strict mode rejects only genuinely
 unresolved Nift expressions; `--auto`'s fallback to `--repair` is temporary and
 must be removed or justified when build recovery integrates.
+
+## D-025 — Multi-line return values; `runtime.*` error codes (owner, 2026-10-18)
+- `return` followed by a value that continues across lines (e.g. `return {`
+  with a multi-line object or array literal, an open bracket or parenthesis)
+  continues to the matching close on both engines — an approved change in
+  CP13, so strict prevalidation accepts nift-packages/http (`src/http.f:101`)
+  and that branch works at run time. Old/new tests; bare `return` at end of
+  line keeps its meaning.
+- Language error codes use the semantic `runtime.*` namespace (e.g.
+  `runtime.type_error`, `runtime.index_out_of_bounds`), independent of where
+  the error arises (built-in, bytecode or legacy); resource and host failures
+  get their own codes (e.g. limit and host-service failures).
