@@ -1,7 +1,8 @@
 # CP12 phase A — Engine selection before execution (bail-and-replay removed, D-018)
 
 Status: see `../progress.md`. Branch `runtime-2-cp12-dev` (local, not
-pushed), rebased on `runtime-2` @`f3208f4` (CP11 certified). Phase B
+pushed), rebased on `runtime-2` @`825c90a` (CP11 certified, D-018/D-019
+recorded in `../decisions.md`). Phase B
 (resolver coverage: globals, `GETDYN`, modules, structs, enums;
 checkpoints.md CP12) is next and not started.
 
@@ -49,10 +50,14 @@ calling context, either the difference is one of the three approved changes
   `rt/prepared.h`). It uses this for two things: the context refusals below,
   and an instruction flag `kInstrLoopPath` that never changes what the VM
   computes. The VM statistics report `large_numbers` (arithmetic that met a
-  number legacy calls large, |n| ≥ 2^53, or went out of range),
-  `large_in_loop_path` (of those, in code legacy runs on its loop evaluator:
-  the flag on the instruction or on any active call) and
-  `error_in_loop_path`. The harness policies require this evidence.
+  number legacy calls large, |n| ≥ 2^53, as an operand or a result, or went
+  out of range; the integer fast paths take only safe operands so none is
+  missed), `large_in_loop_path` (of those, in code legacy runs on its loop
+  evaluator: the flag on the instruction or on any active call),
+  `large_lines` / `derived_lines` (per such loop-code operation, the index
+  of the output line printed next; `derived_lines` when an operand was
+  large) and `error_in_loop_path`. The harness policies require this
+  evidence, line by line (review round 1).
 
 ### D-018 consequences
 
@@ -91,11 +96,20 @@ class rules (`tools/rt-diff/policies/cp12-vm.json`) and `vm_parity.py`
 confirms each class approval against the VM statistics. A pair is identical
 or matches exactly one named policy; anything else fails.
 
+Narrowed in review round 1 (the first versions approved real bugs, see
+Reviews): every approval is attributed to the line or error it approves.
+
 | Policy | Requires (evidence) | Shape approved |
 | --- | --- | --- |
 | `D-001#4 recursion` | `beyond_legacy_depth` | legacy fails only with `callable recursion depth exceeded`; its output a prefix of the VM's; the VM completed or stopped with a program error |
-| `D-018a numbers` | `large_in_loop_path > 0`, outcome `vm`/`vm-error` | output lines differ only in their numbers; extra legacy lines repeat lines the VM printed (re-evaluated calls); the VM may stop with `signed 64-bit integer overflow` / `arithmetic result is not finite` where legacy went on (VM output then compared with a prefix of legacy's); otherwise stderr equal or D-018c |
-| `D-018c diagnostics` | outcome `vm-error`; `error_in_loop_path` for the wording map and for an earlier VM position | same stdout, both exit 1 with one diagnostic on the same file; messages equal once legacy's `return: ` prefixes are removed, or (loop code only) legacy's loop wording maps to the canonical one for the same binding; the VM position is not before legacy's (or loop code) |
+| `D-018a numbers` | `large_lines` (per output line), `derived_lines`, outcome `vm`/`vm-error` | a changed line: same text once whole-word numbers and booleans are abstracted, its VM line in `large_lines`, every changed number pair with a large member (|n| ≥ 2^53, e-notation, inf, nan) — small numbers or booleans only on a line in `derived_lines` (a large operand's consequence: `big - big2`, `m == m + 0`); a legacy line the VM does not print: an exact repeat of an adjacent legacy line at an attributed position (re-evaluated calls); after a VM stop with `signed 64-bit integer overflow` / `arithmetic result is not finite` in loop code (`error_in_loop_path`, statistics naming its line and column, the stop attributed) legacy's continuation is not compared; otherwise stderr equal or D-018c |
+| `D-018c diagnostics` | outcome `vm-error`; statistics' line/column = the VM diagnostic's; the source; `error_in_loop_path` for the wording map and loop positions | same stdout, both exit 1 with one diagnostic on the same file; messages equal once legacy's `return: ` prefixes are removed, or (loop code only) legacy's loop wording is the canonical message's legacy form (same binding; an index error for `invalid index`; an element-assignment error for `invalid index target`); the VM position is the failing site verified against the source (quoted expression, assigned binding, index target, member, operator — never the enclosing statement); legacy's on the same line at or before it, or (loop code) a `while` statement or a statement with a call; without the source only identical positions |
+
+`tests/runtime2/vm_policy_negative.py` pins the narrowing: 35 synthetic VM
+bugs (every case of the reviewer's mask.py, given the evidence a genuine
+run of that shape carries) are rejected and 10 genuine shapes approved.
+rt-diff's D-018 class rules classify with each entry's own VM statistics
+and program (`rt-diff --b-vm-stats`) through the same `classify`.
 
 `tests/runtime2/vm_d018.py` runs each approved change on legacy (old) and
 the VM (new) side by side — 13 live cases, including the same function
@@ -120,13 +134,19 @@ ordering kind check; fixed).
 
 ### Kind inference (`rt/infer.h`, `rt/infer_types.*`)
 
-Flow-insensitive fixpoint over the closed unit: structural types (kinds of a
+Flow-insensitive fixpoint over the closed unit, a worklist over the call
+graph (a unit is walked again only when its bindings, a parameter or a
+callee's return grew; review round 1, D1): structural types (kinds of a
 value; element type of arrays, positional types of literal arrays never
 changed in place, member types of objects by key; depth-capped at 6),
 bindings resolved with the compiler's scope rules, parameters as the union of
 their arguments, returns as the union of return expressions (plus null when
-the end is reachable). Something the compiler refuses anyway is
-`kKindUnknown` and defers to that refusal. The D-018 refusals add two
+the end is reachable). If the fixpoint exceeds its budget (64 walks per
+unit + 1024) the unit is refused (`analysis-limit:kinds`); it is never
+compiled with weakened checks. Something the compiler refuses anyway is
+`kKindUnknown`, which every check treats as "may be anything" and refuses;
+a probe compilation (discarded) only recovers the underlying refusal
+reason for the statistics. The D-018 refusals add two
 name-level analyses per scope (`compiler_unit.cpp`): bindings whose type
 may be double (declared from a double-typed text or a value that may be a
 fraction, parameters receiving such arguments; fixpoint over the call graph)
@@ -140,7 +160,8 @@ an internal failure (exit 70). `NIFT_VM_FLUSH` (test-only) lowers the
 streaming threshold. `NIFT_VM_STATS` outcomes: `vm`, `vm-error` (reason = the
 message), `fallback`, `require-error`, `internal-error`, `compiled`
 (classify); fields `vm_executions`, `legacy_executions`, `large_numbers`,
-`large_in_loop_path`, `error_in_loop_path`.
+`large_in_loop_path`, `error_in_loop_path`, `large_lines`, `derived_lines`,
+`evidence_truncated`.
 
 ## Refused constructs and old behaviour
 
@@ -155,6 +176,7 @@ The `context:*` reasons are in "D-018 consequences" above.
 | `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` |
 | `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, in loop code | legacy abandons preparing the loop body |
 | `param-type-unpredicted` | (defensive) a parameter type read the analysis did not predict | — |
+| `analysis-limit:kinds` | (defensive) the kind inference did not converge within its budget (review round 1, D1) | — |
 
 ## Tests
 
@@ -168,6 +190,16 @@ Final build `aeefaa7`, idle host (2 vCPU). Logs: `../evidence/cp12/`.
 | `vm_context_consistency.py` | 126 (body, argument) pairs × 5 contexts: VM results identical across contexts in every case; 68 pairs ran on the VM in all 5 contexts; **legacy itself is context-dependent on 63 pairs** |
 | extra adversarial seeds 2 and 3 (count 200) | 32,221 programs each, 0 non-approved differences |
 | `make test-rt-value`, `make test-rt-parser`, rt-lint, `legacy_names.py --check`, `certification_guard.sh` | PASS |
+
+Review round 1 (final build, `make -j2`): `test-rt-vm` PASS (unit 40,303
+checks; rt-diff 813 entries, 0 differing, 8 approved, each confirmed from
+the entry's own statistics; adversarial 37,421 programs, 0 non-approved,
+1,636 D-018c + 69 D-001#4, 14,654 on the VM; former replay 66 D-018a + 321
+D-018c + 33 D-001#4, 1,392 on the VM; D-018 13 live + 22 boundary cases;
+policy negatives 35 rejected / 10 approved; review reproducers 87/87),
+`test-rt-vm-sanitize` clean (ASan+UBSan, leaks on; incl. the D2 bounds cases and the 87 reproducers), `test-rt-value`, `test-rt-parser`,
+`test-rt-lint`, certification guard, rt-diff self-test: PASS. Coverage is
+unchanged by the review fixes.
 
 Defects found during the D-018 rework (fixed, with unit cases): a fused
 `if`/`while` ordering comparison skipped the kind check (internal failure
@@ -225,11 +257,44 @@ no optimisation was attempted (owner priority: replay removal and coverage).
   conservative (kind- and name-level), so some units that would behave
   identically are refused. Measured below.
 * **Approved differences are policy-checked, not unbounded.** Each policy
-  needs VM evidence and a narrow shape; `vm_d018.py` pins both sides.
+  needs VM evidence attributed to the line or error it approves and a
+  narrow shape; `vm_d018.py` pins both sides, `vm_policy_negative.py` the
+  rejection of synthetic bugs (review round 1).
+* **D-018a consequences on control flow.** A loop branch taken on a value
+  derived from a large operand can differ from legacy; no policy approves
+  such a divergence (it fails a gate, visibly). Static refusal would need a
+  magnitude analysis.
 * **Diagnostics follow the canonical rules** (D-018c); full error parity is
   CP13.
 * **Equality depth**: legacy crashes on very deep values where the VM
   answers.
+
+## Reviews
+
+### Round 1 (adversarial review of phase A after D-018)
+
+Reviewer material: `nc2.py`, `nc3.py`, `edge.py`, `edge2.py`, `edge3.py`,
+`big.py` ported as `tests/runtime2/vm_review_cp12.py` (87 programs, in
+`test-rt-vm` and the sanitized run); `mask.py` and `strict.py` as
+`tests/runtime2/vm_policy_negative.py`. Final state: every reproducer is
+identical, refused before execution, or approved with per-line evidence;
+none crashes, fails internally or differs unapproved.
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| **D1** (high, silent miscompile): the kind inference gave up after 200 passes and marked every node Unknown, which passed `kinds_within` / `no_alias` / `type_mismatch_possible` and the operator checks: a 201-function call chain (even never called) switched the aliasing, type and context refusals off | Worklist fixpoint over the call graph (a unit is re-walked only when its bindings, a parameter or a callee's return grew); out of budget (64 walks/unit + 1024) the unit is refused, `analysis-limit:kinds`; Unknown is never permissive (widened to every kind, every check refuses on it; a discarded probe compilation only recovers the underlying refusal reason). 500-function chain: compile 183.5M → 22.4M instructions (inference 163M → 3.3M) | `vm_unit` `check_kind_inference` (chains of 199/201/500: aliasing, `context:negative-zero`, `type:<`, `context:assignment-type` refused; walk bound; refusal at a lowered budget); `vm_review_cp12.py` D1 (14 programs). Adversarial coverage unchanged (14,654 on the VM) |
+| **D2** (high, invariant F; also in CP11): `INT64_MIN % -1` raised SIGFPE in the `Mod` fast path (`%`, `%=`, calls, loops) | `r == -1` takes the slow path (result 0, as legacy and CP09). Audit: `AddI` computed `x + offset` before its range check (signed-overflow UB at the int64 bounds), now checks `x` first; division is double with a zero check; negation of INT64_MIN is exact (Decimal); Add/Sub/Mul use overflow builtins. Separate commit `f580d08`; CP11 backport on local branch `runtime-2-d2-int64` (`09ee120`, latent there: operands beyond 2^53 bail before either path) | `vm_unit` `check_integer_bounds` (also under ASan+UBSan; without the fix vm-unit dies with SIGFPE); `vm_review_cp12.py` D2 (13) |
+| **D3**: `-INT64_MIN` is an exact Decimal; print and concatenation stopped with an internal failure (exit 70) | `append_rendered` writes the Decimal's spelling (legacy prints `9223372036854775808`); indexing with it is out of range with legacy's messages | `vm_unit` cases; `vm_review_cp12.py` D3 (22) |
+| **D4**: evidence only for large *results*: `print(big - big2)` (legacy 0, VM 1) and `m == m + 0` (false/true) in loop code were unapproved, and nothing tied evidence to lines | Large operands are recorded too: the first large number switches the dispatch to a checked table (integer arithmetic on slow paths; no cost without large numbers). Evidence per output line (`large_lines`, `derived_lines`). Static refusal was considered and not done: no magnitude analysis exists, and a conservative one would refuse every loop accumulator; per-line attribution is the fallback the review allows. Small-number or boolean consequences are approved only on a line with an attributed large operand; a branch that diverges on such a value is an unapproved difference (visible, never silent) | `vm_review_cp12.py` D4 (51); `vm_policy_negative.py` |
+| **Policy breadth** (main risk): D-018a/D-018c approved real bugs whenever any evidence existed | Policies narrowed to per-line / per-error evidence (see "Approved-difference policies"). mask.py: 13/13 rejected before even with minimal evidence; the permanent suite gives each synthetic bug the evidence a genuine run carries: 35/35 rejected, 10 genuine shapes approved. Genuine approvals unchanged: former replay 66 D-018a + 321 D-018c + 33 D-001#4, adversarial 1,636 D-018c + 69 D-001#4, rt-diff 8 | `vm_policy_negative.py`, `vm_d018.py` (22 boundary cases) |
+| **R2**: `vm_parity.py` matched rt-diff evidence by file base name (12 corpus scripts are `main.f`) | `rt-diff --b-vm-stats` collects each entry's own VM statistics and program; the D-018 class rules classify with them through `vm_policies.classify` (no assumed evidence); `vm_parity.py` confirms approvals from the entry's own record | `make test-rt-vm` rt-diff: 0 differing, 8 approved, each confirmed |
+| **Compile cost** | `infer_text_type` memoised per node (7.69M → 3.14M via the compiler; 2.76M remain in `typed_names`' raw-text types); `collect_assigned` once per function body (main reuses the function sets). 500-function program: compile_unit 63.24M → 58.45M instructions (−7.6 %). Remaining: UnitCompiler analyses 17.2M (`compute_may_double` 7.3M), `infer_unit_kinds` 10.1M, `check_prepared_contexts` 8.0M, code generation ~20M | callgrind (`vm_compare.py --groups phases`) |
+
+Hot paths (callgrind marginal instructions, exact): flat call 425 (426
+before; gate kept), fib 285 per call (287), loop 109 (107: the D2 `AddI`
+check), add_local 183 (180), if_branch 244 (236). Not material: no
+scoreboard row; wall times were not re-measured (host not idle: another
+agent's test runs).
 
 ## Commits
 
@@ -241,4 +306,11 @@ suites; `040f541` prepared compound semantics and statement error sites;
 per function (dual compilation, re-evaluation and per-evaluator diagnostics
 removed; context refusals; policies; new suites); `aeefaa7` assignment
 exemption limited to numeric values; then evidence, scoreboard and this
-record.
+record. Rebased onto `runtime-2` @`825c90a`; the hashes above are
+pre-rebase (now `16ed61e`, `d8dfe12`, `964bd6c`, `129129c`, `f942b9c`,
+`5ce2a6a`, `503c89f`, `c96e563`, `4140c03`, `be3b62b`, `19ffd71`).
+
+Review round 1: `f580d08` D2 (INT64_MIN % -1, AddI; CP11 backport
+`09ee120` on `runtime-2-d2-int64`), `8370e3f` D3, `158be8c` D1, `96e9fb2`
+compile cost, `0bd5f06` per-line policies, operand evidence and R2,
+`ad0de0d` checked dispatch for the operand evidence, then this record.
