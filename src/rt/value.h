@@ -141,7 +141,9 @@ private:
     // longer text would overwrite the aux and kind bytes.
     static Value inline_text(std::string_view text) noexcept {
         Value v; v.set_kind(Kind::String);
-        std::memcpy(v.bytes_, text.data(), text.size());
+        // memcpy with a null source is undefined even for size 0, and an empty
+        // std::string_view may carry a null data pointer.
+        if (!text.empty()) std::memcpy(v.bytes_, text.data(), text.size());
         v.bytes_[14] = static_cast<unsigned char>(kInlineFlag | text.size());
         return v;
     }

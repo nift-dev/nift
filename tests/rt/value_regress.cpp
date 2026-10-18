@@ -270,6 +270,19 @@ void duplicate_keys() {
     CHECK(!from_legacy(wide, rx, err) && err == "object has duplicate key 'k7'");
 }
 
+// CP15 review: an empty view with a null data pointer reached memcpy (UB) via
+// inline_text. Exercise the constructor directly, independent of any caller.
+void empty_string_null_data() {
+    const Value a = make_string(std::string_view{});
+    const Value b = make_string(std::string_view{static_cast<const char*>(nullptr), 0});
+    const Value c = make_string(std::string{});
+    for (const Value* v : {&a, &b, &c}) {
+        CHECK(v->kind() == Kind::String);
+        CHECK(string_view_of(*v).empty());
+    }
+    CHECK(equal(a, b) && equal(b, c) && hash(a) == hash(b));
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -281,5 +294,6 @@ int main(int argc, char** argv) {
     deep_destruction(depth);
     strings_and_refcounts();
     duplicate_keys();
+    empty_string_null_data();
     return rt_test::finish("rt value regress");
 }
