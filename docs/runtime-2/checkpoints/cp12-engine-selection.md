@@ -1,7 +1,8 @@
 # CP12 phase A — Engine selection before execution (bail-and-replay removed, D-018)
 
 Status: see `../progress.md`. Branch `runtime-2-cp12-dev` (local, not
-pushed), rebased on `runtime-2` @`825c90a` (CP11 certified, D-018/D-019
+pushed), rebased on `runtime-2` @`8957559` (site-dx integrated; earlier bases
+`825c90a`, `b61e3a5`; CP11 certified, D-018/D-019
 recorded in `../decisions.md`). Phase B
 (resolver coverage: globals, `GETDYN`, modules, structs, enums;
 checkpoints.md CP12) is next and not started.
@@ -351,6 +352,22 @@ approved).
 | 8 Mod fast-path sign | int bounds, supported, parity, adversarial |
 
 Approvals before → after (seed 1, the gate sizes): former replay 66 D-018a + 33 D-001#4 + 321 D-018c → 0 D-018a (65 pinned, 1 now refused) + 0 D-001#4 in the generated suite (33 pinned) + 292 D-018c (1,645 generated programs; 1,185 on the VM); adversarial 69 D-001#4 + 1,636 D-018c → 69 D-001#4 + 99 D-018c (12,918 on the VM, was 14,654: ≈1,500 loop binding-wording cases are now refused before execution, `context:assignment-error`); rt-diff 8 → 7 (3 D-001#4 class, 2 D-018c class, 2 exact D-001#4 rules; shared corpora 101 of 786 on the VM, was 103). Remaining policy approvals: D-001#4 recursion (legacy is the oracle up to its 64 frames) and D-018c diagnostics checked against the AST.
+
+### Certify follow-up: FLAKY `test-rt-vm-mutants`
+
+Certify @06b6617 (concurrent run) rejected the unmutated binary in the
+gate's `parity` step although rt-diff reported 0 differing, 7 approved;
+the exclusive rerun passed. Cause (reproduced by removing the file during
+a run): `vm_parity.py` wrote `.build/rt-vm/stats-path` before rt-diff and
+removed it afterwards; certify runs `test-rt-vm` and `test-rt-vm-mutants`
+concurrently, both `vm_parity` runs shared that file, and the one finishing
+second failed with `FileNotFoundError` after rt-diff had passed. CPU load
+alone (busy loops, three runs) did not reproduce it. Harness-only: the file
+is no longer used (rt-diff `--b-vm-stats` already supplies each entry's
+statistics); what a VM difference fails on is unchanged. The gate now keeps
+every suite's full output (`--logs`) and prints the tail when the unmutated
+binary is rejected. Verified: both targets concurrently with a busy loop,
+and `test-rt-vm-mutants` exclusively (see the record of the final runs).
 
 ## Commits
 
