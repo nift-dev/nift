@@ -598,6 +598,7 @@ std::string ProjectInfo::listing_fingerprint_cached(const std::string& key) cons
 
 void ProjectInfo::reset_build_caches() {
     if(identity_reload_pending_)reload_identity_catalogue();
+    { std::lock_guard<std::mutex> lock(outstanding_warning_mutex_); outstanding_warnings_.clear(); }
     {
         std::lock_guard<std::mutex> lock(listing_cache_mutex_);
         listing_cache_.clear();
@@ -729,6 +730,27 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         !document.has("pagination-pages") || !document["pagination-pages"].is_number()) {
         reasons.push_back("page build metadata is invalid or from an older metadata format");
         return reasons;
+    }
+
+    // feature-site-dx (review R1): a page that published unknown $[...]
+    // values literally is rebuilt when strict-values is on (so it fails);
+    // pages without such values render identically either way. Recorded
+    // warnings are collected for re-reporting by build summaries and status.
+    if (config.strict_values) {
+        // Round 2 (B1): a missing or invalid count means the page was never
+        // verified (metadata from an older Nift, or edited): under strict it
+        // is rebuilt, and fails if it has unknown values. Without strict a
+        // missing field changes nothing.
+        const bool valid = document.has("site-unknown-values") && document["site-unknown-values"].is_number() &&
+            std::isfinite(document["site-unknown-values"].num) && document["site-unknown-values"].num >= 0 &&
+            std::floor(document["site-unknown-values"].num) == document["site-unknown-values"].num;
+        if (!valid) reasons.push_back("strict-values is on and the page's build metadata has no unknown-value record (needs verification)");
+        else if (document["site-unknown-values"].num > 0) reasons.push_back("strict-values is on and the page published unknown $[...] values");
+    }
+    if (document.has("site-warnings") && document["site-warnings"].is_array()) {
+        std::vector<std::string> recorded;
+        for (const auto& item : document["site-warnings"].array) if (item.is_string()) recorded.push_back(item.string);
+        if (!recorded.empty()) { std::lock_guard<std::mutex> lock(outstanding_warning_mutex_); outstanding_warnings_[info.name] = std::move(recorded); }
     }
 
     json::Document clock_record;
@@ -970,6 +992,57 @@ void ProjectInfo::print_build_error(const BuildError& error) const {
     }
 }
 
+// feature-site-dx: one grep-friendly line per warning
+//   warning: <file>:<line>:<col>: <message> [<kind>]
+// followed by the source excerpt and caret, like build errors.
+void ProjectInfo::print_outstanding_warning_summary(const std::set<std::string>& rebuilt) const {
+    std::size_t outstanding = 0; std::vector<std::string> pages;
+    for (const auto& [page, lines] : outstanding_warnings()) {
+        if (rebuilt.count(page)) continue;
+        outstanding += lines.size(); pages.push_back(page);
+    }
+    if (!outstanding) return;
+    std::lock_guard<std::mutex> lock(console::output_mutex);
+    std::cerr << console::warning_label() << ' ' << outstanding << " earlier warning" << (outstanding == 1 ? "" : "s")
+              << " in " << pages.size() << " unchanged page" << (pages.size() == 1 ? "" : "s") << ": ";
+    for (std::size_t p = 0; p < pages.size() && p < 5; ++p) std::cerr << (p ? ", " : "") << pages[p];
+    if (pages.size() > 5) std::cerr << " (+" << pages.size() - 5 << " more)";
+    std::cerr << " (nift status lists them)\n";
+}
+
+std::map<std::string, std::vector<std::string>> ProjectInfo::outstanding_warnings() const {
+    std::map<std::string, std::vector<std::string>> result;
+    std::lock_guard<std::mutex> lock(outstanding_warning_mutex_);
+    for (const auto& [page, lines] : outstanding_warnings_) {
+        for (const auto& line : lines) {
+            const auto open = line.rfind(" [");
+            const std::string kind = open == std::string::npos || line.back() != ']' ? std::string() : line.substr(open + 2, line.size() - open - 3);
+            if (config.no_warn.count("all") || (!kind.empty() && config.no_warn.count(kind))) continue;
+            result[page].push_back(line);
+        }
+    }
+    return result;
+}
+
+void ProjectInfo::print_build_warning(const BuildWarning& warning) const {
+    std::lock_guard<std::mutex> lock(console::output_mutex);
+    std::cerr << console::warning_label() << ' ';
+    if (!warning.source_file.empty()) {
+        std::cerr << console::path(relative(warning.source_file), true);
+        if (warning.line) std::cerr << ':' << warning.line << ':' << warning.column;
+        std::cerr << ": ";
+    }
+    std::cerr << warning.message << " [" << warning.kind << "]\n";
+    if (!warning.source_line.empty() && warning.column) {
+        const console::SourceExcerpt excerpt = console::render_source_excerpt(
+            warning.source_line, warning.column, warning.source_length);
+        std::cerr << "    " << excerpt.excerpt << '\n';
+        const std::string marker =
+            "^" + std::string(excerpt.underline_columns > 1 ? excerpt.underline_columns - 1 : 0, '~');
+        std::cerr << "    " << std::string(excerpt.caret_columns, ' ') << marker << '\n';
+    }
+}
+
 void ProjectInfo::report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const {
     if (out_error) {
         *out_error = error;
@@ -1195,7 +1268,8 @@ bool ProjectInfo::write_render_clock_record(const TrackedInfo& info, const Rende
 
 bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation,
                                   const RenderClockObservation* render_clock,
-                                  const ReadObservations* observed) const {
+                                  const ReadObservations* observed,
+                                  const PageSiteRecord* site) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
     std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -1294,6 +1368,20 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     }
     output += "\n  }";
     if (observed && !observed->empty()) append_read_observations(output, *observed);
+    // feature-site-dx (review R1, round 2 B1): the unknown-value count is
+    // always written (0 included) so strict-values can tell "verified clean"
+    // from "built before tracking"; warnings only when non-empty.
+    if (site)
+        output += ",\n  \"site-unknown-values\": " + std::to_string(site->unknown_values);
+    if (site && !site->warnings.empty()) {
+        output += ",\n  \"site-warnings\": [";
+        for (std::size_t i = 0; i < site->warnings.size(); ++i) {
+            output += i ? ",\n    \"" : "\n    \"";
+            json::Document::append_escaped_string(output, site->warnings[i]);
+            output += "\"";
+        }
+        output += "\n  ]";
+    }
     if(observation){
         output += ",\n  \"sidecar-state\": {\"version\":1,\"platform\":\"";
         output += sidecar_platform();
@@ -1575,8 +1663,16 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     const bool custom=info.build_hooks.count("build")||info.pipeline().discovered_hooks.count("build");
     const std::optional<filesystem::DependencyTime> render_clock = stamp_render_clock();
     RenderResult result;
+    PageSiteRecord site_record;
     if(custom){attempt.written_pages=1;if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
-    else {Parser parser(host,info);result=parser.render();}
+    else {
+        Parser parser(host,info);result=parser.render();
+        auto warnings=parser.site_warnings();
+        site_record.unknown_values=parser.site_unknown_values();
+        for(const auto& w:warnings)site_record.warnings.push_back(relative(w.source_file)+":"+std::to_string(w.line)+":"+std::to_string(w.column)+": "+w.message+" ["+w.kind+"]");
+        // The latest attempt's warnings replace an earlier attempt's (no duplicates on retry).
+        {std::lock_guard<std::mutex> lock(site_warning_mutex_);if(warnings.empty())site_warnings_by_page_.erase(info.name);else site_warnings_by_page_[info.name]=std::move(warnings);}
+    }
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
     if (!result.ok) { report_build_error(result.error, out_error); return false; }
@@ -1719,7 +1815,7 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
         certificate_valid=current&&*current==authoritative_sidecar.bytes;
     }else certificate_valid=!filesystem::path_exists(sidecar_path);
     // Later hook changes suppress only the new certificate, preserving E2 behavior.
-    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr, &result.observed)) {
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr, &result.observed, &site_record)) {
         attempt.io_failure = true;
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
@@ -1759,6 +1855,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     last_build_affected.clear();
     if (jobs.empty()) {
         last_build_settled_ = true;
+        print_outstanding_warning_summary({});
         if (!console::build_quiet()) {
             std::lock_guard<std::mutex> lock(console::output_mutex);
             if (targeted) return 1;
@@ -1906,6 +2003,30 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     for (std::size_t i = 0; i < jobs.size(); ++i)
         if (succeeded[i] && (!has_build_dependencies||executed[i])) last_build_affected.push_back(jobs[i].info->name);
 
+    {
+        std::map<std::string, std::vector<BuildWarning>> warnings;
+        { std::lock_guard<std::mutex> lock(site_warning_mutex_); warnings.swap(site_warnings_by_page_); }
+        // A warning in a shared template or partial is reported once per
+        // build, not once per page that includes it.
+        std::vector<BuildWarning> unique;
+        std::map<std::string, std::size_t> index;
+        for (std::size_t i = 0; i < jobs.size(); ++i) {
+            const auto found = warnings.find(jobs[i].info->name);
+            if (found == warnings.end()) continue;
+            for (const auto& warning : found->second) {
+                const std::string key = warning.kind + '\x1f' + warning.source_file.generic_string() + '\x1f' +
+                    std::to_string(warning.line) + ':' + std::to_string(warning.column) + '\x1f' + warning.message;
+                const auto inserted = index.emplace(key, unique.size());
+                if (inserted.second) unique.push_back(warning);
+            }
+        }
+        for (const auto& warning : unique) print_build_warning(warning);
+        // Review R1: warnings recorded at earlier builds of pages that were
+        // not rebuilt now are summarised (nift status lists them).
+        std::set<std::string> rebuilt;
+        for (const auto& job : jobs) rebuilt.insert(job.info->name);
+        print_outstanding_warning_summary(rebuilt);
+    }
     for (std::size_t i = 0; i < jobs.size(); ++i)
         if (errors[i].has_value()) print_build_error(*errors[i]);
 

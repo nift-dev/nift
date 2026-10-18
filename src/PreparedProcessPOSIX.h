@@ -47,16 +47,36 @@ struct PreparedProcessPOSIX {
         for(size_t i=1;i<arguments.size();++i)shell_argv.push_back(arguments[i].data());
         shell_argv.push_back(nullptr);
     }
-    [[noreturn]] void exec() {
-        bool denied=false;
-        for(const auto& candidate:candidates) {
+    // feature-site-dx: `report_fd` is the write end of a close-on-exec pipe.
+    // A successful execve closes it (the parent reads EOF: launched); on
+    // failure the child writes {kind, errno} with one async-signal-safe
+    // write before _exit, so the parent can report launched:false and why.
+    // Exit codes are unchanged (127 not found, 126 not executable).
+    // Payload: {kind, errno, detail}. ExecInterpreter: ENOENT from execve of
+    // a file that exists (its #! interpreter or ELF loader is missing);
+    // detail is the candidate index. ExecSetup: chdir/redirection in the
+    // child failed before exec; detail names the step (SetupStep).
+    enum ExecFailure : int { ExecNotFound = 1, ExecDenied = 2, ExecOther = 3, ExecInterpreter = 4, ExecSetup = 5 };
+    enum SetupStep : int { SetupChdir = 1, SetupStdin = 2, SetupStdout = 3, SetupStderr = 4, SetupRedirect = 5 };
+    [[noreturn]] static void fail_exec(int report_fd, int kind, int error, int code, int detail = 0) {
+        if(report_fd>=0){int payload[3]={kind,error,detail};ssize_t ignored=write(report_fd,payload,sizeof payload);(void)ignored;}
+        _exit(code);
+    }
+    [[noreturn]] void exec(int report_fd=-1) {
+        bool denied=false;int last=ENOENT;int interpreter=-1;
+        for(std::size_t index=0;index<candidates.size();++index) {
+            const auto& candidate=candidates[index];
             execve(candidate.c_str(),argv.data(),envp.data());
             int error=errno;
-            if(error==ENOEXEC){shell_argv[1]=const_cast<char*>(candidate.c_str());execve("/bin/sh",shell_argv.data(),envp.data());_exit(126);}
+            if(error==ENOEXEC){shell_argv[1]=const_cast<char*>(candidate.c_str());execve("/bin/sh",shell_argv.data(),envp.data());fail_exec(report_fd,ExecOther,errno,126);}
             if(error==EACCES){denied=true;continue;}
-            if(error!=ENOENT && error!=ENOTDIR)_exit(126);
+            if(error==ENOENT&&interpreter<0&&access(candidate.c_str(),F_OK)==0)interpreter=static_cast<int>(index);
+            if(error!=ENOENT && error!=ENOTDIR)fail_exec(report_fd,ExecOther,error,126);
+            last=error;
         }
-        _exit(denied?126:127);
+        if(denied)fail_exec(report_fd,ExecDenied,EACCES,126);
+        if(interpreter>=0)fail_exec(report_fd,ExecInterpreter,ENOENT,127,interpreter);
+        fail_exec(report_fd,ExecNotFound,last,127);
     }
 };
 #endif

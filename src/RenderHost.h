@@ -67,6 +67,11 @@ public:
     virtual const std::string& output_dir() const = 0;
     virtual int build_threads() const = 0;
     virtual const std::string& platform() const { static const std::string native = "native"; return native; }
+    // feature-site-dx: project build checks. A host without a project
+    // config keeps the historical behaviour (no strict values); warnings are
+    // collected by the parser and reported only by hosts that print them.
+    virtual bool strict_values() const { return false; }
+    virtual bool site_warning_enabled(const std::string&) const { return true; }
 
     virtual std::filesystem::path content_path(const TrackedInfo& info) const = 0;
     virtual std::filesystem::path output_path(const TrackedInfo& info) const = 0;

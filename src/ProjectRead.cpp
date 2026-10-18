@@ -200,12 +200,31 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
     static const std::vector<std::string> hook_keys = {"pre build","post build","pre build -all","post build -all","pre build --auto","post build --auto","pre build --repair","post build --repair"};
     for (const auto& key : hook_keys) if (value.has(key)) { if(!value[key].is_string()||value[key].string.empty()){error="build hook '"+key+"' must be a non-empty .f path string";return false;} config.build_hooks[key]=value[key].string; }
 
+    // feature-site-dx: opt-in strict values and per-kind warning silencing.
+    config.strict_values = false;
+    if (value.has("strict-values")) {
+        if (!value["strict-values"].is_bool()) { error = "strict-values must be true or false"; return false; }
+        config.strict_values = value["strict-values"].boolean;
+    }
+    config.no_warn.clear();
+    if (value.has("no-warn")) {
+        if (!value["no-warn"].is_array()) { error = "no-warn must be an array of warning kinds"; return false; }
+        for (const auto& item : value["no-warn"].array) {
+            const auto& kinds = site_warning_kinds();
+            if (!item.is_string() || (item.string != "all" && std::find(kinds.begin(), kinds.end(), item.string) == kinds.end())) {
+                error = "unknown no-warn entry (expected all, unknown-directive, path-outside-output or unknown-value)";
+                return false;
+            }
+            config.no_warn.insert(item.string);
+        }
+    }
+
     // Unknown config keys fail loudly, exactly like the CLI: a project must
     // never believe a setting is honoured when it is not.
     static const std::unordered_set<std::string> known_config_keys = {
         "content-dir", "content-ext", "output-dir", "output-ext",
         "default-template", "incremental-mode", "build-threads",
-        "contracts", "minify-exts", "schemas", "taxonomies",
+        "contracts", "minify-exts", "schemas", "taxonomies", "strict-values", "no-warn",
         "pre build", "post build", "pre build -all", "post build -all", "pre build --auto", "post build --auto", "pre build --repair", "post build --repair",
     };
     for (const auto& entry : value.object) {

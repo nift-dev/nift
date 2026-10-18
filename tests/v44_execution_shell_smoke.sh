@@ -36,7 +36,9 @@ MINGW*|MSYS*) ;;
   printf '#!/bin/sh\nexit 0\n' >"$t/not-executable"
   chmod 644 "$t/not-executable"
   result=$("$NIFT" -e "r := run(\"$t/not-executable\"); print(r.stringify())")
-  [[ "$result" == '{"exit_code":126,"stdout":"","stderr":"","launched":true}' ]] || {
+  # feature-site-dx: an exec failure is not a launch (launched:false plus an
+  # explanatory error); the shell-convention exit status 126 is kept.
+  [[ "$result" == "{\"exit_code\":126,\"stdout\":\"\",\"stderr\":\"\",\"launched\":false,\"error\":\"permission denied: $t/not-executable\"}" ]] || {
     echo "unexpected 126 result: $result" >&2
     exit 1
   }

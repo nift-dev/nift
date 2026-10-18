@@ -130,7 +130,38 @@ public:
                                  const std::optional<RenderSource>& page_source,
                                  bool require_exactly_one_content);
 
+    // feature-site-dx: template build warnings (unknown-directive,
+    // path-outside-output, unknown-value) collected during render(), in
+    // source order, deduplicated by location. Never affect output or status.
+    std::vector<BuildWarning> site_warnings() const;
+    // Unknown identifier-path $[...] values (and unterminated $[name) this
+    // render published literally in checked contexts, whether or not the
+    // unknown-value warning is enabled. Recorded in page metadata so that
+    // turning strict-values on rebuilds exactly the pages it affects.
+    std::size_t site_unknown_values() const;
+
 private:
+    struct SiteWarningSink {
+        std::mutex mutex;
+        std::vector<BuildWarning> warnings;
+        std::set<std::string> seen;
+        std::size_t unknown_values = 0;
+    };
+    mutable std::vector<std::pair<std::shared_ptr<const nift::detail::SourceDocument>,
+                                  std::vector<std::pair<std::size_t, std::size_t>>>> site_context_cache_;
+    std::filesystem::path site_web_root_;  // cached lexical output root
+    bool site_value_context_checked(const nift::detail::SourceText& source, std::size_t offset) const;
+    std::shared_ptr<SiteWarningSink> site_warnings_ = std::make_shared<SiteWarningSink>();
+    bool site_checks_active() const;
+    void site_warning(const std::string& kind, const nift::detail::SourceText& source, std::size_t offset,
+                      std::size_t length, const std::string& message);
+    std::string closest_value_name(const std::string& root) const;
+    bool check_unknown_value(const std::filesystem::path& source_path, const nift::detail::SourceText& source,
+                             std::size_t offset, const std::string& key);
+    bool check_unterminated_value(const nift::detail::SourceText& source, std::size_t offset);
+    void check_directive_typo(const nift::detail::SourceText& source, std::size_t offset);
+    void check_path_target(const nift::detail::SourceText& source, std::size_t offset, std::size_t length,
+                           const std::string& directive, const std::string& argument, const std::string& resolved);
     // Runtime 2.0 CP02: record dynamic reads that can change page output.
     // No-ops for standalone scripts (nothing to invalidate).
     void observe_presence(const std::filesystem::path& path, bool exists, const std::string& kind = {}) const;

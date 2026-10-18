@@ -85,6 +85,135 @@ constexpr const char* version_text = "Nift v4.12.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
+// feature-site-dx: change detection for `build --auto` after a failed build.
+// A snapshot maps every file under the project root to (size, mtime),
+// skipping .nift/, .git/, node_modules/ and the output directory. The output
+// directory is compared after normalisation (weakly_canonical: `public`,
+// `public/`, `./public`, an absolute path and a symlink to the directory are
+// all the same directory); one outside the project is simply never walked.
+// Directory symlinks are not followed. Inputs outside the project root are
+// not watched while in the failed state.
+using BuildAutoSnapshot = std::map<std::string, std::pair<std::uintmax_t, long long>>;
+BuildAutoSnapshot build_auto_snapshot(const fs::path& root, const std::string& output_dir) {
+    BuildAutoSnapshot snapshot;
+    auto normal_dir = [](const fs::path& path) {
+        std::error_code error;
+        fs::path result = fs::weakly_canonical(path, error);
+        if (error) result = fs::absolute(path, error).lexically_normal();
+        if (!result.has_filename() && result.has_parent_path() && result != result.root_path()) result = result.parent_path();
+        return result;
+    };
+    const fs::path walk_root = normal_dir(root);
+    const fs::path output = output_dir.empty() ? walk_root
+        : normal_dir(fs::path(output_dir).is_absolute() ? fs::path(output_dir) : root / output_dir);
+    const bool skip_output = output != walk_root;
+    std::error_code ec;
+    fs::recursive_directory_iterator it(walk_root, fs::directory_options::skip_permission_denied, ec), end;
+    for (; !ec && it != end; it.increment(ec)) {
+        const fs::path path = it->path();
+        const std::string entry = path.filename().generic_string();
+        std::error_code type_ec;
+        if (it->is_directory(type_ec)) {
+            if (it.depth() == 0 && (entry == ".nift" || entry == ".git" || entry == "node_modules")) { it.disable_recursion_pending(); continue; }
+            if (skip_output && path == output) { it.disable_recursion_pending(); continue; }
+            continue;
+        }
+        std::error_code stat_ec;
+        const auto size = it->file_size(stat_ec);
+        const auto time = it->last_write_time(stat_ec);
+        snapshot[path.generic_string()] = {stat_ec ? 0 : size, static_cast<long long>(time.time_since_epoch().count())};
+    }
+    return snapshot;
+}
+
+// feature-site-dx (round 2, B3): when to retry after a failed build.
+// - Healthy: every poll runs an incremental build (no snapshots).
+// - The first failure from a healthy state retries once, because what
+//   changed while it ran is unknown.
+// - Every later attempt is bracketed by snapshots. Files that changed while
+//   it ran are hashed; a file whose content equals what the previous attempt
+//   left there is the build's own repeated write and is ignored. Anything
+//   else that changed during the attempt (a user edit, an atomic rename, a
+//   new or deleted file) causes another attempt, so no edit is lost.
+// - If the same files change on two consecutive attempts with new content
+//   each time, a build hook rewrites watched files on every build: that is
+//   reported once and the watcher waits for an edit instead of looping.
+// - While idle after a failure, any difference from the post-attempt state
+//   triggers the next attempt.
+class BuildAutoRetryPolicy {
+public:
+    BuildAutoRetryPolicy(fs::path root, std::string output_dir) : root_(std::move(root)), output_dir_(std::move(output_dir)) {}
+    bool should_attempt() const { return !failing_ || retry_ || build_auto_snapshot(root_, output_dir_) != idle_; }
+    void before_attempt() { if (failing_) pre_ = build_auto_snapshot(root_, output_dir_); else pre_.reset(); }
+    // Returns a one-time report when a hook rewrites watched files every build.
+    std::string after_failure() {
+        BuildAutoSnapshot post = build_auto_snapshot(root_, output_dir_);
+        std::string report;
+        if (!pre_) { retry_ = true; previous_valid_ = false; written_.clear(); }
+        else {
+            std::set<std::string> changed;
+            for (const auto& [path, meta] : *pre_) { auto found = post.find(path); if (found == post.end() || found->second != meta) changed.insert(path); }
+            for (const auto& entry : post) if (!pre_->count(entry.first)) changed.insert(entry.first);
+            std::map<std::string, std::size_t> hashes;
+            std::set<std::string> significant;
+            for (const auto& path : changed) {
+                const std::size_t hash = post.count(path) ? std::hash<std::string>{}(filesystem::read_file(path)) : 0;
+                hashes[path] = hash;
+                const auto previous = written_.find(path);
+                if (previous == written_.end() || previous->second != hash) significant.insert(path);
+            }
+            if (significant.empty()) retry_ = false;
+            else if (previous_valid_ && significant == previous_changed_) {
+                retry_ = false;
+                if (!loop_reported_) {
+                    loop_reported_ = true;
+                    report = "a build hook modifies watched files on every build (";
+                    std::size_t shown = 0;
+                    for (const auto& path : significant) { if (shown++) report += ", "; if (shown > 3) { report += "..."; break; } report += fs::path(path).lexically_relative(fs::weakly_canonical(root_)).generic_string(); }
+                    report += "); waiting for an edit before retrying";
+                }
+            } else retry_ = true;
+            written_ = std::move(hashes);
+            previous_changed_ = std::move(significant);
+            previous_valid_ = true;
+        }
+        failing_ = true;
+        idle_ = std::move(post);
+        return report;
+    }
+    void after_success() { *this = BuildAutoRetryPolicy(root_, output_dir_); }
+    bool failing() const { return failing_; }
+private:
+    fs::path root_; std::string output_dir_;
+    bool failing_ = false, retry_ = false, previous_valid_ = false, loop_reported_ = false;
+    BuildAutoSnapshot idle_;
+    std::optional<BuildAutoSnapshot> pre_;
+    std::map<std::string, std::size_t> written_;
+    std::set<std::string> previous_changed_;
+};
+
+// feature-site-dx: TEMPORARY, single removable unit. Ordinary build failures
+// that had already written outputs leave .nift/.unfinished, after which every
+// build refuses until `--repair`. When the watcher's own failed build created
+// the marker (absent before, present after), the next attempt runs as
+// `build --repair`. A marker present before an attempt is never taken over.
+// Remove this class and its call sites (construction plus four calls) when feature-build-recovery
+// integrates (ordinary failures will then leave no marker).
+// Known window: another process creating the marker between before_build()
+// and the build is indistinguishable from our own; SIGTERM/SIGINT during a
+// build can leave a stale marker, exactly as for any interrupted build.
+class BuildAutoRepairWorkaround {
+public:
+    explicit BuildAutoRepairWorkaround(fs::path root) : marker_(std::move(root) / ".nift/.unfinished") {}
+    void before_build() { std::error_code e; marker_before_ = fs::exists(marker_, e); }
+    bool repair() const { return repair_next_; }
+    void after_failure() { std::error_code e; if (!marker_before_ && fs::exists(marker_, e)) repair_next_ = true; }
+    void after_success() { repair_next_ = false; }
+private:
+    fs::path marker_;
+    bool marker_before_ = false, repair_next_ = false;
+};
+
 bool valid_runtime_platform(const std::string& value) {
     if (value.empty()) return false;
     auto first = static_cast<unsigned char>(value.front());
@@ -343,7 +472,9 @@ void print_commands() {
     std::cout << console::dim("Build") << '\n';
     row("build", "[names...] [options]", "Incremental build, or explicitly build the named pages");
     row("build --all", "", "Build all tracked files");
-    row("build --auto", "", "Automatic/watch build");
+    row("build --auto", "", "Watch and rebuild on change; errors are printed and it keeps watching");
+    row("build --strict", "", "Unknown $[name] values are errors (also: \"strict-values\": true)");
+    row("build --no-warn=<kind>", "", "Silence warnings: unknown-directive, path-outside-output, unknown-value, all");
     row("build --repair", "", "Repair/reconstruct derived build state");
 
     std::cout << '\n' << console::dim("Project") << '\n';
@@ -2172,6 +2303,10 @@ int run_cli(int argc, char** argv) {
         // --repair. -p (explain rebuild reasons) is orthogonal and combinable.
         // --no-process extends the script process restriction to build hooks.
         bool all_mode = false, auto_mode = false, repair_mode = false, explain = false, no_process = false;
+        // feature-site-dx: --strict and --no-warn=<kind> are orthogonal to
+        // the build mode and add to the project's config settings.
+        bool strict_values = false;
+        std::set<std::string> no_warn;
         std::vector<std::string> names;
         int mode_flags = 0;
         for (int i = 2; i < argc; ++i) {
@@ -2181,10 +2316,25 @@ int run_cli(int argc, char** argv) {
             else if (arg == "--repair") { repair_mode = true; ++mode_flags; }
             else if (arg == "-p") explain = true;
             else if (arg == "--no-process") no_process = true;
+            else if (arg == "--strict") strict_values = true;
+            else if (arg.rfind("--no-warn=", 0) == 0) {
+                const std::string kind = arg.substr(10);
+                const auto& kinds = site_warning_kinds();
+                if (kind != "all" && std::find(kinds.begin(), kinds.end(), kind) == kinds.end()) {
+                    console::error("unknown warning kind '" + kind + "' (expected all, unknown-directive, path-outside-output or unknown-value)");
+                    return 1;
+                }
+                no_warn.insert(kind);
+            }
             else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
             else names.emplace_back(arg);
         }
         if (no_process) nift_setenv("NIFT_NO_PROCESS", "1", 1);
+        auto apply_checks = [&](ProjectInfo& target) {
+            if (strict_values) target.config.strict_values = true;
+            target.config.no_warn.insert(no_warn.begin(), no_warn.end());
+        };
+        apply_checks(project);
         project.target_ = selected_platform;
         if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
             console::error("build modes are mutually exclusive");
@@ -2203,34 +2353,82 @@ int run_cli(int argc, char** argv) {
             BuildAutoQuitKey quit_key;
             std::cout << console::heading("Nift build --auto") << '\n';
             std::cout << console::dim("watching for changes every 200 ms") << '\n';
-            std::cout << "build output: " << console::path(build_auto_log_path) << '\n';
+            std::cout << "build output: " << console::path(build_auto_log_path)
+                      << console::dim(" (errors and warnings are also printed here)") << '\n';
             if (quit_key.interactive())
                 std::cout << "press " << console::good("q") << " to stop\n";
             else
                 std::cout << console::dim("non-interactive mode; stop the process to exit") << '\n';
             std::cout << std::flush;
 
+            // feature-site-dx: a failed build no longer ends the watcher. The
+            // failure is printed to stderr (once per distinct set of
+            // diagnostics) as well as written to the log.
+            //
+            // Retry policy: BuildAutoRetryPolicy (above).
+            BuildAutoRepairWorkaround repair_workaround(project.root);
+            BuildAutoRetryPolicy retry_policy(project.root, project.config.output_dir);
+            std::string last_reported;
             bool stop_requested = false;
+            auto diagnostic_key = [](const std::string& text) {
+                std::string key; std::istringstream in(text); std::string line;
+                while (std::getline(in, line))
+                    if (line.rfind("error:", 0) == 0 || line.rfind("warning:", 0) == 0 ||
+                        (line.rfind("  ", 0) == 0 && line.rfind("    \xE2\x86\xB3", 0) != 0)) key += line + '\n';
+                return key;
+            };
             while (!stop_requested) {
                 stop_requested = quit_key.pressed();
                 if (stop_requested) break;
 
-                std::string captured_output;
-                int result = 0;
-                {
-                    console::ScopedPlainOutput plain_output;
-                    ScopedStreamCapture capture;
-                    ProjectInfo fresh;
-                    if (!fresh.open()) result = 1;
-                    else { fresh.build_mode_hint_ = "auto"; result = fresh.build_all(false); }
-                    captured_output = capture.str();
-                }
+                if (retry_policy.should_attempt()) {
+                    const bool was_failing = retry_policy.failing();
+                    retry_policy.before_attempt();
+                    repair_workaround.before_build();
+                    std::string captured_output;
+                    int result = 0;
+                    {
+                        console::ScopedPlainOutput plain_output;
+                        ScopedStreamCapture capture;
+                        ProjectInfo fresh;
+                        if (!fresh.open()) result = 1;
+                        else {
+                            apply_checks(fresh);
+                            fresh.build_mode_hint_ = "auto";
+                            result = repair_workaround.repair() ? fresh.build_all(true, false, /*repair=*/true) : fresh.build_all(false);
+                        }
+                        captured_output = capture.str();
+                    }
 
-                if (!write_if_changed(build_auto_log_path, captured_output)) {
-                    console::error("failed to write build-auto output log");
-                    return 1;
+                    if (!write_if_changed(build_auto_log_path, captured_output)) {
+                        console::error("failed to write build-auto output log");
+                        return 1;
+                    }
+                    if (result != 0) {
+                        const std::string key = diagnostic_key(captured_output);
+                        if (!was_failing || key != last_reported) {
+                            std::cerr << console::error_label() << " build failed; still watching (fix the error and save)\n"
+                                      << captured_output << std::flush;
+                            last_reported = key;
+                        }
+                        repair_workaround.after_failure();
+                        const std::string report = retry_policy.after_failure();
+                        if (!report.empty()) std::cerr << console::warning_label() << ' ' << report << '\n' << std::flush;
+                    } else {
+                        const bool warned = captured_output.find("warning: ") != std::string::npos;
+                        const std::string key = warned ? diagnostic_key(captured_output) : std::string();
+                        if (was_failing) {
+                            std::cerr << console::good("build succeeded again") << '\n';
+                            if (warned) std::cerr << captured_output;
+                            std::cerr << std::flush;
+                        } else if (warned && key != last_reported) {
+                            std::cerr << captured_output << std::flush;
+                        }
+                        last_reported = key;
+                        retry_policy.after_success();
+                        repair_workaround.after_success();
+                    }
                 }
-                if (result != 0) return result;
 
                 const auto sleep_step = std::chrono::milliseconds(20);
                 auto remaining = build_auto_poll_interval;
@@ -2433,6 +2631,20 @@ int run_cli(int argc, char** argv) {
             for (int i = 2; i < argc; ++i) {
                 const std::string arg = argv[i];
                 if (!arg.empty() && arg[0] == '-') {
+                    // feature-site-dx: --strict reports pages that a strict
+                    // build would rebuild (and fail); --no-warn filters the
+                    // listed outstanding warnings.
+                    if (arg == "--strict") { project.config.strict_values = true; continue; }
+                    if (arg.rfind("--no-warn=", 0) == 0) {
+                        const std::string kind = arg.substr(10);
+                        const auto& kinds = site_warning_kinds();
+                        if (kind != "all" && std::find(kinds.begin(), kinds.end(), kind) == kinds.end()) {
+                            console::error("unknown warning kind '" + kind + "' (expected all, unknown-directive, path-outside-output or unknown-value)");
+                            return 1;
+                        }
+                        project.config.no_warn.insert(kind);
+                        continue;
+                    }
                     if (arg != "-p") { console::error("unknown status option '" + arg + "'"); return 1; }
                 } else {
                     console::error("status takes no page names");
@@ -2474,6 +2686,19 @@ int run_cli(int argc, char** argv) {
                     if (!reasons[i].empty()) pending.push_back({&project.tracked[i], std::move(reasons[i])});
             }
 
+            // feature-site-dx (review R1): warnings recorded at each page's
+            // last build, listed on stderr so stdout keeps its format.
+            {
+                const auto outstanding = project.outstanding_warnings();
+                std::size_t count = 0;
+                for (const auto& entry : outstanding) count += entry.second.size();
+                if (count) {
+                    std::cerr << console::warning_label() << ' ' << count << " outstanding build warning"
+                              << (count == 1 ? "" : "s") << " (recorded at each page's last build):\n";
+                    for (const auto& [page, lines] : outstanding)
+                        for (const auto& line : lines) std::cerr << "  " << page << ": " << line << '\n';
+                }
+            }
             if (pending.empty()) {
                 std::cout << console::heading("Nift status") << '\n';
                 std::cout << console::good("✓") << " all " << project.tracked.size() << " tracked "

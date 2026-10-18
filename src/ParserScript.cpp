@@ -174,8 +174,28 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
             if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { copied(i,5); i=e<in.size()?e+1:e; continue; } }
             if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { copied(i,8); i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0,bc=0;
-            for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(!par&&!br&&!bc&&(c==';'||c=='\n'))break;}
+            // feature-site-dx: remember where the open quote and each open '['
+            // started so a statement that runs to end of input can be reported
+            // instead of silently swallowing the rest of the program.
+            // A quote that is closed only on a later line is the usual culprit
+            // ("abc<newline>print("x")" closes at the next line's quote and
+            // leaves that line's last quote open), so it is reported first.
+            std::size_t quote_open=0,first_multiline_quote=std::string::npos;std::vector<std::size_t> bracket_opens;
+            for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote){quoted=false;if(first_multiline_quote==std::string::npos&&in.find('\n',quote_open)<i)first_multiline_quote=quote_open;}continue;}if(c=='\''||c=='"'){quoted=true;quote=c;quote_open=i;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='['){++br;bracket_opens.push_back(i);}else if(c==']'){--br;if(!bracket_opens.empty())bracket_opens.pop_back();}else if(c=='{')++bc;else if(c=='}')--bc;if(!par&&!br&&!bc&&(c==';'||c=='\n'))break;}
             std::string stmt=trim_copy(in.substr(start,i-start));
+            // An unclosed quote or '[' makes the statement scan (and the
+            // template $[...] scan that would follow) run to end of input, so
+            // the rest of the program was dropped with exit 0. Unclosed '(' and
+            // '{' already fail in the expression evaluator. Legacy @-/$-prefixed
+            // statements keep their own diagnostics.
+            if(i>=in.size()&&!stmt.empty()&&stmt[0]!='@'&&stmt[0]!='$'&&stmt.rfind("#!",0)!=0&&(quoted||(br>0&&!bracket_opens.empty()))){
+                const std::size_t opener=quoted?(first_multiline_quote!=std::string::npos?first_multiline_quote:quote_open):bracket_opens.front();
+                const auto at=source_position(opener);
+                const std::string where=std::to_string(at.first)+":"+std::to_string(at.second);
+                error=quoted?"unterminated string literal opened at "+where+" (no closing "+std::string(1,in[opener])+" on that line)"
+                            :"unterminated array literal or index: '[' opened at "+where+" has no closing ']'";
+                i=opener;return translation_failure();
+            }
             if(!stmt.empty()){
                 // Template-grammar statements (legacy @-directives and $[...]
                 // values) are already parseable directly and would otherwise be

@@ -61,6 +61,50 @@ Use this compact shape for new entries:
   `docs/HASHING-API.md`
 - Timing: describes built-ins no released Nift has
 
+### Site DX: watch builds, build warnings, strict values, `launched`
+
+- Status: pending (implemented on branch `feature-site-dx`, off `runtime-2`)
+- Earliest release: the first release that includes the `feature-site-dx`
+  checkpoint (not v4.12.0)
+- Website scope: `docs/commands` (build modes), `docs/configuration`,
+  `docs/templating` ("Escaping literal Nift syntax"), `docs/expressions`,
+  `docs/scripting-run-shell`, `docs/runtime-errors` (optional)
+- Required update, following `docs/BUILD-DIAGNOSTICS.md`:
+  - commands: `build --auto` no longer exits on a build error. The error is
+    printed to stderr as well as `.nift/build-auto.log`, the watcher keeps
+    running, and it retries on the next project change, repairing its own
+    partial failure automatically. Replace "build --auto keeps the terminal
+    quiet" with "quiet while builds succeed". Add `--strict` and
+    `--no-warn=<kind>` (orthogonal to the build mode).
+  - configuration: `"strict-values": true|false` (default false; `init` does
+    not set it) and `"no-warn": ["unknown-directive" | "path-outside-output"
+    | "unknown-value" | "all"]`.
+  - templating/escaping: say that an unknown `$[name]` is published literally
+    (the passthrough rule), that this is what makes `$[0,1]$` and shell
+    `$[ x + 1 ]` survive, and that it is not reliable (`$[1+2]` becomes `3`).
+    `\$[` is the way to write literal text. Unknown identifier-path values
+    warn; `--strict` makes them errors.
+  - expressions: one paragraph on the passthrough rule and a link to the
+    escaping section.
+  - templating: list the three build warning kinds and how to silence them.
+  - scripting-run-shell: define `launched` (true when every stage started).
+    A missing or non-executable program gives `launched:false`, an `error`
+    ("executable not found: x" / "permission denied: x") and exit code
+    127/126, on every platform. A missing `#!` interpreter reads
+    "interpreter not found: X (from ./script)"; child setup failures (cwd,
+    stdin/stdout/stderr files) give `launched:false` + error, 126.
+    `cmd(...).run()` also carries `error`, and pipelines add per-stage
+    `stages: [{launched, exit_code[, error]}]` while `exit_code` stays the
+    last stage's status.
+  - templating: warnings are silent in `<pre>`, `<code>`, `<script>`,
+    `<style>`, HTML comments, fenced code and quoted JSON keys; the maths
+    rule (`$[n]$` left literal when unresolved); recorded warnings are
+    summarised for unchanged pages and listed by `nift status`;
+    `--strict` rebuilds (and fails) exactly the pages with unknown values.
+  - scripting: an unterminated string, `[` or `$[` is an error, reported at
+    the opening position.
+- Timing: describes behaviour no released Nift has
+
 None other for the current candidate. All five items targeted at v4.6.0 (native time
 functions, native secure random bytes, execution output separation, relative
 import module ownership, explicit module/package resource paths) were completed

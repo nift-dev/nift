@@ -24,6 +24,28 @@ struct Config {
     std::vector<std::string> taxonomy_files;
     int build_threads = -1;
     std::map<std::string, std::string> build_hooks;
+    // feature-site-dx: "strict-values": true turns an unknown root in a
+    // template $[...] into a build error (default: published literally with a
+    // warning). "no-warn": [kinds] silences build warnings by kind.
+    bool strict_values = false;
+    std::set<std::string> no_warn;
+};
+
+// feature-site-dx: build warning kinds (stable names; used by --no-warn= and
+// the "no-warn" config key). Warnings never change output or exit status.
+inline const std::vector<std::string>& site_warning_kinds() {
+    static const std::vector<std::string> kinds = {"unknown-directive", "path-outside-output", "unknown-value"};
+    return kinds;
+}
+
+struct BuildWarning {
+    std::string kind;
+    std::filesystem::path source_file;
+    std::size_t line = 0;
+    std::size_t column = 0;
+    std::size_t source_length = 1;
+    std::string source_line;
+    std::string message;
 };
 
 struct PaginationConfig {

@@ -19,7 +19,21 @@ struct ProcessSpec {
     // cmd() structured capture never sets it.
     bool foreground_terminal=false;
 };
-struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; };
+// launched: every stage started executing. On POSIX an exec failure in the
+// child (missing or non-executable program) gives launched=false, error
+// "executable not found: <name>" / "permission denied: <name>" and the shell
+// exit status 127 / 126; exec_failed marks that case (feature-site-dx).
+// One entry per pipeline stage, in order (feature-site-dx review R6):
+// launched=false with `error` when the stage could not be started (setup or
+// exec failure, or a later stage never started after an earlier failure);
+// launched=true with that stage's own exit status otherwise.
+struct ProcessStageResult { bool launched=false; int exit_code=-1; std::string error; };
+// exit_code keeps the shell convention: the LAST stage's status (127/126 for
+// an exec failure of that stage). For a single command, launched=false and
+// `error` report an exec/setup failure. For a pipeline the top-level
+// launched/error keep their pre-feature meaning (stages were started /
+// parent-side setup failure); `stages` carries each stage's launch result.
+struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; bool exec_failed=false; std::vector<ProcessStageResult> stages; };
 ProcessResult nift_run_process(const ProcessSpec& spec, bool capture=true, bool stream=false);
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture=true, bool stream=false);
 bool nift_find_executable(const std::string& name, std::string& path);

@@ -16,6 +16,7 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <set>
@@ -59,6 +60,345 @@ bool Parser::resolve_pagination_value(const std::string& expression,
     else if (expression == "paginate.next") value = std::make_shared<const nift::RuntimeValue>(static_cast<double>(pagination_current_ < pagination_total_ ? pagination_current_ + 1 : pagination_total_));
     else return false;
     return true;
+}
+
+// ---- feature-site-dx: template build warnings ------------------------------
+// Warnings are advisory: they never change output or exit status (except the
+// opt-in strict-values error). They are collected only for project page
+// renders (not scripts) and reported by the CLI build after the progress line.
+namespace {
+std::size_t site_dx_osa_distance(const std::string& a, const std::string& b) {
+    const std::size_t n = a.size(), m = b.size();
+    std::vector<std::vector<std::size_t>> d(n + 1, std::vector<std::size_t>(m + 1, 0));
+    for (std::size_t i = 0; i <= n; ++i) d[i][0] = i;
+    for (std::size_t j = 0; j <= m; ++j) d[0][j] = j;
+    for (std::size_t i = 1; i <= n; ++i)
+        for (std::size_t j = 1; j <= m; ++j) {
+            const std::size_t cost = a[i - 1] == b[j - 1] ? 0 : 1;
+            d[i][j] = std::min({d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost});
+            if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1])
+                d[i][j] = std::min(d[i][j], d[i - 2][j - 2] + 1);
+        }
+    return d[n][m];
+}
+std::string site_dx_lower(std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+bool site_dx_ident_start(char c) { return std::isalpha(static_cast<unsigned char>(c)) || c == '_'; }
+bool site_dx_ident_char(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
+// root(.member)*, segments may contain '-' (built-in metadata such as
+// build-date). Anything else ($[0,1], $[ x + 1 ], $[TBD!]) is never treated as
+// an unknown value: it is not plausibly a value reference.
+bool site_dx_identifier_path(const std::string& text) {
+    if (text.empty() || !site_dx_ident_start(text[0])) return false;
+    bool segment_start = false;
+    for (std::size_t i = 1; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == '.') { if (segment_start) return false; segment_start = true; continue; }
+        if (segment_start) { if (!site_dx_ident_start(c)) return false; segment_start = false; continue; }
+        if (!site_dx_ident_char(c) && c != '-') return false;
+    }
+    return !segment_start && text.back() != '-';
+}
+// Word lists are kept as one space-separated literal so that
+// tools/rt-vm/legacy_names.py (which collects brace lists of string literals
+// as names legacy dispatches specially) does not mistake them for dispatch.
+std::vector<std::string> site_dx_words(const char* text) {
+    std::vector<std::string> words; std::string word;
+    for (const char* p = text; ; ++p) {
+        if (*p == ' ' || *p == '\0') { if (!word.empty()) words.push_back(word); word.clear(); if (!*p) break; }
+        else word.push_back(*p);
+    }
+    return words;
+}
+// Directive names written as @name(...).
+const std::vector<std::string>& site_dx_call_directives() {
+    static const std::vector<std::string> names = site_dx_words(
+        "content input path pathto pathtofile pathtopage markup json dep getenv ent substr join filter map "
+        "sort slice find some every distinct reverse sum prod min max reduce return fn fragment struct enum "
+        "import if for while");
+    return names;
+}
+// Directive names written without parentheses.
+const std::vector<std::string>& site_dx_bare_directives() {
+    static const std::vector<std::string> names = site_dx_words("content paginate");
+    return names;
+}
+std::string site_dx_closest(const std::string& name, const std::vector<std::string>& candidates, bool same_length = false) {
+    const std::string folded = site_dx_lower(name);
+    std::string best; std::size_t best_distance = std::numeric_limits<std::size_t>::max();
+    for (const auto& candidate : candidates) {
+        if (candidate == name) return {};
+        if (site_dx_lower(candidate) == folded) return candidate;
+        // Short names (if, for, fn, map, ...) only match case-insensitively:
+        // one edit away from a 2-3 letter name is most of the alphabet.
+        if (candidate.size() < 4 || name.size() < 4) continue;
+        // Bare names: only substitutions and transpositions (@contnet), not
+        // insertions (@contents, a common handle or word).
+        if (same_length && candidate.size() != name.size()) continue;
+        const std::size_t distance = site_dx_osa_distance(folded, candidate);
+        if (distance <= 1 && distance < best_distance) { best = candidate; best_distance = distance; }
+    }
+    return best;
+}
+// A case-only match (@Content, @INPUT) gets its own wording.
+std::string site_dx_directive_message(const std::string& name, const std::string& suggestion) {
+    if (site_dx_lower(name) == suggestion)
+        return "unknown directive @" + name + " published literally: Nift directives are lowercase; did you mean @" + suggestion + "?";
+    return "unknown directive @" + name + " published literally (did you mean @" + suggestion + "?)";
+}
+} // namespace
+
+std::vector<BuildWarning> Parser::site_warnings() const {
+    std::lock_guard<std::mutex> lock(site_warnings_->mutex);
+    return site_warnings_->warnings;
+}
+
+std::size_t Parser::site_unknown_values() const {
+    std::lock_guard<std::mutex> lock(site_warnings_->mutex);
+    return site_warnings_->unknown_values;
+}
+
+// Review R3/R4 (round 2: B2, N3): recognised non-Nift contexts, where code
+// samples, scripts, styles, JSON-LD and commented-out markup live. They
+// suppress WARNINGS only; strict-values errors are context-free.
+//
+// Contexts are computed per source document (one file) in a single forward
+// pass and cached, so a page with many candidates is linear, and nothing
+// leaks between files (an @input file's unclosed <code> does not affect the
+// page that includes it). Only properly closed contexts count: an opener
+// without a matching closer later in the same file (an unclosed <code>,
+// <!--, <script>, or an odd final ``` fence) suppresses nothing.
+//   <!-- ... -->, <script ...> ... </script>, <style ...> ... </style>
+//   (raw text: no other markers are recognised inside), <pre ...> ... </pre>,
+//   <code ...> ... </code>, and Markdown fences (``` or ~~~ after at most
+//   three spaces at a line start) paired in order.
+namespace {
+std::vector<std::pair<std::size_t, std::size_t>> site_dx_context_spans(const std::string& text) {
+    std::vector<std::pair<std::size_t, std::size_t>> spans;
+    auto lower_at = [&](std::size_t p, const char* word) {
+        for (std::size_t k = 0; word[k]; ++k)
+            if (p + k >= text.size() || std::tolower(static_cast<unsigned char>(text[p + k])) != word[k]) return false;
+        return true;
+    };
+    auto tag_at = [&](std::size_t p, const char* name) {  // "<name" followed by '>' or whitespace
+        if (!lower_at(p, name)) return false;
+        const std::size_t after = p + std::strlen(name);
+        return after < text.size() && (text[after] == '>' || std::isspace(static_cast<unsigned char>(text[after])));
+    };
+    auto find_ci = [&](std::size_t from, const char* word) {
+        for (std::size_t p = text.find('<', from); p != std::string::npos; p = text.find('<', p + 1))
+            if (lower_at(p, word)) return p;
+        return std::string::npos;
+    };
+    std::size_t pre_open = std::string::npos, code_open = std::string::npos;
+    for (std::size_t p = text.find('<'); p != std::string::npos; ) {
+        std::size_t next_from = p + 1;
+        if (text.compare(p, 4, "<!--") == 0) {
+            const std::size_t close = text.find("-->", p + 4);
+            if (close != std::string::npos) { spans.emplace_back(p, close + 3); next_from = close + 3; }
+        } else if (tag_at(p, "<script") || tag_at(p, "<style")) {
+            const bool script = tag_at(p, "<script");
+            const std::size_t close = find_ci(p + 1, script ? "</script" : "</style");
+            if (close != std::string::npos) { spans.emplace_back(p, close + 1); next_from = close + 1; }
+        } else if (tag_at(p, "<pre")) {
+            if (pre_open == std::string::npos) pre_open = p;
+        } else if (lower_at(p, "</pre")) {
+            if (pre_open != std::string::npos) { spans.emplace_back(pre_open, p + 1); pre_open = std::string::npos; }
+        } else if (tag_at(p, "<code")) {
+            if (code_open == std::string::npos) code_open = p;
+        } else if (lower_at(p, "</code")) {
+            if (code_open != std::string::npos) { spans.emplace_back(code_open, p + 1); code_open = std::string::npos; }
+        }
+        p = text.find('<', next_from);
+    }
+    std::size_t fence_open = std::string::npos;
+    for (std::size_t line = 0; line < text.size();) {
+        std::size_t p = line, spaces = 0;
+        while (p < text.size() && text[p] == ' ' && spaces < 3) { ++p; ++spaces; }
+        if (text.compare(p, 3, "```") == 0 || text.compare(p, 3, "~~~") == 0) {
+            if (fence_open == std::string::npos) fence_open = line;
+            else { spans.emplace_back(fence_open, p + 3); fence_open = std::string::npos; }
+        }
+        const std::size_t next = text.find('\n', line);
+        if (next == std::string::npos) break;
+        line = next + 1;
+    }
+    std::sort(spans.begin(), spans.end());
+    std::vector<std::pair<std::size_t, std::size_t>> merged;
+    for (const auto& span : spans) {
+        if (!merged.empty() && span.first <= merged.back().second) merged.back().second = std::max(merged.back().second, span.second);
+        else merged.push_back(span);
+    }
+    return merged;
+}
+} // namespace
+
+bool Parser::site_value_context_checked(const nift::detail::SourceText& source, std::size_t offset) const {
+    if (!source.view || !source.view.document()) return true;
+    const auto& document = source.view.document();
+    const std::vector<std::pair<std::size_t, std::size_t>>* spans = nullptr;
+    for (const auto& entry : site_context_cache_) if (entry.first == document) { spans = &entry.second; break; }
+    if (!spans) {
+        if (site_context_cache_.size() >= 32) site_context_cache_.clear();
+        site_context_cache_.emplace_back(document, site_dx_context_spans(document->text));
+        spans = &site_context_cache_.back().second;
+    }
+    const std::size_t position = source.view.original_range(offset).first;
+    auto it = std::upper_bound(spans->begin(), spans->end(), std::make_pair(position, std::numeric_limits<std::size_t>::max()));
+    if (it == spans->begin()) return true;
+    --it;
+    return !(position >= it->first && position < it->second);
+}
+
+bool Parser::site_checks_active() const {
+    return !strict_script_mode_ && !standalone_script_host_ && host_.has_output_context();
+}
+
+void Parser::site_warning(const std::string& kind, const nift::detail::SourceText& source, std::size_t offset,
+                          std::size_t length, const std::string& message) {
+    if (!site_checks_active() || !host_.site_warning_enabled(kind)) return;
+    BuildWarning warning;
+    warning.kind = kind;
+    warning.message = message;
+    nift::detail::DiagnosticOrigin origin;
+    if (source.view) origin = source.view.locate(offset, std::max<std::size_t>(1, length));
+    if (origin.source.empty() && !source_path_stack_.empty()) origin.source = source_path_stack_.back();
+    warning.source_file = origin.source;
+    warning.line = origin.line;
+    warning.column = origin.column;
+    warning.source_length = origin.source_length;
+    warning.source_line = origin.source_line;
+    const std::string key = kind + '\x1f' + warning.source_file.generic_string() + '\x1f' +
+        std::to_string(warning.line) + ':' + std::to_string(warning.column);
+    std::lock_guard<std::mutex> lock(site_warnings_->mutex);
+    if (site_warnings_->seen.insert(key).second) site_warnings_->warnings.push_back(std::move(warning));
+}
+
+std::string Parser::closest_value_name(const std::string& root) const {
+    std::vector<std::string> names = site_dx_words(
+        "title name content-path output-path template-path build-timezone build-time build-UTC-time "
+        "build-date build-UTC-date build-YYYY build-YY build-OS page project paginate");
+    for (const auto& scope : variable_scopes_) for (const auto& entry : scope) names.push_back(entry.first);
+    for (const auto& entry : json_bindings_) names.push_back(entry.first);
+    for (const auto& entry : callables_) names.push_back(entry.first);
+    const std::string folded = site_dx_lower(root);
+    std::string best; std::size_t best_distance = std::numeric_limits<std::size_t>::max();
+    for (const auto& name : names) {
+        if (name.empty() || name.rfind("__", 0) == 0 || name == root) continue;
+        const std::size_t distance = site_dx_lower(name) == folded ? 0 : site_dx_osa_distance(folded, site_dx_lower(name));
+        const std::size_t limit = root.size() <= 4 ? 1 : 2;
+        if (distance <= limit && distance < best_distance) { best = name; best_distance = distance; }
+    }
+    return best;
+}
+
+bool Parser::check_unknown_value(const fs::path& source_path, const nift::detail::SourceText& source,
+                                 std::size_t offset, const std::string& key) {
+    if (!site_checks_active()) return true;
+    const std::string expression = trim_copy(key);
+    if (!site_dx_identifier_path(expression)) return true;
+    // Review R4: $[n]$ is TeX/KaTeX maths (an interval or index set), not a
+    // value reference: no warning and no strict error.
+    const std::size_t after = offset + key.size() + 3;
+    if (after < source.size() && source[after] == '$') return true;
+    // Round 2 (B2): this is an interpolation the substitution code attempted
+    // and could not resolve, wherever it is, so it is counted for strict and
+    // is a strict error in any context. Contexts only suppress the warning.
+    {
+        std::lock_guard<std::mutex> lock(site_warnings_->mutex);
+        ++site_warnings_->unknown_values;
+    }
+    const std::size_t dot = expression.find('.');
+    const std::string root = expression.substr(0, dot);
+    const std::string suggestion = closest_value_name(root);
+    const std::string hint = suggestion.empty() ? std::string()
+        : " (did you mean $[" + suggestion + (dot == std::string::npos ? std::string() : expression.substr(dot)) + "]?)";
+    if (host_.strict_values()) {
+        fail(source_path, source, offset, "unknown value $[" + expression + "]" + hint +
+             "; strict-values is on: write \\$[" + key + "] to publish it literally");
+        return false;
+    }
+    if (!site_value_context_checked(source, offset)) return true;
+    site_warning("unknown-value", source, offset, key.size() + 3,
+                 "unknown value $[" + expression + "] published literally" + hint + "; write \\$[ for literal text");
+    return true;
+}
+
+bool Parser::check_unterminated_value(const nift::detail::SourceText& source, std::size_t offset) {
+    if (!site_checks_active() || !site_value_context_checked(source, offset)) return true;
+    std::size_t end = offset + 2;
+    while (end < source.size() && (site_dx_ident_char(source[end]) || source[end] == '.' || source[end] == '-')) ++end;
+    const std::string name = source.substr(offset + 2, end - offset - 2);
+    if (!site_dx_identifier_path(name)) return true;
+    // Only when the would-be value ends the line or meets markup: "$[title</h1>".
+    if (end < source.size() && source[end] != '<' && source[end] != '\n' && source[end] != '\r' &&
+        source[end] != ' ' && source[end] != '\t' && source[end] != '"' && source[end] != '\'') return true;
+    // Round 2: no substitution is attempted for an unterminated $[ (the
+    // scanner never finds the closing ']'), so this is a heuristic warning
+    // only and never fatal, even under strict-values.
+    site_warning("unknown-value", source, offset, end - offset,
+                 "unterminated $[" + name + " has no closing ']' and is published literally; write \\$[ for literal text");
+    return true;
+}
+
+void Parser::check_directive_typo(const nift::detail::SourceText& source, std::size_t offset) {
+    if (!site_checks_active()) return;
+    if (offset + 1 >= source.size() || !site_dx_ident_start(source[offset + 1])) return;
+    // '@' must start a word: user@example.com, a@b, x.@y are not directives.
+    if (offset > 0) {
+        const char before = source[offset - 1];
+        if (site_dx_ident_char(before) || before == '.' || before == '-' || before == '@' || before == '/' ||
+            before == '+' || before == '%' || before == '&' || before == '=' || before == '\\') return;
+    }
+    std::size_t end = offset + 1;
+    while (end < source.size() && site_dx_ident_char(source[end])) ++end;
+    const std::string name = source.substr(offset + 1, end - offset - 1);
+    const char next = end < source.size() ? source[end] : '\0';
+    // CSS at-rules with hyphens (@font-face, @counter-style), npm scopes
+    // (@types/node), decorators with member access (@app.route) and handles
+    // followed by ':' are never directives.
+    if (next == '-' || next == '/' || next == '.' || next == ':') return;
+    // Review R4: a quote-enclosed name is a JSON(-LD) key or value
+    // ("@context", "@type"), never a directive.
+    if (offset > 0 && (source[offset - 1] == '"' || source[offset - 1] == '\'') && next == source[offset - 1]) return;
+    if (next == '(') {
+        if (callables_.count(name)) {
+            if (!site_value_context_checked(source, offset)) return;
+            site_warning("unknown-directive", source, offset, end - offset + 1,
+                         "@" + name + "(...) is published literally: '" + name +
+                         "' is a function, not a directive; call it as $[" + name + "(...)]");
+            return;
+        }
+        const std::string suggestion = site_dx_closest(name, site_dx_call_directives());
+        if (suggestion.empty() || !site_value_context_checked(source, offset)) return;
+        site_warning("unknown-directive", source, offset, end - offset, site_dx_directive_message(name, suggestion));
+        return;
+    }
+    const std::string suggestion = site_dx_closest(name, site_dx_bare_directives(), /*same_length=*/true);
+    if (suggestion.empty() || !site_value_context_checked(source, offset)) return;
+    site_warning("unknown-directive", source, offset, end - offset, site_dx_directive_message(name, suggestion));
+}
+
+void Parser::check_path_target(const nift::detail::SourceText& source, std::size_t offset, std::size_t length,
+                               const std::string& directive, const std::string& argument, const std::string& resolved) {
+    // Review D2: cheap checks first; the containment test is lexical only (a
+    // heuristic warning: no filesystem access, symlinks are not resolved).
+    // Called only for targets that are not tracked names.
+    if (!site_checks_active() || !host_.site_warning_enabled("path-outside-output")) return;
+    const fs::path destination = (host_.root() / argument).lexically_normal();
+    if (site_web_root_.empty()) {
+        site_web_root_ = (host_.root() / host_.output_dir()).lexically_normal();
+        if (!site_web_root_.has_filename()) site_web_root_ = site_web_root_.parent_path();
+    }
+    const fs::path& web_root = site_web_root_;
+    const std::string relative_target = destination.lexically_relative(web_root).generic_string();
+    if (!relative_target.empty() && relative_target != ".." && relative_target.rfind("../", 0) != 0) return;
+    site_warning("path-outside-output", source, offset, length,
+                 "@" + directive + "('" + argument + "') resolves to '" + resolved + "', outside the output directory " +
+                 host_.output_dir() + "; the link will not exist when " + host_.output_dir() +
+                 " is deployed (link a tracked name or a file under " + host_.output_dir() + ")");
 }
 
 std::string Parser::path_to_page(std::size_t page) {
@@ -314,6 +654,7 @@ RenderResult Parser::execute_loop_emission(const LoopEmissionPlan& plan,
                     continue;
                 }
                 // Unknown $[...] is emitted literally by the canonical parser.
+                if (!check_unknown_value(source_path, source, i, key)) break;
                 output.append(plan.text, op.begin, op.length);
                 continue;
             }
@@ -542,7 +883,11 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             if(catch_open>=source.size()||source[catch_open]!='{'||!find_balanced(source,catch_open,'{','}',catch_close)){fail(source_path,source,i,"catch requires a block");break;}
             const RenderResult saved_result=result_;
             push_json_scope();
-            auto attempted=parse(source.substr(try_open+1,try_close-try_open-1),source_path,depth+1,source_provenance);
+            // feature-site-dx: keep the body's source mapping so an error raised
+            // directly in the try (or catch) body reports its own line/column,
+            // not line 1 of the body substring.
+            const auto try_body=source.substr(try_open+1,try_close-try_open-1);
+            auto attempted=parse(try_body,source_path,depth+1,source_provenance,try_body.view);
             pop_json_scope();
             if(attempted.ok){output+=attempted.output;i=catch_close+1;continue;}
             if(!active_recoverable_){result_=std::move(attempted);break;}
@@ -565,7 +910,8 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             push_json_scope();
             auto caught_value=std::make_shared<nift::RuntimeValue>(std::move(caught));
             variable_scopes_.back()[binding]=VariableBinding{caught_value,nift_binding_type(*caught_value),false,true};
-            auto handled=parse(source.substr(catch_open+1,catch_close-catch_open-1),source_path,depth+1,source_provenance);
+            const auto catch_body=source.substr(catch_open+1,catch_close-catch_open-1);
+            auto handled=parse(catch_body,source_path,depth+1,source_provenance,catch_body.view);
             pop_json_scope();
             if(!handled.ok){result_=std::move(handled);break;}
             output+=handled.output;i=catch_close+1;continue;
@@ -609,7 +955,10 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             auto pr=nift_run_process(spec,true,false);
             execution_output_->write_stdout(pr.out);
             execution_output_->write_stderr(pr.err);
-            if(!pr.launched){fail(source_path,source,i,pr.error.empty()?("cannot launch command: "+spec.program):pr.error);break;}
+            // feature-site-dx: a POSIX exec failure (now reported as launched:false)
+            // keeps its historical command-style behaviour: exit status 127/126,
+            // the script continues. Windows launch failures remain hard errors.
+            if(!pr.launched&&!pr.exec_failed){fail(source_path,source,i,pr.error.empty()?("cannot launch command: "+spec.program):pr.error);break;}
             i=cc+1; continue;
         }
 
@@ -742,6 +1091,21 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                 }
             }
 
+            // feature-site-dx: in script land an unterminated $[ used to fall
+            // through to literal text, silently dropping the rest of the
+            // program. Templates keep the literal passthrough (pages must not
+            // break) but warn for an identifier-path value (unknown-value).
+            if (end >= source.size()) {
+                if (strict_script_mode_) {
+                    const auto at = source.view ? source.view.locate(i) : nift::detail::DiagnosticOrigin{};
+                    std::string where;
+                    if (at.line) where = " opened at " + std::to_string(at.line) + ":" + std::to_string(at.column);
+                    fail(source_path, source, i, "unterminated '$['" + where + " has no closing ']'");
+                    break;
+                }
+                if (!check_unterminated_value(source, i)) break;
+            }
+
             if (end < source.size()) {
                 const auto key = source.substr(i + 2, end - i - 2);
 
@@ -749,7 +1113,9 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                                          std::string& condition,
                                          std::string& when_true,
                                          std::string& when_false,
-                                         bool& malformed) -> bool {
+                                         bool& malformed,
+                                         std::size_t& true_offset,
+                                         std::size_t& false_offset) -> bool {
                     malformed = false;
                     bool quoted = false; char quote = 0;
                     int parens = 0, brackets = 0, braces = 0;
@@ -784,6 +1150,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                             condition = trim_copy(expression.substr(0, question));
                             when_true = expression.substr(question + 1, pos - question - 1);
                             when_false = expression.substr(pos + 1);
+                            true_offset = question + 1; false_offset = pos + 1;
                             return true;
                         }
                     }
@@ -791,6 +1158,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                         condition = trim_copy(expression.substr(0, question));
                         when_true = expression.substr(question + 1);
                         when_false.clear();
+                        true_offset = question + 1; false_offset = expression.size();
                         malformed = condition.empty();
                         return !malformed;
                     }
@@ -799,7 +1167,8 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
 
                 std::string ternary_condition, when_true, when_false;
                 bool malformed_ternary = false;
-                if (split_ternary(key, ternary_condition, when_true, when_false, malformed_ternary)) {
+                std::size_t true_offset = 0, false_offset = 0;
+                if (split_ternary(key, ternary_condition, when_true, when_false, malformed_ternary, true_offset, false_offset)) {
                     bool condition_value = false;
                     std::string condition_error;
                     if (!evaluate_condition(ternary_condition, condition_value, condition_error)) {
@@ -822,7 +1191,10 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                         selected_literal.is_string()) {
                         output += selected_literal.string;
                     } else {
-                        const auto nested = parse(selected, source_path, depth + 1, source_provenance);
+                        // feature-site-dx: keep the branch's source mapping.
+                        const std::size_t branch_offset = condition_value ? true_offset : false_offset;
+                        const auto branch_view = key.view ? key.view.slice(branch_offset, selected.size()) : nift::detail::SourceView{};
+                        const auto nested = parse(selected, source_path, depth + 1, source_provenance, branch_view);
                         if (!nested.ok) break;
                         output += nested.output;
                     }
@@ -915,6 +1287,9 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
                     i = end + 1;
                     continue;
                 }
+                // Published literally (undocumented compatibility rule kept
+                // since d8ee99b): warn, or fail under strict-values.
+                if (!check_unknown_value(source_path, source, i, key)) break;
             }
         }
 
@@ -2271,6 +2646,7 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     fail(source_path, source, i, function + ": expected parentheses for parameters");
                     break;
                 }
+                check_directive_typo(source, i);
                 output += source.substr(i, name_end - i);
                 i = name_end;
                 continue;
@@ -2519,7 +2895,10 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 }
                 parameters[0] = std::move(resolved);
 
-                if (!host_.tracked_output_path(parameters[0])) {
+                // feature-site-dx (review D2): one tracked-name lookup serves
+                // the containment check, the warning and the requirement.
+                const auto tracked_target = host_.tracked_output_path(parameters[0]);
+                if (!tracked_target) {
                     const fs::path target_path = (host_.root() / parameters[0]).lexically_normal();
                     if (!filesystem::path_within(host_.root(), target_path)) {
                         fail(source_path, source, i, "@" + function + " path must stay inside the Nift project: " + parameters[0]);
@@ -2527,10 +2906,12 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     }
                 }
 
-                output += path_to(parameters[0], function);
+                const std::string resolved_path = path_to(parameters[0], function);
+                output += resolved_path;
                 if (!result_.ok) { if (result_.error.source_file.empty()) fail(source_path, source, i, result_.error.message); break; }
+                if (!tracked_target) check_path_target(source, i, end - i, function, parameters[0], resolved_path);
                 fs::path requirement;
-                if (const auto target = host_.tracked_output_path(parameters[0])) requirement = target->path;
+                if (tracked_target) requirement = tracked_target->path;
                 else requirement = host_.root() / parameters[0];
                 result_.reqs.insert(host_.relative(requirement.lexically_normal()));
                 i = end;
@@ -2913,12 +3294,14 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 continue;
             }
 
+            check_directive_typo(source, i);
             output += source.substr(i, end - i);
             i = end;
             continue;
         }
 
         if (source[i] == '\\' || source[i] == '@' || source[i] == '<' || source[i] == '$') {
+            if (source[i] == '@') check_directive_typo(source, i);
             output.push_back(source[i++]);
         } else {
             const std::size_t next_special = source.find_first_of("\\@<$", i);
@@ -3112,6 +3495,7 @@ RenderResult Parser::render() {
             if (page_index >= total) break;
             const std::size_t page = page_index + 1;
             Parser page_parser(host_, tracked_info_, execution_output_);
+            page_parser.site_warnings_ = site_warnings_;
             page_parser.json_bindings_ = json_bindings_;
             page_parser.contract_bindings_ = contract_bindings_;
             page_parser.page_source_ = page_source_;

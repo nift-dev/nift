@@ -1265,6 +1265,14 @@ test-sha256: $(SHA256_UNIT) $(SHA256_UNIT_SANITIZED) $(SHA256_UNIT_PORTABLE) $(T
 	"$(SHA256_UNIT_PORTABLE)"
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/sha256_builtins.sh
 test: test-sha256
+
+# feature-site-dx: website-generator DX fixes (build --auto resilience,
+# unterminated literals, try/catch locations, run() launched, template
+# warnings, strict values). See docs/runtime-2/checkpoints/feature-site-dx.md.
+.PHONY: test-site-dx
+test-site-dx: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/site_dx_smoke.sh
+test: test-site-dx
 # Throughput evidence (not a test): native module alone, in memory and from
 # warm files. See docs/runtime-2/checkpoints/feature-sha256.md.
 benchmark-sha256: $(SHA256_BENCH)

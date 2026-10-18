@@ -3,6 +3,7 @@
 #include "PreparedProcessPOSIX.h"
 #include "ProcessPOSIX.h"
 #include <cstdlib>
+#include <cstring>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -103,6 +104,31 @@ static std::string read_fd_all(int fd){
     for(;;){ssize_t n=pread(fd,buffer,sizeof buffer,offset);if(n<0){if(errno==EINTR)continue;break;}if(n==0)break;data.append(buffer,static_cast<std::size_t>(n));offset+=n;}
     return data;
 }
+// feature-site-dx: parent-side wording for a failure the child reported.
+static std::string exec_failure_message(const ProcessSpec& spec,const PreparedProcessPOSIX& prepared,int kind,int error,int detail){
+    switch(kind){
+    case PreparedProcessPOSIX::ExecNotFound: return "executable not found: "+spec.program;
+    case PreparedProcessPOSIX::ExecDenied: return "permission denied: "+spec.program;
+    case PreparedProcessPOSIX::ExecInterpreter: {
+        std::string interpreter;
+        if(detail>=0&&static_cast<std::size_t>(detail)<prepared.candidates.size()){
+            std::ifstream in(prepared.candidates[static_cast<std::size_t>(detail)],std::ios::binary);std::string line;
+            if(std::getline(in,line)&&line.rfind("#!",0)==0){std::size_t b=line.find_first_not_of(" \t",2);if(b!=std::string::npos){std::size_t e=line.find_first_of(" \t\r",b);interpreter=line.substr(b,e==std::string::npos?std::string::npos:e-b);}}
+        }
+        if(!interpreter.empty())return "interpreter not found: "+interpreter+" (from "+spec.program+")";
+        return "cannot execute "+spec.program+": its interpreter or loader was not found";
+    }
+    case PreparedProcessPOSIX::ExecSetup:
+        switch(detail){
+        case PreparedProcessPOSIX::SetupChdir: return "cannot change directory to "+spec.cwd.generic_string()+": "+std::strerror(error);
+        case PreparedProcessPOSIX::SetupStdin: return "cannot open stdin "+spec.stdin_path+": "+std::strerror(error);
+        case PreparedProcessPOSIX::SetupStdout: return "cannot open stdout "+spec.stdout_path+": "+std::strerror(error);
+        case PreparedProcessPOSIX::SetupStderr: return "cannot open stderr "+spec.stderr_path+": "+std::strerror(error);
+        default: return "redirection setup failed for "+spec.program+": "+std::strerror(error);
+        }
+    default: return "cannot execute "+spec.program+": "+std::strerror(error);
+    }
+}
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
     nift_trace_spawn(specs);
     std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
@@ -117,19 +143,35 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     std::vector<PreparedProcessPOSIX> prepared;prepared.reserve(specs.size());
     for(const auto& spec:specs)prepared.emplace_back(spec);
     std::vector<pid_t> pids;pids.reserve(specs.size());int prev=-1;
-    for(size_t i=0;i<specs.size();++i){int pp[2]={-1,-1};if(i+1<specs.size()&&(nift_process_test_fail("pipe",i)||!nift_process_pipe(pp))){r.error="pipe failed";break;}const bool fail_in=nift_process_test_fail("dup2-in",i), fail_out=nift_process_test_fail("dup2-out",i), fail_err=nift_process_test_fail("dup2-err",i);pid_t pid=nift_process_test_fail("fork",i)?-1:fork();if(pid<0){if(pp[0]>=0)close(pp[0]);if(pp[1]>=0)close(pp[1]);r.error="fork failed";break;}if(pid==0){
+    // feature-site-dx: the first stage whose exec failed (reported by the
+    // child over a close-on-exec pipe). r.launched means every stage exec'd.
+    std::string exec_error;
+    std::vector<std::string> stage_errors(specs.size());
+    for(size_t i=0;i<specs.size();++i){int pp[2]={-1,-1};if(i+1<specs.size()&&(nift_process_test_fail("pipe",i)||!nift_process_pipe(pp))){r.error="pipe failed";break;}int report[2]={-1,-1};if(!nift_process_pipe(report))report[0]=report[1]=-1;const bool fail_in=nift_process_test_fail("dup2-in",i), fail_out=nift_process_test_fail("dup2-out",i), fail_err=nift_process_test_fail("dup2-err",i);pid_t pid=nift_process_test_fail("fork",i)?-1:fork();if(pid<0){if(pp[0]>=0)close(pp[0]);if(pp[1]>=0)close(pp[1]);if(report[0]>=0)close(report[0]);if(report[1]>=0)close(report[1]);r.error="fork failed";break;}if(pid==0){
+            if (report[0] >= 0) close(report[0]);
             if(specs[i].foreground_terminal)setpgid(0,0);
-            if (!specs[i].cwd.empty() && chdir(specs[i].cwd.c_str()) != 0) _exit(126);
-            if(prev>=0){if(!nift_process_dup2(prev,STDIN_FILENO,fail_in))_exit(126);}else if(!specs[i].stdin_path.empty()){int fd=open(specs[i].stdin_path.c_str(),O_RDONLY);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDIN_FILENO,fail_in))_exit(126);if(fd!=STDIN_FILENO)close(fd);}
-            if(i+1<specs.size()){if(!nift_process_dup2(pp[1],STDOUT_FILENO,fail_out))_exit(126);}else if(!specs[i].stdout_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stdout?O_APPEND:O_TRUNC);int fd=open(specs[i].stdout_path.c_str(),fl,0666);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDOUT_FILENO,fail_out))_exit(126);if(fd!=STDOUT_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(ofd,STDOUT_FILENO,fail_out))_exit(126);}
-            if(specs[i].merge_stderr){if(!nift_process_dup2(STDOUT_FILENO,STDERR_FILENO,fail_err))_exit(126);}else if(!specs[i].stderr_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stderr?O_APPEND:O_TRUNC);int fd=open(specs[i].stderr_path.c_str(),fl,0666);if(fd<0)_exit(126);if(!nift_process_dup2(fd,STDERR_FILENO,fail_err))_exit(126);if(fd!=STDERR_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(efd,STDERR_FILENO,fail_err))_exit(126);}
+            if (!specs[i].cwd.empty() && chdir(specs[i].cwd.c_str()) != 0) PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupChdir);
+            if(prev>=0){if(!nift_process_dup2(prev,STDIN_FILENO,fail_in))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);}else if(!specs[i].stdin_path.empty()){int fd=open(specs[i].stdin_path.c_str(),O_RDONLY);if(fd<0)PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupStdin);if(!nift_process_dup2(fd,STDIN_FILENO,fail_in))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);if(fd!=STDIN_FILENO)close(fd);}
+            if(i+1<specs.size()){if(!nift_process_dup2(pp[1],STDOUT_FILENO,fail_out))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);}else if(!specs[i].stdout_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stdout?O_APPEND:O_TRUNC);int fd=open(specs[i].stdout_path.c_str(),fl,0666);if(fd<0)PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupStdout);if(!nift_process_dup2(fd,STDOUT_FILENO,fail_out))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);if(fd!=STDOUT_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(ofd,STDOUT_FILENO,fail_out))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);}
+            if(specs[i].merge_stderr){if(!nift_process_dup2(STDOUT_FILENO,STDERR_FILENO,fail_err))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);}else if(!specs[i].stderr_path.empty()){int fl=O_WRONLY|O_CREAT|(specs[i].append_stderr?O_APPEND:O_TRUNC);int fd=open(specs[i].stderr_path.c_str(),fl,0666);if(fd<0)PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupStderr);if(!nift_process_dup2(fd,STDERR_FILENO,fail_err))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);if(fd!=STDERR_FILENO)close(fd);}else if(capture){if(!nift_process_dup2(efd,STDERR_FILENO,fail_err))PreparedProcessPOSIX::fail_exec(report[1],PreparedProcessPOSIX::ExecSetup,errno,126,PreparedProcessPOSIX::SetupRedirect);}
             if (prev >= 0) close(prev);
             if (pp[0] >= 0) close(pp[0]);
             if (pp[1] >= 0) close(pp[1]);
             if (ofd >= 0) close(ofd);
             if (efd >= 0) close(efd);
             if(specs[i].foreground_terminal){ struct sigaction z{};z.sa_handler=SIG_DFL;sigaction(SIGTTOU,&z,nullptr);sigaction(SIGTTIN,&z,nullptr);sigaction(SIGINT,&z,nullptr);sigaction(SIGQUIT,&z,nullptr); }
-            prepared[i].exec();
+            prepared[i].exec(report[1]);
+        }
+        if (report[1] >= 0) close(report[1]);
+        if (report[0] >= 0) {
+            int payload[3]={0,0,0};std::size_t got=0;
+            while(got<sizeof payload){ssize_t n=read(report[0],reinterpret_cast<char*>(payload)+got,sizeof payload-got);if(n<0&&errno==EINTR)continue;if(n<=0)break;got+=static_cast<std::size_t>(n);}
+            close(report[0]);
+            if(got==sizeof payload){
+                const std::string message=exec_failure_message(specs[i],prepared[i],payload[0],payload[1],payload[2]);
+                stage_errors[i]=message;
+                if(exec_error.empty())exec_error=message;
+            }
         }
         if(specs[i].foreground_terminal&&isatty(STDIN_FILENO)){ setpgid(pid,pid); tcsetpgrp(STDIN_FILENO,pid); }
         if (prev >= 0) close(prev);
@@ -145,12 +187,26 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     if(!r.error.empty())for(pid_t p:pids)kill(p,SIGKILL);
     launch_lock.unlock();
     int status = 0;
-    for (pid_t p : pids) {
+    auto status_code = [](int st) { return WIFEXITED(st) ? WEXITSTATUS(st) : (WIFSIGNALED(st) ? 128 + WTERMSIG(st) : 1); };
+    r.stages.assign(specs.size(), ProcessStageResult{});
+    for (std::size_t index = 0; index < pids.size(); ++index) {
         int st = 0;
-        while(waitpid(p, &st, 0)<0 && errno==EINTR){};
+        while(waitpid(pids[index], &st, 0)<0 && errno==EINTR){};
         status = st;
+        auto& stage = r.stages[index];
+        stage.exit_code = status_code(st);
+        stage.launched = stage_errors[index].empty() && r.error.empty();
+        stage.error = stage_errors[index];
     }
-    if (r.launched && r.error.empty()) r.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1);
+    for (std::size_t index = pids.size(); index < specs.size(); ++index) r.stages[index].error = r.error.empty() ? "not started" : r.error;
+    if (r.launched && r.error.empty()) r.exit_code = status_code(status);
+    // An exec failure keeps its shell-convention exit status (127/126) but is
+    // not a launch (matches Windows, where CreateProcessW fails up front).
+    // Round 2 (N2): for a pipeline (more than one stage) the top-level
+    // fields keep their pre-feature meaning (launched = the stages were
+    // started; error only for setup failures in the parent); per-stage
+    // launch failures are reported in r.stages.
+    if (specs.size() == 1 && r.launched && r.error.empty() && !exec_error.empty()) { r.launched = false; r.error = exec_error; r.exec_failed = true; }
     if (capture) {
         r.out = read_fd_all(ofd);
         r.err = read_fd_all(efd);
@@ -289,6 +345,7 @@ HANDLE child_stdio(HANDLE source,DWORD access,size_t stage) {
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture, bool stream) {
     nift_trace_spawn(specs);
     ProcessResult r;
+    int exec_failure_code = 0;
     if (specs.empty()) { r.error = "empty pipeline"; return r; }
     std::wstring ow, ew; std::string op, ep; HANDLE okeep = INVALID_HANDLE_VALUE, ekeep = INVALID_HANDLE_VALUE;
     auto close_keepers = [&]() { if (okeep != INVALID_HANDLE_VALUE) CloseHandle(okeep); if (ekeep != INVALID_HANDLE_VALUE) CloseHandle(ekeep); okeep = ekeep = INVALID_HANDLE_VALUE; };
@@ -385,7 +442,17 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         DWORD launch_error=routing_ok?GetLastError():setup_error;
         if(attributes_initialized)DeleteProcThreadAttributeList(sx.lpAttributeList);
         for(HANDLE h:inherited)if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);
-        if (!created) { r.error = (routing_ok?"CreateProcessW failed for '":"redirection/stdio setup failed for '") + spec.program + "' at stage " + std::to_string(i) + " (error " + std::to_string(launch_error) + ")"; ok = false; }
+        if (!created) {
+            // feature-site-dx: same wording and exit status as POSIX for the
+            // two common cases (launched stays false; 127/126 follow the
+            // shell convention). Other failures keep the detailed message.
+            // Single commands only (round 2, N2): a pipeline keeps its
+            // pre-feature top-level result; r.stages carries the stage error.
+            if (specs.size() == 1 && routing_ok && (launch_error == ERROR_FILE_NOT_FOUND || launch_error == ERROR_PATH_NOT_FOUND)) { r.error = "executable not found: " + spec.program; exec_failure_code = 127; }
+            else if (specs.size() == 1 && routing_ok && launch_error == ERROR_ACCESS_DENIED) { r.error = "permission denied: " + spec.program; exec_failure_code = 126; }
+            else r.error = (routing_ok?"CreateProcessW failed for '":"redirection/stdio setup failed for '") + spec.program + "' at stage " + std::to_string(i) + " (error " + std::to_string(launch_error) + ")";
+            ok = false;
+        }
         // Parent must close its own copy of every inherited handle once the
         // child that consumes it has started; otherwise downstream readers
         // never see EOF (pipeline deadlock) and handles leak.
@@ -403,13 +470,24 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     if(capture_error!=INVALID_HANDLE_VALUE)CloseHandle(capture_error);
     if(!ok)for(HANDLE h:procs)TerminateProcess(h,126);
     DWORD exit = 0;
+    // feature-site-dx (review R6): per-stage results, as on POSIX.
+    const std::string stage_failure = r.error;
+    r.stages.assign(specs.size(), ProcessStageResult{});
     for (std::size_t i = 0; i < procs.size(); ++i) {
         DWORD waited=WaitForSingleObject(procs[i],ok?INFINITE:5000);
         if(waited!=WAIT_OBJECT_0){r.error += " process cleanup/wait failed";ok=false;}
         GetExitCodeProcess(procs[i], &exit);
         CloseHandle(procs[i]);
+        r.stages[i].launched = true;
+        r.stages[i].exit_code = (int)exit;
+    }
+    for (std::size_t i = procs.size(); i < specs.size(); ++i) {
+        r.stages[i].error = i == procs.size() && !stage_failure.empty() ? stage_failure : "not started";
+        if (i == procs.size() && exec_failure_code) r.stages[i].exit_code = exec_failure_code;
     }
     if (r.launched && ok) r.exit_code = (int)exit;
+    // feature-site-dx: launched means every stage started (as on POSIX).
+    if (exec_failure_code) { r.launched = false; r.exit_code = exec_failure_code; }
     if (capture) {
         // Read through the keeper handles: the named file may not be opened
         // again without FILE_SHARE_DELETE, and closing the keepers deletes it.

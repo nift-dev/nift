@@ -54,6 +54,8 @@ int main(int argc,char**argv){
   specs.resize(1);for(auto& spec:specs){spec.merge_stderr=true;spec.stdin_path="/dev/null";spec.stdout_path="/dev/null";}
   if(argc>3){ShellJobTable jobs;r=jobs.launch(specs,"routing fixture",true);}else r=nift_run_pipeline(specs);
   require(r.exit_code==126,"dup2 setup did not fail closed");
+  // feature-site-dx: the structured path reports the child's setup failure.
+  if(argc<=3)require(!r.launched&&r.error.rfind("redirection setup failed for /bin/sleep",0)==0&&r.stages.size()==1&&!r.stages[0].launched,"dup2 setup failure not reported as launched=false");
  }
  else if(operation=="temp")r=nift_run_process(s);
  else if(argc>3){ShellJobTable jobs;r=jobs.launch(specs,"failure fixture",false);}

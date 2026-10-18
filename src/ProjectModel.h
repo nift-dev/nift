@@ -31,7 +31,35 @@ inline json::Document compute_tracked_metadata(const std::filesystem::path& root
     if (!type.empty() && !metadata.has("_error")) {
         auto si = model.schemas.find(type);
         if (si == model.schemas.end()) { if (!config.schema_files.empty()) metadata["_error"] = json::Document("unknown content schema/type: " + type); }
-        else { std::string ve; if (!content_model::validate(metadata, si->second, model, ve)) metadata["_error"] = json::Document(ve); }
+        else { std::string ve; if (!content_model::validate(metadata, si->second, model, ve)) {
+            // feature-site-dx: name the front matter line of the failing field
+            // and explain the common cause (YAML flow lists are not parsed;
+            // `tags: [a, b]` is the string "[a, b]").
+            const auto q = ve.find(" field '");
+            const auto q_end = q == std::string::npos ? q : ve.find('\'', q + 8);
+            if (q_end != std::string::npos) {
+                const std::string field = ve.substr(q + 8, q_end - q - 8);
+                if (metadata.has(field) && metadata[field].is_string()) {
+                    const std::string& v = metadata[field].string;
+                    if (v.size() >= 2 && v.front() == '[' && v.back() == ']')
+                        ve += " (YAML flow lists such as [a, b] are not supported in front matter; write a block list with one '- item' per line)";
+                }
+                if (inline_fm.present) {
+                    std::size_t line_no = 0, start = 0;
+                    while (start <= source_text.size()) {
+                        ++line_no;
+                        const auto nl = source_text.find('\n', start);
+                        std::string line = source_text.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+                        const auto first = line.find_first_not_of(" ");
+                        if (line_no > 1 && line.rfind("---", 0) == 0) break;
+                        if (first != std::string::npos && line.compare(first, field.size() + 1, field + ":") == 0) { ve = "front matter line " + std::to_string(line_no) + ": " + ve; break; }
+                        if (nl == std::string::npos) break;
+                        start = nl + 1;
+                    }
+                }
+            }
+            metadata["_error"] = json::Document(ve);
+        } }
     }
     if (body_out) *body_out = body;
     return metadata;

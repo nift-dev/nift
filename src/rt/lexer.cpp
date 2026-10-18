@@ -64,7 +64,10 @@ Token Lexer::scan() {
 
 // Quote-aware scan identical to the legacy statement splitter: a backslash
 // escapes the next byte, the same quote character ends the literal. An
-// unterminated literal is a Bad token (legacy reports it only at run time).
+// unterminated literal is a Bad token. (Until feature-site-dx the legacy
+// engine did not report it at all: the rest of the program was silently
+// dropped. Its statement translator now fails with "unterminated string
+// literal opened at L:C", and the same for an unclosed '['.)
 Token Lexer::string_token(std::uint32_t start) {
     const char quote = src_[pos_++];
     while (pos_ < end_ && src_[pos_] != quote) {

@@ -19,6 +19,12 @@ namespace json { class Document; }
 namespace nift { class RuntimeValue; }
 namespace content_model { struct Model; }
 
+// feature-site-dx: site-check results recorded in a page's build metadata.
+struct PageSiteRecord {
+    std::size_t unknown_values = 0;          // literal unknown $[...] values
+    std::vector<std::string> warnings;       // "file:line:col: message [kind]"
+};
+
 class ProjectInfo {
 public:
     // Runtime 2.0 CP02: listing fingerprints computed at most once per build
@@ -222,7 +228,18 @@ private:
                                                         const filesystem::DependencyTime& render_started) const;
     bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr,
                          const RenderClockObservation* render_clock = nullptr,
-                         const ReadObservations* observed = nullptr) const;
+                         const ReadObservations* observed = nullptr,
+                         const struct PageSiteRecord* site = nullptr) const;
+    // feature-site-dx (review R1): warnings recorded in page metadata for
+    // pages that were not rebuilt, collected by build_reasons().
+    mutable std::mutex outstanding_warning_mutex_;
+    mutable std::map<std::string, std::vector<std::string>> outstanding_warnings_;
+public:
+    // Outstanding warnings of pages as recorded at their last build,
+    // filtered by the current no-warn settings; filled by build_reasons().
+    std::map<std::string, std::vector<std::string>> outstanding_warnings() const;
+    void print_outstanding_warning_summary(const std::set<std::string>& rebuilt) const;
+private:
     void append_read_observations(std::string& output, const ReadObservations& observed) const;
     void prune_render_clock_records() const;
     bool write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const;
@@ -230,6 +247,11 @@ private:
     mutable std::mutex listing_cache_mutex_;
     mutable std::unordered_map<std::string, std::string> listing_cache_;
     void print_build_error(const BuildError& error) const;
+    // feature-site-dx: template build warnings, buffered per page and printed
+    // after the progress line (like build errors), in job order.
+    mutable std::mutex site_warning_mutex_;
+    std::map<std::string, std::vector<BuildWarning>> site_warnings_by_page_;
+    void print_build_warning(const BuildWarning& warning) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);
 };

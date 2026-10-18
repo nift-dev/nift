@@ -104,6 +104,8 @@ int main(int argc,char**argv){
  auto echo=s;echo.args={"echoerr"};auto pipeline=nift_run_pipeline({s,echo,echo});require(pipeline.exit_code==0&&pipeline.out=="A\n"&&pipeline.err=="err\nerr\nerr\n","pipeline bytes/EOF");
  auto cwd=s;cwd.cwd=dir;cwd.args={"cwd"};auto cr=nift_run_process(cwd);require(cr.exit_code==0 && std::filesystem::equivalent(std::filesystem::u8path(cr.out),dir),"cwd contract");
  auto missing=s;missing.program="nift-missing-executable-411";auto mr=nift_run_process(missing);require(mr.exit_code!=7,"missing executable contract");
+ // feature-site-dx: both platforms report an exec failure the same way.
+ require(!mr.launched&&mr.exit_code==127&&mr.error=="executable not found: nift-missing-executable-411","missing executable reports launched=false, 127 and the reason");
 #ifdef _WIN32
  ProcessSpec msys;msys.program="sh";msys.args={"-c","printf out; printf err >&2; exit 3"};auto sr=nift_run_process(msys);
  if(sr.exit_code!=3 || sr.out!="out" || sr.err!="err")std::cerr<<"MSYS shell capture out="<<sr.out<<" err="<<sr.err<<" error="<<sr.error<<'\n';

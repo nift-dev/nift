@@ -21,6 +21,10 @@ public:
     const std::string& output_dir() const override { return project_.config.output_dir; }
     int build_threads() const override { return project_.config.build_threads; }
     const std::string& platform() const override { return project_.target_; }
+    bool strict_values() const override { return project_.config.strict_values; }
+    bool site_warning_enabled(const std::string& kind) const override {
+        return !project_.config.no_warn.count("all") && !project_.config.no_warn.count(kind);
+    }
 
     std::filesystem::path content_path(const TrackedInfo& info) const override { return project_.content_path(info); }
     std::filesystem::path output_path(const TrackedInfo& info) const override { return project_.output_path(info); }
