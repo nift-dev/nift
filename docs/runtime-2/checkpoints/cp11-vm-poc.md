@@ -1,10 +1,11 @@
 # CP11 — VM proof of concept (GO/NO-GO)
 
-Status: see `../progress.md` (implemented, review rounds 1 and 2 fixed,
-under review). **Gate verdict: GO** (see "Gate", re-measured after review
-round 2), with the risks and limits listed below. Integrated on `runtime-2`
-@`4287adb` (CP09 + CP10 certified with their review fixes) as branch
-`runtime-2-cp11i`.
+Status: see `../progress.md` (implemented, review rounds 1, 2 and 3 fixed;
+certification pending). **Gate verdict: GO** (see "Gate", re-measured after
+review round 3), with the risks and limits listed below. Integrated on
+`runtime-2` (CP09 + CP10 certified with their review fixes; rebased for
+round 3 on `runtime-2` @`c4c5894`, which adds feature-sha256) as branch
+`runtime-2-cp11i`. Round 3 was the last review round (D-015).
 
 ## Objective
 Show, with real compiled Nift programs, that the approved architecture (D-001:
@@ -22,7 +23,8 @@ with output identical to the legacy engine on every unit the VM runs.
   legacy evaluator source by `tools/rt-vm/legacy_names.py`), since review
   round 2 `prepared.*` (static refusal of prepared-evaluator shapes) and
   `prepared_parse.*` (exact port of legacy's prepared expression parser as
-  a recogniser); all lint-clean.
+  a recogniser), since round 3 `unit_check.*` (the unit's tree depth is
+  bounded, iteratively, before any analysis); all lint-clean.
   `src/rt` is now linked into `nift` (`RT_LINK_SOURCES` in the Makefile).
 - `src/CLI.cpp`: one hook in `run_script_source` (file, `-e`/`-c`, stdin
   scripts; not when an interactive shell follows, only the native target).
@@ -32,7 +34,9 @@ with output identical to the legacy engine on every unit the VM runs.
   `tests/runtime2/vm_adversarial.py` + `vm_adversarial_gen.py` (review round
   1), and since round 2 `tests/rt/vm_prepared_parse.cpp`,
   `tests/runtime2/vm_subset.py`, `vm_adversarial_gen2.py`,
-  `vm_shadow_gen.py`; `tools/rt-vm/nift-vm`, `tools/rt-vm/legacy_names.py`,
+  `vm_shadow_gen.py`, and since round 3 `vm_adversarial_gen3.py` and
+  `vm_subset_gen.py` (the generated supported-subset and unsupported suites,
+  D-016); `tools/rt-vm/nift-vm`, `tools/rt-vm/legacy_names.py`,
   `tools/rt-diff/policies/cp11-vm.json` (plus class policies in
   `tools/rt-diff/rt-diff`), `benchmarks/runtime2/vm_compare.py`.
 - CP09/CP10 files: unchanged by CP11 itself; review round 2 made two
@@ -71,9 +75,16 @@ places:
    completes. When the VM reaches a case it does not reproduce, it stops,
    discards the buffer and the whole unit is run on legacy from the start, so
    legacy produces every diagnostic (text, position, partial output) itself.
-   Bail reasons (an enumerated set; each is decided by a run-time value, so
-   it cannot be refused before execution, and the subset has no effect
-   other than buffered output, so a replay is side-effect free):
+   Bail reasons (an enumerated set). The VM decides each one at run time.
+   In general the deciding fact is a computed value; some instances are
+   decidable from literals alone and are **not** refused by the compiler
+   (CP11 does no constant evaluation): `print(1 / 0)`, `print("a" < 1)`,
+   `print(-"a")` (`runtime-error`), a top-level `x := 1; x = 2.0`, `f(1.0)`
+   (`unverified`: an integral double literal), `o := {"k": 1};
+   o.length()` (`unverified`); `[1][5]` and `{"k": 1}.length()` are refused
+   anyway (postfix on a literal). The subset has no effect other than
+   buffered output, so every replay is side-effect free (D-013); the replay
+   mechanism is removed in CP12 (D-013 removal gate). The reasons:
    `runtime-error` (anything legacy reports as an error: legacy produces its
    own diagnostic), `number-range` (a computed integer or double at or beyond
    2^53, integer −0; see "Numbers"), `aliasing` (a value bound or returned
@@ -207,22 +218,28 @@ callee/name variables, string-only brace lists such as `native_heads`, the
 | --- | --- | --- |
 | Literals: integers < 2^53 without leading zero; non-zero decimals with ≤ 15 significant digits, magnitude < 2^53 and exponent magnitude < 300; strings without `\`, `$`, control bytes, invalid UTF-8; `true` `false` `null` | ✓ | other spellings (exact decimals, zero-valued decimals `0.0`/`0e5`, `1.0e-300`, `007`, escapes, interpolation) |
 | `x := e`, `x = e`, `+= -= *= /= %=`, `++`/`--` on names | ✓ | `const`/`immut`, destructuring, `&= \|= ^=`, increments inside expressions |
-| `a[i] = v` (array, existing element, same type) | ✓ (else bail) | object index assignment (bail), member assignment (bail), calls in both index and value |
-| `+ - * / %`, comparisons, `&&` `\|\|` `!` `??`, `?:` in parentheses, unary `-` `+` | ✓ | `!` ending the left side of an operator (legacy reads `!x + 1` as `!(x + 1)`) |
+| `a[i] = v` with `i` a local name or an unsigned integer literal written directly in the brackets (array, existing element, same type) | ✓ (else bail) | any other index — computed, parenthesised, member, call, decimal, string — (`index-target`, review round 3: legacy reads a target whose text contains `.` as a member path); compound and `++`/`--` element targets; member assignment |
+| `+ - * / %`, comparisons of one operator, `&&` `\|\|` `!` `??`, `?:` in parentheses, unary `-` `+` | ✓ | `!` ending the left side of an operator (legacy reads `!x + 1` as `!(x + 1)`); a comparison whose operand is a comparison, in any order, parenthesised or not (`comparison-chain`, review round 3); `?:`, `??` and object literals inside an `if`/`while` condition (CP10 Opaque) |
 | `if` / `else if` / `else`, `while`, `break`, `continue` as the last statement of their block | ✓ | `for`, `try`/`catch`, `throw`; a `break`/`continue` followed by another statement in its block (legacy ignores the jump; D2, candidate change D-014) |
 | `fn` declarations (top level, before the first other statement), calls, recursion, `return` (also at top level) | ✓ | `fn[async]`, `@fn`, nested functions, lambdas, struct/enum/import/export, functions referring to non-local names (dynamic scope, CP12); function, parameter or binding names in the generated legacy name table (D4/D5); a member/index argument to a parameter the callee may mutate (D6) |
 | Arrays/objects: literals, `a[i]`, `o.k`, `o["k"]`, `.push(x)` on arrays, `.length()` on strings/arrays, `.size()` on arrays | ✓ (other receivers replay) | every other method or built-in (`sort_by`, `map`, `stringify`, `split`, …), `?.`, `?[`, spread, postfix on literals, whitespace before postfix, trailing commas, duplicate object keys |
 | `print(x)` | ✓ | every other native; bare expression statements other than calls |
 
-### Supported subset (specification, after review round 2)
+### Supported subset (specification, after review round 3)
 A script runs on the VM only if every function and every top-level
 statement is inside this subset; otherwise the whole script runs on legacy
-before anything executes. `tests/runtime2/vm_subset.py` holds the two
-suites that pin it: SUPPORTED (40 programs covering every item below at top
-level, in loop bodies, in functions called from top level and from loops:
-each must run entirely on the VM under `NIFT_VM=require` with legacy's exact
-output) and UNSUPPORTED (45 programs, one per refused construct or context:
-each must fall back before execution with the expected reason).
+before anything executes. Four suites pin it (D-016):
+`tests/runtime2/vm_subset.py` SUPPORTED (49 programs covering every item
+below at top level, in loop bodies, in functions called from top level and
+from loops: each must run entirely on the VM under `NIFT_VM=require` with
+legacy's exact output) and UNSUPPORTED (57 programs, one per refused
+construct or context: each must fall back before execution with the
+expected reason), and the generated `tests/runtime2/vm_subset_gen.py`
+suites: `supported` (random programs built only from this specification in
+every context; 100 % must run on the VM, except programs that deliberately
+end in a documented run-time condition, which must replay with that reason)
+and `unsupported` (one of 38 excluded constructs injected into a supported
+program in a random context; refused before execution, nothing executed).
 
 Supported:
 - Literals: integers below 2^53 without leading zeros; decimals other than
@@ -231,12 +248,14 @@ Supported:
   invalid UTF-8 (`"…"` and `'…'`); `true`, `false`, `null`; array and object
   literals (double-quoted keys, no duplicates, no trailing commas).
 - Statements: `x := e` (not `const`/`immut`/patterns), `x = e`,
-  `+= -= *= /= %=`, `++`/`--` on names, `a[i] = v` on a local array,
+  `+= -= *= /= %=`, `++`/`--` on names, `a[i] = v` on a local array where
+  the brackets hold exactly a local name or an unsigned integer literal,
   `a.push(v)`, call statements, `if`/`else if`/`else`, `while`,
   `break`/`continue` as the last statement of their block, `return`
   (functions and top level).
-- Expressions: `+ - * / %`, comparisons (no chains), `&& || ! ??`, `?:` in
-  parentheses, unary `-`/`+`, `a[i]`, `o.k`, `o["k"]`, `.length()` on strings
+- Expressions: `+ - * / %`, comparisons of exactly one operator (no
+  operand of a comparison is itself a comparison, parenthesised or not),
+  `&& || ! ??`, `?:` in parentheses (not inside an `if`/`while` condition), unary `-`/`+`, `a[i]`, `o.k`, `o["k"]`, `.length()` on strings
   and arrays, `.size()` on arrays, `print(x)`, calls to top-level functions.
 - Functions: `fn(name(params))` at top level before the first other
   statement, recursion (100,000-frame budget), referring only to their own
@@ -259,7 +278,14 @@ Excluded contexts (refused even though each construct alone is supported):
   inside a statement (CP10 Opaque);
 - statically known errors: redeclaration in one scope, wrong argument
   count, member assignment, `push` with other than one argument
-  (`static-error:*`).
+  (`static-error:*`);
+- review round 3: element assignment with any other index (`index-target`);
+  a comparison whose operand is a comparison (`comparison-chain`); a unit
+  whose syntax tree is deeper than 256 nodes (`nesting-limit`, checked
+  iteratively before any other analysis, so no input can exhaust the stack
+  during compilation); `?:`, `??` and object literals anywhere inside an
+  `if`/`while` condition (CP10 Opaque; made explicit here after the
+  generated supported suite found the specification imprecise).
 
 ### Legacy's prepared evaluator (review round 2 inventory)
 
@@ -299,25 +325,25 @@ every error by design; P11 needs nothing.
 
 ## Tests
 
-Results after review round 2 on `runtime-2-cp11i` (host shared with other
-work during this round: load average 1.5–3.5; times are not comparable to
-round 1's idle-host figures).
+Results after review round 3 on `runtime-2-cp11i` @`c147f35` (idle 2-vCPU
+host except where noted). Round 2's figures are in git history.
 
 | Suite | Content | Result |
 | --- | --- | --- |
-| `tests/rt/vm_unit.cpp` | outputs (25 programs), fallback reasons (50: round 2 adds statically refused errors, prepared-decl-type, prepared-fn-unprepared, string-arg-type), bail reasons (16), literal decoding, Int rendering = legacy `dump` (20,000 values), frame budget, memory budget (exact heap: growing strings, hidden `[[s]]` per frame → recursion-budget, flat overflow → internal failure), deep equality (9,999 decided, 10,001 bails), 90,000 nested calls on a 256 KiB stack, output limit, generated name table, code shape | 40,219 checks, 0 failures |
-| `tests/rt/vm_prepared_parse.cpp` | the prepared-parser port against legacy's `nift::ast::parse_expression` (linked): 128 hand-written cases, limits (recursion 128, brackets 256, 8,192 bytes), 50,000 random expressions and 50,000 mutants | 100,136 checks, 0 differences (a seeded mutation of the port gives 1,323) |
-| `tests/runtime2/vm_subset.py` | SUPPORTED: 40 programs over the whole subset in four contexts, `NIFT_VM=require`; UNSUPPORTED: 45 programs, one per refused construct/context | all supported run entirely on the VM with legacy's output; all unsupported fall back before execution with the expected reason |
-| `tests/runtime2/vm-corpus/cp11` | 75 scripts (9 round-1 and 11 round-2 regressions), legacy goldens, expected outcome per script: 14 on the VM, 24 replay, 37 fall back | identical to legacy, every outcome as expected |
-| `tests/runtime2/vm_adversarial.py` (seed 1, count 600; in `make test-rt-vm`) | 31,792 programs in 18 families (11 from round 1; round 2: `preptype` 8,064, `dupeval` 984, `strarg` 1,071, `bytes` 437, `memory` 13, `deepeq` 54, `shadow` 1,200) | **0 non-approved differences**; 32 approved D-001#4; 0 endless. The seven new families on the pre-fix build (`594f44b`): 303 / 114 / 128 / 38 / 12 / 36 / 2 failures (631) |
-| Generated programs (`vm_gen.py`) + mutants, seed 1 | 300 + 300 (function-body declarations mostly literal since round 2) | 0 differences; 77 of 300 complete on the VM |
-| rt-diff, legacy vs `tools/rt-vm/nift-vm` | 804 entries | **0 differing**, 2 approved (D-001#4), 0 unused policies |
-| `make test-rt-vm` | all of the above | PASS in 4 min 59 s (shared host) |
-| `make test-rt-vm-sanitize` | ASan+UBSan (no recovery, leak detection on, relocate-on-mutation reference check active): unit tests, prepared-parser differential, corpus + 150 generated + 150 mutants, adversarial gate seed 2 with every family sampled to ≤ 250 (3,099 programs) | clean, 0 non-approved differences (`../evidence/cp11/sanitize.txt`; 34 min on the shared host) |
-| Round-1 reviewer material | `fy1/` 17 and `fz4/` 86 kept programs, `fz1`–`fz3`, case files `c1`–`c12` (307 cases), `fuzz2`/`fuzz3` (1,000 each) | 0 non-approved differences: 10 differences, all D-001#4 (legacy's recursion error, VM output extends legacy's) |
-| Round-2 reviewer material | the nine repros and generators `g_prep`, `g_dup`, `g_dup2`, `g_typed` (4 seeds × 2,000), `g_ctl`, `g_ws` (ported as the families above) | 0 differences (before: 303, 41+, 4/8,000 and the M3/M4/R5/R6 repros) |
-| Lint (`tools/rt-lint.py`) | all of `src/rt`, self-test | 0 problems |
-| `make test-rt-value`, `make test-rt-parser`, `make test-rt-value-sanitize` | CP09/CP10 suites including the follow-ups | pass (1,867,405 property checks; `value_round2` 28 checks; stale references abort under ASan; parser negative gate 1,957 programs 0 failures, paren oracle 0 divergent) |
+| `tests/rt/vm_unit.cpp` | outputs, fallback reasons (round 3 adds `index-target`, `comparison-chain` and admitted forms), bail reasons, literal decoding, Int rendering = legacy `dump` (20,000 values), frame budget, memory budget, deep equality (9,999 decided, 10,001 bails), 90,000 nested calls on a 256 KiB stack, ten 100,000-deep inputs compiled on a 512 KiB stack, a 50,000-statement list, output limit, generated name table, code shape | 40,236 checks, 0 failures |
+| `tests/rt/vm_prepared_parse.cpp` | the prepared-parser port against legacy's `nift::ast::parse_expression` | 100,136 checks, 0 differences |
+| `tests/runtime2/vm_subset.py` | SUPPORTED: 49 programs over the whole subset in four contexts (round 3: element targets, every comparison shape, gcd in loop contexts), `NIFT_VM=require`; UNSUPPORTED: 57 programs (round 3: 12 more); equality memory (two 1M-element arrays and a 9,000-deep pair under a 50 MB budget: peak RSS ≤ budget + 8 MiB) | all supported run entirely on the VM with legacy's output; all unsupported fall back before execution with the expected reason; peak RSS ~37 MB (pre-fix build: 86 MB, fails) |
+| **Supported-subset generator** (`vm_subset_gen.py --suite supported`, D-016 suite 1) | random programs built only from the specification, every context; feature census (76 required features must each be generated) | seed 1, 500 programs (`make test-rt-vm`): **467 vm (93.4 %), 33 deliberate replays** (runtime-error 20, aliasing 9, number-range 4 — each where the program ends in a documented run-time condition), **0 unexplained outcomes, 0 differences**; seed 3, 1,000: 936 vm + 64 deliberate, 0 failures; sanitized seed 2, 80: 76 + 4, 0 failures |
+| **General generator** (`vm_gen.py` via `vm_parity.py`, D-016 suite 2; original distribution restored) | 300 programs + 300 mutants, legacy vs `NIFT_VM=1` | 0 differences. **Coverage (seed 1): 68 of 300 ran on the VM (22.7 %)**, 24 replayed (8.0 %: runtime-error 13, number-range 8, unverified 3), 208 fell back (69.3 %: `opaque:irregular-legacy-parse` 192 — mostly `?:`/`??` in conditions —, prepared-fn-unprepared 7, prepared-decl-type 7, static-error:arity 2). Seed 2 (sanitized, 150): 19.3 % VM. No threshold |
+| **Unsupported generator** (`vm_subset_gen.py --suite unsupported`, D-016 suite 3) | one of 38 excluded constructs injected into a supported program in a random context (top, `if`, loop, function, loop-called function) | seed 1, 500 programs: 500 refused before execution with the expected reason, `execute_us` 0, legacy's output; seed 1, 600: same; sanitized seed 2, 80: same |
+| `tests/runtime2/vm-corpus/cp11` | 78 scripts (round 3 adds `review3_f1_*`, `review3_f2_single_ok`), legacy goldens, expected outcome per script: 16 on the VM, 24 replay, 38 fall back | identical to legacy, every outcome as expected |
+| `tests/runtime2/vm_adversarial.py` (seed 1, count 600; in `make test-rt-vm`) | 37,421 programs in 21 families (round 3: `elemtarget` 2,175, `cmpchain` 3,420, `deeptree` 20) | **0 non-approved differences**; 33 approved D-001#4; 0 endless. The three new families on the round-2 build (`3a3c0be`): 1,155 / 2,728 / 8 failures (8 crashes) |
+| rt-diff, legacy vs `tools/rt-vm/nift-vm` | 813 entries | **0 differing**, 2 approved (D-001#4), 0 unused policies |
+| `make test-rt-vm` | all of the above | PASS in 3 min 28 s |
+| `make test-rt-vm-sanitize` | ASan+UBSan (no recovery, leak detection on, relocate-on-mutation reference check): unit tests, prepared-parser differential, corpus + 150 generated + 150 mutants, adversarial gate seed 2 sampled to ≤ 250 per family (3,619), **round 3 adds** `vm_subset.py` and both generated suites (80 each, seed 2) | clean, 0 non-approved differences, 34 min (`../evidence/cp11/sanitize.txt`) |
+| Reviewer material, rounds 1–3 | round 1: case files `c1`–`c12`, kept `fy1`/`fz1`–`fz4`, `acorp` (1,222), `fuzz2`/`fuzz3` (1,000 each): 3,658 programs; round 2: nine repros, `mem`, generators `g_prep`, `g_dup`, `g_dup2`, `g_ctl`, `g_ws`, `g_big`, `g_bin`, `g_num`, `g_order`, `g_sanmix`, `g_mix`, `g_typed` × 4 seeds: 86,786; round 3: four repros, case files `t1`–`t22` (1,191), kept `diffs-*`, `deep/`, `mem/`, `gen3` × 15 seeds (22,500), `gp1` (36,288), `gprec1`/`gnum` × 2 seeds: 72,080 (`../evidence/cp11/reviewer-material-round3.txt`) | **0 non-approved differences**: 24 approved D-001#4, 42 outcome-only (deep/large and memory inputs whose legacy run takes minutes or crashes legacy: all fall back or compile as expected, none crashes the compiler) |
+| Lint, certification guard | `tools/rt-lint.py` (all of `src/rt`, self-test); `tests/runtime2/certification_guard.sh` | 0 problems; PASS |
+| `make test-rt-value`, `make test-rt-parser`, `make test-rt-value-sanitize`, `make test-runtime2-vm-corpus` | CP09/CP10 suites | pass (1,867,405 property checks; parser negative gate 1,957 programs 0 failures; paren oracle 0 divergent after the equality-chain probe was dropped, see "Reviews"; stale references abort under ASan; VM corpus 179 scripts) |
 
 Defects found before the review by the CP11 differential tests (the review's
 findings are under "Reviews"):
@@ -331,11 +357,21 @@ findings are under "Reviews"):
 
 ### Coverage over the shared corpora (rt-diff script entries)
 
-| Outcome | CP11 as reviewed (758) | integrated, before fixes (757) | after review round 1 (757 + 9) | **after review round 2** (757 + 9 + 11) |
-| --- | ---: | ---: | ---: | ---: |
-| Ran on the VM | 79 | 78 | 78 (+1) | **75** (+1, +3) |
-| Replayed on legacy after a bail | 53 | 53 | 53 (+3) | **42** (+2, +1) |
-| Fell back before running | 626 | 626 | 626 (+5) | **640** (+6, +7) |
+| Outcome | CP11 as reviewed (758) | integrated, before fixes (757) | after review round 1 (757 + 9) | after review round 2 (757 + 9 + 11) | **after review round 3** (757 + 9 + 11 + 3; + 6 new shared) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Ran on the VM | 79 | 78 | 78 (+1) | 75 (+1, +3) | **75** (+1, +3, +2; +0) |
+| Replayed on legacy after a bail | 53 | 53 | 53 (+3) | 42 (+2, +1) | **41** (+2, +1, +0; +0) |
+| Fell back before running | 626 | 626 | 626 (+5) | 640 (+6, +7) | **641** (+6, +7, +1; +6) |
+
+Round 3 on the same 757 scripts: one replay (`escaped.f`, an extracted
+smoke script with `a["x"] = []`, which replayed as an object index
+assignment) is now refused (`index-target`); no script that ran on the VM
+changed. The six new shared entries come from feature-sha256 (the rebase
+onto `c4c5894`) and all fall back (`sha256`, `fn[async]`, `try`, …).
+**Coverage metric (D-016):** the general generator runs 22.7 % of its
+programs on the VM (seed 1, 300 programs; 8.0 % replay, 69.3 % fall back);
+the supported-subset generator runs 93.4 % entirely on the VM and the rest
+are its deliberate run-time conditions.
 
 Round 1 cost no coverage on the shared corpora. Round 2 on the same 757
 scripts: three `call-locals-*` probes move from VM to `prepared-decl-type`
@@ -358,33 +394,36 @@ generates zero literals and mid-block jumps, which are now refused.
 
 ## Performance
 
-Re-measured after review round 2 at `52d0e1a`+ (the analysis speed-up
-commit) with `benchmarks/runtime2/vm_compare.py --runs 5 --slow`. The host
-was **shared** this round (load average 2.4 at the start, 1.0 at the end:
-other sessions' builds), so wall times are indicative only; instruction
+Re-measured after review round 3 on the final build (`c147f35`) with
+`benchmarks/runtime2/vm_compare.py --runs 5 --slow` on an **idle** host
+(nothing else running; round 2 was measured on a shared host). Instruction
 counts (callgrind) are deterministic and gated. Raw data:
-`../evidence/cp11/vm_compare.jsonl` (round 1's file is in git history).
-CPython 3.13.16, function-local code.
+`../evidence/cp11/vm_compare.jsonl` (earlier rounds' files are in git
+history). CPython 3.13.16, function-local code.
 
 ### Instructions per operation (marginal, N=4,000 vs 8,000)
 
-| Operation | v4.12 | legacy (this branch) | VM round 1 | **VM round 2** | CPython 3.13 | VM vs v4.12 | VM / CPython |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Loop iteration | 3,066 | 3,129 | 104 | **98** | 405 | 31.3× fewer | 0.24× |
-| Add-assign | 4,957 | 5,002 | 184 | **179** | 636 | 27.7× fewer | 0.28× |
-| **Flat call** (gate) | 14,994 | 13,414 | 467 | **461** | 961 | **32.5× fewer** | **0.48×** |
-| Array index | 5,356 | 5,401 | 380 | **381** | 721 | 14.1× fewer | 0.53× |
-| Array push | 4,568 | 4,613 | 286 | **326** | 505 | 14.0× fewer | 0.65× |
-| Object member | 5,240 | 5,285 | 347 | **348** | 838 | 15.1× fewer | 0.42× |
-| String append (`t = t + "x"`) | 9,385 | 9,450 | 3,182 | **3,257** | 1,793 | 2.9× fewer | 1.82× |
-| If + modulo | 6,006 | 6,050 | 233 | **223** | 804 | 26.9× fewer | 0.28× |
-| fib call, top level (per call) | 184,444 | 158,549 | 465 | **471** | 366 | 392× fewer | 1.29× |
-| fib call, inside a loop (per call) | 14,766 | 14,760 | 465 | **471** | 436 | 31.4× fewer | 1.08× |
+| Operation | v4.12 | legacy (this branch) | VM round 1 | VM round 2 | **VM round 3** | CPython 3.13 | VM vs v4.12 | VM / CPython |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Loop iteration | 3,066 | 3,129 | 104 | 98 | **98** | 397 | 31.3× fewer | 0.25× |
+| Add-assign | 4,957 | 5,002 | 184 | 179 | **179** | 649 | 27.7× fewer | 0.28× |
+| **Flat call** (gate) | 14,994 | 13,414 | 467 | 461 | **461** | 953 | **32.5× fewer** | **0.48×** |
+| Array index | 5,356 | 5,401 | 380 | 381 | **381** | 703 | 14.1× fewer | 0.54× |
+| Array push | 4,568 | 4,613 | 286 | 326 | **326** | 526 | 14.0× fewer | 0.62× |
+| Object member | 5,240 | 5,303 | 347 | 348 | **348** | 806 | 15.1× fewer | 0.43× |
+| String append (`t = t + "x"`) | 9,385 | 9,450 | 3,182 | 3,257 | **3,256** | 1,797 | 2.9× fewer | 1.81× |
+| If + modulo | 6,006 | 6,050 | 233 | 223 | **223** | 829 | 26.9× fewer | 0.27× |
+| fib call, top level (per call) | 184,321 | 159,234 | 465 | 471 | **471** | 457 | 391× fewer | 1.03× |
+| fib call, inside a loop (per call) | 14,766 | 14,760 | 465 | 471 | **471** | 427 | 31.4× fewer | 1.10× |
 
 Each "operation" includes the loop around it (`run.py` templates). CPython's
 fib figure varies a lot between runs (300–710 per call over the runs so
 far; hash randomisation changes its dictionary work); its flat-call figure
 varied 947–980.
+
+**Hot-path cost of round 3: none.** Round 3 changes only compile-time
+checks and the out-of-line aggregate-equality walk; every VM figure above
+is identical to round 2 (string append −1). Round 2's note follows.
 
 **Hot-path cost of round 2.** No instruction was added to the bytecode of
 these loops; the flat call, loop, add-assign and if operations got 5–10
@@ -397,33 +436,34 @@ budget check; fib +6 (+1.3 %) and array index +1 are code-generation
 effects. The memory check is one thread-local load and compare after each
 allocating slow path; the `Call` hot path is unchanged.
 
-### Whole process (wall, median of 5) and peak RSS
+### Whole process (wall, median of 5; minimum in parentheses) and peak RSS
 
-Shared host this round (see above): indicative only.
+Idle host (round 3).
 
 | Program | v4.12 | legacy | **VM** | CPython | Peak RSS KiB (v4.12 / legacy / VM / CPython) |
 | --- | ---: | ---: | ---: | ---: | --- |
-| fib(22) | 1,311 ms (1,298) | 1,122 ms (1,098) | **6.5 ms** (6.4) | 17.5 ms (16.9) | 7,452 / 7,932 / 5,828 / 8,664 |
-| fib(25) | 5,506 ms (5,492) | 4,897 ms (4,881) | **18.1 ms** (16.3) | 25.7 ms (24.0) | 7,492 / 8,104 / 5,760 / 8,664 |
-| 1M-iteration loop | 509 ms (506) | 519 ms (508) | **26.5 ms** (26.4) | 66.0 ms (65.9) | 6,924 / 7,388 / 5,652 / 8,664 |
-| 200k calls | 340 ms (338) | 293 ms (292) | **11.9 ms** (11.6) | 29.0 ms (28.3) | 6,840 / 7,404 / 5,732 / 8,664 |
-| Startup (`x := 1; print(x)`) | 3.5 ms (3.4) | 3.5 ms (3.4) | **3.3 ms** (3.2) | 14.5 ms (14.3) | 6,716 / 7,204 / 5,512 / 8,664 |
+| fib(22) | 1,266 ms (1,200) | 1,058 ms (1,023) | **6.2 ms** (6.0) | 15.8 ms (15.2) | 7,276 / 7,912 / 5,620 / 8,692 |
+| fib(25) | 5,354 ms (5,244) | 4,799 ms (4,515) | **15.6 ms** (15.4) | 22.9 ms (22.2) | 7,432 / 7,996 / 5,624 / 8,648 |
+| 1M-iteration loop | 490 ms (478) | 483 ms (481) | **24.5 ms** (22.7) | 58.4 ms (57.8) | 6,724 / 7,232 / 5,472 / 8,636 |
+| 200k calls | 341 ms (300) | 299 ms (279) | **11.4 ms** (11.1) | 27.5 ms (27.1) | 6,780 / 7,316 / 5,592 / 8,696 |
+| Startup (`x := 1; print(x)`) | 3.6 ms (3.5) | 3.9 ms (3.6) | **3.7 ms** (3.5) | 15.7 ms (15.4) | 6,620 / 7,068 / 5,352 / 8,636 |
 
-Peak RSS of the VM rose by ~0.2–0.5 MiB over round 1 (5,364–5,620 KiB),
-within run-to-run variation of the allocator; the heap accounting adds no
-per-object memory (it uses the header's padding).
+Peak RSS of the VM is within 0.3 MiB of rounds 1–2 (allocator variation).
 
 ### Startup, compilation and execution separated
 
 | Program | Source bytes | Parse instr | Compile instr | Execute instr | Whole VM process instr | Legacy translation instr (reference) | Parse / compile / execute µs | Cold process | In-process: compile / first run / warm run µs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |
-| startup | 16 | 5,551 | 75,230 | 389 | 2,574,707 | 4,197 | 17.6 / 40.7 / 6.6 | 3.54 ms | 60 / 6.4 / 0.2 |
-| fib(22) | 84 | 21,869 | 106,689 | 26,966,032 | 29,591,563 | 15,473 | 31.2 / 58.2 / 2,928 | 7.3 ms | 80 / 3,053 / 2,887 |
-| 1M loop | 61 | 20,244 | 88,768 | 179,000,743 | 181,605,207 | 11,290 | 30.2 / 52.4 / 22,843 | 30.0 ms | 94 / 22,858 / 22,906 |
-| 200k calls | 98 | 28,668 | 117,679 | 92,200,737 | 94,844,363 | 17,325 | 28.0 / 67.4 / 8,619 | 11.9 ms | 97 / 8,101 / 8,187 |
-| 500 functions (66 KB, generated) | 66,296 | 16,040,754 | 27,808,158 | 1,839 | 49,247,400 | 7,974,041 | 1,744 / 3,114 / 18.7 | 8.4 ms | 5,173 / 12.4 / 1.0 |
+| startup | 16 | 5,551 | 78,338 | 389 | 2,574,506 | 4,197 | 19.6 / 35.9 / 6.3 | 3.39 ms | 59 / 5.3 / 0.2 |
+| fib(22) | 84 | 21,893 | 111,395 | 26,966,032 | 29,592,105 | 15,401 | 22.0 / 54.4 / 2,888 | 6.1 ms | 75 / 2,716 / 2,808 |
+| 1M loop | 61 | 20,291 | 95,980 | 179,000,743 | 181,608,699 | 11,290 | 23.3 / 49.9 / 22,758 | 26.9 ms | 73 / 22,922 / 24,898 |
+| 200k calls | 98 | 28,676 | 125,743 | 92,200,737 | 94,847,812 | 17,325 | 26.9 / 59.6 / 7,731 | 14.4 ms | 86 / 8,038 / 7,800 |
+| 500 functions (66 KB, generated) | 66,296 | 16,045,730 | 29,891,783 | 1,839 | 50,113,511 | 8,122,025 | 1,859 / 3,135 / 20.2 | 8.3 ms | 4,902 / 8.4 / 1.3 |
 
-(Round 2, shared host; round 1's row values are in git history.)
+(Round 3, idle host; earlier rounds' values are in git history. Round 3
+compile cost: +3k–8k instructions for small scripts and +2.1M (+7.5 %) for
+the 500-function program — the iterative depth pre-pass and the iterative
+prepared-context walks, which allocate an explicit stack per walk.)
 
 - **Process startup** is ~2.5M instructions for both engines, almost all in
   the dynamic loader (symbol lookup and relocation of the 5 MB binary); the VM
@@ -458,16 +498,17 @@ per-object memory (it uses the header's padding).
 
 Predefined gate (checkpoints.md CP11), measured with the `run.py ops`
 methodology (marginal callgrind instructions per iteration, N=4,000 vs 8,000),
-re-measured after review round 2 with `NIFT_VM=require` (genuine VM
-execution; a fallback or bail would be an error):
+re-measured after review round 3 on the final build (`c147f35`, idle host)
+with `NIFT_VM=require` (genuine VM execution; a fallback or bail would be
+an error):
 
 | Criterion | Required | Measured | Result |
 | --- | --- | --- | --- |
-| Flat call ≥ 5× fewer instructions than v4.12 | ≤ 2,994 (v4.12 14,994 here; CP00 14,970) | **461** (32.5× fewer; round 1: 467, as reviewed: 464) | **met** |
-| Flat call ≤ 2× CPython function-local | ≤ 1,922 (2 × 961 this run; CP00: ≤ 1,980) | **461** (0.48×) | **met** |
-| Parity on every compiled unit | identical stdout/stderr/exit (approved D-001#4 recursion budget only) | As reviewed: **not met** (round 1 found seven silent miscompiles the corpora did not exercise). After the fixes: 0 non-approved differences over rt-diff 793 entries, VM corpus 64, 600 generated/mutants, the adversarial gate (19,969 programs, seed 1; 1,912 sanitized, seed 2) and the reviewer's own programs | met after round 1; round 2 found three more miscompile classes (M1–M3) and a parser byte class (M4) the gate did not exercise; after round 2: 0 non-approved differences over rt-diff 804 entries, VM corpus 75, 600 generated/mutants, the adversarial gate (31,792 programs in 18 families, seed 1; 3,099 sanitized, seed 2), the subset suites and both rounds' reviewer material | **met after fixes** (review pending) |
+| Flat call ≥ 5× fewer instructions than v4.12 | ≤ 2,994 (v4.12 14,994 here; CP00 14,970) | **461** (32.5× fewer; round 2: 461, round 1: 467, as reviewed: 464) | **met** |
+| Flat call ≤ 2× CPython function-local | ≤ 1,906 (2 × 953 this run; CP00: ≤ 1,980) | **461** (0.48×) | **met** |
+| Parity on every compiled unit | identical stdout/stderr/exit (approved D-001#4 recursion budget only) | As reviewed: **not met** (round 1 found seven silent miscompiles the corpora did not exercise). After the fixes: 0 non-approved differences over rt-diff 793 entries, VM corpus 64, 600 generated/mutants, the adversarial gate (19,969 programs, seed 1; 1,912 sanitized, seed 2) and the reviewer's own programs | met after round 1; round 2 found three more miscompile classes (M1–M3) and a parser byte class (M4) the gate did not exercise; after round 2: 0 non-approved differences over rt-diff 804 entries, VM corpus 75, 600 generated/mutants, the adversarial gate (31,792 programs in 18 families, seed 1; 3,099 sanitized, seed 2), the subset suites and both rounds' reviewer material; round 3 found one more in-subset miscompile (F1), an admitted out-of-subset shape (F2), a compile-time crash (F3) and an uncounted allocation (F4); after round 3: 0 non-approved differences over rt-diff 813 entries, VM corpus 78, 600 generated/mutants, the adversarial gate (37,421 programs in 21 families), the three D-016 suites and all three rounds' reviewer material | **met after fixes** (certification pending) |
 
-**Verdict: GO** (unchanged; review pending). Recursive calls (fib) cost
+**Verdict: GO** (unchanged after round 3; certification pending). Recursive calls (fib) cost
 471 instructions per call, near CPython (366–710 per call over the runs);
 loops are 31× cheaper than v4.12 and ~4× cheaper than CPython.
 
@@ -484,8 +525,9 @@ frames with no heap values, and a non-refcounting store for scalar results.
 
 ## Risks
 - **Coverage.** 75 of the 757 shared-corpus scripts run on the VM (78
-  after round 1; 79 of 758 before the CP10 integration); most real programs
-  need constructs from CP12–CP16. Round 2 refuses three more shared scripts
+  after round 1; 79 of 758 before the CP10 integration; unchanged by round
+  3); the general generator runs 22.7 % of its programs on the VM (the
+  D-016 coverage metric); most real programs need constructs from CP12–CP16. Round 2 refuses three more shared scripts
   (`call-locals-*`: a loop-called function declaring `a := x + 1` from its
   parameter) and turns 10 static-error replays into fallbacks. The owner
   accepted a narrower subset (round 2 direction). The performance
@@ -497,11 +539,20 @@ frames with no heap values, and a non-refcounting store for scalar results.
   before completion, and a program printing more than 64 MiB is stopped at
   the limit and replayed on legacy from the start (cost: the buffer memory
   and the VM time until the limit; such programs effectively run on legacy).
-- **Parity evidence is differential.** Two review rounds found miscompile
+- **Parity evidence is differential.** Three review rounds found miscompile
   classes the corpora and generators did not exercise (round 1: seven;
   round 2: three — M1 typing against preparation-time bindings, M2 double
   argument evaluation, M3 text-typed string arguments — plus a parser byte
-  class). The round-1 record wrongly called M1 a "residual case": it was a
+  class; round 3: F1 member-path element targets, F2 equality chains). The
+  round-3 supported-subset generator is the first suite built from the
+  written specification rather than from found shapes; it is still a
+  generator, not a proof.
+- **CP10 equality-chain grouping (open, CP10/CP12).** Outside conditions the
+  CP10 parser groups `a != b == c` differently from legacy (the paren oracle
+  reports it); the VM refuses every comparison chain, so no unit runs with
+  that tree, but the parser itself still produces it. Recorded for the
+  parser/language checkpoint; the round-3 corpus probe was dropped from the
+  oracle corpus for that reason (as round 1's `!x + 1` probe). The round-1 record wrongly called M1 a "residual case": it was a
   miscompile class (303 of 4,800 targeted programs differed).
 - **Legacy context-dependent semantics.** Legacy's second (prepared)
   evaluator is now inventoried from source ("Legacy's prepared
@@ -529,6 +580,9 @@ frames with no heap values, and a non-refcounting store for scalar results.
   can still kill the process first. A non-recursive program that legitimately
   needs more than 1 GiB of rt heap gets a reported failure where legacy
   might succeed (legacy uses more memory per value, so this is unlikely).
+  Since round 3 (F4) aggregate equality needs O(depth) working memory
+  (≤ 240 KiB at the 10,000-level equality depth), not O(elements); it is a
+  fixed allowance like the stacks of the process, not counted.
 - **Deep equality.** `==` deeper than 10,000 levels bails and legacy
   decides (correct but slow: legacy builds such values in quadratic time);
   beyond about 50,000 levels legacy itself crashes, and so does the replay.
@@ -558,7 +612,12 @@ evidence (`d1a6e0c`); lint, oracle link and corpus fixes (`566ea74`,
 regression tests (`2e2a4d7`, `d7020a7`), hot-path and compile-cost follow-ups
 (`8e10a3a`, `84d9332`), this record and evidence. Review round 2: CP10 follow-up (`26aee9a`), CP09 follow-up (`72c00ac`),
 fixes and tests (`1ff0063`), generator adjustment (`52d0e1a`), analysis
-speed-up (`b2183e4`), this record and evidence.
+speed-up (`b2183e4`), this record and evidence. Review round 3 (rebased on
+`runtime-2` @`c4c5894`): revert of the generator adjustment (`3857cf3`,
+D-016), legacy name table regenerated for feature-sha256 (`568e02f`), CP09
+follow-up F4 (`ba0deb6`), F1–F3 fixes and tests (`1314bd1`), the generated
+suites (`8f1e55d`), corpus probe dropped (`c147f35`), this record, D-016 and
+evidence.
 
 ## Evidence
 `../evidence/cp11/README.md`.
@@ -638,12 +697,43 @@ assignment, push arity) are refused instead of replayed
 UNSUPPORTED suites; the CP09 reference contract is enforced in sanitizer
 builds (owner item 6, `cp09-value-model.md`).
 
-Replay reasons that remain, and why each is not decidable before execution
-(all side-effect free: the subset's only effect is buffered output):
-`runtime-error` (an error depends on values; legacy prints its own
-diagnostic), `number-range` (a computed number reaching 2^53 or −0),
-`aliasing` (whether a bound or returned place holds an aggregate),
-`unverified` (P4/P5: text and value types disagree for this value — e.g.
-an integral double —; an array element of another type; `length()`/`size()`
-on an object), `recursion-budget`, `output-limit`, `nesting-depth`
-(resource bounds).
+Replay reasons that remain after round 2 (all side-effect free: the
+subset's only effect is buffered output): `runtime-error` (an error
+depends on values; legacy prints its own diagnostic), `number-range` (a
+computed number reaching 2^53 or −0), `aliasing` (whether a bound or
+returned place holds an aggregate), `unverified` (P4/P5: text and value
+types disagree for this value — e.g. an integral double —; an array element
+of another type; `length()`/`size()` on an object), `recursion-budget`,
+`output-limit`, `nesting-depth` (resource bounds). (Round 3, DOC-1: the
+original sentence said each is "not decidable before execution"; that was
+too strong — some instances are decidable from literals, see "Opt-in and
+fallback".)
+
+### Independent review, round 3 (2026-10-18)
+The last review round (D-015: no further open-ended compatibility cycle).
+Owner rules for the fixes: no silent miscompiles; prefer compile-time
+refusal (narrow the subset) over machinery; no new replay; the flat-call
+gate re-measured on the final build; no benchmark special-casing; no test
+weakened. The owner also restructured the generated tests (D-016).
+
+| # | Finding | Status | Fix (exact / refused) | Tests |
+| --- | --- | --- | --- | --- |
+| F1 | DEFECT (in-subset miscompile): an element assignment whose index text contains `.` (`a[a.length() - 1] = 9`, `a[o.k] = …`, `a[1.0] = …`, `a[g("x.y")] = …`) is a member assignment to legacy's textual evaluator, which fails ("member assignment requires a struct instance"); the VM succeeded | fixed | **refused** `index-target`: element assignment compiles only when the brackets hold exactly a local name or an unsigned integer literal (no parentheses, no `.` anywhere in the target); compound and `++`/`--` element targets were already refused (`compound-target`, `incdec-target`). The former `index-assign-order` check is subsumed | unit (6 fallbacks, admitted forms run), `vm_subset` (SUPPORTED `element_targets`; UNSUPPORTED 9), corpus `review3_f1_*.f` (1 refused, 1 compiled), adversarial `elemtarget` (33 indexes × 11 values × 5 contexts, plus compound/`++` forms: 2,175 programs; on the pre-fix build 1,155 not refused, 0 after) |
+| F2 | DEFECT (outside the documented subset but admitted): `1 != 1 == 1` and other equality chains compiled with a different grouping (the CP10 tree groups `==`/`!=` as one right-associative level; legacy splits at the first `==`) | fixed | **refused** `comparison-chain`: every comparison whose operand is itself a comparison (equality or relational, either side, any context, parenthesised too — parentheses leave no node). "comparisons (no chains)" in the specification is now true | unit (4), `vm_subset` UNSUPPORTED (3), corpus `review3_f2_single_ok.f` (compiled; the refused probe was dropped from the corpus because the CP10 paren oracle reports exactly this grouping difference, see Risks), adversarial `cmpchain` (exhaustive 6 × 6 operators × flat/left/right × 4 operand sets × 8 contexts = 3,240 refused + 180 single-comparison controls that run on the VM; pre-fix build: 2,728 compiled) |
+| F3 | CRASH: `print(1 + 1 + … + 1)` with ≥ 70,000 terms segfaulted in `compile_unit` (recursive `outermost_loops`/`walk` in `prepared.cpp`) before the expression-nesting limit applied | fixed | `compile_unit` first bounds the unit's tree depth (256 nodes, iterative walk; `nesting-limit`); the prepared-context walks, `outermost_loops` and the Opaque search are iterative; every other recursive pass is then bounded by the depth limit. Legacy runs such units | unit (ten 100,000-deep inputs compiled on a 512 KiB stack; a 50,000-statement list still compiles), `vm_subset` UNSUPPORTED `nesting-limit`, adversarial `deeptree` (18 deep shapes: `+ - && \|\| ?? ==` chains, parentheses, brackets, unary, calls, index chains, deep `if`/`while`, in functions and loops; flat controls), sanitizer run; pre-fix build: 8 crashes |
+| F4 | RISK (memory budget): aggregate `==`/`!=` built an uncounted work list of every element pair (24 B per element; 73 MB peak against a 50 MB budget) | fixed (CP09 follow-up) | `equal_within` keeps one frame per open nesting level: O(depth) working memory, at most `NIFT_VM_EQUALITY_DEPTH` + 1 frames (≤ 240 KiB at the default 10,000), never O(elements); order and the TooDeep boundary unchanged | `vm_subset` equality-memory checks (two 1M-element arrays and a 9,000-deep pair under `NIFT_VM_HEAP_BUDGET=50,000,000`: peak RSS ≤ budget + 8 MiB; pre-fix build 86 MB, now ~37 MB), CP09 value suites, adversarial `deepeq` |
+| DOC-1 | The record said every replay reason is decided by a run-time value; several are decidable from literals | fixed (wording) | the literal-decidable instances are listed precisely ("Opt-in and fallback"); they are not refused (no constant evaluation in CP11); replay stays side-effect free (D-013) and is removed in CP12 | — |
+| DOC-2 | "comparisons (no chains)" was not true | fixed with F2 | specification and table updated | — |
+
+Also in this round: the rebase onto `runtime-2` @`c4c5894` (feature-sha256)
+made the generated legacy name table stale (`sha256`, `sha256_file`); the
+`--check` guard in `make test-rt-vm` caught it and the table was regenerated
+(208 names). The generated supported-subset suite found two imprecisions in
+the specification text (not compiler defects): `?:`, `??` and object
+literals inside `if`/`while` conditions are CP10 Opaque, and `s += <number>`
+is a legacy error (a documented `runtime-error` replay); both are now stated.
+
+Owner-requested test restructuring (D-016): the round-2 change to
+`vm_gen.py` is reverted and its 20 % threshold removed; three generated
+suites are kept apart — supported subset (correctness), general generator
+(coverage, reported) and unsupported (fallback). Results under "Tests".

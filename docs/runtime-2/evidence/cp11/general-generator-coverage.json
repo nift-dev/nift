@@ -1,0 +1,57 @@
+{
+ "count": 300,
+ "generated": {
+  "fallback": 208,
+  "fallback_pct": 69.33333333333333,
+  "fallback_reasons": {
+   "opaque:irregular-legacy-parse": 192,
+   "prepared-decl-type": 7,
+   "prepared-fn-unprepared": 7,
+   "static-error:arity": 2
+  },
+  "other": {},
+  "replay_reasons": {
+   "bail:number-range": 8,
+   "bail:runtime-error": 13,
+   "bail:unverified": 3
+  },
+  "replayed": 24,
+  "replayed_pct": 8.0,
+  "vm": 68,
+  "vm_pct": 22.666666666666668
+ },
+ "mutants": {
+  "fallback": 252,
+  "fallback_pct": 84.0,
+  "fallback_reasons": {
+   "assign-free-name": 3,
+   "callable:prit": 1,
+   "declare-const": 1,
+   "expression-statement": 3,
+   "expression:Await": 1,
+   "fn-after-statement": 1,
+   "object-key": 1,
+   "opaque:irregular-legacy-parse": 173,
+   "opaque:legacy-runtime-error": 35,
+   "parse-error": 14,
+   "prepared-decl-type": 6,
+   "prepared-fn-unprepared": 4,
+   "shebang-statement": 2,
+   "static-error:arity": 1,
+   "static-error:redeclared": 3,
+   "string-literal": 1,
+   "unresolved-name": 2
+  },
+  "other": {},
+  "replay_reasons": {
+   "bail:number-range": 1,
+   "bail:runtime-error": 9,
+   "bail:unverified": 2
+  },
+  "replayed": 12,
+  "replayed_pct": 4.0,
+  "vm": 36,
+  "vm_pct": 12.0
+ },
+ "seed": 1
+}

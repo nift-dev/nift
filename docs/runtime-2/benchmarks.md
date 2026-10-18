@@ -56,43 +56,42 @@ The fib CPython figure here (353, fib(10)→fib(12)) is lower than the 509 quote
 in the design report (fib(14)→fib(16)); both are correct for their inputs. Gates
 compare like with like using this runner only.
 
-## CP11 — VM proof of concept (`runtime-2-cp11i`, after review round 2)
+## CP11 — VM proof of concept (`runtime-2-cp11i`, after review round 3)
 
 Runner: `benchmarks/runtime2/vm_compare.py` (`make bench-rt-vm`): the same
 workloads and goldens on v4.12, the current legacy path, the VM with
 `NIFT_VM=require` (no legacy fallback possible) and CPython 3.13.16. Raw:
 `evidence/cp11/vm_compare.jsonl`; record: `checkpoints/cp11-vm-poc.md`.
-Round 2 was measured on a **shared** host (load 1.0–2.4): instruction counts
-are deterministic; wall times are indicative.
+Round 3 was measured on the final build (`c147f35`) on an **idle** host;
+instruction counts are deterministic (round 2's shared-host figures are in
+git history).
 
-| Operation (marginal instr) | v4.12 | legacy | VM round 1 | **VM round 2** | CPython fn-local |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Loop iteration | 3,066 | 3,129 | 104 | 98 | 405 |
-| Add-assign | 4,957 | 5,002 | 184 | 179 | 636 |
-| **Flat call** | 14,994 | 13,414 | 467 | **461** | 961 |
-| Array index | 5,356 | 5,401 | 380 | 381 | 721 |
-| Array push | 4,568 | 4,613 | 286 | 326 | 505 |
-| Object member | 5,240 | 5,285 | 347 | 348 | 838 |
-| String append | 9,385 | 9,450 | 3,182 | 3,257 | 1,793 |
-| If + modulo | 6,006 | 6,050 | 233 | 223 | 804 |
-| fib call, top level / in loop | 184,444 / 14,766 | 158,549 / 14,760 | 465 / 465 | 471 / 471 | 366 / 436 |
+| Operation (marginal instr) | v4.12 | legacy | VM round 1 | VM round 2 | **VM round 3** | CPython fn-local |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Loop iteration | 3,066 | 3,129 | 104 | 98 | 98 | 397 |
+| Add-assign | 4,957 | 5,002 | 184 | 179 | 179 | 649 |
+| **Flat call** | 14,994 | 13,414 | 467 | 461 | **461** | 953 |
+| Array index | 5,356 | 5,401 | 380 | 381 | 381 | 703 |
+| Array push | 4,568 | 4,613 | 286 | 326 | 326 | 526 |
+| Object member | 5,240 | 5,303 | 347 | 348 | 348 | 806 |
+| String append | 9,385 | 9,450 | 3,182 | 3,257 | 3,256 | 1,797 |
+| If + modulo | 6,006 | 6,050 | 233 | 223 | 223 | 829 |
+| fib call, top level / in loop | 184,321 / 14,766 | 159,234 / 14,760 | 465 / 465 | 471 / 471 | 471 / 471 | 457 / 427 |
 
-| Whole process (median of 5, shared host) | v4.12 | legacy | VM | CPython |
+| Whole process (median of 5, idle host) | v4.12 | legacy | VM | CPython |
 | --- | ---: | ---: | ---: | ---: |
-| fib(22) | 1.311 s | 1.122 s | 0.0065 s | 0.017 s |
-| fib(25) | 5.506 s | 4.897 s | 0.018 s | 0.026 s |
-| 1M-iteration loop | 0.509 s | 0.519 s | 0.027 s | 0.066 s |
-| 200k calls | 0.340 s | 0.293 s | 0.012 s | 0.029 s |
-| Startup | 3.5 ms | 3.5 ms | 3.3 ms | 14.5 ms |
+| fib(22) | 1.266 s | 1.058 s | 0.0062 s | 0.016 s |
+| fib(25) | 5.354 s | 4.799 s | 0.016 s | 0.023 s |
+| 1M-iteration loop | 0.490 s | 0.483 s | 0.025 s | 0.058 s |
+| 200k calls | 0.341 s | 0.299 s | 0.011 s | 0.027 s |
+| Startup | 3.6 ms | 3.9 ms | 3.7 ms | 15.7 ms |
 
-Compilation (callgrind, inside `rt::compile_unit`): 75.2k instructions for
-`x := 1; print(x)` (72.5k after round 1), 27.8M for a generated
-500-function, 66 KB program (20.8M after round 1): the round-2
-prepared-context analysis.
+Compilation (callgrind, inside `rt::compile_unit`): 78.3k instructions for
+`x := 1; print(x)` (75.2k after round 2), 29.9M for a generated
+500-function, 66 KB program (27.8M after round 2): round 3's iterative
+depth pre-pass and iterative prepared-context walks.
 
 CP11 gate (flat call ≥ 5× fewer than v4.12 and ≤ 2× CPython): **met**,
-32.5× fewer and 0.48× CPython (round 1: 32.1×, 0.48×). Round 2 adds no
-bytecode to these loops. Hot-path cost of the exact memory budget: array
-push +40 (+14 %: the footprint recount and budget check after each push),
-string append +75 (+2.4 %); flat call, loop, add-assign and if got 5–10
-cheaper (the sampled frame-memory scan is gone).
+32.5× fewer and 0.48× CPython (unchanged from round 2). Round 3 changes no
+VM hot path (compile-time checks and the out-of-line aggregate-equality
+walk only).

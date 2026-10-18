@@ -234,12 +234,28 @@ Candidates recorded (class 2, not yet changed; the VM falls back today):
 | Aliasing depends on argument shape (`f(o.k)` aliases, `f(a)` copies) | Explicit, documented value/reference rules | CP11 D6 |
 | Some runtime errors cannot be caught | Structured, catchable runtime errors | owner |
 
-## D-016 — Coverage is measured, not maintained by test inputs (owner, 2026-10-18)
-VM coverage is a measured outcome, never a threshold kept by tuning generated
-inputs. Separate permanent suites: supported subset (100 % VM, no replay, 0
-differences), runtime-replay cases (CP11 only; CP12 removes them), unsupported
-(fallback before execution with the correct reason), general language (actual
-VM share reported, no threshold).
+## D-016 — VM coverage is measured, never a threshold; three separate suites (owner, 2026-10-18)
+- VM coverage is a measured outcome, never a threshold maintained by adjusting
+  test inputs. Correctness, coverage and fallback are tested by separate
+  suites:
+  1. **Correctness — supported-subset suite** (`tests/runtime2/vm_subset.py`
+     SUPPORTED and the generated `vm_subset_gen.py --suite supported`):
+     programs built only from the documented subset, in every documented
+     context; 100 % must run entirely on the VM (outcome `vm`; no replay, no
+     fallback), with 0 differences from legacy. Programs that deliberately
+     trigger a documented replay condition form a separate runtime-replay
+     suite (CP11 only; CP12 removes replay).
+  2. **Coverage — general generator** (`vm_gen.py` through `vm_parity.py`,
+     original distribution, representative Nift including unsupported
+     constructs): the VM-execution percentage and the replay and fallback
+     shares by reason are reported and recorded; no threshold.
+  3. **Fallback — unsupported suite** (`vm_subset.py` UNSUPPORTED and
+     `vm_subset_gen.py --suite unsupported`): every deliberately excluded
+     construct must fall back before execution with the documented reason,
+     with no VM execution (checked through `NIFT_VM_STATS`).
+- Consequence for CP11: the round-2 change that steered `vm_gen.py` toward the
+  narrowed subset (to keep its 20 % VM threshold) is reverted and the threshold
+  removed (CP11 review round 3).
 
 ## D-017 — Pipelined checkpoints (owner, 2026-10-18)
 When a checkpoint is stable enough for certification, development of the next

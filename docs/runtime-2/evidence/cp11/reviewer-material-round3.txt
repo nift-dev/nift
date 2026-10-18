@@ -1,0 +1,62 @@
+# CP11 review round 3: reviewer material of rounds 1-3 on the round-3 build (c147f35)
+# legacy vs NIFT_VM=1 (stdout, stderr, exit); verdict 'approved' = D-001#4 recursion budget (vm_adversarial.classify_difference);
+# 'outcome-only' = NIFT_VM=classify only (programs whose legacy run takes minutes or crashes legacy itself: deep/large inputs, memory repros)
+
+## Round 1
+r1 case files c1-c12: 307 programs; outcomes {'replayed': 81, 'vm': 140, 'fallback': 86}; verdicts {'same': 304, 'approved': 3}
+r1 kept fy1/fz1-fz4: 129 programs; outcomes {'fallback': 85, 'replayed': 25, 'nostats': 13, 'vm': 6}; verdicts {'same': 123, 'approved': 6}
+r1 acorp: 1222 programs; outcomes {'fallback': 637, 'replayed': 269, 'vm': 306, 'nostats': 10}; verdicts {'same': 1213, 'approved': 9}
+r1 fuzz2 seed 2: 1000 programs; outcomes {'fallback': 836, 'vm': 80, 'replayed': 80, 'nostats': 4}; verdicts {'same': 999, 'approved': 1}
+r1 fuzz3 seed 3: 1000 programs; outcomes {'fallback': 501, 'replayed': 286, 'vm': 199, 'nostats': 14}; verdicts {'same': 1000}
+TOTAL verdicts {'same': 3639, 'approved': 19}
+
+## Round 2
+r2 repros: 9 programs; outcomes {'fallback': 7, 'replayed': 1, 'compiled': 1}; verdicts {'same': 8, 'outcome-only': 1}
+r2 mem: 11 programs; outcomes {'compiled': 11}; verdicts {'outcome-only': 11}
+r2 g_prep: 4800 programs; outcomes {'fallback': 3840, 'vm': 296, 'replayed': 664}; verdicts {'same': 4800}
+r2 g_dup: 720 programs; outcomes {'vm': 568, 'fallback': 152}; verdicts {'same': 720}
+r2 g_dup2: 93 programs; outcomes {'fallback': 47, 'vm': 43, 'replayed': 3}; verdicts {'same': 93}
+r2 g_ctl: 475 programs; outcomes {'fallback': 419, 'vm': 56}; verdicts {'same': 475}
+r2 g_ws: 244 programs; outcomes {'vm': 120, 'fallback': 124}; verdicts {'same': 244}
+r2 g_big: 984 programs; outcomes {'vm': 500, 'replayed': 4, 'fallback': 480}; verdicts {'same': 984}
+r2 g_bin: 56448 programs; outcomes {'vm': 27035, 'fallback': 5760, 'replayed': 23653}; verdicts {'same': 56448}
+r2 g_num: 12000 programs; outcomes {'vm': 7656, 'fallback': 1292, 'replayed': 3052}; verdicts {'same': 12000}
+r2 g_order: 616 programs; outcomes {'vm': 376, 'fallback': 184, 'replayed': 56}; verdicts {'same': 616}
+r2 g_sanmix: 1986 programs; outcomes {'fallback': 1168, 'vm': 577, 'replayed': 241}; verdicts {'same': 1985, 'approved': 1}
+r2 g_mix: 400 programs; outcomes {'fallback': 377, 'vm': 9, 'replayed': 13, 'nostats': 1}; verdicts {'same': 400}
+r2 g_typed seed 1: 2000 programs; outcomes {'fallback': 935, 'replayed': 617, 'vm': 448}; verdicts {'same': 2000}
+r2 g_typed seed 2: 2000 programs; outcomes {'fallback': 993, 'replayed': 607, 'vm': 400}; verdicts {'same': 2000}
+r2 g_typed seed 3: 2000 programs; outcomes {'fallback': 926, 'vm': 422, 'replayed': 652}; verdicts {'same': 2000}
+r2 g_typed seed 4: 2000 programs; outcomes {'fallback': 918, 'vm': 432, 'replayed': 650}; verdicts {'same': 2000}
+TOTAL verdicts {'same': 86773, 'outcome-only': 12, 'approved': 1}
+
+## Round 3
+r3 repros: 4 programs; outcomes {'fallback': 3, 'vm': 1}; verdicts {'same': 4}
+r3 case files t1-t22: 1191 programs; outcomes {'replayed': 221, 'fallback': 618, 'vm': 352}; verdicts {'same': 1191}
+r3 kept diffs-*: 37 programs; outcomes {'fallback': 37}; verdicts {'same': 37}
+r3 deep (small): 30 programs; outcomes {'fallback': 24, 'vm': 6}; verdicts {'same': 26, 'approved': 4}
+r3 deep (large, classify): 22 programs; outcomes {'fallback': 20, 'compiled': 2}; verdicts {'outcome-only': 22}
+r3 mem (classify): 8 programs; outcomes {'compiled': 7, 'fallback': 1}; verdicts {'outcome-only': 8}
+r3 gen3 seed 1: 1500 programs; outcomes {'replayed': 750, 'fallback': 498, 'vm': 252}; verdicts {'same': 1500}
+r3 gen3 seed 2: 1500 programs; outcomes {'fallback': 514, 'replayed': 764, 'vm': 222}; verdicts {'same': 1500}
+r3 gen3 seed 3: 1500 programs; outcomes {'replayed': 726, 'fallback': 513, 'vm': 261}; verdicts {'same': 1500}
+r3 gen3 seed 4: 1500 programs; outcomes {'fallback': 525, 'replayed': 696, 'vm': 279}; verdicts {'same': 1500}
+r3 gen3 seed 5: 1500 programs; outcomes {'fallback': 551, 'vm': 236, 'replayed': 713}; verdicts {'same': 1500}
+r3 gen3 seed 6: 1500 programs; outcomes {'replayed': 748, 'vm': 251, 'fallback': 501}; verdicts {'same': 1500}
+r3 gen3 seed 7: 1500 programs; outcomes {'replayed': 728, 'fallback': 526, 'vm': 246}; verdicts {'same': 1500}
+r3 gen3 seed 8: 1500 programs; outcomes {'vm': 252, 'replayed': 718, 'fallback': 530}; verdicts {'same': 1500}
+r3 gen3 seed 9: 1500 programs; outcomes {'vm': 235, 'replayed': 724, 'fallback': 541}; verdicts {'same': 1500}
+r3 gen3 seed 10: 1500 programs; outcomes {'replayed': 740, 'vm': 261, 'fallback': 499}; verdicts {'same': 1500}
+r3 gen3 seed 11: 1500 programs; outcomes {'replayed': 723, 'vm': 275, 'fallback': 502}; verdicts {'same': 1500}
+r3 gen3 seed 12: 1500 programs; outcomes {'replayed': 671, 'fallback': 540, 'vm': 289}; verdicts {'same': 1500}
+r3 gen3 seed 13: 1500 programs; outcomes {'fallback': 572, 'replayed': 659, 'vm': 269}; verdicts {'same': 1500}
+r3 gen3 seed 14: 1500 programs; outcomes {'replayed': 722, 'vm': 257, 'fallback': 521}; verdicts {'same': 1500}
+r3 gen3 seed 15: 1500 programs; outcomes {'fallback': 498, 'replayed': 745, 'vm': 257}; verdicts {'same': 1500}
+r3 gp1: 36288 programs; outcomes {'vm': 6258, 'fallback': 17820, 'replayed': 12210}; verdicts {'same': 36288}
+r3 gprec1 seed 1: 3000 programs; outcomes {'fallback': 999, 'vm': 848, 'replayed': 1153}; verdicts {'same': 3000}
+r3 gprec1 seed 2: 3000 programs; outcomes {'vm': 821, 'replayed': 1145, 'fallback': 1034}; verdicts {'same': 3000}
+r3 gnum seed 1: 3000 programs; outcomes {'replayed': 2570, 'vm': 366, 'fallback': 64}; verdicts {'same': 3000}
+r3 gnum seed 2: 3000 programs; outcomes {'replayed': 2553, 'vm': 371, 'fallback': 76}; verdicts {'same': 3000}
+TOTAL verdicts {'same': 72046, 'approved': 4, 'outcome-only': 30}
+
+Round-3 repros: r1_member_index.f fallback index-target; r2_ne_eq_chain.f fallback comparison-chain; r3_deep_chain_crash.f fallback nesting-limit (was SIGSEGV); r4_equality_worklist.f vm, peak RSS 36.7 MB under NIFT_VM_HEAP_BUDGET=50000000 (was 73 MB)
