@@ -56,6 +56,14 @@ void check_outputs() {
         {"x := 0.5 - 0.5\nprint(-x)\nprint(x)\n", "0\n0\n"},                            // D1: a computed zero
         {"i := 0\nwhile(i < 3) { i += 1; if(i == 2) { break } }\nprint(i)\n", "2\n"},   // D2: jump last
         {"fn(f(p)) { return p.length() }\nprint(f([1, 2]))\n", "2\n"},
+        // CP12 review round 1, D3: -INT64_MIN is an exact Decimal; print and
+        // concatenation render its spelling, as legacy (exit 70 before).
+        {"q := 2147483648\nm := (0 - q * q) * 2\nd := -m\nprint(d)\nprint(-d)\nprint(\"s\" + d)\nprint(d + \"s\")\n",
+         "9223372036854775808\n-9223372036854775808\ns9223372036854775808\n9223372036854775808s\n"},
+        {"q := 2147483648\nm := (0 - q * q) * 2\nd := -m\ni := 0\nwhile (i < 1) { i += 1\nprint(d)\nprint(\"s\" + d) }\n",
+         "9223372036854775808\ns9223372036854775808\n"},
+        {"fn(f(d)) { return d }\nq := 2147483648\nm := (0 - q * q) * 2\nprint(f(-m))\nprint(-m - 1)\nprint(-m / 2)\n",
+         "9223372036854775808\n9.223372036854776e+18\n4611686018427387904\n"},
     };
     for (const Case& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -159,6 +167,10 @@ void check_errors() {
         {"o := {\"k\": 1}\nprint(o.size())\n", StopReason::None, "1\n"},
         {"o := {\"k\": 1}\nprint(o.length())\n", StopReason::Error, "unknown value or malformed expression: o.length()"},
         {"x := 1\nx = x + 0.5\n", StopReason::Error, "cannot assign double to int binding 'x'"},
+        // D3: an integral Decimal index (-INT64_MIN) is out of range, as legacy.
+        {"q := 2147483648\nd := -((0 - q * q) * 2)\na := [1]\nprint(a[d])\n", StopReason::Error,
+         "JSON array index 9223372036854775808 is out of range in 'a[d]'"},
+        {"q := 2147483648\nd := -((0 - q * q) * 2)\na := [1]\na[d] = 2\n", StopReason::Error, "index out of range: d"},
         // D-018a: one number rule everywhere, each statement evaluated once
         // (legacy prints 9007199254740992 for the second, a loop double).
         {"w := 9007199254740991\ni := 0\nwhile(i < 1) { i += 1; q := w + 2; print(q); print(w + 2) }\n",

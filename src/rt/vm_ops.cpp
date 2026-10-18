@@ -181,6 +181,11 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
         if (integral)
             return raise(fault, StopReason::Error,
                          "JSON array index " + integer_text(i) + " is out of range in '" + note_text(note) + "'");
+        // An integral Decimal beyond int64 (-INT64_MIN, review D3): out of
+        // range with its spelling, as legacy.
+        if (key.is(Kind::Decimal) && number_is_integer(key) && decimal_spelling(key).substr(0, 1) != "-")
+            return raise(fault, StopReason::Error, "JSON array index " + std::string(decimal_spelling(key)) +
+                                                       " is out of range in '" + note_text(note) + "'");
         return raise(fault, StopReason::Error,
                      "JSON array indices must be non-negative integers in '" + note_text(note) + "'");
     }
@@ -202,7 +207,9 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;
     if (!integral || static_cast<std::uint64_t>(i) >= array_size(object)) {
-        if (integral) return raise(fault, StopReason::Error, "index out of range: " + note_text(note));
+        const bool beyond_int64 =  // an integral Decimal (-INT64_MIN, review D3)
+            key.is(Kind::Decimal) && number_is_integer(key) && decimal_spelling(key).substr(0, 1) != "-";
+        if (integral || beyond_int64) return raise(fault, StopReason::Error, "index out of range: " + note_text(note));
         return raise(fault, StopReason::Error,
                      "assignment index does not address an array or object: " + note_text(note));
     }

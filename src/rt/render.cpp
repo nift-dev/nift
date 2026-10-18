@@ -26,6 +26,14 @@ bool append_rendered(const Value& value, std::string& out) {
             return true;
         }
         case Kind::Double: out += nift::RuntimeValue(value.as_double()).dump(0); return true;
+        case Kind::Decimal: {
+            // Exact numbers beyond int64 (only -INT64_MIN reaches the VM):
+            // legacy prints its StrNumber spelling, 9223372036854775808
+            // (review CP12 round 1, D3).
+            const std::string_view spelling = decimal_spelling(value);
+            out.append(spelling.data(), spelling.size());
+            return true;
+        }
         case Kind::Bool: out += value.as_bool() ? "true" : "false"; return true;
         case Kind::Null: out += "null"; return true;
         default: return false;
