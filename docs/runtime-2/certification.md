@@ -144,3 +144,15 @@ C#, Node, Python) in `test-integrity`; macOS and Windows in
 `checkpoint-10-cross-platform` and `v44-cross-platform`; package dogfood with
 the pinned `nift-packages` checkouts in the regression-suite workflow. A
 platform is claimed only after its CI job passes on the pushed commit.
+
+## Open timing observations (for the next controlled benchmark window)
+
+- `benchmarks/typed_content_scaling.py` (inside `test-v43-language`) is a single
+  wall-clock ratio of ~0.1 s builds. On the shared 2-vCPU host the unchanged
+  `runtime-2` binary measured 3.6×–12.8× across five runs (2026-10-19), so a
+  single run cannot judge regressions there. Instruction counts for site-DX
+  (@1e4cd54) and `runtime-2` (@e9198eb) were both 3.93× for 4× pages (+0.6 %
+  instructions), i.e. linear. Instruction counts cannot exclude filesystem or
+  scheduling regressions, so rerun the wall-clock test in the next preflight-
+  passing benchmark window and record the result here. Until then the target
+  is not counted as a pass in local certification.
