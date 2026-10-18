@@ -48,6 +48,14 @@ BODIES = {
     "control": "k := 0\nwhile (k < 5) {\n  k += 1\n  if (k == 2) { continue }\n  if (k == 4) { break }\n"
                "  print(k)\n}\nif (k > 10) { print(\"big\") } else if (k > 3) { print(\"mid\") } else { print(\"low\") }\n",
     "block_scope": "q := 1\nif (true) {\n  q := 2\n  print(q)\n}\nprint(q)\n",
+    # Review round 3 (F1): element assignment with the admitted index forms,
+    # a local name or an unsigned integer literal, computed or not.
+    "element_targets": "e := [1, 2, 3]\nj := 2\ne[j] = 7\ne[0] = e[j] + 1\nj = 1\ne[j] = e.length()\n"
+                       "e[ j ] = e[0] * 2\nprint(e[0])\nprint(e[1])\nprint(e[2])\n",
+    # Review round 3 (F2): every admitted comparison shape (one operator).
+    "comparisons_all": 'print(1 < 2.5)\nprint("a" >= "a")\nprint(null == null)\nprint(true != false)\n'
+                       'print([1, [2]] != [1, [2]])\nprint(1 == "1")\nprint((1 + 2) <= 3)\n'
+                       'print((1 < 2) && (2 > 1))\nprint(!(1 >= 2))\n',
     "decl_from_outer": "g := 2.5\nj := 0\nwhile (j < 1) {\n  h := g\n  h = 1.5\n  print(h)\n  j += 1\n}\n",
 }
 
@@ -55,6 +63,7 @@ FUNCTIONS = (
     "fn(add(a, b)) { return a + b }\n"
     "fn(fib(n)) { if (n < 2) { return n } return fib(n - 1) + fib(n - 2) }\n"
     "fn(gcd(a, b)) { while (b != 0) { t := b; b = a % b; a = t } return a }\n"
+    "fn(gcd2(a, b)) { t := 0; while (b != 0) { t = b; b = a % b; a = t } return a }\n"
     "fn(nothing()) { }\n"
     "fn(count(xs)) { return xs.length() }\n"
     "fn(greet(s)) { s = s + \"!\"\nreturn s }\n"
@@ -63,7 +72,8 @@ FUNCTIONS = (
     "fn(odd(n)) { if (n == 0) { return false } return even(n - 1) }\n"
 )
 CALLS = ('print(add(2, 3))\nprint(add("a", 1))\nprint(fib(15))\nprint(gcd(1071, 462))\nprint(nothing())\n'
-         'print(count([1, 2, 3]))\nprint(greet("world"))\nprint(sum_to(100))\nprint(even(10))\n')
+         'print(count([1, 2, 3]))\nprint(greet("world"))\nprint(sum_to(100))\nprint(even(10))\n'
+         'print(gcd2(1071, 462))\n')
 
 
 def supported():
@@ -77,10 +87,13 @@ def supported():
             out.append((f"{name}-fn-loop", FN_LOOP.format(body=indented)))
     out.append(("functions-top", FUNCTIONS + CALLS))
     # gcd declares `t := b` (a binding reference): refused in loop-called functions.
-    loop_fns = "".join(l + "\n" for l in FUNCTIONS.splitlines() if not l.startswith("fn(gcd"))
-    loop_calls = "".join(l + "\n" for l in CALLS.splitlines() if "gcd" not in l)
+    loop_fns = "".join(l + "\n" for l in FUNCTIONS.splitlines() if not l.startswith("fn(gcd("))
+    loop_calls = "".join(l + "\n" for l in CALLS.splitlines() if "gcd(" not in l)
     out.append(("functions-loop", loop_fns + "i0 := 0\nwhile (i0 < 2) {\n" + loop_calls + "i0 += 1\n}\n"))
     out.append(("functions-condition", FUNCTIONS + "k := 0\nwhile (fib(k) < 50) { k += 1 }\nprint(k)\n"))
+    # gcd in loop contexts (its loop-safe form declares from a literal).
+    out.append(("gcd-loop", FUNCTIONS + "k := 0\nwhile (k < 3) { k += 1\nprint(gcd2(1071 * k, 462)) }\n"
+                            "while (gcd2(k, 6) < 3) { k += 1 }\nprint(k)\n"))
     out.append(("top-return", "x := 1\nwhile (x < 9) { x += 1; if (x == 3) { return x } }\n"))
     out.append(("bench-call", "fn(add(a, b)) { return a + b }\ni := 0\ns := 0\n"
                               "while (i < 2000) { s = add(s, i); i += 1 }\nprint(s)\n"))
@@ -105,7 +118,23 @@ UNSUPPORTED = [
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),
     ("jump-outside-loop", "break\n", "jump-outside-loop"),
-    ("index-assign-order", "fn(f()) { return 0 }\na := [1]\na[f()] = f()\n", "index-assign-order"),
+    # Review round 3 (F1): only a local name or an unsigned integer literal index.
+    ("index-target-call", "fn(f()) { return 0 }\na := [1]\na[f()] = f()\n", "index-target"),
+    ("index-target-dot", "a := [1, 2, 3]\na[a.length() - 1] = 9\nprint(a[2])\n", "index-target"),
+    ("index-target-member", 'a := [1, 2]\no := {"k": 1}\na[o.k] = 9\nprint(a[1])\n', "index-target"),
+    ("index-target-decimal", "a := [1, 2]\na[1.0] = 9\nprint(a[1])\n", "index-target"),
+    ("index-target-string-arg", 'fn(g(x)) { return 0 }\na := [1]\na[g("x.y")] = 9\nprint(a[0])\n',
+     "index-target"),
+    ("index-target-paren", "a := [1, 2]\ni := 1\na[(i)] = 9\nprint(a[1])\n", "index-target"),
+    ("index-target-arith", "a := [1, 2]\ni := 0\na[i + 1] = 9\nprint(a[1])\n", "index-target"),
+    ("index-compound", "a := [1, 2]\na[0] += 1\nprint(a[0])\n", "compound-target"),
+    ("index-increment", "a := [1, 2]\ni := 0\na[i]++\nprint(a[0])\n", "incdec-target"),
+    # Review round 3 (F2): no comparison whose operand is a comparison.
+    ("comparison-chain-eq", "print(1 != 1 == 1)\n", "comparison-chain"),
+    ("comparison-chain-paren", "x := 1\nprint((x < 2) == true)\n", "comparison-chain"),
+    ("comparison-chain-right", "x := 1\nif (true == (x >= 2)) { print(1) }\n", "comparison-chain"),
+    # Review round 3 (F3): tree depth bounded before any analysis.
+    ("nesting-limit", "print(" + " + ".join(["1"] * 1000) + ")\n", "nesting-limit"),
     ("free-name", "fn(f()) { return n }\nn := 1\nprint(f())\n", "free-name"),
     ("unresolved-name", "print(args)\n", "unresolved-name"),
     # Literals.
@@ -206,6 +235,49 @@ def check(nift, work, kind, name, source, reason):
         shutil.rmtree(d, ignore_errors=True)
 
 
+# Review round 3 (F4): `==`/`!=` on large aggregates must stay within the VM
+# memory budget. The comparison used to build a work list of every element
+# pair outside the budget (73 MB peak for two 1M-element arrays under a 50 MB
+# budget); it now keeps one frame per nesting level. The peak RSS of the
+# whole process must stay below the budget plus a fixed allowance for the
+# process itself (binary, allocator, stacks).
+EQUALITY_MEMORY = [
+    ("flat", "a := [0]\nb := [0]\ni := 0\nwhile (i < 1000000) { a.push(i); b.push(i); i += 1 }\n"
+             "print(a == b)\nprint(a != b)\n", "true\nfalse\n"),
+    ("nested", "fn(w(p, n)) { return [p ?? 0, [n, n + 1]] }\na := [0]\nb := [0]\ni := 0\n"
+               "while (i < 9000) { a = w(a, i); b = w(b, i); i += 1 }\nprint(a == b)\nprint(a != b)\n",
+     "true\nfalse\n"),
+]
+EQUALITY_BUDGET = 50_000_000
+PROCESS_ALLOWANCE = 8 << 20
+
+
+def equality_memory(nift, work):
+    failures = []
+    if not hasattr(os, "wait4") or "ASAN_OPTIONS" in os.environ:
+        return failures  # RSS is meaningless under ASan
+    for name, source, expected in EQUALITY_MEMORY:
+        d = tempfile.mkdtemp(dir=work)
+        with open(os.path.join(d, "p.f"), "w") as f:
+            f.write(source)
+        env = env_for(d)
+        env.update({"NIFT_VM": "require", "NIFT_VM_HEAP_BUDGET": str(EQUALITY_BUDGET)})
+        out_path, err_path = os.path.join(d, ".out"), os.path.join(d, ".err")
+        with open(out_path, "wb") as o, open(err_path, "wb") as e:
+            p = subprocess.Popen([nift, "p.f"], cwd=d, env=env, stdout=o, stderr=e, stdin=subprocess.DEVNULL)
+            _, status, usage = os.wait4(p.pid, 0)  # this child's own peak RSS
+            p.returncode = os.waitstatus_to_exitcode(status)
+        out, err = open(out_path, "rb").read(), open(err_path, "rb").read()
+        rss = usage.ru_maxrss * 1024
+        if p.returncode != 0 or out.decode() != expected:
+            failures.append(f"equality-memory-{name}: exit {p.returncode}, out {out[:60]!r}, err {err[-200:]!r}")
+        elif rss > EQUALITY_BUDGET + PROCESS_ALLOWANCE:
+            failures.append(f"equality-memory-{name}: peak RSS {rss} bytes exceeds the budget "
+                            f"{EQUALITY_BUDGET} + {PROCESS_ALLOWANCE}")
+        shutil.rmtree(d, ignore_errors=True)
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -217,6 +289,7 @@ def main():
     try:
         with cf.ThreadPoolExecutor(a.jobs) as pool:
             failures = [f for f in pool.map(lambda it: check(nift, work, *it), items) if f]
+        failures += equality_memory(nift, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for f in failures:

@@ -2,6 +2,7 @@
 
 #include "rt/compiler.h"
 #include "rt/parser.h"
+#include "rt/unit_check.h"
 #include "rt/vm.h"
 
 #include <chrono>
@@ -67,22 +68,6 @@ void write_stdout(std::string& output, void*) {
 }
 
 // First Opaque node in pre-order, or kNoNode.
-NodeId first_opaque(const Ast& ast, NodeId id) {
-    if (id == kNoNode) return kNoNode;
-    const Node& n = ast.at(id);
-    if (n.kind == NodeKind::Opaque) return id;
-    for (NodeId child : {n.a, n.b, n.c}) {
-        const NodeId r = first_opaque(ast, child);
-        if (r != kNoNode) return r;
-    }
-    const NodeId* list = ast.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k) {
-        const NodeId r = first_opaque(ast, list[k]);
-        if (r != kNoNode) return r;
-    }
-    return kNoNode;
-}
-
 void locate_into(Stats& stats, const std::string& source, std::uint32_t offset) {
     const Location where = locate(source, offset);
     stats.line = where.line;
@@ -192,7 +177,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         locate_into(stats, source, parsed.error.offset);
         return not_compiled(stats, mode, source_path, exit_code);
     }
-    const NodeId opaque = first_opaque(ast, parsed.root);
+    const NodeId opaque = first_opaque_node(ast, parsed.root);
     if (opaque != kNoNode) {
         stats.reason = std::string("opaque:") + opaque_reason_name(ast.at(opaque).reason);
         locate_into(stats, source, ast.at(opaque).begin);

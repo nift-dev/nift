@@ -19,8 +19,10 @@ stderr and exit status must be identical, except for:
 
 Any other difference, any `internal-error` outcome and any missing statistics
 line fail the gate. A program may also name the outcome the VM statistics must
-show (e.g. the memory family must end in a recursion-budget bail); a
-different outcome fails the gate. Exit 1 on failure.
+show (e.g. the memory family must end in a recursion-budget bail), or a
+tuple of acceptable outcome prefixes; `fallback:<reason>` requires a static
+refusal with that reason before execution (review round 3). A different
+outcome fails the gate. Exit 1 on failure.
 """
 import argparse
 import collections
@@ -94,6 +96,8 @@ def outcome_key(st):
 def check(nift, item, work, timeout):
     family, name, source, extra = item[:4]
     expect = item[4] if len(item) > 4 else None
+    if isinstance(expect, str):
+        expect = (expect,)
     d = tempfile.mkdtemp(dir=work)
     path = os.path.join(d, "p.f")
     with open(path, "w") as f:
@@ -103,8 +107,8 @@ def check(nift, item, work, timeout):
         if not cst:
             return family, name, "no-stats", "fail", source, None, None
         if cst["outcome"] == "fallback":
-            verdict = "fail" if expect else "fallback"
-            return family, name, outcome_key(cst), verdict, source, None, None
+            ok = not expect or any(outcome_key(cst).startswith(e) for e in expect)
+            return family, name, outcome_key(cst), "fallback" if ok else "fail", source, None, None
         t = timeout * (8 if family == "output" else 1)
         legacy, _ = run(nift, path, d, None, extra, t)
         vm, st = run(nift, path, d, "1", extra, t)
@@ -114,7 +118,7 @@ def check(nift, item, work, timeout):
             verdict = "diff"
         if not st and vm[2] != "timeout":
             verdict = "diff"
-        if expect and not key.startswith(expect):
+        if expect and not any(key.startswith(e) for e in expect):
             verdict = "fail"
         return family, name, key, verdict, source, legacy, vm
     finally:

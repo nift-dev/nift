@@ -6,6 +6,14 @@ namespace nift::rt::detail {
 
 namespace {
 
+bool is_comparison(const Node& n) {
+    if (n.kind != NodeKind::Binary) return false;
+    switch (n.op) {
+        case Op::Eq: case Op::Ne: case Op::Lt: case Op::Le: case Op::Gt: case Op::Ge: return true;
+        default: return false;
+    }
+}
+
 bool is_receiver(NodeKind kind) {
     return kind == NodeKind::Ident || kind == NodeKind::Member || kind == NodeKind::Index;
 }
@@ -106,6 +114,41 @@ bool UnitCompiler::ends_with_not(NodeId id) const {
 
 bool UnitCompiler::infix_left_ok(const Node& node) {
     return !ends_with_not(node.a) || fail(node, "prefix-not-precedence");
+}
+
+// A comparison whose operand is itself a comparison (`1 != 1 == 1`,
+// `(a < b) == c`, any order and context): the CP10 tree groups `==`/`!=`
+// right-associatively while legacy's textual evaluator splits at the first
+// `==`, and relational chains differ again; none is compiled (review round
+// 3, F2). Parentheses leave no node, so a parenthesised comparison operand is
+// refused as well (conservative).
+bool UnitCompiler::comparison_chain_ok(const Node& node) {
+    if (!is_comparison(node)) return true;
+    if (is_comparison(ast_.at(node.a)) || is_comparison(ast_.at(node.b))) return fail(node, "comparison-chain");
+    return true;
+}
+
+// Element assignment `a[i] = v`: legacy's textual evaluator treats a target
+// whose text contains `.` as a member path (`a[a.length() - 1] = 9`,
+// `a[o.k] = 1`, `a[1.0] = 1` fail there), so only a plain local name or an
+// unsigned integer literal is compiled as the index (review round 3, F1).
+bool UnitCompiler::element_target_ok(const Node& target) {
+    const Node& key = ast_.at(target.b);
+    bool plain = key.kind == NodeKind::Ident;
+    if (key.kind == NodeKind::Number) {
+        plain = true;
+        for (char c : text(key))
+            if (c < '0' || c > '9') plain = false;
+    }
+    // The bracket holds exactly that token (no parentheses around it).
+    std::string_view inside = ast_.source().substr(ast_.at(target.a).end, target.end - ast_.at(target.a).end);
+    while (!inside.empty() && (inside.front() == '[' || inside.front() == ' ' || inside.front() == '\t'))
+        inside.remove_prefix(1);
+    while (!inside.empty() && (inside.back() == ']' || inside.back() == ' ' || inside.back() == '\t'))
+        inside.remove_suffix(1);
+    if (!plain || inside != text(key) || text(target).find('.') != std::string_view::npos)
+        return fail(target, "index-target");
+    return true;
 }
 
 } // namespace nift::rt::detail

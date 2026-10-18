@@ -490,3 +490,7 @@ FAMILIES = {
 import vm_adversarial_gen2  # noqa: E402
 
 FAMILIES.update(vm_adversarial_gen2.FAMILIES)
+
+import vm_adversarial_gen3  # noqa: E402  (review round 3: elemtarget, cmpchain, deeptree)
+
+FAMILIES.update(vm_adversarial_gen3.FAMILIES)

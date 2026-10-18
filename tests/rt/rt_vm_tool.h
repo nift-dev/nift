@@ -3,6 +3,7 @@
 // compile and run a script without the nift CLI.
 #include "rt/compiler.h"
 #include "rt/parser.h"
+#include "rt/unit_check.h"
 #include "rt/vm.h"
 
 #include <memory>
@@ -20,19 +21,9 @@ struct Compiled {
 // Opaque nodes and parse errors are reported as reasons, like the runner
 // (`opaque:<class>` of the first Opaque node in pre-order).
 inline std::string first_opaque(const nift::rt::Ast& ast, nift::rt::NodeId id) {
-    if (id == nift::rt::kNoNode) return {};
-    const nift::rt::Node& n = ast.at(id);
-    if (n.kind == nift::rt::NodeKind::Opaque) return std::string("opaque:") + nift::rt::opaque_reason_name(n.reason);
-    for (nift::rt::NodeId child : {n.a, n.b, n.c}) {
-        std::string r = first_opaque(ast, child);
-        if (!r.empty()) return r;
-    }
-    const nift::rt::NodeId* list = ast.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k) {
-        std::string r = first_opaque(ast, list[k]);
-        if (!r.empty()) return r;
-    }
-    return {};
+    const nift::rt::NodeId opaque = nift::rt::first_opaque_node(ast, id);  // iterative
+    if (opaque == nift::rt::kNoNode) return {};
+    return std::string("opaque:") + nift::rt::opaque_reason_name(ast.at(opaque).reason);
 }
 
 inline Compiled compile(const std::string& source) {

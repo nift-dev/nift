@@ -4,6 +4,7 @@
 #include "rt/literal.h"
 #include "rt/native.h"
 #include "rt/prepared.h"
+#include "rt/unit_check.h"
 
 namespace nift::rt {
 
@@ -163,7 +164,7 @@ bool UnitCompiler::assign(const Node& node) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
         if (object.kind != NodeKind::Ident || !local_register(object, reg)) return fail(target, "index-assign-target");
-        if (has_call(target.b) && has_call(node.b)) return fail(target, "index-assign-order");
+        if (!element_target_ok(target)) return false;
         if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
         fb_->set_offset(node.begin);
         fb_->emit(OpCode::SetIndex, reg, key, value);
@@ -330,6 +331,14 @@ bool UnitCompiler::expression_statement(const Node& node) {
 
 CompileResult compile_unit(const Ast& ast, NodeId root) {
     CompileResult result;
+    // Every later pass may recurse along the tree: bound its depth first,
+    // iteratively (review round 3, F3).
+    const UnitShape shape = check_unit_depth(ast, root);
+    if (!shape.ok) {
+        result.reason = "nesting-limit";
+        result.offset = shape.offset;
+        return result;
+    }
     const UnitPlan plan = plan_unit(ast, root);
     if (!plan.ok) {
         result.reason = plan.reason;

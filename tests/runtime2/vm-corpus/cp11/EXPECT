@@ -12,7 +12,7 @@ fallback_escape.f fallback string-literal
 fallback_fn_after.f fallback fn-after-statement
 fallback_for.f fallback statement:For
 fallback_free_name.f fallback free-name
-fallback_index_assign_call.f fallback index-assign-order
+fallback_index_assign_call.f fallback index-target
 fallback_interpolation.f fallback interpolation
 fallback_lambda.f fallback expression:Lambda
 fallback_large_literal.f fallback number-literal
@@ -77,3 +77,8 @@ review2_m4_formfeed.f fallback opaque:legacy-runtime-error
 review2_m4_vtab.f fallback opaque:legacy-runtime-error
 review2_r5_hidden_frame_memory.f replayed bail:recursion-budget
 review2_r6_deep_equality.f vm
+# CP11 review round 3 regressions.
+review3_f1_member_index.f fallback index-target
+review3_f1_index_name_ok.f vm
+review3_f2_ne_eq_chain.f fallback comparison-chain
+review3_f2_single_ok.f vm

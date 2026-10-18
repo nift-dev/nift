@@ -319,6 +319,86 @@ void check_memory_budget() {
     CHECK(shallow.result.reason == BailReason::None && shallow.output == "true\n");
 }
 
+// Review round 3. F1: element-assignment targets; F2: comparison chains; F3:
+// tree depth bounded before any analysis.
+void check_round3_fallbacks() {
+    const Case cases[] = {
+        {"a := [1, 2, 3]\na[a.length() - 1] = 9\nprint(a[2])\n", "index-target"},
+        {"a := [1, 2]\no := {\"k\": 1}\na[o.k] = 9\n", "index-target"},
+        {"a := [1, 2]\na[1.0] = 9\n", "index-target"},
+        {"fn(g(x)) { return 0 }\na := [1]\na[g(\"x.y\")] = 9\n", "index-target"},
+        {"a := [1, 2]\ni := 1\na[(i)] = 9\n", "index-target"},
+        {"a := [1, 2]\ni := 0\na[i + 1] = 9\n", "index-target"},
+        {"a := [1, 2]\na[0] += 1\n", "compound-target"},
+        {"print(1 != 1 == 1)\n", "comparison-chain"},
+        {"x := 1\nprint((x < 2) == true)\n", "comparison-chain"},
+        {"x := 1\nif (true == (x >= 2)) { print(1) }\n", "comparison-chain"},
+        {"x := 1\nwhile ((x < 2) != false) { x += 1 }\n", "comparison-chain"},
+    };
+    for (const Case& c : cases) {
+        const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
+        CHECK(r.reason == c.output);
+        if (r.reason != c.output) std::fprintf(stderr, "  program: %s  reason [%s]\n", c.source, r.reason.c_str());
+    }
+    // Admitted forms still compile and run.
+    const Case ok[] = {
+        {"a := [1, 2, 3]\ni := 2\na[i] = 7\na[0] = 5\na[ i ] = a[i] + 1\nprint(a[0] + a[2])\n", "13\n"},
+        {"x := 1\nprint(x < 2)\nprint((x + 1) == 2)\nprint((x < 2) && (x > 0))\n", "true\ntrue\ntrue\n"},
+    };
+    for (const Case& c : ok) {
+        const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
+        CHECK(r.reason.empty() && r.output == c.output);
+        if (!r.reason.empty() || r.output != c.output)
+            std::fprintf(stderr, "  program: %s  got [%s] reason [%s]\n", c.source, r.output.c_str(), r.reason.c_str());
+    }
+}
+
+std::string chain(const char* head, const char* op, const char* term, int n, const char* tail) {
+    std::string s = head;
+    for (int k = 0; k < n; ++k) {
+        if (k) s += op;
+        s += term;
+    }
+    return s + tail;
+}
+
+// No input may exhaust the stack during parsing or compilation: the deep
+// inputs are compiled on a thread with a 512 KiB stack.
+void* deep_inputs(void* out) {
+    const std::string sources[] = {
+        chain("print(", " + ", "1", 100000, ")\n"),
+        chain("print(", " && ", "true", 100000, ")\n"),
+        chain("print(", " || ", "false", 100000, ")\n"),
+        chain("print(", " ?? ", "null", 100000, ")\n"),
+        chain("fn(f()) { return ", " - ", "1", 100000, " }\nprint(f())\n"),
+        chain("i := 0\nwhile (i < 1) { i += 1\nprint(", " + ", "1", 100000, ") }\n"),
+        std::string("print(") + std::string(100000, '(') + "1" + std::string(100000, ')') + ")\n",
+        std::string("print(") + std::string(100000, '[') + "1" + std::string(100000, ']') + ")\n",
+        std::string("print(") + std::string(100000, '-') + "1)\n",
+        chain("", "", "if (true) {\n", 3000, "print(1)\n") + chain("", "", "}\n", 3000, ""),
+    };
+    int refused = 0;
+    for (const std::string& s : sources) refused += rt_vm_tool::compile(s).program ? 0 : 1;
+    *static_cast<int*>(out) = refused;
+    return nullptr;
+}
+
+void check_deep_inputs() {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 512 * 1024);
+    pthread_t thread;
+    int refused = -1;
+    CHECK(pthread_create(&thread, &attr, deep_inputs, &refused) == 0);
+    pthread_join(thread, nullptr);
+    pthread_attr_destroy(&attr);
+    CHECK(refused == 10);
+    CHECK(rt_vm_tool::compile(chain("print(", " + ", "1", 100000, ")\n")).reason == "nesting-limit");
+    // A long flat statement list has no depth and still compiles.
+    const rt_vm_tool::Run flat = rt_vm_tool::run(chain("x := 0\n", "", "x += 1\n", 50000, "print(x)\n"));
+    CHECK(flat.reason.empty() && flat.output == "50000\n");
+}
+
 void check_legacy_names() {
     for (const char* name : {"is_null", "is_enum", "is_collection", "title", "name", "loop", "print", "error",
                              "build_all", "first", "split", "json"})
@@ -354,5 +434,7 @@ int main() {
     check_memory_budget();
     check_legacy_names();
     check_code_shape();
+    check_round3_fallbacks();
+    check_deep_inputs();
     return rt_test::finish("rt vm unit");
 }

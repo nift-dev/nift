@@ -161,7 +161,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
 bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
-    if (!infix_left_ok(node)) return false;
+    if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t left = 0, right = 0;
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
@@ -358,6 +358,7 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
     const std::uint16_t mark = fb_->top();
     const OpCode fused = node.kind == NodeKind::Binary ? fused_not_jump(node.op) : OpCode::Nop;
     if (fused != OpCode::Nop) {
+        if (!comparison_chain_ok(node)) return false;
         std::uint16_t left = 0, right = 0;
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
         fb_->set_offset(node.begin);

@@ -14,16 +14,28 @@ namespace nift::rt {
 
 namespace {
 
+// Pushes the children of `n` so that they pop in pre-order (a, b, c, list).
+void push_children(const Ast& ast, const Node& n, std::vector<NodeId>& stack) {
+    const NodeId* list = ast.list(n);
+    for (std::uint32_t k = n.count; k-- > 0;)
+        if (list[k] != kNoNode) stack.push_back(list[k]);
+    for (NodeId child : {n.c, n.b, n.a})
+        if (child != kNoNode) stack.push_back(child);
+}
+
 // Pre-order walk of the subtree `id`; stops (returns false) when `visit`
-// (bool(NodeId, const Node&)) does.
+// (bool(NodeId, const Node&)) does. Iterative (review round 3, F3): no
+// tree shape can exhaust the C++ stack here.
 template <class Visit> bool walk(const Ast& ast, NodeId id, const Visit& visit) {
     if (id == kNoNode) return true;
-    const Node& n = ast.at(id);
-    if (!visit(id, n)) return false;
-    if (!walk(ast, n.a, visit) || !walk(ast, n.b, visit) || !walk(ast, n.c, visit)) return false;
-    const NodeId* list = ast.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k)
-        if (!walk(ast, list[k], visit)) return false;
+    std::vector<NodeId> stack{id};
+    while (!stack.empty()) {
+        const NodeId next = stack.back();
+        stack.pop_back();
+        const Node& n = ast.at(next);
+        if (!visit(next, n)) return false;
+        push_children(ast, n, stack);
+    }
     return true;
 }
 
@@ -170,12 +182,17 @@ private:
     // are prepared with their outermost loop); false stops.
     template <class Visit> bool outermost_loops(NodeId id, const Visit& visit) {
         if (id == kNoNode) return true;
-        const Node& n = ast_.at(id);
-        if (n.kind == NodeKind::While) return visit(n);
-        if (!outermost_loops(n.a, visit) || !outermost_loops(n.b, visit) || !outermost_loops(n.c, visit)) return false;
-        const NodeId* list = ast_.list(n);
-        for (std::uint32_t k = 0; k < n.count; ++k)
-            if (!outermost_loops(list[k], visit)) return false;
+        std::vector<NodeId> stack{id};
+        while (!stack.empty()) {
+            const NodeId next = stack.back();
+            stack.pop_back();
+            const Node& n = ast_.at(next);
+            if (n.kind == NodeKind::While) {
+                if (!visit(n)) return false;
+                continue;
+            }
+            push_children(ast_, n, stack);
+        }
         return true;
     }
 
