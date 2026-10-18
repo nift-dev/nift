@@ -532,3 +532,14 @@ must be removed or justified when build recovery integrates.
   distinguishable from a launched process that exits nonzero.
 - Whole reads stop retaining data at the configured bound (a small probe past
   it is allowed; unbounded allocation is not).
+- **Refinements (owner).** Ownership classes: managed processes belong to their
+  execution context (script, page render, build, `--auto` rebuild) and are
+  cleaned up when it ends; explicitly detached processes transfer
+  responsibility; processes launched during builds are managed, and a
+  superseded `--auto` build leaves none behind. Cancellation distinguishes a
+  direct child, a whole pipeline and a descendant tree, and cooperative
+  cancellation from forced termination with bounded escalation. Documented
+  guarantees are per platform and only what can be enforced (POSIX process
+  groups can be escaped; Windows job objects have breakaway and inherited-handle
+  caveats); no general-purpose supervisor. CP17 owns the handle
+  representation. Public-API alternatives use parser-verified Nift code.
