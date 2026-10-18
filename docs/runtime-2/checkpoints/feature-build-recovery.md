@@ -348,6 +348,16 @@ regression suite 94/95 with the new module (same root-only
 p1–p4, p7 now behave as specified; p8 (inline `@script` scribbling its own
 output) is the documented exception.
 
+Randomized soak (`RECOVERY_RANDOM_STEPS=250 RECOVERY_RANDOM_SEEDS=3`, all
+three modes, 2,250 steps: ~550 builds, ~200 kills, ~95 automatic
+recoveries, ~740 clean-build comparisons): 0 problems. A first soak flagged
+"not a no-op" in 10 of 2,250 steps; each was one extra rebuild where a source's
+mtime equalled the page-info's mtime in the same coarse kernel timestamp tick
+(modified/hybrid rebuild conservatively on equal timestamps — CP01 rule,
+reproduced identically with the pre-change binary by forcing equal mtimes).
+Outputs were correct in every case; the tester now tolerates exactly one such
+extra rebuild and still fails if the build after it is not a no-op.
+
 ## Overlap with feature-site-dx
 
 `build --auto` (src/CLI.cpp, watch loop) is not changed here: on this branch
