@@ -107,6 +107,7 @@ private:
         if (variant_ == Variant::Prepared && prepared()) fb_->at(at).flags |= kInstrCallerSite;
     }
     std::uint32_t site(const Node& node) const;
+    std::uint32_t statement_site(const Node& node) const;
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
@@ -141,6 +142,8 @@ private:
     std::uint32_t index_site_ = kNoSite;   // textual index key: errors at the index expression
     int call_args_ = 0;                    // inside user-call arguments
     int index_depth_ = 0;                  // inside index brackets
+    std::uint32_t loop_site_ = kNoSite;    // the outermost loop body's statement being compiled
+    const Node* loop_body_ = nullptr;      // the outermost loop body (main or a textual variant)
     NodeId print_path_ = kNoNode;          // the path argument of a prepared print()
     bool print_statement_ = false;         // compiling a print statement's call
     NodeId id_of(const Node& node) const { return static_cast<NodeId>(&node - &ast_.at(0)); }

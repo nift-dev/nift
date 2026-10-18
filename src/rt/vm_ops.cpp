@@ -84,6 +84,26 @@ bool prepared_arithmetic(OpCode op, const Value& left, const Value& right, Value
     return true;
 }
 
+bool prepared_compound(OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
+    const double l = number_approx(left), r = number_approx(right);
+    double result = 0;
+    switch (op) {
+        case OpCode::Add: result = l + r; break;
+        case OpCode::Sub: result = l - r; break;
+        case OpCode::Mul: result = l * r; break;
+        case OpCode::Div:
+            if (r == 0) return raise(fault, StopReason::Error, "division by zero");
+            result = l / r;
+            break;
+        default:
+            if (r == 0) return raise(fault, StopReason::Error, "modulo by zero");
+            result = std::fmod(l, r);
+            break;
+    }
+    out = prepared_number(result);
+    return true;
+}
+
 std::string integer_text(std::int64_t v) {
     char buffer[24];
     const auto result = std::to_chars(buffer, buffer + sizeof buffer, v);
@@ -102,8 +122,13 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
         return concatenate(left, right, out, fault);
     if (!left.is_number() || !right.is_number()) return internal(fault, "arithmetic");
     if (prepared(in)) {
-        if ((in.flags & kInstrReeval) && (is_large(left) || is_large(right)))
-            return raise(fault, StopReason::Reeval, "large operand");
+        if (in.flags & kInstrReeval) {
+            // A prepared compound assignment or increment (ParserTemplate.cpp
+            // execute_prepared): a large operand re-evaluates the statement
+            // textually; otherwise doubles, with only the zero-divisor checks.
+            if (is_large(left) || is_large(right)) return raise(fault, StopReason::Reeval, "large operand");
+            return prepared_compound(op, left, right, out, fault);
+        }
         return prepared_arithmetic(op, left, right, out, fault);
     }
     Value result;

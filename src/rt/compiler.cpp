@@ -72,6 +72,7 @@ bool UnitCompiler::statements(const Node& block) {
         const Node& node = ast_.at(list[k]);
         if ((node.kind == NodeKind::Break || node.kind == NodeKind::Continue) && k + 1 < block.count)
             return fail(node, "jump-not-last");
+        if (&block == loop_body_) loop_site_ = node.begin;
         if (!statement(list[k])) return false;
     }
     return true;
@@ -83,10 +84,13 @@ bool UnitCompiler::statement(NodeId id) {
     // Inside prepared code, a statement legacy's prepared parser rejects is
     // run by legacy's textual evaluator (StmtKind::Legacy).
     const bool saved_textual = textual_statement_;
+    // An `if` condition or `return` expression the prepared parser rejects
+    // makes legacy abandon preparing the whole loop body: refused (after the
+    // statement's own checks, so their reasons come first).
+    bool unpreparable = false;
     if (prepared() && !statement_preparable(node)) {
-        if (node.kind == NodeKind::If || node.kind == NodeKind::While || node.kind == NodeKind::Return)
-            return fail(node, "prepared-unpreparable");
-        textual_statement_ = true;
+        if (node.kind == NodeKind::If || node.kind == NodeKind::Return) unpreparable = true;
+        else if (node.kind != NodeKind::While) textual_statement_ = true;
     }
     update_flags();
     fb_->set_offset(node.begin);
@@ -108,6 +112,7 @@ bool UnitCompiler::statement(NodeId id) {
         case NodeKind::Break: case NodeKind::Continue: ok = loop_jump(node); break;
         default: ok = fail(node, std::string("statement:") + node_kind_name(node.kind)); break;
     }
+    if (ok && unpreparable) ok = fail(node, "prepared-unpreparable");
     textual_statement_ = saved_textual;
     update_flags();
     fb_->release_to(mark);
@@ -136,8 +141,8 @@ bool UnitCompiler::if_chain(const Node& node) {
     const Node& other = ast_.at(node.c);
     bool other_ok = false;
     if (other.kind == NodeKind::If) {
-        if (prepared() && !statement_preparable(other)) return fail(other, "prepared-unpreparable");
         other_ok = if_chain(other);
+        if (other_ok && prepared() && !statement_preparable(other)) other_ok = fail(other, "prepared-unpreparable");
     } else {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
@@ -156,12 +161,6 @@ bool UnitCompiler::while_loop(const Node& node) {
     const bool saved_textual = textual_statement_;
     textual_statement_ = false;
     update_flags();
-    if (!statement_preparable(node)) {
-        --loop_depth_;
-        textual_statement_ = saved_textual;
-        update_flags();
-        return fail(node, "prepared-unpreparable");
-    }
     Loop loop;
     loop.start = fb_->here();
     loops_.push_back(loop);
@@ -170,7 +169,12 @@ bool UnitCompiler::while_loop(const Node& node) {
     if (ok) {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
+        const Node* saved_body = loop_body_;
+        const std::uint32_t saved_site = loop_site_;
+        if (loop_depth_ == 1) loop_body_ = &ast_.at(node.b);
         ok = statements(ast_.at(node.b));
+        loop_body_ = saved_body;
+        loop_site_ = saved_site;
         fb_->release_to(mark);
         scopes_.pop();
     }
@@ -182,6 +186,7 @@ bool UnitCompiler::while_loop(const Node& node) {
         for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
     }
     loops_.pop_back();
+    if (ok && !statement_preparable(node)) ok = fail(node, "prepared-unpreparable");
     --loop_depth_;
     textual_statement_ = saved_textual;
     update_flags();
