@@ -355,8 +355,13 @@ recoveries, ~740 clean-build comparisons): 0 problems. A first soak flagged
 mtime equalled the page-info's mtime in the same coarse kernel timestamp tick
 (modified/hybrid rebuild conservatively on equal timestamps — CP01 rule,
 reproduced identically with the pre-change binary by forcing equal mtimes).
-Outputs were correct in every case; the tester now tolerates exactly one such
-extra rebuild and still fails if the build after it is not a no-op.
+Outputs were correct in every case. The tester now allows exactly one extra
+rebuild only when it has itself confirmed, from mtimes read on disk before
+that build, that every rebuilt page's every reason is "dependency changed: X"
+with mtime(X) == mtime(page-info); anything else, or a further rebuild, is a
+problem. Allowances are counted and reported per run: bounded run (80 steps ×
+3 modes) 2, soak rerun under the lock (250 steps × 1 seed × 3 modes) 1, with 0
+problems.
 
 ## Overlap with feature-site-dx
 

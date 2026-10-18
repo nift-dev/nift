@@ -36,20 +36,53 @@ BAD_SCRIPT={"scripts/lpost.f":'nosuchfunction_xyz()\n',"scripts/post.f":'nosuchf
  "scripts/custom.f":'out := file(getenv("NIFT_HOOK_OUTPUT"))\nout.open("w")\nout.write("PARTIAL")\nout.save()\nout.close()\nnosuchfunction_xyz()\n'}
 
 
-def settles(root):
-    """The build after a successful build must be a no-op. One extra rebuild
-    is tolerated when a source's mtime lands in the same coarse filesystem
-    tick as the page-info write: modified/hybrid mode then rebuild
-    conservatively (pre-existing CP01 rule, identical before this branch);
-    the build after that must be a no-op."""
-    for _ in range(2):
+def _mtimes(root):
+    """mtime_ns of every file under the project except outputs, read from disk."""
+    out = {}
+    for p in root.rglob("*"):
+        if p.is_file() and "public" != p.relative_to(root).parts[0]:
+            out[p.relative_to(root).as_posix()] = p.stat().st_mtime_ns
+    return out
+
+
+def _equal_tick(before, out):
+    """True only if every page the build rebuilt was rebuilt solely because a
+    dependency's mtime EQUALS that page's recorded build timestamp (its
+    page-info mtime), both read from disk before the build."""
+    page, ok, seen = None, True, False
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("built "):
+            page = line[len("built "):]
+            seen = True
+        elif line.startswith("↳ "):
+            reason = line[2:]
+            prefix = "dependency changed: "
+            info = before.get(f".nift/public/{page}.info.json") if page else None
+            dep = before.get(reason[len(prefix):]) if reason.startswith(prefix) else None
+            if info is None or dep is None or dep != info:
+                ok = False
+    return seen and ok
+
+
+def settles(root, stats):
+    """The build after a successful build must be a no-op. Exactly one extra
+    rebuild is allowed, and only when the tester itself confirms the
+    equal-timestamp condition from the files on disk: every rebuilt page's
+    every reason is "dependency changed: X" with mtime(X) == mtime(page-info)
+    (modified/hybrid rebuild conservatively on equal timestamps - the
+    pre-existing CP01 rule, identical before this branch). The build after
+    that must be a no-op. Allowances are counted."""
+    for attempt in range(2):
+        before = _mtimes(root)
         rc, out = run(root, "build")
         if rc == 0 and "up to date" in out:
             return True
-        if rc != 0 or "dependency changed" not in out:
-            print(out[-300:])
-            return False
-    print(out[-300:])
+        if attempt == 0 and rc == 0 and _equal_tick(before, out):
+            stats["equal_tick_allowances"] = stats.get("equal_tick_allowances", 0) + 1
+            continue
+        print(out[-400:])
+        return False
     return False
 
 
@@ -127,13 +160,13 @@ def main(mode, steps, seed):
             else:
                 d,extra=diffclean(v); stats["vcompares"]=stats.get("vcompares",0)+1
                 if d or extra: prob(f"step{step} virtual-fix differs from clean: {d[:6]} extra {extra[:6]} broken={sorted(broken)}")
-                if not settles(v): prob(f"step{step} virtual not no-op")
+                if not settles(v, stats): prob(f"step{step} virtual not no-op")
             shutil.rmtree(v)
         # comparison point: when nothing broken, plain build must succeed and match a clean build
         if not broken and rng.random()<0.5:
             rc,out=run(r,"build")
             if rc!=0 or marker(r): prob(f"step{step} clean-sources build rc={rc} marker={marker(r)}: {out[-400:]}"); continue
-            if not settles(r): prob(f"step{step} not a no-op after build")
+            if not settles(r, stats): prob(f"step{step} not a no-op after build")
             d,extra=diffclean(r); stats["compares"]+=1
             if d or extra: prob(f"step{step} differs from clean build: {d[:6]} extra {extra[:6]}")
             if (r/".nift/failed.json").exists(): prob(f"step{step} failed.json remains: {(r/'.nift/failed.json').read_text()}")
@@ -148,16 +181,20 @@ def entry():
     seeds = int(os.environ.get("RECOVERY_RANDOM_SEEDS", "1"))
     base_seed = int(os.environ.get("RECOVERY_RANDOM_SEED", "20261018"))
     problems = []
+    allowances = 0
     with tempfile.TemporaryDirectory(prefix="nift-recovery-rnd-") as td:
         SCR = Path(td)
         for m, mode in enumerate(("modified", "hash", "hybrid")):
             for k in range(seeds):
-                _, probs = main(mode, steps, base_seed + 1000 * m + k)
+                stats, probs = main(mode, steps, base_seed + 1000 * m + k)
                 problems += probs
+                allowances += stats.get("equal_tick_allowances", 0)
     if problems:
-        print(f"build recovery randomized: {len(problems)} problems")
+        print(f"build recovery randomized: {len(problems)} problems; "
+              f"{allowances} confirmed equal-timestamp extra rebuild(s) allowed")
         return 1
-    print(f"PASS build recovery randomized: {steps} steps x {seeds} seeds x 3 modes")
+    print(f"PASS build recovery randomized: {steps} steps x {seeds} seeds x 3 modes; "
+          f"{allowances} confirmed equal-timestamp extra rebuild(s) allowed")
     return 0
 
 
