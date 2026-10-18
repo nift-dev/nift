@@ -10,7 +10,7 @@ LDLIBS ?=
 PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
 # Runtime 2.0 (src/rt): linked into nift from CP11 (opt-in VM, NIFT_VM=1).
 RT_LINK_SOURCES := $(sort $(wildcard src/rt/*.cpp))
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES)
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES)
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -32,6 +32,8 @@ ifeq ($(OS),Windows_NT)
 	# libgcc_s_seh-1, libwinpthread-1) are not guaranteed to be on consumer
 	# PATH, so the CLI and every embedded consumer link the runtimes statically.
 	LDFLAGS += -static -static-libgcc -static-libstdc++
+	# Winsock for the `nift serve` port probe (src/Serve.cpp).
+	LDLIBS += -lws2_32
 	SHARED_LIB := libnift_c.so
 	LIBFFI_SHARED_LINK_FLAGS := -Wl,--exclude-libs,ALL
 else
@@ -1135,6 +1137,13 @@ test-collections: $(TARGET)
 
 test-commands: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/commands_smoke.sh
+
+# `nift serve` smoke: full on Linux, lifecycle core on macOS (needs python3,
+# binds loopback ports). Windows: tests/serve_windows_lifecycle.ps1 (pwsh).
+test-serve: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/serve_smoke.sh
+.PHONY: test-serve
+test: test-serve
 
 test-ownership-concurrency: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/ownership_concurrency.py

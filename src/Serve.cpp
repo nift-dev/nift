@@ -13,6 +13,7 @@
 
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
@@ -290,6 +291,28 @@ bool has_exe_extension(const std::string& path) {
 }
 #endif
 
+#ifndef _WIN32
+// nift_find_executable (shared with the shell and which()) skips files that
+// are not executable, so a miss can hide a `python3` that exists but lacks
+// the execute bit. Say so instead of "not found".
+std::string non_executable_on_path(const std::string& name) {
+    const char* raw = std::getenv("PATH");
+    if (!raw) return {};
+    const std::string path_list = raw;
+    std::size_t start = 0;
+    while (start <= path_list.size()) {
+        const std::size_t end = path_list.find(':', start);
+        const std::string dir = path_list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const fs::path candidate = fs::path(dir.empty() ? "." : dir) / name;
+        std::error_code ec;
+        if (fs::is_regular_file(candidate, ec) && access(candidate.c_str(), X_OK) != 0) return candidate.string();
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return {};
+}
+#endif
+
 std::string indent_lines(const std::string& text) {
     std::string out, line;
     for (std::size_t i = 0; i <= text.size(); ++i) {
@@ -325,7 +348,14 @@ bool find_python(Python& python) {
     for (const auto& candidate : candidates) {
         std::string path;
         const std::string label = candidate.prefix.empty() ? candidate.name : std::string(candidate.name) + " -3";
-        if (!nift_find_executable(candidate.name, path)) { tried.push_back(label + ": not found"); continue; }
+        if (!nift_find_executable(candidate.name, path)) {
+#ifndef _WIN32
+            const std::string blocked = non_executable_on_path(candidate.name);
+            if (!blocked.empty()) { tried.push_back(label + " (" + blocked + "): not executable"); continue; }
+#endif
+            tried.push_back(label + ": not found");
+            continue;
+        }
 #ifdef _WIN32
         if (!has_exe_extension(path)) {
             tried.push_back(label + " (" + path + "): skipped, not an .exe (a .bat/.cmd shim would run through cmd.exe)");

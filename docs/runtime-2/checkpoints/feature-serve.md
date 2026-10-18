@@ -8,14 +8,11 @@ Where things live:
 
 - **Feature commits:** `src/Serve.{h,cpp}`, `tests/serve_smoke.sh`,
   `tests/serve_windows_lifecycle.ps1`, this record and the README section.
-- **Wiring:** CLI dispatch and help row (`src/CLI.cpp`), Makefile (sources,
-  `-lws2_32` on Windows, the `test-serve` target) and the CI steps
-  (`.github/workflows/checkpoint-10-cross-platform.yml`). These are **not**
-  part of the feature commits. They exist only in the local commit "WIP wiring
-  (to be re-applied)" at the tip of `feature-serve`, and as the scratch patch
-  `serve-wiring.patch` handed to the owner. They are to be re-applied after
-  feature-site-dx integrates, because that work owns `src/CLI.cpp` and the
-  `Makefile`.
+- **Wiring commit:** CLI dispatch and help row (`src/CLI.cpp`), Makefile
+  (sources, `-lws2_32` on Windows, the `test-serve` target) and the CI steps
+  (`.github/workflows/checkpoint-10-cross-platform.yml`). Before feature-site-dx
+  integrated, this was a local "WIP wiring" commit plus a scratch patch. It is
+  now an ordinary commit on top of `runtime-2` @`8957559`.
 
 ## What it is
 
@@ -213,12 +210,15 @@ interrupt the CI shell itself. Ctrl+C uses the same console delivery as
 Ctrl+Break and Python handles it as KeyboardInterrupt (exit 0).
 
 The script is wired into the Windows leg of `checkpoint-10-cross-platform.yml`
-(in the WIP wiring), and `make test-serve` into the Linux and macOS legs. Both
+(in the wiring commit), and `make test-serve` into the Linux and macOS legs. Both
 run for the first time at the next cross-platform milestone.
 
 ### Results actually run (Linux x86_64 only)
 
-- `bash tests/serve_smoke.sh`: **48 passed, 0 failed**. IPv6 was **skipped**:
+After the rebase onto `runtime-2` @`8957559`, with the wiring commit applied
+and run through the shared heavy-job gate:
+
+- `bash tests/serve_smoke.sh`: **49 passed, 0 failed**. IPv6 was **skipped**:
   this host's kernel has no IPv6, and `--host ::1` gives `error: cannot create
   a socket for host '::1': Address family not supported by protocol`.
 - Manual confirmations:
@@ -227,7 +227,9 @@ run for the first time at the next cross-platform milestone.
     prevents it. Test 14 is therefore meaningful.
   - A real-terminal Ctrl+C through a pty gives exit 0 with the port closed
     (first revision; the exec path is unchanged).
-- `tests/commands_smoke.sh`: passed (first revision; help output changed).
+- `tests/commands_smoke.sh`: passed.
+- `make test-site-dx`: all checks passed.
+- `make test-process-hardening`: PASS, 19 cases.
 - `src/Serve.cpp` compiles warning-free with g++ and clang++ (`-Wall -Wextra
   -pedantic -Wshadow -Werror`). It was built and linked into `nift` with the
   repo flags.
@@ -240,13 +242,30 @@ IPv6 end-to-end. These are for the next cross-platform milestone.
 
 ## Integration notes
 
-- A non-executable file named `python3` on PATH is reported as "not found",
-  because `nift_find_executable` in `src/Process.cpp` skips files without
-  `X_OK`. That file is owned by feature-site-dx and is left unchanged; worth a
-  look at integration.
-- The `-lws2_32` link flag is added to the global Windows `LDLIBS` in the
-  wiring, because `src/Serve.o` is part of every core-object link set (engine
-  and C ABI tests, `libnift_c`). On Windows those links need Winsock too.
+Rebased onto `runtime-2` @`8957559` (feature-site-dx integrated). The former
+WIP wiring commit was dropped and the wiring re-applied as an ordinary commit:
+CLI dispatch and help row, Makefile (`src/Serve.cpp`, Windows `-lws2_32`,
+`test-serve` in `make test`), and the CI steps. It applied cleanly on top of
+site-dx's `src/CLI.cpp` and `Makefile`.
+
+- **site-dx `src/Process.cpp`.** `nift serve` is unaffected on POSIX: the
+  version probe is its own fork/exec and the server is exec'd directly. On
+  Windows, the probe and the launch use `nift_run_process`, and now benefit
+  from site-dx's wording. A program that is missing or not permitted gives
+  `launched=false` with `executable not found: …` / `permission denied: …`,
+  which `nift serve` prints after `cannot start`. A single command has no
+  pipeline, so the per-stage results are not needed.
+- **Non-executable `python3` on PATH.** This used to be reported as "not
+  found", because `nift_find_executable` (shared with the shell and
+  `which()`) skips files without execute permission. Changing that lookup
+  would change PATH resolution for every caller, so the fix is local to
+  `src/Serve.cpp`. After a miss, PATH is scanned for an existing non-executable
+  file of that name, and it is reported as
+  `tried python3 (/path/python3): not executable`. Test 10 covers it.
+- The `-lws2_32` link flag is added to the global Windows `LDLIBS`, because
+  `src/Serve.o` is part of every core-object link set (engine and C ABI tests,
+  `libnift_c`). On Windows those links need Winsock too.
+- The website item is now queued in `docs/handover/PENDING-WEBSITE.md`.
 
 ## Website
 
@@ -255,9 +274,7 @@ is not available in this environment. The in-repo user docs are the README
 section "Previewing locally with `nift serve`" (build then serve, Python 3.8+
 required, development only).
 
-**At integration:** add a release-coupled item to
-`docs/handover/PENDING-WEBSITE.md` for a `nift serve` entry in
-`content/docs/commands.html` with the same points, with the earliest
-supporting version being the release containing this feature. The queue file
-is introduced by feature-site-dx and does not exist at this branch's base
-(`36a8e73`), so it was deliberately not created or edited here.
+Queued in `docs/handover/PENDING-WEBSITE.md` ("Local preview server
+(`nift serve`)"): a `nift serve` entry in `content/docs/commands.html` and the
+getting-started page, with Python 3.8+ required, local development only, and
+`nift build` shown before it.

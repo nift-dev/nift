@@ -22,6 +22,8 @@ on:
       - 'tests/process_contract.cpp'
       - 'tests/process_failure.cpp'
       - 'tests/process_hardening.py'
+      - 'tests/serve_smoke.sh'
+      - 'tests/serve_windows_lifecycle.ps1'
   workflow_dispatch:
 
 permissions:
@@ -79,6 +81,14 @@ jobs:
         env:
           MSYS: winsymlinks:nativestrict
         run: make test-sha256
+      - name: nift serve lifecycle (feature-serve; Linux full, macOS core)
+        if: runner.os != 'Windows'
+        run: make test-serve
+      - name: nift serve lifecycle on Windows (force-kill, Ctrl+Break)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # setup-python puts python (and the py launcher) on PATH for pwsh steps.
+        run: pwsh -NoProfile -File tests/serve_windows_lifecycle.ps1 -Nift "$PWD\nift.exe"
       - name: Native Windows dependency status contracts
         if: runner.os == 'Windows'
         shell: msys2 {0}

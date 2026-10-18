@@ -105,6 +105,31 @@ Use this compact shape for new entries:
     the opening position.
 - Timing: describes behaviour no released Nift has
 
+### Local preview server (`nift serve`)
+
+- Status: pending (implemented on branch `feature-serve`, off `runtime-2`)
+- Earliest release: the first release that includes the `feature-serve`
+  checkpoint (not v4.12.0)
+- Website scope: `docs/commands` (new `serve` entry), and the getting-started
+  or quick-start page where `nift build` is shown
+- Required update, following the README section "Previewing locally with
+  `nift serve`" and `docs/runtime-2/checkpoints/feature-serve.md`:
+  - commands: `nift serve [--port N] [--host H] [--dir PATH]` serves the
+    project's output directory (or any `--dir`) at
+    `http://127.0.0.1:8000/` by default. It is equivalent to
+    `python3 -m http.server PORT --bind HOST --directory DIR`. It stops with
+    Ctrl+C and lists its options with `--help`.
+  - show `nift build` then `nift serve`. It does not build, watch or reload:
+    run `nift build` (or `nift build --auto` in another terminal) to update
+    what it serves.
+  - requirements: Python 3.8 or newer on PATH (`python3`/`python`; on Windows
+    the `py` launcher or a `python.exe`). Nift never installs it.
+  - say that it is for local development only, not production; deploy the
+    output directory with a real web server or static host.
+  - errors: a missing output directory suggests `nift build`; an occupied
+    port is reported before launch (best effort).
+- Timing: describes a command no released Nift has
+
 None other for the current candidate. All five items targeted at v4.6.0 (native time
 functions, native secure random bytes, execution output separation, relative
 import module ownership, explicit module/package resource paths) were completed

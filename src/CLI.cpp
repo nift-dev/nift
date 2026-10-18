@@ -22,6 +22,7 @@
 #include "Proc.h"
 #include "RenderHost.h"
 #include "ScriptHost.h"
+#include "Serve.h"
 #include "Json.h"
 // Console.h pulls <windows.h> on Windows; include it after the standard-library
 // heavy headers so libstdc++'s <filesystem>/<locale> are parsed before any
@@ -466,6 +467,7 @@ void print_commands() {
     row("rm", "<names...>", "Remove tracking, content and output");
     row("cp / mv", "<source> <destination>", "Copy or move a tracked file");
     row("watch / unwatch", "<directory>", "Manage watched directories");
+    row("serve", "[--port N] [--host H] [--dir PATH]", "Serve the output dir locally (Python 3; development only)");
 
     std::cout << '\n' << console::dim("Inspect") << '\n';
     row("info", "[names...]", "Show project or page information");
@@ -2163,6 +2165,8 @@ int run_cli(int argc, char** argv) {
         return run_eval(argc, argv);
     }
 
+
+    if (command == "serve") return run_serve(argc, argv);
 
     if (command == "minify") {
         bool in_place = false;
