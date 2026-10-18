@@ -504,3 +504,14 @@ must be removed or justified when build recovery integrates.
   D-011 modes); O6/O7 already scheduled (catchable host errors, `save()` and
   symlinks). O2 (a version-2 Host-op trace covering every operation, with
   outcomes and error codes) is a coordinator decision: adopted.
+- **Refinements (owner, same day).** Every filesystem read that influences a
+  build records its dependency whichever API performs it (file-backed streams at
+  successful open; failed or missing opens consistent with other read APIs);
+  copy/move follow normal OS path semantics while `.nift/`, managed outputs and
+  recovery stay protected. The whole-read bound is configurable with a
+  documented conservative default and never truncates silently; streaming reads
+  stay unlimited with bounded buffers; bounds are enforced while reading, not
+  from `st_size`. Never-EOF FIFOs: cancellation/timeouts are supported by the
+  CP16 Host-op architecture, not redesigned now. A bounded audit of all
+  filesystem APIs (dependencies, containment, unbounded reads) accompanies the
+  fix.
