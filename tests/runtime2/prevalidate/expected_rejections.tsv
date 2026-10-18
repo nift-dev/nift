@@ -8,7 +8,6 @@ tests/rt/legacy-cases/c1_if_html_comment.f	R2-stray-closer	`<!-- } -->` is not s
 tests/rt/legacy-cases/c1_neg_depth.f	R2-stray-closer	`x := )`: closer without opener
 tests/rt/legacy-cases/c1_unbalanced_close.f	R2-stray-closer	a lone `}` statement
 tests/rt/legacy-cases/c1_unbalanced_open.f	R2-unclosed	a lone `{` never closed
-tests/rt/legacy-cases/c1_return_multiline.f	R2-unclosed	`return` ends at the line break (translator statement rule), so `return [1,` leaves `[` unclosed; f is never called (legacy exits 0); calling it fails "return: malformed parameters"
 tests/rt/legacy-cases/c2_fp1.f	R3-empty-element	`fn(f(a,))`: trailing comma leaves an empty parameter
 tests/rt/legacy-cases/c2_pt2.f	R3-empty-element	`[a,] := xs`: empty pattern element
 tests/rt/legacy-cases/c2_pt5.f	R3-empty-element	`[a, b, ] := xs`: empty pattern element
@@ -27,4 +26,4 @@ tests/runtime2/diagnostics/scripts/syn_stray_brace.f	R2-stray-closer	lone `}`
 tests/runtime2/diagnostics/scripts/syn_unclosed_paren.f	R2-unclosed	`(1 + 2` unclosed
 tests/runtime2/diagnostics/scripts/syn_unterminated_array.f	R2-unclosed	`[1, 2, 3` unclosed (legacy silently drops the rest of the file: Assessment A #1)
 tests/runtime2/diagnostics/scripts/syn_unterminated_string.f	R1-unterminated-string	`"unterminated` never closed (legacy silently drops the rest: Assessment A #1)
-tests/runtime2/prevalidate/projects/nift-packages_http/src/http.f	R2-unclosed	OWNER DECISION NEEDED: nift-packages/http src/http.f:101 `return {` + multi-line object literal in capabilities() (native-backend branch). `return` ends at the line break in legacy's grammar, so `{` is unclosed; legacy fails "return: malformed parameters" whenever that branch runs (verified with an equivalent struct-method probe). Strict prevalidation makes the whole module fail to import although its other paths work today
+tests/runtime2/diagnostics/changes/ret_multiline_comment.f	R5-missing-left-operand	`1, // one` inside a multi-line return value: comments are not expression grammar, so `/` stands where an operand must start (same verdict as the identical multi-line declaration)

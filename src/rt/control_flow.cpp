@@ -233,17 +233,22 @@ Step StatementParser::else_chain(std::uint32_t& i, std::uint32_t end, NodeId hea
     return Step::Done;
 }
 
-// return [expr] up to the first newline or ';' outside quotes. Brackets do
-// not extend it (a multi-line return expression is a run-time error).
+// return [expr] up to the first newline or ';' outside quotes and outside
+// brackets the value opened (D-025: `return {` + a multi-line literal
+// continues to the matching close, exactly as the legacy translator). A bare
+// `return` at the end of a line keeps its meaning.
 Step StatementParser::return_stmt(std::uint32_t& i, std::uint32_t end, std::vector<NodeId>& out) {
     if (!boundary(i, end, "return")) return Step::NoMatch;
     std::uint32_t e = i + 6;
     bool quoted = false;
     char quote = 0;
-    while (e < end && src_[e] != '\n' && src_[e] != ';') {
+    int depth = 0;
+    while (e < end && !(depth <= 0 && (src_[e] == '\n' || src_[e] == ';'))) {
         const char c = src_[e];
         if (quoted) { if (c == '\\' && e + 1 < end) ++e; else if (c == quote) quoted = false; }
         else if (c == '\'' || c == '"') { quoted = true; quote = c; }
+        else if (c == '(' || c == '[' || c == '{') ++depth;
+        else if (c == ')' || c == ']' || c == '}') --depth;
         ++e;
     }
     const std::string_view inner = src_.substr(i + 6, e - (i + 6));

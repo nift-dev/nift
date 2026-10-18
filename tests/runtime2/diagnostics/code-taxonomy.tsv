@@ -1,0 +1,38 @@
+# CP13 error-code taxonomy (D-022 #2, D-025 #2, owner taxonomy 2026-10-18).
+# Codes describe WHAT went wrong, never which component detected it (a native
+# built-in, a bytecode instruction and legacy raise the same code). The set is
+# small: classes of failure; specifics go in the JSON record's `details`
+# (e.g. runtime.type_error with {"operation": "+", "operand_kinds": ["string", "int"]}).
+# Domains: syntax.* invalid source/grammar; runtime.* language run-time
+# failures (type, indexing, arithmetic, callables, bindings); io.* filesystem
+# and I/O; stream.*; json.*/schema.*; process.* process execution and job
+# control; host.* host integration; limit.* execution/resource limits;
+# policy.*; package.*; ffi.*; user.* thrown Errors; internal.* genuine Nift
+# implementation failures. Existing domains are reused where they fit.
+# Catchability and severity are separate properties of each raise: renaming or
+# adding a code never changes what a program can catch (all codes below that
+# were Fatal stay Fatal).
+# previous text (or "new")	code	DiagnosticCode enumerator	details (JSON)	meaning
+native.syntax_error	syntax.malformed_expression	NativeSyntaxError	rule	malformed expression or literal: R1-R5 (unterminated literal, brackets, empty element, missing operand)
+native.translation_error	syntax.invalid_statement	NativeTranslationError	rule	statement form the statement grammar rejects (fn/if/while/... forms), also inside deferred bodies
+native.name_error	runtime.undefined_name	NativeNameError	name	undefined binding, assignment to an undefined binding, redeclaration (details.kind)
+new	runtime.undefined_callable	RuntimeUndefinedCallable	name	call of an unknown function or method
+new	runtime.type_error	RuntimeTypeError	operation, operand_kinds / binding, expected, actual	operand, binding or value of the wrong type
+new	runtime.index_out_of_bounds	RuntimeIndexOutOfBounds	index, length	array index outside the array (negative or too large)
+new	runtime.member_not_found	RuntimeMemberNotFound	member	missing object key, member or method
+new	runtime.arity_error	RuntimeArityError	callable, expected, actual	wrong number of arguments
+new	runtime.integer_overflow	RuntimeIntegerOverflow	operation	checked int64 overflow
+new	runtime.division_by_zero	RuntimeDivisionByZero	operation	division or modulo by zero
+native.arithmetic_error	runtime.arithmetic_error	NativeArithmeticError	operation	other arithmetic domain errors (fractional modulo, non-finite result)
+native.invalid_argument	runtime.invalid_argument	NativeInvalidArgument	callable, argument	argument value outside a function's domain
+native.invalid_operation	runtime.invalid_operation	NativeInvalidOperation	operation	operation not supported on the value (string indexing, ...)
+native.invalid_control	runtime.invalid_control	NativeInvalidControl	statement	break/continue/return outside their construct
+native.mutation_denied	runtime.mutation_denied	NativeMutationDenied	binding	assignment to const or private state
+native.unsupported_value	runtime.unsupported_value	NativeUnsupportedValue	value_kind	value that cannot be rendered or projected
+native.invalid_handle	runtime.invalid_handle	NativeInvalidHandle	handle_kind	forged or stale handle
+native.resource_lifecycle	runtime.resource_lifecycle	NativeResourceLifecycle	resource	use of a closed or finished resource
+native.resource_owner_mismatch	runtime.resource_owner_mismatch	NativeResourceOwnerMismatch	resource	resource used by a non-owner
+native.resource_transfer_denied	runtime.resource_transfer_denied	NativeResourceTransferDenied	resource	prohibited resource transfer
+native.limit_exceeded	limit.exceeded	NativeLimitExceeded	limit, value	recursion/frame budget, nesting and other explicit limits (never an ordinary exception)
+internal.resource_exhausted	limit.resource_exhausted	InternalResourceExhausted	resource	memory or other resource exhausted (not an implementation defect)
+native.system_service_failed	host.service_failed	NativeSystemServiceFailed	service	non-I/O host service failure (clock, randomness, ...)

@@ -24,3 +24,12 @@ try_uncatchable_div_zero	site-dx	old-vs-new	try_uncatchable_div_zero	1:1 -> 2:9;
 try_error_in_catch	site-dx	old-vs-new	try_error_in_catch	catch-body-relative 1:21 -> 5:9
 try_catch_io_direct	site-dx	old-vs-new	try_catch_io_direct	caught error origin 1:10/1:1 -> 5:10/10:12
 throw_non_error	site-dx	old-vs-new	throw_non_error	reported at the try (1:1) -> at the throw (1:7)
+ret_multiline_http_shape	D-025	old-vs-new	-	nift-packages/http capabilities() shape: `return {` + multi-line object in a struct method branch; old: return: malformed parameters; new: the object
+ret_multiline_array	D-025	old-vs-new	-	`return [1,\n 2]` (tests/rt/legacy-cases/c1_return_multiline.f, called)
+ret_multiline_nested	D-025	old-vs-new	-	nested object/array/parenthesis literals across lines
+ret_multiline_string_braces	D-025	old-vs-new	-	strings containing } { ) ] ( and an escaped quote do not change the bracket depth
+ret_multiline_comment	D-025	old-vs-new	-	a `//` comment inside the multi-line value: comments are not expression grammar, so it is an error exactly as in the same multi-line declaration (`x := [\n 1, // c ...` fails "expression cannot be empty"); prevalidation rejects it (R5)
+ret_multiline_in_loop	D-025	old-vs-new	-	the same function called from a loop (prepared evaluator path)
+ret_bare_newline	D-025	guard	-	bare `return` at the end of a line keeps its meaning
+ret_semicolon	D-025	old-vs-new	-	`;` at depth 0 still ends the return; inside an open bracket a line break continues it
+ret_paren_continuation	D-025	old-vs-new	-	`return (a +\n b) * 2`: continuation only inside the open parenthesis (runs on the VM too)

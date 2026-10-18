@@ -19,7 +19,9 @@
 #   --expect SET      baseline: legacy (default) | v412
 #                     changes:  old (default) | new
 #   --vm              run with NIFT_VM=1 and report the engine outcome per case
-#   --regenerate SET  write goldens (baseline: legacy|v412; changes: old)
+#   --regenerate SET  write goldens (baseline: legacy|v412; changes: old, or new
+#                     from a binary that implements the change - reviewed, and
+#                     only where it differs from old)
 #   --list            print the cases and their class, then exit
 #
 # Comparison (docs/runtime-2/checkpoints/cp13-diagnostics-design.md (b)):
@@ -60,7 +62,7 @@ case "$SUITE" in
             [ -z "$REGEN" ] || case "$REGEN" in legacy|v412) ;; *) echo "baseline: --regenerate legacy|v412" >&2; exit 2;; esac
             MANIFEST="$HERE/MANIFEST.tsv";;
   changes)  EXPECT="${EXPECT:-old}"; case "$EXPECT" in old|new) ;; *) echo "changes: --expect old|new" >&2; exit 2;; esac
-            [ -z "$REGEN" ] || [ "$REGEN" = old ] || { echo "changes: only --regenerate old (new goldens are written by hand)" >&2; exit 2; }
+            [ -z "$REGEN" ] || [ "$REGEN" = old ] || [ "$REGEN" = new ] || { echo "changes: --regenerate old|new" >&2; exit 2; }
             MANIFEST="$HERE/changes/MANIFEST.tsv";;
   *) echo "unknown --suite $SUITE" >&2; exit 2;;
 esac
@@ -112,6 +114,7 @@ compare() {  # $1 = case name, $2 = golden base path
       case "$REGEN" in
         legacy) cp "$W/${k%%:*}" "$base.${k##*:}";;
         old) cp "$W/${k%%:*}" "$base.old.${k##*:}";;
+        new) if cmp -s "$W/${k%%:*}" "$base.old.${k##*:}"; then rm -f "$base.new.${k##*:}"; else cp "$W/${k%%:*}" "$base.new.${k##*:}"; fi;;
         v412) if cmp -s "$W/${k%%:*}" "$base.${k##*:}"; then rm -f "$base.v412.${k##*:}"; else cp "$W/${k%%:*}" "$base.v412.${k##*:}"; fi;;
       esac
     done

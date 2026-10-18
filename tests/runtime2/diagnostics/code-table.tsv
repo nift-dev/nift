@@ -6,36 +6,37 @@
 # new = "new" for a code added to src/Diagnostic.h by the CP13 patch.
 # Codes never decide catchability (D-022 refinement): catchable is a separate
 # property of each raise and stays exactly as today.
-native.translation_error	existing	fn requires '\(name\(args\)\)'	script translator statement forms (pre-execution in legacy already)
-native.translation_error	existing	function \w+ requires a block
-native.translation_error	existing	(try|catch) requires a block|try has malformed catch binding
-native.syntax_error	existing	expression cannot be empty	empty operand, trailing comma
-native.syntax_error	existing	unterminated (string literal|array literal|.*) .*	planned site-dx wording (unterminated literals)
-native.name_error	existing	unknown value or malformed expression: [A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*	undefined identifier (or path whose root is undefined)
-native.member_not_found	new	unknown value or malformed expression: [A-Za-z_][A-Za-z0-9_.]*\.[A-Za-z_][A-Za-z0-9_]*\(.*\)	unknown method on a known receiver
-native.invalid_operation	existing	unknown value or malformed expression: "(?:[^"\\]|\\.)*"\[.*	string indexing (grammatical, unsupported)
-native.syntax_error	existing	unknown value or malformed expression: (?s:.*)	any other malformed expression; after prevalidation only reachable via dynamic code
-native.undefined_callable	new	undefined callable: .*
-native.name_error	existing	assignment to undefined binding: .*
-native.name_error	existing	binding already declared in this scope: .*
-native.mutation_denied	existing	cannot assign to const binding: .*
-native.type_error	new	cannot assign \w+ to \w+ binding '.*'|cannot change binding type: .*	binding type (both wordings)
-native.type_error	new	string concatenation requires renderable scalar values
-native.type_error	new	(@if )?ordering comparisons require .*
-native.type_error	new	unary arithmetic operators require a numeric operand
-native.type_error	new	(print|@script return value|value): .*not directly renderable|.* is not directly renderable
-native.type_error	new	throw expression must evaluate to Error
-native.type_error	new	member assignment requires a struct instance: .*
-native.type_error	new	JSON array indices must be non-negative integers in '.*'	negative or non-integer index
-native.index_out_of_bounds	new	JSON array index -?\d+ is out of range in '.*'|index out of range: -?\d+|invalid index
-native.member_not_found	new	JSON object has no key '.*'|value has no member: .*	missing key and missing member are one code
-native.arity_error	new	callable argument count mismatch: .*|struct constructor argument count mismatch: .*|\w+: expected one value|error: expected message, optional code, and optional cause
-native.integer_overflow	new	signed 64-bit integer overflow
-native.division_by_zero	new	division by zero|modulo by zero
-native.arithmetic_error	existing	modulo requires integer-valued operands|arithmetic result is not finite
-native.limit_exceeded	existing	callable recursion depth exceeded(: .*)?	resource limit: never an ordinary exception (D-022)
-native.invalid_argument	existing	error: (message must be a string|code must be a string|cause must be Error or null|invalid user Error code)
-native.invalid_control	existing	return is only valid in script/function execution|(break|continue) .*outside.*
+syntax.invalid_statement	existing	fn requires '\(name\(args\)\)'	script translator statement forms (pre-execution in legacy already)
+syntax.invalid_statement	existing	function \w+ requires a block
+syntax.invalid_statement	existing	(try|catch) requires a block|try has malformed catch binding
+syntax.malformed_expression	existing	malformed parameters	legacy's message for a return value it split at a line break (before D-025)
+syntax.malformed_expression	existing	expression cannot be empty	empty operand, trailing comma
+syntax.malformed_expression	existing	unterminated (string literal|array literal|.*) .*	planned site-dx wording (unterminated literals)
+runtime.undefined_name	existing	unknown value or malformed expression: [A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*	undefined identifier (or path whose root is undefined)
+runtime.member_not_found	new	unknown value or malformed expression: [A-Za-z_][A-Za-z0-9_.]*\.[A-Za-z_][A-Za-z0-9_]*\(.*\)	unknown method on a known receiver
+runtime.invalid_operation	existing	unknown value or malformed expression: "(?:[^"\\]|\\.)*"\[.*	string indexing (grammatical, unsupported)
+syntax.malformed_expression	existing	unknown value or malformed expression: (?s:.*)	any other malformed expression; after prevalidation only reachable via dynamic code
+runtime.undefined_callable	new	undefined callable: .*
+runtime.undefined_name	existing	assignment to undefined binding: .*
+runtime.undefined_name	existing	binding already declared in this scope: .*
+runtime.mutation_denied	existing	cannot assign to const binding: .*
+runtime.type_error	new	cannot assign \w+ to \w+ binding '.*'|cannot change binding type: .*	binding type (both wordings)
+runtime.type_error	new	string concatenation requires renderable scalar values
+runtime.type_error	new	(@if )?ordering comparisons require .*
+runtime.type_error	new	unary arithmetic operators require a numeric operand
+runtime.type_error	new	(print|@script return value|value): .*not directly renderable|.* is not directly renderable
+runtime.type_error	new	throw expression must evaluate to Error
+runtime.type_error	new	member assignment requires a struct instance: .*
+runtime.type_error	new	JSON array indices must be non-negative integers in '.*'	negative or non-integer index
+runtime.index_out_of_bounds	new	JSON array index -?\d+ is out of range in '.*'|index out of range: -?\d+|invalid index
+runtime.member_not_found	new	JSON object has no key '.*'|value has no member: .*	missing key and missing member are one code
+runtime.arity_error	new	callable argument count mismatch: .*|struct constructor argument count mismatch: .*|\w+: expected one value|error: expected message, optional code, and optional cause
+runtime.integer_overflow	new	signed 64-bit integer overflow
+runtime.division_by_zero	new	division by zero|modulo by zero
+runtime.arithmetic_error	existing	modulo requires integer-valued operands|arithmetic result is not finite
+limit.exceeded	existing	callable recursion depth exceeded(: .*)?	resource limit: never an ordinary exception (D-022)
+runtime.invalid_argument	existing	error: (message must be a string|code must be a string|cause must be Error or null|invalid user Error code)
+runtime.invalid_control	existing	return is only valid in script/function execution|(break|continue) .*outside.*
 io.open_failed	existing	@input path does not exist: .*	fatal here: same identity as cat()'s catchable failure, different catchability
 io.open_failed	existing	cat: cannot open path|\w+: cannot open path
 json.parse_failed	existing	json: failed to parse .*

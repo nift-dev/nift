@@ -162,6 +162,8 @@ def main():
     ap.add_argument('--record', help='write every rejection as TSV')
     a = ap.parse_args()
     a.mode = a.mode or ('tool' if a.tool else 'proxy')
+    a.nift = os.path.abspath(a.nift)
+    a.tool = os.path.abspath(a.tool) if a.tool else None
     if a.mode == 'tool' and not a.tool:
         sys.exit('--mode tool needs --tool .build/rt-parse-dump')
     reviewed = {}

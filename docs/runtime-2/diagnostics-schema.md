@@ -43,7 +43,8 @@ spans and hints appear only in JSON (D-022 #1).
 | --- | --- |
 | `nift_diagnostic` | schema version, `1` |
 | `severity` | `error`, `warning`, `note` |
-| `code` | stable identity from `src/Diagnostic.h` (`domain.name`), or the `user.*` code of a thrown Error |
+| `code` | stable identity naming what went wrong, from the CP13 taxonomy (`syntax.*`, `runtime.*`, `io.*`, `process.*`, `host.*`, `limit.*`, `internal.*`, …; `tests/runtime2/diagnostics/code-taxonomy.tsv`), or the `user.*` code of a thrown Error; never which component detected it |
+| `details` | optional structured context of the failure class (`code-taxonomy.tsv`): `rule` for `syntax.*`, `operation`/`operand_kinds` for `runtime.type_error`, `limit`/`value` for `limit.exceeded`, … (data, never part of the identity) |
 | `catchable` | whether a `try` around this raise would catch it under the current language rules (separate from `code` and `severity`; D-022 refinement) |
 | `message` | message **without** legacy compatibility prefixes (`return: `, `import: `, `thread: `, `future: `, `lambda body error: `); the structure they encode is in `frames` |
 | `span` | primary span: `source` (`file`, `command-line`, `eval`, `stdin`), `file` (path exactly as text mode prints it), 1-based `line`/`column` (byte columns, as text mode) and `end_line`/`end_column` (one past the last byte). The failing expression (D-018c); `null` only when there is no source position |

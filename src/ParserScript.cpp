@@ -161,8 +161,12 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 continue;
             }
             if(boundary(i,"return")) {
-                std::size_t e=i+6; bool quoted=false;char quote=0;
-                while(e<in.size()&&in[e]!='\n'&&in[e]!=';' ) { char c=in[e]; if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;}else if(c=='\''||c=='"'){quoted=true;quote=c;}++e; }
+                // D-025 (CP13): a return value continues across lines while a
+                // bracket it opened is still open (`return {` + a multi-line
+                // literal); a newline or ';' ends it only outside brackets. A
+                // bare `return` at the end of a line keeps its meaning.
+                std::size_t e=i+6; bool quoted=false;char quote=0;int depth=0;
+                while(e<in.size()&&!(depth<=0&&(in[e]=='\n'||in[e]==';'))) { char c=in[e]; if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;}else if(c=='\''||c=='"'){quoted=true;quote=c;}else if(c=='('||c=='['||c=='{')++depth;else if(c==')'||c==']'||c=='}')--depth;++e; }
                 std::string expr=trim_copy(in.substr(i+6,e-(i+6))); if(expr.empty())generated("@__bare_return()",i);else{generated("@return(",i);copied(i+6+in.substr(i+6,e-i-6).find_first_not_of(" \t\r\n"),expr.size());generated(")",e);}  i=e<in.size()?e+1:e; continue;
             }
             if(boundary(i,"throw") && i+5<in.size() && std::isspace((unsigned char)in[i+5]) && trim_copy(in.substr(i+5)).rfind(":=",0)!=0 && trim_copy(in.substr(i+5)).rfind("=",0)!=0 && trim_copy(in.substr(i+5)).rfind("+=",0)!=0 && trim_copy(in.substr(i+5)).rfind("-=",0)!=0 && trim_copy(in.substr(i+5)).rfind("*=",0)!=0 && trim_copy(in.substr(i+5)).rfind("/=",0)!=0 && trim_copy(in.substr(i+5)).rfind("%=",0)!=0) {

@@ -13,8 +13,8 @@ namespace nift::rt {
 
 namespace {
 
-constexpr const char* kSyntax = "native.syntax_error";
-constexpr const char* kTranslation = "native.translation_error";
+constexpr const char* kSyntax = "syntax.malformed_expression";
+constexpr const char* kTranslation = "syntax.invalid_statement";
 
 bool is_open(Tok k) { return k == Tok::LParen || k == Tok::LBracket || k == Tok::LBrace; }
 bool is_close(Tok k) { return k == Tok::RParen || k == Tok::RBracket || k == Tok::RBrace; }

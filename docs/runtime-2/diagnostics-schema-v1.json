@@ -4,91 +4,318 @@
   "title": "Nift machine-readable diagnostics, schema 1 (D-022)",
   "description": "One JSON object per line on stderr when --format=json or NIFT_FORMAT=json is set. Either a diagnostic record or a summary record. See docs/runtime-2/diagnostics-schema.md.",
   "oneOf": [
-    {"$ref": "#/$defs/diagnostic"},
-    {"$ref": "#/$defs/summary"}
+    {
+      "$ref": "#/$defs/diagnostic"
+    },
+    {
+      "$ref": "#/$defs/summary"
+    }
   ],
   "$defs": {
     "code": {
       "type": "string",
-      "description": "Stable identity from the src/Diagnostic.h taxonomy (domain.name), or a user.* code carried by a thrown Error. Never encodes catchability or severity.",
+      "description": "Stable identity naming WHAT went wrong (taxonomy: syntax.*, runtime.*, io.*, stream.*, json.*, schema.*, process.*, host.*, limit.*, policy.*, package.*, ffi.*, user.*, internal.*), never which component detected it; or the user.* code of a thrown Error. Never encodes catchability or severity.",
       "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,7}$"
     },
     "position": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source", "file", "line", "column"],
+      "required": [
+        "source",
+        "file",
+        "line",
+        "column"
+      ],
       "properties": {
-        "source": {"enum": ["file", "command-line", "eval", "stdin"], "description": "Where the text came from; `file` uses `file`."},
-        "file": {"type": ["string", "null"], "description": "The path exactly as text mode prints it (absolute for scripts and imports, project-relative in build diagnostics); null unless source is file."},
-        "line": {"type": "integer", "minimum": 1},
-        "column": {"type": "integer", "minimum": 1, "description": "1-based byte column, as in text mode."},
-        "end_line": {"type": "integer", "minimum": 1},
-        "end_column": {"type": "integer", "minimum": 1, "description": "1-based byte column one past the last byte of the span."}
+        "source": {
+          "enum": [
+            "file",
+            "command-line",
+            "eval",
+            "stdin"
+          ],
+          "description": "Where the text came from; `file` uses `file`."
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The path exactly as text mode prints it (absolute for scripts and imports, project-relative in build diagnostics); null unless source is file."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based byte column, as in text mode."
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_column": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based byte column one past the last byte of the span."
+        }
       }
     },
     "frame": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "name", "call_site"],
+      "required": [
+        "kind",
+        "name",
+        "call_site"
+      ],
       "properties": {
-        "kind": {"enum": ["callable", "method", "lambda", "callback", "import", "template", "script", "future", "thread", "repl"]},
-        "name": {"type": "string", "description": "Function, method, module path, page name; `<top>` for the unit's top level."},
-        "call_site": {"oneOf": [{"$ref": "#/$defs/position"}, {"type": "null"}], "description": "Where this frame was entered from (the call expression in the caller); null for the outermost frame or when the engine cannot tell (frames_complete=false)."}
+        "kind": {
+          "enum": [
+            "callable",
+            "method",
+            "lambda",
+            "callback",
+            "import",
+            "template",
+            "script",
+            "future",
+            "thread",
+            "repl"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Function, method, module path, page name; `<top>` for the unit's top level."
+        },
+        "call_site": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where this frame was entered from (the call expression in the caller); null for the outermost frame or when the engine cannot tell (frames_complete=false)."
+        }
       }
     },
     "cause": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": [
+        "code",
+        "message"
+      ],
       "properties": {
-        "code": {"$ref": "#/$defs/code"},
-        "message": {"type": "string"},
-        "span": {"oneOf": [{"$ref": "#/$defs/position"}, {"type": "null"}]}
+        "code": {
+          "$ref": "#/$defs/code"
+        },
+        "message": {
+          "type": "string"
+        },
+        "span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/position"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "diagnostic": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nift_diagnostic", "severity", "code", "catchable", "message", "span", "context", "frames", "frames_omitted", "frames_complete", "hint", "text"],
+      "required": [
+        "nift_diagnostic",
+        "severity",
+        "code",
+        "catchable",
+        "message",
+        "span",
+        "context",
+        "frames",
+        "frames_omitted",
+        "frames_complete",
+        "hint",
+        "text"
+      ],
       "properties": {
-        "nift_diagnostic": {"const": 1},
-        "severity": {"enum": ["error", "warning", "note"]},
-        "code": {"$ref": "#/$defs/code"},
-        "catchable": {"type": "boolean", "description": "Whether a try/catch around this raise would have caught it, under the language rules in force (today: recoverable operational failures and user throws). Separate from code and severity."},
-        "message": {"type": "string", "description": "Message without legacy compatibility prefixes (return: , import: , thread: , lambda body error: ...); those are expressed by frames."},
-        "span": {"oneOf": [{"$ref": "#/$defs/position"}, {"type": "null"}], "description": "Primary span: the failing expression (D-018c); null only for diagnostics with no source position (e.g. a missing script file)."},
+        "nift_diagnostic": {
+          "const": 1
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "note"
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/code"
+        },
+        "catchable": {
+          "type": "boolean",
+          "description": "Whether a try/catch around this raise would have caught it, under the language rules in force (today: recoverable operational failures and user throws). Separate from code and severity."
+        },
+        "message": {
+          "type": "string",
+          "description": "Message without legacy compatibility prefixes (return: , import: , thread: , lambda body error: ...); those are expressed by frames."
+        },
+        "span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary span: the failing expression (D-018c); null only for diagnostics with no source position (e.g. a missing script file)."
+        },
         "context": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "entry", "page", "phase", "engine"],
+          "required": [
+            "kind",
+            "entry",
+            "page",
+            "phase",
+            "engine"
+          ],
           "properties": {
-            "kind": {"enum": ["script", "command-line", "eval", "build", "page", "import", "repl"]},
-            "entry": {"type": ["string", "null"], "description": "The entry unit (script path, page source, or null for -e/eval)."},
-            "page": {"type": ["string", "null"], "description": "Tracked page name for build diagnostics."},
-            "phase": {"enum": ["validate", "run"], "description": "validate = reported by syntax prevalidation before anything ran (D-022 #3)."},
-            "engine": {"enum": ["legacy", "vm", "none"], "description": "Engine that ran the unit; none when validation failed."}
+            "kind": {
+              "enum": [
+                "script",
+                "command-line",
+                "eval",
+                "build",
+                "page",
+                "import",
+                "repl"
+              ]
+            },
+            "entry": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The entry unit (script path, page source, or null for -e/eval)."
+            },
+            "page": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Tracked page name for build diagnostics."
+            },
+            "phase": {
+              "enum": [
+                "validate",
+                "run"
+              ],
+              "description": "validate = reported by syntax prevalidation before anything ran (D-022 #3)."
+            },
+            "engine": {
+              "enum": [
+                "legacy",
+                "vm",
+                "none"
+              ],
+              "description": "Engine that ran the unit; none when validation failed."
+            }
           }
         },
-        "frames": {"type": "array", "items": {"$ref": "#/$defs/frame"}, "description": "Innermost first: frames[0] is the function containing the span. At most 64 entries (first 32 and last 32)."},
-        "frames_omitted": {"type": "integer", "minimum": 0},
-        "frames_complete": {"type": "boolean", "description": "false when the engine could not record every call site (legacy evaluator)."},
-        "cause": {"type": "array", "items": {"$ref": "#/$defs/cause"}, "maxItems": 16, "description": "Cause chain of a thrown Error, outermost cause first."},
-        "hint": {"type": ["string", "null"]},
-        "text": {"type": "string", "description": "The exact text-mode rendering of this diagnostic (byte-identical to what text mode prints, without colour); may span lines (build diagnostics)."}
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame"
+          },
+          "description": "Innermost first: frames[0] is the function containing the span. At most 64 entries (first 32 and last 32)."
+        },
+        "frames_omitted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frames_complete": {
+          "type": "boolean",
+          "description": "false when the engine could not record every call site (legacy evaluator)."
+        },
+        "cause": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cause"
+          },
+          "maxItems": 16,
+          "description": "Cause chain of a thrown Error, outermost cause first."
+        },
+        "hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "description": "The exact text-mode rendering of this diagnostic (byte-identical to what text mode prints, without colour); may span lines (build diagnostics)."
+        },
+        "details": {
+          "type": "object",
+          "description": "Structured context of the failure class (code-taxonomy.tsv `details` column), e.g. {\"rule\": \"R2-unclosed\"} for syntax.*, {\"operation\": \"+\", \"operand_kinds\": [\"string\", \"int\"]} for runtime.type_error, {\"limit\": \"recursion_depth\", \"value\": 64} for limit.exceeded. Keys are stable per code; values are data, never part of the identity.",
+          "additionalProperties": true
+        }
       }
     },
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nift_summary", "command", "exit_status", "errors", "warnings"],
+      "required": [
+        "nift_summary",
+        "command",
+        "exit_status",
+        "errors",
+        "warnings"
+      ],
       "properties": {
-        "nift_summary": {"const": 1},
-        "command": {"enum": ["build", "script", "eval", "status", "check"]},
-        "exit_status": {"type": "integer"},
-        "errors": {"type": "integer", "minimum": 0},
-        "warnings": {"type": "integer", "minimum": 0},
-        "pages_failed": {"type": "array", "items": {"type": "string"}},
-        "pages_built": {"type": "integer", "minimum": 0}
+        "nift_summary": {
+          "const": 1
+        },
+        "command": {
+          "enum": [
+            "build",
+            "script",
+            "eval",
+            "status",
+            "check"
+          ]
+        },
+        "exit_status": {
+          "type": "integer"
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pages_failed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pages_built": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

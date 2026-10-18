@@ -2,7 +2,7 @@
 """CP13: apply the message-to-code table (codes.tsv) to the diagnostic corpus.
 
 Reads each case's legacy stderr golden (baseline <case>.stderr, or
-changes/<case>.old.stderr), extracts the diagnostic message, strips the
+changes/<case>.new.stderr where the change alters it, else .old), extracts the diagnostic message, strips the
 compatibility prefixes, maps it to a code with code-table.tsv and compares
 with changes/CODES.tsv (`code`; `catchable` must be `no` for a case ending in
 a fatal diagnostic: adding codes never changes catchability). Rows of cases
@@ -69,8 +69,9 @@ def thrown_code(case: str, stderr: str):
 
 
 def golden(case: str, ext: str) -> str:
+    # approved changes: the intended (new) behaviour where it differs
     for p in (HERE / 'scripts' / f'{case}.{ext}', HERE / 'sites' / f'{case}.{ext}',
-              HERE / 'changes' / f'{case}.old.{ext}'):
+              HERE / 'changes' / f'{case}.new.{ext}', HERE / 'changes' / f'{case}.old.{ext}'):
         if p.exists():
             return p.read_text()
     return ''
@@ -92,7 +93,7 @@ def main():
         while len(cols) < 4:
             cols.append('')
         case, suite, code_col, catch_col = cols[:4]
-        stderr = golden(case, 'stderr')
+        stderr = golden(case, 'stderr') if golden(case, 'exit').strip() != '0' else ''
         message = message_of(stderr)
         if message is None:
             # No fatal diagnostic: the code/catchable columns are maintained

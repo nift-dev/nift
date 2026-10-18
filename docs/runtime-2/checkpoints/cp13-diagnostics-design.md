@@ -136,7 +136,7 @@ feature-site-dx — the four Assessment A reproducers, `1 + "s"`, the
 `$`-line drop and the seven try/catch-body position cases).
 
 **Changes (separate old-vs-new tests).** `tests/runtime2/diagnostics/changes/`:
-25 cases, each tied to a decision in `changes/MANIFEST.tsv`:
+34 cases, each tied to a decision in `changes/MANIFEST.tsv`:
 `<case>.old.*` = legacy behaviour before the change, `<case>.new.*` = intended
 behaviour (a missing `.new` stream means unchanged).
 
@@ -147,6 +147,7 @@ behaviour (a missing `.new` stream means unchanged).
 | D-009 #1 (canonical wording) | 1 | old-vs-new (`.new` captured from the CP12 VM) |
 | D-022 #3 (syntax before execution) | 7 + 3 guards | old-vs-new: no output, no effects (`syn_after_effect` checks a file is not created), import validated when loaded; guards: translator errors already pre-execution, and `"abc"[1]` (valid syntax, run-time error) must not be rejected |
 | site-dx try/catch-body positions (coordinator decision C) | 7 | old-vs-new, still fatal (D-022 #2) |
+| D-025 multi-line return values | 8 + 1 guard | old-vs-new, `.new` from the implementing binary (section (i)) |
 
 The D-018c `.new` files other than the CP12 captures were written from the
 rule (failing expression's start, no prefix) and are verified when the VM
@@ -240,15 +241,15 @@ CP16), so the io/json cases stay legacy-routed until then.
 **Future language checkpoint (recorded, R3): "catchable runtime errors".**
 Both engines (never VM-only, D-018), as its own approved change with
 old-vs-new tests. Ordinary runtime errors become catchable Error values with
-their codes: `native.name_error`, `native.undefined_callable`,
-`native.type_error`, `native.index_out_of_bounds`,
-`native.member_not_found`, `native.arity_error`,
-`native.integer_overflow`, `native.division_by_zero`,
-`native.arithmetic_error`, `native.invalid_argument`,
-`native.invalid_operation`, `native.mutation_denied`. Stay distinct, never
+their codes: `runtime.undefined_name`, `runtime.undefined_callable`,
+`runtime.type_error`, `runtime.index_out_of_bounds`,
+`runtime.member_not_found`, `runtime.arity_error`,
+`runtime.integer_overflow`, `runtime.division_by_zero`,
+`runtime.arithmetic_error`, `runtime.invalid_argument`,
+`runtime.invalid_operation`, `runtime.mutation_denied`. Stay distinct, never
 ordinary exceptions: `internal.*` (VM internal failures, invariants),
-resource exhaustion (`native.limit_exceeded`: recursion budget, memory
-budget; `internal.resource_exhausted`), termination/signals, and syntax or
+resource exhaustion (`limit.exceeded`: recursion budget, memory
+budget; `limit.resource_exhausted`), termination/signals, and syntax or
 translation errors (rejected before execution). `policy.*` catchability is
 a decision for that checkpoint. Affected pinned behaviour:
 `semantics/errors_try_catch`, `semantics/errors_catch_index`, baseline
@@ -271,13 +272,13 @@ parser (one grammar). A unit is rejected, citing the rule, when:
 
 | Rule | Grammar / lexical rule | Code |
 | --- | --- | --- |
-| `translator` | a statement form the translator grammar rejects (`fn add(a,b)`, `if(x) stmt`, …); CP10 reproduces legacy's message and position exactly | `native.translation_error` |
-| `deferred-translator` | the same grammar inside a deferred region (function, method, lambda block body) — legacy checks it only when the region runs; recorded by the three deferred sites via `Ast::note_deferred_error` (tree unchanged) | `native.translation_error` |
-| `R1-unterminated-string` | a `"`/`'` literal never closed (quotes pair as legacy reads them) | `native.syntax_error` |
-| `R2-unclosed` / `R2-stray-closer` / `R2-mismatched` | brackets `()[]{}` unbalanced in the statement (strings, nested blocks and other Opaque regions are skipped as units) | `native.syntax_error` |
-| `R3-empty-element` | an empty element: `,` after an opener or a comma, or before a closer | `native.syntax_error` |
-| `R4-missing-operand` | `+ - * / % == != && .` followed by a closer, a comma or the end of the statement | `native.syntax_error` |
-| `R5-missing-left-operand` | `* / % == != && || ??` where an operand must start | `native.syntax_error` |
+| `translator` | a statement form the translator grammar rejects (`fn add(a,b)`, `if(x) stmt`, …); CP10 reproduces legacy's message and position exactly | `syntax.invalid_statement` |
+| `deferred-translator` | the same grammar inside a deferred region (function, method, lambda block body) — legacy checks it only when the region runs; recorded by the three deferred sites via `Ast::note_deferred_error` (tree unchanged) | `syntax.invalid_statement` |
+| `R1-unterminated-string` | a `"`/`'` literal never closed (quotes pair as legacy reads them) | `syntax.malformed_expression` |
+| `R2-unclosed` / `R2-stray-closer` / `R2-mismatched` | brackets `()[]{}` unbalanced in the statement (strings, nested blocks and other Opaque regions are skipped as units) | `syntax.malformed_expression` |
+| `R3-empty-element` | an empty element: `,` after an opener or a comma, or before a closer | `syntax.malformed_expression` |
+| `R4-missing-operand` | `+ - * / % == != && .` followed by a closer, a comma or the end of the statement | `syntax.malformed_expression` |
+| `R5-missing-left-operand` | `* / % == != && || ??` where an operand must start | `syntax.malformed_expression` |
 
 Rules R1–R5 are checked only on the text of `Opaque(LegacyRuntimeError)`
 regions; every other Opaque (template text, irregular legacy parses, struct
@@ -304,13 +305,14 @@ only the timing changes. The two differences are `(1]` (legacy quotes `(1`)
 and `(,1)` (legacy quotes `,1`).
 
 **Tests.** `tests/runtime2/prevalidate/rules.tsv` + `rules_test.py` (85
-cases, each run through the prevalidator and against legacy): every rule
+cases, each run through the prevalidator and against legacy; 89 with the
+D-025 rows): every rule
 with legacy-failing examples; the D-022 #3 "never executed" cases
 (uncalled function, untaken branch, uncalled lambda); and owner addition 2 —
 syntactically valid programs that fail at run time (undefined callable,
 bad index, division by zero, type errors, throw, overflow, arity) at top
 level, in dead branches, in uncalled functions and after `return`, all
-accepted. Result: 85/85. `rt-parser-unit` PASS, CP10 error corpus 1,500/1,500
+accepted. Result: 89/89. `rt-parser-unit` PASS, CP10 error corpus 1,500/1,500
 identical, rt-lint clean.
 
 **Units.** Entry points (script file, `-e`, stdin) are validated whole in
@@ -341,95 +343,65 @@ repositories** pinned by commit in `repos.tsv` — all 25 nift-packages, the
 Labs evidence scripts (28, a local snapshot pinned by sha256; not a public
 repository), vendored offline under `projects/`.
 
-Result in strict (tool) mode, after the split (provisional evidence, not
-certification):
+Result in strict (tool) mode, after the split and D-025 (provisional
+evidence, not certification):
 
 | Corpus | Units | Accepted | Rejected (rule cited) | Unreviewed |
 | --- | ---: | ---: | ---: | ---: |
-| CP10 legacy cases | 257 | 207 | 50 | 0 |
+| CP10 legacy cases | 257 | 208 | 49 | 0 |
 | CP10 syntax errors | 34 | 0 | 34 | 0 |
 | VM corpus | 122 | 120 | 2 | 0 |
 | semantics | 57 | 57 | 0 | 0 |
 | rt-diff corpus | 15 | 15 | 0 | 0 |
-| CP13 diagnostics | 110 | 94 | 16 | 0 |
+| CP13 diagnostics (incl. D-025 cases) | 119 | 102 | 17 | 0 |
 | cp410 probes | 120 | 120 | 0 | 0 |
 | tests/*.f | 1 | 1 | 0 | 0 |
 | smoke-test extracts | 1,780 | 1,780 | 0 | 0 |
-| real projects (38 repos + Labs evidence) | 86 | 85 | 1 | 0 |
+| real projects (38 repos + Labs evidence) | 86 | 86 | 0 | 0 |
 | nift-regression-suite extracts | 126 | 126 | 0 | 0 |
-| **total** | **2,708** | **2,605** | **103** | **0** |
+| **total** | **2,717** | **2,615** | **102** | **0** |
 
-Rejections by rule: translator 74, R2 17, R3 7, deferred-translator 4, R1 1.
-**Owner decision needed:** the one real-project rejection is
-nift-packages/http `src/http.f:101` — `return {` followed by a multi-line
-object literal in `capabilities()`. In legacy's grammar `return` ends at the
-line break, so `{` is unclosed; legacy fails ("return: malformed
-parameters") whenever that branch runs (verified with an equivalent probe),
-but the module loads and its other paths work today. Strict prevalidation
-would make the whole module fail to import. Options: reject (strict
-D-022 #3), fix the package, or make multi-line `return` values a language
-form (a grammar change for both engines).
+Rejections by rule: translator 74, R2 15, R3 7, deferred-translator 4,
+R1 1, R5 1. The earlier real-project rejection (nift-packages/http
+`src/http.f:101`, multi-line `return {`) is resolved by D-025 (section (i)):
+the module is accepted and that branch now works on both engines.
 
-## (g) Error model and the message-to-code table (D-022 #2, R2)
+--- | --- | --- |
+| `syntax.*` | invalid source / grammar | `syntax.invalid_statement` (statement grammar, also in deferred bodies; was `native.translation_error`), `syntax.malformed_expression` (R1–R5; was `native.syntax_error`); `details.rule` |
+| `runtime.*` | language run-time failures | new: `runtime.undefined_callable`, `runtime.type_error`, `runtime.index_out_of_bounds`, `runtime.member_not_found`, `runtime.arity_error`, `runtime.integer_overflow`, `runtime.division_by_zero`; renamed from `native.*`: `runtime.undefined_name`, `runtime.arithmetic_error`, `runtime.invalid_argument`, `runtime.invalid_operation`, `runtime.invalid_control`, `runtime.mutation_denied`, `runtime.unsupported_value`, `runtime.invalid_handle`, `runtime.resource_lifecycle`, `runtime.resource_owner_mismatch`, `runtime.resource_transfer_denied` |
+| `limit.*` | execution and resource limits (never ordinary exceptions, R3) | `limit.exceeded` (was `native.limit_exceeded`; `details.limit`), `limit.resource_exhausted` (was `internal.resource_exhausted`) |
+| `host.*` | host integration | `host.service_failed` (was `native.system_service_failed`), `host.provider_error` (unchanged) |
+| `io.*`, `stream.*`, `json.*`, `schema.*`, `process.*`, `policy.*`, `package.*`, `ffi.*`, `user.*` | unchanged | — |
+| `internal.*` | genuine Nift implementation failures | unchanged except `resource_exhausted` (moved to `limit.*`) |
 
-Three independent properties per diagnostic: **code** (identity),
-**severity** (error/warning/note), **catchable** (decided by the raise).
-`DiagnosticCodeInfo::disposition` stays only as the default for
-`fail_recoverable`/`fail_fatal`; the Diagnostic records `catchable` per
-raise. Both engines emit the same codes; JSON carries them; text is
-unchanged.
+The `native.` domain is retired: the word is overloaded in Nift (platform
+target, HTTP backend, the VM's built-in table). Mapping, enumerators and
+`details` keys: `tests/runtime2/diagnostics/code-taxonomy.tsv`. All renamed
+codes were Fatal and stay Fatal; none was visible as a caught Error's `code`.
+Each code has exactly one text (the registry test requires unique texts;
+statement and expression syntax are two classes for that reason). Mapping of
+the legacy messages to codes and the reused codes:
+`tests/runtime2/diagnostics/code-table.tsv`.
 
-**Naming — semantic identity (owner addition 4).** Codes must name *what
-went wrong in the language*, the same whether a native built-in, a bytecode
-instruction or legacy raises it. The v4.6 registry
-(`docs/evidence/v46-b4-cp2-diagnostic-registry.md`) did intend `native.` as
-"language runtime" (grammar, binding, arity/type/value, arithmetic,
-handles), but the word is overloaded in Nift (`platform() == "native"`,
-`http.use_backend("native")`, the VM's `rt/native.*` built-in table,
-"contained native exceptions" in `internal.*`), so `native.type_error` reads
-as "an error inside a native built-in". These codes are not yet visible to
-users (all Fatal, so never a caught Error's `code`; not in the C ABI; one
-unit test), so **renaming is cheap now and expensive after JSON ships.
-Proposal (owner decision):** a semantic `lang.*` domain — mapping in
-`tests/runtime2/diagnostics/code-namespace-proposal.tsv` (e.g.
-`lang.type_error`, `lang.index_out_of_bounds`, `lang.undefined_name`,
-`lang.statement_error`), with resource limits as `limit.exceeded` (kept out
-of ordinary exceptions, R3) and the non-I/O service failure as
-`host.service_failed`; alternative patch
-`scratchpad/cp13/cp13-diagnostic-codes-lang.patch` (applies cleanly; also
-needs `tests/diagnostic_outcome_unit.cpp` and `ParseError::kCode` updated).
-Until decided, fixtures use the current `native.*` texts below.
-
-**New codes (7, appended; all default Fatal, i.e. exactly today's
-behaviour):** `native.undefined_callable`, `native.type_error`,
-`native.index_out_of_bounds`, `native.member_not_found`,
-`native.arity_error`, `native.integer_overflow`,
-`native.division_by_zero`. Reused: `native.syntax_error` (malformed
-expressions, unterminated literals), `native.translation_error` (statement
-forms rejected by the translator), `native.name_error` (undefined names,
-assignment to an undefined binding, redeclaration),
-`native.mutation_denied` (const), `native.arithmetic_error` (fractional
-modulo, non-finite results), `native.limit_exceeded` (recursion),
-`native.invalid_argument` (`error()` arguments, invalid user codes),
-`native.invalid_control`, `native.invalid_operation` (string indexing),
-`io.open_failed` (also the fatal `@input` miss: same identity, different
-catchability), `user.*` (thrown Errors carry their own code).
+**Patch prepared, not applied** (Diagnostic.h may be touched by site-dx):
+`/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp13/cp13-diagnostic-codes.patch`
+— renames the code texts per the taxonomy (enumerator identifiers unchanged,
+so no raising site changes), appends the seven `Runtime*` enumerators (Fatal),
+adds `DiagnosticSeverity` and `Diagnostic::{severity, catchable}`
+(`make_diagnostic` sets `catchable` from the default disposition, so existing
+raises keep their behaviour), and updates `tests/diagnostic_outcome_unit.cpp`
+(code count 69, new registry fingerprint) and `tests/source_map_contract.json`
+(`syntax.invalid_statement`). `git apply --check` clean; the patched unit test
+compiles and passes.
 
 **Table.** `tests/runtime2/diagnostics/code-table.tsv`: ordered regexes over
 the message after removing compatibility prefixes; `unknown value or
 malformed expression: X` is split by the shape of X (identifier path →
-`native.name_error`, method call → `native.member_not_found`, string index
-→ `native.invalid_operation`, otherwise `native.syntax_error`). The VM sets
+`runtime.undefined_name`, method call → `runtime.member_not_found`, string index
+→ `runtime.invalid_operation`, otherwise `syntax.malformed_expression`). The VM sets
 codes at the raising instruction (no table); legacy maps in `Parser::fail`
 when no explicit code was given (a C++ table generated from, or checked
 against, `code-table.tsv`). Coverage on the corpus: 97 rows, 0 unmapped.
-
-**Patch prepared, not applied** (site-dx may touch diagnostics):
-`/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp13/cp13-diagnostic-codes.patch`
-— appends the seven codes and their texts, adds `DiagnosticSeverity` and
-`Diagnostic::{severity, catchable}` (`make_diagnostic` sets `catchable`
-from the default disposition, so existing raises keep their behaviour);
-`git apply --check` clean on this branch, header compiles stand-alone.
 
 ---
 
@@ -447,6 +419,56 @@ Assessment: defect candidate. Behaviour unchanged until established; the CP10
 parser currently reads such lines as `TemplateText` (valid, legacy-routed),
 so if they are ruled invalid the rule changes in the parser (and translator)
 and they fail under prevalidation.
+
+---
+
+## (i) Multi-line return values (D-025) — implemented on both front ends
+
+**Exact rule.** `return` takes the text after the keyword up to the first
+line break or `;` that is outside quotes **and** outside every `(`, `[`, `{`
+the return value itself opened (depth counted from the keyword, quote-aware;
+a closer at depth 0 does not reopen anything). So the value continues across
+lines only while a bracket, brace or parenthesis it opened is still open;
+nothing else continues it — no operator-at-end-of-line, blank-line or
+indentation heuristics. A bare `return` at the end of a line keeps its
+meaning. An unterminated literal or a bracket never closed still runs to the
+end of the region and is a syntax error (prevalidation R1/R2). Unchanged
+(recorded for the language-consistency register): a `;` inside a quoted
+string at depth 0 still ends the statement (`return "a;b"` fails, before and
+after; the prevalidator reports it, R1), and comments are not part of
+expression grammar (`return [\n 1, // c` fails exactly like the same
+multi-line declaration).
+
+**Implementation (identical in both).** Legacy translator:
+`src/ParserScript.cpp`, the `return` branch of the statement loop only (for
+integration: site-dx's committed work touches the import-hook area of the
+same file, not this branch). CP10 parser: `src/rt/control_flow.cpp`
+`StatementParser::return_stmt`. CP10's legacy oracle links the translator, so
+it reflects the new rule automatically.
+
+**Tests.** `changes/ret_*` (9 cases, decision D-025): the http.f shape
+(struct method, `if` branch), `return [1,\n 2]`, nested literals, strings
+containing braces and an escaped quote, a comment inside the value, the same
+function called from a loop, bare `return` (guard), `;` handling, and a
+parenthesis continuation (which also runs on the VM). Old = legacy before
+(`return: malformed parameters` for every multi-line value), new = after;
+`.new` captured from the patched binary and reviewed. All 9 pass `--expect
+new`, also with `NIFT_VM=1`. The CP10 legacy oracle agrees with rt on all
+of them, on `tests/rt/legacy-cases/c1_return_multiline.f` and on
+`nift-packages/http src/http.f` (11/11 accepted, 0 mismatched).
+
+**Gates rerun after the change** (`make -j1`; rt objects and
+`ParserScript.o` rebuilt):
+
+| Gate | Result |
+| --- | --- |
+| CP10 accept/reject vs the legacy oracle (`rt_parser_corpus.py`, all corpora + 6,587 generated) | 0 mismatched in every corpus; error corpus 1,500/1,500 and legacy error corpus 1,500/1,500 identical |
+| CP10 fuzz (20,000), deep nesting on a 1 MB stack | no crash or hang; 22/22 |
+| negative gate (`rt_parser_negative.py`, 1,957 programs) | PASS, 0 failures |
+| paren oracle (572 scripts) | 0 divergent |
+| `rt-parser-unit` | PASS |
+| prevalidation rules (`rules_test.py`) | see (f) |
+| strict zero-false-rejection gate | see (f) |
 
 ---
 

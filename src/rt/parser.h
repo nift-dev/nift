@@ -20,10 +20,11 @@
 namespace nift::rt {
 
 // A script syntax error. Legacy reports these from the translator with code
-// native.translation_error (DiagnosticCode::NativeTranslationError, Fatal) as
+// syntax.invalid_statement (DiagnosticCode::NativeTranslationError, Fatal; CP13
+// taxonomy, before it: native.translation_error) as
 // "<file>:<line>:<column>: <message>"; every ParseError carries that code.
 struct ParseError {
-    static constexpr const char* kCode = "native.translation_error";
+    static constexpr const char* kCode = "syntax.invalid_statement";
     std::string message;
     std::uint32_t offset = 0;  // byte offset of the reported position
 };

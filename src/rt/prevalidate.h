@@ -30,7 +30,7 @@ struct Prevalidation {
     bool ok = true;
     std::uint32_t offset = 0;  // byte offset of the reported position
     std::string message;
-    const char* code = "";     // DiagnosticCode text (native.translation_error / native.syntax_error)
+    const char* code = "";     // DiagnosticCode text (syntax.invalid_statement / syntax.malformed_expression)
     const char* rule = "";     // which check rejected it (tests and the gate)
 };
 

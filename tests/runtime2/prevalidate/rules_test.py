@@ -35,6 +35,8 @@ def program(context, stmt):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--tool', required=True); ap.add_argument('--legacy'); ap.add_argument('--verbose', action='store_true')
     a = ap.parse_args()
+    a.tool = os.path.abspath(a.tool)
+    a.legacy = os.path.abspath(a.legacy) if a.legacy else None
     bad = n = 0
     parity = [0, 0]  # [same text as legacy, compared]
     with tempfile.TemporaryDirectory() as d:
@@ -42,6 +44,7 @@ def main():
             if line.startswith('#') or not line.strip():
                 continue
             verdict, rule, legacy, context, stmt = line.rstrip('\n').split('\t')
+            stmt = stmt.replace('\\n', '\n')  # a literal \n in rules.tsv is a line break
             n += 1
             text, stmt_line = program(context, stmt)
             path = os.path.join(d, 'p.f')
@@ -65,7 +68,7 @@ def main():
                 if verdict == 'reject' and legacy == 'fails':
                     import re as _re
                     want = _re.search(r'p\.f:(\d+:\d+: .*)', p.stderr, _re.S)
-                    got = _re.search(r'p\.f:(\d+:\d+: .*) \[native', out, _re.S)
+                    got = _re.search(r'p\.f:(\d+:\d+: .*) \[(?:syntax|native)', out, _re.S)
                     parity[1] += 1
                     if want and got and want.group(1).strip() == got.group(1).replace('\\n', '\n').strip():
                         parity[0] += 1

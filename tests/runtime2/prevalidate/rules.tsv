@@ -92,3 +92,9 @@ accept	-	ok	uncalled	x := "s" + [1]
 accept	-	ok	uncalled	return undefined_name
 accept	-	ok	after-return	nosuch_fn(1)
 accept	-	ok	after-return	x := 1 / 0
+# D-025: multi-line return values (\n = line break). Continuation only inside
+# a bracket the value opened; a never-closed bracket is still R2.
+accept	-	ok	fn	return {\n"a": 1,\n"b": [2,\n3]\n}
+accept	-	ok	fn	return (1 +\n2)
+accept	-	ok	fn	return\nprint("x")
+reject	R2-unclosed	fails	fn	return [1,
