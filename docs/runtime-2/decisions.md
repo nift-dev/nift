@@ -303,3 +303,23 @@ CP12 (replay removal) started from CP11 `bf32e4f` while CP11 certifies.
   CP16 effect recording as a basis for execution inspection; present trade-offs
   before expanding any checkpoint. Assessment B: different model family, bounded
   pilot first. None of this delays Runtime 2.0.
+
+## D-020 — Loud errors, automatic safe recovery; benchmark campaigns kept distinct (owner, 2026-10-18)
+- Contract: errors are loud, recovery is automatic whenever it is safe, and
+  success means success.
+- An ordinary build failure (syntax, template or expression error, missing
+  dependency, failed page) ends cleanly with a non-zero status, keeps valid
+  build state and last-good outputs, and the next build works normally once
+  the problem is fixed. It never requires `--repair`. `.nift/.unfinished` and
+  `--repair` are reserved for genuinely interrupted or uncertain state (crash,
+  forced termination), and recovery is automated wherever correctness can be
+  established. `build --auto` keeps watching after ordinary errors. Delivered
+  by a dedicated bounded checkpoint (feature-build-recovery), tested for partial
+  page failures, concurrent builds, cleanup, process termination and
+  dependency-state consistency, without weakening crash recovery, dependency
+  tracking or atomic output.
+- The original website-generator benchmark (nift.dev/website-generator-benchmark,
+  v4.0.7, 0.165 s/10k) and the Nift Labs campaign (v4.12, 1.267 s/10k) are
+  separate campaigns with their own fixtures and methods; both remain
+  legitimate historical evidence, labelled with their conditions. Differences
+  are not called regressions without establishing comparability.

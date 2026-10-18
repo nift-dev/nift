@@ -185,3 +185,11 @@ become current. Non-negotiable gates already fixed now:
 - CP24 may not regress website build time or memory beyond the matrix limits.
 - CP25 requires the fallback counter to read zero across all corpora.
 - CP27 reports every performance target from the owner's table, met or not.
+
+## Feature checkpoints (outside the CP numbering)
+
+| Feature | Scope | Gate |
+| --- | --- | --- |
+| feature-sha256 | native `sha256()`/`sha256_file()` | done |
+| feature-site-dx | site-generation DX fixes and strict `$[...]` stage 1 | in progress |
+| feature-build-recovery | D-020: ordinary build failures never need `--repair`; `.unfinished` only for interrupted/uncertain state; auto-recovery where provably safe | partial-failure, concurrency, kill-at-every-step and incremental-equivalence tests pass |
