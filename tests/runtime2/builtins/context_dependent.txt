@@ -1,0 +1,11 @@
+# Legacy built-in behaviour that depends on the evaluation context or on the
+# expression's shape (design record cp14-builtins-design.md, Q1-Q10).
+# context_probe.py --expect-file fails when this inventory changes.
+obj.length
+num.to_double
+pair.keys.arity
+pair.range.exact
+pair.substr.units
+pair.sum.exact
+pair.trim.forms
+pair.trim.large

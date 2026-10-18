@@ -2415,3 +2415,48 @@ test-release-cert: $(TARGET)
 	python3 scripts/release_certify.py --root "$(CURDIR)" --jobs "$(shell nproc)"
 
 test: test-call-semantics
+
+# Runtime 2.0 CP14 built-in natives (src/rt/natives): unit tests, randomised
+# differential test against the legacy engine, context/shape probe of legacy,
+# ASan+UBSan build. Linked against the CP09 value model only (not the CP12
+# compiler/VM). RT_BUILTINS_LEGACY: the legacy nift binary used as oracle.
+RT_BUILTINS_LEGACY ?= $(CURDIR)/$(TARGET)
+RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp compare.cpp \
+	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp
+RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
+RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/natives/*.inc) \
+	$(RT_BUILTINS_CORE) $(wildcard src/rt/*.h) src/RuntimeValue.h tests/rt/rt_test.h tests/rt/builtins_support.h
+RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
+RT_BUILTINS_DIFF := $(TEST_DIR)/rt/builtins-diff$(EXEEXT)
+
+$(RT_BUILTINS_UNIT): tests/rt/builtins_unit.cpp $(RT_BUILTINS_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+
+$(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_BUILTINS_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+
+.PHONY: test-rt-builtins test-rt-builtins-sanitize test-rt-builtins-probe
+# RT_BUILTINS_SEED / RT_BUILTINS_CASES vary the differential test.
+test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF)
+	@test -x "$(RT_BUILTINS_LEGACY)" || { echo "legacy oracle $(RT_BUILTINS_LEGACY) missing (set RT_BUILTINS_LEGACY)" >&2; exit 1; }
+	"$(RT_BUILTINS_UNIT)"
+	"$(RT_BUILTINS_DIFF)" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_CASES:-5000}
+	python3 tools/rt-lint.py src/rt/natives
+	python3 tests/runtime2/builtins/context_probe.py --nift "$(RT_BUILTINS_LEGACY)" \
+		--expect-file tests/runtime2/builtins/context_dependent.txt
+
+# Legacy's context- and shape-dependent built-in behaviour (D-015 inventory).
+test-rt-builtins-probe:
+	python3 tests/runtime2/builtins/context_probe.py --nift "$(RT_BUILTINS_LEGACY)" \
+		--expect-file tests/runtime2/builtins/context_dependent.txt
+
+# ASan+UBSan build of the built-in tests; every CP09 mutation entry point
+# relocates storage, so a reference held across a mutation aborts.
+test-rt-builtins-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-diff"
+	"$(TEST_DIR)/rt-san/builtins-unit"
+	"$(TEST_DIR)/rt-san/builtins-diff" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_SAN_CASES:-2000}
