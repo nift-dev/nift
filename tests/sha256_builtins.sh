@@ -19,9 +19,18 @@ expect() { # name expected actual
 }
 # Portable across Linux, macOS (bash 3.2, BSD sed, shasum) and Windows/MSYS2
 # (paths written into Nift sources must be native: cygpath -m).
-case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;; *) IS_WINDOWS=0 ;; esac
+IS_WINDOWS=0
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+esac
 PY="$(command -v python3 || command -v python)"
-nat() { if [ "$IS_WINDOWS" -eq 1 ] && command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
+nat() {
+  if [ "$IS_WINDOWS" -eq 1 ] && command -v cygpath >/dev/null 2>&1; then
+    cygpath -m "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
 W="$(nat "$(mktemp -d)")"; trap 'chmod -R u+rwx "$W" 2>/dev/null; rm -rf "$W"' EXIT
 pyhash() { "$PY" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
 # Second, independent tool: sha256sum (GNU), shasum -a 256 (macOS), else hashlib.
