@@ -1,0 +1,6 @@
+a := cmd("yes")
+pl := a.pipe(cmd("gzip"))
+k := pl.kill_after(500)
+p := k.start()
+p.cancel()
+print(p.wait().cancelled)

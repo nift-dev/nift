@@ -1,0 +1,6 @@
+p := run("python3", "-i", "-q", {"mode": "interactive"})
+p.write_line("print(1 + 1)")
+print(p.read_line())
+p.close_stdin()
+r := p.wait()
+print(r.exit_code)

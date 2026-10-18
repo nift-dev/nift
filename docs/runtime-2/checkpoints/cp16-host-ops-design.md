@@ -11,7 +11,9 @@ benchmark set; no hangs/leaks".
 This record covers, in order: the inventory of legacy host behaviour (§1),
 the Host-op interface natives call (§2), filesystem (§3), process (§4) and
 clock (§5) semantics, the compiler wiring rules W12–W24 (§6), the test plan
-(§7), benchmark readiness (§8), and risks, quirks and open decisions (§9).
+(§7), benchmark readiness (§8), risks, quirks and open decisions (§9), and —
+added after D-028/D-029 — the process lifetime and ownership model (§11) and
+the public-syntax comparison for process modes (§12, owner decision O8).
 Fixtures captured from legacy are in `tests/runtime2/cp16/` (§7.1).
 
 Everything stated as legacy behaviour below is either pinned by a fixture
@@ -462,6 +464,10 @@ Process launch failures are not errors: they are result values
 
 ### 4.2 D-011 objective: pipe capture and streaming in the Host process layer
 
+*Superseded in its lifetime and cancellation details by §11 (D-029 process
+model, owner refinements); the output-mode list below remains the
+vocabulary §11 uses.*
+
 `SpawnRequest { std::vector<SpawnStage> stages; OutputMode mode; std::size_t
 capture_limit; std::optional<std::chrono::milliseconds> deadline; CancelToken*
 cancel; }` with
@@ -725,6 +731,19 @@ cost, the suite gives end-to-end time. records20k needs nothing from CP16.
 
 ### 9.1 Decisions needed
 
+**Status after D-028/D-029 (owner, 2026-10-19; `runtime-2` @`1d304b0`):**
+O1 decided — legacy gaps are fixed before CP16 by `feature-host-deps` (another
+agent), so the VM does **not** reproduce Q-H2/Q-H4 and W24 lapses; `site_deps`
+and `site_contain` expected files must be re-captured on that branch's
+binary. O2 adopted (trace v2). O3 decided — whole reads stop retaining data at
+a configurable bound and fail with `limit.exceeded` on both engines (streaming
+reads unlimited with bounded buffers; bound enforced while reading). O4
+decided — the VM budget becomes configurable, name and default chosen in the
+CP16 implementation; exceeding it is `limit.exceeded` naming the setting. O5
+is narrowed by D-029: one process model in the Host layer now (§11); public
+syntax chosen by the owner from §12. O6/O7 unchanged. The table below is kept
+as the record of what was asked.
+
 | # | Question | Options | Recommendation | Who |
 |---|---|---|---|---|
 | O1 | Legacy gaps: `open_bytes`/`ifstream` reads not recorded (stale output, D-002); `file().copy/move` containment in pages (D-002 remnant) | (a) VM reproduces; fix later in language cleanup; (b) fix legacy now (small change in `ParserExpression.cpp`), then both engines match | (b): these are defects against decisions already taken (D-002, D-020 "success means success"), not language changes; old/new tests from `site_deps`/`site_contain` | **owner** (changes incremental rebuild results and an error into success; could be judged coordinator-level under D-002 — flagged so the owner can say) |
@@ -734,6 +753,7 @@ cost, the suite gives end-to-end time. records20k needs nothing from CP16.
 | O5 | Language surface for D-011 modes (pipe capture, streaming, detached, deadlines, cancellation, `timed_out` result keys) | new `cmd()` methods; new built-in; Host-layer only for now | Host layer + C++ benchmarks in CP16; syntax proposal for the owner before exposing | **owner** (new capability surface) |
 | O6 | Catchability of host failures that are fatal today: `inject` missing source, `open(dir)`, `rm(dir)`, glob-no-match, `sleep(-1)`, random limit, `NIFT_NO_PROCESS` | part of the D-022 "catchable runtime errors" checkpoint | defer to that checkpoint (both engines) | owner (already scheduled by D-022) |
 | O7 | `file().save()` through a symlink | keep (replace link) or write the target atomically | target (consistent with build recovery F3) | language cleanup (owner) |
+| O8 | Public syntax for process modes and the process-model defaults (§12.4): A `"mode"` key, B orthogonal flags, C `cmd()` methods, or a hybrid; `kill_after` default, unknown option keys fatal, detach refused in builds, warning-only context-end termination, compatibility changes C1–C3 (§11.11) | §12 | none (comparison only) | **owner** |
 
 ### 9.2 Candidate quirks for `language-consistency.md` (recorded, not decided)
 
@@ -804,8 +824,458 @@ cost, the suite gives end-to-end time. records20k needs nothing from CP16.
 * Blocked on decisions: O1 before step 6's expected outputs are final; O3/O4
   before the read paths are frozen; O5 before any new process API.
 
+---
+
+## 11. Process lifetime and ownership (D-029 process model)
+
+One Host-layer model serves every mode (capture, streaming, interactive
+input, detached execution, deadlines, cancellation). It is independent of the
+public syntax (§12): the syntax only selects a `SpawnRequest`. It is not a
+general-purpose supervisor; it provides exactly the guarantees listed in
+§11.9 and nothing it cannot enforce.
+
+### 11.1 Objects
+
+| Object | Lives in | Holds |
+|---|---|---|
+| `ExecContext` | Host, one per execution context (§11.2) | the set of `ProcessGroup`s it owns, its kind (`Script`, `PageRender`, `BuildHook`, `Build`, `AutoRebuild`), parent context, cancel token |
+| `ProcessGroup` | owned by exactly one `ExecContext`, or by none once detached | one launch of a pipeline: stage pids/handles, POSIX process-group id or Windows job object, parent-side stdio endpoints (CLOEXEC / non-inheritable), drain buffers, deadline, state, per-stage results |
+| `ProcessResource` | CP17 typed-handle registry (`HandleKind::Process`) | a reference to a `ProcessGroup` plus the handle's lifetime contract (`on_release`, §11.5) |
+
+`ProcessGroup` states: `Launching → Running → Exited` (every stage reaped),
+or `Launching → LaunchFailed` (no stage left running), plus the terminal
+markers `Cancelled`, `TimedOut`, `Lost` (§11.7). A stage's result is one of
+`launch_failed` (never ran: `launched:false`, `error`, 127/126 as site-dx
+defines), `exited` (`exit_code`), `signaled` (`signal`, `exit_code` =
+128+n on POSIX). Launch failure therefore never looks like "launched, then
+exited nonzero", in any mode, for single commands and per stage.
+
+### 11.2 Ownership classes
+
+| Class | Definition | Owner | Ends when |
+|---|---|---|---|
+| **Managed** | every process Nift launches unless explicitly detached; includes every stage of a pipeline and every descendant that stays in the group/job (§11.9) | the innermost `ExecContext` active at launch | its owner context ends (§11.3), or earlier when waited for and fully reaped |
+| **Explicitly detached** | launched with the detached mode only; own session (POSIX `setsid`) or no Nift job (Windows), stdio not connected to Nift (null device or a named file), never waited by a context | nobody after launch: responsibility transferred to the user/OS; Nift keeps only a pid record to reap it (no zombies) while Nift lives | the process exits by itself, or the user stops it |
+| **Build-managed** | any process launched from a build: page renders, item scripts, `pre`/`post` hooks, custom build scripts, each `--auto` rebuild | the `Build` / `AutoRebuild` context (page and hook contexts are its children) | that build or rebuild ends, fails, is interrupted or is **superseded** |
+
+Rules:
+* Contexts nest: `Script`; `Build ⊃ {BuildHook, PageRender…}`; `--auto`
+  creates one `AutoRebuild` per pass. A child context's groups are cleaned up
+  when the child ends; anything a child leaves behind (it cannot, by the
+  previous rule, except §11.9 escapees) is cleaned up by the parent.
+* **Detach inside a build context is an error**: `process.detach_in_build`
+  (fatal, loud), so no build can leave a process behind deliberately. A
+  development server belongs in a standalone script, not a build hook.
+* An `--auto` rebuild that is superseded (an edit arrives while it runs, or it
+  is retried) is cancelled **before** the next pass starts (cooperative, then
+  forced, §11.4), and the next pass waits until every group of the old pass is
+  reaped or marked `Lost`. A process from pass N can therefore never write an
+  output or a file the next pass reads.
+* Ownership never moves between contexts (no adoption), except detach, which
+  removes it entirely.
+
+### 11.3 Who owns a process after `run()` returns; context exit and signals
+
+| Situation | Behaviour |
+|---|---|
+| blocking `run()` / `cmd().run()` (capture, stream, inherit) | returns only after every stage is reaped; the stages are gone. Descendants still alive in the group (a stage's `cmd &`) stay owned by the context (legacy: not waited, not killed — kept for the call itself, see C1) |
+| non-blocking start (interactive/handle modes) | the `ProcessGroup` is owned by the context; the handle is a reference, not the owner |
+| context ends **normally** (script returns, page render done, hook done, build done) | every owned group still running is cancelled (§11.4); a stderr warning `warning: process '<argv0>' (pid N) was still running when <context> ended; terminated` is printed per group that had a live handle or a live **stage** (leftover background descendants are terminated silently — they are the documented consequence of C1); exit status unchanged |
+| context ends **on error** (fatal error, failed page, failed hook) | same cleanup, no extra warning beyond the error; a failed page's processes never outlive the page (D-020: next build starts clean) |
+| Nift receives **SIGINT/SIGTERM** (POSIX) or Ctrl+C/Ctrl+Break/close (Windows console) | Nift forwards the cooperative request to every managed group (they are not in Nift's terminal process group unless §11.8 applies), waits up to the grace period, then forces; detached processes are untouched; then Nift exits 130/143 (`--auto`: as today, the running pass is cancelled and the watcher stops with exit 0, "build --auto stopped") |
+| Nift is **SIGKILLed** / crashes | no cleanup code runs. Linux: stages carry `PR_SET_PDEATHSIG(SIGKILL)` (direct children only); Windows: per-context jobs with `KILL_ON_JOB_CLOSE` kill every job member; macOS: nothing (managed processes may survive). This is the "honest" row of §11.9 |
+| `--auto` pass superseded | §11.2; next pass starts with zero processes from the old pass (Linux/Windows guaranteed; macOS: group members only) |
+
+### 11.4 Cancellation: scope, order, escalation
+
+Scopes (Host API `cancel(ProcessGroup&, CancelScope, ...)`):
+
+| Scope | Targets | POSIX | Windows |
+|---|---|---|---|
+| `Child` | one stage process only | `kill(pid, sig)` | console app: no per-process Ctrl event exists (Ctrl events address process groups) → forced only: `TerminateProcess` |
+| `Pipeline` (default for every public cancel, deadline and cleanup) | every stage at once, plus everything still in the group/job | `kill(-pgid, sig)`: all stages simultaneously, never stage by stage (sequential signalling lets an upstream stage die of SIGPIPE before it is asked, changing its status) | `GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, group)` then `TerminateJobObject` |
+| `Tree` | `Pipeline` plus descendants that left the group (§11.9) | Linux only: escapees reparented to Nift as subreaper are signalled by pid; elsewhere = `Pipeline` | = `Pipeline` (the job already contains descendants that did not break away) |
+
+Sequence for `Pipeline`/`Tree`:
+1. **Cooperative request**: POSIX `SIGTERM` to the group; Windows
+   `CTRL_BREAK_EVENT` to the console process group (children are created with
+   `CREATE_NEW_PROCESS_GROUP`; non-console programs cannot receive it and go
+   straight to step 3). Nift closes its write end of stdin (so a child
+   blocked reading stdin sees EOF) and **keeps draining** stdout/stderr (so a
+   child blocked writing can make progress and exit).
+2. **Grace period**: `kill_after` (default 2,000 ms, configurable per request;
+   0 = immediate force). Reaping continues as stages exit.
+3. **Forced termination**: POSIX `SIGKILL` to the group (and Linux escapees);
+   Windows `TerminateJobObject`. Cannot be ignored.
+4. **Bounded wait for exit after force**: 5,000 ms. A stage still unreaped
+   (POSIX uninterruptible sleep, e.g. dead NFS) is handed to the background
+   reaper and reported as `Lost` (§11.7). Nift never hangs here.
+
+Results after cancellation: per stage `signaled` (`signal: "SIGTERM"` or
+`"SIGKILL"`, `exit_code` 143/137) or `exited` if it handled SIGTERM and exited
+on its own; group flags `cancelled: true` (explicit cancel or context
+cleanup) or `timed_out: true` (deadline). Cancelling an already exited
+group is a no-op returning `false`; cancelling twice escalates nothing extra
+(the sequence is idempotent).
+
+### 11.5 Abandoned handles
+
+The handle contract (implemented on CP17's typed handles; CP17 owns the
+representation and reclamation, CP16 the semantics):
+* When CP17 reclaims the last reference to a running `ProcessResource`
+  (unreachable value, scope end), `on_release` cancels the group with scope
+  `Pipeline` **asynchronously** (the Host reaper runs steps 1–4; the script is
+  not blocked) and prints `warning: process '<argv0>' (pid N) was abandoned
+  while running; terminated`. Output not yet read is discarded.
+* Abandoning an **exited** group: reaped silently; unread output and the exit
+  status are discarded (like ignoring a function result).
+* Until CP17's reclamation lands (CP16 may land first), handles are released
+  at context end only, so "abandoned" means "still owned at context end" and
+  §11.3's normal-end row applies — the observable difference is only *when*
+  the termination happens, which the tests pin per phase.
+* A detached process's handle is a pid record: releasing it does nothing to
+  the process.
+* **Stale handles**: CP17's generation check makes a released or foreign
+  handle unresolvable; the compiler (W13) admits handles only where they
+  cannot be forged, so a failed resolution is `internal.*` (exit 70), never a
+  user-visible state. A handle whose process has exited is **not** stale: it
+  stays valid until released and answers `status`, `wait` (immediately) and
+  buffered reads.
+
+### 11.6 Draining stdout/stderr without deadlocks
+
+* Never read one stream to EOF before the other. Each `ProcessGroup` with pipe
+  endpoints is driven by one event loop: POSIX `poll()` over the stdout and
+  stderr read ends, the stdin write end when the script has pending input, and
+  a self-pipe for SIGCHLD; descriptors non-blocking. Windows: one I/O
+  completion port per group with overlapped named pipes (anonymous pipes do not
+  support overlapped I/O), or one drain thread per stream where overlapped I/O
+  is unavailable.
+* Writing stdin is part of the same loop: `p.write(x)` queues bytes and the
+  loop writes them while also draining both outputs, so "child writes a lot
+  before reading stdin" cannot deadlock.
+* **Completion** is "every stage reaped", never "pipe EOF" (a background
+  descendant may hold the pipe forever, the CP07 failure) and never an idle
+  timeout. After the last stage is reaped the loop reads what is immediately
+  available (until `EAGAIN`), then — for pipe-based modes only — the leftover
+  group members are cancelled (§11.4, which closes the pipes), and the loop
+  reads to EOF. `FileCapture` (legacy default) keeps CP07's behaviour.
+* **Bounds** (D-028): capture buffers are charged to the VM budget and capped
+  by the configured capture limit; reaching it cancels the group and raises
+  `limit.exceeded` naming the setting — never silent truncation. Stream mode
+  forwards as data arrives (after flushing Nift's own buffered stdout, so order
+  with `print` is preserved) and has no size limit; writing to Nift's stdout
+  may block, which propagates backpressure to the child (correct, not a
+  deadlock). Handle (interactive) mode buffers up to `buffer_limit` per stream,
+  then stops polling that stream so the child blocks; `wait()` drains into the
+  capture buffer (bounded) so "wait without reading" cannot deadlock either.
+
+### 11.7 Deadlines
+
+* A deadline is an absolute monotonic time computed at launch, covering the
+  whole pipeline including the final drain. The event loop's poll timeout is
+  the time remaining; expiry starts the §11.4 sequence regardless of what the
+  child is doing.
+* Child **blocked on I/O** (reading a stdin Nift never closes, writing to a
+  full pipe nobody reads, sleeping on a socket): SIGTERM's default action ends
+  it; Nift's closing of stdin and continued draining unblock children that
+  handle SIGTERM; Windows CTRL_BREAK then `TerminateJobObject`.
+* Child **ignores SIGTERM** (`trap '' TERM`, a handler that never exits):
+  SIGKILL after `kill_after`; result `timed_out:true`, stage
+  `signal:"SIGKILL"`, 137.
+* Child in **uninterruptible sleep**: after the 5 s post-kill bound the stage
+  is `Lost` (`exit_code: -1`, `error: "process did not exit after SIGKILL"`),
+  handed to the reaper; the call returns. The VM itself is never blocked
+  indefinitely by a deadline-bearing call.
+* Nift's own side never blocks past the deadline: all pipe I/O is
+  non-blocking inside the loop.
+* No deadline is applied to calls that did not ask for one (compatibility
+  with today's `run()`, which waits forever); detached processes take no
+  deadline (`run: deadline is not allowed for a detached process`, fatal).
+
+### 11.8 Terminal and interactive input
+
+* A managed group gets its own POSIX process group so it can be signalled as a
+  unit. A child in a background process group that **reads the controlling
+  terminal** would be stopped by SIGTTIN. Therefore: a *blocking* call whose
+  stdin is the terminal makes the group the terminal's foreground group for
+  the duration (`tcsetpgrp`, SIGTTOU ignored by Nift meanwhile, restored
+  afterwards; this is what the interactive shell already does for
+  `foreground_terminal`) — terminal Ctrl+C then reaches the child directly,
+  and Nift, back in the foreground, decides the rest. A *non-blocking* handle
+  may not inherit a terminal stdin: its stdin is a pipe, the null device or a
+  file (`run: a started process cannot read the terminal`, fatal).
+* Interactive input (the handle mode) is pipe-based: `write`,
+  `write_line`, `close_stdin`; reading is line- or chunk-based on the drained
+  buffer.
+
+### 11.9 Honest platform guarantees
+
+What Nift enforces, per platform; tests assert exactly these rows and the
+documented limitations, nothing stronger.
+
+| Guarantee | Linux | macOS / other POSIX | Windows |
+|---|---|---|---|
+| every stage of a managed pipeline is terminated and reaped at context end, cancel, deadline, SIGINT/SIGTERM | yes | yes | yes |
+| descendants that **stay in the process group / job** are terminated with it | yes | yes | yes (job; breakaway denied: no `JOB_OBJECT_LIMIT_BREAKAWAY_OK`) |
+| descendants that **leave the group** (`setsid`, `setpgid`, double fork) | terminated at the owning **build/script** end: Nift is a child subreaper (`PR_SET_CHILD_SUBREAPER`), orphans reparent to it, and since build contexts forbid detach, every non-detached child of Nift during a build belongs to that build; within a script they are attributed to the script context | **not guaranteed**: orphans reparent to launchd/init; documented limitation | contained unless created through a mechanism outside the job (services, WMI, Task Scheduler, COM out-of-process servers, `start` via the shell) — documented |
+| superseded `--auto` pass leaves nothing running | yes (group + subreaper) | group members only | yes (job) |
+| managed processes die when Nift is SIGKILLed | direct stages only (`PDEATHSIG`); their descendants may survive | no | yes (`KILL_ON_JOB_CLOSE`) |
+| no inherited pipe keeps a capture open | Nift's descriptors are CLOEXEC; descriptors Nift itself inherited without CLOEXEC are passed on (legacy, like Bash) | same | explicit inherit list (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`) |
+| detached processes survive Nift's exit and are never zombies while Nift lives | yes (double fork, pid record, reaped as subreaper) | yes (double fork) | yes if the environment's job allows breakaway (`CREATE_BREAKAWAY_FROM_JOB`); otherwise a warning that the process will end with Nift's job |
+| cooperative request before force | SIGTERM | SIGTERM | CTRL_BREAK for console programs only; GUI/non-console programs: force only |
+
+Not provided (deliberately): cgroups, resource limits, restart policies,
+monitoring of processes Nift did not launch, re-attaching to detached
+processes after Nift exits.
+
+### 11.10 Handle operations per mode
+
+| Mode (Host) | Returns | read / read_line | write / close_stdin | wait | cancel | status / pid |
+|---|---|---|---|---|---|---|
+| capture (blocking) | result object | — | — (stdin: inherit, null, file or given text) | implicit | via deadline only | in the result |
+| stream (blocking) | result object (`stdout`/`stderr` empty strings) | — | — | implicit | via deadline only | in the result |
+| inherit/terminal (blocking) | result object | — | — | implicit | via deadline / terminal Ctrl+C | in the result |
+| interactive / started (handle) | `Process` handle | yes (drained buffer; `null` at EOF) | yes; writes after `close_stdin` or exit: `process.stdin_closed` (fatal) | yes, returns the result object; repeatable | yes (`Pipeline`), returns whether anything was running | `running`, `status`, `pid` (first stage) |
+| detached | `Process` handle (pid record) | — | — | no (`process.not_owned`, fatal) | yes while Nift lives (`Pipeline` on its session; a request, not owned cleanup) | `running` (best effort), `pid` |
+
+`status` values: `running`, `exited`, `signaled`, `launch_failed`,
+`cancelled`, `timed_out`, `lost`. New result keys (`signal`, `cancelled`,
+`timed_out`, `status`) appear only in results of calls that use the new
+options; results of today's calls stay byte-identical (their `stringify()`
+output is behaviour).
+
+### 11.11 Compatibility changes implied by the model (need old/new tests)
+
+| # | Today | Under the model | Why |
+|---|---|---|---|
+| C1 | a background descendant of a `run()` stage (`sh -c "x &"`) survives the script and the build | terminated when the owning context ends (silently) | owner refinement: managed processes are cleaned up with their context; builds must not leave processes |
+| C2 | SIGTERM to Nift during `run()`: the child keeps running (`process_capture.sh`, "child survives Nift being terminated") | the child is terminated (cooperative, then forced) | same |
+| C3 | stages run in Nift's process group | each managed pipeline gets its own group (terminal stdin handled by §11.8) | group-wide cancellation |
+
+They follow from the owner's refinement but change pinned tests
+(`tests/runtime2/process_capture.sh` C2); the old/new tests and the
+`decisions.md` wording are for the coordinator to record when implementation
+starts. Both engines get the same model (D-018): legacy's `nift_run_pipeline`
+moves onto the Host process layer rather than keeping its own semantics.
+
+### 11.12 Tests (`tests/runtime2/process_lifetime/`, `tests/rt/host_process_unit.cpp`)
+
+Orphan detection: every test process carries a unique environment marker
+`NIFT_TEST_PROC_TAG=<uuid>`; after the cleanup bound the test scans
+`/proc/*/environ` (Linux), `ps -E -ww` (macOS) or a Toolhelp snapshot plus job
+accounting (Windows) and requires zero survivors where §11.9 claims it, and
+asserts the documented survivor where it does not.
+
+| Test | Answers | Asserts |
+|---|---|---|
+| `own_blocking_reaped` | 11.3 row 1 | no zombie/child of Nift after `run()` returns (1,000 calls) |
+| `own_bg_descendant_context_end` | C1 | `sh -c "sleep 60 &"`: alive after `run()` returns, gone after script end; same inside a page render and a hook |
+| `exit_normal_unwaited` | 11.3 | started handle never waited: terminated at script end, one warning, exit status unchanged |
+| `exit_error_unwaited` | 11.3 | same after a fatal error; exit 1 and the original error text |
+| `exit_sigint`, `exit_sigterm` | 11.3 | managed group terminated within grace + bound, detached alive, Nift exit 130/143 |
+| `exit_sigkill_linux`, `exit_sigkill_windows`, `exit_sigkill_macos_documented` | 11.9 | stages die (Linux), all members die (Windows), survivor recorded (macOS) |
+| `build_page_unwaited`, `build_hook_bg` | 11.2 build-managed | nothing survives `nift build`; failed page also cleans up |
+| `auto_superseded_pass` | 11.2 | slow hook spawns a long child; edit during the pass: old child gone before the next pass's first read; 20 rapid edits leave ≤ 1 pass's processes |
+| `build_detach_refused` | 11.2 | `process.detach_in_build`, nothing launched |
+| `escape_setsid_linux`, `escape_double_fork_linux`, `escape_macos_documented`, `escape_windows_job` | 11.9 | per-platform claims exactly |
+| `cancel_pipeline_all_stages` | 11.4 | `yes \| gzip \| cat`: all three signaled SIGTERM, statuses per stage, no SIGPIPE-first ordering artefact |
+| `cancel_child_scope` | 11.4 | only the targeted stage signaled |
+| `cancel_ignores_term` | 11.4, 11.7 | `trap '' TERM`: SIGKILL after `kill_after` ± tolerance |
+| `cancel_idempotent`, `cancel_after_exit` | 11.4 | no-op semantics |
+| `abandon_running_cp17`, `abandon_running_pre_cp17`, `abandon_exited` | 11.5 | async termination + warning (CP17 phase), context-end termination (CP16 phase), silent reap |
+| `stale_handle_internal` | 11.5 | test-hook forged generation → exit 70, never resolves another process |
+| `drain_both_64m` | 11.6 | 64 MB on each stream interleaved, no deadlock, exact bytes (SHA-256) |
+| `drain_stdin_before_read` | 11.6 | child writes 1 MB to stderr before reading 1 MB stdin from the handle |
+| `drain_bg_holds_pipe` | 11.6 | `(sleep 60 &); echo x` in pipe mode returns promptly; leftover terminated; CP07's FileCapture behaviour unchanged |
+| `capture_limit_loud` | 11.6 | limit reached → `limit.exceeded` naming the setting, group gone |
+| `deadline_blocked_read`, `deadline_blocked_write`, `deadline_sleeping`, `deadline_ignores_term` | 11.7 | `timed_out:true`, return within deadline + grace + bound |
+| `deadline_lost_dstate` (Linux, FUSE fixture if available, else skipped with reason) | 11.7 | `Lost` reported, call returns |
+| `launch_vs_exit_each_mode` | 11.1 | missing program → `launched:false`/127 in every mode; `exit 1` → `launched:true`/1; middle-stage launch failure in a cancelled pipeline keeps its `launch_failed` stage |
+| `terminal_foreground_handoff` (pty) | 11.8 | blocking child reading the tty works and gets Ctrl+C; started handle with terminal stdin refused |
+| `fd_no_leak_low_limit` | 11.6 | `ulimit -n 32`, 1,000 launches, fd count unchanged; EMFILE → `launched:false` |
+
+---
+
+## 12. Public syntax for process modes: comparison (owner decision)
+
+D-029: extend `run()` with explicit options/modes rather than add unrelated
+commands; the owner chooses from concrete alternatives. **This section
+decides nothing.**
+
+### 12.1 Existing conventions (verified with the legacy binary)
+
+| Convention | Where | Facts |
+|---|---|---|
+| trailing **options object** | `minify(path, {"format": …, "in_place": …, "output": …})` | snake_case keys; object keys must be double-quoted (`{a: 1}` → `object literal: keys must be double-quoted strings`); wrong value types are fatal (`minify: in_place must be a boolean`); **unknown keys are silently ignored** (`{"bogus": 1}` accepted) |
+| **mode strings** | `file().open("r"/"w"/"a"/"rw")`, `cmd().stdout(p, "append")`, `encode("utf-8")`, `sort_by` `'asc'/'desc'` | short lower-case words |
+| **fluent builder** on a handle | `cmd(...).pipe(cmd(...)).cwd(d).env(k, v).stdin(p).stdout(p[, "append"]).stderr(p).run()` | only built-in handles chain; a user struct returned by a call cannot (`mk().run()` → `unknown value or malformed expression`) |
+| **handle objects with methods** | `file()`, `timer()`, `ifstream()`/`ofstream()` (+ `close(s)`) | methods: `open read read_line write close`; `start stop pause elapsed` |
+| **result objects** | `run()`: `{exit_code, stdout, stderr, launched[, error][, stages]}`; `minify()`: `{ok, output, error, format, written}` | launch failure is a value, not an exception |
+| `run()` signature | `run(program, args…)`; arrays flattened; numbers/bools rendered | an **object argument is a fatal error today** (`run: arguments must be scalar`) → a trailing options object is backward compatible; a **trailing string is an argument today** (`run("x", ["a","b"], "stream")` passes `stream` to the program, verified) → a bare mode string is **not** compatible |
+| lambdas in objects | `{"on_stdout": (line) => print(line)}` | parses; `type(o.on_stdout)` is `function` |
+
+### 12.2 Alternatives
+
+**A — one `"mode"` key in a trailing options object** (`run(prog, args…,
+{"mode": "capture" | "stream" | "interactive" | "detached", "timeout_ms": n,
+"kill_after_ms": n, "stdin": …})`). Interactive/detached return a `Process`
+handle, the others a result object.
+
+```nift
+r := run("make", "-j4", {"mode": "stream"})
+print("make exited " + r.exit_code.to_string())
+
+p := run("python3", "-i", "-q", {"mode": "interactive"})
+p.write_line("print(1 + 1)")
+print(p.read_line())
+p.close_stdin()
+r := p.wait()
+print(r.exit_code)
+
+srv := run("python3", "-m", "http.server", "8000", {"mode": "detached"})
+print("server pid " + srv.pid.to_string())
+
+p := run("sh", "-c", "yes | gzip > /dev/null", {"mode": "interactive", "kill_after_ms": 500})
+p.cancel()
+r := p.wait()
+print(r.cancelled)
+
+r := run("curl", "-s", url, {"timeout_ms": 5000, "kill_after_ms": 1000})
+if(r.timed_out) { print("too slow") } else { print(r.stdout.length()) }
+```
+
+**B — orthogonal flags named after `cmd()`'s redirections**
+(`{"stdout": "capture" | "inherit" | "discard" | path, "stderr": …,
+"stdin": "inherit" | "null" | "pipe" | path, "wait": bool, "detach": bool,
+"timeout_ms", "kill_after_ms"}`); `"wait": false` returns a handle.
+
+```nift
+r := run("make", "-j4", {"stdout": "inherit", "stderr": "inherit"})
+print(r.exit_code)
+
+p := run("python3", "-i", "-q", {"stdin": "pipe", "wait": false})
+p.write_line("print(1 + 1)")
+print(p.read_line())
+p.close_stdin()
+print(p.wait().exit_code)
+
+srv := run("python3", "-m", "http.server", "8000", {"detach": true})
+print(srv.pid)
+
+p := run("sh", "-c", "yes | gzip > /dev/null", {"wait": false})
+p.cancel({"kill_after_ms": 500})
+print(p.wait().cancelled)
+
+r := run("curl", "-s", url, {"timeout_ms": 5000})
+print(r.timed_out)
+```
+
+**C — new methods on the existing `cmd()` builder**, with a handle from
+`.start()`/`.detach()`; `run()` itself unchanged (extends the `cmd().run()`
+family rather than `run()`'s argument list).
+
+```nift
+r := cmd("make", "-j4").stream().run()
+print(r.exit_code)
+
+p := cmd("python3", "-i", "-q").start()
+p.write_line("print(1 + 1)")
+print(p.read_line())
+p.close_stdin()
+print(p.wait().exit_code)
+
+srv := cmd("python3", "-m", "http.server", "8000").detach()
+print(srv.pid)
+
+p := cmd("yes").pipe(cmd("gzip")).kill_after(500).start()
+p.cancel()
+print(p.wait().cancelled)
+
+r := cmd("curl", "-s", url).timeout(5000).run()
+print(r.timed_out)
+```
+
+Captured output (all three keep today's form) and errors:
+
+```nift
+r := run("git", "rev-parse", "HEAD")
+if(!r.launched) { print("cannot start git: " + r.error) } else { if(r.exit_code != 0) { print("git failed: " + r.stderr) } else { print(r.stdout.trim()) } }
+
+r := run("definitely-missing", {"mode": "capture"})
+print(r.launched)
+print(r.exit_code)
+print(r.error)
+```
+
+Common behaviour in all three: launch failure, nonzero exit, deadlines and
+cancellation are **result values** (`launched`, `exit_code`, `signal`,
+`timed_out`, `cancelled`), never exceptions; invalid options are fatal argument
+errors like `minify`'s (`run: mode must be one of capture, stream, interactive,
+detached`, `run: timeout_ms must be a non-negative integer`) — and unlike
+`minify`, **unknown option keys are fatal** (`run: unknown option 'timout_ms'`;
+D-020 loud errors; a silent typo would disable a deadline); exceeding the
+capture limit is `limit.exceeded`; handle misuse (`write` after
+`close_stdin`, `wait` on a detached handle) is fatal `process.*`; handles obey
+§11.5/§11.10 and W13.
+
+### 12.3 Verification (`tests/runtime2/cp16/syntax/`)
+
+`syntax_check.sh NIFT` runs each of the 21 example programs
+(`[ABC]_{capture,stream,interactive,detached,cancel,deadline,errors}.f`) twice
+with the legacy binary; `expected.txt` holds the result:
+
+* **legacy pass** (as written, `PATH` empty so nothing launches): shows what
+  the code does **today**. A and B stop at `run: arguments must be scalar`
+  (the options object reaches `run()`'s argument check — the call parses);
+  C stops at `unknown value or malformed expression: cmd(...).stream()` (the
+  same message legacy uses for malformed text, so this pass alone does not
+  prove C's new method calls parse); the capture examples run.
+* **mock pass**: `mock.f` (a struct `mproc` with the proposed handle methods
+  and variadic `mrun`/`mcmd` returning result objects or handles) prepended,
+  `run(`→`mrun(`, `cmd(`→`mcmd(` (built-ins cannot be shadowed, D-009 #3).
+  **All 21 programs execute with exit 0**: every line — options objects,
+  handle method calls, `try`-free error handling through result keys,
+  `if`/`print` — is real Nift. Legacy cannot chain methods on a struct
+  returned by a call, so C's mock pass uses step-wise twins (`C_*.mock`,
+  e.g. `c := cmd(...); s := c.stream(); r := s.run()`); C's chained form
+  itself is the existing `cmd()` syntax (`proc_cmd` fixture chains `.pipe`,
+  `.cwd`, `.env`, `.stdout`, `.run`).
+* Not verifiable today (need new built-in behaviour, stated explicitly): the
+  handle methods on a real process (`write_line`, `read_line`,
+  `close_stdin`, `wait`, `cancel`, `pid`), the new result keys, and the new
+  `cmd()` methods (`stream`, `start`, `detach`, `timeout`, `kill_after`).
+  The CP10 parser tool (`tests/rt/parse_dump.cpp`) was not used: it needs a
+  build.
+
+### 12.4 Trade-offs
+
+| | A: `"mode"` key | B: orthogonal flags | C: `cmd()` methods |
+|---|---|---|---|
+| Extends `run()` (D-029 preference) | yes | yes | no (extends `cmd().run()`; `run()` unchanged) |
+| Compatible with every valid program today | yes (object args are an error today) | yes | yes (unknown methods are an error today) |
+| Invalid combinations | few (mode is one value; `timeout_ms` with `detached` refused) | many to validate (`detach` + `stdin: "pipe"`, `wait: false` + `stdout: "inherit"`, …) | few (method set per terminal call) |
+| Expressiveness | fixed set of modes; stdout/stderr routed together | per-stream routing (stream stdout, capture stderr) | per-stream via existing `.stdout()`/`.stderr()` |
+| Consistency with conventions | `minify`'s options object + `open()`'s mode words | `cmd()`'s redirection vocabulary inside an options object | `cmd()`'s fluent builder |
+| Return type predictable from the call | yes from the mode | depends on `wait`/`detach` | yes from the terminal method (`run` / `start` / `detach`) |
+| Static checking (wiring rules) | literal mode string → compile-time handle vs result kind | needs literal `wait`/`detach` values | method name decides statically |
+| Pipelines | via `cmd()` anyway (`cmd(...).pipe(...).run({"mode": …})` if `.run` also takes the object) | same | native |
+| Discoverability for agents | one key to learn | more keys, but mirrors `cmd()` | needs to know `cmd()` exists |
+
+A hybrid is possible and keeps one vocabulary: A or B's options object
+accepted by both `run(…, opts)` and `cmd(…).run(opts)`.
+
+**Owner decision (O8):** choose A, B, C or the hybrid; also confirm the
+defaults this design assumes (`kill_after` 2,000 ms; unknown option keys
+fatal; detach refused in builds; context-end termination prints a warning
+without changing the exit status) and the compatibility changes C1–C3.
+
+
 ## Evidence
 
 Fixture capture: `capture.py --nift /home/claude/review/nift-serve/nift
 --runs 2 --write` → 30 probes WROTE, none UNSTABLE. Self-check:
-`selfcheck.sh` → 18/18 pass. No builds, sanitizers or benchmarks were run.
+`selfcheck.sh` → 18/18 pass. §12 examples: `tests/runtime2/cp16/syntax/
+syntax_check.sh /home/claude/review/nift-serve/nift --write` → 21 programs,
+mock pass exit 0 for all (`syntax/expected.txt`). No builds, sanitizers or
+benchmarks were run.

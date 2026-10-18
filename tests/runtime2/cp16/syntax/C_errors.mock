@@ -1,0 +1,4 @@
+c := cmd("definitely-missing")
+r := c.run()
+print(r.launched)
+print(r.error)

@@ -30,3 +30,4 @@ site_observe	site	FS-10..FS-14, EN-01..EN-03, EN-07	-	absent/listing/env/env-sna
 site_contain	site	FS-23	-	cp() outside the project works, file().copy() outside is refused (Q-H4)
 site_buildvars	site	TI-04	build-time template variables	build-* variables (normalised), not dependencies
 site_run	site	PR-01	-	run() in a page: traced, never a dependency
+# syntax/: §12 public-syntax examples (A/B/C x capture/stream/interactive/detached/cancel/deadline/errors), mock.f, syntax_check.sh, expected.txt

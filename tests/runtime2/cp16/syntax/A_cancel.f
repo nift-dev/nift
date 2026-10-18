@@ -1,0 +1,5 @@
+p := run("sh", "-c", "yes | gzip > /dev/null", {"mode": "interactive", "kill_after_ms": 500})
+p.cancel()
+r := p.wait()
+print(r.cancelled)
+print(r.signal)

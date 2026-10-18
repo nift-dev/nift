@@ -1,0 +1,4 @@
+c := cmd("curl", "-s", url)
+t := c.timeout(5000)
+r := t.run()
+print(r.timed_out)

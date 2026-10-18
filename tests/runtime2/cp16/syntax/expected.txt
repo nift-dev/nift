@@ -1,0 +1,71 @@
+== A_cancel legacy: error: legacy.f:2:6: run: arguments must be scalar
+== A_cancel mock (exit 0):
+true
+SIGTERM
+== A_capture legacy: cannot start git: executable not found: git
+== A_capture mock (exit 0):
+hi
+== A_deadline legacy: error: legacy.f:2:6: run: arguments must be scalar
+== A_deadline mock (exit 0):
+2
+== A_detached legacy: error: legacy.f:2:8: run: arguments must be scalar
+== A_detached mock (exit 0):
+server pid 4242
+== A_errors legacy: error: legacy.f:4:6: run: arguments must be scalar
+== A_errors mock (exit 0):
+false
+127
+executable not found: definitely-missing
+== A_interactive legacy: error: legacy.f:2:6: run: arguments must be scalar
+== A_interactive mock (exit 0):
+2
+143
+== A_stream legacy: error: legacy.f:2:6: run: arguments must be scalar
+== A_stream mock (exit 0):
+make exited 0
+== B_cancel legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_cancel mock (exit 0):
+true
+== B_capture legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_capture mock (exit 0):
+hi
+== B_deadline legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_deadline mock (exit 0):
+false
+== B_detached legacy: error: legacy.f:2:8: run: arguments must be scalar
+== B_detached mock (exit 0):
+4242
+== B_errors legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_errors mock (exit 0):
+false
+executable not found: definitely-missing
+== B_interactive legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_interactive mock (exit 0):
+2
+143
+== B_stream legacy: error: legacy.f:2:6: run: arguments must be scalar
+== B_stream mock (exit 0):
+0
+== C_cancel legacy: error: legacy.f:2:6: unknown value or malformed expression: cmd("yes").pipe(cmd("gzip")).kill_after(500)
+== C_cancel mock (exit 0):
+true
+== C_capture legacy: git failed
+== C_capture mock (exit 0):
+hi
+== C_deadline legacy: error: legacy.f:2:6: unknown value or malformed expression: cmd("curl", "-s", url).timeout(5000)
+== C_deadline mock (exit 0):
+false
+== C_detached legacy: error: legacy.f:2:8: unknown value or malformed expression: cmd("python3", "-m", "http.server", "8000").detach()
+== C_detached mock (exit 0):
+4242
+== C_errors legacy: false
+== C_errors mock (exit 0):
+false
+executable not found: definitely-missing
+== C_interactive legacy: error: legacy.f:2:6: unknown value or malformed expression: cmd("python3", "-i", "-q").start()
+== C_interactive mock (exit 0):
+2
+143
+== C_stream legacy: error: legacy.f:2:6: unknown value or malformed expression: cmd("make", "-j4").stream()
+== C_stream mock (exit 0):
+0

@@ -1,0 +1,5 @@
+p := cmd("python3", "-i", "-q").start()
+p.write_line("print(1 + 1)")
+print(p.read_line())
+p.close_stdin()
+print(p.wait().exit_code)

@@ -1,0 +1,3 @@
+c := cmd("python3", "-m", "http.server", "8000")
+srv := c.detach()
+print(srv.pid)

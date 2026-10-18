@@ -1,0 +1,4 @@
+c := cmd("make", "-j4")
+s := c.stream()
+r := s.run()
+print(r.exit_code)
