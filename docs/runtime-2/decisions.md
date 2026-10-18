@@ -486,3 +486,21 @@ must be removed or justified when build recovery integrates.
 - **Dogfooding re-assessment.** After build recovery and site-DX are certified,
   repeat the website-generation dogfooding assessment to check whether the
   original problems are actually gone (not to chase a score).
+
+## D-028 — Host operations: fix legacy gaps first; bounded reads; configurable VM budget (owner, 2026-10-19)
+- **Legacy gaps are fixed before CP16, not reproduced by the VM.** A small
+  checkpoint (`feature-host-deps`) makes `open_bytes()` and stream reads record
+  their dependencies (no page may be reported up to date with stale output,
+  D-020) and removes the remaining containment in `file().copy()/.move()`
+  (filesystem freedom, D-002). Both engines then share one meaning.
+- **Unbounded reads fail loudly.** Reading a device, FIFO or other unbounded
+  source past a fixed bound is a fatal `limit.exceeded` on both engines, never an
+  out-of-memory kill.
+- **VM memory budget is configurable.** The VM heap budget (currently 1 GiB)
+  becomes configurable, with the default and the setting's name decided in the
+  CP16 implementation; exceeding it remains a loud `limit.exceeded` that names the
+  setting. Large data should still prefer streaming (D-011 modes).
+- Still open for the owner from the CP16 design: O5 (language surface for the
+  D-011 modes); O6/O7 already scheduled (catchable host errors, `save()` and
+  symlinks). O2 (a version-2 Host-op trace covering every operation, with
+  outcomes and error codes) is a coordinator decision: adopted.
