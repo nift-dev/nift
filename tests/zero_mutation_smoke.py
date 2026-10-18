@@ -210,19 +210,59 @@ def main():
         check("6 ordinary build after the fix succeeds", rc == 0)
         check("6 failed list cleared", not (root / ".nift/failed.json").exists())
 
-        # 7. build --auto pass fails with zero mutation -> marker cleared; the
-        #    watch loop still exits non-zero (conservative error handling).
-        root = base / "t7"
-        root.mkdir()
-        scaffold(root, ["/"])
-        (root / "templates/template.html").write_text("@if(never closed{\n")
-        p = subprocess.run([NIFT, "build", "--auto"], cwd=root, capture_output=True,
-                           text=True, timeout=60)
-        check("7 build --auto exits non-zero on first failed pass", p.returncode != 0)
-        check("7 marker cleared (pass made zero mutations)", not marker(root))
-        (root / "templates/template.html").write_text("@content\n")
+        # 7. build --auto pass fails with zero mutation -> marker cleared.
+        #    feature-site-dx contract: the watcher keeps watching after a
+        #    failure (it reports it and waits for an edit, without spinning),
+        #    and SIGINT/SIGTERM stop it cleanly (exit 0, "build --auto
+        #    stopped", no marker). Both signals are exercised.
+        for signame, signum in (("SIGINT", signal.SIGINT), ("SIGTERM", signal.SIGTERM)):
+            root = base / f"t7-{signame}"
+            root.mkdir()
+            scaffold(root, ["/"])
+            (root / "templates/template.html").write_text("@if(never closed{\n")
+            out_path, err_path = root.parent / f"t7-{signame}.out", root.parent / f"t7-{signame}.err"
+            with open(out_path, "w") as out, open(err_path, "w") as err:
+                p = subprocess.Popen([NIFT, "build", "--auto"], cwd=root, stdout=out, stderr=err,
+                                     stdin=subprocess.DEVNULL)
+                deadline = time.time() + 30
+                while time.time() < deadline and "build failed" not in err_path.read_text():
+                    time.sleep(0.1)
+                check(f"7 {signame}: build --auto reports the failed pass", "build failed" in err_path.read_text())
+                time.sleep(1.0)  # let the one follow-up attempt settle
+                check(f"7 {signame}: marker cleared (pass made zero mutations)", not marker(root))
+                check(f"7 {signame}: no output written", not (root / "public/index.html").exists())
+                def cpu_ticks():
+                    fields = (pathlib.Path(f"/proc/{p.pid}/stat").read_text().rsplit(")", 1)[1]).split()
+                    return int(fields[11]) + int(fields[12])
+                if pathlib.Path(f"/proc/{p.pid}/stat").exists():
+                    t0 = cpu_ticks(); time.sleep(3.0); t1 = cpu_ticks()
+                    hz = os.sysconf("SC_CLK_TCK")
+                    check(f"7 {signame}: watcher waits instead of spinning ({(t1 - t0) / hz:.2f}s CPU in 3s)",
+                          (t1 - t0) / hz < 0.6)
+                check(f"7 {signame}: failure reported once (no rebuild loop)",
+                      err_path.read_text().count("build failed") == 1)
+                check(f"7 {signame}: still running after the failure", p.poll() is None)
+                # A later correction is picked up by the same watcher and the
+                # rebuild succeeds (bounded wait: hang detection only).
+                (root / "templates/template.html").write_text("@content\n")
+                deadline = time.time() + 30
+                while time.time() < deadline and not (
+                        (root / "public/index.html").exists() and "build succeeded again" in err_path.read_text()):
+                    time.sleep(0.1)
+                check(f"7 {signame}: the correction triggers a successful rebuild",
+                      (root / "public/index.html").exists() and "build succeeded again" in err_path.read_text())
+                check(f"7 {signame}: rebuilt output is correct", (root / "public/index.html").exists()
+                      and (root / "public/index.html").read_text() == "<p>/</p>\n")
+                check(f"7 {signame}: still responsive after the rebuild", p.poll() is None)
+                p.send_signal(signum)
+                try:
+                    rc = p.wait(timeout=20)
+                except subprocess.TimeoutExpired:
+                    p.kill(); rc = p.wait()
+            check(f"7 {signame}: stops cleanly with exit 0", rc == 0 and "build --auto stopped" in out_path.read_text())
+            check(f"7 {signame}: no marker after stop", not marker(root))
         rc, _ = run(root, "build")
-        check("7 ordinary build succeeds after fix", rc == 0)
+        check("7 ordinary build afterwards is clean", rc == 0)
 
         # 8. Targeted duplicate-name rejection: no derived mutation, no marker.
         root = base / "t8"

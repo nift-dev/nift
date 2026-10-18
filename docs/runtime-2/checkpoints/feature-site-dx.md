@@ -544,6 +544,76 @@ Fixes:
   - **Regression suite** (`runtime-2` @`523d1df`): 93/94 modules pass. The
     failure is `unreadable_source`, which fails as root.
 
+### Certify follow-up (`make certify` @2b5b179: 4 FAIL)
+
+For each failure, the side that changed was identified before any
+expectation was touched.
+
+1. **`test-runtime2-vm-corpus`, 5 goldens.** The side that changed is legacy,
+   through the try/catch source-mapping fix (item 3, D-018).
+   - **Old position:** every golden recorded 1:1, the try statement.
+   - **New position:** the real failing site. `toplevel_try_errors` 2:9
+     (`nope(1)`), `try_catch` 5:3 (the `print` arity error in the catch
+     body), `errors_catch_index` 1:12 (`[1][5]`), `errors_throw_value` 1:7
+     (`throw`), `errors_try_catch` 5:7 (`undefined_fn(1)`).
+   - **Both engines agree.** `NIFT_VM=1` reports the identical new position
+     for each file. The VM refuses `statement:Try` (`NIFT_VM=require`
+     reports "not compiled for the VM") and falls back to legacy.
+   - **Goldens:** per-case updates under D-018 ("errors reported where
+     they occur"). The diff touches exactly these five `.stderr` files, one
+     line each; `.stdout` and `.exit` are unchanged. `semantics.md` records
+     the new position.
+2. **`test-rt-parser`, 3 of 1,500 error-corpus cases** (15, 136, 748). Legacy
+   changed: the unterminated-literal rule now reports an earlier real error,
+   an unclosed `[` inside a block, before the later error that used to come
+   first:
+
+   | Case | Earlier real error | Previous first error |
+   | --- | --- | --- |
+   | 15 | `print(er$[r1.message)` in a catch body at 5:12 | `fn` at 13:1 |
+   | 136 | `i1[0 := 10` at 26:5 | `if` at 29:1 |
+   | 748 | `a.push([i,i+1);` at 1:43 | `export` at 1:68 |
+
+   - **Before the fix,** the CP10 rt parser still reported the old error, so
+     the two sides disagreed.
+   - **Fix:** the rt statement splitter now applies the same rule, with the
+     same opener selection and wording (`statement_end` scan state plus
+     `general_stmt`). Earliest real error wins on both sides.
+   - **Result:** rt and legacy produce identical verdicts for all three.
+   - **Stored entries:** only these three entries were updated, each
+     reviewed individually, under D-022/D-024 (unterminated literals, and
+     syntax errors reported before execution). The change is the header
+     line:column and the message line of cases 15, 136 and 748; the mutant
+     sources are untouched. No bulk regeneration was done.
+   - **Gates:** see the runs below.
+3. **`test-v410-sort-factory-parity` `bad-key-cleanup`.** The oracle is the
+   case file recorded from baseline commit `4d80ca4` (frozen). The new binary
+   changed.
+   - **Old position:** 1:1. v4.12 (`825c90a`) still reports 1:1.
+   - **New position:** 1:7, the `[2,1].sort_by(...)` that raises, inside the
+     try body. Same under `NIFT_VM=1`.
+   - **Approved difference.** The test now lists it as an approved D-018
+     difference, scoped to this case and this exact substitution. `--baseline`
+     runs still compare against the unmodified oracle.
+4. **`test-zero-mutation` case 7.** The new keep-watching contract applies:
+   the test expected `--auto` to exit after a failed pass. The watcher was
+   waiting, not spinning: about 0.01 s of CPU in 3 s, and the failure
+   reported once.
+   - **New clean stop.** `--auto` now stops cleanly on SIGINT/SIGTERM. The
+     running build finishes, it prints "build --auto stopped", and it exits 0.
+     This was proposal P11.
+   - **New test, run for SIGINT and for SIGTERM.** Start `--auto` with a
+     broken template, then assert:
+     - the failure is reported;
+     - no marker and no output are written;
+     - CPU stays under 0.6 s in 3 s;
+     - there is no rebuild loop;
+     - the watcher is still running;
+     - a later correction triggers a rebuild that succeeds, with correct
+       output, and the watcher stays responsive;
+     - the signal produces exit 0 and the stop message;
+     - no marker remains after the stop.
+
 ## Proposals (not implemented)
 
 - **P1. `.nift/.unfinished` lock-out softening.** Done separately by
@@ -569,9 +639,9 @@ Fixes:
 - **P9. Sitemap and feed helpers.**
 - **P10. `@path('/about')` message.** Suggest dropping the leading slash
   (dossier A5).
-- **P11. SIGINT/SIGTERM in `--auto`.** Killing the watcher during a build can
-  leave a stale marker, as before. Install a handler that finishes or
-  abandons the build cleanly.
+- **P11. SIGINT/SIGTERM in `--auto`.** Done in the certify follow-up: the
+  signal sets a stop flag, the running build finishes, and the watcher exits
+  0.
 - **P13. Script lines that are template text are silently dropped**
   (investigated at the coordinator's request; CP13 case
   `syn_dollar_line_silent`). For example, `$o := nosuch_function(1)`,

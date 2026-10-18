@@ -55,9 +55,10 @@ non-interactive use (a service, a background job), stop the process.
   last good output and is listed in `.nift/failed.json`. The next build after
   your fix rebuilds it, and `--auto` does this on its own. The watcher never
   runs `--repair`.
-- **Stopping the watcher.** Prefer `q` in a terminal. A SIGTERM or Ctrl-C
-  during a build is an interrupted build. Build recovery handles it
-  automatically on the next build.
+- **Stopping the watcher.** Press `q` in a terminal, or send SIGINT
+  (Ctrl-C) or SIGTERM. A build in progress finishes first, so no
+  interrupted-build state is left. The watcher then prints `build --auto
+  stopped` and exits 0.
 - **Limitation.** While a build is failing, the watcher does not watch inputs
   outside the project root (for example, files read through `--fs-root`). Save
   any project file to retry.

@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <iomanip>
@@ -140,6 +141,9 @@ BuildAutoSnapshot build_auto_snapshot(const fs::path& root, const std::string& o
 //   reported once and the watcher waits for an edit instead of looping.
 // - While idle after a failure, any difference from the post-attempt state
 //   triggers the next attempt.
+volatile std::sig_atomic_t build_auto_stop_signal = 0;
+extern "C" void build_auto_on_signal(int) { build_auto_stop_signal = 1; }
+
 class BuildAutoRetryPolicy {
 public:
     BuildAutoRetryPolicy(fs::path root, std::string output_dir) : root_(std::move(root)), output_dir_(std::move(output_dir)) {}
@@ -2345,6 +2349,12 @@ int run_cli(int argc, char** argv) {
             // diagnostics) as well as written to the log.
             //
             // Retry policy: BuildAutoRetryPolicy (above).
+            // feature-site-dx: SIGINT/SIGTERM stop the watcher cleanly: a build
+            // in progress finishes (so no interrupted-build state is left),
+            // then it prints "build --auto stopped" and exits 0.
+            build_auto_stop_signal = 0;
+            const auto previous_int = std::signal(SIGINT, build_auto_on_signal);
+            const auto previous_term = std::signal(SIGTERM, build_auto_on_signal);
             BuildAutoRetryPolicy retry_policy(project.root, project.config.output_dir);
             std::string last_reported;
             bool stop_requested = false;
@@ -2356,7 +2366,7 @@ int run_cli(int argc, char** argv) {
                 return key;
             };
             while (!stop_requested) {
-                stop_requested = quit_key.pressed();
+                stop_requested = quit_key.pressed() || build_auto_stop_signal != 0;
                 if (stop_requested) break;
 
                 if (retry_policy.should_attempt()) {
@@ -2411,10 +2421,12 @@ int run_cli(int argc, char** argv) {
                     const auto delay = std::min(remaining, sleep_step);
                     std::this_thread::sleep_for(delay);
                     remaining -= delay;
-                    stop_requested = quit_key.pressed();
+                    stop_requested = quit_key.pressed() || build_auto_stop_signal != 0;
                 }
             }
 
+            std::signal(SIGINT, previous_int);
+            std::signal(SIGTERM, previous_term);
             std::cout << console::good("build --auto stopped") << '\n';
             return 0;
         }
