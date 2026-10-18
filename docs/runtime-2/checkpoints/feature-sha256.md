@@ -162,10 +162,10 @@ to `tests/runtime2/certification_guard.sh` REQUIRED):
 | Part | Result |
 | --- | --- |
 | `check_vendored_sha256.py` (5 verbatim blocks; also run with `--upstream`) | pass; a one-character mutation is detected |
-| `sha256-unit` (both transforms) | 1310 checks, 0 failures as root; 1312 as an unprivileged user (unreadable-file checks run) |
-| `sha256-unit-san` (ASan+UBSan, `-fno-sanitize-recover=undefined`) | 1310 checks, 0 failures; 1312 unprivileged |
+| `sha256-unit` (both transforms) | 1310 checks, 0 failures as root; 1314 as an unprivileged user (unreadable file and directory checks run) |
+| `sha256-unit-san` (ASan+UBSan, `-fno-sanitize-recover=undefined`) | 1310 checks, 0 failures; 1314 unprivileged |
 | `sha256-unit-portable` (`NIFT_SHA256_DISABLE_X86_SHANI`) | 655 checks, 0 failures |
-| `tests/sha256_builtins.sh` | 79 checks, 0 failures |
+| `tests/sha256_builtins.sh` | 83 checks, 0 failures (after review round 1) |
 
 Unit coverage: FIPS 180-4 / NIST examples (empty, "abc", 448-bit, 896-bit,
 one million `a` in 997-byte pieces) and SHA2_Additional cases (one byte,
@@ -390,3 +390,19 @@ unprivileged `tester` user.
 94th, `unreadable_source_smoke.sh`, is the documented root-only failure and
 passes as `tester`.
 Not run here: `make certify`, `test-all` (owner runs certification).
+
+### After review round 1 (`d506011` and the following doc commit)
+
+`make test-sha256` passes (unit 1310/1310/655 as root, 1314 unprivileged for
+both normal and ASan+UBSan builds; builtins 83/83). The reviewer's D1 repros
+(`written.sh`, `written_hash.sh`) now rebuild after the external edit
+(`W:o2-c`). Rerun and passing: certification guard, dynamic reads, fs freedom,
+contracts, control flow, cp19 bytes, incremental state transitions,
+requirements, VM corpus, rt-diff, conformance. D2 replay: from `git archive
+HEAD`, the packaging.yml staging steps produce an sdist containing
+`native/src/Sha256.cpp` and `native/third_party/bitcoin-sha256/`; building the
+extension from the extracted sdist compiles and links `Sha256.o`, and the
+binding evaluates `sha256("abc")` correctly. (`pip wheel` itself fails on this
+host with Debian setuptools' `install_layout` AttributeError after the link
+step, an environment issue unrelated to the sources; `setup.py build_ext`
+from the same sdist succeeds.)
