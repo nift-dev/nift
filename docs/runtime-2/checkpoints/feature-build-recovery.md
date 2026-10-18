@@ -339,6 +339,15 @@ Not automated: `untrack`/`rm`/`cp`/`mv` on a stale marker refuse and ask for
   `404.html` would match it), so a *crash* after writing extra index pages can
   leave them; failures (not crashes) remove them at once.
 
+Results after the fixes (@0d0c512, run sequentially, `make -j1`; the regression
+suite under the host heavy-job lock): `test-build-recovery` (now ~1,000 checks
+plus the bounded randomized run, 80 steps × 3 modes, 0 problems) and every
+suite listed under Results pass again; `checkpoint-8` 17/17 as non-root;
+regression suite 94/95 with the new module (same root-only
+`unreadable_source_smoke` failure as the pre-change binary). The review probes
+p1–p4, p7 now behave as specified; p8 (inline `@script` scribbling its own
+output) is the documented exception.
+
 ## Overlap with feature-site-dx
 
 `build --auto` (src/CLI.cpp, watch loop) is not changed here: on this branch
