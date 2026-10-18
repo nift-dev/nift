@@ -372,3 +372,14 @@ D-022 refinements (owner, 2026-10-18):
 - Intended long-term semantics: ordinary runtime errors become catchable via a
   separate approved language checkpoint applied to both engines; internal VM
   failures and resource exhaustion stay distinct (not ordinary exceptions).
+
+## D-023 — CP14 built-in inconsistencies: record now, change later (owner, 2026-10-18)
+CP14 natives reproduce legacy exactly (zero-difference gate). The intended
+semantics are recorded for one later language-change checkpoint applied to both
+engines (D-018), with old/new tests: consistent `trim` (same whitespace set as
+`trim_start`/`trim_end`, Q1); character-based string indices for `index_of`/
+`substr` consistent with `length` (Q2); exact integer `sum` and `range` beyond
+2^53 (Q6, Q7); both `index_of` spellings on arrays and strings (Q8); literal keys
+for `pick`/`omit` with explicit globbing (Q9). Context- and shape-dependent
+quirks (Q3, Q4, Q5, Q10, Q11) are never reproduced by the VM: they are refused
+before execution.
