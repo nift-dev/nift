@@ -354,3 +354,21 @@ Coordinator decisions within existing rules: try/catch body positions are fixed
 in legacy too (feature-site-dx; one meaning, D-018/D-020); legacy message
 prefixes other than `return:` stay for parity until the JSON mode carries the
 structure; the VM's missing colour on `error:` is a defect to fix.
+D-022 refinements (owner, 2026-10-18):
+- Syntax prevalidation applies to BOTH engines while legacy fallback exists: a
+  program routed to legacy must not bypass it. A compilation unit is fully
+  parsed and syntax-validated before any instruction runs; on failure: non-zero
+  exit, accurate location and specific code, no program output, no
+  program-initiated effects, structured JSON when enabled. Dynamically loaded
+  units (imports) are validated when loaded, without preloading unrelated
+  files. Syntax validation is not full static validation: valid programs may
+  still fail at run time.
+- Error model: identity (code), severity and catchability are separate
+  properties; adding a code never changes catchability. Codes reuse the
+  existing taxonomy where apt (e.g. index out of bounds, type error, undefined
+  callable, arity, integer overflow, division by zero), are emitted by both
+  engines, appear in JSON, and text stays under the CP13 gate. Tests cover
+  codes and the unchanged catchable/fatal split.
+- Intended long-term semantics: ordinary runtime errors become catchable via a
+  separate approved language checkpoint applied to both engines; internal VM
+  failures and resource exhaustion stay distinct (not ordinary exceptions).
