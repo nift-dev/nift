@@ -9,3 +9,6 @@ pair.substr.units
 pair.sum.exact
 pair.trim.forms
 pair.trim.large
+fmt.chain
+fmt.chain.concat
+fmt.chain.pretty

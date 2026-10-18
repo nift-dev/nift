@@ -224,6 +224,32 @@ CASES = [
     ("num.unique.big", ['v := [9007199254740993, 9007199254740992]'], "v.unique()"),
     ("num.range.big", [], "range(9007199254740993, 9007199254740995)"),
     ("num.length.type", S, "s.length() / 2"),
+    # ---- F6 conversion and formatting ----
+    ("fmt.stringify", O, "o.stringify()"),
+    ("fmt.prettify", O, "o.prettify()"),
+    ("fmt.highlight", O, "o.highlight()"),
+    ("fmt.stringify.str", S, "s.stringify()"),
+    ("fmt.stringify.num", BIG, "g.stringify()"),
+    ("fmt.stringify.args", O, "o.stringify(1)"),
+    ("fmt.stringify.nested", ['k := [[], {}, [{"a": [1, {"b": null}]}]]'], "k.prettify()"),
+    ("fmt.chain", O, "o.stringify().stringify()"),
+    ("fmt.chain.pretty", O, "o.prettify().stringify()"),
+    ("fmt.chain.concat", O, '"" + o.stringify().stringify()'),
+    ("fmt.to_string.num", ['x := 1e21'], "x.to_string()"),
+    ("fmt.to_string.null", ['x := null'], "x.to_string()"),
+    ("fmt.to_string.bool.args", ['x := false'], "x.to_string(1)"),
+    ("fmt.html_escape.arr", [], "html_escape([1])"),
+    ("fmt.url_encode.null", [], "url_encode(null)"),
+    ("fmt.url_encode.args", [], 'url_encode("a", "b")'),
+    ("fmt.type.float", [], "type(2.5)"),
+    ("fmt.type.str", [], 'type("x")'),
+    ("fmt.type.args", [], "type(1, 2)"),
+    ("fmt.is_number", [], 'is_number("1")'),
+    ("fmt.is_float", [], "is_float(2.5)"),
+    ("fmt.is_object", O, "is_object(o)"),
+    ("fmt.is_enum", [], "is_enum(1)"),
+    ("fmt.is_bool.args", [], "is_bool()"),
+
 ]
 
 # (id, setup, expression, equivalent expression): the two must mean the same.

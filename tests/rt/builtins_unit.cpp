@@ -6,10 +6,12 @@
 
 #include "rt/compare.h"
 #include "rt/decimal.h"
+#include "rt/natives/format_methods.h"
 #include "rt/natives/object_methods.h"
 #include "rt/natives/support.h"
 
 #include <cmath>
+#include <cstring>
 #include <initializer_list>
 #include <set>
 
@@ -82,7 +84,9 @@ void table() {
     CHECK(find_builtin(Receiver::String, "size") == nullptr);   // legacy: unsupported for strings
     CHECK(find_builtin(Receiver::Array, "index_of") == nullptr);  // arrays spell it indexOf
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
-    CHECK(builtin_count() == 50);
+    CHECK(builtin_count() == 73);
+    CHECK(find_builtin(Receiver::Number, "to_string") && find_builtin(Receiver::Any, "stringify"));
+    CHECK(find_builtin(Receiver::Number, "to_double") == nullptr);  // Q4: context-dependent in legacy
 }
 
 void strings() {
@@ -251,6 +255,72 @@ void objects() {
     CHECK(glob_magic("a*") && !glob_magic("a\\*") && !glob_magic("abc"));
 }
 
+void formatting() {
+    const Value o = obj({{"b", i(1)}, {"a", arr({i(2), s("q\"\x01\n\x7f")})}, {"c", obj({})}, {"d", arr({})}});
+    CHECK(ok(call(BuiltinId::Stringify, {o}),
+             "string | [\"{\\\"b\\\":1,\\\"a\\\":[2,\\\"q\\\\\\\"\\\\u0001\\\\n\x7f\\\"],"
+             "\\\"c\\\":{},\\\"d\\\":[]}\"]"));
+    Value text;
+    std::string error;
+    bool bad = false;
+    std::string out;
+    CHECK(serialize(o, true, out, error, bad));
+    CHECK(out == "{\n  \"b\": 1,\n  \"a\": [\n    2,\n    \"q\\\"\\u0001\\n\x7f\"\n  ],\n  \"c\": {},\n  \"d\": []\n}");
+    out.clear();
+    CHECK(serialize(s("x"), false, out, error, bad) && out == "\"x\"");
+    CHECK(ok(call(BuiltinId::Highlight, {arr({d(2.5), Value()})}), "string | [\"[2.5,null]\"]"));
+    CHECK(err(call(BuiltinId::Stringify, {make_bytes({1})}), "bytes values are not serializable"));
+    CHECK(err(call(BuiltinId::Stringify, {o, i(1)}), "stringify: expected no arguments"));
+    Value deep = arr({});
+    for (int k = 0; k < 129; ++k) deep = arr({deep});
+    CHECK(err(call(BuiltinId::Stringify, {deep}), "value serialization depth exceeded"));
+    CHECK(ok(call(BuiltinId::Stringify, {array_items(deep)[0]}), "string | [\"" + std::string(129, '[') +
+             std::string(129, ']') + "\"]"));
+    CHECK(ok(call(BuiltinId::NumToString, {d(1e21)}), "string | [\"1e+21\"]"));
+    CHECK(ok(call(BuiltinId::NumToString, {d(-0.0)}), "string | [\"0\"]"));
+    CHECK(ok(call(BuiltinId::NumToString, {i(9007199254740993)}), "string | [\"9007199254740993\"]"));
+    CHECK(ok(call(BuiltinId::BoolToString, {Value::boolean(false)}), "string | [\"false\"]"));
+    CHECK(ok(call(BuiltinId::NullToString, {Value()}), "string | [\"null\"]"));
+    CHECK(err(call(BuiltinId::NullToString, {Value(), i(1)}), "to_string: expected no arguments"));
+    CHECK(ok(call(BuiltinId::FnHtmlEscape, {s("<a href='x'>&\"")}), "string | [\"&lt;a href='x'&gt;&amp;\\\"\"]"));
+    CHECK(ok(call(BuiltinId::FnAttrEscape, {s("<'\">")}), "string | [\"&lt;&#39;&quot;&gt;\"]"));
+    CHECK(ok(call(BuiltinId::FnUrlEncode, {s("a b/\xc3\xa9~")}), "string | [\"a%20b%2F%C3%A9~\"]"));
+    CHECK(ok(call(BuiltinId::FnUrlEncode, {Value()}), "string | [\"null\"]"));
+    CHECK(err(call(BuiltinId::FnHtmlEscape, {arr({})}), "html_escape: value must be a string or scalar"));
+    CHECK(err(call(BuiltinId::FnUrlEncode, {s("a"), s("b")}), "url_encode: expected one value"));
+    CHECK(ok(call(BuiltinId::FnType, {d(2.0)}), "string | [\"int\"]"));
+    CHECK(ok(call(BuiltinId::FnType, {d(2.5)}), "string | [\"float\"]"));
+    CHECK(err(call(BuiltinId::FnType, {}), "type: expected one value"));
+    CHECK(ok(call(BuiltinId::FnIsNumber, {s("1")}), "bool | [false]"));
+    CHECK(ok(call(BuiltinId::FnIsInt, {d(2.0)}), "bool | [true]"));
+    CHECK(ok(call(BuiltinId::FnIsFloat, {i(2)}), "bool | [false]"));
+    CHECK(ok(call(BuiltinId::FnIsObject, {o}), "bool | [true]"));
+    CHECK(ok(call(BuiltinId::FnIsEnum, {i(1)}), "bool | [false]"));
+    CHECK(err(call(BuiltinId::FnIsBool, {}), "is_bool: expected one value"));
+    CHECK(call(BuiltinId::FnType, {Value::handle(HandleKind::File, 1, 0)}).status == Status::Internal);
+    // Number rendering is a port of legacy dump: compared with the legacy
+    // engine on special values and 200,000 random bit patterns.
+    std::uint64_t state = 88172645463325252ull;
+    auto next = [&] { state ^= state << 13; state ^= state >> 7; state ^= state << 17; return state; };
+    std::vector<double> samples = {0.0, -0.0, 1e21, 1e-7, 0.1, 123.456, 9007199254740993.0, 9.2233720368547758e18,
+                                   -9.2233720368547758e18, 1e300, 5e-324, 1.7976931348623157e308, -2.5, 3.0};
+    for (int k = 0; k < 200000; ++k) {
+        std::uint64_t bits = next();
+        double v;
+        std::memcpy(&v, &bits, 8);
+        if (k % 2) v = static_cast<double>(static_cast<std::int64_t>(bits >> (bits & 63)));
+        if (std::isfinite(v)) samples.push_back(v);
+    }
+    long mismatches = 0;
+    for (double v : samples) {
+        std::string mine;
+        append_number(Value::number(v), mine);
+        if (mine != nift::RuntimeValue(v).dump(0) && ++mismatches <= 5)
+            std::fprintf(stderr, "  number %.17g: native %s legacy %s\n", v, mine.c_str(), nift::RuntimeValue(v).dump(0).c_str());
+    }
+    CHECK(mismatches == 0);
+}
+
 // Receivers are never changed, `out` may alias the receiver's register, and
 // self-referential calls (o.merge(o)) respect the CP09 reference contract
 // (enforced by relocation under ASan).
@@ -324,6 +394,7 @@ int main() {
     strings();
     arrays();
     objects();
+    formatting();
     aliasing_and_cow();
     heap_accounting();
     return rt_test::finish("builtins-unit");

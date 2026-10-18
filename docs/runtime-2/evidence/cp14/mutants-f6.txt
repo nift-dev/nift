@@ -1,0 +1,6 @@
+M11 JSON escapes in upper-case hex           DETECTED  builtins-diff: 2992 checks, 13 failures
+M12 prettify indents by four                 DETECTED  builtins-diff: 2992 checks, 31 failures
+M13 attr_escape keeps apostrophes            DETECTED  builtins-diff: 2992 checks, 12 failures
+M14 large doubles in fixed notation          DETECTED  builtins-diff: 2992 checks, 9 failures
+M15 is_number accepts numeric strings        DETECTED  builtins-diff: 2992 checks, 10 failures
+builtins_mutants: 5/5 detected

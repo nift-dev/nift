@@ -147,6 +147,10 @@ std::vector<Value> arguments(BuiltinId id) {
             else args.push_back(random_array(0, 8));
             break;
         case Receiver::Object: args.push_back(random_object(0)); break;
+        case Receiver::Number: args.push_back(random_number()); break;
+        case Receiver::Bool: args.push_back(Value::boolean(chance(50))); break;
+        case Receiver::Null: args.push_back(Value()); break;
+        case Receiver::Any: args.push_back(chance(70) ? random_array(0) : random_value(0)); break;
         case Receiver::None: break;
     }
     const Value receiver = args.empty() ? Value() : args[0];
@@ -180,6 +184,9 @@ std::vector<Value> arguments(BuiltinId id) {
                 a = k == 0 ? (chance(90) ? make_string(kKeys[pick(sizeof kKeys / sizeof kKeys[0])]) : random_scalar())
                            : random_value(1);
                 break;
+            case BuiltinId::FnHtmlEscape: case BuiltinId::FnAttrEscape: case BuiltinId::FnUrlEncode:
+                a = chance(80) ? make_string(random_text() + (chance(30) ? "<a href='x'>&\"/" : "")) : random_value(0);
+                break;
             case BuiltinId::ObjMerge: case BuiltinId::ObjMergeDeep:
                 a = chance(90) ? random_object(0) : random_value(1);
                 break;
@@ -210,9 +217,14 @@ struct Case {
 // differential test therefore does not compare: keys/values/entries with
 // arguments are an arity error on most receivers but ignore the arguments on
 // a binding (shape-dependent legacy behaviour, design record Q10).
+// Every case is generated so the compiler would bind it otherwise.
 bool refused(const Case& c) {
     const bool listing = c.id == BuiltinId::ObjKeys || c.id == BuiltinId::ObjValues || c.id == BuiltinId::ObjEntries;
-    return listing && c.args.size() != 1;
+    // stringify/prettify/highlight with arguments: legacy's presentation
+    // chain does not match, and the call is "unknown value or malformed
+    // expression" (Q12) - also refused by W1.
+    const bool presentation = c.id == BuiltinId::Stringify || c.id == BuiltinId::Prettify || c.id == BuiltinId::Highlight;
+    return (listing || presentation) && c.args.size() != 1;
 }
 
 std::string native_outcome(const Case& c) {
@@ -324,8 +336,8 @@ int main(int argc, char** argv) {
         if (n < shown_cases)
             std::printf("%s  native: %s\n  legacy: %s\n", program_lines(c, n).c_str(), c.expected.c_str(), c.legacy.c_str());
         const BuiltinSpec& spec = builtin_spec(c.id);
-        auto& row = per[std::string(spec.receiver == Receiver::String ? "str." : spec.receiver == Receiver::Array ? "arr."
-                                    : spec.receiver == Receiver::Object ? "obj." : "fn.") + std::string(spec.name)];
+        static const char* const kPrefix[] = {"fn.", "str.", "arr.", "obj.", "num.", "bool.", "null.", "any."};
+        auto& row = per[kPrefix[static_cast<int>(spec.receiver)] + std::string(spec.name)];
         if (refused(c)) { ++refused_cases; continue; }
         ++row.first;
         if (c.legacy.rfind("error", 0) == 0) { ++row.second; ++errors; }

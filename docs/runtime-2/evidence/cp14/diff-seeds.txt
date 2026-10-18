@@ -6,3 +6,10 @@ builtins-diff: seed 3, 5000 cases (4987 compared, 800 legacy errors, 13 refused 
 builtins-diff: 4987 checks, 0 failures
 builtins-diff: seed 4, 5000 cases (4988 compared, 834 legacy errors, 12 refused by rule W1) in 835 legacy runs
 builtins-diff: 4988 checks, 0 failures
+# round 2 (F1-F3 + F6)
+builtins-diff: seed 20261018, 7300 cases (7271 compared, 916 legacy errors, 29 refused by rule W1) in 935 legacy runs
+builtins-diff: 7271 checks, 0 failures
+builtins-diff: seed 2, 7300 cases (7276 compared, 866 legacy errors, 24 refused by rule W1) in 881 legacy runs
+builtins-diff: 7276 checks, 0 failures
+builtins-diff: seed 3, 7300 cases (7274 compared, 893 legacy errors, 26 refused by rule W1) in 911 legacy runs
+builtins-diff: 7274 checks, 0 failures

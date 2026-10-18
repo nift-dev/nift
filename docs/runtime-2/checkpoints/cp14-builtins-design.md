@@ -13,6 +13,11 @@ implemented as pure natives over `rt::Value` with unit, differential and
 sanitizer tests, and the plan for wiring them into the compiler and VM once
 CP12 certifies. The wiring itself is **not** done.
 
+Round 2 (coordinator, 2026-10-18): family F6 (conversion and formatting)
+implemented to the same standard; per-native instruction guards measured with
+callgrind and locked (owner addition); natives proven free of legacy-value
+conversion (link test).
+
 ## Objective
 
 1. Every collection and string built-in legacy provides is listed, grouped
@@ -57,8 +62,9 @@ any other expression) and even on the expression's source length:
 
 ## Inventory
 
-107 entries in batch A's scope, in eight families. "Impl." = implemented as
-a native in this checkpoint (50 natives). Error messages are legacy's exact
+107 entries in batch A's scope, in eight families. Implemented as natives in
+this checkpoint: F1, F2, F3, F6 (73 table entries for 71 built-ins:
+`to_string` has one entry per receiver kind). Error messages are legacy's exact
 text; `<m>` is the method name.
 
 ### F1 String methods (receiver String) — implemented (18)
@@ -150,18 +156,24 @@ orders mixed key kinds by type rank). They need the VM to call back into
 compiled code (re-entrant `Call` from a native, the frame budget, error
 frames "collection callback"), i.e. CP12's call path and lambdas.
 
-### F6 Conversion and formatting — design only (21)
+### F6 Conversion and formatting — implemented (21 built-ins, 23 entries)
 
-`to_string()` on numbers, bools, null (strings: F1; composites:
-`to_string: use stringify() for composite values`), `stringify()`,
-`prettify()`, `highlight()` (legacy's presentation chain, `serialize_value`),
-`html_escape`, `attr_escape`, `url_encode` (strings as-is, numbers/bools
-rendered, null → `"null"`, else `<f>: value must be a string or scalar`),
-`type(v)` and the 13 `is_*` predicates (`is_null is_bool is_number is_int
-is_float is_string is_bytes is_array is_object is_struct is_function
-is_collection is_enum`). Pure functions of the value; they are the next family
-to implement (no CP12 dependency beyond F1–F3's), except that `type`/`is_*`
-on structs, functions, enums and handles need CP12 phase B / CP17 kinds.
+| Built-in | Receiver / args | Result | Legacy errors |
+| --- | --- | --- | --- |
+| `to_string()` | number, bool, null (strings: F1) | string: numbers as legacy `dump` (integral doubles in int64 range as integers, others shortest round trip in C++ `general` form: `1e+21`, `1e-07`; exact big integers by digits), `true`/`false`, `null` | `to_string: expected no arguments`; arrays/objects: `to_string: use stringify() for composite values` (not bound: a refusal, Q12) |
+| `stringify()`, `highlight()` | any plain value | string: compact JSON (`,` and `:`, Jsonic++ escaping: `\" \\ \b \f \n \r \t`, other bytes < 0x20 as `\u00xx` lower-case, all other bytes raw) | `bytes values are not serializable`, `value serialization depth exceeded` (> 128 nested levels) |
+| `prettify()` | any plain value | string: two-space indent, one element per line, `": "` after keys, empty containers `[]`/`{}` | as stringify |
+| `html_escape(v)`, `attr_escape(v)` | string, number, bool, null (rendered) | `& < >` escaped; attr also `"` → `&quot;`, `'` → `&#39;` | `<f>: expected one value`, `<f>: value must be a string or scalar` |
+| `url_encode(v)` | as above | RFC 3986 unreserved bytes kept, others `%XX` upper-case | as above |
+| `type(v)` | any | `null bool int float string array object bytes function struct error` (`int`/`float` by value: `type(2.0)` is `int`) | `type: expected one value` |
+| `is_null … is_enum(v)` (13) | any | bool: `public_type(v)` equals the category (`is_number`: int or float) | `<pred>: expected one value` |
+
+`highlight()` only changes the REPL's terminal display; as an expression it
+is the compact serialization (legacy's `complete_presentation` ignores the
+flag). Arity errors of the presentation methods are not legacy's message
+(`o.stringify(1)` is `unknown value or malformed expression`), so W1
+refuses them. `type`/`is_*` on handles (timer, file, future, mutex, atomic,
+collection, enum) wait for CP17 (the natives report `Internal`).
 
 ### F7 Collection handles — deferred to CP17 (10)
 
@@ -197,12 +209,13 @@ reproduced by the VM; the "VM handling" column is the wiring rule.
 | Q11 | Argument validation is lazy: `s.substr(bad, f())` never calls `f()`; `o.get(k, d)` evaluates `d` only when `k` is missing; `range(a, b, c)` stops at the first bad argument | evaluation order | arguments evaluated once, left to right, before the call (D-018 exactly-once) | W2/W4: admitted only where the difference cannot be observed |
 | Q12 | Unknown method diagnostics differ by receiver kind and by legacy's "known method" list (`unsupported for this value` vs `unknown value or malformed expression: <text>`) | diagnostics | one message | CP13 (refused until then) |
 | Q13 | Mutating methods work only on bare bindings (`[1].push(2)`, `h.k.pop()` fail) | shape | any place | F4 design |
+| Q14 | A chain of presentation methods composes over the original value at top level and in functions called from top level (`o.stringify().stringify()` is `o.stringify()`, `o.prettify().stringify()` is pretty), but each call serializes its receiver in loop code (the second `stringify` JSON-encodes the string) | **context** | each call serializes its receiver (ordinary method semantics) | W6 `builtin-presentation-chain`: a presentation call whose receiver is a presentation call is refused |
 
 The probe's pinned inventory (`tests/runtime2/builtins/context_dependent.txt`)
-lists Q3, Q4 (context) and the shape pairs for Q1, Q2, Q5, Q6, Q7, Q10;
+lists Q3, Q4, Q14 (context) and the shape pairs for Q1, Q2, Q5, Q6, Q7, Q10;
 `make test-rt-builtins-probe` fails when legacy's inventory changes.
 
-Everything else probed (200 cases × 6 contexts: all F1–F5 methods, receiver
+Everything else probed (224 cases × 6 contexts: all F1–F5 methods, receiver
 shapes `h.s`, `h[0]`, `(s + "x")`, chains, calls, computed and large
 arguments) behaves the same in every context.
 
@@ -264,7 +277,8 @@ wiring patch `static_assert`s equality.
 | --- | --- | --- |
 | Fixed | counts and indexes (`length size index_of last_index_of indexOf to_int`) | int |
 | Fixed | predicates (`empty contains starts_with ends_with has`) | bool |
-| Fixed | string results (`trim* to_* replace substr join to_string`) | string |
+| Fixed | string results (`trim* to_* replace substr join to_string stringify prettify highlight html_escape attr_escape url_encode type`) | string |
+| Fixed | `is_*` predicates | bool |
 | Fixed | `split keys values entries flatten chunk range` | array (elements: string / string / any / object / any / array / int) |
 | Fixed | `sum to_double` | int \| frac |
 | Fixed | `from_entries pick omit` | object |
@@ -275,7 +289,9 @@ wiring patch `static_assert`s equality.
 | Selected | free `min max` | the arguments' kinds, or the single array argument's element kinds |
 
 Receiver rule: a method is bound only when the receiver's inferred kinds are
-exactly one of String, Array, Object (no Unknown). Argument kinds outside
+exactly one of String, Array, Object, Number (int ∪ frac), Bool, Null (no
+Unknown); the presentation methods (`Receiver::Any`) accept any kind set
+without Unknown. Argument kinds outside
 what a native accepts are not refused: the native reports legacy's message
 (`may_fail`).
 
@@ -319,11 +335,14 @@ with its CP12 dependency:
    * W2 `builtin-lazy-args`: a `may_fail` built-in with more than one
      argument whose later arguments are not literals or local reads (Q11:
      legacy may skip them).
-   * W3 `builtin-receiver`: receiver kinds not exactly one of
-     String/Array/Object, or the method not in that receiver's family.
+   * W3 `builtin-receiver`: receiver kinds not exactly one receiver family
+     (String, Array, Object, Number, Bool, Null; Any for presentation), or
+     the method not in that receiver's family.
    * W4 `builtin-default`: `get(k, d)` with `d` other than a literal or local
      read (Q11).
    * W5 the context-dependent built-ins (Q3, Q4) are simply not bound.
+   * W6 `builtin-presentation-chain`: `stringify`/`prettify`/`highlight`
+     on a receiver that is itself a presentation call (Q14).
    * F4 methods stay `method:<name>` refusals until the place model lands;
      F5 until native-to-compiled callbacks exist.
 7. **Statistics and suites (D-016)** — a supported-subset suite
@@ -337,29 +356,94 @@ with its CP12 dependency:
    F1–F3 built-in, except the documented W-rules. "Per-builtin instruction
    guards": see below.
 
-## Instruction guards
+## Instruction guards and allocation scaling (measured)
 
-Per built-in, two callgrind measurements on the VM (D-005; idle host):
-the marginal instructions of one call on a minimal input (fixed part) and the
-per-element slope (N = 1,000 vs 2,000 elements or bytes). Gate per built-in:
-fixed part ≤ the `guard` column of `builtin_list.inc` (60–400 instructions:
-kind check, argument conversion, result construction) and ≤ 1/10 of
-legacy's marginal cost for the same call; slope ≤ 2× the equivalent C++ loop
-(≤ 30 instructions per element for scans, ≤ 60 for copies). The measured
-values are then locked (+10 %) in `benchmarks/runtime2/builtin_guards.json`
-and checked by a regression test. Not measured in this development round
-(host constraint: no benchmarks while other agents build); the targets are
-the design's, to be confirmed or revised with evidence at wiring time.
+Owner addition (round 2). `tests/rt/builtins_bench.cpp` runs 25
+representative workloads; `tests/runtime2/builtins/builtins_guards.py` runs
+it under callgrind (D-005: deterministic instruction counts, valid on the
+shared host; one valgrind process per size, sequential, ~30 s) at n = 1, 100,
+10,000, 100,000. Only the operation is counted (`CALLGRIND_ZERO_STATS` /
+`CALLGRIND_DUMP_STATS_AT` around the calls; inputs are built outside).
+Allocations are counted with a replaced `operator new` around the same calls,
+and the live-heap delta with the exact heap accounting.
+
+Guard: Ir per call at every size, locked in
+`tests/runtime2/builtins/builtin_guards.json`; `make test-rt-builtins-guards`
+fails above +10 % (+50 Ir) or when a scaling exponent grows by more than
+0.15. The n = 1 values (rounded up to 10) are also the `guard` column of
+`builtin_list.inc`; natives without a workload keep design targets there.
+Callbacks over large arrays (F5) get guards once wired.
+
+| workload | Ir/call n=1 | n=100 | n=10,000 | n=100,000 | exponent | allocs/call n=10⁴ / 10⁵ |
+|---|---:|---:|---:|---:|---:|---:|
+| any.prettify (records) | 3,781 | 167,224 | 17,988,241 | 177,574,367 | 0.99 | 17 / 20 |
+| any.stringify (records) | 4,531 | 122,583 | 13,116,102 | 133,340,177 | 1.01 | 16 / 19 |
+| arr.contains (miss) | 190 | 7,318 | 720,118 | 7,200,118 | 1.00 | 0 / 0 |
+| arr.first | 128 | 128 | 128 | 128 | 0.00 | 0 / 0 |
+| arr.join (strings, concat) | 329 | 15,148 | 1,411,537 | 14,139,279 | 1.00 | 12 / 15 |
+| arr.join.numbers | 326 | 24,164 | 2,617,022 | 29,372,310 | 1.05 | 13 / 17 |
+| arr.max | 183 | 8,309 | 820,109 | 8,200,109 | 1.00 | 0 / 0 |
+| arr.slice (n/2) | 511 | 2,621 | 180,732 | 1,800,874 | 1.00 | 2 / 2 |
+| arr.take (copy) | 622 | 4,810 | 410,866 | 4,100,860 | 1.00 | 2 / 2 |
+| arr.sum | 151 | 2,527 | 240,127 | 2,400,127 | 1.00 | 0 / 0 |
+| arr.unique | 1,388 | 12,569 | 1,515,032 | 14,347,666 | 0.98 | 4 / 4 |
+| fn.range (append) | 617 | 9,461 | 757,988 | 7,262,337 | 0.98 | 16 / 19 |
+| num.to_string (per call) | 1,005 | 982 | 963 | 955 | 0.00 | 0 / 0 |
+| obj.get (member lookup) | 235 | 326 | 351 | 357 | 0.01 | 0 / 0 |
+| obj.keys | 2,330 | 12,419 | 982,875 | 9,803,230 | 1.00 | 6 / 6 |
+| obj.merge (n + 4 keys) | 1,915 | 3,063 | 292,520 | 1,693,074 | 0.76 | 3 / 3 |
+| str.index_of | 241 | 265 | 1,298 | 10,421 | 0.91 | 0 / 0 |
+| str.length | 152 | 945 | 80,145 | 800,145 | 1.00 | 0 / 0 |
+| str.replace (every 10th byte) | 492 | 2,953 | 209,277 | 2,081,894 | 1.00 | 3 / 3 |
+| str.split | 1,186 | 21,694 | 1,919,981 | 18,867,140 | 0.99 | 16 / 19 |
+| str.substr (slice n/2) | 267 | 494 | 1,159 | 50,653 | 1.64 | 2 / 2 |
+| str.to_double (per call) | 981 | 996 | 1,051 | 1,077 | 0.01 | 0 / 0 |
+| str.to_int (per call) | 166 | 199 | 223 | 235 | 0.02 | 0 / 0 |
+| str.to_upper | 269 | 2,451 | 210,540 | 2,100,582 | 1.00 | 2 / 2 |
+| str.trim (copy of n bytes) | 293 | 527 | 10,630 | 100,656 | 0.98 | 2 / 2 |
+
+Findings:
+
+* **No O(n²) path**: every exponent is ≤ 1.05 except `str.substr`, whose
+  absolute cost is a `memcpy` of n/2 bytes (1,159 Ir at 5 KB, 50,653 Ir at
+  50 KB: glibc switches copy strategy; still linear in bytes, 1 Ir/byte). The
+  10,000 → 100,000 exponent is therefore not a quadratic signal there;
+  `str.index_of` (memchr-based) is sub-linear for the same reason.
+* **Hidden copies / temporaries**: copying natives allocate exactly the
+  result (object + buffer: `slice`, `take`, `substr`, `trim`, `to_upper`,
+  `replace` 3 with the growth of the built string); builders whose size is
+  unknown grow geometrically (O(log n) allocations: `split`, `range`, `join`,
+  `stringify`). One defect fixed: `unique` used an `unordered_map` of vectors
+  (2,020 allocations for 1,000 elements); it now uses one open-addressing
+  table (4 allocations at any size). No native deep-copies an input.
+* **Exact heap**: the live-heap delta per call equals the result's footprint
+  (unit test `heap_accounting`); conversions and lookups leave it unchanged.
+* `+` concatenation, `a[i]`, `a.push(x)` are VM operations (CP11/CP12
+  benchmarks), not natives; `join("")` and `range` stand for concat and
+  append here.
+
+**No legacy conversion on any path.** `tests/rt/builtins_bench.cpp` links the
+natives with the CP09 value model *without* `RuntimeValue.cpp`,
+`legacy_bridge.cpp` and `render.cpp`; any call into them is an undefined
+reference (negative control: an object calling `to_legacy` fails that link).
+`make test-rt-builtins-isolation` also greps the natives for those headers,
+`nift::RuntimeValue`, `to_legacy`/`from_legacy` and `append_rendered`. For
+this, number rendering (`append_number`) was ported from Jsonic++
+`format_number` instead of going through `render.cpp` (which builds a legacy
+`RuntimeValue` per double); it is checked against legacy `dump` on 200,000
+random doubles and the special values in the unit test.
 
 ## Tests
 
 | Suite | Content | Result (this round) |
 | --- | --- | --- |
-| `tests/rt/builtins_unit.cpp` | every native (results, every legacy message, arity), table invariants (ids, unique names per receiver, lookup), internal status for impossible receivers, heap budget (`range`, `split("")` stop with `Memory`), receiver immutability and `out` aliasing the receiver (`o.merge(o)`, `merge_deep`, self-containing arrays, `replace` into its own register), shared results, exact heap accounting over 13 calls | 463 checks, 0 failures (`-O2`); 462 under ASan (the 160 MB `range` limit case is skipped) |
-| `tests/rt/builtins_diff.cpp` | random receivers/arguments (strings with multi-byte, `\v`, `\f`, quotes, backslashes, globs; numbers incl. 2^53+1…+3, −0.0, 1e21, 1e-7; nested arrays/objects; numeric-looking strings; wrong kinds and wrong arity); each case also run by the legacy binary as a Nift program; type + stringify or error message compared | seeds 20261018, 2, 3, 4 × 5,000: **19,948 compared, 0 differences** (52 refused by W1, Q10) |
-| mutation check (`builtins_mutants.py`) | 10 single-line mutants of the natives (trim set, byte offsets, glob dot rule, mixed min/max, exact sum, −0.0 size, trailing split field, merge order, `+` in to_int, unique order) must each make the differential test fail | **10/10 detected** (2–49 failures each, seed 1, 3,000 cases) |
+| `tests/rt/builtins_unit.cpp` | every native (F6: escaping, pretty layout, depth limit, number rendering vs legacy on 200,000 doubles) (results, every legacy message, arity), table invariants (ids, unique names per receiver, lookup), internal status for impossible receivers, heap budget (`range`, `split("")` stop with `Memory`), receiver immutability and `out` aliasing the receiver (`o.merge(o)`, `merge_deep`, self-containing arrays, `replace` into its own register), shared results, exact heap accounting over 13 calls | 635 checks, 0 failures (`-O2`); 634 under ASan (the 160 MB `range` limit case is skipped) |
+| `tests/rt/builtins_diff.cpp` | random receivers/arguments (strings with multi-byte, `\v`, `\f`, quotes, backslashes, globs; numbers incl. 2^53+1…+3, −0.0, 1e21, 1e-7; nested arrays/objects; numeric-looking strings; wrong kinds and wrong arity); each case also run by the legacy binary as a Nift program; type + stringify or error message compared | round 1 (F1–F3): seeds 20261018, 2, 3, 4 × 5,000: 19,948 compared, 0 differences. Round 2 (F1–F3 + F6): seeds 20261018, 2, 3 × 7,300: **21,821 compared, 0 differences** (79 refused by W1: Q10 and presentation arity) |
+| mutation check (`builtins_mutants.py`) | 10 single-line mutants of the natives (trim set, byte offsets, glob dot rule, mixed min/max, exact sum, −0.0 size, trailing split field, merge order, `+` in to_int, unique order) must each make the differential test fail | **15/15 detected** (M1–M10 F1–F3; M11–M15 F6: upper-case `\u` hex, four-space indent, unescaped `'`, fixed-notation doubles, numeric strings as numbers; 2–49 failures each, seed 1, 3,000 cases) |
 | ASan+UBSan (`make test-rt-builtins-sanitize`) | unit + differential (2,000 cases) with CP09's relocate-on-mutation reference checks, leaks on | **clean**: 462 + 1,997 checks, 0 failures |
-| `context_probe.py` | 200 legacy cases × 6 contexts + 8 pairs; pinned inventory | Q3, Q4 context-dependent; 6 shape pairs (Q1, Q2, Q5, Q6, Q7, Q10) |
+| `context_probe.py` | 224 legacy cases × 6 contexts + 8 pairs; pinned inventory | Q3, Q4, Q14 (3 cases) context-dependent; 6 shape pairs (Q1, Q2, Q5, Q6, Q7, Q10) |
+| guards (`make test-rt-builtins-guards`) | 25 workloads × 4 sizes under callgrind vs the locked JSON | 0 guard failures |
+| isolation (`make test-rt-builtins-isolation`) | natives link without legacy values; grep | PASS |
 | `rt-lint` | `src/rt/natives` | PASS |
 
 ## Exit criteria (CP14) and status
@@ -367,10 +451,10 @@ the design's, to be confirmed or revised with evidence at wiring time.
 | Criterion | Status |
 | --- | --- |
 | Inventory and family split, legacy and intended semantics, kind rules, guard targets | this record |
-| ≥ 2 families as pure natives with unit, differential and sanitizer tests | F1, F2, F3 (50 natives) |
+| ≥ 2 families as pure natives with unit, differential and sanitizer tests | F1, F2, F3, F6 (73 entries) |
 | Wiring into compiler/VM; supported/unsupported suites; batch fallback = 0 | **after CP12 certifies** (plan above) |
-| Per-builtin instruction guards measured and locked | **at wiring** (targets above) |
-| D-015 candidates recorded | Q1–Q13; owner decisions pending for Q1, Q2, Q4, Q6–Q9 |
+| Per-builtin instruction guards measured and locked | native level: 25 workloads locked (+10 %); VM-level guards (call overhead through `CallNative`) at wiring |
+| D-015 candidates recorded | Q1–Q14; owner decisions pending for Q1, Q2, Q4, Q6–Q9, Q14 |
 
 ## Risks
 
@@ -391,10 +475,10 @@ the design's, to be confirmed or revised with evidence at wiring time.
 
 `src/rt/natives/` (`builtin.{h,cpp}`, `builtin_list.inc`,
 `string_methods.{h,cpp}`, `array_methods.{h,cpp}`, `object_methods.{h,cpp}`,
-`support.{h,cpp}`); `tests/rt/builtins_{unit,diff}.cpp`,
+`format_methods.{h,cpp}`, `support.{h,cpp}`); `tests/rt/builtins_{unit,diff,bench}.cpp`,
 `tests/rt/builtins_support.h`; `tests/runtime2/builtins/` (`context_probe.py`,
-`probe_cases.py`, `context_dependent.txt`, `builtins_mutants.py`); Makefile
-targets; this record. Wiring patch sketch: outside the branch (scratch), as
+`probe_cases.py`, `context_dependent.txt`, `builtins_mutants.py`,
+`builtins_guards.py`, `builtin_guards.json`); Makefile targets; this record. Wiring patch sketch: outside the branch (scratch), as
 CP12 files are not to be edited here.
 
 ## Commit strategy
@@ -407,5 +491,6 @@ record and evidence. Rebased onto CP12's certified tip before wiring.
 
 `../evidence/cp14/`: `unit-diff-probe.txt` (`make test-rt-builtins`),
 `diff-seeds.txt`, `sanitize.txt` (`make test-rt-builtins-sanitize`),
-`mutants.txt`, `context-probe.txt`. Legacy oracle: the `runtime-2` legacy
+`mutants.txt`, `context-probe.txt`; round 2: `mutants-f6.txt`,
+`mutants-m10.txt`, `guards.md`, `guards-check.txt`. Legacy oracle: the `runtime-2` legacy
 build at `/home/claude/review/nift/nift` (`$LEGACY` in the logs).
