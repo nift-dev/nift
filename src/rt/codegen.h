@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nift::rt {
 
@@ -43,14 +44,26 @@ public:
 
     // True when `operand` is a constant -1 or 2 (a text type that defers to the value).
     bool is_untyped_constant(std::uint16_t operand) const;
+    // Marks [begin, end) as cold code entered only by jumps (legacy's textual
+    // re-evaluation of a prepared statement): `skip` is the jump over it on
+    // the normal path. layout_cold moves every cold block after the function
+    // body (each followed by a jump back to `end`) and deletes `skip`, so the
+    // normal path runs no extra instruction.
+    void cold_block(std::size_t skip, std::size_t begin, std::size_t end) { cold_.push_back({skip, begin, end}); }
     // Removes BindType instructions whose type register is never read (and
-    // closes the gaps, re-targeting jumps). Run once, after the last emit.
+    // closes the gaps, re-targeting jumps), after laying out the cold blocks.
+    // Run once, after the last emit.
     void drop_unread_types();
 
     std::unique_ptr<Proto> finish();
     const std::string& error() const { return error_; }
 
 private:
+    struct Cold {
+        std::size_t skip, begin, end;
+    };
+    void layout_cold();
+    std::vector<Cold> cold_;
     std::unique_ptr<Proto> proto_;
     std::uint16_t top_ = 0;
     std::uint32_t offset_ = 0;

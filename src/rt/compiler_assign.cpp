@@ -47,6 +47,7 @@ bool UnitCompiler::declare_value(const Node& node, std::uint16_t reg) {
     textual_statement_ = false;
     update_flags();
     fb_->patch(join, fb_->here());
+    fb_->cold_block(join, join + 1, fb_->here());
     return ok && builder_ok();
 }
 
@@ -137,6 +138,7 @@ bool UnitCompiler::assign(const Node& node) {
     textual_statement_ = false;
     update_flags();
     fb_->patch(done, fb_->here());
+    fb_->cold_block(done, done + 1, fb_->here());
     return ok && builder_ok();
 }
 
@@ -207,6 +209,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     textual_statement_ = false;
     update_flags();
     fb_->patch(done, fb_->here());
+    fb_->cold_block(done, done + 1, fb_->here());
     return ok && builder_ok();
 }
 
@@ -231,6 +234,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     textual_statement_ = false;
     update_flags();
     fb_->patch(done, fb_->here());
+    fb_->cold_block(done, done + 1, fb_->here());
     return ok && builder_ok();
 }
 

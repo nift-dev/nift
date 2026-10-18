@@ -276,6 +276,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
     textual_statement_ = false;
     update_flags();
     fb_->patch(done, fb_->here());
+    fb_->cold_block(done, done + 1, fb_->here());
     return alt_ok && builder_ok();
 }
 
