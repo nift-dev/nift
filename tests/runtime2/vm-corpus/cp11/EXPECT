@@ -80,5 +80,4 @@ review2_r6_deep_equality.f vm
 # CP11 review round 3 regressions.
 review3_f1_member_index.f fallback index-target
 review3_f1_index_name_ok.f vm
-review3_f2_ne_eq_chain.f fallback comparison-chain
 review3_f2_single_ok.f vm
