@@ -15,10 +15,10 @@ _Last updated: 2026-10-18_
 | CP06 | complete — Linux, macOS, Windows (CI @262d3ec) | `runtime-2` | Template scanner dispatch: −57.8% full-build instructions, byte-identical; review found no output difference in ~37k cases (`checkpoints/cp06-scanner-dispatch.md`) |
 | CP07 | complete — Linux, macOS, Windows (CI @aba3a50) as leak/resource fix; launch-cost gate **deferred, not passed** (D-011) | `runtime-2` | Anonymous capture files; pipe attempt rejected and preserved (`checkpoints/cp07-process-capture.md`) |
 | CP08 | complete — Linux, macOS, Windows (evidence split across two commits, see below) | `runtime-2` | Host-op trace, `tools/rt-diff` harness (policies, minimiser, 83 self-tests), corpus, semantics v1.1; two adversarial review rounds addressed (`checkpoints/cp08-semantics-harness.md`) |
-| CP09 | complete — Linux, locally certified (`make certify` @0dc60c6: 0 FAIL); cross-platform at the CP09–CP11 milestone | `runtime-2` | `src/rt` value model; review round 1: 3 defects + 4 risks fixed (reference-invalidation contract documented only), verified by the reviewer's repros ported as regression tests; no second review round (`checkpoints/cp09-value-model.md`) |
-| CP10 | complete — Linux, locally certified (`make certify` @0dc60c6: 0 FAIL); cross-platform at the CP09–CP11 milestone | `runtime-2` | Script lexer/parser; review round 1: 10 defects + 2 risks fixed by Opaque fallback, new negative gate against legacy (0 failures, 28,464 programs); no second review round (`checkpoints/cp10-parser.md`) |
-| feature-sha256 | complete — Linux, locally certified (`make certify` @ae0b7ac: 1 FAIL in test-test-integrity fixed at ced1f98 and re-certified; 159 PASS, 7 classified); Windows/macOS at the CP09–CP11 milestone | `runtime-2` | Native `sha256()` / `sha256_file()` (vendored Bitcoin Core v29.0 SHA-256, SHA-NI with portable fallback); one review round, 2 defects fixed (incl. a stale-page bug in the first `@try` dependency fix) (`checkpoints/feature-sha256.md`) |
-| CP11 | complete — Linux, locally certified (`make certify` @bf32e4f: 0 FAIL, 161 PASS, 7 classified; test-rt-vm re-run at the final commit); cross-platform at the CP09–CP11 milestone | `runtime-2-cp11i` (local, not pushed; rebased on `runtime-2` @`c4c5894`) | VM proof of concept, **gate GO** (re-measured on the final build, idle host): register bytecode VM over CP09 values, compiler from the CP10 AST, heap frame stack (100k-frame budget, exact memory budget, no C++ recursion), whole-unit fallback plus enumerated value-dependent bail-and-replay, opt-in `NIFT_VM=1`/`require`. Round 1: 7 miscompiles + 2 risks fixed. Round 2: legacy's prepared evaluator inventoried (11 differences), M1–M4 refused/Opaque, R5/R6 (CP09 follow-ups). Round 3 (last, D-015): F1 member-path element targets refused (`index-target`), F2 comparison chains refused (`comparison-chain`), F3 tree depth bounded before analysis and prepared walks iterative (100k-term inputs no longer crash compilation), F4 aggregate equality O(depth) memory (CP09 follow-up), DOC-1/2 corrected; D-016: supported-subset generator (100 % on the VM required and met; the deliberate replay cases moved to a separate runtime-replay suite, the CP12 backlog), general generator coverage reported (22.7 % VM, no threshold), unsupported generator (500/500 refused before execution). `make test-rt-vm`: 37,421 adversarial programs in 21 families, 0 non-approved differences; sanitizer clean; reviewer material rounds 1–3: 0 non-approved differences. Flat call 461 instr (v4.12 14,994: 32.5× fewer; CPython 953: 0.48×), fib call 471; 75 of 757 shared-corpus scripts run on the VM (`checkpoints/cp11-vm-poc.md`) |
+| CP09 | complete — Linux, locally certified (`make certify` @0dc60c6: 0 FAIL); cross-platform certified at the CP09–CP11 milestone (Linux, macOS, Windows; see below) | `runtime-2` | `src/rt` value model; review round 1: 3 defects + 4 risks fixed (reference-invalidation contract documented only), verified by the reviewer's repros ported as regression tests; no second review round (`checkpoints/cp09-value-model.md`) |
+| CP10 | complete — Linux, locally certified (`make certify` @0dc60c6: 0 FAIL); cross-platform certified at the CP09–CP11 milestone (Linux, macOS, Windows; see below) | `runtime-2` | Script lexer/parser; review round 1: 10 defects + 2 risks fixed by Opaque fallback, new negative gate against legacy (0 failures, 28,464 programs); no second review round (`checkpoints/cp10-parser.md`) |
+| feature-sha256 | complete — Linux, locally certified (`make certify` @ae0b7ac: 1 FAIL in test-test-integrity fixed at ced1f98 and re-certified; 159 PASS, 7 classified); cross-platform certified at the CP09–CP11 milestone (Linux, macOS, Windows @c6fac06 after two CI-only fixes; see below) | `runtime-2` | Native `sha256()` / `sha256_file()` (vendored Bitcoin Core v29.0 SHA-256, SHA-NI with portable fallback); one review round, 2 defects fixed (incl. a stale-page bug in the first `@try` dependency fix) (`checkpoints/feature-sha256.md`) |
+| CP11 | complete — Linux, locally certified (`make certify` @bf32e4f: 0 FAIL, 161 PASS, 7 classified; test-rt-vm re-run at the final commit); cross-platform certified at the CP09–CP11 milestone (Linux, macOS, Windows; see below) | `runtime-2-cp11i` (local, not pushed; rebased on `runtime-2` @`c4c5894`) | VM proof of concept, **gate GO** (re-measured on the final build, idle host): register bytecode VM over CP09 values, compiler from the CP10 AST, heap frame stack (100k-frame budget, exact memory budget, no C++ recursion), whole-unit fallback plus enumerated value-dependent bail-and-replay, opt-in `NIFT_VM=1`/`require`. Round 1: 7 miscompiles + 2 risks fixed. Round 2: legacy's prepared evaluator inventoried (11 differences), M1–M4 refused/Opaque, R5/R6 (CP09 follow-ups). Round 3 (last, D-015): F1 member-path element targets refused (`index-target`), F2 comparison chains refused (`comparison-chain`), F3 tree depth bounded before analysis and prepared walks iterative (100k-term inputs no longer crash compilation), F4 aggregate equality O(depth) memory (CP09 follow-up), DOC-1/2 corrected; D-016: supported-subset generator (100 % on the VM required and met; the deliberate replay cases moved to a separate runtime-replay suite, the CP12 backlog), general generator coverage reported (22.7 % VM, no threshold), unsupported generator (500/500 refused before execution). `make test-rt-vm`: 37,421 adversarial programs in 21 families, 0 non-approved differences; sanitizer clean; reviewer material rounds 1–3: 0 non-approved differences. Flat call 461 instr (v4.12 14,994: 32.5× fewer; CPython 953: 0.48×), fib call 471; 75 of 757 shared-corpus scripts run on the VM (`checkpoints/cp11-vm-poc.md`) |
 
 ### CP08 certification evidence (owner-accepted 2026-10-18)
 
@@ -35,14 +35,46 @@ annotations, private temp files in three tests, and docs (D-012). The integrity
 job at `bce5913` failed only on the mutant self-test fixed in `aed991b`. No full
 matrix was re-run to consolidate (D-012).
 
+### CP09–CP11 + feature-sha256 cross-platform milestone (2026-10-18)
+
+| Workflow (run) | Commit | Linux | macOS | Windows | Other jobs |
+| --- | --- | --- | --- | --- | --- |
+| Checkpoint 10 cross-platform equivalence (39100542589) | `f3208f4` | pass | **fail** (Native SHA-256 step) | **fail** (Native SHA-256 step) | compare: skipped |
+| Test integrity guards (39100545658) | `f3208f4` | binding gates **fail** (`make -j2 test-all`: load-sensitive `v44_perf_scaling_smoke.sh`, map 40k=52 ms 80k=232 ms, ratio 4.46 > 3.5); static scan, fast contract suites, aggregate evidence ubuntu: pass | aggregate evidence: pass | — | |
+| v4.4/v4.5 cross-platform (39100544195) | `f3208f4` | pass | pass | pass | |
+| Regression suite `runtime-2` vs core (39100540920) | `f3208f4` | pass | — | — | |
+| Checkpoint 10 cross-platform equivalence (39104574518) | `c6fac06` | pass | pass | pass | compare normalized semantics: pass |
+| Test integrity guards (39104576304) | `c6fac06` | all jobs pass: static scan, fast contract suites, aggregate evidence ubuntu, binding gates (`NIFT_DEFER_LOAD_SENSITIVE=1 make -j2 test-all` pass; `make test-load-sensitive` alone pass; build-boundary serial pass) | aggregate evidence: pass | — | |
+| Regression suite `runtime-2` vs core (39104571762, push) | `c6fac06` | pass | — | — | |
+
+Root causes of the `f3208f4` failures, all test/CI infrastructure (no product
+source changed in `f3208f4..c6fac06`):
+- Windows SHA-256: the checkout converted `third_party/bitcoin-sha256/COPYING`
+  to CRLF (core.autocrlf), so `check_vendored_sha256.py` found its hash
+  unrecorded. Fixed in `b963f62` (`.gitattributes`: `third_party/bitcoin-sha256/** -text`;
+  the checker also names CRLF as the cause).
+- macOS SHA-256: the Host-op trace check expected `$P/data/x.bin`, but the
+  trace records the canonical path (`/private/var/...`; `$TMPDIR` is under the
+  `/var` symlink). Fixed in `b963f62` (accepts the `pwd -P` form too). The unit
+  tests (incl. ASan/UBSan) and all other builtins checks passed on macOS.
+- Linux binding gates: a load-sensitive wall-clock guard ran inside
+  `make -j2 test-all`. Fixed structurally in `c6fac06` (guards deferred there and
+  run alone by `make test-load-sensitive`; thresholds unchanged). Recorded in
+  `certification.md` as a load-sensitive observation (with `974dcb3`), **not
+  resolved**.
+
+v4.4/v4.5 cross-platform was not re-run at `c6fac06` (narrowest workflow, D-012;
+nothing it exercises changed). Windows aggregate evidence is not part of Test
+integrity guards and is not claimed.
+
 ### Certification levels (D-012)
 
 - **locally certified** — `make certify` on Linux with every result PASS or classified;
 - **cross-platform certified** — the CI workflows above pass on Linux, macOS and Windows;
 - **release certified** — full matrix on the exact commit to be promoted, before merge to `main`.
 
-CP09–CP11 are certified locally; the next full matrix runs at the CP09–CP11
-integration milestone.
+CP09–CP11 and feature-sha256 are certified locally and, at the CP09–CP11
+milestone above, cross-platform (`f3208f4` + CI-only fixes to `c6fac06`).
 
 `runtime-2` holds checkpoints that passed every gate. `runtime-2-dev` holds work
 whose review is still open; it is rebased onto `runtime-2` before each delivery.
