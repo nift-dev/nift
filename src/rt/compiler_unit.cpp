@@ -19,9 +19,18 @@ void binding_leaves(const TextType& type, std::unordered_set<std::string_view>& 
     }
 }
 
-// Names whose binding type legacy may read in `body`: assignment targets and
-// the bindings named by declaration, assignment and argument texts.
-void typed_names(const Ast& ast, NodeId body, std::unordered_set<std::string_view>& out) {
+struct ArgUse {
+    std::size_t callee;
+    std::uint32_t index;
+    std::unordered_set<std::string_view> names;  // bindings named by the argument's text
+};
+
+// Names whose binding type legacy reads in `body` whatever the callees do:
+// assignment targets and the bindings named by declaration and assignment
+// texts; and, per user-call argument, the bindings its text names (read only
+// when the callee's parameter is observable).
+void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body, std::unordered_set<std::string_view>& out,
+                 std::vector<ArgUse>& args) {
     collect_assigned(ast, body, out);
     std::vector<NodeId> stack{body};
     while (!stack.empty()) {
@@ -32,8 +41,15 @@ void typed_names(const Ast& ast, NodeId body, std::unordered_set<std::string_vie
         if ((n.kind == NodeKind::Declare || n.kind == NodeKind::Assign) && n.b != kNoNode)
             binding_leaves(infer_text_type(ast.text(ast.at(n.b))), out);
         const NodeId* list = ast.list(n);
-        if (n.kind == NodeKind::Call)
-            for (std::uint32_t k = 0; k < n.count; ++k) binding_leaves(infer_text_type(ast.text(ast.at(list[k]))), out);
+        if (n.kind == NodeKind::Call && ast.at(n.a).kind == NodeKind::Ident) {
+            const auto fn = plan.index.find(ast.text(ast.at(n.a)));
+            if (fn != plan.index.end())
+                for (std::uint32_t k = 0; k < n.count; ++k) {
+                    ArgUse use{fn->second - 1u, k, {}};
+                    binding_leaves(infer_text_type(ast.text(ast.at(list[k]))), use.names);
+                    if (!use.names.empty()) args.push_back(std::move(use));
+                }
+        }
         for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
         for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
     }
@@ -43,15 +59,30 @@ void typed_names(const Ast& ast, NodeId body, std::unordered_set<std::string_vie
 
 UnitCompiler::UnitCompiler(const Ast& ast, const UnitPlan& plan, const UnitKinds& kinds)
     : ast_(ast), plan_(plan), kinds_(kinds) {
-    variant_proto_.assign(plan.functions.size(), {0, 0});
-    observable_.resize(plan.functions.size());
-    for (std::size_t f = 0; f < plan.functions.size(); ++f) {
-        const Node& fn = ast.at(plan.functions[f]);
-        std::unordered_set<std::string_view> names;
-        typed_names(ast, fn.b, names);
-        const NodeId* params = ast.list(fn);
-        observable_[f].resize(fn.count);
-        for (std::uint32_t k = 0; k < fn.count; ++k) observable_[f][k] = names.count(ast.text(ast.at(params[k]))) != 0;
+    const std::size_t count = plan.functions.size();
+    variant_proto_.assign(count, {0, 0});
+    observable_.resize(count);
+    std::vector<std::unordered_set<std::string_view>> names(count);
+    std::vector<std::vector<ArgUse>> args(count);
+    for (std::size_t f = 0; f < count; ++f) {
+        typed_names(ast, plan, ast.at(plan.functions[f]).b, names[f], args[f]);
+        observable_[f].assign(ast.at(plan.functions[f]).count, false);
+    }
+    // Fixpoint: an argument's named bindings are read when the callee's
+    // parameter is observable (its type then travels to the callee).
+    for (bool changed = true; changed;) {
+        changed = false;
+        for (std::size_t f = 0; f < count; ++f) {
+            for (const ArgUse& use : args[f])
+                if (observable_[use.callee][use.index]) names[f].insert(use.names.begin(), use.names.end());
+            const Node& fn = ast.at(plan.functions[f]);
+            const NodeId* params = ast.list(fn);
+            for (std::uint32_t k = 0; k < fn.count; ++k)
+                if (!observable_[f][k] && names[f].count(ast.text(ast.at(params[k])))) {
+                    observable_[f][k] = true;
+                    changed = true;
+                }
+        }
     }
 }
 
