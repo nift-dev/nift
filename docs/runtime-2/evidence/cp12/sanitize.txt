@@ -1,0 +1,11 @@
+rt vm unit: 40261 checks, 0 failures
+rt prepared-parser port (differential vs legacy): 40136 checks, 0 failures
+PASS vm parity
+PASS vm adversarial: 3619 programs, 0 non-approved differences, 133 approved {'D-001#4 recursion': 49, 'D-018c diagnostics': 84}, 0 endless, 2188 static fallbacks
+PASS vm subset suites: 49 supported programs (NIFT_VM=require, identical to legacy), 63 unsupported programs (refused before execution); 0 failure(s)
+PASS vm generated subset suites: 0 failure(s)
+PASS vm engine selection: 12 cases, 0 failure(s)
+PASS vm former replay: 0 failure(s)
+PASS vm D-018: 13 live cases (old vs new), 18 policy boundary cases, 0 failure(s)
+PASS vm context consistency: 0 failure(s)
+exit 0

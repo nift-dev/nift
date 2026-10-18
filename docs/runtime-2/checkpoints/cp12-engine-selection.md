@@ -1,87 +1,122 @@
-# CP12 phase A — Engine selection before execution (bail-and-replay removed)
+# CP12 phase A — Engine selection before execution (bail-and-replay removed, D-018)
 
-Status: see `../progress.md` (phase A implemented; targeted tests pass; full
-suites, sanitizer run, certification and performance measurements pending an
-idle host). Branch `runtime-2-cp12-dev` (local, not pushed), from CP11
-`bf32e4f`. Phase B (resolver coverage: globals, `GETDYN`, modules, structs,
-enums; checkpoints.md CP12) is next.
+Status: see `../progress.md`. Branch `runtime-2-cp12-dev` (local, not
+pushed), rebased on `runtime-2` @`f3208f4` (CP11 certified). Phase B
+(resolver coverage: globals, `GETDYN`, modules, structs, enums;
+checkpoints.md CP12) is next and not started.
+
+Owner decision D-018 (recorded in `../decisions.md` by the coordinator; the
+per-case consequences are below): a function has **one** compiled
+representation and every expression **one** meaning wherever it appears.
+The earlier phase-A design reproduced legacy's two evaluators (a compiled
+variant per evaluator, textual re-evaluation blocks, per-evaluator error
+sites); that machinery is removed. Where legacy behaves differently by
+calling context, either the difference is one of the three approved changes
+(D-018a–c), or the unit is refused before execution (`context:*`).
 
 ## Objective (owner, D-013 removal gate)
 
-After phase A these invariants hold and are enforced by tests:
-
 | | Invariant | How it holds | Test |
 | --- | --- | --- | --- |
-| A | Single execution: every compilation unit executes at most once | `run_script_on_vm` returns "run legacy" only before anything executed; once the VM starts, it returns the VM's exit status whatever happens. `NIFT_VM_STATS` reports `vm_executions` and `legacy_executions` (exactly one is 1) | `vm_engine_selection.py` (statistics, every printed line, the host-op trace `NIFT_TRACE_HOST`, an appended file); every harness (`vm_parity`, `vm_adversarial`, `vm_subset_gen`, `vm_former_replay`) fails a unit with other counts |
-| B | Pre-execution selection | Parse, Opaque check, compile and the kind inference decide; `NIFT_VM=classify` (no execution) names the same engine | `vm_engine_selection.py` (classify vs `NIFT_VM=1` on every case), `vm_subset.py`/`vm_subset_gen.py` (unsupported suites) |
-| C | No partial replay | There is no replay code: no `BailReason`, no `Bail`/`NoAlias`/`CheckParam` opcodes, no "replayed" outcome | every harness fails on a `replayed` outcome; `vm_former_replay.py` aims at every former replay reason |
-| D | No duplicated effects | Output streams (64 KiB chunks), errors are reported by the VM after the output already written; effectful programs (files, processes, ...) are refused before execution | `vm_engine_selection.py`: file write traced and appended exactly once, no duplicated output line; all suites compare complete stdout/stderr/exit |
-| E | Explicit fallback | Unsupported units are classified before execution with a recorded reason (`outcome: fallback`, `reason`, `execute_us: 0`, `vm_executions: 0`) | `vm_subset.py` UNSUPPORTED, `vm_subset_gen.py --suite unsupported`, `vm_engine_selection.py`, `vm_former_replay.py` |
-| F | VM errors remain errors | Program errors: the VM reports legacy's error (exit 1). Unexpected failures (broken invariant, flat memory budget, any exception): `NIFT_VM internal failure`, exit 70, never run on legacy | `vm_engine_selection.py` (`internal-failure` case: exit 70, only the VM's output); unexpected operand kinds report internal failures (a compiler defect), never a guess |
+| A | Single execution: every compilation unit executes at most once | `run_script_on_vm` returns "run legacy" only before anything executed; once the VM starts it returns the VM's exit status whatever happens. `NIFT_VM_STATS` reports `vm_executions` and `legacy_executions` (exactly one is 1) | `vm_engine_selection.py` (statistics, every printed line, the host-op trace `NIFT_TRACE_HOST`, an appended file); every harness fails a unit with other counts |
+| B | Pre-execution selection | parse, Opaque check, compile and the kind inference decide; `NIFT_VM=classify` (no execution) names the same engine | `vm_engine_selection.py` (classify vs `NIFT_VM=1`), `vm_subset.py` / `vm_subset_gen.py` (unsupported suites) |
+| C | No partial replay | there is no replay or re-evaluation code: no `Bail`/`NoAlias`/`CheckParam`/`JmpLarge` opcodes, no `Reeval` stop, no "replayed" outcome | every harness fails on `replayed`; `vm_former_replay.py` aims at every former replay reason |
+| D | No duplicated effects | output streams (64 KiB chunks); every statement is evaluated once (D-018a); effectful programs (files, processes, ...) are refused before execution | `vm_engine_selection.py` (file write traced once, no duplicated line, the former re-evaluation call printed once by the VM), all suites compare complete stdout/stderr/exit |
+| E | Explicit fallback | unsupported units are classified before execution with a recorded reason (`outcome: fallback`, `reason`, `execute_us: 0`, `vm_executions: 0`) | `vm_subset.py` UNSUPPORTED (incl. every `context:*` reason), `vm_subset_gen.py --suite unsupported`, `vm_engine_selection.py` |
+| F | VM errors remain errors | program errors: the VM reports them itself (legacy's format, the failing expression's position, exit 1); unexpected failures: `NIFT_VM internal failure`, exit 70, never run on legacy | `vm_engine_selection.py` (`internal-failure`), unexpected operand kinds are internal failures (compiler defects), never guessed |
 
 ## Design
 
-### What replaced each bail
+### One compiled representation (D-018)
 
-CP11 stopped a run with a bail reason and replayed the unit on legacy. CP12
-replaces every reason either by **exact VM behaviour** (the VM does what
-legacy does, including its error) or by a **static refusal** (the unit is
-refused before execution). The legacy behaviour comes from the two legacy
-evaluators (textual and prepared: `cp11-vm-poc.md`, "Legacy's prepared
-evaluator", P1–P11).
+* **Compiler.** One proto per function (`protos[f + 1]`), whatever calls it.
+  Every user call passes the P5 text types of the parameters the callee can
+  observe (call-graph fixpoint); every assignment uses the canonical
+  text-and-value binding check (`CheckAssign`); errors are reported at the
+  failing expression's start (`site(node) = node.begin`; statement-level
+  errors at the statement). Removed: function variants, textual
+  re-evaluation copies and their cold-block layout, `if`/`return`/index/
+  caller error sites, `return: ` prefixes, the print-path re-resolution.
+* **VM.** One semantics: CP09 canonical arithmetic (checked int64, exact
+  beyond 2^53, `signed 64-bit integer overflow`, doubles otherwise) and the
+  canonical messages (D-009#1) in every context. Removed: the prepared
+  double arithmetic, `-0` negation, prepared messages (`invalid index`,
+  `cannot change binding type: x`, `invalid index target`), `length()` on
+  objects, `StopReason::Reeval`, `JmpLarge`, caller-site offsets, prefix
+  counting.
+* **Evidence only.** The compiler still knows which code legacy would run on
+  its loop (prepared) evaluator (loop regions; functions called from them;
+  `rt/prepared.h`). It uses this for two things: the context refusals below,
+  and an instruction flag `kInstrLoopPath` that never changes what the VM
+  computes. The VM statistics report `large_numbers` (arithmetic that met a
+  number legacy calls large, |n| ≥ 2^53, or went out of range),
+  `large_in_loop_path` (of those, in code legacy runs on its loop evaluator:
+  the flag on the instruction or on any active call) and
+  `error_in_loop_path`. The harness policies require this evidence.
 
-| Former bail (CP11) | Decision | Mechanism | Old legacy behaviour (recorded) |
+### D-018 consequences
+
+Every legacy behaviour that depends on the calling context, its single VM
+semantics, and how the difference is handled. "Loop code" = code legacy runs
+on its prepared evaluator (loop conditions and bodies, functions called from
+them, transitively), except statements it runs textually.
+
+| # | Legacy behaviour by context | Intended consistent semantics (VM) | Handling |
 | --- | --- | --- | --- |
-| `runtime-error`: value-dependent errors (division/modulo by zero, modulo of a non-integral number, non-finite result, integer overflow, index out of range / negative / fractional, missing key or member, element assignment out of range, binding type change, `length()` on an object at top level) | **exact in VM** | error message, source position and `return: ` prefixes as legacy reports them, per evaluator ("Error sites" below); exit 1, output before the error kept | messages and positions differ per evaluator and statement shape (tables below) |
-| `runtime-error`: kind errors (`1 - "a"`, `"a" < 1`, `-"a"`, `s += 1`, `s++` on a string, `print([1])`, `return [1]` at top level, `.size()` on a string, `.length()` on a number, member/index on a non-aggregate, `push` on a non-array, concatenation with an aggregate) | **refused** (`type:<op>`, `type:print`, `type:length`, `type:index`, `type:member`, `type:push`, `type:unary`, `type:compound-assignment`, `type:increment`, `type:element-assignment`, `type:script-return`) | static kind inference (`rt/infer*`) proves the operand kinds; an operation whose operands may have a kind legacy rejects or treats specially is refused | legacy errors, with evaluator-specific wording (`@if ordering comparisons require ... of the same type` in an `if`); in loop bodies legacy **renders aggregates as JSON in `+`** (`"a" + [1]` gives `a[\n1\n]`) where the top level fails |
-| `unverified` P4: `x = e` typed from text (textual) or value (prepared) | **exact** | every instruction is compiled for the evaluator that runs it (Instr flag `kInstrPrepared`); textual: `CheckAssign` with the text type, prepared: `CheckType` with the value type; a function reachable from both is compiled twice (variants) | textual and prepared verdicts differ for integral doubles and text-typed bindings (`a := "" + 1.5` is a double binding holding a string) |
-| `unverified` P5: parameters typed from argument text (textual call) or value (prepared call) | **exact** | a textual call leaves the argument's text type in the callee's parameter type register (frame register nparams + k) for every parameter whose type the callee can observe; the callee's `BindType` combines it with the value; prepared calls type from the value | legacy `bind_call_param` (text) vs `scope.emplace(param, value type)` |
-| `unverified` P7: `length()`/`size()` on an object | **exact** | `size()` counts members everywhere; `length()` counts on the prepared path and is legacy's error `unknown value or malformed expression: <text>` on the textual path | legacy accepts `length()` on objects only in loop bodies |
-| `unverified`: element assignment with another element type, or out of range | **exact** | type change allowed (both evaluators allow it); out of range: textual `index out of range: <index text>` / `assignment index does not address an array or object: <index text>`, prepared `invalid index target` | — |
-| `number-range` P6 (|n| ≥ 2^53, integer −0) | **exact** | textual: CP09 arithmetic (checked int64, exact beyond 2^53, `signed 64-bit integer overflow`); prepared: doubles (−0 kept, no overflow) like `src/Ast.cpp`; a prepared declaration or assignment whose value is large, or a compound assignment / increment with a large operand, runs the statement's **textual code** (legacy re-evaluates it: `large_num` → `c.legacy(st.text)`), compiled next to it as a cold block (`JmpLarge`, `StopReason::Reeval` from the compound slow paths) | `print(w + 2)` in a loop prints `9007199254740992` (double) where top level prints `9007199254740993`; a loop statement `t := f(x) + 2` with a large value **calls f twice** (prepared, then textual) — reproduced exactly, see "Legacy quirks reproduced" |
-| `aliasing` P8 (aggregate bound, returned, pushed or put in a literal from a place) | **refused** (`aliasing`) | kind inference: a declaration, assignment, return, push, element assignment, array item or object value written as a place that may hold an array or object | legacy makes a location reference (mutation through it changes the owner) |
-| `recursion-budget` | **VM error** (approved D-001#4) | beyond 100,000 frames, or the memory budget exceeded deeper than 64 frames: the VM reports `callable recursion depth exceeded: <fn>` (exit 1, no `return:` prefix, like legacy's) | legacy fails at depth 65 with that error; the harness class D-001#4 approves the VM going further (completing, stopping at its budget, or ending in the program's own error deeper than legacy can go) |
-| `output-limit` | **removed** | output streams; nothing is buffered for replay | — |
-| `nesting-depth` (`==` deeper than 10,000 levels) | **exact** | the VM decides `==` at every depth (iterative, CP09 `equal`) | legacy answers up to ~30,000 levels and crashes beyond; such programs now get the answer instead of a crash |
-| internal | unchanged | exit 70, reported, never run on legacy | — |
+| 1 | Numbers in loop code are doubles: `print(w + 2)` with `w = 2^53 − 1` prints `9007199254740992` in a loop, `9007199254740993` at top level; a product overflowing int64 prints `6.4e+19` in a loop-called function and fails `signed 64-bit integer overflow` when called directly | CP09 everywhere (exact integers, overflow error) | **approved D-018a**; policy `D-018a numbers` (evidence `large_in_loop_path`) |
+| 2 | A loop declaration/assignment whose value is large, or a compound assignment/increment with a large operand, is re-evaluated textually: its calls run twice (output twice) | evaluated once | **approved D-018a** (same policy: legacy's extra lines repeat lines also printed once) |
+| 3 | `print(path)` with a missing element in loop code resolves the path again (keys evaluated twice) | keys evaluated once | **approved D-018b**; not observable in the compiled subset (keys with calls make legacy run the statement textually; the re-resolution's message is the canonical one), so no harness policy: such programs must be identical (`vm_d018.py` print-path cases) |
+| 4 | Error positions: textual code reports the enclosing `if`, the `return` statement (plus a `return: ` prefix per `return` the error passes through) or the index expression; loop code reports the failing node with its parentheses, or the statement / outermost loop statement / caller's call site for statement errors | the failing expression (statement errors: the statement), no prefix | **approved D-018c** (D-009#5); policy `D-018c diagnostics` |
+| 5 | Error wording in loop code: `invalid index`, `cannot change binding type: x`, `invalid index target` | canonical: `JSON array index 3 is out of range in 'a[k]'`, `JSON object has no key 'k'`, `cannot assign string to int binding 'x'`, `index out of range: 3` | **approved D-018c** (D-009#1); mapped only with evidence `error_in_loop_path` |
+| 6 | `x = e`: textual code checks the type derived from the text and value, loop code the value's type (P4): `x = x + 0.5` on an int `x` fails differently; a double-typed binding holding a string (`b := "" + 1.5`) accepts `b = b` only textually | canonical text-and-value check | **refused** in loop code where the verdicts can differ: `context:assignment-type` (the text may give a double type while the value may be integral or not a number; exempt: numeric values assigned to an always-double binding, or `x = x` with a numeric value) |
+| 7 | Parameters: a textual call types a parameter from the argument's text and value, a loop call from the value only (P5) | canonical (text and value) | **refused**: `context:parameter-type` (a loop call to a function that observes that parameter's type, with an argument that may differ) |
+| 8 | `o.length()` on an object counts members in loop code, fails at top level | canonical error (`size()` counts) | **refused**: `context:object-length` (receiver may be an object, loop code) |
+| 9 | `x %= y` in loop code is `fmod` on any numbers (no integer check, no finiteness check) | canonical `modulo requires integer-valued operands` | **refused**: `context:modulo-assignment` (an operand may be a fraction, loop code) |
+| 10 | `s += t` on strings in loop code appends without the binding type check (a double-typed binding holding a string keeps it) | canonical check after every compound assignment | **refused**: `context:string-append-type` (target may be double-typed, loop code) |
+| 11 | `-x` with integer `x == 0` gives `-0` in loop code, `0` at top level | `0` (CP09 negate) | **refused**: `context:negative-zero` (operand may be an integer, loop code; non-zero literals are constants) |
+| 12 | Declarations in loop code typed from the value (not the text), aggregates rendered as JSON in `+` in loop code, loop bodies legacy abandons preparing, functions legacy cannot prepare | — | **refused** (unchanged from earlier phase A): `prepared-decl-type`, `type:+`, `prepared-unpreparable`, `prepared-fn-unprepared` |
+| 13 | Recursion: legacy stops at 64 frames | 100,000-frame budget | approved D-001#4 (unchanged); policy `D-001#4 recursion` |
 
-### Evaluator variants and error sites
+Rules 6–11 are the "refuse before execution" part of D-018: the excluded
+behaviour is recorded above, the intended semantics is the canonical one
+(already the VM's), and phase B or a later language checkpoint can admit
+these units once legacy is no longer the oracle in loop code.
 
-* **Context of every instruction.** The compiler knows statically which
-  legacy evaluator runs each statement: top-level code and functions called
-  from it are textual; `while` conditions and bodies, and functions called
-  from them, are prepared; inside prepared code a statement legacy's prepared
-  parser rejects (`legacy_prepared_parse_accepts`, the CP11 port) runs
-  textually (`StmtKind::Legacy`), as does a call with a rejected argument
-  (`legacy_with_span`). A function is compiled per variant on demand (proto
-  per (function, variant)); calls pick the variant of their context. An
-  `if`/`while` condition or `return` expression the prepared parser rejects
-  inside prepared code is refused (`prepared-unpreparable`: legacy abandons
-  preparing the loop).
-* **Error sites** (`compiler_rules.cpp`, verified by ~6,000 probe programs and
-  the suites below), legacy's reported offset:
-  * textual: the failing expression's start (parentheses excluded); inside an
-    `if`/`else if` condition the `if`; inside a `return` expression the
-    `return`, with a `return: ` prefix per textual `return` the error passes
-    through (Instr flag; counted over the frame stack at the error); inside
-    index brackets the index expression;
-  * prepared: the failing node's span with enclosing parentheses
-    (`src/Ast.cpp` `failure_origin`); errors with no failing expression
-    (binding type change, compound operation, element assignment) at the
-    statement of the outermost loop body that contains them, and in a
-    function legacy runs prepared at the call in its caller;
-  * `print(path)` on the prepared path: when the location is missing legacy
-    resolves the statement again textually (its message, keys evaluated
-    again): compiled as a cold textual block entered from the lookup.
-* **Messages**: legacy's text per evaluator (`invalid index` vs `JSON array
-  index 5 is out of range in 'a[k]'`; `cannot change binding type: x` vs
-  `cannot assign double to int binding 'x'`; prepared compound assignment
-  `%=` has no integer check and no finite check, ...).
-* **Hot path**: flags and notes are read only on slow and error paths;
-  re-evaluation blocks are laid out after the function body. Per iteration,
-  `s = add(s, i); i += 1` executes one extra instruction (`JmpLarge` after a
-  value whose size the compiler cannot bound); `i += 1` none (the check is in
-  `AddI`'s slow path).
+### Approved-difference policies (harnesses)
+
+All differential harnesses (`vm_adversarial.py`, `vm_parity.py`,
+`vm_engine_selection.py`, `vm_former_replay.py`) classify a legacy/VM pair
+with `tests/runtime2/vm_policies.py`; rt-diff uses the same functions as
+class rules (`tools/rt-diff/policies/cp12-vm.json`) and `vm_parity.py`
+confirms each class approval against the VM statistics. A pair is identical
+or matches exactly one named policy; anything else fails.
+
+| Policy | Requires (evidence) | Shape approved |
+| --- | --- | --- |
+| `D-001#4 recursion` | `beyond_legacy_depth` | legacy fails only with `callable recursion depth exceeded`; its output a prefix of the VM's; the VM completed or stopped with a program error |
+| `D-018a numbers` | `large_in_loop_path > 0`, outcome `vm`/`vm-error` | output lines differ only in their numbers; extra legacy lines repeat lines the VM printed (re-evaluated calls); the VM may stop with `signed 64-bit integer overflow` / `arithmetic result is not finite` where legacy went on (VM output then compared with a prefix of legacy's); otherwise stderr equal or D-018c |
+| `D-018c diagnostics` | outcome `vm-error`; `error_in_loop_path` for the wording map and for an earlier VM position | same stdout, both exit 1 with one diagnostic on the same file; messages equal once legacy's `return: ` prefixes are removed, or (loop code only) legacy's loop wording maps to the canonical one for the same binding; the VM position is not before legacy's (or loop code) |
+
+`tests/runtime2/vm_d018.py` runs each approved change on legacy (old) and
+the VM (new) side by side — 13 live cases, including the same function
+called directly where legacy and VM agree — and 18 boundary cases showing
+each policy refusing the same difference without its evidence or outside
+its shape (different stdout, other message, other binding name, earlier
+position, missing evidence, extra VM line, non-repeated legacy line,
+fallback outcome).
+
+### Context consistency (owner requirement 5)
+
+`tests/runtime2/vm_context_consistency.py`: 18 function bodies (arithmetic,
+large numbers, indexes, `if`, assignment, division by zero, members, string
+append, `length()`, negation, `%=`, helper calls, loops, arrays, recursion,
+output, nested errors) × 7 arguments (int, fraction, string, array, 2^53−1,
+negative), each called from 5 contexts: directly, inside a loop, from
+another function, from another function inside a loop, in a loop condition.
+Wherever the unit runs on the VM, stdout, error (message and position) and
+exit status must be identical across contexts. Result: see Tests. The suite
+found one compiler defect (a fused `if`/`while` comparison skipped the
+ordering kind check; fixed).
 
 ### Kind inference (`rt/infer.h`, `rt/infer_types.*`)
 
@@ -90,125 +125,120 @@ value; element type of arrays, positional types of literal arrays never
 changed in place, member types of objects by key; depth-capped at 6),
 bindings resolved with the compiler's scope rules, parameters as the union of
 their arguments, returns as the union of return expressions (plus null when
-the end is reachable). Something the compiler refuses anyway (an unresolved
-name, an unsupported expression) is `kKindUnknown` and defers to that
-refusal. Cost: compile time only.
+the end is reachable). Something the compiler refuses anyway is
+`kKindUnknown` and defers to that refusal. The D-018 refusals add two
+name-level analyses per scope (`compiler_unit.cpp`): bindings whose type
+may be double (declared from a double-typed text or a value that may be a
+fraction, parameters receiving such arguments; fixpoint over the call graph)
+and bindings whose type is always double.
 
 ### Runner and statistics
 
 `NIFT_VM=1`: compile; if refused, legacy runs the unit (it was never
 touched); otherwise the VM runs it to completion, a program error (exit 1) or
-an internal failure (exit 70). `NIFT_VM_OUTPUT_LIMIT` and
-`NIFT_VM_EQUALITY_DEPTH` are gone; `NIFT_VM_FLUSH` (test-only) lowers the
+an internal failure (exit 70). `NIFT_VM_FLUSH` (test-only) lowers the
 streaming threshold. `NIFT_VM_STATS` outcomes: `vm`, `vm-error` (reason = the
 message), `fallback`, `require-error`, `internal-error`, `compiled`
-(classify); new fields `vm_executions`, `legacy_executions`, `reevaluations`.
+(classify); fields `vm_executions`, `legacy_executions`, `large_numbers`,
+`large_in_loop_path`, `error_in_loop_path`.
 
-## Refused constructs (subset narrowed) and old behaviour
+## Refused constructs and old behaviour
 
 Recorded for later language checkpoints (D-015); none is changed in legacy.
+The `context:*` reasons are in "D-018 consequences" above.
 
 | Reason | Construct | Old legacy behaviour |
 | --- | --- | --- |
-| `type:*` (see table above) | an operation whose operand kinds may include one legacy rejects or treats per evaluator | errors with evaluator-specific wording; concatenation with an aggregate succeeds only in loop bodies (multi-line JSON) |
+| `type:*` | an operation whose operand kinds may include one legacy rejects | errors; concatenation with an aggregate succeeds only in loop bodies (multi-line JSON) |
 | `aliasing` | aggregate bound/returned/pushed/listed from a place | location reference |
-| `path-in-call-argument` | a member or index read inside a user-call argument (`f(a[i])`, `f(o.k)`; CP11 compiled read-only callees) | legacy resolves such arguments as locations (`arg_is_location`): the call takes the textual path, errors quote the raw argument text (`JSON value '(o.z)' has no member 'z'`) at positions that depend on the enclosing statement (after the call's `(` in a declaration, at the argument in `print`) |
-| `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` (the textual path splits the text) |
-| `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, inside prepared code | legacy abandons preparing the loop body |
-| `print-path-nested` | `print(path)` nested in another expression inside prepared code | location re-resolution (above) |
+| `path-in-call-argument` | a member or index read inside a user-call argument | legacy resolves such arguments as locations: errors quote the raw argument text at statement-dependent positions |
+| `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` |
+| `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, in loop code | legacy abandons preparing the loop body |
 | `param-type-unpredicted` | (defensive) a parameter type read the analysis did not predict | — |
 
-Positional precision is limited to literal indexes (`p := [1, {"z": 4}];
-p[1].z` compiles, `p[i].z` is refused `type:member`); objects read through a
-non-literal key take the union of their members.
+## Tests
 
-## Legacy quirks reproduced exactly (owner decision requested)
-
-D-015 prefers refusal to machinery. The cases below are value-dependent (no
-static refusal short of refusing every loop assignment with a call, which
-would include the gated flat-call benchmark), so the VM reproduces them:
-
-1. A prepared declaration/assignment whose value is a large number (|n| ≥
-   2^53), or a compound assignment/increment with a large operand, is
-   re-evaluated on the textual path: calls in it run twice (their output
-   appears twice) and the value is the textual one. Candidate: evaluate once,
-   exact integers everywhere.
-2. `print(path)` in a loop with a missing location re-resolves the path
-   textually (keys evaluated twice). Candidate: one evaluation.
-3. Statement errors of a loop-called function are reported at the call in the
-   caller; nested statements in loops at the outermost loop statement.
-   Candidate: report at the failing statement (D-009#5 already approves this
-   for the textual path).
-4. Wording and position of errors differ per evaluator (CP13 diagnostics).
-
-## Tests (targeted; host shared, `make -j1`)
+Final build `aeefaa7`, idle host (2 vCPU). Logs: `../evidence/cp12/`.
 
 | Suite | Result |
 | --- | --- |
-| `tests/rt/vm_unit.cpp` (errors with exact messages, refusals of former replay cases, streaming, recursion and memory budgets, code shape incl. variants and `JmpLarge`) | 40,252 checks, 0 failures |
-| `vm_engine_selection.py` (invariants A–F, 12 cases with prints, file writes, host trace, errors after output, 200,000-line output, recursion budget, internal failure) | PASS |
-| `vm_former_replay.py` (new: errors × 21 expression shapes × 9 statement kinds × 10 contexts, type changes, numeric boundaries, recursion, aggregates, methods, call chains, loops with textual statements, output) | seed 1, 600/family: 1,796 programs — 1,459 on the VM (742 vm, 717 vm-error), 337 refused before execution, **0 replayed**, 0 differences; seed 3, 1,500/family: 2,696 programs, 0 failures |
-| `vm_subset.py` | 49 supported on the VM (`require`), 57 unsupported refused: PASS |
-| `vm_subset_gen.py` (supported / former / unsupported) | seed 1, 300: supported 300/300 on the VM (100 %), former-replay cases: vm or vm-error with legacy's output or refused, 0 replayed; unsupported 300/300 refused before execution |
-| `vm_adversarial.py` (CP11 gate, 21 families) | seed 1, count 100: 30,921 programs, 0 non-approved differences (47 approved D-001#4); seed 2 sampled (4,169): 0 |
-| `vm_parity.py` (VM corpus 78 scripts + 300 generated + 300 mutants) | PASS; corpus outcomes 16 vm, 11 vm-error, 51 fallback (2 approved D-001#4) |
-| ad-hoc probe matrix (error kinds × shapes × contexts; nested loops/ifs with re-evaluation) | 6,000 + 80 programs, 0 differences |
-| `tools/rt-lint.py src/rt`, `legacy_names.py --check` | 0 problems; up to date |
+| `make test-rt-vm` (unit 40,261 checks; prepared-parser differential; rt-lint; name table; VM corpus 78 + 300 generated + 300 mutants; rt-diff over the shared corpora on both engines, 813 entries; adversarial gate seed 1 at 600, 21 families; subset suites; both generated suites at 500; engine selection; former replay at 600/family; D-018; context consistency) | **PASS**: rt-diff 0 differing, 8 approved (3 D-001#4, 2 D-018c, 1 D-018c loop, each confirmed by VM statistics; 2 exact D-001#4 rules); adversarial 37,421 programs, **0 non-approved differences** (69 D-001#4, 1,636 D-018c); former replay 1,796 programs, 0 replayed, 0 failures (33 D-001#4, 66 D-018a, 321 D-018c); supported generator 500/500 on the VM; unsupported 500/500 refused before execution |
+| `make test-rt-vm-sanitize` (ASan+UBSan, leaks on) | **clean**: same suites on the sanitized build (adversarial sampled 3,619, former replay 80/family) |
+| `vm_d018.py` | 13 live old-vs-new cases + 18 policy boundary cases: PASS (`../evidence/cp12/d018-old-vs-new.txt`) |
+| `vm_context_consistency.py` | 126 (body, argument) pairs × 5 contexts: VM results identical across contexts in every case; 68 pairs ran on the VM in all 5 contexts; **legacy itself is context-dependent on 63 pairs** |
+| extra adversarial seeds 2 and 3 (count 200) | 32,221 programs each, 0 non-approved differences |
+| `make test-rt-value`, `make test-rt-parser`, rt-lint, `legacy_names.py --check`, `certification_guard.sh` | PASS |
 
-Defects the suites found during phase A (all fixed): a textual call passing a
-binding's type let that binding's `BindType` be dropped (stale type register;
-found by `vm_former_replay`); prepared compound assignment semantics (`%=`
-without integer check) and statement-error positions in nested loops (found
-by the CP11 adversarial gate, `typed`/`shadow` families).
-
-**Pending (host not idle):** `make test-rt-vm` in full (rt-diff over the
-shared corpora with execution on both engines, 600-count adversarial gate),
-`make test-rt-vm-sanitize`, `make -k test`/`make certify`, benchmarks.
+Defects found during the D-018 rework (fixed, with unit cases): a fused
+`if`/`while` ordering comparison skipped the kind check (internal failure
+on `"s" > 1`; context-consistency suite); the assignment exemptions of
+`context:assignment-type` applied to a double-typed binding holding a
+string (adversarial gate, typing/context families).
 
 ## Coverage
 
-Coverage is measured, not a threshold (D-016).
+Coverage is measured, not a threshold (D-016). "Before" = phase A with the
+dual compilation (`32198fe`, full run before the owner decision); "after" =
+D-018 (`aeefaa7`). Same seeds and suites.
 
-| Measure | CP11 (round 3) | CP12 phase A |
-| --- | --- | --- |
-| Shared corpora (rt-diff script entries, 786) | 81 VM, 44 replayed, 661 fallback | **104 VM** (81 vm + 23 vm-error), **0 replayed**, 682 fallback (new reasons: aliasing 19, type:push 10, other type:* 10, path-in-call-argument 1) |
-| General generator (seed 1, 300) | 68 VM (22.7 %), 24 replayed (8.0 %), 208 fallback | **72 VM (24.0 %**, 5 ending in a program error), 0 replayed, 228 fallback (type:* 20: the programs' own kind errors, CP11 replayed them) |
-| Supported-subset generator | 100 % (deliberate replay programs separate) | 100 % (subset narrowed: no member/index reads in user-call arguments) |
-| VM corpus (78) | 16 vm, 24 replayed, 38 fallback | 16 vm, 11 vm-error, 51 fallback, 0 replayed |
+| Measure | CP11 (round 3) | CP12 A before D-018 | **CP12 A after D-018** |
+| --- | --- | --- | --- |
+| Shared corpora (rt-diff script entries, 786) | 81 VM + 44 replayed | 104 VM (81 vm + 23 vm-error) | **103 VM** (81 vm + 22 vm-error; 1 `context:assignment-type`) |
+| General generator (seed 1, 300) | 22.7 % VM + 8.0 % replayed | 72 VM (24.0 %) | **72 VM (24.0 %)** |
+| Adversarial gate (37,421 programs) | — | 15,180 on the VM | **14,654** on the VM (−526: `context:*` refusals) |
+| Former-replay suite (1,796) | — (replayed) | 1,459 (81.2 %) | **1,392 (77.5 %)** |
+| VM corpus (78) | 16 vm, 24 replayed | 16 vm, 11 vm-error | 16 vm, 10 vm-error |
+| Supported-subset generator | 100 % | 100 % | 100 % |
 
 ## Performance
 
-Not measured yet (shared host; owner instruction). Expected, from the code
-shape: flat call +1 dispatched instruction per iteration (`JmpLarge`; CP11
-461 instructions, gate ≤ 2,994 and ≤ 2× CPython); loop and add-assign
-unchanged (re-evaluation checks in slow paths); fib: 2 instructions fewer per
-call than CP11 (a parameter's text type is passed only when the callee can
-observe it, a call-graph fixpoint; fib's is not, where CP11 computed and
-checked one per call with `TypeMeet` + `CheckParam`); compile overhead: kind
-inference (structural types, fixpoint), per-variant compilation, cold blocks
-and preparability checks per statement; cold start and peak RSS: expected
-within noise for small scripts. To be measured with `vm_compare.py` when the
-host is idle: call, loop, fib, compile overhead, cold start, peak RSS.
+`benchmarks/runtime2/vm_compare.py --runs 5 --slow` at `aeefaa7`
+(`../evidence/cp12/vm_compare.jsonl`); the CP11 binary (`bf32e4f`) re-run
+on the same host right after (`../evidence/cp12/vm_compare-cp11.jsonl`).
+Instruction counts are exact; wall times are medians of 5 (host idle but
+load average decaying from the sanitizer run at the start). Running table:
+`../scoreboard.md`.
+
+| Measure | v4.12 | CP11 | **CP12 A (D-018)** | CPython 3.13 |
+| --- | ---: | ---: | ---: | ---: |
+| flat call (marginal instr; gate ≤ 2,994 and ≤ 2× CPython) | 14,994 | 461 | **426** (35× fewer than v4.12; 0.45× CPython) — **gate met** | 952 |
+| loop iteration | 3,066 | 98 | **107** (+9: the binding type check after `i += 1` is now always emitted) | 387 |
+| fib, per recursive call (top level / in a loop) | 184,439 / 14,766 | 471 / 471 | **287 / 287** (one proto; no per-call parameter type work when unobserved) | 615 / 518 |
+| string append | 9,385 | 3,257 | 3,248 | 1,787 |
+| fib(22) / fib(25), ms | 1,368 / 6,034 | 8.7 / 16.8 | **6.9 / 11.3** | 19.2 / 24.8 |
+| 1M loop / 200k calls, ms | 553 / 354 | 28.0 / 13.5 | 30.4 / 15.0 | 92.7 / 41.6 |
+| compile: small script (instr, µs) | — | 78,331, 34 | 93,796, 55 | — |
+| compile: 500-function program (instr, µs; per function) | — | 29.9 M, 3,337 (6.7 µs) | **63.2 M, 7,163 (14.3 µs)** | — |
+| cold start (trivial script), ms | 4.6 | 4.6 | 4.5 | 21.4 |
+| peak RSS fib(22), KiB | 7,480 | 5,884 | 5,704 | 8,664 |
+| end-to-end `records20k`, ms (VM outcome) | 1,390 | 1,324 (fallback) | 1,284 (fallback: `prepared-fn-unprepared`) | 44.9 |
+
+Compile time doubled on the large program: kind inference (~10 M instr),
+the unit analyses including the D-018 may-double fixpoint (~18 M),
+preparability and place-call checks (~20 M). It stays at 14 µs per function;
+no optimisation was attempted (owner priority: replay removal and coverage).
 
 ## Risks
 
-* **Diagnostics are reproduced by a model.** Positions and wording come from
-  legacy's evaluators as observed and read; the probe matrix and the suites
-  cover the compiled subset's shapes, but a shape the generators do not
-  produce could still differ (as in CP11, differential evidence, not proof).
-  The full error-parity work is CP13.
-* **Two evaluators in the VM.** Variants double the code of functions called
-  from both contexts; the evaluator choice per statement follows legacy's
-  preparability (ported parser). Legacy changes there would need the port
-  updated (`vm_prepared_parse` differential test).
-* **Reproduced quirks** (above) are deliberate until the owner decides.
-* **Equality depth**: legacy crashes on very deep values where the VM answers.
-* Coverage loss is concentrated in aggregates read through places and paths
-  in call arguments; phase B and later language checkpoints can widen it.
+* **Coverage moved to refusals.** The context refusals exclude loop code
+  whose legacy meaning differs from the canonical one; they are
+  conservative (kind- and name-level), so some units that would behave
+  identically are refused. Measured below.
+* **Approved differences are policy-checked, not unbounded.** Each policy
+  needs VM evidence and a narrow shape; `vm_d018.py` pins both sides.
+* **Diagnostics follow the canonical rules** (D-018c); full error parity is
+  CP13.
+* **Equality depth**: legacy crashes on very deep values where the VM
+  answers.
 
 ## Commits
 
-`ae7363d` remove bail-and-replay (runner, variants, inference, error sites,
-tests adapted); `b9589d0` invariant and former-replay suites (+ one fix);
-`451eaae` prepared compound semantics and statement error sites; `ef0c22c`
-cold re-evaluation blocks; the observability fixpoint; this record.
+`968bcf0` remove bail-and-replay; `5bc14be` invariant and former-replay
+suites; `040f541` prepared compound semantics and statement error sites;
+`19d50d2` cold re-evaluation blocks; `75cf742` observability fixpoint;
+`51fb2e6` record; `f081e47` quirks isolated; `32198fe` prepared string `+=`
+— all superseded in part by D-018: `57fa508` one compiled representation
+per function (dual compilation, re-evaluation and per-evaluator diagnostics
+removed; context refusals; policies; new suites); `aeefaa7` assignment
+exemption limited to numeric values; then evidence, scoreboard and this
+record.

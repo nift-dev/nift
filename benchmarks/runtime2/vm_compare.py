@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime 2.0 CP11: VM proof-of-concept comparison.
+"""Runtime 2.0 CP11/CP12: VM comparison.
 
 Runs the same workloads (same algorithm, same output) on four engines:
   v4.12   the baseline binary (--baseline, built from ce8cd36)
@@ -14,6 +14,10 @@ Groups:
   fib      callgrind marginal instructions per recursive call (fib(10)->fib(12))
   kernels  whole-process wall time (median) and peak RSS: fib(22), fib(25),
            1M-iteration loop, 200k calls; process startup (trivial script)
+  e2e      end-to-end scripting workload (records: arrays, objects, string
+           building, functions; scoreboard.md) on v4.12, legacy, NIFT_VM=1
+           with its actual outcome (vm or fallback, from NIFT_VM_STATS) and
+           CPython: wall median/min and peak RSS
   phases   VM phase split: callgrind instructions inside rt::parse_script,
            rt::compile_unit and rt::Vm::run (and legacy translation for
            reference), wall microseconds from NIFT_VM_STATS; cold (fresh
@@ -23,6 +27,7 @@ Every run checks its output against the golden value; a mismatch aborts.
 Output: JSON lines, host fingerprint first. Needs valgrind for ops/fib/phases.
 
 Usage: vm_compare.py --nift ./nift --baseline ../baseline-src/nift [--groups ...] [--runs N] [--out F]
+       [--label CP11]   (`commit` in the meta line is this checkout's HEAD; --label names the build measured)
 """
 import argparse, json, os, re, statistics, subprocess, sys, tempfile, time
 
@@ -30,7 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import run as base  # noqa: E402  (run.py: OPS templates, host fingerprint)
 
-GROUPS = ["ops", "fib", "kernels", "phases"]
+GROUPS = ["ops", "fib", "kernels", "phases", "e2e"]
 FIB = "fn(fib(n)) { if(n < 2) { return n } return fib(n - 1) + fib(n - 2) }\n"
 PY_FIB = "def fib(n): return n if n < 2 else fib(n-1) + fib(n-2)\n"
 FIB_VALUE = {10: 55, 12: 144, 22: 17711, 25: 75025}
@@ -43,6 +48,11 @@ KERNELS = {  # name: (nift source, python source, golden)
     "startup": ("x := 1\nprint(x)\n", "x = 1\nprint(x)\n", "1"),
 }
 NIFT_ENGINES = ("v4.12", "legacy", "vm")
+# End-to-end workload (CP12 scoreboard): grows with VM coverage; the VM row
+# reports its actual outcome (NIFT_VM=1, not require).
+E2E_NIFT = 'fn(make_record(i)) {\n  return {"id": i, "name": "item" + i, "score": (i * 37) % 101, "tags": [i % 3, i % 5]}\n}\nfn(grade(score)) {\n  if (score >= 75) { return "high" }\n  if (score >= 40) { return "mid" }\n  return "low"\n}\nfn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\nrecords := []\ni := 0\nwhile (i < 20000) {\n  records.push(make_record(i))\n  i += 1\n}\nhigh := 0\nmid := 0\nlow := 0\ntotal := 0\ntags := 0\nreport := ""\nk := 0\nn := records.length()\nwhile (k < n) {\n  s := records[k].score\n  g := grade(s)\n  if (g == "high") { high += 1 } else if (g == "mid") { mid += 1 } else { low += 1 }\n  total += s\n  tags += records[k].tags[0] + records[k].tags[1]\n  if (k < 5) { report += pad(records[k].name, 10) + g + ";" }\n  k += 1\n}\nprint(report)\nprint("high " + high + " mid " + mid + " low " + low)\nprint("total " + total + " tags " + tags)\n'
+E2E_PY = 'def main():\n    def make_record(i):\n        return {"id": i, "name": "item" + str(i), "score": (i * 37) % 101, "tags": [i % 3, i % 5]}\n    def grade(score):\n        if score >= 75: return "high"\n        if score >= 40: return "mid"\n        return "low"\n    def pad(s, width):\n        out = s\n        while len(out) < width: out += "."\n        return out\n    records = []\n    i = 0\n    while i < 20000:\n        records.append(make_record(i)); i += 1\n    high = mid = low = total = tags = 0\n    report = ""\n    k = 0\n    n = len(records)\n    while k < n:\n        s = records[k]["score"]; g = grade(s)\n        if g == "high": high += 1\n        elif g == "mid": mid += 1\n        else: low += 1\n        total += s\n        tags += records[k]["tags"][0] + records[k]["tags"][1]\n        if k < 5: report += pad(records[k]["name"], 10) + g + ";"\n        k += 1\n    print(report)\n    print("high " + str(high) + " mid " + str(mid) + " low " + str(low))\n    print("total " + str(total) + " tags " + str(tags))\nmain()\n'
+E2E_GOLDEN = "total 999937 tags 59999"
 
 
 def engine_cmd(a, engine, path):
@@ -182,6 +192,30 @@ def g_kernels(a, d, emit):
         emit("kernels", name, row)
 
 
+def g_e2e(a, d, emit):
+    row = {}
+    for engine in NIFT_ENGINES + ("cpython",):
+        p = write(d, "e2e.py" if engine == "cpython" else "e2e.f", E2E_PY if engine == "cpython" else E2E_NIFT)
+        cmd, env = engine_cmd(a, engine, p)
+        if engine == "vm":
+            env = {"NIFT_VM": "1"}
+        walls, rss = [], []
+        for _ in range(a.runs):
+            dt, kib = timed(cmd, env, E2E_GOLDEN, f"e2e {engine}", d)
+            walls.append(dt)
+            rss.append(kib)
+        row[engine] = {"median_s": round(statistics.median(walls), 5), "min_s": round(min(walls), 5),
+                       "peak_rss_kib": max(rss), "n": a.runs}
+    fd, sp = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    subprocess.run([a.nift, os.path.join(d, "e2e.f")], stdout=subprocess.DEVNULL,
+                   env=environ({"NIFT_VM": "1", "NIFT_VM_STATS": sp}), check=True)
+    st = json.loads(open(sp).read().splitlines()[-1])
+    os.unlink(sp)
+    row["vm"]["outcome"] = st["outcome"] + (":" + st["reason"] if st["outcome"] == "fallback" else "")
+    emit("e2e", "records20k", row)
+
+
 def vm_stats(a, path, runs):
     """Median NIFT_VM_STATS phase times (microseconds) over `runs` processes."""
     fd, sp = tempfile.mkstemp(suffix=".jsonl")
@@ -223,6 +257,14 @@ def g_phases(a, d, emit):
         rec["legacy_translate_instr"] = callgrind([a.nift, p], {}, golden, f"translate {name}",
                                                   "Parser::translate_function_program*") if name != "fib25" else None
         rec["wall_us_median"] = vm_stats(a, p, a.runs)
+        # Compile throughput (scoreboard): per KiB of source and per function.
+        kib = rec["source_bytes"] / 1024.0
+        functions = src.count("fn(")
+        rec["compile_instr_per_kib"] = round(rec["compile_instr"] / kib)
+        rec["compile_us_per_kib"] = round(rec["wall_us_median"]["compile_us"] / kib, 1)
+        if functions:
+            rec["compile_instr_per_function"] = round(rec["compile_instr"] / functions)
+            rec["compile_us_per_function"] = round(rec["wall_us_median"]["compile_us"] / functions, 2)
         cold = [timed([a.nift, p], {"NIFT_VM": "require"}, golden, f"cold {name}", d)[0] for _ in range(a.runs)]
         rec["cold_process_s_median"] = round(statistics.median(cold), 5)
         if a.vm_run and name != "fib25":
@@ -243,12 +285,14 @@ def main():
     ap.add_argument("--slow", action="store_true", help="also time fib(25) on v4.12 and legacy")
     ap.add_argument("--vm-run", help="tests/rt/vm_run.cpp binary (.build/rt/vm-run) for in-process warm runs")
     ap.add_argument("--out")
+    ap.add_argument("--label", default="CP12", help="checkpoint label recorded in the meta line (e.g. CP11 when "
+                    "--nift is a CP11 build)")
     a = ap.parse_args()
     a.nift, a.baseline = os.path.abspath(a.nift), os.path.abspath(a.baseline)
     a.vm_run = os.path.abspath(a.vm_run) if a.vm_run else None
     out = open(a.out, "w") if a.out else sys.stdout
     head = subprocess.run(["git", "-C", HERE, "rev-parse", "HEAD"], stdout=subprocess.PIPE, text=True).stdout.strip()
-    meta = {"kind": "meta", "checkpoint": "CP11", "commit": head, "nift": a.nift, "baseline": a.baseline,
+    meta = {"kind": "meta", "checkpoint": a.label, "commit": head, "nift": a.nift, "baseline": a.baseline,
             "baseline_version": subprocess.run([a.baseline, "version"], stdout=subprocess.PIPE, text=True).stdout.strip(),
             "python": subprocess.run(["python3", "--version"], stdout=subprocess.PIPE, text=True).stdout.strip(),
             "host": base.host(), "loadavg": open("/proc/loadavg").read().split()[:3]}

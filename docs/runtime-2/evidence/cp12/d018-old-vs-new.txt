@@ -1,0 +1,100 @@
+--- numbers-reevaluation [D-018a numbers]
+    fn(loud(x)) { print("loud " + x)
+    return x }
+    w := 9007199254740991
+    i := 0
+    while (i < 1) { t := loud(w + i) + 2
+    print(t)
+    i += 1 }
+  old (legacy): exit 0 stdout 'loud 9007199254740991\nloud 9007199254740991\n9007199254740993\n' stderr ''
+  new (VM): exit 0 stdout 'loud 9007199254740991\n9007199254740993\n' stderr ''
+--- numbers-loop-double [D-018a numbers]
+    w := 9007199254740991
+    i := 0
+    while (i < 1) { i += 1
+    print(w + 2) }
+    print(w + 2)
+  old (legacy): exit 0 stdout '9007199254740992\n9007199254740993\n' stderr ''
+  new (VM): exit 0 stdout '9007199254740993\n9007199254740993\n' stderr ''
+--- numbers-overflow-in-loop-call [D-018a numbers]
+    fn(cube(b)) { return b * b * b }
+    i := 0
+    while (i < 1) { i += 1
+    print(cube(4000000)) }
+  old (legacy): exit 0 stdout '6.4e+19\n' stderr ''
+  new (VM): exit 1 stdout '' stderr 'error: $D/p.f:1:22: signed 64-bit integer overflow\n'
+--- numbers-overflow-top-level [D-018c diagnostics]
+    fn(cube(b)) { return b * b * b }
+    print(cube(4000000))
+  old (legacy): exit 1 stdout '' stderr 'error: $D/p.f:1:15: return: signed 64-bit integer overflow\n'
+  new (VM): exit 1 stdout '' stderr 'error: $D/p.f:1:22: signed 64-bit integer overflow\n'
+--- diagnostics-return-prefix [D-018c diagnostics]
+    fn(f(a)) { return a[2] }
+    print(f([1]))
+  old (legacy): exit 1 stdout '' stderr "error: $D/p.f:1:12: return: JSON array index 2 is out of range in 'a[2]'\n"
+  new (VM): exit 1 stdout '' stderr "error: $D/p.f:1:19: JSON array index 2 is out of range in 'a[2]'\n"
+--- diagnostics-if [D-018c diagnostics]
+    x := 0
+    if (1 / x > 0) { print(1) }
+  old (legacy): exit 1 stdout '' stderr 'error: $D/p.f:2:1: division by zero\n'
+  new (VM): exit 1 stdout '' stderr 'error: $D/p.f:2:5: division by zero\n'
+--- diagnostics-loop-binding [D-018c diagnostics]
+    fn(f(a)) {
+    x := 1
+    x = a
+    return x }
+    i := 0
+    while (i < 1) { i += 1
+    print(f("s")) }
+  old (legacy): exit 1 stdout '' stderr 'error: $D/p.f:7:7: cannot change binding type: x\n'
+  new (VM): exit 1 stdout '' stderr "error: $D/p.f:3:1: cannot assign string to int binding 'x'\n"
+--- diagnostics-loop-index [D-018c diagnostics]
+    fn(g(a, k)) { return a[k] }
+    a := [1, 2]
+    k := 0
+    while (k < 4) { print(g(a, k))
+    k += 1 }
+  old (legacy): exit 1 stdout '1\n2\n' stderr 'error: $D/p.f:1:22: invalid index\n'
+  new (VM): exit 1 stdout '1\n2\n' stderr "error: $D/p.f:1:22: JSON array index 2 is out of range in 'a[k]'\n"
+--- diagnostics-nested-loop-statement [D-018c diagnostics]
+    a := [1]
+    i := 0
+    while (i < 1) { i += 1
+    j := 0
+    while (j < 1) { j += 1
+    a[3] = 1 } }
+  old (legacy): exit 1 stdout '' stderr 'error: $D/p.f:5:1: invalid index target\n'
+  new (VM): exit 1 stdout '' stderr 'error: $D/p.f:6:1: index out of range: 3\n'
+--- diagnostics-direct-call [identical]
+    fn(f(a)) {
+    x := 1
+    x = a
+    return x }
+    print(f("s"))
+  old (legacy): exit 1 stdout '' stderr "error: $D/p.f:3:1: cannot assign string to int binding 'x'\n"
+  new (VM): exit 1 stdout '' stderr "error: $D/p.f:3:1: cannot assign string to int binding 'x'\n"
+--- print-path-index [identical]
+    a := [1]
+    k := 3
+    i := 0
+    while (i < 1) { i += 1
+    print(a[k]) }
+  old (legacy): exit 1 stdout '' stderr "error: $D/p.f:5:7: JSON array index 3 is out of range in 'a[k]'\n"
+  new (VM): exit 1 stdout '' stderr "error: $D/p.f:5:7: JSON array index 3 is out of range in 'a[k]'\n"
+--- print-path-key-call [identical]
+    fn(key(x)) { print("key " + x)
+    return x }
+    a := [1]
+    i := 0
+    while (i < 1) { i += 1
+    print(a[key(3)]) }
+  old (legacy): exit 1 stdout 'key 3\n' stderr "error: $D/p.f:6:7: JSON array index 3 is out of range in 'a[key(3)]'\n"
+  new (VM): exit 1 stdout 'key 3\n' stderr "error: $D/p.f:6:7: JSON array index 3 is out of range in 'a[key(3)]'\n"
+--- print-path-member [identical]
+    o := {"k": 1}
+    i := 0
+    while (i < 1) { i += 1
+    print((o.z)) }
+  old (legacy): exit 1 stdout '' stderr 'error: $D/p.f:4:8: value has no member: z\n'
+  new (VM): exit 1 stdout '' stderr 'error: $D/p.f:4:8: value has no member: z\n'
+PASS vm D-018: 13 live cases (old vs new), 18 policy boundary cases, 0 failure(s)
