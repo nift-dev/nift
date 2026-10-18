@@ -1,0 +1,14 @@
+certify @ ae0b7ac: FAIL 1, BASELINE-FAILURE 0, UNVERIFIED 4, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 159
+  FAIL                   test-test-integrity: see .build/certify/test-test-integrity.log
+  UNVERIFIED             test-csharp-binding: tool 'dotnet' not installed
+  UNVERIFIED             test-go-binding: Go toolchain download blocked (no network access to proxy.golang.org)
+  UNVERIFIED             test-v48-prepared-collection-guard: system tool /usr/bin/time missing
+  UNVERIFIED             test-v48-prepared-object-literal-guard: system tool /usr/bin/time missing
+  SKIPPED-ENVIRONMENTAL  test-dependency-status: fails only as root; passes as unprivileged user 'tester'
+  SKIPPED-ENVIRONMENTAL  test-unreadable-source: fails only as root; passes as unprivileged user 'tester'
+  SKIPPED-ENVIRONMENTAL  test-v43-language: fails only as root; passes as unprivileged user 'tester'
+NOT FULLY VERIFIED HERE: 7 target(s) are not counted as passes (see reasons; CI covers UNVERIFIED)
+make: *** [Makefile:1195: certify] Error 1
+
+Re-run after ced1f98 (test script only: one-line case/if rewritten so the integrity scanner proves pipefail):
+certify @ ced1f98 --targets test-test-integrity test-sha256: FAIL 0, PASS 2
