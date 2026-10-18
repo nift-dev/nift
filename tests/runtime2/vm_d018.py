@@ -89,25 +89,36 @@ LIVE = [
 ]
 
 DIAG = b"error: /x/p.f:%d:%d: %s\n"
+SRC_DIV = b"x := 0\nif (1 / x > 0) { print(1) }\n"   # legacy reports the `if` (2:1), the VM the division (2:5)
+SRC_IDX = b"a := [1]\na[2]\n"
 
 
 def diag(line, col, msg):
     return DIAG % (line, col, msg)
 
 
-# (name, legacy, vm, stats, expected verdict, expected policy)
+# (name, legacy, vm, stats, expected verdict, expected policy[, source])
 SYNTHETIC = [
     ("diagnostics-approved", (b"a\n", diag(2, 1, b"return: division by zero"), 1),
-     (b"a\n", diag(2, 8, b"division by zero"), 1), {"outcome": "vm-error"}, "approved", "D-018c diagnostics"),
+     (b"a\n", diag(2, 5, b"division by zero"), 1), {"outcome": "vm-error", "line": 2, "column": 5},
+     "approved", "D-018c diagnostics", SRC_DIV),
+    ("diagnostics-vm-site-not-the-division", (b"a\n", diag(2, 1, b"return: division by zero"), 1),
+     (b"a\n", diag(2, 1, b"division by zero"), 1), {"outcome": "vm-error", "line": 2, "column": 1},
+     "diff", None, SRC_DIV),
+    ("diagnostics-vm-site-after-the-division", (b"a\n", diag(2, 1, b"return: division by zero"), 1),
+     (b"a\n", diag(2, 13, b"division by zero"), 1), {"outcome": "vm-error", "line": 2, "column": 13},
+     "diff", None, SRC_DIV),
     ("diagnostics-other-stdout", (b"a\n", diag(2, 1, b"division by zero"), 1),
      (b"b\n", diag(2, 8, b"division by zero"), 1), {"outcome": "vm-error"}, "diff", None),
     ("diagnostics-other-message", (b"", diag(2, 1, b"division by zero"), 1),
      (b"", diag(2, 8, b"modulo by zero"), 1), {"outcome": "vm-error", "error_in_loop_path": True}, "diff", None),
     ("diagnostics-loop-wording-without-evidence", (b"", diag(2, 1, b"invalid index"), 1),
-     (b"", diag(2, 1, b"JSON array index 2 is out of range in 'a[2]'"), 1), {"outcome": "vm-error"}, "diff", None),
+     (b"", diag(2, 1, b"JSON array index 2 is out of range in 'a[2]'"), 1), {"outcome": "vm-error", "line": 2,
+                                                                           "column": 1}, "diff", None, SRC_IDX),
     ("diagnostics-loop-wording-with-evidence", (b"", diag(2, 1, b"invalid index"), 1),
      (b"", diag(2, 1, b"JSON array index 2 is out of range in 'a[2]'"), 1),
-     {"outcome": "vm-error", "error_in_loop_path": True}, "approved", "D-018c diagnostics"),
+     {"outcome": "vm-error", "error_in_loop_path": True, "line": 2, "column": 1}, "approved", "D-018c diagnostics",
+     SRC_IDX),
     ("diagnostics-binding-name-changed", (b"", diag(2, 1, b"cannot change binding type: x"), 1),
      (b"", diag(2, 1, b"cannot assign string to int binding 'y'"), 1),
      {"outcome": "vm-error", "error_in_loop_path": True}, "diff", None),
@@ -118,7 +129,9 @@ SYNTHETIC = [
     ("diagnostics-fallback", (b"", diag(2, 1, b"x"), 1), (b"", diag(2, 2, b"x"), 1), {"outcome": "fallback"},
      "diff", None),
     ("numbers-approved", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
-     {"outcome": "vm", "large_in_loop_path": 1}, "approved", "D-018a numbers"),
+     {"outcome": "vm", "large_in_loop_path": 1, "large_lines": [0]}, "approved", "D-018a numbers"),
+    ("numbers-unattributed-line", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
+     {"outcome": "vm", "large_in_loop_path": 1, "large_lines": [1]}, "diff", None),
     ("numbers-without-evidence", (b"9007199254740992\n", b"", 0), (b"9007199254740993\n", b"", 0),
      {"outcome": "vm", "large_numbers": 1, "large_in_loop_path": 0}, "diff", None),
     ("numbers-text-changed", (b"value 1\n", b"", 0), (b"other 1\n", b"", 0),
@@ -130,7 +143,12 @@ SYNTHETIC = [
     ("numbers-other-vm-error", (b"1\n", b"", 0), (b"", diag(1, 1, b"division by zero"), 1),
      {"outcome": "vm-error", "large_in_loop_path": 1}, "diff", None),
     ("numbers-overflow-stop", (b"a\n6.4e+19\nb\n", b"", 0), (b"a\n", diag(1, 1, b"signed 64-bit integer overflow"), 1),
-     {"outcome": "vm-error", "large_in_loop_path": 1}, "approved", "D-018a numbers"),
+     {"outcome": "vm-error", "large_in_loop_path": 1, "error_in_loop_path": True, "large_lines": [1], "line": 1,
+      "column": 1}, "approved", "D-018a numbers"),
+    ("numbers-overflow-stop-unattributed", (b"a\n6.4e+19\nb\n", b"", 0),
+     (b"a\n", diag(1, 1, b"signed 64-bit integer overflow"), 1),
+     {"outcome": "vm-error", "large_in_loop_path": 1, "error_in_loop_path": True, "large_lines": [0], "line": 1,
+      "column": 1}, "diff", None),
     ("recursion-approved", (b"0\n", diag(1, 1, b"callable recursion depth exceeded: d"), 1), (b"0\n1\n", b"", 0),
      {"outcome": "vm", "beyond_legacy_depth": True}, "approved", "D-001#4 recursion"),
     ("recursion-without-evidence", (b"0\n", diag(1, 1, b"callable recursion depth exceeded: d"), 1),
@@ -192,8 +210,8 @@ def main():
                     print(f"  {label}: exit {r[2]} stdout {r[0].decode()!r} stderr {err!r}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    for name, legacy, vm, st, verdict, policy in SYNTHETIC:
-        got = vm_policies.classify(legacy, vm, st)
+    for name, legacy, vm, st, verdict, policy, *source in SYNTHETIC:
+        got = vm_policies.classify(legacy, vm, st, source[0] if source else None)
         if got != (verdict, policy):
             failures.append(f"synthetic {name}: {got}, expected ({verdict}, {policy})")
     for f in failures:

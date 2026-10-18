@@ -96,6 +96,8 @@ def compare(nift, text, name, work, timeout, require=False):
     a = run(nift, name, d, None, stats, timeout)
     b = run(nift, name, d, "1", stats, timeout)
     st = last_stats(stats)
+    if st is not None:
+        st["_source"] = text  # for the D-018c site checks (vm_policies.classify)
     c = run(nift, name, d, "require", stats, timeout) if require else None
     shutil.rmtree(d, ignore_errors=True)
     return a == b, a, b, st, c
@@ -242,6 +244,7 @@ def rt_diff(args, work):
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
+           "--b-vm-stats",
            "--report", os.path.join(work, "rt-diff-report.json")]
     for c in corpora:
         cmd += ["--corpus", c]
@@ -251,17 +254,17 @@ def rt_diff(args, work):
     finally:
         os.unlink(os.path.join(stats_dir, "stats-path"))
     tally = collections.Counter()
-    seen, raw = {}, {}
-    if os.path.exists(stats):
-        for line in open(stats):
-            st = json.loads(line)
-            seen[st["path"]] = outcome_key(st)  # last run of a script wins (combined channel runs A twice)
-            raw[st["path"]] = st
-        tally.update(seen.values())
-    print(f"rt-diff VM outcomes over {len(seen)} distinct scripts: {dict(tally.most_common())}")
-    # The class rule is textual; the VM statistics must confirm each approval.
-    bad_class = 0
+    seen = {}
     report = json.load(open(os.path.join(work, "rt-diff-report.json")))
+    # Outcomes from each entry's own main runs (rt-diff --b-vm-stats); the
+    # wrapper's shared stats file only receives the combined-channel runs.
+    for r in report["results"]:
+        for st in r.get("vm_stats") or []:
+            seen[r["id"] + "|" + os.path.relpath(st["path"], os.path.dirname(st["path"]))] = outcome_key(st)
+    tally.update(seen.values())
+    print(f"rt-diff VM outcomes over {len(seen)} distinct scripts: {dict(tally.most_common())}")
+    # The class rules classify with the entry's own statistics; confirm each approval here too.
+    bad_class = 0
     evidence = {
         "cp11-recursion-budget-class": lambda v: v.get("beyond_legacy_depth"),
         "cp12-d018-diagnostics": lambda v: v["outcome"] == "vm-error",
@@ -272,9 +275,11 @@ def rt_diff(args, work):
     for r in report["results"]:
         for policy in sorted({d["policy"] for d in r["approved"] if d["policy"] in evidence}):
             approvals[policy] += 1
-            # rt-diff runs copies of the entry, so statistics are matched by file name.
-            same_name = [v for k, v in raw.items() if os.path.basename(k) == os.path.basename(r["path"])]
-            if not any(v["outcome"] in ("vm", "vm-error") and evidence[policy](v) for v in same_name):
+            # The entry's own VM statistics (rt-diff --b-vm-stats), never
+            # matched by file name: 12 corpus scripts are called main.f
+            # (review CP12 round 1, R2).
+            own = r.get("vm_stats") or []
+            if len(own) != 1 or not (own[0]["outcome"] in ("vm", "vm-error") and evidence[policy](own[0])):
                 print(f"FAIL rt-diff class approval {policy} for {r['id']} not confirmed by VM statistics")
                 bad_class += 1
     print(f"rt-diff class approvals (confirmed by VM statistics): {dict(sorted(approvals.items()))}")

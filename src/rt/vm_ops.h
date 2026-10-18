@@ -31,10 +31,20 @@ struct Fault {
     // (or a result out of range); the VM counts it and clears it (evidence
     // for the D-018 number policy, never a change of behaviour).
     bool large = false;
+    // ... and one of its operands was large (the result may be a small number
+    // or a boolean that still differs from legacy's double arithmetic).
+    bool large_operand = false;
 };
 
 inline constexpr std::int64_t kSafeInteger = std::int64_t(1) << 53;
 inline bool safe_integer(std::int64_t v) { return v > -kSafeInteger && v < kSafeInteger; }
+// Both safe (one compare each, no signed overflow): the fast paths take only
+// these, so every large operand reaches a slow path and its evidence (review
+// CP12 round 1, D4).
+inline bool safe_integers(std::int64_t a, std::int64_t b) {
+    constexpr std::uint64_t bias = static_cast<std::uint64_t>(kSafeInteger) - 1;
+    return (static_cast<std::uint64_t>(a) + bias <= 2 * bias) & (static_cast<std::uint64_t>(b) + bias <= 2 * bias);
+}
 
 bool raise(Fault& fault, StopReason reason, std::string message);
 bool internal(Fault& fault, const char* what);

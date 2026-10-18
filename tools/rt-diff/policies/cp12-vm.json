@@ -3,21 +3,21 @@
   "id": "cp12-d018-diagnostics",
   "decision": "D-018#3",
   "class": "d018-diagnostics",
-  "justification": "D-018c (with D-009#1, #5): errors are reported where they occur, without legacy's \"return: \" prefixes; legacy reports the enclosing `if`, `return` or index expression. Approved only for the exact shape of vm_policies.diagnostics_match without loop evidence: same stdout, both exit 1 with one diagnostic, equal messages after removing the prefixes, VM position not before legacy's.",
-  "test": "tests/runtime2/vm_d018.py (diagnostics cases, old and new side by side)"
+  "justification": "D-018c (with D-009#1, #5): errors are reported where they occur, without legacy's \"return: \" prefixes; legacy reports the enclosing `if`, `return` or index expression. The class rule classifies with the entry's own VM statistics and source (rt-diff --b-vm-stats) through vm_policies.classify: same stdout, one diagnostic each, equal messages after removing the prefixes, statistics locating the same error, the VM position verified against the source as the failing site and legacy's on the same line at or before it; no loop evidence.",
+  "test": "tests/runtime2/vm_d018.py (old vs new); tests/runtime2/vm_policy_negative.py (synthetic bugs rejected)"
  },
  {
   "id": "cp12-d018-diagnostics-loop",
   "decision": "D-018#3",
   "class": "d018-diagnostics-loop",
-  "justification": "D-018c in code legacy runs on its loop evaluator: canonical wording (MESSAGE_MAP) and the failing expression's position instead of the statement, outermost loop statement or caller call site. vm_parity.py requires the VM statistics to show error_in_loop_path for every approval.",
-  "test": "tests/runtime2/vm_d018.py (loop diagnostics cases)"
+  "justification": "D-018c in code legacy runs on its loop evaluator (error_in_loop_path in the entry's own VM statistics): legacy's loop wording only as the canonical message's legacy form (same binding; an index error for \"invalid index\"; an element-assignment error for \"invalid index target\"), the VM position verified as the failing site and legacy's at the same line, a `while` statement or a statement with a call (outermost loop statement, caller's call site).",
+  "test": "tests/runtime2/vm_d018.py (old vs new); tests/runtime2/vm_policy_negative.py (synthetic bugs rejected)"
  },
  {
   "id": "cp12-d018-numbers",
   "decision": "D-018#1",
   "class": "d018-numbers",
-  "justification": "D-018a: one number rule everywhere and exactly-once evaluation; legacy computes loop arithmetic in doubles and re-evaluates a loop statement whose value reaches 2^53. Approved only for vm_policies.numbers_match (number-only line differences, repeated re-evaluation lines, a VM overflow stop); vm_parity.py requires large_in_loop_path > 0 in the VM statistics.",
-  "test": "tests/runtime2/vm_d018.py (numbers cases)"
+  "justification": "D-018a: one number rule everywhere and exactly-once evaluation; legacy computes loop arithmetic in doubles and re-evaluates a loop statement whose value reaches 2^53. Approved per output line from the entry's own VM statistics (large_lines / derived_lines): number-only line changes on attributed lines (small numbers or booleans only where a large operand is attributed), adjacent repeated legacy lines at an attributed position, and legacy's continuation after an attributed overflow stop in loop code (vm_policies.numbers_match).",
+  "test": "tests/runtime2/vm_d018.py (old vs new); tests/runtime2/vm_policy_negative.py (synthetic bugs rejected)"
  }
 ]

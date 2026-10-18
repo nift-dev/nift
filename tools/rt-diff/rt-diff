@@ -318,7 +318,7 @@ def wipe(base):
             os.remove(full)
 
 
-def run_one(binary, entry, base, timeout, trace, combined_runs):
+def run_one(binary, entry, base, timeout, trace, combined_runs, vm_stats=False):
     """Runs one entry with one binary under `base` (an existing empty
     directory shared by A and B, so absolute paths are identical). The copy
     lives three levels down; the whole of `base` is snapshotted."""
@@ -328,6 +328,11 @@ def run_one(binary, entry, base, timeout, trace, combined_runs):
     roots = roots_for(((work, b"$ROOT"), (home, b"$HOME"), (tmp, b"$TMPDIR"), (base, b"$BASE")))
     site_like = entry["kind"] in ("site", "workspace")
     result = {"stdout": b"", "stderr": b"", "combined": [], "exit": [], "trace": [], "threads": None}
+    if vm_stats:
+        # CP12 (review R2): the VM statistics of this entry's own runs (main
+        # steps only), each with the program it ran, for the class rules and
+        # the report; never matched by file name.
+        result["vm_stats"] = []
 
     def prepare():
         wipe(base)
@@ -373,6 +378,9 @@ def run_one(binary, entry, base, timeout, trace, combined_runs):
             run_env = dict(env)
             if trace:
                 run_env["NIFT_TRACE_HOST"] = str(trace_fd)
+            stats_path = os.path.join(tracedir, "vm-stats-%d.jsonl" % index)
+            if vm_stats:
+                run_env["NIFT_VM_STATS"] = stats_path
             marker = ("-- step %d: %s\n" % (index, " ".join(step[1][:3]))).encode() if len(steps) > 1 else b""
             try:
                 code, out, err = run_group([binary] + step[1], project, run_env, step[2], timeout,
@@ -382,6 +390,16 @@ def run_one(binary, entry, base, timeout, trace, combined_runs):
             result["stdout"] += marker + normalise(out, roots, site_like)
             result["stderr"] += marker + normalise(err, roots, site_like)
             result["exit"].append(code)
+            if vm_stats and os.path.exists(stats_path):
+                with open(stats_path) as handle:
+                    for line in handle:
+                        st = json.loads(line)
+                        try:
+                            with open(st.get("path", ""), "rb") as source:
+                                st["_source"] = source.read()  # the copy is removed after the run
+                        except OSError:
+                            pass
+                        result["vm_stats"].append(st)
             with open(trace_path, "rb") as handle:
                 result["trace"].extend(parse_trace(normalise(handle.read(), roots)))
         snap = snapshot(base, roots)
@@ -608,31 +626,30 @@ def _single_outcome(a, b):
     return (a["stdout"], a["stderr"], a["exit"][0]), (b["stdout"], b["stderr"], b["exit"][0])
 
 
-def _d018(check, outcome_from_exit, loop):
-    """A D-018 policy of vm_policies.py, assuming the VM evidence it needs
-    (`loop`); vm_parity.py confirms that evidence from the VM statistics for
-    every approval of a class whose id ends in -loop or -numbers."""
+def _d018(policy, loop):
+    """A D-018 policy of vm_policies.py with the entry's own VM statistics
+    (rt-diff --b-vm-stats): one script run on the VM, classified by
+    vm_policies.classify with its evidence and source, exactly as the other
+    harnesses do (review CP12 round 1: no assumed evidence). `loop`: the
+    diagnostics class for errors in loop-evaluator code (else outside)."""
     def matches(a, b):
         runs = _single_outcome(a, b)
-        if runs is None:
+        stats = b.get("vm_stats") or []
+        if runs is None or len(stats) != 1:
             return False
+        st = stats[0]
         legacy, vm = runs
-        st = {"outcome": "vm-error" if vm[2] == 1 else "vm" if outcome_from_exit else "",
-              "error_in_loop_path": loop, "large_in_loop_path": 1 if loop else 0}
-        return bool(check(legacy, vm, st))
+        if policy == "D-018c diagnostics" and bool(st.get("error_in_loop_path")) != loop:
+            return False
+        return vm_policies.classify(legacy, vm, st, st.get("_source")) == ("approved", policy)
     return matches
-
-
-def _diagnostics(legacy, vm, st):
-    return (legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
-            and vm_policies.diagnostics_match(legacy[1], vm[1], st))
 
 
 CLASS_RULES = {
     "recursion-budget": recursion_budget_matches,
-    "d018-diagnostics": _d018(_diagnostics, True, False),
-    "d018-diagnostics-loop": _d018(_diagnostics, True, True),
-    "d018-numbers": _d018(vm_policies.numbers_match, True, True),
+    "d018-diagnostics": _d018("D-018c diagnostics", False),
+    "d018-diagnostics-loop": _d018("D-018c diagnostics", True),
+    "d018-numbers": _d018("D-018a numbers", True),
 }
 
 
@@ -835,6 +852,8 @@ def main():
     parser.add_argument("--repro-limit", type=int, default=3, help="minimise at most this many programs")
     parser.add_argument("--extract-smoke", metavar="TESTS_DIR", help="also run scripts extracted from smoke-test heredocs")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--b-vm-stats", action="store_true",
+                        help="collect B's NIFT_VM_STATS per entry (CP12 class rules, report field vm_stats)")
     options = parser.parse_args()
     for binary in (options.a, options.b):
         if not os.access(binary, os.X_OK):
@@ -879,17 +898,19 @@ def main():
                 # A twice on the combined channel: its order is compared only
                 # if A reproduces it (measured stability, not a guess).
                 a = run_one(a_bin, entry, base, options.timeout, use_trace or options.trace_neutrality, 2 if interleave else 0)
-                b = run_one(b_bin, entry, base, options.timeout, use_trace, 1 if interleave else 0)
+                b = run_one(b_bin, entry, base, options.timeout, use_trace, 1 if interleave else 0,
+                            vm_stats=options.b_vm_stats)
             finally:
                 shutil.rmtree(base, ignore_errors=True)
             diffs = compare(a, b, use_trace, entry.get("excluded", ()))
             approved, remaining = apply_policies(entry, a, b, diffs, rules, used)
-            return entry, approved, remaining, len(a["trace"]), a.get("combined_unstable", False)
+            vm_stats = [{k: v for k, v in st.items() if k != "_source"} for st in b.get("vm_stats", [])]
+            return entry, approved, remaining, len(a["trace"]), a.get("combined_unstable", False), vm_stats
 
         results = []
         with cf.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
-            for entry, approved, diffs, events, unstable in pool.map(job, entries):
-                results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs,
+            for entry, approved, diffs, events, unstable, vm_stats in pool.map(job, entries):
+                results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs, "vm_stats": vm_stats,
                                 "approved": approved, "trace_events": events, "path": entry["path"],
                                 "combined_unstable": unstable, "excluded": entry.get("excluded", [])})
         differing = [r for r in results if r["diffs"]]

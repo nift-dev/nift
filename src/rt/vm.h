@@ -39,6 +39,8 @@
 
 namespace nift::rt {
 
+inline constexpr std::size_t kMaxEvidenceLines = 4096;
+
 // Legacy limit of nested user-callable frames (ParserHelpers.cpp kMaxCallableDepth).
 inline constexpr std::size_t kLegacyMaxDepth = 64;
 
@@ -67,6 +69,15 @@ struct VmResult {
     std::uint64_t large_numbers = 0;
     std::uint64_t large_in_loop_path = 0;
     bool error_in_loop_path = false;
+    // Per-line evidence (review CP12 round 1, D4): for each such operation in
+    // loop-evaluator code, the index of the output line printed next (the
+    // number of lines printed before it), deduplicated; `derived_lines` only
+    // those with a large operand. Capped at kMaxEvidenceLines entries each
+    // (evidence_truncated: later lines are unattributed).
+    std::vector<std::uint64_t> large_lines;
+    std::vector<std::uint64_t> derived_lines;
+    bool evidence_truncated = false;
+    std::uint64_t output_lines = 0;  // newlines printed by the program
 };
 
 class Vm {
@@ -106,6 +117,9 @@ private:
     std::vector<const Proto*> protos_;
     std::uint64_t large_numbers_ = 0;
     std::uint64_t large_in_loop_path_ = 0;
+    std::uint64_t lines_ = 0;  // newlines printed so far (evidence attribution)
+    std::vector<std::uint64_t> large_lines_, derived_lines_;
+    bool evidence_truncated_ = false;
     bool beyond_legacy_depth_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound

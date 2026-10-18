@@ -73,14 +73,15 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
     // Evidence for the D-018 number policy (VM stats): an operand or result
     // legacy calls large, or a result out of range.
     const bool large = is_large(left) || is_large(right);
+    if (large) fault.large = fault.large_operand = true;
     Value result;
     std::string error;
     if (!arithmetic(arith_op(op), left, right, result, error)) {
-        if (large || error.find("overflow") != std::string::npos || error.find("not finite") != std::string::npos)
+        if (error.find("overflow") != std::string::npos || error.find("not finite") != std::string::npos)
             fault.large = true;
         return raise(fault, StopReason::Error, error);
     }
-    if (large || is_large(result)) fault.large = true;
+    if (is_large(result)) fault.large = true;
     out = static_cast<Value&&>(result);
     return true;
 }
@@ -121,7 +122,7 @@ bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result
 bool negate_slow(const Instr& in, const Value& value, Value& out, Fault& fault) {
     if (!value.is_number()) return internal(fault, "negation");
     static_cast<void>(in);
-    if (is_large(value)) fault.large = true;
+    if (is_large(value)) fault.large = fault.large_operand = true;
     out = negate(value);
     return true;
 }

@@ -118,7 +118,8 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 #define ARITH(name, builtin, extra)                                                                  \
     OP(name) {                                                                                       \
         const Value& l = RK(pc->b); const Value& r = RK(pc->c); std::int64_t v;                      \
-        if (both_int(l, r) && !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v) extra) {       \
+        if (both_int(l, r) && safe_integers(l.as_int(), r.as_int()) &&                                \
+            !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v) extra) {                         \
             R[pc->a] = Value::integer(v); NEXT();                                                    \
         }                                                                                            \
         if (!arith_slow(*pc, OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();      \
@@ -172,7 +173,7 @@ VmResult Vm::run(std::string& output) {
         const Value& l = RK(pc->b); const Value& r = RK(pc->c);
         // r == -1 takes the slow path: INT64_MIN % -1 traps in C++ (SIGFPE);
         // integer_arithmetic gives 0 (review CP12 round 1, D2).
-        if (both_int(l, r) && r.as_int() != 0 && r.as_int() != -1) {
+        if (both_int(l, r) && r.as_int() != 0 && r.as_int() != -1 && safe_integers(l.as_int(), r.as_int())) {
             const std::int64_t v = l.as_int() % r.as_int();
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
         }
@@ -191,7 +192,8 @@ VmResult Vm::run(std::string& output) {
     }
     OP(AddAssign) {
         Value& x = R[pc->a]; const Value& y = RK(pc->b); std::int64_t v;
-        if (both_int(x, y) && !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
+        if (both_int(x, y) && safe_integers(x.as_int(), y.as_int()) &&
+            !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
             x = Value::integer(v); NEXT();
         }
         if (!add_assign_slow(*pc, x, y, fault) || !memory_ok(fault)) FAIL();
@@ -273,6 +275,10 @@ done:
     result.beyond_legacy_depth = beyond_legacy_depth_;
     result.large_numbers = large_numbers_;
     result.large_in_loop_path = large_in_loop_path_;
+    result.large_lines = std::move(large_lines_);
+    result.derived_lines = std::move(derived_lines_);
+    result.evidence_truncated = evidence_truncated_;
+    result.output_lines = lines_;
     return result;
 }
 
@@ -286,9 +292,20 @@ bool Vm::in_loop_path(const Instr* pc) const {
 }
 
 void Vm::note_large(const Instr* pc, Fault& fault) {
-    fault.large = false;
+    const bool operand = fault.large_operand;
+    fault.large = fault.large_operand = false;
     ++large_numbers_;
-    if (in_loop_path(pc)) ++large_in_loop_path_;
+    if (!in_loop_path(pc)) return;
+    ++large_in_loop_path_;
+    // Per-line attribution (review CP12 round 1, D4): the output line this
+    // operation can affect is the next one printed (index lines_).
+    const auto record = [this](std::vector<std::uint64_t>& lines) {
+        if (!lines.empty() && lines.back() == lines_) return;
+        if (lines.size() >= kMaxEvidenceLines) { evidence_truncated_ = true; return; }
+        lines.push_back(lines_);
+    };
+    record(large_lines_);
+    if (operand) record(derived_lines_);
 }
 
 void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const {
@@ -300,11 +317,14 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
 
 bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
     switch (static_cast<NativeId>(in.b)) {
-        case NativeId::Print:
+        case NativeId::Print: {
+            const std::size_t before = output.size();
             if (!native_print(R[in.a], output, fault.message)) return internal(fault, "print");
+            for (std::size_t k = before; k < output.size(); ++k) lines_ += output[k] == '\n';
             R[in.a] = Value();
             flush_if_needed(output);
             return true;
+        }
     }
     return raise(fault, StopReason::Internal, "unknown native");
 }

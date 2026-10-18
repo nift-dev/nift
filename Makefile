@@ -293,6 +293,8 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET)
 		--sample $${RT_VM_FORMER:-600}
 	python3 tests/runtime2/vm_d018.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_policy_negative.py
+	python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(TARGET)"
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -321,6 +323,8 @@ test-rt-vm-sanitize: $(SAN_TARGET)
 		python3 tests/runtime2/vm_d018.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(SAN_TARGET)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 120
 
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)

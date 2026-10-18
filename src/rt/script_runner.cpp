@@ -36,6 +36,8 @@ struct Stats {
     // Evidence for the D-018 difference policies (rt/vm.h).
     std::uint64_t large_numbers = 0, large_in_loop_path = 0;
     bool error_in_loop_path = false;
+    std::vector<std::uint64_t> large_lines, derived_lines;
+    bool evidence_truncated = false;
     std::string path;
 };
 
@@ -60,7 +62,15 @@ void report(const Stats& s) {
          << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
          << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
          << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
-         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false") << ",\"path\":\""
+         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false");
+    const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
+        line << ",\"" << name << "\":[";
+        for (std::size_t k = 0; k < values.size(); ++k) line << (k ? "," : "") << values[k];
+        line << "]";
+    };
+    list("large_lines", s.large_lines);
+    list("derived_lines", s.derived_lines);
+    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false") << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
         std::cerr << line.str() << std::flush;
@@ -222,6 +232,9 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.large_numbers = result.large_numbers;
     stats.large_in_loop_path = result.large_in_loop_path;
     stats.error_in_loop_path = result.error_in_loop_path;
+    stats.large_lines = result.large_lines;
+    stats.derived_lines = result.derived_lines;
+    stats.evidence_truncated = result.evidence_truncated;
     write_stdout(output, nullptr);
     if (result.reason == StopReason::None) {
         if (result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
