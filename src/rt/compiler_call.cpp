@@ -2,6 +2,7 @@
 
 #include "rt/alias.h"
 #include "rt/atom.h"
+#include "rt/legacy_quirks.h"
 #include "rt/native.h"
 #include "rt/prepared_parse.h"
 
@@ -32,7 +33,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const std::size_t f = is_native ? 0 : fn->second - 1u;
     // print(path) on the prepared path: legacy resolves the path as a location
     // (its messages for a missing element are the textual ones).
-    if (is_native && node.count == 1 && prepared()) {
+    if (kQuirkPrintPathReresolve && is_native && node.count == 1 && prepared()) {  // LEGACY QUIRK Q2
         const NodeKind arg = ast_.at(args[0]).kind;
         if (arg == NodeKind::Index || arg == NodeKind::Member) {
             // When the location is missing, legacy resolves the whole path again

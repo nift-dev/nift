@@ -250,34 +250,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
     if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
     std::uint16_t scratch = 0;
     if (!temp(scratch)) return false;
-    // print(path) on the prepared path: when the location does not exist
-    // legacy resolves the statement again on its textual path (its message,
-    // its evaluation of the keys): that code is compiled next to it and the
-    // lookup continues there (kInstrPathText, StopReason::Reeval).
-    const Node& callee = ast_.at(expr.a);
-    const bool path_print = prepared() && callee.kind == NodeKind::Ident && expr.count == 1 &&
-                            (ast_.at(ast_.list(expr)[0]).kind == NodeKind::Index ||
-                             ast_.at(ast_.list(expr)[0]).kind == NodeKind::Member);
-    if (!path_print) return expr_to(node.a, scratch);
-    const std::size_t first = fb_->here();
-    print_statement_ = true;
-    const bool ok = expr_to(node.a, scratch);
-    print_statement_ = false;
-    if (!ok) return false;
-    std::size_t lookup = fb_->here();
-    for (std::size_t i = first; i < fb_->here(); ++i)
-        if (fb_->at(i).flags & kInstrPathText) lookup = i;
-    if (lookup == fb_->here()) return expr_to(node.a, scratch);  // not a call of print
-    const std::size_t done = fb_->emit(OpCode::Jmp);
-    fb_->set_note_alt(fb_->note_index(lookup), fb_->here());
-    textual_statement_ = true;
-    update_flags();
-    const bool alt_ok = expr_to(node.a, scratch);
-    textual_statement_ = false;
-    update_flags();
-    fb_->patch(done, fb_->here());
-    fb_->cold_block(done, done + 1, fb_->here());
-    return alt_ok && builder_ok();
+    return print_statement(node, scratch);
 }
 
 } // namespace detail

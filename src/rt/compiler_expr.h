@@ -16,6 +16,7 @@
 #include "rt/text_type.h"
 
 #include <array>
+#include <functional>
 #include <deque>
 
 #include <cstdint>
@@ -101,11 +102,11 @@ private:
     // compiler_rules.cpp: legacy context, error sites and kind checks (CP12)
     bool prepared() const { return (variant_ == Variant::Prepared || loop_depth_ > 0) && !textual_statement_; }
     void update_flags();
-    // Statement-level errors (no failing expression) of a function legacy
-    // runs prepared are reported at the call in the caller.
-    void caller_site(std::size_t at) {
-        if (variant_ == Variant::Prepared && prepared()) fb_->at(at).flags |= kInstrCallerSite;
-    }
+    // compiler_quirks.cpp: legacy behaviours reproduced pending an owner
+    // decision, each behind a switch in rt/legacy_quirks.h.
+    void caller_site(std::size_t at);
+    bool textual_copy(std::size_t skip, const std::function<bool()>& textual_code);
+    bool print_statement(const Node& node, std::uint16_t scratch);
     std::uint32_t site(const Node& node) const;
     std::uint32_t statement_site(const Node& node) const;
     std::uint32_t prepared_begin(const Node& node) const;

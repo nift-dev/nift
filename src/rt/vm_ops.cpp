@@ -126,7 +126,8 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
             // A prepared compound assignment or increment (ParserTemplate.cpp
             // execute_prepared): a large operand re-evaluates the statement
             // textually; otherwise doubles, with only the zero-divisor checks.
-            if (is_large(left) || is_large(right)) return raise(fault, StopReason::Reeval, "large operand");
+            if (is_large(left) || is_large(right))  // LEGACY QUIRK Q1 (rt/legacy_quirks.h)
+                return raise(fault, StopReason::Reeval, "large operand");
             return prepared_compound(op, left, right, out, fault);
         }
         return prepared_arithmetic(op, left, right, out, fault);
@@ -236,7 +237,7 @@ bool get_index(const Instr& in, const Note* note, const Value& object, const Val
         }
         // print(path) on the prepared path: a valid position past the end is
         // resolved again textually (legacy's location failure).
-        if (prepared(in) && (in.flags & kInstrPathText) && integral)
+        if (prepared(in) && (in.flags & kInstrPathText) && integral)  // LEGACY QUIRK Q2
             return raise(fault, StopReason::Reeval, "location");
         if (!textual) return raise(fault, StopReason::Error, "invalid index");
         if (integral)
@@ -253,7 +254,8 @@ bool get_index(const Instr& in, const Note* note, const Value& object, const Val
                 return true;
             }
         }
-        if (prepared(in) && (in.flags & kInstrPathText)) return raise(fault, StopReason::Reeval, "location");
+        if (prepared(in) && (in.flags & kInstrPathText))  // LEGACY QUIRK Q2
+            return raise(fault, StopReason::Reeval, "location");
         if (!textual) return raise(fault, StopReason::Error, "invalid index");
         return raise(fault, StopReason::Error, "JSON object has no key '" + std::string(string_view_of(key)) + "'");
     }
@@ -281,7 +283,8 @@ bool get_member(const Instr& in, const Value& object, Atom key, Value& out, Faul
         out = *member;
         return true;
     }
-    if (prepared(in) && (in.flags & kInstrPathText)) return raise(fault, StopReason::Reeval, "location");
+    if (prepared(in) && (in.flags & kInstrPathText))  // LEGACY QUIRK Q2
+        return raise(fault, StopReason::Reeval, "location");
     return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
 }
 

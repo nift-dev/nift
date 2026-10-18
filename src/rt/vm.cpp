@@ -223,6 +223,7 @@ VmResult Vm::run(std::string& output) {
         binding_type_error(*pc, tag, to, note_at(proto, pc), fault);
         FAIL();
     }
+    // LEGACY QUIRK Q1: a large value continues at the textual code.
     OP(JmpLarge) { pc += large_number(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(Call) {
         const Proto* callee = protos_[pc->b];
@@ -277,8 +278,9 @@ done:
     return result;
 }
 
-// Legacy re-evaluates this prepared statement on its textual path: the run
-// continues at the statement's textual code (compiled next to it).
+// LEGACY QUIRKS Q1/Q2 (rt/legacy_quirks.h): legacy re-evaluates this prepared
+// statement on its textual path: the run continues at the statement's
+// textual code (a cold block after the function body).
 const Instr* Vm::reeval_target(const Proto* proto, const Instr* pc, Fault& fault) {
     const Note* note = proto->note(static_cast<std::size_t>(pc - proto->code.data()));
     if (!note) {
@@ -295,8 +297,8 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
     result.reason = fault.reason;
     result.message = fault.message;
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
-    // A statement-level error of a function legacy runs prepared carries no
-    // expression of its own: legacy reports it at the call in the caller.
+    // LEGACY QUIRK Q3: a statement-level error of a function legacy runs
+    // prepared is reported at the call in the caller.
     if ((pc->flags & kInstrCallerSite) && !frames_.empty()) {
         const Frame& caller = frames_.back();
         result.offset = caller.proto->offsets[static_cast<std::size_t>(caller.ret - 1 - caller.proto->code.data())];

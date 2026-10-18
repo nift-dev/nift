@@ -214,15 +214,6 @@ std::uint32_t UnitCompiler::site(const Node& node) const {
     return node.begin;
 }
 
-// The offset legacy reports for an error of a statement that has no failing
-// expression (a binding type change, a compound operation, an element
-// assignment) on the prepared path: the statement of the outermost loop body
-// that contains it (legacy's prepared statement span). In a function legacy
-// runs prepared, the caller's call (kInstrCallerSite).
-std::uint32_t UnitCompiler::statement_site(const Node& node) const {
-    if (prepared() && !textual_statement_ && variant_ == Variant::Textual && loop_site_ != kNoSite) return loop_site_;
-    return node.begin;
-}
 
 // Does legacy's prepared evaluator run this statement (parse_statement
 // accepts it), or its textual one (StmtKind::Legacy)?

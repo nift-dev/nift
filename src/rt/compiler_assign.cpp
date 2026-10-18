@@ -20,18 +20,6 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     return true;
 }
 
-// A prepared declaration, assignment, compound assignment or increment whose
-// value (or operand) legacy calls large is re-evaluated by legacy on its
-// textual path (ParserTemplate.cpp, large_num): such statements are compiled
-// twice, the textual code next to the prepared code (CP12; P6).
-bool UnitCompiler::reevaluated(const Node& node, NodeId value) const {
-    if (!prepared()) return false;
-    switch (node.kind) {
-        case NodeKind::Declare: case NodeKind::Assign: return (kinds(value) & kKindNumber) != 0;
-        case NodeKind::CompoundAssign: case NodeKind::IncDec: return (kinds(node.a) & kKindNumber) != 0;
-        default: return false;
-    }
-}
 
 bool UnitCompiler::declare_value(const Node& node, std::uint16_t reg) {
     if (!no_alias(node.b, node)) return false;
@@ -41,14 +29,7 @@ bool UnitCompiler::declare_value(const Node& node, std::uint16_t reg) {
     const std::size_t large = fb_->emit(OpCode::JmpLarge, reg);
     const std::size_t join = fb_->emit(OpCode::Jmp);
     fb_->patch(large, fb_->here());
-    textual_statement_ = true;
-    update_flags();
-    const bool ok = expr_to(node.b, reg);
-    textual_statement_ = false;
-    update_flags();
-    fb_->patch(join, fb_->here());
-    fb_->cold_block(join, join + 1, fb_->here());
-    return ok && builder_ok();
+    return textual_copy(join, [&] { return expr_to(node.b, reg); });  // LEGACY QUIRK Q1
 }
 
 bool UnitCompiler::declare(const Node& node) {
@@ -132,14 +113,7 @@ bool UnitCompiler::assign(const Node& node) {
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->release_to(mark);
     fb_->patch(large, fb_->here());
-    textual_statement_ = true;
-    update_flags();
-    const bool ok = assign_value(node, b);
-    textual_statement_ = false;
-    update_flags();
-    fb_->patch(done, fb_->here());
-    fb_->cold_block(done, done + 1, fb_->here());
-    return ok && builder_ok();
+    return textual_copy(done, [&] { return assign_value(node, b); });  // LEGACY QUIRK Q1
 }
 
 bool UnitCompiler::compound_op(const Node& node, const Binding& b, bool prepared_code) {
@@ -203,14 +177,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     }
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->set_note_alt(note, fb_->here());
-    textual_statement_ = true;
-    update_flags();
-    const bool ok = compound_op(node, b, false);
-    textual_statement_ = false;
-    update_flags();
-    fb_->patch(done, fb_->here());
-    fb_->cold_block(done, done + 1, fb_->here());
-    return ok && builder_ok();
+    return textual_copy(done, [&] { return compound_op(node, b, false); });  // LEGACY QUIRK Q1
 }
 
 bool UnitCompiler::inc_dec(const Node& node) {
@@ -228,14 +195,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
         if (fb_->at(i).flags & kInstrReeval) note = fb_->note(i, std::string());
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->set_note_alt(note, fb_->here());
-    textual_statement_ = true;
-    update_flags();
-    const bool ok = compound_op(node, b, false);
-    textual_statement_ = false;
-    update_flags();
-    fb_->patch(done, fb_->here());
-    fb_->cold_block(done, done + 1, fb_->here());
-    return ok && builder_ok();
+    return textual_copy(done, [&] { return compound_op(node, b, false); });  // LEGACY QUIRK Q1
 }
 
 } // namespace nift::rt::detail
