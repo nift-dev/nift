@@ -33,7 +33,8 @@ std::filesystem::perms file_permissions(const std::filesystem::path& path);
 // CP3: direct in-place write for REGENERABLE build-derived state (generated
 // outputs, pagination outputs, .info.json). No compare, no temp+rename:
 // interruption safety is provided by the project-level lock + .unfinished +
-// mutation_started + build --repair protocol, not by atomic replacement.
+// repair protocol (automatic on the next build, D-020), not by atomic
+// replacement.
 bool write_direct_file(const std::filesystem::path& path, const std::string& contents,
                        std::filesystem::perms mode = std::filesystem::perms::owner_read |
                                                         std::filesystem::perms::group_read |
@@ -43,6 +44,11 @@ bool write_direct_files(const std::vector<std::pair<std::filesystem::path, std::
                                                         std::filesystem::perms::group_read |
                                                         std::filesystem::perms::others_read);
 bool remove_owned_file(const std::filesystem::path& path);
+// D-020: copy an existing file to a PID-tagged temporary sibling (the same
+// .nift-tmp-* namespace crash recovery already sweeps), keeping its mode, so a
+// failed page can put its last-good output back with replace_file_atomic.
+// Returns the backup path, or nullopt when the copy failed.
+std::optional<std::filesystem::path> backup_file(const std::filesystem::path& path);
 bool path_exists(const std::filesystem::path& path);
 bool file_exists(const std::filesystem::path& path);
 bool file_readable(const std::filesystem::path& path);

@@ -25,9 +25,10 @@
 // Acquisition contract (encoded centrally here):
 //   Clean  -> the caller created the marker (no prior unfinished state); a
 //             normal build may proceed and is the owner.
-//   Stale  -> a marker existed and no live process owns the lock; a normal
-//             build must refuse (run `build --repair`), while --repair may
-//             proceed and takes over ownership.
+//   Stale  -> a marker existed and no live process owns the lock; the
+//             caller now owns it. Builds take over and run the repair epoch
+//             (explicitly with --repair, automatically otherwise - D-020);
+//             non-build mutators (untrack/rm/cp/mv) refuse.
 //   Live   -> a live process owns the lock; the caller must refuse.
 //   Failed -> I/O error; the caller must refuse.
 //

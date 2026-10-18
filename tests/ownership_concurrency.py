@@ -92,22 +92,32 @@ def main():
         scaffold(root)
         run(root, "build", "--all")
 
-        # 3. Failed post-mutation build leaves the marker (stale).
+        # 3. D-020: an ordinary failed build (pages written, one page failing)
+        #    ends non-zero WITHOUT leaving the marker; the next build works.
         (root / "content" / "p0.html").unlink()   # per-page failure after acquisition
         rc, _ = run(root, "build", "--all")
         check("3 failing build returns nonzero", rc != 0)
-        check("3 marker remains after failed post-mutation build", (root / ".nift/.unfinished").exists())
+        check("3 no marker after an ordinary failed build (D-020)", not (root / ".nift/.unfinished").exists())
         check("3 .nift/.lock retained after a failed build", (root / ".nift/.lock").exists())
         (root / "content" / "p0.html").write_text("<p>ok</p>\n")
-
-        # 4. Stale marker + ordinary build refuses; --repair recovers.
         rc, err = run(root, "build")
-        check("4 ordinary build refuses on stale marker", rc == 1)
-        check("4 refusal directs toward build --repair", "build --repair" in err)
+        check("3 next build after the fix succeeds without --repair", rc == 0 and "unfinished" not in err)
+
+        # 4. D-020: a stale marker (interrupted epoch) is recovered automatically
+        #    by every build entry point; --repair still recovers explicitly.
+        stale = root / ".nift/.unfinished"
+        stale.touch()
+        rc, err = run(root, "build")
+        check("4 ordinary build recovers a stale marker automatically", rc == 0 and "Recovering automatically" in err)
+        check("4 recovery mentions build --repair", "build --repair" in err)
+        check("4 marker removed by the automatic recovery", not stale.exists())
+        stale.touch()
         rc, err = run(root, "build", "--all")
-        check("4 build --all refuses on stale marker", rc == 1 and "build --repair" in err)
+        check("4 build --all recovers a stale marker", rc == 0 and "Recovering automatically" in err and not stale.exists())
+        stale.touch()
         rc, err = run(root, "build", "/")
-        check("4 targeted build refuses on stale marker", rc == 1)
+        check("4 targeted build recovers a stale marker", rc == 0 and "Recovering automatically" in err and not stale.exists())
+        stale.touch()
         rc, _ = run(root, "build", "--repair")
         check("4 build --repair succeeds on stale marker", rc == 0)
         check("4 marker removed after successful repair", not (root / ".nift/.unfinished").exists())
@@ -143,11 +153,12 @@ def main():
         os.kill(child, signal.SIGKILL)
         os.waitpid(child, 0)
         check("6 marker survives SIGKILL", (root / ".nift/.unfinished").exists())
-        rc, _ = run(root, "build")
-        check("6 ordinary build refuses after SIGKILL (stale)", rc == 1 and "unfinished build detected" in run(root, "build")[1])
+        rc, err = run(root, "build")
+        check("6 ordinary build recovers automatically after SIGKILL (stale)",
+              rc == 0 and "unfinished build detected" in err and "Recovering automatically" in err)
+        check("6 marker removed after the automatic recovery", not (root / ".nift/.unfinished").exists())
         rc, _ = run(root, "build", "--repair")
-        check("6 repair acquires after SIGKILL", rc == 0)
-        check("6 marker removed after repair", not (root / ".nift/.unfinished").exists())
+        check("6 explicit repair still acquires", rc == 0)
 
         # 7. MUTATOR FIRST: a mutator holds full ownership; a concurrently
         #    starting build must refuse (CP2.1 TOCTOU regression).

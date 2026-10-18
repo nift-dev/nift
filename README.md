@@ -83,8 +83,13 @@ A new project contains a persistent `.nift/.lock` file. It is Nift's normal
 concurrency infrastructure: it exists so simultaneous Nift commands serialize
 safely, and it stays after every build. Its presence does **not** mean a command
 is running and never requires repair — unlike `.nift/.unfinished`, which is
-evidence that a mutating operation failed, was interrupted, or otherwise was not
-proven to finish, and requires `nift build --repair`.
+evidence that a mutating operation was interrupted (crash, forced termination)
+or left state Nift could not confirm. The next `nift build` recovers it
+automatically, the same as `nift build --repair`. An ordinary build error
+(a template or expression error, a missing file, a failing script or hook)
+never leaves it: the build fails with a non-zero status, failed pages keep
+their last good output and are listed in `.nift/failed.json`, and the next
+build rebuilds them once the problem is fixed.
 `.nift/.lock` is automatically ignored by the generated `.gitignore`, so it is
 never committed. Do not delete it while Nift may be running, and do not create
 it by hand — older projects acquire it automatically on their next build.

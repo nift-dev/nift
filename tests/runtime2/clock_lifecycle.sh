@@ -49,7 +49,7 @@ printf '@script { sleep(1500) }\nKILLED-RUN\n' > content/index.html
 sleep 0.5; kill -9 "$(cat "$T/pid")" 2>/dev/null; wait 2>/dev/null
 if fresh; then bad "status trusts output after a killed build"; else ok "killed build -> page still needs rebuilding"; fi
 printf 'RECOVERED\n' > content/index.html
-"$NIFT" build --repair >/dev/null 2>&1   # an unfinished build requires repair (existing contract)
+"$NIFT" build >/dev/null 2>&1   # D-020: the next plain build recovers an unfinished build automatically
 grep RECOVERED public/index.html >/dev/null && fresh && ok "build recovers after a killed build" || bad "no recovery after killed build"
 
 # Records are removed with their page and pruned for untracked pages.

@@ -25,10 +25,35 @@
 #include <map>
 #include <thread>
 #include <unordered_set>
+#include <cstdlib>
+#ifndef _WIN32
+#include <csignal>
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
 namespace {
+// D-020 test seam (feature-build-recovery): NIFT_TEST_CRASH_AT=<point>[:<page>]
+// SIGKILLs the process at a named point of the build epoch, so tests can prove
+// recovery from every distinguishable interruption deterministically. Unset in
+// normal use (one getenv per process).
+void test_crash_point(const char* point, const std::string& page = std::string()) {
+    static const char* const spec = std::getenv("NIFT_TEST_CRASH_AT");
+    if (!spec || !*spec) return;
+    const std::string value(spec);
+    const std::size_t colon = value.find(':');
+    if (value.substr(0, colon) != point) return;
+    if (colon != std::string::npos && value.substr(colon + 1) != page) return;
+    std::cout.flush();
+    std::cerr.flush();
+#ifdef _WIN32
+    std::_Exit(137); // no destructors, no atexit: as abrupt as a kill for the epoch
+#else
+    ::kill(::getpid(), SIGKILL);
+#endif
+}
+
 // DAG outputs can be read through symlinks. Share their cache identity while
 // preserving the ordinary no-dependency path and retaining lexical fallback.
 std::string build_cache_key(const fs::path& path, bool canonical) {
@@ -90,7 +115,7 @@ bool ProjectInfo::open() {
         return false;
     }
     bool ok=load_config() && load_tracking() && watch_->load(root);
-    if(ok)reload_identity_catalogue();
+    if(ok){reload_identity_catalogue();load_failed_pages();}
     return ok;
 }
 
@@ -675,6 +700,9 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
     std::vector<std::string> reasons;
     const fs::path output = output_path(info);
     const fs::path page_info = info_path(info);
+    // D-020: a page whose last build failed keeps its last-good output and
+    // page-info, and is rebuilt whatever else is (un)changed.
+    if (failed_pages_.count(info.name)) reasons.push_back("previous build of this page failed");
 
     if (!filesystem::path_exists(output)) reasons.push_back("generated output is missing");
     if (!filesystem::path_exists(page_info)) {
@@ -1286,10 +1314,153 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 
     // Certification metadata uses the existing atomic readonly replacement.
     if (!filesystem::write_readonly_file(info_path(info), output)) return false;
+    test_crash_point("page-info", info.name);
     return write_render_clock_record(info, render_clock);
 }
 
+// D-020 per-page failure transaction. What one attempt did, so a failure can
+// leave the page consistent (last-good outputs, old outputs restored for
+// scripted pages) and dirty (a failure record), and so Nift-owned write
+// failures (I/O, not ordinary errors) keep .nift/.unfinished.
+struct ProjectInfo::PageAttempt {
+    std::size_t previous_pages = 0;      // pagination count of the last build
+    std::size_t written_pages = 0;       // outputs this attempt (over)wrote
+    bool scripted = false;               // runs user scripts that may write outputs
+    bool io_failure = false;             // a Nift-owned derived write failed
+    std::vector<std::pair<fs::path, std::optional<fs::path>>> backups; // output -> last-good copy
+};
+
+fs::path ProjectInfo::failed_pages_path() const { return root / ".nift/failed.json"; }
+
+void ProjectInfo::load_failed_pages() {
+    failed_pages_.clear();
+    failed_pages_dirty_ = false;
+    const fs::path path = failed_pages_path();
+    if (!filesystem::path_exists(path)) return;
+    json::Document document;
+    std::string error;
+    bool valid = load_json_file(path, document, error) && document.is_object() &&
+                 document.has("failed") && document["failed"].is_object();
+    if (valid) {
+        for (const auto& [name, pages] : document["failed"].object) {
+            if (!pages.is_number() || !std::isfinite(pages.num) || pages.num < 0 ||
+                std::floor(pages.num) != pages.num) { valid = false; break; }
+            failed_pages_[name] = static_cast<std::size_t>(pages.num);
+        }
+    }
+    if (!valid) {
+        // Damaged list: conservatively treat every tracked page as failed (a
+        // full rebuild) and rewrite the list on the next build with work.
+        failed_pages_.clear();
+        for (const auto& info : tracked) failed_pages_[info.name] = 0;
+        failed_pages_dirty_ = true;
+    }
+}
+
+bool ProjectInfo::save_failed_pages() {
+    for (auto it = failed_pages_.begin(); it != failed_pages_.end();)
+        it = find(it->first) ? std::next(it) : failed_pages_.erase(it);
+    const fs::path path = failed_pages_path();
+    if (failed_pages_.empty()) return filesystem::remove_owned_file(path);
+    std::map<std::string, std::size_t> sorted(failed_pages_.begin(), failed_pages_.end());
+    std::string output = "{\n  \"failed\": {";
+    std::size_t index = 0;
+    for (const auto& [name, pages] : sorted) {
+        output += index++ ? ",\n    \"" : "\n    \"";
+        json::Document::append_escaped_string(output, name);
+        output += "\": " + std::to_string(pages);
+    }
+    output += "\n  }\n}\n";
+    return filesystem::write_readonly_file(path, output);
+}
+
+void ProjectInfo::settle_failed_page(const TrackedInfo& info, const PageAttempt& attempt) {
+    bool consistent = !attempt.io_failure;
+    if (attempt.scripted) {
+        // Put last-good outputs back. Outputs that had no last-good version
+        // are left as the attempt wrote them (inspectable; the page stays
+        // dirty and any extra pagination pages are recorded for cleanup).
+        for (const auto& [path, backup] : attempt.backups)
+            if (backup && !filesystem::replace_file_atomic(*backup, path)) consistent = false;
+    }
+    // Page-info is left as it was (it still describes the last-good output);
+    // the page joins the failed list when build_many finishes.
+    {
+        std::lock_guard<std::mutex> lock(failed_mutex_);
+        auto& pages = failed_now_[info.name];
+        pages = std::max({pages, attempt.previous_pages, attempt.written_pages});
+    }
+    if (has_build_dependencies)
+        for (std::size_t page = 1; page <= std::max({std::size_t(1), attempt.previous_pages, attempt.written_pages}); ++page)
+            invalidate_output_caches(pagination_output_path(info, page));
+    test_crash_point("page-failed", info.name);
+    if (!consistent) mark_unresolved();
+}
+
+namespace {
+// Pagination page count recorded by a page's last successful build;
+// 0 when absent or unreadable.
+std::size_t recorded_pagination_pages(const fs::path& page_info) {
+    if (!filesystem::path_exists(page_info)) return 0;
+    json::Document previous; std::string previous_error;
+    if (load_json_file(page_info, previous, previous_error) && previous.is_object() &&
+        previous.has("pagination-pages") && previous["pagination-pages"].is_number() &&
+        std::isfinite(previous["pagination-pages"].num) && previous["pagination-pages"].num >= 0 &&
+        std::floor(previous["pagination-pages"].num) == previous["pagination-pages"].num)
+        return static_cast<std::size_t>(previous["pagination-pages"].num);
+    return 0;
+}
+} // namespace
+
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error, std::vector<std::string>* identities) {
+    PageAttempt attempt;
+    // The previous pagination page count is historical state required for
+    // stale-output cleanup: when pagination is removed or its page count
+    // decreases, page-2..N outputs from the previous build must be removed.
+    // This read is therefore required for every page (a page whose pagination
+    // was removed no longer has info.paginate set, so gating the read on the
+    // current paginate would silently leave stale pagination outputs). A
+    // failure record keeps the count, so it survives a failed build.
+    attempt.previous_pages = recorded_pagination_pages(info_path(info));
+    // A failed earlier attempt may have written more pagination pages than the
+    // last successful build recorded; they are still this page's to clean up.
+    if (const auto failed = failed_pages_.find(info.name); failed != failed_pages_.end())
+        attempt.previous_pages = std::max(attempt.previous_pages, failed->second);
+    test_crash_point("page-start", info.name);
+    // Pages running user scripts (per-file hooks, item scripts, a custom
+    // build) can touch their outputs before failing; keep a copy of the
+    // last-good outputs for them. Pages without scripts never write before
+    // the in-memory render succeeds, so they pay nothing.
+    attempt.scripted = !info.build_hooks.empty() || !info.pipeline().discovered_hooks.empty();
+    if (attempt.scripted) {
+        for (std::size_t page = 1; page <= std::max<std::size_t>(1, attempt.previous_pages); ++page) {
+            const fs::path path = pagination_output_path(info, page);
+            std::optional<fs::path> backup;
+            std::error_code ec;
+            if (fs::is_regular_file(path, ec) && !ec) {
+                backup = filesystem::backup_file(path);
+                if (!backup) {
+                    for (const auto& [ignored, copy] : attempt.backups) if (copy) filesystem::remove_owned_file(*copy);
+                    attempt.backups.clear();
+                    attempt.scripted = false; // nothing touched yet
+                    report_build_error({info.name, path, 0, "could not preserve the last-good output before running build scripts"}, out_error);
+                    settle_failed_page(info, attempt);
+                    return false;
+                }
+            }
+            attempt.backups.emplace_back(path, std::move(backup));
+        }
+    }
+    if (build_one_attempt(info, out_error, identities, attempt)) {
+        for (const auto& [ignored, copy] : attempt.backups) if (copy) filesystem::remove_owned_file(*copy);
+        test_crash_point("page-done", info.name);
+        return true;
+    }
+    settle_failed_page(info, attempt);
+    return false;
+}
+
+bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>* out_error, std::vector<std::string>* identities, PageAttempt& attempt) {
     const nift::trace::ContextGuard trace_context(info.name);
     std::map<std::string,std::string> snapshots;
     const bool hashing = config.incremental_mode != "modified";
@@ -1307,19 +1478,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     // This read is therefore required for every page (a page whose pagination
     // was removed no longer has info.paginate set, so gating the read on the
     // current paginate would silently leave stale pagination outputs).
-    std::size_t previous_pagination_pages = 0;
-    {
-        const fs::path previous_info_path = info_path(info);
-        if (filesystem::path_exists(previous_info_path)) {
-            json::Document previous; std::string previous_error;
-            if (load_json_file(previous_info_path, previous, previous_error) && previous.is_object() &&
-                previous.has("pagination-pages") && previous["pagination-pages"].is_number() &&
-                std::isfinite(previous["pagination-pages"].num) && previous["pagination-pages"].num >= 0 &&
-                std::floor(previous["pagination-pages"].num) == previous["pagination-pages"].num) {
-                previous_pagination_pages = static_cast<std::size_t>(previous["pagination-pages"].num);
-            }
-        }
-    }
+    const std::size_t previous_pagination_pages = attempt.previous_pages;
     const fs::path content = content_path(info);
 
     ProjectInfoHost host(*this);
@@ -1370,7 +1529,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     const bool custom=info.build_hooks.count("build")||info.pipeline().discovered_hooks.count("build");
     const std::optional<filesystem::DependencyTime> render_clock = stamp_render_clock();
     RenderResult result;
-    if(custom){if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
+    if(custom){attempt.written_pages=1;if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
     else {Parser parser(host,info);result=parser.render();}
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
@@ -1423,7 +1582,18 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     // First recovery-relevant derived mutation of this page (outputs). The
     // flag is set BEFORE the write: an interruption during the write is
     // precisely the case the marker must protect.
+    test_crash_point("page-rendered", info.name);
     mark_mutation();
+    attempt.written_pages = std::max<std::size_t>(1, result.pagination_outputs.size());
+    if (!custom) {
+        // Test seam: a torn in-place output write (half the bytes, then kill).
+        static const char* const crash = std::getenv("NIFT_TEST_CRASH_AT");
+        if (crash && (std::string(crash) == "page-output-partial" || std::string(crash) == "page-output-partial:" + info.name)) {
+            const std::string& first = result.pagination_outputs.empty() ? result.output : result.pagination_outputs.front();
+            filesystem::write_direct_file(output, first.substr(0, first.size() / 2), output_mode);
+            test_crash_point("page-output-partial", info.name);
+        }
+    }
     if(custom) {
         std::error_code ec;
         if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom build did not produce the tracked output file"},out_error);return false;}
@@ -1433,14 +1603,17 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
             page_files.emplace_back(pagination_output_path(info, page), result.pagination_outputs[page - 1]);
         if (!filesystem::write_direct_files(page_files, output_mode)) {
+            attempt.io_failure = true;
             report_build_error({info.name, output, 0, "failed to commit generated pagination outputs"}, out_error);
             return false;
         }
     } else if (!filesystem::write_direct_file(output, result.output, output_mode)) {
+        attempt.io_failure = true;
         report_build_error({info.name, output, 0, "failed to write generated output"}, out_error);
         return false;
     }
 
+    test_crash_point("page-output", info.name);
     if(!item_script("post-build"))return false;
     if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr,&result.dependencies)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
     if(custom){std::error_code ec;if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom post-build removed the tracked output"},out_error);return false;}}
@@ -1486,11 +1659,13 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     for (std::size_t page = keep_pages + 1; page <= previous_pagination_pages; ++page) {
         const fs::path stale = pagination_output_path(info, page);
         if (!filesystem::remove_owned_file(stale)) {
+            attempt.io_failure = true;
             report_build_error({info.name, stale, 0, "failed to remove stale pagination output"}, out_error);
             return false;
         }
     }
 
+    test_crash_point("page-post", info.name);
     fs::path sidecar_path=content_path(info);sidecar_path.replace_extension(".deps.json");
     bool certificate_valid=false;
     if(authoritative_sidecar.present){
@@ -1499,6 +1674,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     }else certificate_valid=!filesystem::path_exists(sidecar_path);
     // Later hook changes suppress only the new certificate, preserving E2 behavior.
     if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr, &result.observed)) {
+        attempt.io_failure = true;
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
     }
@@ -1518,6 +1694,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
 }
 
 int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count) {
+    last_build_settled_ = false;
     std::vector<BuildJob> expanded_jobs;
     if(has_build_dependencies) {
         expanded_jobs=initial_jobs;
@@ -1535,6 +1712,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     const auto& jobs=has_build_dependencies?expanded_jobs:initial_jobs;
     last_build_affected.clear();
     if (jobs.empty()) {
+        last_build_settled_ = true;
         if (!console::build_quiet()) {
             std::lock_guard<std::mutex> lock(console::output_mutex);
             if (targeted) return 1;
@@ -1635,6 +1813,42 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     for (std::size_t i = 0; i < thread_count; ++i) workers.emplace_back(worker);
     for (auto& worker_thread : workers) worker_thread.join();
 
+    // D-020: record the outcome in the failed-page list. Succeeded pages leave
+    // it; failed pages join it; a page blocked by a failed prerequisite never
+    // ran and joins it too (it must be rebuilt once the prerequisite is fixed,
+    // even when it was selected by --all or --repair). Validation-only jobs
+    // were clean and are re-validated next time, so they are left alone.
+    {
+        bool changed = failed_pages_dirty_;
+        for (std::size_t i = 0; i < jobs.size(); ++i) {
+            const std::string& name = jobs[i].info->name;
+            if (succeeded[i] && (!has_build_dependencies || executed[i])) {
+                if (failed_pages_.erase(name)) changed = true;
+            } else if (has_build_dependencies && blocked[i] && !jobs[i].validation_only) {
+                auto& pages = failed_pages_[name];
+                pages = std::max(pages, recorded_pagination_pages(info_path(*jobs[i].info)));
+                changed = true;
+            }
+        }
+        for (const auto& [name, pages] : failed_now_) {
+            auto& recorded = failed_pages_[name];
+            recorded = std::max(recorded, pages);
+            changed = true;
+        }
+        failed_now_.clear();
+        if (changed) {
+            if (save_failed_pages()) failed_pages_dirty_ = false;
+            else {
+                mark_unresolved();
+                std::lock_guard<std::mutex> lock(console::output_mutex);
+                std::cerr << console::error_label() << " could not record failed pages in "
+                          << relative(failed_pages_path()) << '\n';
+            }
+            test_crash_point("failed-list");
+        }
+    }
+    last_build_settled_ = true;
+
     // Deterministic shutdown: stop the renderer, join it, erase the transient
     // line and flush — only then may diagnostics and the summary be written.
     progress.finish();
@@ -1722,6 +1936,35 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     return failed_count == 0 ? 0 : 1;
 }
 
+namespace {
+// D-020: a stale marker is evidence that a previous epoch died mid-mutation
+// (crash, SIGKILL, power loss). Its recovery is the repair epoch, whose
+// convergence to a clean-build-equivalent state is the tested repair contract,
+// so it runs automatically - loudly - instead of locking the project.
+void announce_automatic_recovery() {
+    std::lock_guard<std::mutex> lock(console::output_mutex);
+    std::cerr << console::warning_label() << " unfinished build detected: a previous build was interrupted before it finished.\n";
+    std::cerr << "  Recovering automatically: rebuilding every page and removing stale derived files"
+              << " (the same as " << console::good("nift build --repair") << ").\n";
+}
+
+bool refuse_ownership(ProjectOwnership::State state, const std::string& marker) {
+    if (state == ProjectOwnership::State::Live) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " another build appears to be running;"
+                  << " refusing to mutate build state\n";
+        return true;
+    }
+    if (state == ProjectOwnership::State::Failed) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " could not acquire the build lock ("
+                  << marker << ")\n";
+        return true;
+    }
+    return false;
+}
+} // namespace
+
 int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     filesystem::begin_recovery_epoch();
 
@@ -1730,42 +1973,36 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     // path is reconcile_watch() (it removes outputs for disappeared watched
     // pages and rewrites watched state). Load/validation happened in open().
     //
-    // Ordinary builds refuse on a stale marker (previous epoch unfinished) or
-    // a live owner. build --repair is the only mode that may take over a stale
-    // marker; it refuses on a live owner just like everything else. No derived
-    // state is mutated before acquisition, and nothing is mutated after the
-    // marker is removed on success.
+    // A live owner is refused. A stale marker (previous epoch interrupted) is
+    // taken over: build --repair does so explicitly, and every other build
+    // recovers automatically by running the same repair epoch (D-020). No
+    // derived state is mutated before acquisition, and nothing is mutated
+    // after the marker is removed.
     ProjectOwnership ownership(root / ".nift/.unfinished");
     const ProjectOwnership::State ownership_state = ownership.acquire();
-    if (ownership_state == ProjectOwnership::State::Live) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " another build appears to be running;"
-                  << " refusing to mutate build state\n";
-        return 1;
-    }
-    if (ownership_state == ProjectOwnership::State::Failed) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " could not acquire the build lock ("
-                  << relative(root / ".nift/.unfinished") << ")\n";
-        return 1;
-    }
+    if (refuse_ownership(ownership_state, relative(root / ".nift/.unfinished"))) return 1;
     if (ownership_state == ProjectOwnership::State::Stale && !repair) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " unfinished build detected.\n";
-        std::cerr << "  Generated build state may be incomplete.\n";
-        std::cerr << "  Run " << console::good("nift build --repair") << " to reconstruct it.\n";
-        return 1;
+        announce_automatic_recovery();
+        force = true;
+        repair = true;
     }
+    return build_all_owned(ownership, force, explain, repair);
+}
 
+int ProjectInfo::build_all_owned(ProjectOwnership& ownership, bool force, bool explain, bool repair) {
     mutation_started_.store(false, std::memory_order_relaxed);
+    unresolved_mutation_.store(false, std::memory_order_relaxed);
+    last_build_settled_ = false;
+    test_crash_point("acquired");
 
-    // reconcile_watch failure is a controlled failure subject to the same
-    // epoch-completion rule: if it failed BEFORE any recovery-relevant derived
-    // removal (mutation_started still false), nothing needs repair and the
-    // marker is cleared; if it removed outputs then failed, the marker stays.
+    // reconcile_watch is idempotent and its mutations are complete when it
+    // returns true. A failure after it removed files is the one reconcile case
+    // that stays unresolved (the marker is kept; the next build recovers).
     if (!reconcile_watch()) {
+        if (mutation_started()) mark_unresolved();
         return finish_if_epoch_complete(ownership, 1, repair);
     }
+    test_crash_point("reconciled");
     reset_build_caches();
 
     const std::string mode = nift_hooks::effective_mode(force, repair, build_mode_hint_);
@@ -1778,6 +2015,7 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
           return finish_if_epoch_complete(ownership, 1, repair);
       }
     }
+    test_crash_point("pre-hooks");
     current_hook_mode_ = mode;
 
     std::vector<BuildJob> jobs;
@@ -1814,6 +2052,7 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
 
     const int result = build_many(jobs, false, explain, tracked.size());
+    test_crash_point("pages-done");
     if (result == 0) {
         std::string hook_error;
         if (!nift_hooks::run_project_hooks(root, config, "post", mode, hook_error)) {
@@ -1822,24 +2061,41 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
             return finish_if_epoch_complete(ownership, 1, repair);
         }
     }
+    test_crash_point("post-hooks");
     return finish_if_epoch_complete(ownership, result, repair);
 }
 
 int ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair) {
-    if (result != 0) {
-        // A failure occurred: clear the marker only for an ordinary build with
-        // PROVEN zero recovery-relevant mutations; build --repair always
-        // retains on failure because its pre-existing stale evidence is
-        // unresolved. The command still reports failure.
-        if (!repair && !mutation_started()) ownership.finish();
-        return result;
+    // D-020: the marker records uncertainty, not failure. An ordinary failure
+    // leaves every page consistent (succeeded pages committed; failed and
+    // blocked pages carry failure records and keep their last-good outputs),
+    // so it ends cleanly with a non-zero status and the marker removed. A
+    // repair (explicit or automatic) clears pre-existing crash evidence only
+    // when every page was settled by this epoch and the required sweep
+    // converged; failed pages then carry failure records, so the next build
+    // rebuilds them normally. Ownership is released either way.
+    if (repair && !unresolved_mutation()) {
+        if (!last_build_settled_) {
+            mark_unresolved(); // pages were not rebuilt: crash evidence stands
+        } else {
+            test_crash_point("repair-sweep");
+            if (!repair_derived_state()) {
+                mark_unresolved();
+                std::lock_guard<std::mutex> lock(console::output_mutex);
+                std::cerr << console::error_label() << " repair could not remove stale derived files\n";
+                result = result ? result : 1;
+            }
+        }
     }
-    // Success. A successful repair additionally runs the required sweep BEFORE
-    // the marker is removed; if a required sweep operation fails, repair has
-    // not converged, so the marker is retained and the command fails.
-    if (repair && !repair_derived_state()) return 1;
+    if (unresolved_mutation()) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " build state could not be confirmed consistent after the errors above;"
+                  << " kept .nift/.unfinished, so the next " << console::good("nift build")
+                  << " recovers automatically once they are fixed\n";
+        return result ? result : 1;
+    }
     ownership.finish(); // remove marker strictly after the final mutation
-    return 0;
+    return result;
 }
 
 namespace {
@@ -1894,6 +2150,11 @@ bool ProjectInfo::repair_derived_state() {
             doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
             std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 1)
             pages = static_cast<std::size_t>(doc["pagination-pages"].num);
+        // A page whose build failed keeps its last-good page-info; pages a
+        // failed attempt wrote beyond that count are still in use until it
+        // is rebuilt (D-020).
+        if (const auto failed = failed_pages_.find(info.name); failed != failed_pages_.end())
+            pages = std::max(pages, failed->second);
         if (pages >= 2) {
             for (std::size_t n = 2; n <= pages; ++n)
                 current_owned.insert(pagination_output_path(info, n).lexically_normal());
@@ -2025,35 +2286,25 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
     }
 
     // Targeted builds are derived-state mutators and take the same ownership:
-    // refuse on a live owner or a stale marker (repair is only reachable via
-    // `build --repair`).
+    // refuse on a live owner. A stale marker is recovered automatically by the
+    // project-wide repair epoch, which rebuilds the requested pages too (D-020).
     ProjectOwnership ownership(root / ".nift/.unfinished");
     const ProjectOwnership::State ownership_state = ownership.acquire();
-    if (ownership_state == ProjectOwnership::State::Live) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " another build appears to be running;"
-                  << " refusing to mutate build state\n";
-        return 1;
-    }
-    if (ownership_state == ProjectOwnership::State::Failed) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " could not acquire the build lock ("
-                  << relative(root / ".nift/.unfinished") << ")\n";
-        return 1;
-    }
+    if (refuse_ownership(ownership_state, relative(root / ".nift/.unfinished"))) return 1;
     if (ownership_state == ProjectOwnership::State::Stale) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        std::cerr << console::error_label() << " unfinished build detected.\n";
-        std::cerr << "  Generated build state may be incomplete.\n";
-        std::cerr << "  Run " << console::good("nift build --repair") << " to reconstruct it.\n";
-        return 1;
+        announce_automatic_recovery();
+        return build_all_owned(ownership, /*force=*/true, explain, /*repair=*/true);
     }
 
     mutation_started_.store(false, std::memory_order_relaxed);
+    unresolved_mutation_.store(false, std::memory_order_relaxed);
+    test_crash_point("acquired");
 
     if (!reconcile_watch()) {
+        if (mutation_started()) mark_unresolved();
         return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
     }
+    test_crash_point("reconciled");
     reset_build_caches();
 
     // CP3.2 lifetime invariant: TrackedInfo* jobs are obtained ONLY after the
@@ -2072,9 +2323,7 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         }
     }
     if (jobs.empty()) {
-        // Zero-derived-mutation controlled failure - unless reconcile itself
-        // performed a recovery-relevant deletion (mutation_started true), in
-        // which case the completion rule correctly retains the marker.
+        // Controlled failure: reconcile (if it removed anything) completed.
         return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
     }
 
@@ -2086,9 +2335,11 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
           return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
       }
     }
+    test_crash_point("pre-hooks");
     current_hook_mode_ = mode;
 
     const int result = build_many(jobs, true, explain, names.size());
+    test_crash_point("pages-done");
     if (result == 0) {
         std::string hook_error;
         if (!nift_hooks::run_project_hooks(root, config, "post", mode, hook_error)) {
@@ -2097,6 +2348,7 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
             return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
         }
     }
+    test_crash_point("post-hooks");
     return finish_if_epoch_complete(ownership, result, /*repair=*/false);
 }
 

@@ -4,8 +4,11 @@ These features are part of unreleased v4.10 development.
 
 Per-item scripts run `pre-build` → custom `build` or normal render → `post-build`.
 A failed phase stops that item and all its later phases. A post failure fails the
-invocation; successful metadata is committed only after post succeeds. Independent
-DAG branches continue. Interrupted/partially written builds require `build --repair`.
+invocation; successful metadata is committed only after post succeeds. When any
+phase of an item with scripts fails, its previous outputs are put back, so the
+item keeps its last good output and is rebuilt by the next build. Independent
+DAG branches continue. An interrupted build (crash, forced termination) is
+recovered automatically by the next build, the same as `build --repair`.
 
 ## Configuration and discovery
 
@@ -74,7 +77,8 @@ with `@dep` or `.deps.json`) when its bytes affect your output. Clean dependents
 are rechecked after prerequisites execute, so generated file changes can rebuild
 them in the same invocation. Renaming a prerequisite updates its references;
 removing one is rejected while retained tracked items depend on it. Failed prerequisites
-block descendants with an explicit diagnostic and do not commit descendant metadata.
+block descendants with an explicit diagnostic and do not commit descendant metadata;
+blocked descendants are rebuilt with the prerequisite once it is fixed.
 
 Scripts, content, script-import/file dependencies and structural script selection
 are recorded in incremental metadata. Added/removed sidecars, changed scripts,

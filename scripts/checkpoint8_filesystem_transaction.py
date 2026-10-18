@@ -161,9 +161,9 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         # With metadata absent, status must say rebuild rather than silently clean.
         s=run(root,"status")
         if "needs rebuilding" not in s.stdout: raise RuntimeError("missing metadata did not leave page stale")
-        # The failed build left a durable .unfinished marker (v4.0.7+): a plain
-        # build refuses and repair is the only mode that reconstructs the
-        # incomplete derived state.
+        # The failed metadata write is uncertain state: it leaves a durable
+        # .unfinished marker; the next build (here explicitly --repair)
+        # reconstructs the incomplete derived state (D-020).
         run(root,"build", "--repair")
         if b"NEW-META" not in (root/"public/index.html").read_bytes():
             raise RuntimeError("repair did not rebuild the page after metadata obstruction")
@@ -239,9 +239,11 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         if p.returncode==0: raise RuntimeError("file-size-limited build unexpectedly claimed success")
         marker=root/".nift/.unfinished"
         if not marker.exists(): raise RuntimeError("direct-write failure did not leave .unfinished marker")
-        r=run(root,"build", "--all",ok=False)
-        if "unfinished build detected" not in (r.stdout+r.stderr):
-            raise RuntimeError("plain build did not refuse while the marker remains")
+        # D-020: the next plain build recovers automatically (loudly) instead
+        # of refusing; an explicit --repair afterwards remains valid.
+        r=run(root,"build", "--all",timeout=20)
+        if "unfinished build detected" not in (r.stdout+r.stderr) or "Recovering automatically" not in (r.stdout+r.stderr):
+            raise RuntimeError("plain build did not announce automatic recovery while the marker remains")
         run(root,"build", "--repair",timeout=20)
         if (root/"public/index.html").stat().st_size != (4*1024*1024):
             raise RuntimeError("repair did not reconstruct the complete output")
@@ -365,9 +367,11 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         os.kill(p.pid,signal.SIGKILL); p.wait(timeout=5)
         marker=root/".nift/.unfinished"
         if not marker.exists(): raise RuntimeError("killed direct write did not leave .unfinished marker")
-        r=run(root,"build", "--all",ok=False)
-        if "unfinished build detected" not in (r.stdout+r.stderr):
-            raise RuntimeError("plain build did not refuse while the marker remains")
+        # D-020: the next plain build recovers automatically (loudly) instead
+        # of refusing; an explicit --repair afterwards remains valid.
+        r=run(root,"build", "--all",timeout=30)
+        if "unfinished build detected" not in (r.stdout+r.stderr) or "Recovering automatically" not in (r.stdout+r.stderr):
+            raise RuntimeError("plain build did not announce automatic recovery while the marker remains")
         run(root,"build", "--repair",timeout=30)
         if (root/"public/index.html").stat().st_size != size:
             raise RuntimeError("repair did not reconstruct the complete output")

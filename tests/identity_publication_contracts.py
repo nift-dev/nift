@@ -50,8 +50,8 @@ with tempfile.TemporaryDirectory(prefix='nift-identity-publication-') as tempora
  # Failed consumers cannot manufacture clean history; successful sibling's
  # discoveries remain safe optional identities if the whole build fails.
  (root/'data/success.txt').write_text('success');(root/'content/a.html').write_text('@dep("data/success.txt")@input("data/success.txt")');(root/'content/b.html').write_text('@input("data/missing.txt")')
- r=run(binary,root,'build','--all');assert r.returncode!=0;assert 'data/success.txt' in keys(load(root));assert (root/'.nift/.unfinished').exists();record('failed build after sibling discovery preserves failure/repair marker')
- (root/'content/b.html').write_text('fixed');build(root,'--repair');record('repair after failed build converges')
+ r=run(binary,root,'build','--all');assert r.returncode!=0;assert 'data/success.txt' in keys(load(root));assert not (root/'.nift/.unfinished').exists();record('failed build after sibling discovery fails without a repair marker (D-020)')
+ (root/'content/b.html').write_text('fixed');build(root);record('ordinary build after the fix converges (D-020)')
  # Malformed, unsupported-platform, coherent absolute and parent corruption.
  directory=root/'.nift/identity-stage1';good=(directory/'manifest.bin').read_bytes();good_files={f.name:f.read_bytes() for f in directory.glob('*.bin')}
  # Optional cache files cannot open blocking FIFO/device/directory streams.

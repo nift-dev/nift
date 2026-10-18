@@ -1,6 +1,7 @@
 # Incremental build state (Runtime 2.0)
 
-Two kinds of per-page state live under `.nift/`:
+Two kinds of per-page state live under `.nift/` (plus the project-level
+failed-page list, below):
 
 | State | Path | Contract |
 | --- | --- | --- |
@@ -19,10 +20,24 @@ Rules for the timing record (CP01; `tests/runtime2/clock_lifecycle.sh`):
 - Removed with its page (`rm`, untrack, watch-list removal) and pruned for
   pages no longer tracked on the next build that has work to do (never on a
   no-op build), so the directory is bounded by the tracked set.
-- A build killed mid-render leaves `.nift/.unfinished`; the existing contract
-  requires `nift build --repair`, after which state is consistent.
+- A build killed mid-render leaves `.nift/.unfinished`; the next build
+  recovers automatically (the repair epoch, D-020), after which state is
+  consistent. A page whose build fails keeps its record untouched (the
+  failed-page list makes it dirty instead).
 - Timestamp granularity: the render clock is read back from the filesystem,
   so comparisons use the filesystem's own granularity (coarse clocks such as
   FAT's 2 s make same-tick cases more common; those are resolved by tick
   hashes). Residual risk: an edit after the read within the render clock's
   tick is not detected in `modified` mode; `hash` mode has no such window.
+
+## Failed-page list (D-020, feature-build-recovery)
+
+`.nift/failed.json` = `{"failed": {"<tracked name>": <pagination pages>}}`,
+present only while some page's last build failed (or was blocked by a failed
+prerequisite). A failed page keeps its last-good output and page-info; the list
+adds the status reason "previous build of this page failed", so the page is
+rebuilt whatever selected it, and records the largest pagination count an
+attempt wrote so stale-page cleanup and the repair sweep stay correct. A page
+leaves the list when it builds successfully; untracked names are pruned when
+the list is rewritten; a damaged list marks every page dirty. Written
+atomically after the pages of a build settle.

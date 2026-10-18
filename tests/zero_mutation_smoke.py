@@ -6,10 +6,14 @@ Governing invariant:
   (not merely that a build returned non-zero).
 
   success -> remove
-  controlled failure + mutation_started==false -> remove
-  controlled failure + mutation_started==true  -> retain
-  crash/SIGKILL                                -> retain
-  build --repair failure (even zero new mutations) -> retain
+  ordinary controlled failure (D-020: failed pages keep last-good output and
+    page-info and join .nift/failed.json)    -> remove
+  failure that leaves a mutation unresolved (Nift-owned write failed,
+    reconcile failed after deleting)          -> retain
+  crash/SIGKILL                                -> retain; the next build
+    recovers automatically (D-020)
+  build --repair (explicit or automatic) that did not rebuild every page or
+    whose sweep failed                         -> retain
 """
 import json
 import shutil
@@ -108,24 +112,26 @@ def main():
         rc, _ = run(root, "build")
         check("2 fix + ordinary build succeeds", rc == 0)
 
-        # 3. One page writes, another fails -> marker REMAINS; --repair recovers.
+        # 3. One page writes, another fails -> D-020: no marker; the next
+        #    ordinary build works once the problem is fixed.
         root = base / "t3"
         root.mkdir()
         scaffold(root, ["a", "b"], broken_index=1)
         (root / "templates/t1.html").write_text("@if(never closed{\n")
         rc, _ = run(root, "build", "--all")
         check("3 mixed success/failure build returns nonzero", rc != 0)
-        check("3 marker REMAINS (a page wrote, b failed)", marker(root))
+        check("3 no marker after an ordinary failure (D-020)", not marker(root))
         rc, err = run(root, "build")
-        check("3 ordinary build refuses", rc == 1 and "build --repair" in err)
+        check("3 unfixed ordinary build fails again, still no marker", rc != 0 and not marker(root))
         (root / "templates/t1.html").write_text("@content\n")
-        rc, _ = run(root, "build", "--repair")
-        check("3 build --repair succeeds", rc == 0)
-        check("3 marker cleared after repair", not marker(root))
+        rc, _ = run(root, "build")
+        check("3 ordinary build after the fix succeeds", rc == 0)
+        check("3 marker absent", not marker(root))
 
         # 4. Stale pagination deletion happened, then another page failed ->
-        #    marker REMAINS. Page x shrinks pagination (stale outputs deleted),
-        #    page y renders and fails.
+        #    D-020: x committed consistently, y keeps its last-good state, so no
+        #    marker. Page x shrinks pagination (stale outputs deleted), page y
+        #    renders and fails.
         root = base / "t4"
         root.mkdir()
         scaffold(root, ["x", "y"])
@@ -152,15 +158,15 @@ def main():
         (root / "templates/t1.html").write_text("@if(never closed{\n")
         rc, _ = run(root, "build", "--all")
         check("4 shrink+break build returns nonzero", rc != 0)
-        check("4 marker REMAINS (stale deletion + partial writes)", marker(root))
+        check("4 no marker (x committed, y failed cleanly; D-020)", not marker(root))
         (root / "templates/t1.html").write_text("@content\n")
-        rc, _ = run(root, "build", "--repair")
-        check("4 build --repair succeeds", rc == 0)
+        rc, _ = run(root, "build")
+        check("4 ordinary build after the fix succeeds", rc == 0)
         check("4 stale page-3 gone after repair", not (root / "public/x-3.html").exists())
         check("4 marker cleared", not marker(root))
 
         # 5. SIGKILL while holding ownership (mid-epoch) -> marker REMAINS;
-        #    --repair recovers. Uses the env-gated hold hook so the build is
+        #    the next ordinary build recovers automatically (D-020). Uses the env-gated hold hook so the build is
         #    deterministically inside its ownership epoch (marker present,
         #    lock held) when killed.
         root = base / "t5"
@@ -182,14 +188,14 @@ def main():
         os.kill(proc.pid, signal.SIGKILL)
         proc.wait(timeout=60)
         check("5 marker REMAINS after SIGKILL mid-epoch", marker(root))
-        rc, _ = run(root, "build")
-        check("5 ordinary build refuses after kill", rc == 1)
-        rc, _ = run(root, "build", "--repair")
-        check("5 build --repair succeeds after kill", rc == 0)
-        check("5 marker cleared after repair", not marker(root))
+        rc, err = run(root, "build")
+        check("5 ordinary build recovers automatically after kill", rc == 0 and "Recovering automatically" in err)
+        check("5 marker cleared after the automatic recovery", not marker(root))
         shutil.rmtree(hold_dir, ignore_errors=True)
 
-        # 6. build --repair fails before new mutations -> marker STILL remains.
+        # 6. build --repair whose only page fails with an ordinary error: every
+        #    page was settled (the failed one keeps its state and joins
+        #    .nift/failed.json), so the crash evidence is resolved (D-020).
         root = base / "t6"
         root.mkdir()
         scaffold(root, ["/"])
@@ -197,12 +203,12 @@ def main():
         (root / ".nift/.unfinished").touch()          # stale evidence
         rc, _ = run(root, "build", "--repair")
         check("6 repair fails on broken source", rc != 0)
-        check("6 marker REMAINS after failed repair (evidence unresolved)",
-              marker(root))
+        check("6 settled repair clears the marker", not marker(root))
+        check("6 failed page recorded", (root / ".nift/failed.json").exists())
         (root / "templates/template.html").write_text("@content\n")
-        rc, _ = run(root, "build", "--repair")
-        check("6 fixed repair succeeds", rc == 0)
-        check("6 marker cleared after successful repair", not marker(root))
+        rc, _ = run(root, "build")
+        check("6 ordinary build after the fix succeeds", rc == 0)
+        check("6 failed list cleared", not (root / ".nift/failed.json").exists())
 
         # 7. build --auto pass fails with zero mutation -> marker cleared; the
         #    watch loop still exits non-zero (conservative error handling).
@@ -253,8 +259,8 @@ def main():
 
         # 11. reconcile_watch failure AFTER derived deletion (output removed for
         #     a disappeared page, then the watch-state save fails): marker
-        #     REMAINS; ordinary build refuses; --repair recovers once the
-        #     authoritative project is restored.
+        #     REMAINS; the next ordinary build recovers automatically (D-020);
+        #     --repair still recovers once the authoritative project is restored.
         root = base / "t11"
         root.mkdir()
         scaffold(root, ["/"])
@@ -275,7 +281,7 @@ def main():
               not (root / "public/posts/p1.html").exists())
         check("11 marker REMAINS (mutation_started true)", marker(root))
         rc, err = run(root, "build")
-        check("11 ordinary build refuses", rc == 1 and "build --repair" in err)
+        check("11 ordinary build recovers automatically", rc == 0 and "Recovering automatically" in err and not marker(root))
         (root / "content/posts/p1.bak").rename(root / "content/posts/p1.html")
         rc, _ = run(root, "build", "--repair")
         check("11 build --repair recovers", rc == 0)
@@ -317,8 +323,8 @@ def main():
 
         # 14. Disappearing watched target: reconcile removes it (and deletes its
         #     output = derived mutation) before targeted resolution; the result
-        #     is a clean failure with the marker retained, never a stale-pointer
-        #     dereference.
+        #     is a clean failure, never a stale-pointer dereference. Reconcile
+        #     completed its removal, so no marker remains (D-020).
         root = watch_project("t14")
         rc, _ = run(root, "watch", "content/posts", ".html")
         check("14 watch setup succeeds", rc == 0)
@@ -328,8 +334,8 @@ def main():
         (root / "content/posts/p1.html").unlink()
         rc, _ = run(root, "build", "posts/p1")
         check("14 disappearing-target build fails cleanly", rc != 0)
-        check("14 marker retained (reconcile deleted derived output)",
-              marker(root))
+        check("14 no marker (reconcile completed its deletion; D-020)",
+              not marker(root))
         rc, _ = run(root, "build", "--repair")
         check("14 --repair recovers", rc == 0)
         check("14 marker cleared after repair", not marker(root))
@@ -346,7 +352,8 @@ def main():
         check("15 no marker (zero mutations)", not marker(root))
 
         # 16. Empty resolved job set while reconcile DID perform a derived
-        #     deletion -> marker retained.
+        #     deletion that completed -> no marker (D-020: reconcile's
+        #     mutations are complete when it succeeds).
         root = watch_project("t16")
         rc, _ = run(root, "watch", "content/posts", ".html")
         check("16 watch setup succeeds", rc == 0)
@@ -356,11 +363,10 @@ def main():
         (root / "content/posts/p1.html").unlink()   # reconcile will delete output
         rc, _ = run(root, "build", "never-existed")  # no jobs, but reconcile mutated
         check("16 unresolvable target fails", rc != 0)
-        check("16 marker retained (reconcile performed a derived deletion)",
-              marker(root))
-        rc, _ = run(root, "build", "--repair")
-        check("16 --repair recovers", rc == 0)
-        check("16 marker cleared after repair", not marker(root))
+        check("16 no marker (reconcile completed its deletion)", not marker(root))
+        check("16 deleted page's output removed", not (root / "public/posts/p1.html").exists())
+        rc, _ = run(root, "build")
+        check("16 ordinary build afterwards succeeds", rc == 0)
 
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")

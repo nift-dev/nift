@@ -131,8 +131,8 @@ bool durable_sync_parent(const std::filesystem::path& path) {
 // .nift/.lock is normal persistent concurrency infrastructure. Its presence
 // does not mean a command is running and does not require repair. That is
 // deliberately distinct from .nift/.unfinished, which is evidence that a
-// derived-state mutation was not proven to finish and requires
-// `nift build --repair`. Newly created .lock files carry that explanation;
+// derived-state mutation was interrupted or left uncertain; the next build
+// recovers it automatically (as `nift build --repair`, D-020). Newly created .lock files carry that explanation;
 // existing files keep their filesystem identity and are never truncated, and
 // locking does not depend on the explanatory contents.
 // ---------------------------------------------------------------------------
@@ -495,8 +495,8 @@ bool ProjectOwnership::live_owner_exists(const std::filesystem::path& marker) {
 }
 
 ProjectOwnership::~ProjectOwnership() {
-    // Do NOT remove the marker here: a destructor path after a failed or
+    // Do NOT remove the marker here: a destructor path after an unresolved or
     // interrupted epoch must leave `.unfinished` in place so the next build
-    // refuses and repair is required. finish() is the only success path.
+    // recovers. finish() is the only path that clears it.
     close_file(file_);
 }

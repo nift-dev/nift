@@ -472,7 +472,8 @@ bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& f
 // CP3 direct in-place write. In-place truncation of an existing read-only
 // output fails on POSIX, so make it writable first (the historical direct-write
 // retry). A crash mid-write can leave a truncated file; that is the documented
-// risk recovered by the .unfinished marker + build --repair protocol.
+// risk recovered by the .unfinished marker + repair protocol (run
+// automatically by the next build, D-020).
 bool write_direct_file(const fs::path& path, const std::string& contents, fs::perms mode) {
     ensure_parent_directory(path);
     // Direct writes do not create temps, but crash-leftover .nift-tmp-* files
@@ -498,6 +499,18 @@ bool write_direct_files(const std::vector<std::pair<fs::path, std::string>>& fil
     for (const auto& [path, contents] : files)
         if (!write_direct_file(path, contents, mode)) return false;
     return true;
+}
+
+std::optional<fs::path> backup_file(const fs::path& path) {
+    const fs::path backup = temporary_sibling(path);
+    std::error_code error;
+    fs::copy_file(path, backup, fs::copy_options::overwrite_existing, error);
+    if (error) {
+        std::error_code ignored;
+        fs::remove(backup, ignored);
+        return std::nullopt;
+    }
+    return backup;
 }
 
 bool remove_owned_file(const fs::path& path) {

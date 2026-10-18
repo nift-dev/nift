@@ -70,7 +70,7 @@ NiftOperationResult automation_untrack(ProjectInfo& project, const std::vector<s
     const ProjectOwnership::State state = ownership.acquire();
     if (state == ProjectOwnership::State::Live) { r.ok = false; r.exit_code = 1; r.errors.push_back("another build appears to be running; refusing to mutate build state"); return r; }
     if (state == ProjectOwnership::State::Failed) { r.ok = false; r.exit_code = 1; r.errors.push_back("could not acquire the build lock"); return r; }
-    if (state == ProjectOwnership::State::Stale) { r.ok = false; r.exit_code = 1; r.errors.push_back("unfinished build detected; run build --repair before changing tracking"); return r; }
+    if (state == ProjectOwnership::State::Stale) { r.ok = false; r.exit_code = 1; r.errors.push_back("unfinished build detected; run build (it recovers automatically, as build --repair) before changing tracking"); return r; }
     for (const auto& name : names) {
         auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == name; });
         if (it == project.tracked.end()) continue;

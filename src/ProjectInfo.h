@@ -83,12 +83,18 @@ public:
     // call, exposed to the structured automation API.
     std::vector<std::string> last_build_affected;
 
-    // Central epoch-completion rule (CP3.1): every controlled exit after
-    // ownership acquisition routes through this and returns the command exit
-    // code. A failure clears the marker only for an ordinary build with proven
-    // zero recovery-relevant mutations; success clears it; a repair whose
-    // required sweep fails retains the marker and returns failure.
+    // Central epoch-completion rule (CP3.1, D-020): every controlled exit
+    // after ownership acquisition routes through this and returns the command
+    // exit code. The marker records uncertainty, not failure: it is cleared on
+    // success AND on an ordinary failure (failed pages carry a failure record,
+    // succeeded pages committed normally), and kept only when a mutation could
+    // not be brought back to a consistent state (unresolved_mutation()). A
+    // repair additionally needs every page settled (rebuilt or carrying a
+    // failure record) and its required sweep to converge.
     int finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair);
+    // Body of build_all once ownership is held (also the automatic recovery
+    // path: a stale marker runs it with force+repair).
+    int build_all_owned(ProjectOwnership& ownership, bool force, bool explain, bool repair);
 
     // CP4 repair sweep: called after a successful repair rebuild. Removes only
     // derived artifacts Nift can establish as its own: pagination surplus of
@@ -100,13 +106,19 @@ public:
     // operation fails (repair must not certify convergence).
     bool repair_derived_state();
 
-    // Zero-mutation failure distinction (CP2.2): monotonic flag set BEFORE any
-    // recovery-relevant derived mutation (output write, pagination write, stale
-    // output/pagination deletion, .info.json write). A controlled failure with
-    // the flag still false has proven zero derived mutations and may clear
-    // .unfinished; any mutation means repair is required.
+    // CP2.2 monotonic flag set BEFORE any recovery-relevant derived mutation
+    // (output write, script run, reconcile deletion). Since D-020 it no longer
+    // decides the marker by itself: a failed page is settled per page
+    // (settle_failed_page), and only a reconcile failure after deletions turns
+    // it into an unresolved mutation.
     void mark_mutation() { mutation_started_.store(true, std::memory_order_relaxed); }
     bool mutation_started() const { return mutation_started_.load(std::memory_order_relaxed); }
+    // D-020: set when a derived-state mutation could not be brought back to a
+    // consistent state (a Nift-owned write failed, a failure record or output
+    // restore could not be written, reconcile failed after removing files).
+    // Only this keeps .nift/.unfinished after a controlled exit.
+    void mark_unresolved() { unresolved_mutation_.store(true, std::memory_order_relaxed); }
+    bool unresolved_mutation() const { return unresolved_mutation_.load(std::memory_order_relaxed); }
 
     bool reconcile_watch();
     WatchList& watch_list();
@@ -131,6 +143,28 @@ private:
     mutable std::mutex hierarchy_mutex_;
     mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
     std::atomic<bool> mutation_started_{false};
+    std::atomic<bool> unresolved_mutation_{false};
+    // True once build_many processed every job (each one succeeded, failed
+    // with a failure record, or was blocked with one); repair needs it.
+    bool last_build_settled_ = false;
+    struct PageAttempt;
+    bool build_one_attempt(TrackedInfo& info, std::optional<BuildError>* out_error, std::vector<std::string>* identities, PageAttempt& attempt);
+    // Leaves a failed page consistent and dirty: restores last-good outputs
+    // of scripted pages, writes the failure record, marks unresolved on error.
+    void settle_failed_page(const TrackedInfo& info, const PageAttempt& attempt);
+    // D-020 failed-page list (.nift/failed.json): names of tracked pages whose
+    // last build failed (or was blocked by a failed prerequisite), with the
+    // largest pagination count any attempt wrote. Their page-info and
+    // last-good outputs are left untouched; the list only makes them dirty
+    // ("previous build of this page failed") whatever selected them. Absent
+    // when empty, so a healthy project pays one stat per command.
+    std::unordered_map<std::string, std::size_t> failed_pages_;
+    bool failed_pages_dirty_ = false;
+    std::mutex failed_mutex_;
+    std::unordered_map<std::string, std::size_t> failed_now_;
+    std::filesystem::path failed_pages_path() const;
+    void load_failed_pages();
+    bool save_failed_pages();
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;
     mutable bool tracked_output_index_valid_ = false;

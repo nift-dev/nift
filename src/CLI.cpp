@@ -2302,8 +2302,9 @@ int run_cli(int argc, char** argv) {
         // so the lock is held continuously for the whole mutation window (no
         // TOCTOU against a concurrently starting build). A live owner and a
         // stale .unfinished both refuse: stale derived state is untrusted and
-        // only `build --repair` may mutate it. A crash mid-mutation leaves
-        // .unfinished, so the next build refuses and --repair restores.
+        // only a build (which recovers it automatically, D-020) or `build
+        // --repair` may mutate it. A crash mid-mutation leaves .unfinished, so
+        // the next build recovers.
         ProjectOwnership ownership(project.root / ".nift/.unfinished");
         const ProjectOwnership::State ownership_state = ownership.acquire();
         if (ownership_state == ProjectOwnership::State::Live) {
@@ -2315,7 +2316,7 @@ int run_cli(int argc, char** argv) {
             return 1;
         }
         if (ownership_state == ProjectOwnership::State::Stale) {
-            console::error("unfinished build detected; generated build state may be incomplete. run `nift build --repair` to reconstruct it before changing tracking.");
+            console::error("unfinished build detected; generated build state may be incomplete. run `nift build` (it recovers automatically, as `nift build --repair`) before changing tracking.");
             return 1;
         }
         for (int i = 2; i < argc; ++i) {
@@ -2364,7 +2365,7 @@ int run_cli(int argc, char** argv) {
         // CP2.1: full ownership epoch for the mutation window (no probe). All
         // validation above runs before acquisition, so a validation failure
         // does not leave a marker; a crash during the mutations below leaves
-        // .unfinished so the next build refuses and --repair restores.
+        // .unfinished so the next build recovers automatically (D-020).
         ProjectOwnership ownership(project.root / ".nift/.unfinished");
         const ProjectOwnership::State ownership_state = ownership.acquire();
         if (ownership_state == ProjectOwnership::State::Live) {
@@ -2376,7 +2377,7 @@ int run_cli(int argc, char** argv) {
             return 1;
         }
         if (ownership_state == ProjectOwnership::State::Stale) {
-            console::error("unfinished build detected; generated build state may be incomplete. run `nift build --repair` to reconstruct it before changing tracking.");
+            console::error("unfinished build detected; generated build state may be incomplete. run `nift build` (it recovers automatically, as `nift build --repair`) before changing tracking.");
             return 1;
         }
 

@@ -1,0 +1,82 @@
+diff --git a/contract/build_recovery_smoke.sh b/contract/build_recovery_smoke.sh
+new file mode 100644
+index 0000000..c015819
+--- /dev/null
++++ b/contract/build_recovery_smoke.sh
+@@ -0,0 +1,64 @@
++#!/usr/bin/env bash
++# D-020 (Runtime 2.0 feature-build-recovery): errors are loud, recovery is
++# automatic whenever it is safe. An ordinary build failure ends non-zero,
++# keeps the failed page's last-good output and page metadata, leaves no
++# .nift/.unfinished, and the next build works once the problem is fixed -
++# never requiring --repair. An unfinished marker left by an interrupted build
++# is recovered automatically by the next plain build.
++set -euo pipefail
++NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
++TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-build-recovery.XXXXXX")"
++trap 'rm -rf "$TMP"' EXIT
++fail() { echo "FAIL: $*" >&2; exit 1; }
++
++for mode in modified hash hybrid; do
++  P="$TMP/$mode"; mkdir -p "$P/.nift" "$P/content" "$P/templates" "$P/public" "$P/scripts"
++  cat >"$P/.nift/config.json" <<JSON
++{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/t.html","build-threads":4,"incremental-mode":"$mode"}}
++JSON
++  cat >"$P/.nift/tracked.json" <<'JSON'
++{"tracked":[{"name":"a","title":"A","template":"templates/t.html"},{"name":"b","title":"B","template":"templates/t.html"},{"name":"c","title":"C","template":"templates/t.html"}]}
++JSON
++  printf '@content\n' >"$P/templates/t.html"
++  for x in a b c; do printf '<p>%s-1</p>\n' "$x" >"$P/content/$x.html"; done
++  (cd "$P" && "$NIFT_BIN" build >/dev/null)
++  cp "$P/public/b.html" "$P/b-old"; cp "$P/.nift/public/b.info.json" "$P/b-info-old"
++
++  # Ordinary partial failure.
++  printf '<p>a-2</p>\n' >"$P/content/a.html"
++  printf '@input("missing.txt")\n' >"$P/content/b.html"
++  if (cd "$P" && "$NIFT_BIN" build >fail.log 2>&1); then fail "$mode: failing build returned success"; fi
++  grep -q 'error' "$P/fail.log" || fail "$mode: failure was not reported"
++  [ ! -e "$P/.nift/.unfinished" ] || fail "$mode: ordinary failure left .nift/.unfinished"
++  grep -q 'a-2' "$P/public/a.html" || fail "$mode: successful page not committed"
++  cmp -s "$P/public/b.html" "$P/b-old" || fail "$mode: failed page lost its last-good output"
++  cmp -s "$P/.nift/public/b.info.json" "$P/b-info-old" || fail "$mode: failed page metadata changed"
++  (cd "$P" && "$NIFT_BIN" status >status.log 2>&1) || true
++  grep -q 'previous build of this page failed' "$P/status.log" || fail "$mode: failed page not reported as needing a rebuild"
++
++  # Fix -> plain build, no --repair.
++  printf '<p>b-2</p>\n' >"$P/content/b.html"
++  (cd "$P" && "$NIFT_BIN" build >fixed.log 2>&1) || fail "$mode: build after the fix failed: $(cat "$P/fixed.log")"
++  grep -q 'b-2' "$P/public/b.html" || fail "$mode: fixed page not rebuilt"
++  (cd "$P" && "$NIFT_BIN" build >noop.log 2>&1) || fail "$mode: no-op build failed"
++  grep -q 'up to date' "$P/noop.log" || fail "$mode: build not clean after the fix"
++
++  # Failing project post-build hook: loud, non-zero, no marker.
++  python3 -S - "$P/.nift/config.json" <<'PY'
++import json,sys
++d=json.load(open(sys.argv[1])); d["config"]["post build"]="scripts/bad.f"; json.dump(d,open(sys.argv[1],"w"))
++PY
++  printf 'undefined_function_xyz()\n' >"$P/scripts/bad.f"
++  if (cd "$P" && "$NIFT_BIN" build >hook.log 2>&1); then fail "$mode: failing hook returned success"; fi
++  [ ! -e "$P/.nift/.unfinished" ] || fail "$mode: hook failure left .nift/.unfinished"
++  printf 'print("ok")\n' >"$P/scripts/bad.f"
++  (cd "$P" && "$NIFT_BIN" build >/dev/null 2>&1) || fail "$mode: build after the hook fix failed"
++
++  # Interrupted-build evidence (marker with no live owner) is recovered
++  # automatically by the next plain build.
++  touch "$P/.nift/.unfinished"
++  (cd "$P" && "$NIFT_BIN" build >recover.log 2>&1) || fail "$mode: automatic recovery failed: $(cat "$P/recover.log")"
++  grep -q 'unfinished build detected' "$P/recover.log" || fail "$mode: recovery was not announced"
++  [ ! -e "$P/.nift/.unfinished" ] || fail "$mode: recovery left the marker"
++done
++echo "PASS build recovery (D-020)"
+diff --git a/run-contract.sh b/run-contract.sh
+index af586a5..8d615b8 100755
+--- a/run-contract.sh
++++ b/run-contract.sh
+@@ -157,6 +157,7 @@ CONTRACT_TESTS=(
+   v48_init_migration_smoke.sh
+   v48_comparison_parity_smoke.sh
+   v48_callable_parity_smoke.sh
++  build_recovery_smoke.sh
+ )
+ 
+ # Fail closed when a contract file is added but not wired into the canonical runner.

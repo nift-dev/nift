@@ -7,8 +7,9 @@ For representative projects, corrupt only DERIVED state, then require:
   ordinary incremental build afterward is clean/successful
   no .unfinished remains
   a second repair converges identically (idempotence)
-Also: repair failure on broken authoritative input retains the marker;
-interrupted repair retains the marker and a second repair converges;
+Also (D-020): a repair whose pages fail with ordinary errors settles them
+(failed pages join .nift/failed.json) and clears the marker; an interrupted
+repair retains the marker and the next build (or repair) converges;
 repair/build concurrency excludes two simultaneous epochs.
 """
 import json
@@ -191,7 +192,8 @@ def main():
               not (r / "public/blog-3.html").exists())
         check("pagination-shrink-corrupt: no marker", not marker(r))
 
-        # Repair failure on broken authoritative input retains the marker.
+        # Repair on broken authoritative input: an ordinary error. Every page is
+        # settled (recorded as failed), so no marker remains (D-020).
         r = base / "repair-failure"
         r.mkdir()
         canonical_project(r)
@@ -199,7 +201,8 @@ def main():
         (r / "templates/template.html").write_text("@if(never closed{\n")
         rc, _ = run(r, "build", "--repair")
         check("repair-failure: broken template repair returns nonzero", rc != 0)
-        check("repair-failure: marker remains", marker(r))
+        check("repair-failure: settled repair leaves no marker", not marker(r))
+        check("repair-failure: failed pages recorded", (r / ".nift/failed.json").exists())
         (r / "templates/template.html").write_text(
             "<main>@input('templates/head.html')</main>\n@content\n")
         rc, _ = run(r, "build", "--repair")
@@ -207,8 +210,9 @@ def main():
         check("repair-failure: marker cleared", not marker(r))
         check("repair-failure: tree converges", tree(r) == canonical)
 
-        # Interrupted repair: kill mid-epoch -> marker remains -> ordinary
-        # refuses -> second repair converges. (Deterministic via the hold hook.)
+        # Interrupted repair: kill mid-epoch -> marker remains -> the ordinary
+        # build recovers automatically (D-020) -> a further repair converges.
+        # (Deterministic via the hold hook.)
         r = base / "interrupted-repair"
         r.mkdir()
         canonical_project(r)
@@ -228,7 +232,7 @@ def main():
         proc.wait(timeout=60)
         check("interrupted-repair: marker remains after kill", marker(r))
         rc, _ = run(r, "build")
-        check("interrupted-repair: ordinary build refuses", rc == 1)
+        check("interrupted-repair: ordinary build recovers automatically", rc == 0 and not marker(r))
         rc, _ = run(r, "build", "--repair")
         check("interrupted-repair: second repair succeeds", rc == 0)
         check("interrupted-repair: tree converges", tree(r) == canonical)
@@ -309,8 +313,9 @@ def main():
                   not (r / "keepme.txt").exists() and not (r.parent / "outside.txt").exists())
 
         # Sweep-failure: a REQUIRED orphan-info removal fails (read-only
-        # containing dir) -> repair non-zero, marker retained, ordinary build
-        # refuses; restore -> second repair succeeds. (Permission-based; root
+        # containing dir) -> repair non-zero, marker retained, the ordinary
+        # build retries the recovery and fails the same way; restore -> second
+        # repair succeeds. (Permission-based; root
         # bypasses POSIX mode bits, so it is skipped when running as root.)
         if os.geteuid() != 0:
             r = base / "sweep-failure"
@@ -327,7 +332,7 @@ def main():
             check("sweep-failure: repair returns non-zero", rc != 0)
             check("sweep-failure: marker retained", marker(r))
             rc, _ = run(r, "build")
-            check("sweep-failure: ordinary build refuses", rc == 1)
+            check("sweep-failure: ordinary build retries recovery, still retained", rc != 0 and marker(r))
             (r / ".nift/public/gone").chmod(0o755)
             rc, _ = run(r, "build", "--repair")
             check("sweep-failure: second repair succeeds", rc == 0)

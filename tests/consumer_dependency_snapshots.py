@@ -142,8 +142,10 @@ def post_hook_output_validation(binary,base):
  r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
  assert r.returncode!=0,(r.stdout,r.stderr)
  assert metadata(p,'a').read_bytes()==old
- assert (p/'.nift/.unfinished').exists()
- (p/'post.f').write_text('print("post")\n');run(binary,p,'build','--repair')
+ # D-020: a failing post-build script is an ordinary failure: no marker, the
+ # last-good output is put back, and the next ordinary build recovers.
+ assert not (p/'.nift/.unfinished').exists();assert (p/'public/a.html').exists()
+ (p/'post.f').write_text('print("post")\n');run(binary,p,'build')
  assert hashes(p,'a')['templates/shared.html']==hash_bytes(dep.read_bytes())
  old=metadata(p,'a').read_bytes();dep.write_text('LATER\n@content');(p/'post.f').write_text('missing_function()\n')
  r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
