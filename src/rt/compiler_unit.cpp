@@ -99,7 +99,8 @@ bool UnitCompiler::may_double(const TextType& type, std::size_t scope) const {
 // double type (or another binding's type that may be double) while the
 // value is not a non-integral number.
 bool UnitCompiler::type_mismatch_possible(const TextType& type, std::uint8_t kinds, std::size_t scope) const {
-    if (kinds & kKindUnknown) return false;  // refused for its own reason
+    if (unknown_defers(kinds)) return false;
+    if (kinds & kKindUnknown) kinds = kKindAll;  // may be anything (review D1)
     return may_double(type, scope) && (kinds & static_cast<std::uint8_t>(kKindAll & ~kKindFrac)) != 0;
 }
 

@@ -8,6 +8,7 @@
 #include "rt/ast.h"
 #include "rt/proto.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,6 +22,11 @@ struct CompileResult {
 };
 
 // `root` must be the Program node of a successful parse_script.
-CompileResult compile_unit(const Ast& ast, NodeId root);
+// Analysis limits (tests lower them to exercise the refusal).
+struct CompileLimits {
+    std::size_t kind_walks = 0;  // infer_unit_kinds max_walks (0: automatic)
+};
+
+CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());
 
 } // namespace nift::rt

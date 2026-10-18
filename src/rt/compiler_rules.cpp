@@ -227,7 +227,7 @@ bool UnitCompiler::statement_preparable(const Node& node) const {
 }
 
 bool UnitCompiler::kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason) {
-    if ((kinds(id) & kKindUnknown) || (kinds(id) & ~allowed) == 0) return true;
+    if ((kinds(id) & ~allowed) == 0 || unknown_defers(kinds(id))) return true;  // Unknown: never within (D1)
     return fail(at, reason);
 }
 
@@ -238,7 +238,7 @@ bool UnitCompiler::kinds_within(NodeId id, std::uint8_t allowed, const Node& at,
 bool UnitCompiler::no_alias(NodeId value, const Node& at) {
     const NodeKind kind = ast_.at(value).kind;
     if (kind != NodeKind::Ident && kind != NodeKind::Member && kind != NodeKind::Index) return true;
-    if ((kinds(value) & kKindUnknown) || (kinds(value) & kKindAggregate) == 0) return true;
+    if ((kinds(value) & (kKindAggregate | kKindUnknown)) == 0 || unknown_defers(kinds(value))) return true;
     return fail(at, "aliasing");
 }
 

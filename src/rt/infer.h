@@ -27,6 +27,7 @@
 #include "rt/ast.h"
 #include "rt/resolver.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -44,16 +45,25 @@ inline constexpr std::uint8_t kKindAggregate = kKindArray | kKindObject;
 inline constexpr std::uint8_t kKindScalar = kKindNull | kKindBool | kKindNumber | kKindString;
 inline constexpr std::uint8_t kKindAll = 0x7f;
 // Derived from something the compiler refuses anyway (an unresolved name, an
-// unsupported expression): checks defer to that refusal.
+// unsupported expression). Never permissive: every check treats it as "may be
+// anything" and refuses (review CP12 round 1, D1); the unit is refused either
+// way, at most for another reason.
 inline constexpr std::uint8_t kKindUnknown = 0x80;
 
 struct UnitKinds {
     std::vector<std::uint8_t> kinds;  // per NodeId (expressions)
+    // False when the fixpoint ran out of its walk budget: the kinds are then
+    // not sound and the compiler refuses the unit (`analysis-limit:kinds`),
+    // never compiles it with weakened checks (review CP12 round 1, D1).
+    bool converged = false;
+    std::size_t walks = 0;  // unit walks the worklist needed (statistics, tests)
     std::uint8_t of(NodeId id) const {
         return id < kinds.size() ? kinds[id] : static_cast<std::uint8_t>(kKindAll | kKindUnknown);
     }
 };
 
-UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan);
+// `max_walks` bounds the worklist (0: 64 walks per unit + 1024); beyond it
+// the result is not converged.
+UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks = 0);
 
 } // namespace nift::rt

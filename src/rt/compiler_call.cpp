@@ -141,7 +141,8 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const std::uint8_t object_kinds = kinds(node.a), key_kinds = kinds(node.b);
     const bool array = (object_kinds & ~kKindArray) == 0 && (key_kinds & ~kKindNumber) == 0;
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
-    if (!array && !object && !((object_kinds | key_kinds) & kKindUnknown)) return fail(node, "type:index");
+    if (!array && !object && !unknown_defers(object_kinds | key_kinds))  // Unknown is neither (review D1)
+        return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
     if (!reg_any(node.a, object_reg)) return false;

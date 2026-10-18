@@ -6,6 +6,8 @@
 #include "rt/native.h"
 
 #include <cmath>
+#include <deque>
+#include <set>
 #include <map>
 #include <memory>
 #include <string>
@@ -30,29 +32,55 @@ public:
         for (std::size_t f = 0; f < n; ++f) params_[f].assign(ast.at(plan.functions[f]).count, empty_ty());
     }
 
-    UnitKinds run() {
-        // Monotone unions over a finite (depth-capped) lattice: terminates.
-        // The final pass (no change) leaves every node consistent.
-        for (int pass = 0; pass < 200; ++pass) {
-            changed_ = false;
-            walk_main();
-            for (std::size_t f = 0; f < plan_.functions.size(); ++f) walk_function(f);
-            if (!changed_) return std::move(result_);
+    // Monotone unions over a finite (depth-capped) lattice: terminates.
+    // Worklist over the call graph (review CP12 round 1, D1): a unit (main or
+    // a function) is walked again only when its bindings, a parameter or a
+    // callee's return grew, so a call chain converges in O(chain) walks; a
+    // unit's last walk sees its final inputs. Out of budget the result is
+    // "not converged" (never "know nothing") and the compiler refuses.
+    UnitKinds run(std::size_t max_walks) {
+        const std::size_t n = plan_.functions.size();
+        callers_.assign(n, {});
+        queued_.assign(n + 1, false);
+        enqueue(n);  // main first: its calls seed the parameters
+        for (std::size_t f = n; f-- > 0;) enqueue(f);
+        for (std::size_t budget = max_walks ? max_walks : 64 * (n + 1) + 1024; !queue_.empty(); --budget) {
+            if (budget == 0) return std::move(result_);  // converged stays false
+            const std::size_t unit = queue_.front();
+            queue_.pop_front();
+            queued_[unit] = self_changed_ = false;
+            if (unit == n) walk_main();
+            else walk_function(unit);
+            ++result_.walks;
+            if (self_changed_) enqueue(unit);
         }
-        // Not converged (cannot happen with the depth cap): know nothing.
-        result_.kinds.assign(ast_.size(), static_cast<std::uint8_t>(kKindAll | kKindUnknown));
+        result_.converged = true;
         return std::move(result_);
     }
 
 private:
+    void enqueue(std::size_t unit) {
+        if (!queued_[unit]) queue_.push_back(unit);
+        queued_[unit] = true;
+    }
+
+    std::size_t current_unit() const {
+        return current_ < 0 ? plan_.functions.size() : static_cast<std::size_t>(current_);
+    }
+
     using Scope = std::vector<std::pair<std::string_view, std::size_t>>;
 
-    void merge(TyRef& into, const TyRef& value) {
+    // Unions `value` into `into`; true if it grew (the caller re-queues).
+    bool merge(TyRef& into, const TyRef& value) {
         TyRef next = unite(into, value);
-        if (!same(next, into)) {
-            into = std::move(next);
-            changed_ = true;
-        }
+        if (same(next, into)) return false;
+        into = std::move(next);
+        return true;
+    }
+    void merge_local(TyRef& into, const TyRef& value) { self_changed_ = merge(into, value) || self_changed_; }
+    void merge_return(const TyRef& value) {  // the callers read the return
+        if (current_ >= 0 && merge(returns_[static_cast<std::size_t>(current_)], value))
+            for (std::size_t caller : callers_[static_cast<std::size_t>(current_)]) enqueue(caller);
     }
 
     void declare(std::string_view name, NodeId at, const TyRef& value) {
@@ -62,7 +90,7 @@ private:
             slot = vars_.size();
             vars_.push_back(empty_ty());
         }
-        merge(vars_[slot], value);
+        merge_local(vars_[slot], value);
         scopes_.back().emplace_back(name, slot);
     }
 
@@ -209,26 +237,13 @@ private:
             if (callee.kind == NodeKind::Ident && lookup_native(ast_.text(callee), native)) return kinds_ty(kKindNull);
             return any_ty();
         }
-        auto& params = params_[static_cast<std::size_t>(f)];
-        for (std::uint32_t k = 0; k < n.count && k < params.size(); ++k) merge(params[k], values[k]);
-        return returns_[static_cast<std::size_t>(f)];
-    }
-
-    // Can control reach the end of `block` (a Block node)?
-    bool falls_through(NodeId block) const {
-        const Node& b = ast_.at(block);
-        if (b.count == 0) return true;
-        const Node& last = ast_.at(ast_.list(b)[b.count - 1]);
-        if (last.kind == NodeKind::Return) return false;
-        if (last.kind == NodeKind::If) return if_falls(ast_.list(b)[b.count - 1]);
-        return true;
-    }
-
-    bool if_falls(NodeId id) const {
-        const Node& n = ast_.at(id);
-        if (n.c == kNoNode) return true;
-        const Node& other = ast_.at(n.c);
-        return falls_through(n.b) || (other.kind == NodeKind::If ? if_falls(n.c) : falls_through(n.c));
+        const auto fn_index = static_cast<std::size_t>(f);
+        auto& params = params_[fn_index];
+        bool grew = false;
+        for (std::uint32_t k = 0; k < n.count && k < params.size(); ++k) grew = merge(params[k], values[k]) || grew;
+        if (grew) enqueue(fn_index);
+        callers_[fn_index].insert(current_unit());  // re-walked when the return grows
+        return returns_[fn_index];
     }
 
     void block(NodeId id) {
@@ -253,7 +268,7 @@ private:
         // The variable's type loses its positions for good (merge would keep
         // the old tuple): replace it, monotonically larger.
         TyRef next = unite(TyRef(updated), TyRef(updated));
-        if (!same(next, *var)) { *var = next; changed_ = true; }
+        if (!same(next, *var)) { *var = next; self_changed_ = true; }
     }
 
     void statement(NodeId id) {
@@ -269,7 +284,7 @@ private:
                 const TyRef v = expr(n.b);
                 const Node& target = ast_.at(n.a);
                 if (target.kind == NodeKind::Ident) {
-                    if (TyRef* var = find(ast_.text(target))) merge(*var, v);
+                    if (TyRef* var = find(ast_.text(target))) merge_local(*var, v);
                 } else if (target.kind == NodeKind::Index) {
                     expr(target.b);
                     add_element(ast_.at(target.a), v);
@@ -293,7 +308,7 @@ private:
                 }
                 std::uint8_t out = arithmetic_kinds(op, (*var)->kinds, v->kinds);
                 if (op == Op::Add && ((*var)->kinds & kKindString) && (v->kinds & kKindString)) out |= kKindString;
-                merge(*var, kinds_ty(out));
+                merge_local(*var, kinds_ty(out));
                 record(n.a, *var);
                 break;
             }
@@ -301,7 +316,7 @@ private:
                 const Node& target = ast_.at(n.a);
                 if (target.kind == NodeKind::Ident)
                     if (TyRef* var = find(ast_.text(target))) {
-                        merge(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
+                        merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
                         record(n.a, *var);
                     }
                 break;
@@ -317,12 +332,8 @@ private:
             }
             case NodeKind::While: expr(n.a); block(n.b); break;
             case NodeKind::Return:
-                if (!(n.flags & kFlagBare) && n.a != kNoNode) {
-                    const TyRef v = expr(n.a);
-                    if (current_ >= 0) merge(returns_[static_cast<std::size_t>(current_)], v);
-                } else if (current_ >= 0) {
-                    merge(returns_[static_cast<std::size_t>(current_)], kinds_ty(kKindNull));
-                }
+                if (!(n.flags & kFlagBare) && n.a != kNoNode) merge_return(expr(n.a));
+                else merge_return(kinds_ty(kKindNull));
                 break;
             case NodeKind::ExprStmt: {
                 const Node& e = ast_.at(n.a);
@@ -358,7 +369,7 @@ private:
         const NodeId* params = ast_.list(fn);
         for (std::uint32_t k = 0; k < fn.count; ++k) declare(ast_.text(ast_.at(params[k])), params[k], params_[f][k]);
         statements(ast_.at(fn.b));
-        if (falls_through(fn.b)) merge(returns_[f], kinds_ty(kKindNull));
+        if (block_falls_through(ast_, fn.b)) merge_return(kinds_ty(kKindNull));
     }
 
     const Ast& ast_;
@@ -370,14 +381,17 @@ private:
     std::vector<TyRef> vars_;
     std::vector<std::size_t> persist_index_;
     std::vector<Scope> scopes_;
+    std::vector<std::set<std::size_t>> callers_;  // per function: the units reading its return
+    std::deque<std::size_t> queue_;
+    std::vector<bool> queued_;
     int current_ = -1;
-    bool changed_ = false;
+    bool self_changed_ = false;
 };
 
 } // namespace
 
-UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan) {
-    return Inference(ast, root, plan).run();
+UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks) {
+    return Inference(ast, root, plan).run(max_walks);
 }
 
 } // namespace nift::rt

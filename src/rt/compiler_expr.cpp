@@ -43,7 +43,7 @@ OpCode fused_not_jump(Op op) {
 // Kinds an arithmetic operator accepts without a legacy type error (or a
 // prepared-path rendering of aggregates in `+`).
 bool arithmetic_kinds_ok(Op op, std::uint8_t l, std::uint8_t r) {
-    if ((l | r) & kKindUnknown) return true;  // refused for its own reason
+    if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1); probe: caller
     const auto only = [](std::uint8_t k, std::uint8_t allowed) { return (k & ~allowed) == 0; };
     if (op == Op::Add) {
         if (only(l, kKindNumber) && only(r, kKindNumber)) return true;
@@ -61,7 +61,7 @@ bool arithmetic_kinds_ok(Op op, std::uint8_t l, std::uint8_t r) {
 }
 
 bool ordering_kinds_ok(std::uint8_t l, std::uint8_t r) {
-    if ((l | r) & kKindUnknown) return true;
+    if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1)
     return ((l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0) || ((l & ~kKindString) == 0 && (r & ~kKindString) == 0);
 }
 
@@ -189,10 +189,12 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const std::uint8_t l = kinds(node.a), r = kinds(node.b);
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
-            if (!arithmetic_kinds_ok(node.op, l, r)) return fail(node, std::string("type:") + op_name(node.op));
+            if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r))
+                return fail(node, std::string("type:") + op_name(node.op));
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
-            if (!ordering_kinds_ok(l, r)) return fail(node, std::string("type:") + op_name(node.op));
+            if (!ordering_kinds_ok(l, r) && !unknown_defers(l | r))
+                return fail(node, std::string("type:") + op_name(node.op));
             break;
         default: break;
     }
@@ -317,7 +319,8 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
         // The fused form takes the same kind check as the plain comparison
         // (found by vm_context_consistency.py: `if (p > 1)` with a string p).
         const bool ordering = node.op != Op::Eq && node.op != Op::Ne;
-        if (ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)))
+        if (ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)) &&
+            !unknown_defers(kinds(node.a) | kinds(node.b)))
             return fail(node, std::string("type:") + op_name(node.op));
         std::uint16_t left = 0, right = 0;
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;

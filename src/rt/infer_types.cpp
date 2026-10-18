@@ -107,6 +107,25 @@ TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long po
     return out;
 }
 
+namespace {
+bool if_falls(const Ast& ast, NodeId id) {
+    const Node& n = ast.at(id);
+    if (n.c == kNoNode) return true;
+    const Node& other = ast.at(n.c);
+    return block_falls_through(ast, n.b) || (other.kind == NodeKind::If ? if_falls(ast, n.c)
+                                                                         : block_falls_through(ast, n.c));
+}
+} // namespace
+
+bool block_falls_through(const Ast& ast, NodeId block) {
+    const Node& b = ast.at(block);
+    if (b.count == 0) return true;
+    const Node& last = ast.at(ast.list(b)[b.count - 1]);
+    if (last.kind == NodeKind::Return) return false;
+    if (last.kind == NodeKind::If) return if_falls(ast, ast.list(b)[b.count - 1]);
+    return true;
+}
+
 std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r) {
     std::uint8_t out = 0;
     if (op == Op::Add && ((l & kKindString) || (r & kKindString))) out |= kKindString;

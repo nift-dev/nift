@@ -236,7 +236,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
 
 } // namespace detail
 
-CompileResult compile_unit(const Ast& ast, NodeId root) {
+CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
     CompileResult result;
     // Every later pass may recurse along the tree: bound its depth first,
     // iteratively (review round 3, F3).
@@ -260,12 +260,28 @@ CompileResult compile_unit(const Ast& ast, NodeId root) {
         result.offset = prepared.offset;
         return result;
     }
-    const UnitKinds kinds = infer_unit_kinds(ast, root, plan);
+    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks);
+    if (!kinds.converged) {  // never compile with unsound kinds (review D1)
+        result.reason = "analysis-limit:kinds";
+        result.offset = ast.at(root).begin;
+        return result;
+    }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
         result.offset = compiler.offset();
+        if (compiler.unknown_hit()) {
+            // Unknown kinds come from something refused anyway: report that
+            // refusal when the probe finds one (the unit is refused either way).
+            detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called);
+            probe.probe_unknown();
+            Program discarded;
+            if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
+                result.reason = probe.reason();
+                result.offset = probe.offset();
+            }
+        }
         return result;
     }
     result.program = std::move(program);

@@ -35,6 +35,8 @@ bool same(const TyRef& a, const TyRef& b);
 // The type of `value[key]` (key: a literal string, or null when unknown;
 // position: an integer literal index, or -1).
 TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long position = -1);
+// Can control reach the end of `block` (a Block node)?
+bool block_falls_through(const Ast& ast, NodeId block);
 // Result kinds of `l op r` for an arithmetic operator.
 std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r);
 

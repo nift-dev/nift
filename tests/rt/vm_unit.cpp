@@ -3,6 +3,8 @@
 // v4.12/runtime-2 and, for whole programs, by tests/runtime2/vm_parity.py).
 #include "RuntimeValue.h"
 #include "rt/aggregate.h"
+#include "rt/infer.h"
+#include "rt/resolver.h"
 #include "rt/legacy_names.h"
 #include "rt/literal.h"
 #include "rt/render.h"
@@ -516,6 +518,56 @@ void check_integer_bounds() {
     }
 }
 
+// CP12 review round 1, D1: the kind inference converges on long call chains
+// (worklist, not passes over the unit), and when it cannot it refuses the
+// unit; it never gives up into "unknown" kinds that switch checks off.
+std::string chain_program(int n, const char* tail) {
+    std::string src = "fn(g0(a)) { return a }\n";
+    for (int k = 1; k < n; ++k)
+        src += "fn(g" + std::to_string(k) + "(a)) {\n  x := a\n  return g" + std::to_string(k - 1) + "(x)\n}\n";
+    return src + "if (0 > 1) { print(g" + std::to_string(n - 1) + "(1)) }\n" + tail;
+}
+
+void check_kind_inference() {
+    // The reviewer's repros: 201 functions (one more than the old 200-pass
+    // limit), the chain never called; each tail must still be refused.
+    const Case tails[] = {
+        {"a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "aliasing"},
+        {"x := 0\ni := 0\nwhile (i < 1) { i += 1\nprint(-x) }\n", "context:negative-zero"},
+        {"fn_v := 1\nprint(\"x\" < 1)\n", "type:<"},
+        {"x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i++ }\nprint(x)\n", "context:assignment-type"},
+    };
+    for (int n : {199, 201, 500}) {
+        for (const Case& c : tails) {
+            const rt_vm_tool::Run r = rt_vm_tool::run(chain_program(n, c.source));
+            CHECK(r.reason == c.output);
+            if (r.reason != c.output) std::fprintf(stderr, "  chain %d %s: reason [%s]\n", n, c.output, r.reason.c_str());
+        }
+    }
+    // Convergence cost: a 500-function chain needs O(n) walks (each unit a
+    // few times), not O(n) passes over all n functions.
+    {
+        const std::string src = chain_program(500, "print(g499(7))\n");
+        Ast ast(src);
+        const ParseResult parsed = parse_script(ast);
+        CHECK(parsed.ok);
+        const UnitPlan plan = plan_unit(ast, parsed.root);
+        CHECK(plan.ok);
+        const UnitKinds kinds = infer_unit_kinds(ast, parsed.root, plan);
+        CHECK(kinds.converged && kinds.walks <= 4 * 501);
+        if (kinds.walks > 4 * 501) std::fprintf(stderr, "  chain 500: %zu walks\n", kinds.walks);
+        const rt_vm_tool::Run r = rt_vm_tool::run(src);
+        CHECK(r.reason.empty() && r.output == "7\n");
+        // Out of budget: not converged, and the unit is refused before
+        // execution with an explicit reason (never compiled with weakened checks).
+        CHECK(!infer_unit_kinds(ast, parsed.root, plan, 3).converged);
+        CompileLimits limits;
+        limits.kind_walks = 3;
+        const CompileResult refused = compile_unit(ast, parsed.root, limits);
+        CHECK(!refused.program && refused.reason == "analysis-limit:kinds");
+    }
+}
+
 int main() {
     check_outputs();
     check_fallbacks();
@@ -531,5 +583,6 @@ int main() {
     check_round3_fallbacks();
     check_deep_inputs();
     check_integer_bounds();
+    check_kind_inference();
     return rt_test::finish("rt vm unit");
 }

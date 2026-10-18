@@ -141,7 +141,8 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const std::uint8_t l = kinds(node.a), r = kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-    if (!numbers && !strings && !((l | r) & kKindUnknown)) return fail(node, "type:compound-assignment");
+    if (!numbers && !strings && !unknown_defers(l | r))  // Unknown is neither (review D1)
+        return fail(node, "type:compound-assignment");
     if (loop_reachable()) {
         // Legacy's prepared `%=` computes fmod on any numbers (the canonical
         // rule requires integer-valued operands).

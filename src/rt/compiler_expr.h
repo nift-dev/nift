@@ -36,6 +36,13 @@ public:
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
     std::uint32_t offset() const { return offset_; }
+    // kKindUnknown (something the compiler refuses anyway) is never treated
+    // as acceptable (review CP12 round 1, D1). A unit whose refusal involved
+    // it is compiled a second time in probe mode, where Unknown defers as
+    // before, only to report the underlying refusal reason; the probe's
+    // program is discarded even if it compiles (compiler.cpp).
+    bool unknown_hit() const { return unknown_hit_; }
+    void probe_unknown() { probe_ = true; }
 
 private:
     struct Loop {
@@ -111,7 +118,19 @@ private:
     bool statement_preparable(const Node& node) const;
     bool kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason);
     bool no_alias(NodeId value, const Node& at);
-    std::uint8_t kinds(NodeId id) const { return kinds_.of(id); }
+    // kKindUnknown always comes with every kind, so a "may be X" test is
+    // conservative for it too (review CP12 round 1, D1).
+    std::uint8_t kinds(NodeId id) const {
+        const std::uint8_t k = kinds_.of(id);
+        return (k & kKindUnknown) && !probe_ ? static_cast<std::uint8_t>(kKindAll | kKindUnknown) : k;
+    }
+    // True when kinds `k` include kKindUnknown and the check must pass (probe
+    // mode only); outside the probe it records that Unknown decided a refusal.
+    bool unknown_defers(std::uint8_t k) const {
+        if (!(k & kKindUnknown)) return false;
+        if (!probe_) unknown_hit_ = true;
+        return probe_;
+    }
     bool no_trailing_comma(const Node& node);
     bool temp(std::uint16_t& reg);
 
@@ -119,6 +138,8 @@ private:
     bool builder_ok();
     std::string_view text(const Node& node) const { return ast_.text(node); }
 
+    bool probe_ = false;
+    mutable bool unknown_hit_ = false;
     const Ast& ast_;
     const UnitPlan& plan_;
     const UnitKinds& kinds_;
