@@ -218,3 +218,19 @@ Candidates recorded (class 2, not yet changed; the VM falls back today):
 | Built-ins win over user functions; precedence varies by context | Consistent lexical resolution (D-009 #3) | CP11 D4 |
 | Aliasing depends on argument shape (`f(o.k)` aliases, `f(a)` copies) | Explicit, documented value/reference rules | CP11 D6 |
 | Some runtime errors cannot be caught | Structured, catchable runtime errors | owner |
+
+## D-016 — Coverage is measured, not maintained by test inputs (owner, 2026-10-18)
+VM coverage is a measured outcome, never a threshold kept by tuning generated
+inputs. Separate permanent suites: supported subset (100 % VM, no replay, 0
+differences), runtime-replay cases (CP11 only; CP12 removes them), unsupported
+(fallback before execution with the correct reason), general language (actual
+VM share reported, no threshold).
+
+## D-017 — Pipelined checkpoints (owner, 2026-10-18)
+When a checkpoint is stable enough for certification, development of the next
+starts at once in its own worktree (recording its base commit); certification,
+CI and review of the previous one continue independently. Next-checkpoint work
+avoids unstable interfaces of the previous one; corrections are rebased in, and
+a checkpoint is never certified on an obsolete base. On the 2-vCPU host only
+CPU-light work overlaps certification; performance is measured on an idle host.
+CP12 (replay removal) started from CP11 `bf32e4f` while CP11 certifies.
