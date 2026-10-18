@@ -383,3 +383,18 @@ engines (D-018), with old/new tests: consistent `trim` (same whitespace set as
 for `pick`/`omit` with explicit globbing (Q9). Context- and shape-dependent
 quirks (Q3, Q4, Q5, Q10, Q11) are never reproduced by the VM: they are refused
 before execution.
+
+## D-024 — Language consistency register and cleanup checkpoint (owner, 2026-10-18)
+Historical inconsistencies are tracked in `language-consistency.md` and resolved
+together in a dedicated language-semantics checkpoint once the VM migration has
+stabilised native APIs and values, correctness issues (integer precision,
+Unicode indexing) ahead of cosmetic ones. Preserving legacy behaviour in the
+meantime keeps checkpoint scope bounded; it is not an endorsement. For Unicode
+the preferred direction is code-point indexing with explicit byte operations,
+finalised after investigating performance, edge cases and migration. Natives
+operate on the compact value representation, never through legacy
+`RuntimeValue` conversions on hot paths, under per-built-in instruction guards.
+Site-DX warnings stay conservative (no speculative warnings where Nift cannot
+tell its syntax from legitimate content); strict mode rejects only genuinely
+unresolved Nift expressions; `--auto`'s fallback to `--repair` is temporary and
+must be removed or justified when build recovery integrates.
