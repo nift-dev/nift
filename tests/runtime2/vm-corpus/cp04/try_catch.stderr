@@ -1,1 +1,1 @@
-error: $ROOT/try_catch.f:1:1: print: expected one value
+error: $ROOT/try_catch.f:5:3: print: expected one value

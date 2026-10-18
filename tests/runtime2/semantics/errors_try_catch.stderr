@@ -1,1 +1,1 @@
-error: $ROOT/errors_try_catch.f:1:1: undefined callable: undefined_fn
+error: $ROOT/errors_try_catch.f:5:7: undefined callable: undefined_fn
