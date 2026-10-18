@@ -323,3 +323,17 @@ CP12 (replay removal) started from CP11 `bf32e4f` while CP11 certifies.
   separate campaigns with their own fixtures and methods; both remain
   legitimate historical evidence, labelled with their conditions. Differences
   are not called regressions without establishing comparability.
+
+## D-021 — Continuous pipeline and proactive delegation (owner, 2026-10-18; standing rule)
+Reviews, certification and CI are asynchronous parts of the pipeline, not global
+barriers. While checkpoint N is in review or certification, the coordinator
+starts N+1 (and independent parts of N+2) wherever interfaces are stable,
+delegating substantial, self-contained tasks with clear acceptance criteria.
+Each concurrent task has its own worktree, recorded base commit, owned files and
+interfaces, dependencies, required tests and integration conditions; two agents
+never edit the same files at once (stabilise an interface or sequence instead).
+Resource limits on the 2-vCPU host: code writing and light tests may overlap;
+heavy builds, sanitizer campaigns and wall-clock measurements do not.
+Certification discipline is unchanged: work developed on an earlier base is
+re-integrated and re-certified on the final base; only certified work enters
+`runtime-2`. Status updates show the pipeline and explain any idle capacity.
