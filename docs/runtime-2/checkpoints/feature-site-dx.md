@@ -482,6 +482,68 @@ Fixes:
     syntax-suffix heuristics, so no further exemptions are added.
   - **Heavy jobs** go through `heavy.sh`.
 
+### Round 2 results and rebase onto build recovery
+
+- **Rebase.** Squashed and rebased onto `runtime-2` @`e9198eb`. The
+  pre-rebase history is kept on the local branch
+  `feature-site-dx-prerebase-6d8dfa6`.
+  - **Conflicts** were in `ProjectInfo.cpp` (`build_one_attempt` /
+    `write_page_info` / the `build_many` no-op path), the certification guard
+    and `progress.md`.
+  - **Site warnings with retries.** A page's site warnings now come from its
+    latest render attempt, so a retried attempt does not duplicate them.
+  - **Workaround removed.** `BuildAutoRepairWorkaround` and its documentation
+    are gone. The watcher only runs ordinary incremental builds.
+  - **Strict with recovery.** After a failed strict build, recovery records
+    the page in `.nift/failed.json`. The next ordinary build rebuilds it
+    once (status: "previous build of this page failed"), and status is then
+    up to date. The toggle test asserts exactly this.
+- **Blocking repros** (copies of `sitedx-verify/p2`, `p4`):
+  - **Default mode.** No warning inside the closed contexts in p2, except
+    `inc.txt` (its own file). p4 `b`, `c` and `d` each warn on `$[titel]`.
+  - **Strict.** p2 `pre`, `scr`, `com`, `code` and `inc`, and p4 `b`, `c` and
+    `d`, all fail (exit 1). The clean pages pass.
+  - **w1.** Covered by watcher scenario 2.
+  - **B1 with real old-binary metadata** (v4.12 / `825c90a`): `status` up to
+    date; `status --strict` lists all 3 pages as "needs verification";
+    `build --strict` fails the dirty page; the clean pages now record 0.
+- **FP corpus under `--strict`.** `nift build --all --strict` fails only
+  pages with real attempted, unresolved interpolations. Each count is the
+  page's recorded `site-unknown-values`:
+  - **latex:** 4 — `$[t]_+`, `$[x]_p`, `$[n]_q`, `$[redacted].`;
+  - **shell:** 2 — bash `$[i]`, `$[count]`;
+  - **typos_tp:** 1 — `$[titel]`. Its unterminated `$[title` is warning-only.
+
+  Every one is a real substitution attempt: Nift would substitute it if the
+  name were defined. Directive-only pages (angular, nest_java, python,
+  handles, jsonld, vue, control `@Content()`) pass strict. Default-mode
+  warnings per file are unchanged from round 1: 14 false positives, typos
+  6/6, control 1/1.
+- **N1.** The exact three-stage pipeline result
+  (`true | missing | cat`) matched 20/20 consecutive runs. The full smoke
+  test passed 3 consecutive times on the rebased binary: 159 checks each.
+- **Perf** (siteB-1k, `build --all`, total Ir, under `heavy.sh`). Output
+  `public/` is byte-identical to `825c90a` (1,011 files; 0 warnings):
+
+  | Binary | Ir | vs `825c90a` | vs `e9198eb` |
+  | --- | --- | --- | --- |
+  | `825c90a` (pre-site-dx) | 2,980,783,635 | — | |
+  | `e9198eb` (runtime-2 with build recovery) | 2,984,655,699 | +0.13 % | — |
+  | this branch, warnings on | 3,004,567,187 | +0.80 % | +0.67 % |
+  | this branch, `--no-warn=path-outside-output` | 2,918,153,687 | −2.10 % | −2.23 % |
+  | this branch, `--no-warn=all` | 2,916,623,811 | −2.15 % | −2.28 % |
+
+- **N3.** 5,000 → 20,000 candidates: 90 ms → 355 ms, which is linear.
+- **Runs on the rebased branch** (`make -j1`; heavy jobs via `heavy.sh`):
+  - **Pass:** `test-site-dx` (159 checks), `test-build-recovery`,
+    `test-process-hardening`, `test-runtime2-rt-diff`, `test-contracts`,
+    `test-template-variables`, `test-template-optional`, `test-diagnostics`,
+    `test-v44-execution-shell`, `test-pagination`, `test-control-flow`,
+    `test-runtime2-certification-guard`, `test-test-integrity`.
+  - **Checks:** `legacy_names --check` up to date (208 names).
+  - **Regression suite** (`runtime-2` @`523d1df`): 93/94 modules pass. The
+    failure is `unreadable_source`, which fails as root.
+
 ## Proposals (not implemented)
 
 - **P1. `.nift/.unfinished` lock-out softening.** Done separately by
