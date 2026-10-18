@@ -7,6 +7,8 @@
 #include "rt/render.h"
 #include "rt/text_type.h"
 
+#include <algorithm>
+#include <iterator>
 #include <utility>
 
 // Dispatch: computed goto on GCC/Clang (labels-as-values), a portable switch
@@ -28,6 +30,12 @@ namespace {
 
 inline bool both_int(const Value& a, const Value& b) { return a.is(Kind::Int) && b.is(Kind::Int); }
 inline bool truth(const Value& v) { return v.is(Kind::Bool) ? v.as_bool() : truthy(v); }
+VmResult register_budget_exceeded() {
+    VmResult result;
+    result.reason = StopReason::Internal;
+    result.message = "register stack budget exceeded";
+    return result;
+}
 
 } // namespace
 
@@ -107,24 +115,39 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 #define RK(x) (((x) & kConstantBit) ? K[(x) & 0x7fffu] : R[(x)])
 #if NIFT_RT_COMPUTED_GOTO
 #define OP(name) L_##name:
-#define DISPATCH() goto *kLabels[static_cast<std::size_t>(pc->op)]
+#define DISPATCH() goto *labels[static_cast<std::size_t>(pc->op)]
+#define CHECKED(name) LC_##name:
+#define UNCHECKED true
 #else
 #define OP(name) case OpCode::name:
 #define DISPATCH() continue
+#define CHECKED(name)
+#define UNCHECKED !checked
 #endif
 #define NEXT() { ++pc; DISPATCH(); }
 #define FAIL() goto bail
-#define NOTE_LARGE if (fault.large) note_large(pc, fault);
+// A number legacy calls large now exists (only slow paths create one): from
+// here on the integer arithmetic opcodes take their slow paths ("checked"
+// dispatch), so every large operand is seen and recorded as evidence
+// (review CP12 round 1, D4) at no cost to programs without large numbers.
+#define NOTE_LARGE if (fault.large) { note_large(pc, fault); CHECK_FROM_NOW_ON }
+#if NIFT_RT_COMPUTED_GOTO
+#define CHECK_FROM_NOW_ON labels = checked_labels;
+#else
+#define CHECK_FROM_NOW_ON checked = true;
+#endif
 #define ARITH(name, builtin, extra)                                                                  \
     OP(name) {                                                                                       \
         const Value& l = RK(pc->b); const Value& r = RK(pc->c); std::int64_t v;                      \
-        if (both_int(l, r) && safe_integers(l.as_int(), r.as_int()) &&                                \
-            !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v) extra) {                         \
+        if (UNCHECKED && both_int(l, r) && !builtin(l.as_int(), r.as_int(), &v) && safe_integer(v)   \
+            extra) {                                                                                 \
             R[pc->a] = Value::integer(v); NEXT();                                                    \
         }                                                                                            \
-        if (!arith_slow(*pc, OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();      \
-        NOTE_LARGE NEXT();                                                                           \
-    }
+    }                                                                                                \
+    CHECKED(name)                                                                                    \
+    if (!arith_slow(*pc, OpCode::name, RK(pc->b), RK(pc->c), R[pc->a], fault) || !memory_ok(fault))  \
+        FAIL();                                                                                      \
+    NOTE_LARGE NEXT();
 #define COMPARE(name, base, expr, left, right, store)                                                \
     OP(name) {                                                                                       \
         const Value& l = RK(left); const Value& r = RK(right); bool res;                             \
@@ -145,11 +168,7 @@ VmResult Vm::run(std::string& output) {
     Fault fault;
     const Proto* proto = protos_.front();
     std::size_t base = 0;
-    if (!reserve_registers(proto->nregs + 1u)) {
-        result.reason = StopReason::Internal;
-        result.message = "register stack budget exceeded";
-        return result;
-    }
+    if (!reserve_registers(proto->nregs + 1u)) return register_budget_exceeded();
     Value* R = stack_.data();
     const Value* K = proto->constants.data();
     const Instr* pc = proto->code.data();
@@ -157,8 +176,18 @@ VmResult Vm::run(std::string& output) {
 #define NIFT_RT_LABEL(name) &&L_##name,
     static const void* const kLabels[] = {NIFT_RT_OPCODES(NIFT_RT_LABEL)};
 #undef NIFT_RT_LABEL
+    // The checked table: the integer arithmetic opcodes go straight to their
+    // slow paths (see NOTE_LARGE).
+    const void* checked_labels[std::size(kLabels)];
+    std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
+    for (const auto& [op, label] : {std::pair{OpCode::Add, &&LC_Add}, {OpCode::Sub, &&LC_Sub},
+                                    {OpCode::Mul, &&LC_Mul}, {OpCode::Mod, &&LC_Mod}, {OpCode::AddI, &&LC_AddI},
+                                    {OpCode::AddAssign, &&LC_AddAssign}})
+        checked_labels[static_cast<std::size_t>(op)] = label;
+    const void* const* labels = kLabels;
     DISPATCH();
 #else
+    bool checked = false;
     for (;;) switch (pc->op) {
 #endif
     OP(LoadK) { R[pc->a] = K[pc->b]; NEXT(); }
@@ -173,32 +202,34 @@ VmResult Vm::run(std::string& output) {
         const Value& l = RK(pc->b); const Value& r = RK(pc->c);
         // r == -1 takes the slow path: INT64_MIN % -1 traps in C++ (SIGFPE);
         // integer_arithmetic gives 0 (review CP12 round 1, D2).
-        if (both_int(l, r) && r.as_int() != 0 && r.as_int() != -1 && safe_integers(l.as_int(), r.as_int())) {
+        if (UNCHECKED && both_int(l, r) && r.as_int() != 0 && r.as_int() != -1) {
             const std::int64_t v = l.as_int() % r.as_int();
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
         }
-        if (!arith_slow(*pc, OpCode::Mod, l, r, R[pc->a], fault)) FAIL();
-        NOTE_LARGE NEXT();
     }
+    CHECKED(Mod)
+    if (!arith_slow(*pc, OpCode::Mod, RK(pc->b), RK(pc->c), R[pc->a], fault)) FAIL();
+    NOTE_LARGE NEXT();
     OP(AddI) {
-        Value& x = R[pc->b];
+        const Value& x = R[pc->b];
         // safe_integer(x) first: x + offset must not overflow int64 (UB)
         // for x near INT64_MIN/MAX (review CP12 round 1, D2 audit).
-        if (x.is(Kind::Int) && safe_integer(x.as_int()) && safe_integer(x.as_int() + jump_offset(pc->c))) {
+        if (UNCHECKED && x.is(Kind::Int) && safe_integer(x.as_int()) && safe_integer(x.as_int() + jump_offset(pc->c))) {
             R[pc->a] = Value::integer(x.as_int() + jump_offset(pc->c)); NEXT();
         }
-        if (!arith_slow(*pc, OpCode::Add, x, Value::integer(jump_offset(pc->c)), R[pc->a], fault)) FAIL();
-        NOTE_LARGE NEXT();
     }
+    CHECKED(AddI)
+    if (!arith_slow(*pc, OpCode::Add, R[pc->b], Value::integer(jump_offset(pc->c)), R[pc->a], fault)) FAIL();
+    NOTE_LARGE NEXT();
     OP(AddAssign) {
         Value& x = R[pc->a]; const Value& y = RK(pc->b); std::int64_t v;
-        if (both_int(x, y) && safe_integers(x.as_int(), y.as_int()) &&
-            !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
+        if (UNCHECKED && both_int(x, y) && !__builtin_add_overflow(x.as_int(), y.as_int(), &v) && safe_integer(v)) {
             x = Value::integer(v); NEXT();
         }
-        if (!add_assign_slow(*pc, x, y, fault) || !memory_ok(fault)) FAIL();
-        NOTE_LARGE NEXT();
     }
+    CHECKED(AddAssign)
+    if (!add_assign_slow(*pc, R[pc->a], RK(pc->b), fault) || !memory_ok(fault)) FAIL();
+    NOTE_LARGE NEXT();
     COMPARE(Eq, Eq, x == y, pc->b, pc->c, SET_RESULT)
     COMPARE(Ne, Ne, x != y, pc->b, pc->c, SET_RESULT)
     COMPARE(Lt, Lt, x < y, pc->b, pc->c, SET_RESULT)
