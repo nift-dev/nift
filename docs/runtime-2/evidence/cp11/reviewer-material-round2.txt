@@ -1,0 +1,31 @@
+# CP11 review round 2: reviewer material on the fixed build (52d0e1a/later)
+
+## Round-2 repros (NIFT_VM=classify / NIFT_VM=1)
+r1_prepare_type.f: fallback prepared-decl-type
+r1b_param_caller_scope.f: fallback prepared-decl-type
+r2_dup_arg_eval.f: fallback prepared-fn-unprepared
+r3_string_arg_name.f: fallback string-arg-type
+r3b_string_arg_number.f: fallback string-arg-type
+r4_formfeed.f: fallback opaque:legacy-runtime-error
+r4b_vtab.f: fallback opaque:legacy-runtime-error
+r5_hidden_frame_memory.f: replayed bail:recursion-budget
+r6_deep_equality.f: replayed bail:nesting-depth (the legacy replay then takes ~10 min at 50,000 levels, as legacy alone does)
+
+## Round-2 generators (scratch par.py, legacy vs NIFT_VM=1)
+g_typed seed 1: 2000 programs {'fallback': 1235, 'replayed': 411, 'vm': 354} diffs 0
+g_typed seed 2: 2000 programs {'fallback': 1281, 'replayed': 407, 'vm': 312} diffs 0
+g_typed seed 3: 2000 programs {'fallback': 1224, 'vm': 337, 'replayed': 439} diffs 0
+g_typed seed 4: 2000 programs {'fallback': 1221, 'vm': 322, 'replayed': 457} diffs 0
+g_ctl: 475 programs {'fallback': 419, 'vm': 56} diffs 0
+g_ws: 244 programs {'vm': 120, 'fallback': 124} diffs 0
+(g_typed ran on an intermediate round-2 build, before the loop-header refinement of prepared-decl-type; the permanent ports of all these generators run on the final build in `make test-rt-vm`.)
+g_prep: 4800 programs, diffs 0; g_dup: 720, diffs 0; g_dup2: 93, diffs 0 (earlier in this round)
+
+## Round-1 material
+c1-c12 (307 cases): 3 differences, all D-001#4 (legacy recursion error, VM completes)
+fy1/fz1-fz4 (129 programs): 6 differences, all D-001#4 (checked: legacy exit 1 with the recursion error, VM output extends legacy's, beyond_legacy_depth)
+fuzz2 seed 2: stats {'fallback': 775, 'vm': 80, 'none': 67, 'replayed': 78}
+fuzz2 seed 2: diffs 1
+fuzz3 seed 3: stats {'fallback': 470, 'replayed': 268, 'vm': 199, 'none': 63}
+fuzz3 seed 3: diffs 0
+fuzz2's one difference: program 226, D-001#4 (legacy recursion error at line 3, VM output extends legacy's)

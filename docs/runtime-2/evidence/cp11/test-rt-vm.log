@@ -1,0 +1,65 @@
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/vm_unit.cpp src/rt/aggregate.cpp src/rt/alias.cpp src/rt/ast.cpp src/rt/atom.cpp src/rt/codegen.cpp src/rt/compare.cpp src/rt/compiler.cpp src/rt/compiler_expr.cpp src/rt/compiler_rules.cpp src/rt/control_flow.cpp src/rt/decimal.cpp src/rt/declarations.cpp src/rt/error.cpp src/rt/expr_literals.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/handle.cpp src/rt/heap_account.cpp src/rt/legacy_bridge.cpp src/rt/legacy_names.cpp src/rt/lexer.cpp src/rt/literal.cpp src/rt/native.cpp src/rt/number.cpp src/rt/parser.cpp src/rt/prepared.cpp src/rt/prepared_parse.cpp src/rt/proto.cpp src/rt/render.cpp src/rt/resolver.cpp src/rt/script_runner.cpp src/rt/source_scan.cpp src/rt/statement_parser.cpp src/rt/string.cpp src/rt/text_type.cpp src/rt/value.cpp src/rt/vm.cpp src/rt/vm_ops.cpp src/RuntimeValue.cpp -o ".build/rt/vm-unit"
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/vm_run.cpp src/rt/aggregate.cpp src/rt/alias.cpp src/rt/ast.cpp src/rt/atom.cpp src/rt/codegen.cpp src/rt/compare.cpp src/rt/compiler.cpp src/rt/compiler_expr.cpp src/rt/compiler_rules.cpp src/rt/control_flow.cpp src/rt/decimal.cpp src/rt/declarations.cpp src/rt/error.cpp src/rt/expr_literals.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/handle.cpp src/rt/heap_account.cpp src/rt/legacy_bridge.cpp src/rt/legacy_names.cpp src/rt/lexer.cpp src/rt/literal.cpp src/rt/native.cpp src/rt/number.cpp src/rt/parser.cpp src/rt/prepared.cpp src/rt/prepared_parse.cpp src/rt/proto.cpp src/rt/render.cpp src/rt/resolver.cpp src/rt/script_runner.cpp src/rt/source_scan.cpp src/rt/statement_parser.cpp src/rt/string.cpp src/rt/text_type.cpp src/rt/value.cpp src/rt/vm.cpp src/rt/vm_ops.cpp src/RuntimeValue.cpp -o ".build/rt/vm-run"
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+".build/rt/vm-unit"
+rt vm unit: 40219 checks, 0 failures
+".build/rt/vm-prepared-parse"
+rt prepared-parser port (differential vs legacy): 100136 checks, 0 failures
+python3 tools/rt-lint.py src/rt
+PASS rt-lint: 0 problem(s)
+python3 tools/rt-vm/legacy_names.py --check
+legacy_names: 206 names, up to date
+python3 tests/runtime2/vm_parity.py --nift "/home/claude/review/nift-cp11i/nift" --gen ${RT_VM_GEN:-300} --seed ${RT_VM_SEED:-1} --rt-diff
+vm corpus: 75 scripts, 0 failures; outcomes {'fallback:alias-argument': 1, 'fallback:binding-name-reserved': 1, 'fallback:declare-const': 1, 'fallback:expression-statement': 1, 'fallback:expression:Lambda': 1, 'fallback:fn-after-statement': 1, 'fallback:fn-flags': 1, 'fallback:fn-name-reserved': 2, 'fallback:free-name': 1, 'fallback:index-assign-order': 1, 'fallback:interpolation': 1, 'fallback:jump-not-last': 1, 'fallback:method:split': 1, 'fallback:number-literal': 2, 'fallback:opaque:legacy-runtime-error': 4, 'fallback:parse-error': 1, 'fallback:prepared-decl-type': 3, 'fallback:prepared-fn-unprepared': 1, 'fallback:shebang-statement': 1, 'fallback:statement:For': 1, 'fallback:statement:StructDecl': 1, 'fallback:statement:Try': 1, 'fallback:static-error:arity': 1, 'fallback:static-error:member-assign': 1, 'fallback:static-error:redeclared': 2, 'fallback:string-arg-type': 2, 'fallback:string-literal': 1, 'fallback:unresolved-name': 1, 'replayed:bail:aliasing': 3, 'replayed:bail:number-range': 3, 'replayed:bail:recursion-budget': 2, 'replayed:bail:runtime-error': 15, 'replayed:bail:unverified': 1, 'vm': 14}
+generated: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 186, 'vm': 77, 'fallback:prepared-fn-unprepared': 14, 'replayed:bail:runtime-error': 12, 'replayed:bail:number-range': 4, 'replayed:bail:unverified': 3, 'fallback:static-error:arity': 2, 'fallback:prepared-decl-type': 2}
+mutants: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 168, 'vm': 39, 'fallback:opaque:legacy-runtime-error': 38, 'fallback:parse-error': 17, 'fallback:prepared-fn-unprepared': 9, 'replayed:bail:runtime-error': 7, 'fallback:static-error:redeclared': 4, 'fallback:fn-after-statement': 3, 'fallback:shebang-statement': 2, 'fallback:free-name': 2, 'fallback:expression-statement': 1, 'fallback:assign-free-name': 1, 'fallback:statement:For': 1, 'fallback:object-key': 1, 'fallback:string-literal': 1, 'fallback:unresolved-name': 1, 'fallback:fn-redeclared': 1, 'fallback:prepared-decl-type': 1, 'fallback:expression:Await': 1, 'fallback:declare-const': 1, 'fallback:callable:prit': 1}
+generated programs completed on the VM: 77 of 300
+rt-diff: 804 entries {"eval": 1, "script": 775, "site": 24, "workspace": 4}, 0 differing, 2 approved; 269 entries traced (1797 Host ops); combined order unstable (not compared) in 0; 0 unused policies
+rt-diff VM outcomes over 777 distinct scripts: {'fallback:fn-after-statement': 212, 'vm': 79, 'fallback:fn-flags': 55, 'fallback:statement:Import': 53, 'replayed:bail:runtime-error': 26, 'fallback:statement:StructDecl': 25, 'fallback:callable:inject': 24, 'fallback:method:sort_by': 19, 'fallback:callable:map': 16, 'fallback:statement:Try': 15, 'fallback:expression:Lambda': 14, 'fallback:opaque:legacy-runtime-error': 12, 'fallback:postfix-receiver': 12, 'fallback:callable:thread': 12, 'replayed:bail:aliasing': 11, 'fallback:method:stringify': 10, 'fallback:statement:Export': 10, 'fallback:callable:set': 9, 'fallback:method:map': 9, 'fallback:statement:For': 8, 'fallback:prepared-decl-type': 8, 'fallback:fn-name-reserved': 7, 'fallback:opaque:template-text': 6, 'fallback:declare-const': 5, 'fallback:static-error:redeclared': 5, 'fallback:number-literal': 5, 'fallback:callable:getenv': 5, 'fallback:callable:mutex': 5, 'fallback:static-error:arity': 4, 'fallback:unresolved-name': 4, 'fallback:callable:file': 4, 'fallback:callable:run': 4, 'fallback:assign-free-name': 3, 'replayed:bail:recursion-budget': 3, 'fallback:callable:timer': 3, 'fallback:expression-statement': 3, 'fallback:string-literal': 3, 'fallback:free-name': 3, 'fallback:interpolation': 3, 'replayed:bail:number-range': 3, 'fallback:binding-name-reserved': 3, 'fallback:callable:ls': 3, 'fallback:statement:Command': 3, 'fallback:callable:ffi_open': 3, 'fallback:method:sort': 2, 'fallback:statement:Throw': 2, 'fallback:callable:nope': 2, 'fallback:shebang-statement': 2, 'replayed:bail:unverified': 2, 'fallback:static-error:member-assign': 2, 'fallback:string-arg-type': 2, 'fallback:callable:cat': 2, 'fallback:method:to_string': 2, 'fallback:callable:open': 2, 'fallback:callable:minify': 2, 'fallback:method:nope': 1, 'fallback:callable:err': 1, 'fallback:callable:exit': 1, 'fallback:callable:error': 1, 'fallback:method:split': 1, 'fallback:index-assign-order': 1, 'fallback:parse-error': 1, 'fallback:prepared-fn-unprepared': 1, 'fallback:jump-not-last': 1, 'fallback:alias-argument': 1, 'fallback:call-binding': 1, 'fallback:param-name-reserved': 1, 'fallback:callable:warn': 1, 'fallback:callable:read': 1, 'fallback:method:to_upper': 1, 'fallback:method:clear': 1, 'fallback:callable:project_root': 1, 'fallback:index-assign-target': 1, 'fallback:jump-outside-loop': 1, 'fallback:declare-pattern': 1, 'fallback:method:pop': 1, 'fallback:opaque:irregular-legacy-parse': 1, 'fallback:fn-param': 1, 'fallback:opaque:struct-body': 1, 'fallback:callable:ffi_callback': 1, 'fallback:callable:platform': 1}
+PASS vm parity
+python3 tests/runtime2/vm_adversarial.py --nift "/home/claude/review/nift-cp11i/nift" --seed ${RT_VM_SEED:-1} --count ${RT_VM_ADV:-600}
+typed: 3000 programs; ran on the VM 532, replayed 776, fallback 1692; same 1303, approved D-001#4 5, endless 0, DIFF 0
+  outcomes: vm 532, replayed:bail:runtime-error 510, fallback:number-literal 494, fallback:opaque:irregular-legacy-parse 415, fallback:prepared-fn-unprepared 279, replayed:bail:unverified 168, fallback:prepared-decl-type 164, fallback:prefix-not-precedence 163
+context: 2400 programs; ran on the VM 704, replayed 638, fallback 1058; same 1342, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: vm 704, replayed:bail:runtime-error 558, fallback:number-literal 486, fallback:prepared-decl-type 457, fallback:prefix-not-precedence 90, replayed:bail:number-range 44, replayed:bail:unverified 36, fallback:text-type-name 25
+numeric: 3042 programs; ran on the VM 1884, replayed 16, fallback 1142; same 1900, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: vm 1884, fallback:number-literal 1064, fallback:prepared-decl-type 78, replayed:bail:number-range 16
+receiver: 1904 programs; ran on the VM 656, replayed 1192, fallback 56; same 1848, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: replayed:bail:runtime-error 1040, vm 656, replayed:bail:unverified 128, fallback:static-error:push-arity 56, replayed:bail:aliasing 24
+names: 3801 programs; ran on the VM 2594, replayed 0, fallback 1207; same 2594, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: vm 2594, fallback:binding-name-reserved 588, fallback:fn-name-reserved 392, fallback:param-name-reserved 201, fallback:opaque:legacy-runtime-error 16, fallback:parse-error 9, fallback:param-shadows-fn 1
+alias: 243 programs; ran on the VM 104, replayed 87, fallback 52; same 191, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: vm 104, replayed:bail:aliasing 87, fallback:alias-argument 40, fallback:prepared-decl-type 12
+control: 600 programs; ran on the VM 213, replayed 0, fallback 387; same 213, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: fallback:jump-not-last 387, vm 213
+recursion: 40 programs; ran on the VM 33, replayed 7, fallback 0; same 17, approved D-001#4 23, endless 0, DIFF 0
+  outcomes: vm 33, replayed:bail:recursion-budget 7
+output: 19 programs; ran on the VM 6, replayed 13, fallback 0; same 17, approved D-001#4 2, endless 0, DIFF 0
+  outcomes: replayed:bail:output-limit 7, vm 6, replayed:bail:runtime-error 2, replayed:bail:number-range 2, replayed:bail:recursion-budget 2
+malformed: 600 programs; ran on the VM 85, replayed 117, fallback 398; same 200, approved D-001#4 2, endless 0, DIFF 0
+  outcomes: fallback:opaque:legacy-runtime-error 154, vm 85, replayed:bail:runtime-error 70, fallback:prepared-decl-type 37, fallback:prepared-fn-unprepared 30, replayed:bail:unverified 30, fallback:parse-error 26, fallback:jump-not-last 23
+typing: 4320 programs; ran on the VM 1056, replayed 2004, fallback 1260; same 3060, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: replayed:bail:runtime-error 1720, fallback:prepared-decl-type 1260, vm 1056, replayed:bail:unverified 284
+preptype: 8064 programs; ran on the VM 984, replayed 2472, fallback 4608; same 3456, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: fallback:prepared-decl-type 4608, replayed:bail:runtime-error 2088, vm 984, replayed:bail:unverified 384
+dupeval: 984 programs; ran on the VM 692, replayed 8, fallback 282; same 702, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: vm 692, fallback:prepared-fn-unprepared 200, fallback:opaque:irregular-legacy-parse 41, fallback:prepared-decl-type 25, fallback:postfix-receiver 16, replayed:bail:runtime-error 8, timeout 2
+strarg: 1071 programs; ran on the VM 405, replayed 178, fallback 488; same 583, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: fallback:string-arg-type 420, vm 405, replayed:bail:runtime-error 178, fallback:prepared-decl-type 68
+bytes: 437 programs; ran on the VM 70, replayed 0, fallback 367; same 70, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: fallback:opaque:legacy-runtime-error 365, vm 70, fallback:string-literal 2
+memory: 13 programs; ran on the VM 1, replayed 12, fallback 0; same 13, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: replayed:bail:recursion-budget 12, vm 1
+deepeq: 54 programs; ran on the VM 18, replayed 36, fallback 0; same 54, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: replayed:bail:nesting-depth 36, vm 18
+shadow: 1200 programs; ran on the VM 259, replayed 390, fallback 551; same 649, approved D-001#4 0, endless 0, DIFF 0
+  outcomes: fallback:prepared-decl-type 325, vm 259, replayed:bail:runtime-error 245, fallback:prepared-fn-unprepared 107, replayed:bail:aliasing 87, fallback:static-error:redeclared 73, replayed:bail:unverified 47, fallback:string-arg-type 35
+PASS vm adversarial: 31792 programs, 0 non-approved differences, 32 approved (D-001#4), 0 endless, 13548 static fallbacks
+python3 tests/runtime2/vm_subset.py --nift "/home/claude/review/nift-cp11i/nift"
+PASS vm subset suites: 40 supported programs (NIFT_VM=require, identical to legacy), 45 unsupported programs (refused before execution); 0 failure(s)
+
+real	4m20.228s
+user	4m39.931s
+sys	1m24.219s

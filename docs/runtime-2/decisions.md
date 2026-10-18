@@ -190,7 +190,18 @@ Candidates recorded (class 2, not yet changed; the VM falls back today):
 - Inside loop bodies (and functions called from them) a declaration `b := a`
   takes its binding type from the current value, at top level from `a`'s
   declared type, so `a := 2.0; b := a; b = 2.5` errors only in a loop (CP11
-  review N1). CP11 refuses such declarations at compile time (round 2, `prepared-decl-type`).
+  review N1). More precisely (round 2, M1): the type is fixed from the
+  bindings visible when legacy *prepares* the loop or the loop-called
+  function. The VM refuses such declarations statically since round 2 (no
+  replay).
+- Round 2 (old behaviour recorded, refused statically; intended behaviour is
+  the owner's decision): a loop-called function whose body legacy's prepared
+  parser rejects has its arguments evaluated twice (M2); a string-literal
+  argument types its parameter from the unquoted text (M3); assignments and
+  parameters are typed from text at top level and from values in prepared
+  code (P4/P5 in the CP11 inventory, still replayed when they disagree).
+  Full inventory: `checkpoints/cp11-vm-poc.md`, "Legacy's prepared
+  evaluator".
 
 ## D-015 — Legacy is an oracle, not the language definition; CP11 subset narrowed (owner, 2026-10-18)
 - The legacy interpreter identifies behavioural differences; it is not the

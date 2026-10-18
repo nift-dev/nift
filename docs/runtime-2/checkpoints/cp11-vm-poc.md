@@ -1,8 +1,8 @@
 # CP11 — VM proof of concept (GO/NO-GO)
 
-Status: see `../progress.md` (implemented, review round 1 fixed, under
-re-review). **Gate verdict: GO** (see "Gate", re-measured after the review
-fixes), with the risks and limits listed below. Integrated on `runtime-2`
+Status: see `../progress.md` (implemented, review rounds 1 and 2 fixed,
+under review). **Gate verdict: GO** (see "Gate", re-measured after review
+round 2), with the risks and limits listed below. Integrated on `runtime-2`
 @`4287adb` (CP09 + CP10 certified with their review fixes) as branch
 `runtime-2-cp11i`.
 
@@ -19,19 +19,27 @@ with output identical to the legacy engine on every unit the VM runs.
   `text_type.*`, `native.*`, `render.*`, `vm.*`, `vm_ops.*`,
   `script_runner.*`, and since review round 1 `alias.*` (argument aliasing
   analysis) and `legacy_names.*` (`legacy_names.cpp` is generated from the
-  legacy evaluator source by `tools/rt-vm/legacy_names.py`); all lint-clean.
+  legacy evaluator source by `tools/rt-vm/legacy_names.py`), since review
+  round 2 `prepared.*` (static refusal of prepared-evaluator shapes) and
+  `prepared_parse.*` (exact port of legacy's prepared expression parser as
+  a recogniser); all lint-clean.
   `src/rt` is now linked into `nift` (`RT_LINK_SOURCES` in the Makefile).
 - `src/CLI.cpp`: one hook in `run_script_source` (file, `-e`/`-c`, stdin
   scripts; not when an interactive shell follows, only the native target).
 - Tests and tools: `tests/rt/vm_unit.cpp`, `tests/rt/vm_run.cpp`,
-  `tests/rt/rt_vm_tool.h`, `tests/runtime2/vm-corpus/cp11/` (64 scripts +
+  `tests/rt/rt_vm_tool.h`, `tests/runtime2/vm-corpus/cp11/` (75 scripts +
   `EXPECT`), `tests/runtime2/vm_gen.py`, `tests/runtime2/vm_parity.py`,
   `tests/runtime2/vm_adversarial.py` + `vm_adversarial_gen.py` (review round
-  1), `tools/rt-vm/nift-vm`, `tools/rt-vm/legacy_names.py`,
+  1), and since round 2 `tests/rt/vm_prepared_parse.cpp`,
+  `tests/runtime2/vm_subset.py`, `vm_adversarial_gen2.py`,
+  `vm_shadow_gen.py`; `tools/rt-vm/nift-vm`, `tools/rt-vm/legacy_names.py`,
   `tools/rt-diff/policies/cp11-vm.json` (plus class policies in
   `tools/rt-diff/rt-diff`), `benchmarks/runtime2/vm_compare.py`.
-- CP09/CP10 files are unchanged. All of `src/rt` is linted (CP10 is
-  lint-clean since its review).
+- CP09/CP10 files: unchanged by CP11 itself; review round 2 made two
+  labelled follow-up commits (CP10: `\f`/`\v` inside statements are Opaque;
+  CP09: iterative equality/hashing, exact live-heap accounting
+  `heap_account.*`, reference safety enforced in sanitizer builds), each
+  recorded in its own checkpoint record. All of `src/rt` is linted.
 
 ## Design
 
@@ -42,9 +50,10 @@ with output identical to the legacy engine on every unit the VM runs.
 | `NIFT_VM=1` | Eligible scripts run on the VM; everything else, and every run-time bail, runs on legacy unchanged |
 | `NIFT_VM=require` | Never uses legacy: an ineligible script or a bail is an error (`error: <file>:<l>:<c>: …`, exit 1). Used for every VM measurement |
 | `NIFT_VM=classify` | Test tooling: parse and compile only, report `compiled`/`fallback` (with `NIFT_VM_STATS`), run nothing |
-| `NIFT_VM_STATS=1` / `=<path>` | One JSON line per script (stderr / appended to the file): outcome, fallback or bail reason, position, parse/compile/execute µs, protos, instructions, `beyond_legacy_depth` |
-| `NIFT_VM_DUMP=1` | Bytecode listing on stderr |
+| `NIFT_VM_STATS=1` / `=<path>` | Test tooling only. One JSON line per script (stderr / appended to the file): outcome, fallback or bail reason, position, parse/compile/execute µs, protos, instructions, `beyond_legacy_depth`. With `=1` the line is written to stderr **before** a replay runs, so stderr then differs from legacy's; harnesses use `=<path>` |
+| `NIFT_VM_DUMP=1` | Test tooling only: bytecode listing on stderr, also written before a replay |
 | `NIFT_VM_OUTPUT_LIMIT=<bytes>` | Test-only: lowers the 64 MiB output buffer limit (D7 regression tests) |
+| `NIFT_VM_HEAP_BUDGET=<bytes>`, `NIFT_VM_EQUALITY_DEPTH=<levels>` | Test-only: lower the memory budget (1 GiB) and the equality depth (10,000) (review round 2 R5/R6 tests) |
 
 Unexpected VM failures (an internal error such as a bad opcode, `std::bad_alloc`
 or any other C++ exception) are reported as `error: <file>: NIFT_VM internal
@@ -62,16 +71,21 @@ places:
    completes. When the VM reaches a case it does not reproduce, it stops,
    discards the buffer and the whole unit is run on legacy from the start, so
    legacy produces every diagnostic (text, position, partial output) itself.
-   Bail reasons (an enumerated set; each is a legacy behaviour the VM
-   deliberately does not reproduce): `runtime-error` (anything legacy
-   reports as an error), `number-range` (integer or double at or beyond 2^53,
-   integer −0; see "Numbers"), `aliasing` (an aggregate bound from a place,
-   where legacy makes a location reference), `static-error` (a statement the
-   compiler knows errors, e.g. redeclaration, wrong argument count),
-   `unverified` (a case whose legacy result the VM does not claim, e.g.
-   assigning a different type to an array element, or a binding type the two
-   legacy paths derive differently), `recursion-budget` (frame, register or
-   frame-memory budget), `output-limit`.
+   Bail reasons (an enumerated set; each is decided by a run-time value, so
+   it cannot be refused before execution, and the subset has no effect
+   other than buffered output, so a replay is side-effect free):
+   `runtime-error` (anything legacy reports as an error: legacy produces its
+   own diagnostic), `number-range` (a computed integer or double at or beyond
+   2^53, integer −0; see "Numbers"), `aliasing` (a value bound or returned
+   from a place turns out to be an aggregate, where legacy makes a location
+   reference), `unverified` (assignment or argument types where the textual
+   and prepared legacy paths disagree for this value — P4/P5 in the
+   inventory; a different type assigned to an array element; `length()`/
+   `size()` on an object), `recursion-budget` (frame, register or memory
+   budget beyond legacy's depth), `output-limit`, `nesting-depth` (`==` on
+   values nested deeper than the VM decides). Review round 2 removed
+   `static-error` (statically known errors are now refused before execution)
+   and the N1 declaration check (now a static refusal).
    A replay is not observable except in time (the VM work is wasted) and in
    when output appears (at the end instead of progressively). **Nothing is
    ever committed before the run completes under `NIFT_VM=1`** (review D7):
@@ -119,15 +133,22 @@ fast paths are inline, every other case calls an out-of-line slow path
   policy `cp11-recursion-budget-class` approve it only when legacy fails with
   exactly that diagnostic, the VM completes with legacy's output as a prefix
   of its own, and the VM statistics show `beyond_legacy_depth`.
-- Memory (review R1): the register stack is capped at 16M values (256 MiB);
-  past legacy's 64-frame limit the bytes held by live registers (strings,
-  array/object elements two levels deep, shared objects counted per
-  reference) are measured at geometrically spaced depths (every +12.5 %);
-  beyond 256 MiB the run stops with `recursion-budget`. Every such stop
-  happens deeper than legacy can go, so the approved behaviour applies
-  (legacy replays and reports its recursion error) before memory runs out.
-  The check is the slow branch of the frame-budget compare that `Call`
-  already made: no new hot-path test.
+- Memory (review R1, round 2 R5): the register stack is capped at 16M
+  values; the whole run is bounded by `heap_budget` (1 GiB): the **exact**
+  live rt heap of the isolate (`heap_account.h`, CP09: every string,
+  array, object, decimal, error, at any nesting depth, counted when created
+  or resized and uncounted when freed) plus the register and frame stacks.
+  It is checked after every instruction that can allocate — all of them
+  slow paths (concatenation, in-place append, array/object construction,
+  push, member set) — and when the stacks grow; no new hot-path test.
+  Exceeded deeper than legacy's 64 frames: `recursion-budget` bail
+  (legacy then reports its recursion error, approved D-001#4). Exceeded at
+  a depth legacy also reaches: an internal failure, reported (exit 70),
+  never replayed. Either way the process stops itself at the budget instead
+  of being killed (the round-2 repro, `[[s]]` per frame, now stops at about
+  2,600 frames; it was OOM-killed). The budget is not a promise that the
+  host has that much memory: on a host with less free memory than the
+  budget the kernel can still kill the process first.
 
 ### Natives
 Bound to integer ids at compile time: `print` (`NativeId::Print`). The
@@ -158,11 +179,11 @@ callee/name variables, string-only brace lists such as `native_heads`, the
   x's binding type. Plain assignments are checked with the text-derived type
   at top level and the value type in loop bodies; where the two verdicts
   differ the VM bails. Arguments whose text type disagrees with their value
-  bail (legacy types parameters from argument text). Legacy loop bodies (and
-  functions called from them) type a declaration whose text refers to
-  another binding (`b := a`, `b := a * 2`) from the value alone, top level
-  from the referenced binding's type; such declarations check that both
-  readings agree and bail otherwise (review finding N1).
+  bail (legacy types parameters from argument text). A declaration whose
+  text refers to another binding is typed from that binding at run time;
+  where legacy prepares it against other bindings (loop-local shadows,
+  loop-called functions) it is refused before execution (review round 2,
+  M1/N1; see "Legacy's prepared evaluator").
 - **Rendering.** Strings as-is; numbers through the legacy
   `RuntimeValue::dump`; `true`/`false`/`null`. Arrays/objects bail.
 - **Strings.** `s += t` appends in place when the string is unshared (legacy
@@ -193,24 +214,110 @@ callee/name variables, string-only brace lists such as `native_heads`, the
 | Arrays/objects: literals, `a[i]`, `o.k`, `o["k"]`, `.push(x)` on arrays, `.length()` on strings/arrays, `.size()` on arrays | ✓ (other receivers replay) | every other method or built-in (`sort_by`, `map`, `stringify`, `split`, …), `?.`, `?[`, spread, postfix on literals, whitespace before postfix, trailing commas, duplicate object keys |
 | `print(x)` | ✓ | every other native; bare expression statements other than calls |
 
+### Supported subset (specification, after review round 2)
+A script runs on the VM only if every function and every top-level
+statement is inside this subset; otherwise the whole script runs on legacy
+before anything executes. `tests/runtime2/vm_subset.py` holds the two
+suites that pin it: SUPPORTED (40 programs covering every item below at top
+level, in loop bodies, in functions called from top level and from loops:
+each must run entirely on the VM under `NIFT_VM=require` with legacy's exact
+output) and UNSUPPORTED (45 programs, one per refused construct or context:
+each must fall back before execution with the expected reason).
+
+Supported:
+- Literals: integers below 2^53 without leading zeros; decimals other than
+  zero-valued spellings, with ≤ 15 significant digits, magnitude < 2^53 and
+  exponent magnitude < 300; strings without `\`, `$`, control bytes or
+  invalid UTF-8 (`"…"` and `'…'`); `true`, `false`, `null`; array and object
+  literals (double-quoted keys, no duplicates, no trailing commas).
+- Statements: `x := e` (not `const`/`immut`/patterns), `x = e`,
+  `+= -= *= /= %=`, `++`/`--` on names, `a[i] = v` on a local array,
+  `a.push(v)`, call statements, `if`/`else if`/`else`, `while`,
+  `break`/`continue` as the last statement of their block, `return`
+  (functions and top level).
+- Expressions: `+ - * / %`, comparisons (no chains), `&& || ! ??`, `?:` in
+  parentheses, unary `-`/`+`, `a[i]`, `o.k`, `o["k"]`, `.length()` on strings
+  and arrays, `.size()` on arrays, `print(x)`, calls to top-level functions.
+- Functions: `fn(name(params))` at top level before the first other
+  statement, recursion (100,000-frame budget), referring only to their own
+  parameters and locals.
+
+Excluded contexts (refused even though each construct alone is supported):
+- a declaration whose text refers to another binding, in a function
+  reachable from a loop body or condition, or in a loop where that name is
+  (re)declared inside the outermost enclosing loop (`prepared-decl-type`);
+- a function reachable from a loop whose body contains a bare `return`, or
+  an `if`/`while` condition or `return` expression legacy's prepared parser
+  rejects — e.g. `?:`, a comparison chain, `(a ?? b)`, an object literal
+  with a string value (`prepared-fn-unprepared`);
+- a string-literal argument to a user function whose unquoted text types as
+  a double or names a binding visible at the call (`string-arg-type`);
+- a member/index argument to a parameter the callee may mutate
+  (`alias-argument`); a `break`/`continue` followed by statements in its
+  block (`jump-not-last`); names in the generated legacy name table;
+- `\f`/`\v`, NEL, NBSP, U+2028/9, BOM, NUL, DEL and other control bytes
+  inside a statement (CP10 Opaque);
+- statically known errors: redeclaration in one scope, wrong argument
+  count, member assignment, `push` with other than one argument
+  (`static-error:*`).
+
+### Legacy's prepared evaluator (review round 2 inventory)
+
+Legacy has a second evaluator. When a `while` statement starts
+(`src/ParserTemplate.cpp` `@while(` handler, ~line 1705), its condition is
+parsed by `nift::ast::parse_expression` (`src/Ast.cpp`, struct `P`) and its
+body is prepared once by `prepare_loop_body` (ParserTemplate ~1123) into
+statement trees executed by `execute_prepared` (~1670–1700). A user function called from prepared
+code is translated and prepared once per program on its first prepared
+call (`c.call`, ~1284–1350; cache `prepared_callables_`) and runs on the
+same evaluator. Everything else (top-level statements, `if` at top level,
+functions called from them, a loop body whose preparation failed) runs on
+the textual evaluator (`ParserExpression.cpp`, `ParserScript.cpp`).
+Reading both end to end gives these differences (the policy is the owner's:
+refuse statically where the meaning depends on the evaluator; the intended
+future behaviour is the owner's decision and is not implemented):
+
+| # | Prepared path (source) | Textual path | Handling in CP11 |
+| --- | --- | --- | --- |
+| P1 | Declaration type fixed at preparation: `decl_type = expression_type(text after :=)` against the bindings visible **when the body is prepared** (ParserTemplate `prepare_loop_body`, `$[` leaf; executed `bt = dt==3 ? 3 : dt==2/-1 ? value type : dt`) — for a loop, at its outermost header (loop-local shadows not yet declared); for a loop-called function, in the **caller's** scope chain before its own parameters exist (M1, N1) | `nift_binding_type_from_text` at run time against the current bindings (ParserExpression ~4636) | **refused** `prepared-decl-type`: in loop-called functions every declaration whose text refers to a binding; in other loops, a declaration referring to a name (re)declared anywhere inside the outermost enclosing loop. Otherwise the binding visible at the header is the one the VM resolves (exact). The N1 run-time check is removed |
+| P2 | Preparation failure: `c.call` returns false when `translate_function_program` or `prepare_loop_body` fails, after the arguments were evaluated; `nift::ast::evaluate` (Ast.cpp `Kind::Call`) then evaluates the whole call text on the textual path, evaluating the arguments again (M2). Failures: a bare `return` (`@__bare_return()` is not a prepared statement), an `if`/`else if`/`while` condition or `return` expression the prepared parser rejects (P3) | n/a | **refused** `prepared-fn-unprepared` for every function reachable from a loop body or condition (call-graph fixpoint) whose body contains one of them; acceptance is decided by `rt/prepared_parse.cpp`, an exact port of the prepared parser (differential test against `src/Ast.cpp`, 100,136 texts, 0 differences) |
+| P3 | Prepared grammar (Ast.cpp `P`): no `?:`; one comparison per level (`a < b == c` rejected); `(…)` holds `logical_or` (so `(a ?? b)` is rejected); `!`/`-`/`+` bind to the next unary; `isspace` (incl. `\f`, `\v`) between tokens; object literals only with plain `"key"`s and non-string values; integers beyond 2^53 rejected; `strtod` numbers (hex accepted); 8,192-byte / 256-bracket / 128-recursion limits; a call argument it rejects sends that call to the textual path | CP10 grammar (textual) | rejection matters only through P2 (refused). Where both accept, the trees agree for the compiled subset (equality vs relational nesting and `!` precedence are CP10 Opaque; `\f`/`\v` are Opaque since M4; hex/escapes are not compiled) |
+| P4 | Plain assignment checks the **value** type (`assign_plain`: `nift_binding_type(v)`) | text-derived type (`nift_binding_type_from_text`, ParserExpression ~2261/2280) | **replay** `unverified` when the two verdicts differ (CheckAssign) — remains: it depends on whether a computed number is integral at run time |
+| P5 | Parameters bound by **value** type (`scope.emplace(param, nift_binding_type(arg))`) | `bind_call_param`: text type of the argument; a quoted argument is typed from its **unquoted** text, looked up as a binding name in the caller's dynamic scope (M3) | string literals: **refused** `string-arg-type` when the unquoted text types as a double or names a binding visible at that call (globals, the calling function and every function that can be below it); other arguments: **replay** `unverified` when text and value types differ (CheckParam) — remains, value-dependent |
+| P6 | Numbers as doubles; results at or beyond 2^53 re-evaluated textually (`large_num`) | int64/StrNumber | **replay** `number-range` (value-dependent, unchanged) |
+| P7 | `length()` on objects works; other method dispatch via `native_method` | `length()` on objects is an error | **replay** `unverified` for `length()`/`size()` on objects (receiver kind is a run-time property) |
+| P8 | Declaring from a place makes a location reference / shares the slot (`bind_location`, aggregate `b := a`); returns of places | location references too | **replay** `aliasing` when the value is an aggregate (kind is a run-time property); place arguments to mutating callees refused (D6) |
+| P9 | `break`/`continue` stop the block at the next statement (`execute_body` checks `pending_control_`) | the rest of the block runs (D2) | **refused** `jump-not-last` (D2) |
+| P10 | Errors carry prepared-view positions and messages | textual positions | every run-time error replays on legacy (`runtime-error`), which reports its own diagnostic |
+| P11 | `+=` on a string appends in place when unshared; native calls go through temporaries and the textual evaluator; recursion limit 64 (`callable_call_depth_`) | same values / same limit | identical results; nothing to refuse |
+
+Eleven differences: four refused statically by this round (P1, P2 with P3,
+P5 string literals, plus M4 in the parser), one already refused (P9), five
+kept as enumerated, side-effect-free replays because the deciding fact is a
+run-time value (P4, P5 non-literal arguments, P6, P7, P8) and P10 replays
+every error by design; P11 needs nothing.
+
 ## Tests
 
-| Suite | Content | Result |
-| --- | --- | --- |
-Results after review round 1 on the integrated branch (`runtime-2-cp11i`).
+Results after review round 2 on `runtime-2-cp11i` (host shared with other
+work during this round: load average 1.5–3.5; times are not comparable to
+round 1's idle-host figures).
 
 | Suite | Content | Result |
 | --- | --- | --- |
-| `tests/rt/vm_unit.cpp` | outputs (25 programs), fallback reasons (33), bail reasons (18), literal decoding, Int rendering = legacy `dump` (20,000 values), frame budget (99,990 deep OK, 100,000 bails, configurable), frame-memory and register budgets, 90,000 nested calls on a 256 KiB stack, output limit (flush only with a hook; otherwise stop without commit), generated name table, code shape | 40,206 checks, 0 failures |
-| `tests/runtime2/vm-corpus/cp11` | 64 scripts (9 review regressions), legacy goldens (also checked by `test-runtime2-vm-corpus`), expected VM outcome per script: 11 run on the VM, 28 replay, 25 fall back | identical to legacy, every outcome as expected; the VM scripts also identical under `NIFT_VM=require` |
-| `tests/runtime2/vm_adversarial.py` (seed 1, count 600; in `make test-rt-vm`) | 19,969 programs in 11 families (see Reviews and the generator docstring): 7,941 completed on the VM, 6,744 replayed, 5,283 static fallbacks (classified with `NIFT_VM=classify`, legacy by construction) | **0 non-approved differences**; 31 approved D-001#4 (recursion budget, confirmed by the statistics); 0 endless |
-| Generated programs (`vm_gen.py`) + mutants, seed 1 | 300 + 300: since the CP10 review fixes 192/173 are Opaque (mostly `?:` in conditions), 76/41 complete on the VM | 0 differences |
-| rt-diff, legacy vs `tools/rt-vm/nift-vm` | `vm-corpus`, `semantics`, `rt-diff-corpus`, conformance cases, cp410 probes, extracted smoke scripts, 200 `gen.py` programs: 793 entries | **0 differing**, 2 approved (`deep_recursion.f`, `recursion_limit.f`: D-001#4), 0 unused policies |
-| `make test-rt-vm` | all of the above | PASS in 2 min 46 s (idle 2-vCPU host) |
-| `make test-rt-vm-sanitize` | ASan+UBSan (no recovery, leak detection on): unit tests; corpus + 150 generated + 150 mutants; adversarial gate seed 2, every family sampled to ≤ 250 programs (1,912), on `nift-sanitize` | clean, 0 non-approved differences (`../evidence/cp11/sanitize.txt`; 19 min) |
-| Reviewer's material | kept divergent programs (`fy1/` 17, `fz4/` 86) and the twelve case files `c1`–`c12` (307 cases) through the reviewer's comparison | all identical to legacy or approved (8 recursion-budget); `fuzz2`/`fuzz3` 1,000 programs each: 0 non-approved differences (before: 33 and 6 differing, including unlabelled recursion-budget cases) |
-| Lint (`tools/rt-lint.py`) | all of `src/rt` | 0 problems |
-| `make test-rt-value`, `make test-rt-parser` | CP09/CP10 suites on the integrated branch | pass (1,867,405 property checks; parser negative gate 0 failures, paren oracle 0 divergent) |
+| `tests/rt/vm_unit.cpp` | outputs (25 programs), fallback reasons (50: round 2 adds statically refused errors, prepared-decl-type, prepared-fn-unprepared, string-arg-type), bail reasons (16), literal decoding, Int rendering = legacy `dump` (20,000 values), frame budget, memory budget (exact heap: growing strings, hidden `[[s]]` per frame → recursion-budget, flat overflow → internal failure), deep equality (9,999 decided, 10,001 bails), 90,000 nested calls on a 256 KiB stack, output limit, generated name table, code shape | 40,219 checks, 0 failures |
+| `tests/rt/vm_prepared_parse.cpp` | the prepared-parser port against legacy's `nift::ast::parse_expression` (linked): 128 hand-written cases, limits (recursion 128, brackets 256, 8,192 bytes), 50,000 random expressions and 50,000 mutants | 100,136 checks, 0 differences (a seeded mutation of the port gives 1,323) |
+| `tests/runtime2/vm_subset.py` | SUPPORTED: 40 programs over the whole subset in four contexts, `NIFT_VM=require`; UNSUPPORTED: 45 programs, one per refused construct/context | all supported run entirely on the VM with legacy's output; all unsupported fall back before execution with the expected reason |
+| `tests/runtime2/vm-corpus/cp11` | 75 scripts (9 round-1 and 11 round-2 regressions), legacy goldens, expected outcome per script: 14 on the VM, 24 replay, 37 fall back | identical to legacy, every outcome as expected |
+| `tests/runtime2/vm_adversarial.py` (seed 1, count 600; in `make test-rt-vm`) | 31,792 programs in 18 families (11 from round 1; round 2: `preptype` 8,064, `dupeval` 984, `strarg` 1,071, `bytes` 437, `memory` 13, `deepeq` 54, `shadow` 1,200) | **0 non-approved differences**; 32 approved D-001#4; 0 endless. The seven new families on the pre-fix build (`594f44b`): 303 / 114 / 128 / 38 / 12 / 36 / 2 failures (631) |
+| Generated programs (`vm_gen.py`) + mutants, seed 1 | 300 + 300 (function-body declarations mostly literal since round 2) | 0 differences; 77 of 300 complete on the VM |
+| rt-diff, legacy vs `tools/rt-vm/nift-vm` | 804 entries | **0 differing**, 2 approved (D-001#4), 0 unused policies |
+| `make test-rt-vm` | all of the above | PASS in 4 min 59 s (shared host) |
+| `make test-rt-vm-sanitize` | ASan+UBSan (no recovery, leak detection on, relocate-on-mutation reference check active): unit tests, prepared-parser differential, corpus + 150 generated + 150 mutants, adversarial gate seed 2 with every family sampled to ≤ 250 (3,099 programs) | clean, 0 non-approved differences (`../evidence/cp11/sanitize.txt`; 34 min on the shared host) |
+| Round-1 reviewer material | `fy1/` 17 and `fz4/` 86 kept programs, `fz1`–`fz3`, case files `c1`–`c12` (307 cases), `fuzz2`/`fuzz3` (1,000 each) | 0 non-approved differences: 10 differences, all D-001#4 (legacy's recursion error, VM output extends legacy's) |
+| Round-2 reviewer material | the nine repros and generators `g_prep`, `g_dup`, `g_dup2`, `g_typed` (4 seeds × 2,000), `g_ctl`, `g_ws` (ported as the families above) | 0 differences (before: 303, 41+, 4/8,000 and the M3/M4/R5/R6 repros) |
+| Lint (`tools/rt-lint.py`) | all of `src/rt`, self-test | 0 problems |
+| `make test-rt-value`, `make test-rt-parser`, `make test-rt-value-sanitize` | CP09/CP10 suites including the follow-ups | pass (1,867,405 property checks; `value_round2` 28 checks; stale references abort under ASan; parser negative gate 1,957 programs 0 failures, paren oracle 0 divergent) |
 
 Defects found before the review by the CP11 differential tests (the review's
 findings are under "Reviews"):
@@ -224,15 +331,19 @@ findings are under "Reviews"):
 
 ### Coverage over the shared corpora (rt-diff script entries)
 
-| Outcome | CP11 as reviewed (758) | integrated, before fixes (757) | after review round 1 (757 + 9 new regression scripts) |
-| --- | ---: | ---: | ---: |
-| Ran on the VM | 79 | 78 | 78 (+1) |
-| Replayed on legacy after a bail | 53 | 53 | 53 (+3) |
-| Fell back before running | 626 | 626 | 626 (+5) |
+| Outcome | CP11 as reviewed (758) | integrated, before fixes (757) | after review round 1 (757 + 9) | **after review round 2** (757 + 9 + 11) |
+| --- | ---: | ---: | ---: | ---: |
+| Ran on the VM | 79 | 78 | 78 (+1) | **75** (+1, +3) |
+| Replayed on legacy after a bail | 53 | 53 | 53 (+3) | **42** (+2, +1) |
+| Fell back before running | 626 | 626 | 626 (+5) | **640** (+6, +7) |
 
-The review fixes cost no coverage on the shared corpora (the same 757
-scripts have the same outcome classes; within replays one script moved from
-`static-error` to `unverified`). The integration with the fixed CP10 parser
+Round 1 cost no coverage on the shared corpora. Round 2 on the same 757
+scripts: three `call-locals-*` probes move from VM to `prepared-decl-type`
+(a loop-called function declaring from its parameter), `official-bfs.f` and
+`loop_callee_error_location.f` change fallback reason, and the 10
+`static-error` replays (plus `decl_types.f`, an `unverified` replay) become
+static fallbacks. Round 1's corpus of its own regression scripts: one
+replay (`review_n1`) became a fallback. The integration with the fixed CP10 parser
 cost one script (`opaque`). Main fallback reasons: `fn-after-statement` 212,
 `fn[async]`/`@fn` 55, `import` 53, `struct` 25, `inject` 24, `sort_by` 19,
 Opaque 18, `map` 16+9, `try` 15, lambdas 14. Per-script list:
@@ -247,69 +358,72 @@ generates zero literals and mid-block jumps, which are now refused.
 
 ## Performance
 
-Re-measured after review round 1 at `84d9332` on an otherwise idle host
-(load average 1.0 at the start, from the preceding build; the pre-review
-figures at `25089e8` were taken under load 2.6–3.8). Raw data:
-`../evidence/cp11/vm_compare.jsonl`; tables with the pre-review VM column:
-`../evidence/cp11/vm_compare-tables.md`. Instructions: callgrind
-(deterministic, gated). Wall times: median of 5 (min in brackets), reported,
-not gated. CPython 3.13.16, function-local code.
+Re-measured after review round 2 at `52d0e1a`+ (the analysis speed-up
+commit) with `benchmarks/runtime2/vm_compare.py --runs 5 --slow`. The host
+was **shared** this round (load average 2.4 at the start, 1.0 at the end:
+other sessions' builds), so wall times are indicative only; instruction
+counts (callgrind) are deterministic and gated. Raw data:
+`../evidence/cp11/vm_compare.jsonl` (round 1's file is in git history).
+CPython 3.13.16, function-local code.
 
 ### Instructions per operation (marginal, N=4,000 vs 8,000)
 
-| Operation | v4.12 | legacy (this branch) | VM before review | **VM** | CPython 3.13 | VM vs v4.12 | VM / CPython |
+| Operation | v4.12 | legacy (this branch) | VM round 1 | **VM round 2** | CPython 3.13 | VM vs v4.12 | VM / CPython |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Loop iteration | 3,066 | 3,129 | 105 | **104** | 388 | 29.5× fewer | 0.27× |
-| Add-assign | 4,957 | 5,002 | 177 | **184** | 653 | 26.9× fewer | 0.28× |
-| **Flat call** (gate) | 14,994 | 13,414 | 464 | **467** | 980 | **32.1× fewer** | **0.48×** |
-| Array index | 5,356 | 5,401 | 374 | **380** | 722 | 14.1× fewer | 0.53× |
-| Array push | 4,568 | 4,613 | 277 | **286** | 535 | 16.0× fewer | 0.53× |
-| Object member | 5,240 | 5,285 | 340 | **347** | 846 | 15.1× fewer | 0.41× |
-| String append (`t = t + "x"`) | 9,385 | 9,450 | 3,152 | **3,182** | 1,770 | 3.0× fewer | 1.80× |
-| If + modulo | 6,006 | 6,050 | 235 | **233** | 820 | 25.8× fewer | 0.28× |
-| fib call, top level (per call) | 184,321 | 158,662 | 459 | **465** | 629 | 396× fewer | 0.74× |
-| fib call, inside a loop (per call) | 14,766 | 14,760 | 459 | **465** | 512 | 31.8× fewer | 0.91× |
+| Loop iteration | 3,066 | 3,129 | 104 | **98** | 405 | 31.3× fewer | 0.24× |
+| Add-assign | 4,957 | 5,002 | 184 | **179** | 636 | 27.7× fewer | 0.28× |
+| **Flat call** (gate) | 14,994 | 13,414 | 467 | **461** | 961 | **32.5× fewer** | **0.48×** |
+| Array index | 5,356 | 5,401 | 380 | **381** | 721 | 14.1× fewer | 0.53× |
+| Array push | 4,568 | 4,613 | 286 | **326** | 505 | 14.0× fewer | 0.65× |
+| Object member | 5,240 | 5,285 | 347 | **348** | 838 | 15.1× fewer | 0.42× |
+| String append (`t = t + "x"`) | 9,385 | 9,450 | 3,182 | **3,257** | 1,793 | 2.9× fewer | 1.82× |
+| If + modulo | 6,006 | 6,050 | 233 | **223** | 804 | 26.9× fewer | 0.28× |
+| fib call, top level (per call) | 184,444 | 158,549 | 465 | **471** | 366 | 392× fewer | 1.29× |
+| fib call, inside a loop (per call) | 14,766 | 14,760 | 465 | **471** | 436 | 31.4× fewer | 1.08× |
 
 Each "operation" includes the loop around it (`run.py` templates). CPython's
-fib figure varies between runs (300–630 per call over the runs so far; hash
-randomisation changes its dictionary work); its flat-call figure varied
-948–980 over this round's three runs.
+fib figure varies a lot between runs (300–710 per call over the runs so
+far; hash randomisation changes its dictionary work); its flat-call figure
+varied 947–980.
 
-**Hot-path cost of the review fixes.** None of the fixes adds an instruction
-to the bytecode of these loops. The R1 budgets first made `Call` test the
-frame mark and the register stack separately (flat call 488); a single
-combined test with an out-of-line cold slow path brought it to 467 (+3,
-+0.6 %). The remaining +6–9 instructions on add-assign, array and object
-operations and fib (+1–3 %) are code-generation effects in the larger
-`Vm::run` (`Value::integer` is no longer inlined at one site: 7 instructions
-per flat-call iteration, `Value::release` 7 fewer); the loop and if
-operations got cheaper by 1–2.
+**Hot-path cost of round 2.** No instruction was added to the bytecode of
+these loops; the flat call, loop, add-assign and if operations got 5–10
+instructions cheaper (the removed sampled frame-memory scan and smaller
+`Vm::run`; flat call 467 → 461). Costs: **array push +40 (+14 %)** — every
+push now recounts the array's footprint for the exact memory budget
+(`heap_retally`) and then checks the budget (`memory_ok`); **string
+append +75 (+2.4 %)** — concatenation allocates and is followed by the
+budget check; fib +6 (+1.3 %) and array index +1 are code-generation
+effects. The memory check is one thread-local load and compare after each
+allocating slow path; the `Call` hot path is unchanged.
 
 ### Whole process (wall, median of 5) and peak RSS
 
+Shared host this round (see above): indicative only.
+
 | Program | v4.12 | legacy | **VM** | CPython | Peak RSS KiB (v4.12 / legacy / VM / CPython) |
 | --- | ---: | ---: | ---: | ---: | --- |
-| fib(22) | 1,372 ms (1,315) | 1,195 ms (1,147) | **7.2 ms** (6.7) | 18.3 ms (17.4) | 7,352 / 7,856 / 5,364 / 8,628 |
-| fib(25) | 5,834 ms (5,725) | 5,253 ms (5,056) | **16.2 ms** (15.9) | 24.8 ms (24.3) | 7,492 / 7,896 / 5,596 / 8,628 |
-| 1M-iteration loop | 507 ms (503) | 527 ms (489) | **31.7 ms** (27.2) | 66.9 ms (65.3) | 6,736 / 7,280 / 5,616 / 8,628 |
-| 200k calls | 345 ms (344) | 337 ms (319) | **12.4 ms** (11.9) | 31.9 ms (31.1) | 6,880 / 7,440 / 5,620 / 8,624 |
-| Startup (`x := 1; print(x)`) | 5.0 ms (4.8) | 4.6 ms (4.5) | **4.8 ms** (3.8) | 16.7 ms (15.2) | 6,624 / 7,140 / 5,248 / 8,628 |
+| fib(22) | 1,311 ms (1,298) | 1,122 ms (1,098) | **6.5 ms** (6.4) | 17.5 ms (16.9) | 7,452 / 7,932 / 5,828 / 8,664 |
+| fib(25) | 5,506 ms (5,492) | 4,897 ms (4,881) | **18.1 ms** (16.3) | 25.7 ms (24.0) | 7,492 / 8,104 / 5,760 / 8,664 |
+| 1M-iteration loop | 509 ms (506) | 519 ms (508) | **26.5 ms** (26.4) | 66.0 ms (65.9) | 6,924 / 7,388 / 5,652 / 8,664 |
+| 200k calls | 340 ms (338) | 293 ms (292) | **11.9 ms** (11.6) | 29.0 ms (28.3) | 6,840 / 7,404 / 5,732 / 8,664 |
+| Startup (`x := 1; print(x)`) | 3.5 ms (3.4) | 3.5 ms (3.4) | **3.3 ms** (3.2) | 14.5 ms (14.3) | 6,716 / 7,204 / 5,512 / 8,664 |
 
-On the idle host the VM's fib(22)/fib(25) wall times are about half the
-pre-review figures (12.5/37.2 ms under load). The startup medians (3.5–5 ms)
-are within noise of each other. The VM's lower RSS is real but small: legacy
-allocates its interpreter state (Parser, scope maps) even for a trivial
-script; the VM path returns before it is constructed.
+Peak RSS of the VM rose by ~0.2–0.5 MiB over round 1 (5,364–5,620 KiB),
+within run-to-run variation of the allocator; the heap accounting adds no
+per-object memory (it uses the header's padding).
 
 ### Startup, compilation and execution separated
 
 | Program | Source bytes | Parse instr | Compile instr | Execute instr | Whole VM process instr | Legacy translation instr (reference) | Parse / compile / execute µs | Cold process | In-process: compile / first run / warm run µs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |
-| startup | 16 | 5,531 | 72,524 | 383 | 2,568,706 | 4,197 | 20.5 / 42.6 / 6.7 | 3.52 ms | 47 / 9.6 / 0.2 |
-| fib(22) | 84 | 21,804 | 96,931 | 26,622,154 | 29,234,607 | 15,401 | 27.8 / 51.2 / 2,960 | 6.8 ms | 67 / 3,012 / 2,906 |
-| 1M loop | 61 | 20,159 | 79,983 | 184,000,737 | 186,593,062 | 11,290 | 28.7 / 51.4 / 22,862 | 26.8 ms | 121 / 25,185 / 22,996 |
-| 200k calls | 98 | 28,557 | 100,765 | 93,400,731 | 96,024,077 | 17,325 | 29.8 / 57.6 / 8,305 | 12.2 ms | 80 / 8,245 / 8,178 |
-| 500 functions (66 KB, generated) | 66,296 | 15,953,728 | 20,836,549 | 1,862 | 42,185,514 | 8,122,025 | 1,758 / 2,431 / 19.8 | 7.7 ms | 4,398 / 9.0 / 1.0 |
+| startup | 16 | 5,551 | 75,230 | 389 | 2,574,707 | 4,197 | 17.6 / 40.7 / 6.6 | 3.54 ms | 60 / 6.4 / 0.2 |
+| fib(22) | 84 | 21,869 | 106,689 | 26,966,032 | 29,591,563 | 15,473 | 31.2 / 58.2 / 2,928 | 7.3 ms | 80 / 3,053 / 2,887 |
+| 1M loop | 61 | 20,244 | 88,768 | 179,000,743 | 181,605,207 | 11,290 | 30.2 / 52.4 / 22,843 | 30.0 ms | 94 / 22,858 / 22,906 |
+| 200k calls | 98 | 28,668 | 117,679 | 92,200,737 | 94,844,363 | 17,325 | 28.0 / 67.4 / 8,619 | 11.9 ms | 97 / 8,101 / 8,187 |
+| 500 functions (66 KB, generated) | 66,296 | 16,040,754 | 27,808,158 | 1,839 | 49,247,400 | 7,974,041 | 1,744 / 3,114 / 18.7 | 8.4 ms | 5,173 / 12.4 / 1.0 |
+
+(Round 2, shared host; round 1's row values are in git history.)
 
 - **Process startup** is ~2.5M instructions for both engines, almost all in
   the dynamic loader (symbol lookup and relocation of the 5 MB binary); the VM
@@ -327,6 +441,13 @@ script; the VM path returns before it is constructed.
   up-front translation is 123/byte but it re-parses expression text on every
   evaluation. Its functions are now named `g<k>` (`f32`/`f64` are FFI type
   names in the generated table).
+- **Compilation, round 2.** The prepared-context analysis (`prepared.cpp`:
+  call-graph marking, loop regions, preparability of loop-called functions,
+  string-argument typing) adds 3–20k instructions to small scripts (startup
+  72.5k → 75.2k, fib(22) 97k → 107k, 200k calls 101k → 118k) and 7.0M to the
+  500-function program (20.8M → 27.8M, 420 per source byte); a first version
+  cost 15M there (std::function visitors, eager name sets) before the
+  speed-up commit.
 - **Cold vs warm.** Cold process time = startup + compile + first run. In
   process, later runs of the same compiled Program were 1–9 % faster than
   the first (1M loop 25.2 → 23.0 ms, 200k calls 8.2 → 8.2 ms, fib(22)
@@ -337,21 +458,21 @@ script; the VM path returns before it is constructed.
 
 Predefined gate (checkpoints.md CP11), measured with the `run.py ops`
 methodology (marginal callgrind instructions per iteration, N=4,000 vs 8,000),
-re-measured after the review fixes with `NIFT_VM=require` (genuine VM
+re-measured after review round 2 with `NIFT_VM=require` (genuine VM
 execution; a fallback or bail would be an error):
 
 | Criterion | Required | Measured | Result |
 | --- | --- | --- | --- |
-| Flat call ≥ 5× fewer instructions than v4.12 | ≤ 2,994 (v4.12 14,994 here; CP00 14,970) | **467** (32.1× fewer; before the review 464) | **met** |
-| Flat call ≤ 2× CPython function-local | ≤ 1,960 (2 × 980 here; CP00: ≤ 1,980) | **467** (0.48×) | **met** |
-| Parity on every compiled unit | identical stdout/stderr/exit (approved D-001#4 recursion budget only) | As reviewed: **not met** (round 1 found seven silent miscompiles the corpora did not exercise). After the fixes: 0 non-approved differences over rt-diff 793 entries, VM corpus 64, 600 generated/mutants, the adversarial gate (19,969 programs, seed 1; 1,912 sanitized, seed 2) and the reviewer's own programs | **met after fixes** (re-review pending) |
+| Flat call ≥ 5× fewer instructions than v4.12 | ≤ 2,994 (v4.12 14,994 here; CP00 14,970) | **461** (32.5× fewer; round 1: 467, as reviewed: 464) | **met** |
+| Flat call ≤ 2× CPython function-local | ≤ 1,922 (2 × 961 this run; CP00: ≤ 1,980) | **461** (0.48×) | **met** |
+| Parity on every compiled unit | identical stdout/stderr/exit (approved D-001#4 recursion budget only) | As reviewed: **not met** (round 1 found seven silent miscompiles the corpora did not exercise). After the fixes: 0 non-approved differences over rt-diff 793 entries, VM corpus 64, 600 generated/mutants, the adversarial gate (19,969 programs, seed 1; 1,912 sanitized, seed 2) and the reviewer's own programs | met after round 1; round 2 found three more miscompile classes (M1–M3) and a parser byte class (M4) the gate did not exercise; after round 2: 0 non-approved differences over rt-diff 804 entries, VM corpus 75, 600 generated/mutants, the adversarial gate (31,792 programs in 18 families, seed 1; 3,099 sanitized, seed 2), the subset suites and both rounds' reviewer material | **met after fixes** (review pending) |
 
-**Verdict: GO** (unchanged; re-review pending). Recursive calls (fib) cost
-465 instructions per call, at CPython parity; loops are 29× cheaper than
-v4.12 and ~3.7× cheaper than CPython.
+**Verdict: GO** (unchanged; review pending). Recursive calls (fib) cost
+471 instructions per call, near CPython (366–710 per call over the runs);
+loops are 31× cheaper than v4.12 and ~4× cheaper than CPython.
 
-### Where the remaining time goes (flat call, 467 instructions/iteration)
-`callgrind_annotate` (`../evidence/cp11/profile-call.txt`): `Vm::run` 420,
+### Where the remaining time goes (flat call; profile from round 1 at 467 instructions/iteration, now 461)
+`callgrind_annotate` (`../evidence/cp11/profile-call.txt`, round 1): `Vm::run` 420,
 `Value` move-assignment 26, `Value::release` 14, `Value::integer` 7 per
 iteration (before the review: 410 / 26 / 21 / `reserve_registers` 7). Per
 iteration the VM executes 11 instructions in the caller loop (compare-jump,
@@ -362,11 +483,12 @@ already in place, a specialised `Return` that skips register clearing for
 frames with no heap values, and a non-refcounting store for scalar results.
 
 ## Risks
-- **Coverage.** 78 of the 757 shared-corpus scripts run on the VM (79 of 758
-  before the CP10 integration); most real programs need constructs from
-  CP12–CP16. The review fixes refuse more shapes (zero decimal literals,
-  mid-block jumps, 206 legacy-special names, place arguments to mutating
-  callees) without changing any shared-corpus outcome. The performance
+- **Coverage.** 75 of the 757 shared-corpus scripts run on the VM (78
+  after round 1; 79 of 758 before the CP10 integration); most real programs
+  need constructs from CP12–CP16. Round 2 refuses three more shared scripts
+  (`call-locals-*`: a loop-called function declaring `a := x + 1` from its
+  parameter) and turns 10 static-error replays into fallbacks. The owner
+  accepted a narrower subset (round 2 direction). The performance
   evidence is for the subset only; template, filesystem and process code is
   untouched.
 - **Replay** costs time on programs that bail late (the VM work is wasted),
@@ -375,34 +497,41 @@ frames with no heap values, and a non-refcounting store for scalar results.
   before completion, and a program printing more than 64 MiB is stopped at
   the limit and replayed on legacy from the start (cost: the buffer memory
   and the VM time until the limit; such programs effectively run on legacy).
-- **Parity evidence is differential.** The review showed that corpora and a
-  single generator miss shapes (seven silent miscompiles reached `vm`). The
-  adversarial gate now targets feature interactions explicitly and found one
-  more (N1) during the fixes; other context-dependent legacy rules may
-  remain outside what the generators produce.
-- **Legacy context-dependent semantics.** Legacy has two evaluators whose
-  behaviour depends on where code runs (top level, loop body, function called
-  from a loop). The VM avoids them by bailing outside a verified domain, but
-  rules found only by differential testing (text-derived binding types, `!`
-  precedence, `+=` on strings) suggest others may exist outside what the
-  generator produces. Known residual case: a loop-body declaration `y := x`
-  whose name `x` refers to a different binding when legacy prepares the loop
-  than when it runs it.
-- CP09 review items apply: references from `array_mut`/`object_get` must not
-  be held across mutations (the VM copies values out immediately); deep
-  nesting destruction recursion; `hash_number` inconsistency (unused here).
+- **Parity evidence is differential.** Two review rounds found miscompile
+  classes the corpora and generators did not exercise (round 1: seven;
+  round 2: three — M1 typing against preparation-time bindings, M2 double
+  argument evaluation, M3 text-typed string arguments — plus a parser byte
+  class). The round-1 record wrongly called M1 a "residual case": it was a
+  miscompile class (303 of 4,800 targeted programs differed).
+- **Legacy context-dependent semantics.** Legacy's second (prepared)
+  evaluator is now inventoried from source ("Legacy's prepared
+  evaluator": eleven differences), not only found by testing; each is
+  refused statically or reduced to an enumerated value-dependent replay. The
+  inventory covers the constructs of the compiled subset; widening the
+  subset (CP12+) must extend it. The refusals over-approximate where the
+  prepared path runs (every loop, every function reachable from one).
+- CP09: reference safety is enforced in sanitizer builds (relocate on
+  mutation; the VM's uses were audited, see `cp09-value-model.md`), equality
+  and hashing are iterative; `hash_number` inconsistency is unused here.
 - CP10's review fixes are integrated (`runtime-2` @`4287adb`); the CP11
   compiler checks for the same shapes remain as a second line.
 - **Build gates now see `src/rt`.** Linking `src/rt` into `nift` puts its
   files in the zero-warning gate (`test-warnings`) and the sanitizer/TSan
   builds. Not re-run for this round: `make -k test`/`make certify` on the
   integrated branch (left to certification).
-- **Memory budget is approximate.** The frame-held bytes are measured, not
-  tracked: strings and elements two levels deep, shared objects counted per
-  reference, checked at depths +12.5 % apart. A program that allocates a lot
-  per frame between two checks can still use more memory than the budget
-  before the bail; an allocation failure is then reported as a VM internal
-  failure (exit 70), never silently replayed.
+- **Memory budget.** Exact accounting of the rt heap (64-byte granules,
+  object and owned capacities) plus the VM stacks, checked after every
+  allocating instruction, so one instruction can overshoot the budget by at
+  most its own allocation (e.g. one string concatenation). It does not
+  include allocator overhead, the 64 MiB output buffer, the parse tree or
+  the program. Exit 70 is guaranteed only if the host can actually provide
+  the budget (1 GiB); with less free memory (or a tighter cgroup) the kernel
+  can still kill the process first. A non-recursive program that legitimately
+  needs more than 1 GiB of rt heap gets a reported failure where legacy
+  might succeed (legacy uses more memory per value, so this is unlikely).
+- **Deep equality.** `==` deeper than 10,000 levels bails and legacy
+  decides (correct but slow: legacy builds such values in quadratic time);
+  beyond about 50,000 levels legacy itself crashes, and so does the replay.
 - **Name table breadth.** The generated table is deliberately broad (it also
   contains FFI type names such as `f32`, `i8`, metadata keys and keywords);
   refusing a harmless name costs coverage only. A name legacy dispatches
@@ -427,7 +556,9 @@ evidence (`d1a6e0c`); lint, oracle link and corpus fixes (`566ea74`,
 `runtime-2-cp11i` (`54b26d7` … `0a0d43f`), then review round 1: integration
 (`38fd2df`), fixes (`d6d0d2b`), rt-diff class policies (`ca41053`), gate and
 regression tests (`2e2a4d7`, `d7020a7`), hot-path and compile-cost follow-ups
-(`8e10a3a`, `84d9332`), this record and evidence.
+(`8e10a3a`, `84d9332`), this record and evidence. Review round 2: CP10 follow-up (`26aee9a`), CP09 follow-up (`72c00ac`),
+fixes and tests (`1ff0063`), generator adjustment (`52d0e1a`), analysis
+speed-up (`b2183e4`), this record and evidence.
 
 ## Evidence
 `../evidence/cp11/README.md`.
@@ -474,3 +605,45 @@ integrated build it reports differences in every family
 (typed 25, context 68, numeric 232, receiver 12, names 19, alias 26,
 control 56, output 3, malformed 1; recursion 27 unlabelled because that
 build has no `beyond_legacy_depth`).
+
+### Independent review, round 2 (2026-10-18)
+The round showed that legacy's second evaluator (loop bodies and the
+functions called from them are *prepared*) had been handled finding by
+finding. Owner direction for the fixes: legacy is an oracle for finding
+differences, not the authority on semantics; narrow the subset instead of
+modelling legacy's quirks; refuse statically wherever the uncertainty is
+detectable before execution; do not expand replay; keep the gate
+benchmarks compiling; record the old behaviour of every difference and leave
+the intended language behaviour to the owner (candidates: arguments
+evaluated exactly once, types from values not text, consistent declarations
+inside and outside loops, conventional `break`, consistent built-in
+resolution, explicit aliasing rules). The class was fixed from the source:
+"Legacy's prepared evaluator" above lists all eleven differences and how
+each is handled.
+
+| # | Finding | Status | Fix (exact / refused) | Tests |
+| --- | --- | --- | --- | --- |
+| M1 | DEFECT (miscompile class; the round-1 record wrongly called it a residual): loop bodies and loop-called functions type `b := a` / `(a)` against the `a` visible when legacy prepares them (a global, an enclosing scope, the caller's scope), not the one that runs; 303/4,800 targeted programs differed | fixed | **refused** `prepared-decl-type` (P1): any binding-referring declaration in a function reachable from a loop; in other loops one referring to a name declared inside the outermost enclosing loop. Elsewhere exact (same binding at the header and at run time) | unit (4), corpus `review2_m1_*.f` (2 refused, 1 compiled), adversarial `preptype` (8,064 programs; 303 differences on the pre-fix build, 0 after), `shadow`, subset suites |
+| N1 | (round-1 replay) | replaced | the run-time check (`CheckParam` after `BindType`) is removed; the shape is refused with M1 | corpus `review_n1_loop_decl_type.f` now `fallback prepared-decl-type` |
+| M2 | DEFECT: a loop-called function whose `return`/`if`/`while` text legacy's prepared parser rejects (or with a bare `return`) has its arguments evaluated twice (nested: 4×) | fixed | **refused** `prepared-fn-unprepared` (P2/P3): every function reachable from a loop body or condition (call-graph fixpoint) whose body legacy cannot prepare; acceptance by `rt/prepared_parse.cpp`, an exact port of `src/Ast.cpp`'s parser | `vm_prepared_parse` (100,136 texts vs `nift::ast::parse_expression`: 0 differences; a seeded port mutation gives 1,323), unit (4), corpus `review2_m2_dup_arg_eval.f`, adversarial `dupeval` (984; 114 differences before, 0 after) |
+| M3 | DEFECT: a string-literal argument is typed from its unquoted text (`f("q")` with `q := null` → null binding; `f("2.5")` → double binding) | fixed | **refused** `string-arg-type` (P5) when the unquoted text types as a double or names a binding that can be in legacy's scope chain at that call (globals; the calling function and every function that can be active below it). Other string literals type as strings on both legacy paths, as on the VM | unit (3), corpus `review2_m3_*.f` (2 refused, 1 compiled), adversarial `strarg` (1,071; 128 before, 0 after) |
+| M4 | DEFECT (CP10): `\f`/`\v` inside a statement are whitespace to the rt lexer, malformed to legacy | fixed | **Opaque** in the CP10 lexer (separate commit "CP10 follow-up"; `cp10-parser.md` Reviews). Conservative inside loop bodies, where legacy's prepared parser accepts them | parser unit, `legacy-cases/c3_*.f`, negative gate whitespace set, corpus `review2_m4_*.f`, adversarial `bytes` (437; 38 before, 0 after; CR, NEL, NBSP, U+2028/9, BOM, NUL, DEL, C0 kept as tests) |
+| R5 | D-013 violation: the frame-memory budget sampled two levels deep; `[[s]]` per frame evaded it and the process was OOM-killed | fixed (exact) | CP09 `heap_account` (exact live rt heap, any nesting) + VM stacks, checked after every allocating instruction; deep → `recursion-budget` bail, otherwise reported internal failure (exit 70) | unit (budgets, hidden nested memory, flat overflow → Internal), corpus `review2_r5_hidden_frame_memory.f` (stops at ~2,600 frames, legacy replays), adversarial `memory` (13, with `NIFT_VM_HEAP_BUDGET=2 MiB`: every holder shape must end in a recursion-budget bail; the pre-fix build completes 12 of them) |
+| R6 | RISK: `rt::equal` recursion segfaulted on ~50,000-deep arrays | fixed | CP09: iterative `equal`/`hash`, `equal_within` (legacy visiting order); VM bails `nesting-depth` beyond 10,000 levels so legacy decides; CP09 bridge bounded at 512 levels | `value_round2` (300,000 deep), unit (9,999 decided / 10,001 bails), corpus `review2_r6_deep_equality.f`, adversarial `deepeq` (54, `NIFT_VM_EQUALITY_DEPTH=50`) |
+| DOC | M1 called a residual; `NIFT_VM_STATS`/`DUMP` behaviour; memory-budget claim | fixed | this record: M1 is a miscompile class; STATS/DUMP are test tooling written to stderr before a replay; memory budget text states what is and is not guaranteed | — |
+
+Also in this round: statically known errors (redeclaration, arity, member
+assignment, push arity) are refused instead of replayed
+(`BailReason::StaticError` removed); `vm_subset.py` adds the SUPPORTED and
+UNSUPPORTED suites; the CP09 reference contract is enforced in sanitizer
+builds (owner item 6, `cp09-value-model.md`).
+
+Replay reasons that remain, and why each is not decidable before execution
+(all side-effect free: the subset's only effect is buffered output):
+`runtime-error` (an error depends on values; legacy prints its own
+diagnostic), `number-range` (a computed number reaching 2^53 or −0),
+`aliasing` (whether a bound or returned place holds an aggregate),
+`unverified` (P4/P5: text and value types disagree for this value — e.g.
+an integral double —; an array element of another type; `length()`/`size()`
+on an object), `recursion-budget`, `output-limit`, `nesting-depth`
+(resource bounds).
