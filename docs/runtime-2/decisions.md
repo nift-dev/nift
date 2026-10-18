@@ -560,3 +560,25 @@ must be removed or justified when build recovery integrates.
   end prints a warning without changing the exit status.
 - Design record: CP16 `cp16-host-ops-design.md` §11–§12 (`runtime-2-cp16-design`
   @d4310bc); parser-checked examples in `tests/runtime2/cp16/syntax/`.
+- **Refinements (owner).**
+  - *Syntax:* an explicit `mode` where execution behaviour differs, named options
+    for deadlines and cancellation; incompatible combinations are fatal; unknown
+    keys are fatal with a spelling suggestion; defaults preserve every existing
+    valid `run()` call; launch failure, nonzero exit, timeout and cancellation
+    stay distinguishable; ownership and cleanup documented per mode; the 21
+    parser-checked examples become acceptance fixtures.
+  - *C1–C3:* explicitly detached processes are never touched by managed cleanup,
+    but a managed process cannot escape ownership by backgrounding itself
+    (platform limits documented). SIGTERM to Nift runs bounded cleanup
+    (graceful → bounded wait → forced) and then exits with a signal-derived
+    status. Process groups are per managed pipeline; cancelling one never affects
+    other pipelines or Nift itself; exit/cancel races leave no zombies. The
+    pinned SIGTERM expectation is updated explicitly under this decision.
+    Release notes call out C2 prominently (use explicit detachment instead of
+    relying on accidental survival).
+  - *Defaults:* detachment is forbidden in builds including hooks and `--auto`
+    rebuilds. The cleanup warning fires only when Nift actually terminates a
+    still-running process (not when reaping an exited one), names the process and
+    the reason, is not duplicated across a pipeline, and may become suppressible
+    without disabling cleanup. 2,000 ms is a documented default that may become
+    configurable later; no new configuration machinery in CP16.
