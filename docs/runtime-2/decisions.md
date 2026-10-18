@@ -410,3 +410,32 @@ must be removed or justified when build recovery integrates.
   `runtime.type_error`, `runtime.index_out_of_bounds`), independent of where
   the error arises (built-in, bytecode or legacy); resource and host failures
   get their own codes (e.g. limit and host-service failures).
+
+## D-026 — Performance ambition; site-DX warning and strict contracts (owner, 2026-10-18)
+- **Performance ambition.** CPython parity is the first milestone; competitiveness
+  with Bun on representative scripting and automation workloads is the stretch
+  goal (match or beat it on short-lived scripts, filesystem orchestration and
+  native-dominated work). Cold start, warm/sustained throughput, peak memory and
+  end-to-end time are measured separately; references are v4.12, CPython, Bun,
+  Node, Lua and Go (compiled reference). Semantics and methodology are never
+  bent for a result. Where Bun wins, the scoreboard records the likely cause
+  (JIT, native library, runtime overhead, architecture). Whether Nift needs
+  adaptive optimisation or a JIT is decided from that evidence, not before.
+- **Disabled features cost nothing.** A disabled warning does no filesystem
+  work; overhead is measured in instructions against the pre-feature baseline.
+- **Strict is a verification command.** `build --strict` exit 0 means no unknown
+  names anywhere in the site, including up-to-date pages; toggling strict
+  without source edits keeps `build`, `status` and exit codes in agreement.
+- **Output paths.** `public` and `public/` are one directory; absolute, external
+  and symlinked output dirs are supported; no project-root containment.
+- **Warnings stay conservative, by context not case.** No blanket case-based
+  exclusion (`@Content()` in template text still warns); suppression only in
+  recognised non-Nift contexts (script/style/pre/code, comments, fenced code,
+  JSON keys/JSON-LD). `$[…]$` maths passthrough has a precise documented rule
+  and never changes output of a resolving name.
+- **Structured process results.** Conventional pipeline exit status is kept;
+  results also expose per-stage status, distinguishing launch failure from a
+  launched process exiting nonzero.
+- The temporary `--auto` → `--repair` retry is removed once build recovery is
+  integrated, verified by an end-to-end watcher test (error → fix → rebuild,
+  no repair).
