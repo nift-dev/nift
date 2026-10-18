@@ -132,10 +132,12 @@ nift serve --dir dist       # any directory, inside or outside the project
 
 `nift serve` is a convenience wrapper for
 `python3 -m http.server PORT --bind HOST --directory DIR`. It requires
-**Python 3.7 or newer** on `PATH` (`python3` or `python`, or `py -3` on Windows);
-Nift never installs it. It serves the project's configured output directory,
+**Python 3.8 or newer** on `PATH` (`python3` or `python`; on Windows the `py`
+launcher or a `python.exe`); Nift never installs it. It serves the project's configured output directory,
 reports a clear error if that directory does not exist yet (run `nift build`)
-or if the port is in use, and stops with Ctrl+C. It does not build, watch or
+or if the port is already in use (a best-effort check: Python reports a port
+taken in the meantime), and stops with Ctrl+C. `nift serve --help` lists the
+options. It does not build, watch or
 reload: run `nift build` (or `nift build --auto` in another terminal) to
 update the files it serves.
 
