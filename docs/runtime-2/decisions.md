@@ -515,3 +515,20 @@ must be removed or justified when build recovery integrates.
   CP16 Host-op architecture, not redesigned now. A bounded audit of all
   filesystem APIs (dependencies, containment, unbounded reads) accompanies the
   fix.
+
+## D-029 — One process model; `run()` extended, syntax decided later (owner, 2026-10-19)
+- CP16's Host layer implements one process model (capture, streaming,
+  interactive input, detached execution, deadlines, cancellation, exit
+  information, cleanup) without waiting for the public syntax.
+- The public surface should extend `run()` with explicit options/modes rather
+  than add unrelated process commands; the final syntax is chosen by the owner
+  from a short comparison of concrete alternatives that follow existing Nift
+  conventions, with examples for each mode.
+- Process lifetime and ownership come first: ownership after `run()` returns,
+  behaviour at script/build exit and on signals, pipeline cancellation,
+  abandoned handles, deadlock-free draining, deadlines while blocked, and
+  POSIX/Windows differences, each with explicit cleanup semantics and tests.
+- Process handles use CP17's typed-handle design. Launch failure stays
+  distinguishable from a launched process that exits nonzero.
+- Whole reads stop retaining data at the configured bound (a small probe past
+  it is allowed; unbounded allocation is not).
