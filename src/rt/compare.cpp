@@ -79,12 +79,6 @@ std::uint64_t hash_number(const Value& number) {
 
 namespace {
 
-struct EqualPair {
-    const Value* left;
-    const Value* right;
-    std::size_t depth;
-};
-
 enum class Shallow : std::uint8_t { Unequal, Equal, Descend };
 
 // One level of legacy runtime_equal: scalars and identities are decided here;
@@ -115,49 +109,60 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
     return same ? Shallow::Equal : Shallow::Unequal;
 }
 
-// Pushes the children of two equal-sized aggregates so they pop in legacy's
-// order (array elements first to last; object entries in the left object's
-// order, matched by key). A missing key is a pair with no right side, which
-// decides the result when legacy would reach it.
-void push_children(const EqualPair& pair, std::vector<EqualPair>& work) {
-    const Value& l = *pair.left;
-    const Value& r = *pair.right;
-    if (l.is(Kind::Array)) {
-        const auto& a = array_items(l);
-        const auto& b = array_items(r);
-        for (std::size_t i = a.size(); i-- > 0;) work.push_back({&a[i], &b[i], pair.depth + 1});
-        return;
-    }
-    const auto& entries = object_entries(l);
-    const std::size_t mark = work.size();
-    for (const auto& entry : entries) {
-        work.push_back({&entry.second, object_get(r, entry.first), pair.depth + 1});
-    }
-    std::reverse(work.begin() + static_cast<std::ptrdiff_t>(mark), work.end());
-}
+// Two equal-sized aggregates being compared child by child: `next` is the
+// index of the next child (array element, or entry of the left object, matched
+// by key in the right one).
+struct EqualFrame {
+    const Value* left;
+    const Value* right;
+    std::size_t next;
+};
 
 } // namespace
 
-// Iterative (heap worklist, CP11 review round 2, R6): no nesting depth can
-// exhaust the C++ stack. Pairs are visited depth-first in legacy's order, so
-// when `max_depth` stops the walk, legacy (whose recursion goes deeper before
-// it crashes) has not yet decided either. A bounded walk also descends into
-// two references to the same aggregate, as legacy does.
+// Iterative (CP11 review round 2, R6): no nesting depth can exhaust the C++
+// stack. Pairs are visited depth-first in legacy's order (array elements first
+// to last; object entries in the left object's order, a missing key deciding
+// when legacy would reach it), so when `max_depth` stops the walk, legacy
+// (whose recursion goes deeper before it crashes) has not yet decided either.
+// A bounded walk also descends into two references to the same aggregate, as
+// legacy does. One frame per open nesting level (review round 3, F4): the
+// working memory is O(depth), at most max_depth + 1 frames, never O(elements)
+// (comparing two 1M-element arrays used to build a 24 MB work list outside
+// the VM's memory budget).
 Equality equal_within(const Value& left, const Value& right, std::size_t max_depth) {
     const bool identity = max_depth == static_cast<std::size_t>(-1);
-    std::vector<EqualPair> work;
-    EqualPair pair{&left, &right, 0};
-    for (;;) {
-        const Shallow s = pair.right ? shallow_equal(*pair.left, *pair.right, identity) : Shallow::Unequal;
+    const Shallow first = shallow_equal(left, right, identity);
+    if (first != Shallow::Descend) return first == Shallow::Equal ? Equality::Equal : Equality::Unequal;
+    if (max_depth == 0) return Equality::TooDeep;
+    std::vector<EqualFrame> open{{&left, &right, 0}};
+    while (!open.empty()) {
+        EqualFrame& top = open.back();
+        const Value& l = *top.left;
+        const bool array = l.is(Kind::Array);
+        if (top.next == (array ? array_size(l) : object_size(l))) {
+            open.pop_back();
+            continue;
+        }
+        const Value* a = nullptr;
+        const Value* b = nullptr;
+        if (array) {
+            a = &array_items(l)[top.next];
+            b = &array_items(*top.right)[top.next];
+        } else {
+            const auto& entry = object_entries(l)[top.next];
+            a = &entry.second;
+            b = object_get(*top.right, entry.first);
+        }
+        ++top.next;
+        const Shallow s = b ? shallow_equal(*a, *b, identity) : Shallow::Unequal;
         if (s == Shallow::Unequal) return Equality::Unequal;
         if (s == Shallow::Descend) {
-            if (pair.depth >= max_depth) return Equality::TooDeep;
-            push_children(pair, work);
+            if (open.size() >= max_depth) return Equality::TooDeep;  // the child is at depth open.size()
+            open.push_back({a, b, 0});
         }
-        if (work.empty()) return Equality::Equal;
-        pair = work.back();
-        work.pop_back();
     }
+    return Equality::Equal;
 }
 
 bool equal(const Value& left, const Value& right) {
