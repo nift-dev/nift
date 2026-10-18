@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace nift::rt {
@@ -102,10 +103,25 @@ public:
     // Number of Opaque nodes in the subtree rooted at `id`.
     std::size_t opaque_count(NodeId id) const;
 
+    // Syntax prevalidation (CP13, D-022 #3; rt/prevalidate.h). A deferred
+    // region (function, method or lambda block body) whose statement structure
+    // the translator rejects becomes Opaque(DeferredTranslation) for the VM;
+    // the translator's diagnostic, which legacy reports only when the region
+    // runs, is kept here. Recording it never changes the tree.
+    struct DeferredError {
+        std::uint32_t offset = 0;
+        std::string message;
+    };
+    void note_deferred_error(std::uint32_t offset, std::string message) {
+        deferred_errors_.push_back({offset, std::move(message)});
+    }
+    const std::vector<DeferredError>& deferred_errors() const { return deferred_errors_; }
+
 private:
     std::string_view source_;
     std::vector<Node> nodes_;
     std::vector<NodeId> lists_;
+    std::vector<DeferredError> deferred_errors_;
 };
 
 const char* node_kind_name(NodeKind kind);

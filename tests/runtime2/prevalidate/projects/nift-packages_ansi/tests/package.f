@@ -1,0 +1,46 @@
+@import("ansi")
+
+esc := bytes([27]).decode("utf-8")
+fn(expect(condition, label)) {
+    if(!condition) { print("FAIL " + label); missing.value }
+}
+
+expect(ansi.sgr(0) == esc + "[0m", "sgr lower boundary")
+expect(ansi.sgr(255) == esc + "[255m", "sgr upper boundary")
+expect(ansi.sgr([1, 31, 4]) == esc + "[1;31;4m", "sgr multiple")
+expect(ansi.reset() == esc + "[0m", "reset")
+expect(ansi.wrap("text", [1, 34]) == esc + "[1;34mtext" + esc + "[0m", "wrap")
+expect(ansi.wrap("", 32) == esc + "[32m" + esc + "[0m", "empty text")
+expect(ansi.bold("x") == esc + "[1mx" + esc + "[0m", "bold")
+expect(ansi.dim("x") == esc + "[2mx" + esc + "[0m", "dim")
+expect(ansi.italic("x") == esc + "[3mx" + esc + "[0m", "italic")
+expect(ansi.underline("x") == esc + "[4mx" + esc + "[0m", "underline")
+expect(ansi.black("x") == esc + "[30mx" + esc + "[0m", "black")
+expect(ansi.red("x") == esc + "[31mx" + esc + "[0m", "red")
+expect(ansi.green("x") == esc + "[32mx" + esc + "[0m", "green")
+expect(ansi.yellow("x") == esc + "[33mx" + esc + "[0m", "yellow")
+expect(ansi.blue("x") == esc + "[34mx" + esc + "[0m", "blue")
+expect(ansi.magenta("x") == esc + "[35mx" + esc + "[0m", "magenta")
+expect(ansi.cyan("x") == esc + "[36mx" + esc + "[0m", "cyan")
+expect(ansi.white("x") == esc + "[37mx" + esc + "[0m", "white")
+
+expect(ansi.sgr([]) == null, "empty sgr array")
+expect(ansi.sgr(-1) == null, "negative code")
+expect(ansi.sgr(256) == null, "oversized code")
+expect(ansi.sgr(1.5) == null, "fractional code")
+expect(ansi.sgr("31") == null, "string code")
+expect(ansi.sgr([1, -1]) == null, "mixed invalid codes")
+expect(ansi.sgr([31, "1"]) == null, "mixed non-integer codes")
+expect(ansi.sgr([31, null]) == null, "mixed null codes")
+expect(ansi.wrap(7, 31) == null, "non-string text")
+expect(ansi.wrap("x", []) == null, "missing wrap code")
+expect(ansi.wrap("x", [31, 256]) == null, "invalid wrap code")
+expect(ansi.bold(7) == null, "invalid helper text")
+
+first := ansi.red("repeat")
+second := ansi.red("repeat")
+expect(first == second && first == esc + "[31mrepeat" + esc + "[0m", "deterministic repetition")
+expect(ansi.blue(ansi.bold("nested")) == esc + "[34m" + esc + "[1mnested" + esc + "[0m" + esc + "[0m", "nested emission")
+expect(ansi.red("before" + esc + "[1mafter") == esc + "[31mbefore" + esc + "[1mafter" + esc + "[0m", "embedded escape passthrough")
+
+print("PASS ansi package contract")

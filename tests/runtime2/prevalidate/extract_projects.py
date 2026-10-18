@@ -27,9 +27,12 @@ imports = re.compile(r'''\bimport\(\s*["']([^"']+)["']''')
 rows = []
 for repo in sorted(os.listdir(SRC)):
     root = os.path.join(SRC, repo)
-    if not os.path.isdir(os.path.join(root, '.git')): continue
-    commit = subprocess.run(['git', '-C', root, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
-    url = subprocess.run(['git', '-C', root, 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
+    if not os.path.isdir(root): continue
+    if os.path.isdir(os.path.join(root, '.git')):
+        commit = subprocess.run(['git', '-C', root, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        url = subprocess.run(['git', '-C', root, 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
+    else:  # a local snapshot without git (pinned by the per-file sha256 only)
+        commit, url = 'local-snapshot', '(local snapshot) ' + os.path.realpath(root)
     units, imported = [], set()
     for d, dirs, names in os.walk(root):
         dirs[:] = [x for x in dirs if x not in SKIP]
@@ -52,7 +55,10 @@ for repo in sorted(os.listdir(SRC)):
                     units.append((f'{rel}.script{k}.f', f'{rel}:{line}', 'template-script', body))
     for out_rel, origin, kind, text in units:
         if kind == 'script':
-            kind = 'import' if os.path.normpath(out_rel) in imported else 'entry'
+            # Package modules (nift-packages/*/src/*.f) are loaded by consumers'
+            # import(...): dynamically loaded units, validated when loaded.
+            pkg_module = repo.startswith('nift-packages_') and out_rel.startswith('src/')
+            kind = 'import' if os.path.normpath(out_rel) in imported or pkg_module else 'entry'
         dst = os.path.join(OUT, repo, out_rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         open(dst, 'w', encoding='utf-8').write(text)

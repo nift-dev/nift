@@ -256,110 +256,119 @@ a decision for that checkpoint. Affected pinned behaviour:
 
 ---
 
-## (f) Syntax prevalidation on both engines (D-022 #3, R1)
+## (f) Syntax prevalidation on both engines (D-022 #3, R1) — implemented (T8)
 
-**Design.** One authoritative parser: the CP10 rt parser (`rt::parse_script`)
-is the validator. CP10 already reproduces every parse-time rejection of the
-legacy translator with the identical message and line:column (CP10 gate 1)
-and marks constructs it reads but does not compile as Opaque. A new
-`rt::prevalidate(source, path)` runs in `run_script_source` (`CLI.cpp`)
-**before engine selection** — so a unit routed to legacy cannot bypass it —
-and in the `-e`, `eval` and stdin paths; on failure it prints the
-diagnostic (text, or JSON with `phase: "validate"`, `engine: "none"`),
-exits 1 (eval: 2), and nothing has run: no output, no effects. A passing
-check guarantees only valid syntax (not static validity).
+**Principle (owner addition 1).** Prevalidation classifies by grammar and
+lexical rules only. A program that parses and then fails at run time —
+undefined callable, type error, bad index, in code that runs or in code that
+never runs — is syntactically valid and is accepted. Legacy's exit status is
+recorded as an observation, never as the criterion. A passing check
+guarantees only valid syntax.
 
-| Outcome | Parser result | Behaviour |
+**Implementation** (this worktree; VM Opaque/fallback semantics unchanged):
+`src/rt/prevalidate.{h,cpp}` — `rt::prevalidate(source)` over the CP10
+parser (one grammar). A unit is rejected, citing the rule, when:
+
+| Rule | Grammar / lexical rule | Code |
 | --- | --- | --- |
-| invalid syntax | parse error, or an Opaque node of the new reason **`LegacyMalformed`** | rejected before execution, both engines |
-| valid, VM-unsupported | Opaque `TemplateText`, `IrregularLegacyParse`, `StructBody`, `DeferredTranslation` (well-formed body), `NestingLimit`, **`LegacyRuntimeReject`**; or a compiler refusal | accepted; runs on legacy, never rejected by the validator |
-| valid, run-time-determined | compiled | runs normally (may still fail at run time) |
+| `translator` | a statement form the translator grammar rejects (`fn add(a,b)`, `if(x) stmt`, …); CP10 reproduces legacy's message and position exactly | `native.translation_error` |
+| `deferred-translator` | the same grammar inside a deferred region (function, method, lambda block body) — legacy checks it only when the region runs; recorded by the three deferred sites via `Ast::note_deferred_error` (tree unchanged) | `native.translation_error` |
+| `R1-unterminated-string` | a `"`/`'` literal never closed (quotes pair as legacy reads them) | `native.syntax_error` |
+| `R2-unclosed` / `R2-stray-closer` / `R2-mismatched` | brackets `()[]{}` unbalanced in the statement (strings, nested blocks and other Opaque regions are skipped as units) | `native.syntax_error` |
+| `R3-empty-element` | an empty element: `,` after an opener or a comma, or before a closer | `native.syntax_error` |
+| `R4-missing-operand` | `+ - * / % == != && .` followed by a closer, a comma or the end of the statement | `native.syntax_error` |
+| `R5-missing-left-operand` | `* / % == != && || ??` where an operand must start | `native.syntax_error` |
 
-**The split CP10 needs (T8).** Today `OpaqueReason::LegacyRuntimeError`
-(47 sites in `src/rt/{control_flow,declarations,expr_literals,expr_parser,expr_postfix,statement_parser}.cpp`)
-mixes truly malformed statements with grammatical forms legacy merely
-evaluates differently. Measured over the in-repo corpora (first Opaque per
-file, legacy run in a temporary copy): of 101 files whose first Opaque is
-`legacy-runtime-error`, **26 run successfully on legacy** (`f (1)` with a
-space, `while (…)`, a multi-line `return [1,\n 2]`, single-quoted strings in
-object literals, methods on literals, `throw(1)` as a call, plus the two
-`syn_malformed_in_*` probes whose malformed code never runs) — classing all
-such sites as invalid would reject valid programs. Of the 75 that fail on
-legacy, 66 fail on the Opaque's line with a syntax-family message
-(`unknown value or malformed expression`, `expression cannot be empty`,
-`invalid callable signature`, removed `await(…)`, C-style `@for`,
-malformed lambda/destructuring/declaration/enum/object literal forms,
-`unterminated parameter value expression`); the rest fail with semantic
-errors (`assignment to undefined binding`, `print` arity) or elsewhere.
-Each of the 47 sites is therefore classified individually, and a site
-becomes `LegacyMalformed` only if a differential oracle shows legacy fails
-on that statement whenever it executes, with the message the validator will
-print (CP10's legacy-oracle harness, extended to execute the isolated
-statement).
+Rules R1–R5 are checked only on the text of `Opaque(LegacyRuntimeError)`
+regions; every other Opaque (template text, irregular legacy parses, struct
+bodies, nesting limit, well-formed deferred bodies) is valid-but-unsupported
+and accepted. Deliberately not rules (accepted although legacy may fail when
+the statement runs, because the reading is ambiguous or legacy accepts it):
+`x := 1 ||`, `x := 1 ??`, partial ternaries, `+ 2`, relational operators,
+`h( )`, `\v`/`\f` and `1abc` tokens.
 
-**Legacy run-time "syntax" errors that move before execution:** unbalanced
-or stray delimiters and malformed expressions (`unknown value or malformed
-expression: (1 + 2…`), empty operands and trailing commas (`expression
-cannot be empty`), unterminated literals (wording from site-dx), and the
-malformed declaration/lambda/signature/enum/object/loop forms above, when the
-oracle confirms them. Their text stays legacy's (message and location); only
-the timing changes (no prior output). Not moving: anything grammatical
-(`"abc"[1]`, semantic errors). Translator errors (`fn add(a,b)`, `if(x)
-stmt`) are already pre-execution in legacy (guards).
+**The 47 sites.** `tests/runtime2/prevalidate/sites.tsv` lists every
+`Opaque(LegacyRuntimeError)` site (file:line, code context): **none rejects by
+itself** — a site only says "not a construct the VM compiles"; the statement
+is rejected only when one of R1–R5 holds on its text. This is what keeps
+`f (1)`, `while (…)`, `{"a": 'single'}`, `"hello".to_string()`,
+`throw(1)` as a call, … (26 legacy-accepted shapes measured earlier) valid.
 
-**Units.** Entry points (script file, `-e`, `eval`, stdin) are validated
-whole before the first instruction. Imports are validated when loaded
-(legacy import loader in `ParserScript.cpp`; VM import in phase B), without
-preloading unrelated files: output of the importer before the import stays
-(`syn_import_module_syntax`). Template pages: all `@script` bodies of a page
-are validated before the page renders (a page is already published
-atomically); `$[...]` expression syntax in templates keeps legacy timing
-until the template compiler (CP24).
+**Diagnostic text.** Same family, position and wording as legacy's run-time
+error for the statement (`unknown value or malformed expression: <text from
+the offending operand to the end of the statement>` for R2; `expression
+cannot be empty` for R3–R5; `object literal: trailing comma`): identical to
+legacy on 33 of 35 legacy-failing rule cases (`rules_test.py`), and identical
+to the `.new` expectations of all 7 D-022 #3 old-vs-new tests (unchanged);
+only the timing changes. The two differences are `(1]` (legacy quotes `(1`)
+and `(,1)` (legacy quotes `,1`).
 
-**Zero-false-rejection gate (permanent, R1).**
-`tests/runtime2/prevalidate/gate.py` (`make
-test-runtime2-prevalidate-gate`): every corpus the project has — CP10's
-legacy cases and error corpus, VM corpus, semantics, rt-diff corpus,
-diagnostics, cp410 probes, `tests/*.f`, scripts extracted from the shell
-smoke tests, optionally the nift-regression-suite (extracted offline) — plus
-**real projects**: 26 units (16 entry scripts, 3 imports, 7 template
-`@script` bodies) vendored under `tests/runtime2/prevalidate/projects/` from
-19 repositories pinned in `repos.tsv`/`projects.tsv` (commit, origin,
-sha256; no network at test time; `extract_projects.py` refreshes them):
-nift-experiments tanstack, tanstack-rewrite, spacex, agora, temporal, deno,
-docker, ai-sdk, capgo, cloudflare-docs; nift-dev nift-dev.github.io, lab;
-nift-packages curl, imagemagick, mysql, postgres, redis, sqlite, vips (the
-seven packages known locally — the org listing is not reachable from this
-session). Four repositories contain no script units (recorded with the
-reason). Every rejection must be one legacy also fails on at that line
-(in-repo files run once in a temporary copy); external code is never run —
-any rejection there fails until classified by hand in
-`expected_rejections.tsv`. Passing is evidence, not proof, that every valid
-program is accepted.
+**Tests.** `tests/runtime2/prevalidate/rules.tsv` + `rules_test.py` (85
+cases, each run through the prevalidator and against legacy): every rule
+with legacy-failing examples; the D-022 #3 "never executed" cases
+(uncalled function, untaken branch, uncalled lambda); and owner addition 2 —
+syntactically valid programs that fail at run time (undefined callable,
+bad index, division by zero, type errors, throw, overflow, arity) at top
+level, in dead branches, in uncalled functions and after `return`, all
+accepted. Result: 85/85. `rt-parser-unit` PASS, CP10 error corpus 1,500/1,500
+identical, rt-lint clean.
 
-Measured now in proxy mode (CP10 parse failures = rejections; the
-`legacy-runtime-error` Opaques the split must decide = pending):
+**Units.** Entry points (script file, `-e`, stdin) are validated whole in
+`run_script_source` before engine selection — the wiring is a prepared
+patch because `src/CLI.cpp` belongs to other agents:
+`scratchpad/cp13/cp13-prevalidate-cli-wiring.patch` (applies cleanly;
+the patched file compiles; adds `NIFT_PREVALIDATE=only`, exit 0/65, for the
+gate's `check` mode). Plan for the rest: `eval` validates its expression
+with `rt::parse_expression` + R1–R5 (same function, expression entry); the
+legacy import loader (`ParserScript.cpp`, owned by site-dx) calls
+`prevalidate` on the module text when it is loaded, reporting through the
+import frame (keeps the `import: ` prefix, as the `syn_import_module_syntax`
+`.new` expects); page `@script` bodies are validated before the page
+renders; `$[...]` template expressions keep legacy timing until CP24. The
+VM's script runner needs no change (validation precedes it).
 
-| Corpus | Units | Accepted | Rejected (legacy also fails) | False rejections | Pending split |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| CP10 legacy cases | 257 | 158 | 35 | 0 | 64 |
-| CP10 syntax errors | 34 | 0 | 34 | 0 | 0 |
-| VM corpus | 122 | 116 | 1 | 0 | 5 |
-| semantics | 57 | 54 | 0 | 0 | 3 |
-| rt-diff corpus | 15 | 15 | 0 | 0 | 0 |
-| CP13 diagnostics | 104 | 87 | 4 | 0 | 13 |
-| cp410 probes | 120 | 120 | 0 | 0 | 0 |
-| tests/*.f | 1 | 1 | 0 | 0 | 0 |
-| smoke-test extracts | 1,780 | 1,762 | 0 | 0 | 18 |
-| real projects (19 repos) | 26 | 26 | 0 | 0 | 0 |
-| nift-regression-suite extracts | 126 | 126 | 0 | 0 | 0 |
-| **total** | **2,642** | | **74** | **0** | **103** |
+**Zero-false-rejection gate (permanent).** `tests/runtime2/prevalidate/gate.py`
+(`make test-runtime2-prevalidate-gate`, `--tool .build/rt-parse-dump`):
+every rejection must cite a rule; translator-grammar rejections pass on the
+rule; every other rejection needs a reviewed entry in
+`expected_rejections.tsv` naming the rule and the reviewer's reading of the
+line (legacy behaviour is not a criterion); anything else fails. All
+rejections are recorded in `rejections.tsv` (rule, message, legacy
+observation, line text). Real projects: 86 units (50 entry scripts, 29
+imports / package modules, 7 template `@script` bodies) from **38
+repositories** pinned by commit in `repos.tsv` — all 25 nift-packages, the
+10 nift-experiments sites, nift-dev nift-dev.github.io and lab — plus the
+Labs evidence scripts (28, a local snapshot pinned by sha256; not a public
+repository), vendored offline under `projects/`.
 
-In `check` mode (after T8) the pending column disappears: each pending unit
-is accepted or rejected by the real validator and every rejection is
-checked against legacy.
+Result in strict (tool) mode, after the split (provisional evidence, not
+certification):
 
----
+| Corpus | Units | Accepted | Rejected (rule cited) | Unreviewed |
+| --- | ---: | ---: | ---: | ---: |
+| CP10 legacy cases | 257 | 207 | 50 | 0 |
+| CP10 syntax errors | 34 | 0 | 34 | 0 |
+| VM corpus | 122 | 120 | 2 | 0 |
+| semantics | 57 | 57 | 0 | 0 |
+| rt-diff corpus | 15 | 15 | 0 | 0 |
+| CP13 diagnostics | 110 | 94 | 16 | 0 |
+| cp410 probes | 120 | 120 | 0 | 0 |
+| tests/*.f | 1 | 1 | 0 | 0 |
+| smoke-test extracts | 1,780 | 1,780 | 0 | 0 |
+| real projects (38 repos + Labs evidence) | 86 | 85 | 1 | 0 |
+| nift-regression-suite extracts | 126 | 126 | 0 | 0 |
+| **total** | **2,708** | **2,605** | **103** | **0** |
+
+Rejections by rule: translator 74, R2 17, R3 7, deferred-translator 4, R1 1.
+**Owner decision needed:** the one real-project rejection is
+nift-packages/http `src/http.f:101` — `return {` followed by a multi-line
+object literal in `capabilities()`. In legacy's grammar `return` ends at the
+line break, so `{` is unclosed; legacy fails ("return: malformed
+parameters") whenever that branch runs (verified with an equivalent probe),
+but the module loads and its other paths work today. Strict prevalidation
+would make the whole module fail to import. Options: reject (strict
+D-022 #3), fix the package, or make multi-line `return` values a language
+form (a grammar change for both engines).
 
 ## (g) Error model and the message-to-code table (D-022 #2, R2)
 
@@ -370,12 +379,26 @@ Three independent properties per diagnostic: **code** (identity),
 raise. Both engines emit the same codes; JSON carries them; text is
 unchanged.
 
-**Naming.** `Diagnostic.h` names codes `domain.snake_name`; the domain for
-errors raised by Nift's own runtime is `native.` (`native.name_error`,
-`native.arithmetic_error`, …). The owner's examples
-(`runtime.index_out_of_bounds`, …) therefore become `native.*` codes —
-a new `runtime.` domain would duplicate `native.` — and existing codes are
-reused where apt.
+**Naming — semantic identity (owner addition 4).** Codes must name *what
+went wrong in the language*, the same whether a native built-in, a bytecode
+instruction or legacy raises it. The v4.6 registry
+(`docs/evidence/v46-b4-cp2-diagnostic-registry.md`) did intend `native.` as
+"language runtime" (grammar, binding, arity/type/value, arithmetic,
+handles), but the word is overloaded in Nift (`platform() == "native"`,
+`http.use_backend("native")`, the VM's `rt/native.*` built-in table,
+"contained native exceptions" in `internal.*`), so `native.type_error` reads
+as "an error inside a native built-in". These codes are not yet visible to
+users (all Fatal, so never a caught Error's `code`; not in the C ABI; one
+unit test), so **renaming is cheap now and expensive after JSON ships.
+Proposal (owner decision):** a semantic `lang.*` domain — mapping in
+`tests/runtime2/diagnostics/code-namespace-proposal.tsv` (e.g.
+`lang.type_error`, `lang.index_out_of_bounds`, `lang.undefined_name`,
+`lang.statement_error`), with resource limits as `limit.exceeded` (kept out
+of ordinary exceptions, R3) and the non-I/O service failure as
+`host.service_failed`; alternative patch
+`scratchpad/cp13/cp13-diagnostic-codes-lang.patch` (applies cleanly; also
+needs `tests/diagnostic_outcome_unit.cpp` and `ParseError::kCode` updated).
+Until decided, fixtures use the current `native.*` texts below.
 
 **New codes (7, appended; all default Fatal, i.e. exactly today's
 behaviour):** `native.undefined_callable`, `native.type_error`,
@@ -438,9 +461,17 @@ and they fail under prevalidation.
 | T5 Codes | apply the patch; VM codes at sites; legacy table in `Parser::fail`; `catchable` per raise | `src/Diagnostic.h`, new `src/DiagnosticCodes.{h,cpp}`, `src/Parser.cpp` (`fail`) | site-dx done with diagnostics files; T2 | patch ready |
 | T6 Policies and probes | extend `vm_policies.py` D-018c to try bodies; semantics.md Errors rows | `tests/runtime2/vm_policies.py`, `vm_d018.py`, `docs/runtime-2/semantics.md` | CP12 certified | waits |
 | T7 Try-body positions (legacy) | `@__try` bodies parsed with their `SourceView` | `src/ParserTemplate.cpp` | feature-site-dx | site-dx |
-| T8 Prevalidator | `LegacyMalformed`/`LegacyRuntimeReject` split of the 47 sites with the oracle; `rt::prevalidate`; hook before engine selection, `-e`/`eval`/stdin, legacy import loader, page `@script` bodies; `NIFT_PREVALIDATE=only` for the gate | `src/rt/ast.h`, `src/rt/{control_flow,declarations,expr_literals,expr_parser,expr_postfix,statement_parser}.cpp`, new `src/rt/prevalidate.{h,cpp}`, `src/CLI.cpp`, `src/ParserScript.cpp` (import), `tests/rt/*` oracle | CP12 has not changed these parser files since `bf32e4f` (checked); re-check before starting; site-dx owns `ParserScript.cpp` now (sequence the import hook after it) | ready to start on the parser split |
+| T8 Prevalidator | rule-based split (R1–R5 + deferred translator errors; sites never reject by themselves); `rt::prevalidate`; `rt-parse-dump prevalidate`; rules tests; strict gate; CLI wiring as a patch | changed: `src/rt/ast.h`, `src/rt/declarations.cpp`, `src/rt/expr_literals.cpp` (record deferred errors only); new `src/rt/prevalidate.{h,cpp}`; `tests/rt/parse_dump.cpp`; Makefile `RT_PARSER_SOURCES`; `tests/runtime2/prevalidate/**`. Patch for `src/CLI.cpp` | CLI owner applies the wiring patch; import hook after site-dx (`ParserScript.cpp`); eval entry | **done** except wiring
 | T9 JSON mode | flag/env, emitter, build summary, eval contract 2, capabilities | new `src/DiagnosticJson.{h,cpp}`, `src/CLI.cpp`, `src/ProjectInfo.cpp`, `src/rt/script_runner.cpp` | T2, T5 | spec done |
 | T10 Real-project refresh | re-extract pinned units when a repo moves; review new rejections | `tests/runtime2/prevalidate/{extract_projects.py,projects.tsv,repos.tsv,projects/}` | — | done for the current pins |
+
+Files changed by T8 in this worktree (for integration): `src/rt/ast.h`,
+`src/rt/declarations.cpp`, `src/rt/expr_literals.cpp`, new
+`src/rt/prevalidate.h`, `src/rt/prevalidate.cpp`, `tests/rt/parse_dump.cpp`,
+`Makefile` (`RT_PARSER_SOURCES`/`HEADERS`); everything else is under
+`tests/runtime2/` and `docs/runtime-2/`. `src/rt/*.cpp` is linked into
+`nift` by wildcard, so `prevalidate.cpp` is compiled into the binary but not
+called until the wiring patch is applied.
 
 CP12 interfaces that must be stable before T2–T6: `VmResult`/`Fault` and
 `StopReason`; `Vm::Frame` and the frame stack; `Proto` offsets and notes;

@@ -172,7 +172,10 @@ NodeId ExprParser::lambda_body(NodeId lambda) {
         node.flags |= kFlagBlockBody;
         node.b = block;
         node.end = close + 1;
-        if (!ok) return make_opaque(ast_, node.begin, node.end, OpaqueReason::DeferredTranslation);
+        if (!ok) {
+            ast_.note_deferred_error(ignored.offset, ignored.message);
+            return make_opaque(ast_, node.begin, node.end, OpaqueReason::DeferredTranslation);
+        }
         return lambda;
     }
     const NodeId body = unit();

@@ -1384,11 +1384,13 @@ test-runtime2-diagnostics: $(TARGET)
 	python3 tests/runtime2/diagnostics/codes_check.py
 	python3 tests/runtime2/diagnostics/json_check.py
 
-# Syntax prevalidation: zero false rejections over every corpus and the
-# vendored real-project units (permanent requirement, D-022). Proxy mode until
-# the prevalidator exists (NIFT_PREVALIDATE_MODE=check afterwards).
-test-runtime2-prevalidate-gate: $(TARGET)
-	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --mode $${NIFT_PREVALIDATE_MODE:-proxy}
+# Syntax prevalidation (D-022 #3): the rules decided against legacy, and the
+# permanent zero-false-rejection gate over every corpus and the vendored
+# real-project units (every rejection must cite a grammar/lexical rule and be
+# reviewed). Not yet in the certification guard's REQUIRED list.
+test-runtime2-prevalidate-gate: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	python3 tests/runtime2/prevalidate/rules_test.py --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT) --legacy "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 
 test-runtime2-clock-lifecycle: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/clock_lifecycle.sh
@@ -2107,10 +2109,11 @@ test: test-source-translation
 # Runtime 2.0 CP10: script lexer/parser (src/rt). Not linked into nift yet;
 # compiled only into these test binaries.
 RT_PARSER_SOURCES := src/rt/lexer.cpp src/rt/ast.cpp src/rt/source_scan.cpp src/rt/parser.cpp src/rt/statement_parser.cpp \
-	src/rt/declarations.cpp src/rt/control_flow.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/expr_literals.cpp
+	src/rt/declarations.cpp src/rt/control_flow.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/expr_literals.cpp \
+	src/rt/prevalidate.cpp
 RT_PARSER_HEADERS := src/rt/lexer.h src/rt/ast.h src/rt/source_scan.h src/rt/parser.h src/rt/parser_internal.h \
 	src/rt/statement_parser.h src/rt/declarations.h src/rt/control_flow.h src/rt/expr_parser.h src/rt/expr_postfix.h \
-	src/rt/expr_literals.h tests/rt/rt_parser_tool.h
+	src/rt/expr_literals.h src/rt/prevalidate.h tests/rt/rt_parser_tool.h
 
 $(TEST_DIR)/rt-parse-dump$(EXEEXT): tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
 	mkdir -p $(TEST_DIR)

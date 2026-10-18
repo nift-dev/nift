@@ -1,0 +1,30 @@
+# Proposed semantic namespace for language errors (owner question, D-022 #2 follow-up).
+# `native.` is overloaded in Nift (platform() == "native", http backend "native",
+# the VM's rt/native.* built-in table, "native exceptions" in internal.*), so
+# `native.type_error` reads as "an error inside a native built-in". The identity
+# must be the same whether a native built-in, a bytecode instruction or legacy
+# raises it. These codes are not yet user-visible (all Fatal: never in a caught
+# Error's `code`; not in the C ABI; one unit test), so renaming now is cheap.
+# current or CP13-new code	proposed code	meaning
+native.syntax_error	lang.syntax_error	malformed expression or literal (prevalidation R1-R5)
+native.translation_error	lang.statement_error	statement form rejected by the translator grammar
+native.name_error	lang.undefined_name	undefined binding, assignment to an undefined binding, redeclaration
+native.undefined_callable	lang.undefined_callable	call of an unknown function
+native.type_error	lang.type_error	operand/binding/value of the wrong type
+native.index_out_of_bounds	lang.index_out_of_bounds	array index outside the array
+native.member_not_found	lang.member_not_found	missing object key, member or method
+native.arity_error	lang.arity_error	wrong number of arguments
+native.integer_overflow	lang.integer_overflow	checked int64 overflow
+native.division_by_zero	lang.division_by_zero	division or modulo by zero
+native.arithmetic_error	lang.arithmetic_error	other arithmetic domain errors (fractional modulo, non-finite)
+native.invalid_argument	lang.invalid_argument	argument value outside a function's domain
+native.invalid_operation	lang.invalid_operation	operation not supported on the value (e.g. string indexing)
+native.invalid_control	lang.invalid_control	break/continue/return outside their construct
+native.mutation_denied	lang.mutation_denied	assignment to const / private
+native.unsupported_value	lang.unsupported_value	value that cannot be projected (render, JSON)
+native.invalid_handle	lang.invalid_handle	forged or stale handle
+native.resource_lifecycle	lang.resource_lifecycle	use of a closed/finished resource
+native.resource_owner_mismatch	lang.resource_owner_mismatch	resource used by a non-owner
+native.resource_transfer_denied	lang.resource_transfer_denied	prohibited resource transfer
+native.limit_exceeded	limit.exceeded	recursion/frame budget, explicit limits: resource exhaustion, kept out of ordinary exceptions (D-022 R3)
+native.system_service_failed	host.service_failed	non-I/O host service failure (clock, randomness)

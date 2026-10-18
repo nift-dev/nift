@@ -162,7 +162,10 @@ NodeId StatementParser::struct_body(NodeId decl, std::uint32_t begin, std::uint3
             if (mbo >= end || src_[mbo] != '{' || !balanced(mbo, end, '{', '}', mbc)) return opaque();
             std::vector<NodeId> body;
             ParseError ignored;
-            if (!parse_block(ast_, mbo + 1, mbc, Mode::Deferred, body, ignored)) return opaque();
+            if (!parse_block(ast_, mbo + 1, mbc, Mode::Deferred, body, ignored)) {
+                ast_.note_deferred_error(ignored.offset, ignored.message);
+                return opaque();
+            }
             const NodeId method = ast_.add(NodeKind::FnDecl, p, mbc + 1);
             ast_.at(method).flags |= kFlagMethod | (priv ? kFlagPrivate : 0);
             const NodeId block_id = ast_.add(NodeKind::Block, mbo, mbc + 1);
@@ -307,8 +310,10 @@ NodeId StatementParser::template_declaration(std::uint32_t start, std::uint32_t 
     }
     std::vector<NodeId> body;
     ParseError ignored;
-    if (!parse_block(ast_, bo + 1, bc, Mode::Deferred, body, ignored))
+    if (!parse_block(ast_, bo + 1, bc, Mode::Deferred, body, ignored)) {
+        ast_.note_deferred_error(ignored.offset, ignored.message);
         return make_opaque(ast_, start, stmt_end, OpaqueReason::DeferredTranslation);
+    }
     const NodeId block_id = ast_.add(NodeKind::Block, bo, bc + 1);
     ast_.set_list(block_id, body);
     const NodeId fn = ast_.add(NodeKind::FnDecl, start, stmt_end);

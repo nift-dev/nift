@@ -7,10 +7,15 @@
 //   parse_dump errors CORPUS          verify a stored error corpus
 //   parse_dump fuzz SEED ITERS FILE...  random byte/structure mutations
 //   parse_dump bench ITERS FILE...    parse repeatedly (callgrind)
+//   parse_dump prevalidate FILE...   CP13 syntax prevalidation: one line per
+//                                     file, `ok FILE` or `reject FILE:L:C: message
+//                                     [code] rule` (exit 1 if any rejection)
 //   parse_dump strings FILE           rt's reading of each string literal:
 //                                     escapes decoded, $[...] segments as
 //                                     \x01text\x02 (negative gate)
 #include "rt_parser_tool.h"
+
+#include "rt/prevalidate.h"
 
 #include <algorithm>
 #include <chrono>
@@ -292,11 +297,32 @@ int bench_mode(int argc, char** argv) {
 
 } // namespace
 
+int prevalidate_mode(int argc, char** argv) {
+    int status = 0;
+    for (int i = 2; i < argc; ++i) {
+        std::string source;
+        if (!load(argv[i], source)) return 2;
+        const auto verdict = prevalidate(source);
+        if (verdict.ok) {
+            std::cout << "ok " << argv[i] << '\n';
+            continue;
+        }
+        const auto where = locate(source, verdict.offset);
+        std::string message;  // one line per file: a newline in the message is written as \n
+        for (const char c : verdict.message) message += c == '\n' ? std::string("\\n") : std::string(1, c);
+        std::cout << "reject " << argv[i] << ':' << where.line << ':' << where.column << ": " << message
+                  << " [" << verdict.code << "] " << verdict.rule << '\n';
+        status = 1;
+    }
+    return status;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) return usage();
     const std::string mode = argv[1];
     if (mode == "dump") return dump_mode(argv[2]);
     if (mode == "check") return check_mode(argc, argv);
+    if (mode == "prevalidate") return prevalidate_mode(argc, argv);
     if (mode == "reprint") return reprint_mode(argv[2]);
     if (mode == "errors") return errors_mode(argv[2]);
     if (mode == "fuzz") return fuzz_mode(argc, argv);

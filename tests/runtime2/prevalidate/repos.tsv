@@ -1,6 +1,6 @@
 # repo	url	commit	units	note
 nift-dev_lab	https://github.com/nift-dev/lab.git	88efbf181add21ac15c27aea700792ed1bbfaff2	0	no Nift script units (no .f/.nft; no @script in templates/ or content/)
-nift-dev_nift-dev.github.io	https://github.com/nift-dev/nift-dev.github.io.git	7400024218e72e27131815a9cdc56e61fe1e6cf7	0	published site output (HTML-escaped samples), no Nift sources; source lives in the site repo
+nift-dev_nift-dev.github.io	https://github.com/nift-dev/nift-dev.github.io.git	7400024218e72e27131815a9cdc56e61fe1e6cf7	0	published site output (HTML-escaped samples), no Nift sources
 nift-experiments_agora	https://github.com/nift-experiments/agora.git	c6bbe6ed3be77358d327dfcf03920ed193179708	2	
 nift-experiments_ai-sdk	https://github.com/nift-experiments/ai-sdk.git	6d07d2f06a96d33deac0384514574d069cce98b7	1	
 nift-experiments_capgo	https://github.com/nift-experiments/capgo.git	590c1eecb23eeb7ac091f8affca5c0e45b852a64	5	
@@ -11,10 +11,29 @@ nift-experiments_spacex	https://github.com/nift-experiments/spacex.git	a467f6f85
 nift-experiments_tanstack-rewrite	https://github.com/nift-experiments/tanstack-rewrite.git	4df533907b5b82ff842f7a58d2cdf13dea7f7735	7	
 nift-experiments_tanstack	https://github.com/nift-experiments/tanstack.git	7af3af0141e09248dacfc11f722c495abadd96a4	1	
 nift-experiments_temporal	https://github.com/nift-experiments/temporal.git	8d82e1a1f746a8c690abb700fb493855ae822bcc	1	
+nift-packages_ansi	https://github.com/nift-packages/ansi.git	df4b0a1c7960c0ff80f10b74489aa779f0f5e486	3	
+nift-packages_assert	https://github.com/nift-packages/assert.git	9437bc9d6ecae8fd0e57eceaf4f479c1f0fe2e24	1	
+nift-packages_cli	https://github.com/nift-packages/cli.git	bb735df6f7a5ee9ac726e5ecca2ac4aab0b9f3db	2	
+nift-packages_csv	https://github.com/nift-packages/csv.git	41c42856ffbb863ca04937a75276d9c0d278e2a5	3	
 nift-packages_curl	https://github.com/nift-packages/curl.git	1d615772e887255c3d93cec13143609bab4f6d09	1	
+nift-packages_diff	https://github.com/nift-packages/diff.git	11c5e34e4dabfedc81110118af6bd1ae193c9689	2	
+nift-packages_dotenv	https://github.com/nift-packages/dotenv.git	a386fe337dc56c7b67059b62d908c3eded239dcb	1	
+nift-packages_duration	https://github.com/nift-packages/duration.git	b7761e674bac424f3a053ad9ff477e9da790e517	1	
+nift-packages_fuzzy	https://github.com/nift-packages/fuzzy.git	bb8c3de87fa141a040425f7babbc1f76afe202aa	1	
+nift-packages_http	https://github.com/nift-packages/http.git	4defe98a3c547ff17545f3376224c97f5b2309ab	2	
+nift-packages_humanize	https://github.com/nift-packages/humanize.git	07afbd3adc884f9ed1538d106e470e9ac8fa7da8	2	
+nift-packages_id	https://github.com/nift-packages/id.git	f3a9d4bea1d5f2866455aba73e67b1efc944c932	1	
+nift-packages_ignore	https://github.com/nift-packages/ignore.git	fc6827b9af4f7ffe62533cd006698ade41d659cb	1	
 nift-packages_imagemagick	https://github.com/nift-packages/imagemagick.git	80d1c0932a4e10bb01823ea47835549125ad9502	1	
+nift-packages_jq	https://github.com/nift-packages/jq.git	49c8f664bda8d06afc96e8972bc1cd2c50c6df16	1	
+nift-packages_mdx	https://github.com/nift-packages/mdx.git	22bb53653f47c22defff863e3465e8df9a11da99	6	
 nift-packages_mysql	https://github.com/nift-packages/mysql.git	ceb0321924f57335c296ea0a2ef02565e1f7d68d	1	
+nift-packages_pandoc	https://github.com/nift-packages/pandoc.git	59310bece27e3b4b7fb98d4914868a6364bc1ac9	1	
 nift-packages_postgres	https://github.com/nift-packages/postgres.git	fa2f660d9cee22f1258840314a1af5887770115d	1	
 nift-packages_redis	https://github.com/nift-packages/redis.git	6aeb92b574b16e4a1bebd4c00a71c60ea1b3c42b	1	
+nift-packages_semver	https://github.com/nift-packages/semver.git	0b0e39817445e25213ffe8cd54b89b5b47f57a7f	2	
+nift-packages_socket	https://github.com/nift-packages/socket.git	02447214423fd60f56cae67ab5e2952fe4c05082	1	
 nift-packages_sqlite	https://github.com/nift-packages/sqlite.git	176e7965c1a4b1680ebc9660eae43004435462e8	1	
+nift-packages_url	https://github.com/nift-packages/url.git	dfcf2a7e7d59a5b381d9a94ba89d99dc4d7ad66c	1	
 nift-packages_vips	https://github.com/nift-packages/vips.git	f4ada5372742c970a8c535a5fa14b5e7480f282c	1	
+labs_lab-evidence	(local snapshot) labs-src/lab-evidence	local-snapshot	28	Labs benchmark evidence scripts (not a public git repository; pinned by per-file sha256)

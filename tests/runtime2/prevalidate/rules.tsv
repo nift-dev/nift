@@ -1,0 +1,94 @@
+# CP13 prevalidation rules, each decided against legacy (rules_test.py).
+# verdict	rule (reject) or - (accept)	legacy: fails|silent|runtime-error|ok	context	statement
+# context: top = between print("a") and print("b"); dead = inside if(0 == 1) {...};
+# after-return = after `return 0` in a called function; fn = inside a function that
+# IS called; uncalled = inside a function that is never called (legacy never
+# translates/evaluates it: these are the D-022 #3 "before anything runs" cases).
+reject	R2-unclosed	fails	top	x := (1 + 2
+reject	R2-unclosed	silent	top	x := [1, 2
+reject	R2-unclosed	fails	top	x := {"a": 1
+reject	R2-unclosed	fails	top	print((1)
+reject	R2-unclosed	fails	top	print(f(1)
+reject	R2-stray-closer	fails	top	x := 1 + 2)
+reject	R2-stray-closer	silent	top	x := [1, 2]]
+reject	R2-stray-closer	fails	top	y := f(1))
+reject	R2-stray-closer	fails	top	x := )
+reject	R2-mismatched	fails	top	x := (1]
+reject	R3-empty-element	fails	top	print(f(1,))
+reject	R3-empty-element	fails	top	x := [1, 2,]
+reject	R3-empty-element	fails	top	x := [1,, 2]
+reject	R3-empty-element	fails	top	x := {"a": 1,}
+reject	R3-empty-element	fails	top	x := (,1)
+reject	R3-empty-element	fails	top	x := [,1]
+reject	R3-empty-element	fails	top	x := f(,)
+reject	R4-missing-operand	fails	top	x := 1 +
+reject	R4-missing-operand	fails	top	x := 1 -
+reject	R4-missing-operand	fails	top	x := 1 *
+reject	R4-missing-operand	fails	top	x := 1 %
+reject	R4-missing-operand	fails	top	print(1 ==)
+reject	R4-missing-operand	fails	top	x := 1 !=
+reject	R4-missing-operand	fails	top	x := (2 *)
+reject	R4-missing-operand	fails	top	x := 1 &&
+reject	R4-missing-operand	fails	top	print([1 +])
+reject	R4-missing-operand	fails	top	x := [1].
+reject	R5-missing-left-operand	fails	top	x := * 2
+reject	R5-missing-left-operand	fails	top	x := / 2
+reject	R5-missing-left-operand	fails	top	x := % 2
+reject	R5-missing-left-operand	fails	top	print(== 1)
+reject	R5-missing-left-operand	fails	top	x := && 1
+reject	R5-missing-left-operand	fails	top	x := || 1
+reject	R5-missing-left-operand	fails	top	x := ?? 1
+reject	R1-unterminated-string	silent	top	print("abc)
+reject	R1-unterminated-string	silent	top	x := 'abc
+reject	R2-unclosed	fails	fn	x := (1 + 2
+reject	R3-empty-element	fails	fn	x := [1, 2,]
+reject	R2-unclosed	ok	uncalled	x := (1 + 2
+reject	R4-missing-operand	ok	uncalled	return 1 +
+reject	deferred-translator	ok	top	k := (v) => { fn add(a) { return a } }
+reject	deferred-translator	fails	top	k := (v) => { fn add(a) { return a } }; k(1)
+accept	-	ok	top	x := 1 ??
+accept	-	ok	top	x := 1 ||
+accept	-	ok	top	x := 1 ?
+accept	-	ok	top	x := 1 ? 2
+accept	-	ok	top	x := 1 ? 2 :
+accept	-	ok	top	x := + 2
+accept	-	ok	top	x := -1
+accept	-	ok	top	x := !true
+accept	-	ok	top	print(f (1))
+accept	-	ok	top	y := f (2)
+accept	-	ok	top	y := 1; y++
+accept	-	ok	top	y := 1; y--
+accept	-	ok	top	print("a,)")
+accept	-	ok	top	x := {"a": 'single'}
+accept	-	ok	top	print("hello".to_string())
+accept	-	ok	top	print(true.to_string())
+accept	-	ok	top	i := 0; while (i < 3) { i += 1 }
+accept	-	ok	top	print(1 ?? 2)
+accept	-	runtime-error	top	print("abc"[1])
+accept	-	runtime-error	top	print('it''s')
+accept	-	runtime-error	top	x := 1 < 
+accept	-	ok	top	// comment with ( and "quote
+accept	-	ok	uncalled	print("abc"[1])
+# Owner addition (2): syntactically valid programs that fail at run time are
+# accepted - at top level and in code that never runs (dead branches,
+# uncalled functions, statements after return).
+accept	-	runtime-error	top	nosuch_fn(1)
+accept	-	runtime-error	top	x := [1][5]
+accept	-	runtime-error	top	x := 1 / 0
+accept	-	runtime-error	top	x := "s" > 1
+accept	-	runtime-error	top	y := undefined_name + 1
+accept	-	runtime-error	top	throw error("boom")
+accept	-	runtime-error	top	print([1, 2])
+accept	-	runtime-error	top	x := {"a": 1}; x.a = 2
+accept	-	runtime-error	top	z := 9223372036854775807 + 1
+accept	-	runtime-error	top	f(1, 2)
+accept	-	ok	dead	nosuch_fn(1)
+accept	-	ok	dead	x := [1][5]
+accept	-	ok	dead	x := 1 / 0
+accept	-	ok	dead	throw error("never")
+accept	-	ok	dead	y := undefined_name.member.call()
+accept	-	ok	uncalled	nosuch_fn(1)
+accept	-	ok	uncalled	x := "s" + [1]
+accept	-	ok	uncalled	return undefined_name
+accept	-	ok	after-return	nosuch_fn(1)
+accept	-	ok	after-return	x := 1 / 0
