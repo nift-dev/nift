@@ -5,9 +5,9 @@
 #include "rt/decimal.h"
 #include "rt/heap_account.h"
 #include "rt/number.h"
-#include "rt/render.h"
 #include "rt/string.h"
 
+#include <charconv>
 #include <cmath>
 #include <limits>
 
@@ -100,7 +100,37 @@ bool renderable_scalar(const Value& value) {
     }
 }
 
-void append_scalar(const Value& value, std::string& out) { append_rendered(value, out); }
+void append_number(const Value& value, std::string& out) {
+    char buffer[64];
+    std::to_chars_result converted{buffer, std::errc()};
+    if (value.is(Kind::Int)) {
+        converted = std::to_chars(buffer, buffer + sizeof buffer, value.as_int());
+    } else if (value.is(Kind::Double)) {
+        // Jsonic++ format_number (legacy RuntimeValue::dump): integral values in
+        // int64 range as integers ("-0.0" is "0"), others shortest round trip in
+        // general format ("1e+21", "1e-07").
+        const double d = value.as_double();
+        if (std::floor(d) == d && d >= -9223372036854775808.0 && d < 9223372036854775808.0)
+            converted = std::to_chars(buffer, buffer + sizeof buffer, static_cast<long long>(d));
+        else
+            converted = std::to_chars(buffer, buffer + sizeof buffer, d, std::chars_format::general);
+        if (converted.ec != std::errc()) { out += '0'; return; }
+    } else {
+        const std::string_view spelling = decimal_spelling(value);  // a StrNumber dumps its spelling
+        out.append(spelling.data(), spelling.size());
+        return;
+    }
+    out.append(buffer, static_cast<std::size_t>(converted.ptr - buffer));
+}
+
+void append_scalar(const Value& value, std::string& out) {
+    switch (value.kind()) {
+        case Kind::String: { const std::string_view s = string_view_of(value); out.append(s.data(), s.size()); return; }
+        case Kind::Bool: out += value.as_bool() ? "true" : "false"; return;
+        case Kind::Null: out += "null"; return;
+        default: append_number(value, out); return;
+    }
+}
 
 ArrayBuilder::ArrayBuilder(std::size_t reserve) : array_(make_array(reserve)), items_(&array_mut(array_)) {}
 
@@ -126,7 +156,7 @@ bool generated_key(const Value& key, std::string_view name, std::string& rendere
         return false;
     }
     rendered.clear();
-    append_rendered(key, rendered);
+    append_scalar(key, rendered);
     return true;
 }
 

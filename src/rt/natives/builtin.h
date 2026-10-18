@@ -58,9 +58,10 @@ inline constexpr KindSet kNumber = kInt | kFrac;
 inline constexpr KindSet kScalar = kNull | kBool | kNumber | kString;
 inline constexpr KindSet kAny = 0x7f;
 
-// The receiver a built-in is called on: a method of a string, array or
-// object, or a free function (no receiver).
-enum class Receiver : std::uint8_t { None, String, Array, Object };
+// The receiver a built-in is called on: a method of a string, array,
+// object, number, bool or null, a method of any value (Any: the presentation
+// methods), or a free function (None).
+enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any };
 
 // How the result kinds follow from the argument kinds (for kind inference).
 enum class ResultRule : std::uint8_t {

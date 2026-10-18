@@ -38,7 +38,11 @@ bool utf8_count(std::string_view text, std::size_t& count);
 // strings as-is, numbers as legacy dump, true/false/null. False for every
 // other kind.
 bool renderable_scalar(const Value& value);
+// Appends a renderable scalar (callers check renderable_scalar first).
 void append_scalar(const Value& value, std::string& out);
+// Legacy number rendering (RuntimeValue::dump of Number / StrNumber), ported:
+// natives never construct legacy values.
+void append_number(const Value& value, std::string& out);
 
 // Legacy generated_object_key (CP171): strings as-is, numbers and booleans
 // rendered; any other kind is "<name>: generated key must be string, number,

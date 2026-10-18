@@ -8,7 +8,6 @@
 #include "rt/string.h"
 
 #include <limits>
-#include <unordered_map>
 #include <vector>
 
 namespace nift::rt::natives {
@@ -189,19 +188,26 @@ Status arr_unique(const Context&, const Value* args, std::uint32_t argc, Value& 
     const auto* items = receiver(args, argc);
     if (!items) return internal(error, "unique receiver");
     if (!no_arguments(argc, "unique", error)) return Status::Error;
-    // Legacy keeps the first of each structurally equal group (O(n^2) scan);
-    // hash buckets give the same result (equal values hash alike, CP09).
-    std::unordered_map<std::uint64_t, std::vector<std::size_t>> buckets;
-    std::vector<std::size_t> kept;
-    for (std::size_t i = 0; i < items->size(); ++i) {
-        auto& bucket = buckets[hash((*items)[i])];
+    // Legacy keeps the first of each structurally equal group (O(n^2) scan).
+    // Here: one open-addressing table of kept positions keyed by the CP09 hash
+    // (equal values hash alike), so O(n) with two allocations.
+    const std::size_t n = items->size();
+    std::size_t capacity = 16;
+    while (capacity < n * 2) capacity <<= 1;
+    std::vector<std::uint64_t> slots(capacity, 0);      // the hash of the kept value
+    std::vector<std::uint32_t> positions(capacity, 0);  // position + 1; 0 = empty
+    ArrayBuilder result(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::uint64_t h = hash((*items)[i]);
+        std::size_t slot = static_cast<std::size_t>(h) & (capacity - 1);
         bool seen = false;
-        for (std::size_t k : bucket)
-            if (equal((*items)[k], (*items)[i])) { seen = true; break; }
-        if (!seen) { bucket.push_back(i); kept.push_back(i); }
+        for (; positions[slot] != 0; slot = (slot + 1) & (capacity - 1))
+            if (slots[slot] == h && equal((*items)[positions[slot] - 1], (*items)[i])) { seen = true; break; }
+        if (seen) continue;
+        slots[slot] = h;
+        positions[slot] = static_cast<std::uint32_t>(i + 1);
+        result.push((*items)[i]);
     }
-    ArrayBuilder result(kept.size());
-    for (std::size_t i : kept) result.push((*items)[i]);
     out = result.finish();
     return Status::Ok;
 }
