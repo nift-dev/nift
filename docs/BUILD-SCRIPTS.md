@@ -5,8 +5,12 @@ These features are part of unreleased v4.10 development.
 Per-item scripts run `pre-build` → custom `build` or normal render → `post-build`.
 A failed phase stops that item and all its later phases. A post failure fails the
 invocation; successful metadata is committed only after post succeeds. When any
-phase of an item with scripts fails, its previous outputs are put back, so the
-item keeps its last good output and is rebuilt by the next build. Independent
+phase of an item with scripts fails, its previous tracked outputs are put back
+(through a symlinked output, which stays a symlink), extra pagination pages the
+attempt created are removed, and the item is rebuilt by the next build. An
+output that had no previous version is left as the attempt wrote it. Files a
+script writes outside its tracked outputs are not restored: scripts own their
+side effects. Independent
 DAG branches continue. An interrupted build (crash, forced termination) is
 recovered automatically by the next build, the same as `build --repair`.
 

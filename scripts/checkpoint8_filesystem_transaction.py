@@ -244,6 +244,10 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         r=run(root,"build", "--all",timeout=20)
         if "unfinished build detected" not in (r.stdout+r.stderr) or "Recovering automatically" not in (r.stdout+r.stderr):
             raise RuntimeError("plain build did not announce automatic recovery while the marker remains")
+        # The automatic recovery itself must restore the complete output.
+        if (root/"public/index.html").read_bytes() != b"C"*(4*1024*1024):
+            raise RuntimeError("automatic recovery did not restore the complete output")
+        if marker.exists(): raise RuntimeError("automatic recovery did not clear .unfinished marker")
         run(root,"build", "--repair",timeout=20)
         if (root/"public/index.html").stat().st_size != (4*1024*1024):
             raise RuntimeError("repair did not reconstruct the complete output")
@@ -372,6 +376,10 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         r=run(root,"build", "--all",timeout=30)
         if "unfinished build detected" not in (r.stdout+r.stderr) or "Recovering automatically" not in (r.stdout+r.stderr):
             raise RuntimeError("plain build did not announce automatic recovery while the marker remains")
+        # The automatic recovery itself must restore the complete output.
+        if (root/"public/index.html").read_bytes() != b"B"*size:
+            raise RuntimeError("automatic recovery did not restore the complete output")
+        if marker.exists(): raise RuntimeError("automatic recovery did not clear .unfinished marker")
         run(root,"build", "--repair",timeout=30)
         if (root/"public/index.html").stat().st_size != size:
             raise RuntimeError("repair did not reconstruct the complete output")

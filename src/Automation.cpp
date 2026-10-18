@@ -86,7 +86,7 @@ NiftOperationResult automation_untrack(ProjectInfo& project, const std::vector<s
         project.invalidate_tracked_index();
         r.affected.push_back(name);
     }
-    const bool ok = project.save_tracking();
+    const bool ok = project.save_tracking() && project.prune_failed_pages();
     if (ok) ownership.finish();
     r.ok = ok; r.exit_code = ok ? 0 : 1;
     if (!ok) r.errors.push_back("could not write .nift/tracked.json");

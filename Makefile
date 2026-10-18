@@ -1290,6 +1290,7 @@ certify:
 # SIGKILL at every named epoch point recovers automatically to a clean build.
 test-build-recovery: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/build_recovery.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/build_recovery_random.py
 
 # D-010: test-all must keep reaching the comprehensive suites.
 test-runtime2-certification-guard:

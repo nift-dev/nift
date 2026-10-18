@@ -153,18 +153,25 @@ private:
     // of scripted pages, writes the failure record, marks unresolved on error.
     void settle_failed_page(const TrackedInfo& info, const PageAttempt& attempt);
     // D-020 failed-page list (.nift/failed.json): names of tracked pages whose
-    // last build failed (or was blocked by a failed prerequisite), with the
-    // largest pagination count any attempt wrote. Their page-info and
-    // last-good outputs are left untouched; the list only makes them dirty
+    // last build failed (or was blocked by a failed prerequisite). Their
+    // page-info and last-good outputs are left untouched; the list only makes
+    // them dirty
     // ("previous build of this page failed") whatever selected them. Absent
     // when empty, so a healthy project pays one stat per command.
-    std::unordered_map<std::string, std::size_t> failed_pages_;
+    std::unordered_set<std::string> failed_pages_;
     bool failed_pages_dirty_ = false;
     std::mutex failed_mutex_;
-    std::unordered_map<std::string, std::size_t> failed_now_;
+    std::unordered_set<std::string> failed_now_;
     std::filesystem::path failed_pages_path() const;
     void load_failed_pages();
-    bool save_failed_pages();
+    // Merges this build's outcome into the list on disk and rewrites it.
+    bool save_failed_pages(const std::unordered_set<std::string>& succeeded,
+                           const std::unordered_set<std::string>& failed);
+public:
+    // Drops untracked names (and removes the list when it becomes empty);
+    // run on every build and by untrack/rm/mv. False on a write failure.
+    bool prune_failed_pages();
+private:
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;
     mutable bool tracked_output_index_valid_ = false;

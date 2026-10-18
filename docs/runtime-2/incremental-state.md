@@ -32,12 +32,13 @@ Rules for the timing record (CP01; `tests/runtime2/clock_lifecycle.sh`):
 
 ## Failed-page list (D-020, feature-build-recovery)
 
-`.nift/failed.json` = `{"failed": {"<tracked name>": <pagination pages>}}`,
-present only while some page's last build failed (or was blocked by a failed
-prerequisite). A failed page keeps its last-good output and page-info; the list
-adds the status reason "previous build of this page failed", so the page is
-rebuilt whatever selected it, and records the largest pagination count an
-attempt wrote so stale-page cleanup and the repair sweep stay correct. A page
-leaves the list when it builds successfully; untracked names are pruned when
-the list is rewritten; a damaged list marks every page dirty. Written
-atomically after the pages of a build settle.
+`.nift/failed.json` = `{"failed": ["<tracked name>", ...]}`, present only
+while some page's last build failed (or was blocked by a failed
+prerequisite). A failed page keeps its page-info and (with the exceptions in
+`checkpoints/feature-build-recovery.md`) its last-good output; the list adds
+the status reason "previous build of this page failed", so the page is rebuilt
+whatever selected it. It holds names only — no state recovery depends on — so
+a damaged list marks every page dirty (bounded full rebuild) and a deleted one
+loses only the hint. A page leaves the list when it builds successfully;
+untracked names are pruned on every build and by `untrack`/`rm`/`mv`. Written
+atomically after the pages of a build settle, merged with the list on disk.

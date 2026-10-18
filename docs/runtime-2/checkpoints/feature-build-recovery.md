@@ -105,22 +105,36 @@ currently paginated pages, orphan page-info).
      per-file hooks, custom `build`) can touch outputs before failing; for
      them only, the existing outputs (main + pagination pages) are copied to
      PID-tagged `.nift-tmp-*` siblings before the first script runs
-     (`filesystem::backup_file`) and atomically renamed back on failure.
-     Pages without scripts pay nothing. An output with no last-good version is
-     left as the attempt wrote it (inspectable; the page stays dirty).
+     (`filesystem::backup_file`) and put back on failure — atomically
+     renamed for a regular file, written back *through* the link for a
+     symlinked output (the build's own write-through semantics, so the link
+     and its target survive). Pages without scripts pay nothing. Pagination
+     pages beyond the last-good set that a failed attempt created are removed
+     at once. Exceptions (the page still stays dirty and is rebuilt next time):
+     a page *without* build scripts whose inline template `@script` writes its
+     own output and then fails (backing up every page's output is not cheap);
+     a page without scripts that fails *after* its output was written
+     (hash-mode "dependency changed during build", I/O errors); an output that
+     had no previous version (left as the attempt wrote it). Files a failing
+     script writes outside its tracked outputs are never restored — scripts
+     own their side effects (D-002).
    - **Last-good page-info.** Page-info is not touched by a failure, so it
      still describes the last-good output (the regression-suite contract
      `persistence_concurrency_failure_smoke` checks this byte for byte).
    - **Dirty.** The page joins the **failed-page list** `.nift/failed.json`
-     (`{"failed": {"<name>": <pagination pages>}}`), written atomically once
-     after the pages of a build settle. `build_reasons` adds "previous build of
-     this page failed" for listed pages, so they rebuild whatever selected
-     them (`--all`, a missing output, a post-build script that never
-     completed). The pagination count is the largest any attempt wrote, used
-     as the "previous" count for stale-page cleanup and by the repair sweep. A
-     page leaves the list when it builds; untracked names are pruned; a damaged
-     list marks every page dirty. The file is absent when empty (one stat per
-     command), so a recovered project is byte-identical to a clean build.
+     (`{"failed": ["<name>", ...]}`), written atomically once after the
+     pages of a build settle, merged with the list on disk (so a long-lived
+     `ProjectInfo` such as the automation API's never overwrites another
+     process's entries) and re-read at the start of every epoch.
+     `build_reasons` adds "previous build of this page failed" for listed
+     pages, so they rebuild whatever selected them (`--all`, a missing output,
+     a post-build script that never completed). The list holds names only; it
+     carries no state recovery depends on, so a damaged list (anything but an
+     array of strings) is handled conservatively — every page is dirty, a full
+     rebuild converges — and a deleted one only loses the "rebuild me" hint.
+     A page leaves the list when it builds; untracked names are pruned on
+     every build and by `untrack`/`rm`/`mv`; the file is absent when empty
+     (one stat per command).
    - Pages blocked by a failed prerequisite join the list too (not
      validation-only jobs, which were clean).
 2. **Marker = uncertainty, not failure.** `unresolved_mutation_` replaces
@@ -158,7 +172,9 @@ currently paginated pages, orphan page-info).
 Unchanged: in-place output writes (no per-page temp+rename cost for pages
 without scripts); atomic page-info; CP01 clock records and CP02 observations
 (written only by successful page builds, so a failed page keeps its own);
-live-lock refusal; `build --auto`'s loop (owned by feature-site-dx).
+live-lock refusal; `build --auto`'s loop (owned by feature-site-dx: on this
+branch `--auto` still exits after the first failing pass; keep-watching
+arrives with feature-site-dx).
 
 ## Behaviour before / after
 
@@ -295,9 +311,39 @@ build once its cause is gone, and `--repair` does the same explicitly:
 Not automated: `untrack`/`rm`/`cp`/`mv` on a stale marker refuse and ask for
 `nift build` (proposal below).
 
+## Independent review round 1 (fixed)
+
+- **F1** failed-list counts (`1e11`, `1e300`) hung builds and `--repair`:
+  the list now holds names only; any other shape is "damaged" → every page
+  dirty → bounded full rebuild. Test: eight malformed lists × build, repair,
+  status, then convergence to a clean build.
+- **F2** extra pagination pages of a failed attempt were remembered only in
+  the list: they are now removed when the page fails, and the repair sweep
+  registers every currently paginated page's namespace (also at one page),
+  so an interrupted attempt's surplus is swept. Tests: deleted, damaged and
+  kept list, `--repair`, and a kill after writing the pages.
+- **F3** restore replaced a symlinked output with a regular file: restored
+  through the link. Tests: links inside the project, outside it and broken
+  (dangling), through success, failure, kill-recovery and `--repair`.
+- **F4/F5/F7** documentation above (exceptions, `--auto`, kill cost,
+  proposals). **F6** pruning on every build and on `untrack`/`rm`/`mv`;
+  re-tracking a name starts clean (test). **F8**
+  `checkpoint8_filesystem_transaction` now checks the automatic recovery
+  itself restores the full output before any `--repair`;
+  `consumer_dependency_snapshots` byte-compares the restored output.
+- The review's randomized tester is ported as
+  `tests/build_recovery_random.py` (bounded: 80 steps × 3 modes, part of
+  `make test-build-recovery`; `RECOVERY_RANDOM_STEPS`/`SEEDS` for soaks).
+- Repair-sweep limitation (pre-existing): the root `index` page paginates as
+  `2.html`, `3.html`, …, a namespace the sweep does not claim (a user's
+  `404.html` would match it), so a *crash* after writing extra index pages can
+  leave them; failures (not crashes) remove them at once.
+
 ## Overlap with feature-site-dx
 
-`build --auto` (src/CLI.cpp, watch loop) is not changed here. It calls
+`build --auto` (src/CLI.cpp, watch loop) is not changed here: on this branch
+it still exits after a failing pass; keep-watching after errors arrives with
+feature-site-dx. It calls
 `build_all(false)` on a fresh `ProjectInfo` each pass; after an ordinary
 error that call now leaves no marker and a dirty failed list, so a
 keep-watching loop rebuilds the failed pages on the next pass and recovers by
@@ -316,4 +362,12 @@ repeats each pass. src/CLI.cpp is touched only in the `untrack/rm` and
   scripts: needs temp+rename or backups for every page, which CP3 rejected
   for cost; a crash is recovered by rebuilding instead.
 - Automatic recovery for `untrack`/`rm`/`cp`/`mv` on a stale marker.
-- `nift status` could say when `.nift/.unfinished` is present.
+- `nift status` does not report `.nift/.unfinished` today (it can say "up to
+  date" after a kill, while the next build will recover); it should say so.
+- **SIGINT/SIGTERM handler.** Ctrl-C today is a kill: the marker stays and
+  the next build pays a **full rebuild** (the repair epoch: every page, every
+  hook in `repair` mode) — seconds on a 10k-page site. A handler that lets
+  the current pages finish or cleanly abandon them (settled exactly like a
+  failure) and then exits through the normal epoch end would need no marker
+  at all; combined with incremental crash recovery above, only a genuine
+  crash would cost a full rebuild.

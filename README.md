@@ -87,9 +87,13 @@ evidence that a mutating operation was interrupted (crash, forced termination)
 or left state Nift could not confirm. The next `nift build` recovers it
 automatically, the same as `nift build --repair`. An ordinary build error
 (a template or expression error, a missing file, a failing script or hook)
-never leaves it: the build fails with a non-zero status, failed pages keep
-their last good output and are listed in `.nift/failed.json`, and the next
-build rebuilds them once the problem is fixed.
+never leaves it: the build fails with a non-zero status, failed pages are
+listed in `.nift/failed.json` and rebuilt by the next build once the problem
+is fixed. A failed page keeps its last good output, except when it had none,
+when a page without build scripts fails after its output was written (or its
+own inline `@script` wrote it), or for files a script wrote outside the page's
+outputs. A killed build (including Ctrl-C) costs one full rebuild on the next
+build.
 `.nift/.lock` is automatically ignored by the generated `.gitignore`, so it is
 never committed. Do not delete it while Nift may be running, and do not create
 it by hand — older projects acquire it automatically on their next build.

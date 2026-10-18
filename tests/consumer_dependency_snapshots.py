@@ -136,7 +136,7 @@ def fingerprint_migration(binary,base):
 def post_hook_output_validation(binary,base):
  p=base/'post-removes-output';p.mkdir();dep,_,_=setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='templates/shared.html',**{'post-build':'post.f'})])
- (p/'post.f').write_text('print("post")\n');run(binary,p,'build','--all');old=metadata(p,'a').read_bytes()
+ (p/'post.f').write_text('print("post")\n');run(binary,p,'build','--all');old=metadata(p,'a').read_bytes();good=(p/'public/a.html').read_bytes()
  dep.write_text('NEW\n@content')
  (p/'post.f').write_text('f := file(getenv("NIFT_HOOK_OUTPUT"))\nf.remove()\n')
  r=subprocess.run([binary,'build','--all'],cwd=p,text=True,capture_output=True)
@@ -144,7 +144,7 @@ def post_hook_output_validation(binary,base):
  assert metadata(p,'a').read_bytes()==old
  # D-020: a failing post-build script is an ordinary failure: no marker, the
  # last-good output is put back, and the next ordinary build recovers.
- assert not (p/'.nift/.unfinished').exists();assert (p/'public/a.html').exists()
+ assert not (p/'.nift/.unfinished').exists();assert (p/'public/a.html').read_bytes()==good
  (p/'post.f').write_text('print("post")\n');run(binary,p,'build')
  assert hashes(p,'a')['templates/shared.html']==hash_bytes(dep.read_bytes())
  old=metadata(p,'a').read_bytes();dep.write_text('LATER\n@content');(p/'post.f').write_text('missing_function()\n')

@@ -2328,7 +2328,9 @@ int run_cli(int argc, char** argv) {
             project.tracked.erase(it);
             project.invalidate_tracked_index();
         }
-        const bool ok = project.save_tracking();
+        // D-020: drop the removed names from the failed-page list, so a
+        // re-tracked name starts clean.
+        const bool ok = project.save_tracking() && project.prune_failed_pages();
         if (ok) ownership.finish();
         return ok ? 0 : 1;
     }
@@ -2418,6 +2420,8 @@ int run_cli(int argc, char** argv) {
         }
 
         if (command == "mv" || command == "move") remove_page_build_state(project, source_copy, true);
+        // D-020: a moved page's failed-list entry goes with its old name.
+        if (!project.prune_failed_pages()) return 1; // marker kept: next build recovers
         ownership.finish();
         return 0;
     }

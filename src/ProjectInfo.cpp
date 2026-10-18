@@ -1332,63 +1332,112 @@ struct ProjectInfo::PageAttempt {
 
 fs::path ProjectInfo::failed_pages_path() const { return root / ".nift/failed.json"; }
 
-void ProjectInfo::load_failed_pages() {
-    failed_pages_.clear();
-    failed_pages_dirty_ = false;
-    const fs::path path = failed_pages_path();
-    if (!filesystem::path_exists(path)) return;
+namespace {
+// Reads .nift/failed.json: {"failed": ["<tracked name>", ...]}. Returns false
+// when the file exists but is not exactly that shape (damaged).
+bool read_failed_list(const fs::path& path, std::unordered_set<std::string>& names) {
+    names.clear();
+    if (!filesystem::path_exists(path)) return true;
     json::Document document;
     std::string error;
-    bool valid = load_json_file(path, document, error) && document.is_object() &&
-                 document.has("failed") && document["failed"].is_object();
-    if (valid) {
-        for (const auto& [name, pages] : document["failed"].object) {
-            if (!pages.is_number() || !std::isfinite(pages.num) || pages.num < 0 ||
-                std::floor(pages.num) != pages.num) { valid = false; break; }
-            failed_pages_[name] = static_cast<std::size_t>(pages.num);
-        }
+    if (!load_json_file(path, document, error) || !document.is_object() ||
+        !document.has("failed") || !document["failed"].is_array())
+        return false;
+    for (const auto& value : document["failed"].array) {
+        if (!value.is_string()) { names.clear(); return false; }
+        names.insert(value.string);
     }
-    if (!valid) {
+    return true;
+}
+
+// Puts a backed-up last-good output back. A symlinked output is written back
+// THROUGH the link (the build's own write-through semantics, so the link and
+// its external target are both preserved); a regular one is atomically
+// renamed back.
+bool restore_output(const fs::path& backup, const fs::path& path) {
+    std::error_code ec;
+    if (fs::is_symlink(fs::symlink_status(path, ec)) && !ec) {
+        const auto bytes = filesystem::read_file_checked(backup);
+        const fs::perms mode = filesystem::file_permissions(backup);
+        const bool ok = bytes && filesystem::write_direct_file(path, *bytes,
+            mode == fs::perms::unknown ? fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read : mode);
+        filesystem::remove_owned_file(backup);
+        return ok;
+    }
+    return filesystem::replace_file_atomic(backup, path);
+}
+} // namespace
+
+void ProjectInfo::load_failed_pages() {
+    failed_pages_dirty_ = false;
+    if (!read_failed_list(failed_pages_path(), failed_pages_)) {
         // Damaged list: conservatively treat every tracked page as failed (a
-        // full rebuild) and rewrite the list on the next build with work.
+        // full rebuild) and rewrite the list on the next build.
         failed_pages_.clear();
-        for (const auto& info : tracked) failed_pages_[info.name] = 0;
+        for (const auto& info : tracked) failed_pages_.insert(info.name);
         failed_pages_dirty_ = true;
     }
 }
 
-bool ProjectInfo::save_failed_pages() {
-    for (auto it = failed_pages_.begin(); it != failed_pages_.end();)
-        it = find(it->first) ? std::next(it) : failed_pages_.erase(it);
+bool ProjectInfo::save_failed_pages(const std::unordered_set<std::string>& succeeded,
+                                    const std::unordered_set<std::string>& failed) {
+    // Merge with the list as it is on disk now (a long-lived ProjectInfo, such
+    // as the automation API's, must not overwrite entries another process
+    // recorded), apply this build's outcome, and drop names no longer tracked.
+    std::unordered_set<std::string> merged;
+    if (!read_failed_list(failed_pages_path(), merged))
+        for (const auto& info : tracked) merged.insert(info.name);
+    for (const auto& name : succeeded) merged.erase(name);
+    merged.insert(failed.begin(), failed.end());
+    for (auto it = merged.begin(); it != merged.end();)
+        it = find(*it) ? std::next(it) : merged.erase(it);
+    failed_pages_ = merged;
+    failed_pages_dirty_ = false;
     const fs::path path = failed_pages_path();
-    if (failed_pages_.empty()) return filesystem::remove_owned_file(path);
-    std::map<std::string, std::size_t> sorted(failed_pages_.begin(), failed_pages_.end());
-    std::string output = "{\n  \"failed\": {";
+    if (merged.empty()) return filesystem::remove_owned_file(path);
+    std::set<std::string> sorted(merged.begin(), merged.end());
+    std::string output = "{\n  \"failed\": [";
     std::size_t index = 0;
-    for (const auto& [name, pages] : sorted) {
+    for (const auto& name : sorted) {
         output += index++ ? ",\n    \"" : "\n    \"";
         json::Document::append_escaped_string(output, name);
-        output += "\": " + std::to_string(pages);
+        output += "\"";
     }
-    output += "\n  }\n}\n";
+    output += "\n  ]\n}\n";
     return filesystem::write_readonly_file(path, output);
+}
+
+bool ProjectInfo::prune_failed_pages() {
+    // Keeps "absent when empty" and drops untracked names on every build and
+    // on untrack/rm/mv, so a re-tracked name starts clean.
+    std::unordered_set<std::string> current;
+    const bool readable = read_failed_list(failed_pages_path(), current);
+    if (readable && current.empty()) { failed_pages_.clear(); return true; }
+    bool stale = !readable;
+    for (const auto& name : current) if (!find(name)) stale = true;
+    if (!stale) return true;
+    return save_failed_pages({}, {});
 }
 
 void ProjectInfo::settle_failed_page(const TrackedInfo& info, const PageAttempt& attempt) {
     bool consistent = !attempt.io_failure;
     if (attempt.scripted) {
-        // Put last-good outputs back. Outputs that had no last-good version
-        // are left as the attempt wrote them (inspectable; the page stays
-        // dirty and any extra pagination pages are recorded for cleanup).
+        // Put last-good outputs back (through a symlinked output, as the
+        // build writes). Page 1 with no last-good version is left as the
+        // attempt wrote it (inspectable; the page stays dirty).
         for (const auto& [path, backup] : attempt.backups)
-            if (backup && !filesystem::replace_file_atomic(*backup, path)) consistent = false;
+            if (backup && !restore_output(*backup, path)) consistent = false;
     }
+    // Pagination pages beyond the last-good set were created by this attempt
+    // and never had a last-good version: remove them now, so no later build
+    // (or repair) depends on remembering them.
+    for (std::size_t page = std::max<std::size_t>(2, attempt.previous_pages + 1); page <= attempt.written_pages; ++page)
+        if (!filesystem::remove_owned_file(pagination_output_path(info, page))) consistent = false;
     // Page-info is left as it was (it still describes the last-good output);
     // the page joins the failed list when build_many finishes.
     {
         std::lock_guard<std::mutex> lock(failed_mutex_);
-        auto& pages = failed_now_[info.name];
-        pages = std::max({pages, attempt.previous_pages, attempt.written_pages});
+        failed_now_.insert(info.name);
     }
     if (has_build_dependencies)
         for (std::size_t page = 1; page <= std::max({std::size_t(1), attempt.previous_pages, attempt.written_pages}); ++page)
@@ -1420,12 +1469,9 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     // This read is therefore required for every page (a page whose pagination
     // was removed no longer has info.paginate set, so gating the read on the
     // current paginate would silently leave stale pagination outputs). A
-    // failure record keeps the count, so it survives a failed build.
+    // failed attempt removes the extra pages it created, so page-info's count
+    // stays the complete last-good set.
     attempt.previous_pages = recorded_pagination_pages(info_path(info));
-    // A failed earlier attempt may have written more pagination pages than the
-    // last successful build recorded; they are still this page's to clean up.
-    if (const auto failed = failed_pages_.find(info.name); failed != failed_pages_.end())
-        attempt.previous_pages = std::max(attempt.previous_pages, failed->second);
     test_crash_point("page-start", info.name);
     // Pages running user scripts (per-file hooks, item scripts, a custom
     // build) can touch their outputs before failing; keep a copy of the
@@ -1819,26 +1865,21 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     // even when it was selected by --all or --repair). Validation-only jobs
     // were clean and are re-validated next time, so they are left alone.
     {
-        bool changed = failed_pages_dirty_;
+        bool changed = failed_pages_dirty_ || !failed_now_.empty();
+        std::unordered_set<std::string> succeeded_names, failed_names(failed_now_);
         for (std::size_t i = 0; i < jobs.size(); ++i) {
             const std::string& name = jobs[i].info->name;
             if (succeeded[i] && (!has_build_dependencies || executed[i])) {
-                if (failed_pages_.erase(name)) changed = true;
+                if (failed_pages_.count(name)) changed = true;
+                succeeded_names.insert(name);
             } else if (has_build_dependencies && blocked[i] && !jobs[i].validation_only) {
-                auto& pages = failed_pages_[name];
-                pages = std::max(pages, recorded_pagination_pages(info_path(*jobs[i].info)));
+                failed_names.insert(name);
                 changed = true;
             }
         }
-        for (const auto& [name, pages] : failed_now_) {
-            auto& recorded = failed_pages_[name];
-            recorded = std::max(recorded, pages);
-            changed = true;
-        }
         failed_now_.clear();
         if (changed) {
-            if (save_failed_pages()) failed_pages_dirty_ = false;
-            else {
+            if (!save_failed_pages(succeeded_names, failed_names)) {
                 mark_unresolved();
                 std::lock_guard<std::mutex> lock(console::output_mutex);
                 std::cerr << console::error_label() << " could not record failed pages in "
@@ -2004,6 +2045,10 @@ int ProjectInfo::build_all_owned(ProjectOwnership& ownership, bool force, bool e
     }
     test_crash_point("reconciled");
     reset_build_caches();
+    // The failed list on disk is authoritative inside the epoch (another
+    // process may have changed it since this ProjectInfo was opened).
+    load_failed_pages();
+    if (!prune_failed_pages()) mark_unresolved();
 
     const std::string mode = nift_hooks::effective_mode(force, repair, build_mode_hint_);
     // Project pre-hooks run before the affected-set calculation so generated
@@ -2150,14 +2195,12 @@ bool ProjectInfo::repair_derived_state() {
             doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
             std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 1)
             pages = static_cast<std::size_t>(doc["pagination-pages"].num);
-        // A page whose build failed keeps its last-good page-info; pages a
-        // failed attempt wrote beyond that count are still in use until it
-        // is rebuilt (D-020).
-        if (const auto failed = failed_pages_.find(info.name); failed != failed_pages_.end())
-            pages = std::max(pages, failed->second);
-        if (pages >= 2) {
-            for (std::size_t n = 2; n <= pages; ++n)
-                current_owned.insert(pagination_output_path(info, n).lexically_normal());
+        for (std::size_t n = 2; n <= pages; ++n)
+            current_owned.insert(pagination_output_path(info, n).lexically_normal());
+        // Every currently paginated page's namespace is registered, also when
+        // it now has a single page (D-020: surplus left by an interrupted
+        // attempt is removed whatever the last count was).
+        if (pages >= 2 || info.paginate.has_value()) {
             // Register the in-use pagination namespace so the output-tree
             // sweep can remove surplus pages N > count (ownership established
             // by the current render).
@@ -2306,6 +2349,8 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
     }
     test_crash_point("reconciled");
     reset_build_caches();
+    load_failed_pages();
+    if (!prune_failed_pages()) mark_unresolved();
 
     // CP3.2 lifetime invariant: TrackedInfo* jobs are obtained ONLY after the
     // last operation that can structurally modify `tracked` for this pass

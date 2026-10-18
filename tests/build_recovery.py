@@ -34,7 +34,7 @@ def run(root, *args, env=None):
     if env:
         e.update(env)
     p = subprocess.run([NIFT, *args], cwd=root, env=e, stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE, text=True, timeout=120)
+                       stderr=subprocess.PIPE, text=True, timeout=60)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -425,6 +425,169 @@ def uncertain_and_concurrency(scratch):
     shutil.rmtree(root)
 
 
+
+# ---------------------------------------------------------------- review fixes
+
+def corrupt_failed_lists(scratch):
+    """F1: any malformed failed list (huge/absurd numbers, wrong shapes) is
+    treated as damaged: bounded, conservative full rebuild, clean result."""
+    root = scratch / "corrupt-list"
+    project(root, "modified")
+    run(root, "build")
+    for text in ('{"failed":{"a":100000000000}}', '{"failed":{"post":1e300}}', '{"failed":["a",1e300]}',
+                 '{"failed":[["a"]]}', '{"failed":"a"}', '[]', '{"failed":["a"],"x":', '\u0000'):
+        (root / ".nift/failed.json").write_text(text)
+        for args in (("build",), ("build", "--repair"), ("status",)):
+            try:
+                rc, out = run(root, *args) if args[0] != "status" else run(root, "status")
+            except subprocess.TimeoutExpired:
+                check(f"corrupt list {text[:24]!r}: {' '.join(args)} finishes (no hang)", False)
+                continue
+            if args[0] == "build":
+                check(f"corrupt list {text[:24]!r}: {' '.join(args)} succeeds", rc == 0, out[-300:])
+                (root / ".nift/failed.json").write_text(text)
+        rc, out = run(root, "build")
+        check(f"corrupt list {text[:24]!r}: converges", rc == 0 and not (root / ".nift/failed.json").exists(), out[-300:])
+        same_as_clean(root, scratch, f"corrupt list {text[:24]!r}")
+    shutil.rmtree(root)
+
+
+def paginated_script_project(root, mode="modified"):
+    project(root, mode)
+    t = json.loads((root / ".nift/tracked.json").read_text())
+    for e in t["tracked"]:
+        if e["name"] == "list":
+            e["post-build"] = "scripts/lpost.f"
+    (root / ".nift/tracked.json").write_text(json.dumps(t))
+    write(root, "scripts/lpost.f", 'print("ok")\n')
+    rc, out = run(root, "build")
+    assert rc == 0, out
+
+
+def list_files(root):
+    return sorted(p.name for p in (root / "public").glob("list*"))
+
+
+def pagination_without_failed_list(scratch):
+    """F2: extra pagination pages a failed attempt wrote are removed at
+    failure time, so neither a deleted nor a damaged failed list, nor a
+    later --repair, can leave them behind."""
+    for variant in ("deleted", "damaged", "repair", "kept"):
+        root = scratch / f"pag-{variant}"
+        paginated_script_project(root)
+        before = list_files(root)
+        write(root, "data/items.json", json.dumps({"items": [str(i) for i in range(9)]}))
+        write(root, "scripts/lpost.f", "nosuchfunction_xyz()\n")
+        rc, out = run(root, "build")
+        check(f"pagination/{variant}: failing attempt exits non-zero, no marker", rc != 0 and not marker(root), out[-300:])
+        check(f"pagination/{variant}: extra pages of the failed attempt removed", list_files(root) == before,
+              f"{list_files(root)} vs {before}")
+        if variant == "deleted":
+            (root / ".nift/failed.json").unlink()
+        elif variant == "damaged":
+            (root / ".nift/failed.json").write_text("{torn")
+        write(root, "scripts/lpost.f", 'print("ok")\n')
+        write(root, "data/items.json", json.dumps({"items": ["a"]}))
+        rc, out = run(root, *(("build", "--repair") if variant == "repair" else ("build",)))
+        check(f"pagination/{variant}: fixed build succeeds", rc == 0, out[-300:])
+        if variant == "deleted":
+            run(root, "build", "--all")  # the page itself is no longer known dirty
+        up_to_date(root, f"pagination/{variant}")
+        same_as_clean(root, scratch, f"pagination/{variant}")
+        shutil.rmtree(root)
+    # Interrupted after the extra pages were written: the recovery sweep
+    # removes them (namespace of a currently paginated page).
+    root = scratch / "pag-killed"
+    paginated_script_project(root)
+    write(root, "data/items.json", json.dumps({"items": [str(i) for i in range(9)]}))
+    rc, out = run(root, "build", env={"NIFT_TEST_CRASH_AT": "page-output:list"})
+    check("pagination/killed: killed after writing 5 pages", rc in (-9, 137) and (root / "public/list-5.html").exists())
+    (root / ".nift/failed.json").unlink(missing_ok=True)
+    write(root, "data/items.json", json.dumps({"items": ["a"]}))
+    rc, out = run(root, "build")
+    check("pagination/killed: recovery succeeds", rc == 0 and "Recovering automatically" in out, out[-300:])
+    same_as_clean(root, scratch, "pagination/killed")
+    shutil.rmtree(root)
+
+
+def symlinked_outputs(scratch):
+    """F3: a symlinked output stays a symlink through success, failure
+    (last-good written back through the link) and repair; inside-project,
+    outside-project and broken links."""
+    outside = scratch / "outside"
+    outside.mkdir(exist_ok=True)
+    for kind in ("outside", "inside", "broken"):
+        root = scratch / f"link-{kind}"
+        project(root, "modified")
+        run(root, "build")
+        link = root / "public/post.html"
+        if kind == "outside":
+            target = outside / "post-real.html"
+        elif kind == "inside":
+            (root / "store").mkdir()
+            target = root / "store/post-real.html"
+        else:
+            target = outside / "missing-dir-free" / "post-dangling.html"
+            target.parent.mkdir(exist_ok=True)
+        if kind != "broken":
+            shutil.copy(link, target)
+            os.chmod(target, 0o644)
+        link.unlink()
+        os.symlink(target, link)
+        write(root, "content/post.html", "<p>post-v2</p>\n")
+        rc, out = run(root, "build")
+        check(f"symlink/{kind}: successful build keeps the link", rc == 0 and link.is_symlink(), out[-200:])
+        check(f"symlink/{kind}: target written through the link", target.exists() and b"post-v2" in target.read_bytes())
+        good = target.read_bytes()
+        write(root, "content/post.html", "<p>post-v3</p>\n")
+        write(root, "scripts/post.f", "nosuchfunction_xyz()\n")
+        rc, out = run(root, "build")
+        check(f"symlink/{kind}: failure keeps the link", rc != 0 and link.is_symlink() and not marker(root), out[-200:])
+        check(f"symlink/{kind}: target holds the last-good bytes", target.read_bytes() == good)
+        check(f"symlink/{kind}: no backup files left", not list(root.rglob("*.nift-tmp-*")))
+        write(root, "scripts/post.f", 'print("post ok")\n')
+        run(root, "build", env={"NIFT_TEST_CRASH_AT": "page-output-partial:post"})
+        rc, out = run(root, "build")
+        check(f"symlink/{kind}: recovery after a kill keeps the link", rc == 0 and link.is_symlink(), out[-200:])
+        rc, out = run(root, "build", "--repair")
+        check(f"symlink/{kind}: --repair keeps the link", rc == 0 and link.is_symlink() and b"post-v3" in target.read_bytes(), out[-200:])
+        shutil.rmtree(root)
+
+
+def failed_list_hygiene(scratch):
+    """F6: untracked/removed/moved names leave the list (absent when empty);
+    a re-tracked name starts clean; a no-op build prunes stale names."""
+    root = scratch / "hygiene"
+    project(root, "modified")
+    run(root, "build")
+    write(root, "content/b.html", '@input("data/missing.txt")\n')
+    run(root, "build")
+    rc, out = run(root, "untrack", "b")
+    check("hygiene: untrack drops the name, list absent when empty",
+          rc == 0 and not (root / ".nift/failed.json").exists(), out)
+    write(root, "content/b.html", "<p>b back</p>\n")
+    rc, out = run(root, "track", "b", "B", "templates/t.html")
+    rc, out = run(root, "status")
+    check("hygiene: re-tracked name is not reported as failed", "previous build of this page failed" not in out, out)
+    rc, out = run(root, "build")
+    check("hygiene: re-tracked name builds", rc == 0, out[-200:])
+    for op in (("rm", "c"), ("mv", "c", "c2")):
+        write(root, "content/c.html", '@input("data/missing.txt")\n')
+        run(root, "build")
+        check(f"hygiene: {op[0]} precondition", "c" in (root / ".nift/failed.json").read_text())
+        rc, out = run(root, *op)
+        check(f"hygiene: {op[0]} drops the name", rc == 0 and not (root / ".nift/failed.json").exists(), out)
+        if op[0] == "mv":
+            run(root, "rm", "c2")
+        write(root, "content/c.html", "<p>c</p>\n")
+        run(root, "track", "c", "C", "templates/t.html")
+        run(root, "build")
+    (root / ".nift/failed.json").write_text('{"failed": ["gone-page"]}')
+    rc, out = run(root, "build")
+    check("hygiene: a no-op build prunes untracked names", rc == 0 and not (root / ".nift/failed.json").exists(), out[-200:])
+    same_as_clean(root, scratch, "hygiene")
+    shutil.rmtree(root)
+
 def main():
     with tempfile.TemporaryDirectory(prefix="nift-recovery-") as td:
         scratch = Path(td)
@@ -432,6 +595,10 @@ def main():
             ordinary_failures(mode, scratch)
             crashes(mode, scratch)
         uncertain_and_concurrency(scratch)
+        corrupt_failed_lists(scratch)
+        pagination_without_failed_list(scratch)
+        symlinked_outputs(scratch)
+        failed_list_hygiene(scratch)
     if fails:
         print(f"build recovery: {len(fails)} of {checks} checks FAILED")
         return 1
