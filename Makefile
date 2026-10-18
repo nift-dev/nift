@@ -278,7 +278,7 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_run.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
-test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET)
+test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	"$(RT_VM_UNIT)"
 	"$(RT_VM_PREPARED)"
 	python3 tools/rt-lint.py src/rt
@@ -295,10 +295,12 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET)
 	python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_policy_negative.py
 	python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_golden.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_int_bounds.py --nift "$(CURDIR)/$(TARGET)"
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
-test-rt-vm-sanitize: $(SAN_TARGET)
+test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
@@ -325,6 +327,27 @@ test-rt-vm-sanitize: $(SAN_TARGET)
 		python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 120
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_golden.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_int_bounds.py --nift "$(CURDIR)/$(SAN_TARGET)"
+
+# Review CP12 round 2: live mutation gate. One extra link of nift with the VM
+# compiled -DNIFT_VM_MUTANTS (deliberate bugs selected by NIFT_VM_MUTANT=n,
+# src/rt/vm_mutants.h); the differential gates must reject every mutant and
+# pass the unmutated binary. Normal builds contain no mutant code.
+RT_VM_MUTANTS := $(TEST_DIR)/nift-mutants$(EXEEXT)
+RT_VM_MUTANT_OBJECTS := $(TEST_DIR)/mutants/vm.o $(TEST_DIR)/mutants/vm_ops.o
+$(TEST_DIR)/mutants/%.o: src/rt/%.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/mutants"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_VM_MUTANTS -c $< -o $@
+$(RT_VM_MUTANTS): $(filter-out src/rt/vm.o src/rt/vm_ops.o,$(CLI_OBJECTS)) $(RT_VM_MUTANT_OBJECTS) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/vm.o src/rt/vm_ops.o,$(CLI_OBJECTS)) $(RT_VM_MUTANT_OBJECTS) \
+		$(LDLIBS) -o $@
+
+.PHONY: test-rt-vm-mutants
+test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
+	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
 
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)
@@ -2087,7 +2110,7 @@ test-rt-parser: $(TEST_DIR)/rt-parser-unit$(EXEEXT) $(TEST_DIR)/rt-parse-dump$(E
 	python3 tests/runtime2/rt_parser_corpus.py --build $(TEST_DIR) --nift ./$(TARGET)
 
 test: test-rt-parser
-test: test-rt-vm
+test: test-rt-vm test-rt-vm-mutants
 
 # ASan/UBSan run of the rt parser over the script corpora plus fuzzing (CP10
 # evidence; slower, not part of `make test`).

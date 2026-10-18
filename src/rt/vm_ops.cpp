@@ -8,11 +8,19 @@
 #include "rt/string.h"
 
 #include <charconv>
+#include <cstdlib>
 #include <cmath>
 
 // rt-lint: cold-file slow and error paths of the VM; the hot paths are inline in vm.cpp
 
 namespace nift::rt {
+
+#ifdef NIFT_VM_MUTANTS
+int vm_mutant() {
+    static const int mutant = std::getenv("NIFT_VM_MUTANT") ? std::atoi(std::getenv("NIFT_VM_MUTANT")) : 0;
+    return mutant;
+}
+#endif
 
 bool raise(Fault& fault, StopReason reason, std::string message) {
     fault.reason = reason;
@@ -82,6 +90,10 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
         return raise(fault, StopReason::Error, error);
     }
     if (is_large(result)) fault.large = true;
+#ifdef NIFT_VM_MUTANTS
+    if (vm_mutant() == 2 && result.is(Kind::Int) && is_large(result))  // M2: large results off by 1000
+        result = Value::integer(result.as_int() - 1000);
+#endif
     out = static_cast<Value&&>(result);
     return true;
 }
@@ -165,6 +177,9 @@ const char* binding_type_name(std::int64_t tag) {
 }
 
 bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault) {
+#ifdef NIFT_VM_MUTANTS
+    if (vm_mutant() == 7) std::swap(assigned, binding);  // M7: wrong kinds in the message
+#endif
     return raise(fault, StopReason::Error,
                  std::string("cannot assign ") + binding_type_name(assigned) + " to " + binding_type_name(binding) +
                      " binding '" + note_text(note) + "'");
@@ -179,6 +194,9 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
             out = items[static_cast<std::size_t>(i)];
             return true;
         }
+#ifdef NIFT_VM_MUTANTS
+        if (integral && vm_mutant() == 6) ++i;  // M6: wrong index number in the message
+#endif
         if (integral)
             return raise(fault, StopReason::Error,
                          "JSON array index " + integer_text(i) + " is out of range in '" + note_text(note) + "'");

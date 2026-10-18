@@ -39,6 +39,14 @@ struct Fault {
 inline constexpr std::int64_t kSafeInteger = std::int64_t(1) << 53;
 inline bool safe_integer(std::int64_t v) { return v > -kSafeInteger && v < kSafeInteger; }
 
+// Mutation gate (review CP12 round 2, `make test-rt-vm-mutants`): a build
+// with -DNIFT_VM_MUTANTS selects one deliberate VM bug with NIFT_VM_MUTANT=n
+// (1..8); the differential gates must reject each. Normal builds contain no
+// mutant code: every use is inside #ifdef NIFT_VM_MUTANTS.
+#ifdef NIFT_VM_MUTANTS
+int vm_mutant();
+#endif
+
 bool raise(Fault& fault, StopReason reason, std::string message);
 bool internal(Fault& fault, const char* what);
 

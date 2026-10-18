@@ -6,6 +6,7 @@
 #include "rt/native.h"
 #include "rt/render.h"
 #include "rt/text_type.h"
+#include "rt/vm_mutants.h"
 
 #include <algorithm>
 #include <iterator>
@@ -176,14 +177,14 @@ VmResult Vm::run(std::string& output) {
 #define NIFT_RT_LABEL(name) &&L_##name,
     static const void* const kLabels[] = {NIFT_RT_OPCODES(NIFT_RT_LABEL)};
 #undef NIFT_RT_LABEL
-    // The checked table: the integer arithmetic opcodes go straight to their
-    // slow paths (see NOTE_LARGE).
+    // The checked table: integer arithmetic on its slow paths (see NOTE_LARGE).
     const void* checked_labels[std::size(kLabels)];
     std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
     for (const auto& [op, label] : {std::pair{OpCode::Add, &&LC_Add}, {OpCode::Sub, &&LC_Sub},
                                     {OpCode::Mul, &&LC_Mul}, {OpCode::Mod, &&LC_Mod}, {OpCode::AddI, &&LC_AddI},
                                     {OpCode::AddAssign, &&LC_AddAssign}})
         checked_labels[static_cast<std::size_t>(op)] = label;
+    MUTATE_CHECKED_TABLE(checked_labels)
     const void* const* labels = kLabels;
     DISPATCH();
 #else
@@ -203,7 +204,7 @@ VmResult Vm::run(std::string& output) {
         // r == -1 takes the slow path: INT64_MIN % -1 traps in C++ (SIGFPE);
         // integer_arithmetic gives 0 (review CP12 round 1, D2).
         if (UNCHECKED && both_int(l, r) && r.as_int() != 0 && r.as_int() != -1) {
-            const std::int64_t v = l.as_int() % r.as_int();
+            const std::int64_t v = MUTATE_MOD(l.as_int() % r.as_int());
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
         }
     }
@@ -212,9 +213,9 @@ VmResult Vm::run(std::string& output) {
     NOTE_LARGE NEXT();
     OP(AddI) {
         const Value& x = R[pc->b];
-        // safe_integer(x) first: x + offset must not overflow int64 (UB)
-        // for x near INT64_MIN/MAX (review CP12 round 1, D2 audit).
+        // safe_integer(x) first: x + offset must not overflow (UB; review D2 audit).
         if (UNCHECKED && x.is(Kind::Int) && safe_integer(x.as_int()) && safe_integer(x.as_int() + jump_offset(pc->c))) {
+            MUTATE_ADDI(x, jump_offset(pc->c))
             R[pc->a] = Value::integer(x.as_int() + jump_offset(pc->c)); NEXT();
         }
     }
@@ -343,6 +344,7 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
     result.reason = fault.reason;
     result.message = fault.message;
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
+    MUTATE_ERROR_OFFSET(result.offset)
     result.error_in_loop_path = in_loop_path(pc);
 }
 
