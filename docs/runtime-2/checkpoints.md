@@ -194,3 +194,4 @@ become current. Non-negotiable gates already fixed now:
 | feature-site-dx | site-generation DX fixes and strict `$[...]` stage 1 | in progress |
 | language-cleanup | resolve `language-consistency.md` entries together (both engines; old/new tests, migration guidance) | after CP16–CP17 stabilise natives and values | coherent rules tested together; no unexplained behaviour changes |
 | feature-build-recovery | D-020: ordinary build failures never need `--repair`; `.unfinished` only for interrupted/uncertain state; auto-recovery where provably safe | partial-failure, concurrency, kill-at-every-step and incremental-equivalence tests pass |
+| feature-serve | D-026: `nift serve` wraps Python 3 `http.server` for local preview; no new server, watch or reload | serve_smoke (default/custom dir, port, host, spaces, outside project, missing dir/Python, occupied port, HTTP fetch, Ctrl+C with no orphans, no project/metadata changes); macOS/Windows at next milestone |

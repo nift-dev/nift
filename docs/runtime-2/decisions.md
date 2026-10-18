@@ -439,3 +439,15 @@ must be removed or justified when build recovery integrates.
 - The temporary `--auto` → `--repair` retry is removed once build recovery is
   integrated, verified by an end-to-end watcher test (error → fix → rebuild,
   no repair).
+- **Benchmark readiness (refinement).** Load average is an indicator, not the
+  criterion. Wall-clock runs follow a preflight (CPU contention and competing
+  heavy jobs, memory pressure/swap/PSI, free disk, CPU frequency/thermal where
+  readable, calibration-kernel stability) and run in an exclusive window;
+  preflight results are kept with the raw data. Benchmark infrastructure stays
+  bounded to the current milestone; the priority result is records20k at 100%
+  VM once CP14/CP15 are integrated.
+- **`nift serve`** (feature-serve): a thin wrapper over Python 3's
+  `http.server` (argv, never a shell string) serving the configured output dir
+  or `--dir` (no containment), defaults 127.0.0.1:8000; no live reload, watch,
+  proxy, HTTPS or C++ server. Local development only; Python 3 is required and
+  never installed automatically.
