@@ -660,16 +660,26 @@ class Supported:
 
 
 def supported_program(seed, index):
-    """(source, expected outcome key, features)."""
+    """(source, expected outcome key, features). Fully supported: no deliberate
+    run-time condition; the program must run entirely on the VM (outcome vm)."""
     rng = random.Random(seed * 7919 + index)
     g = Supported(rng)
-    trigger, expect = (None, "vm")
-    if rng.random() < 0.06:
-        trigger, expect = rng.choice(TRIGGERS)
-    src = g.program(trigger)
-    if trigger and src.rstrip().split("\n")[-1] != trigger.split("\n")[-1]:
-        expect = "vm"  # the program ended in a top-level return first
-    return src, expect, g.features
+    src = g.program(None)
+    return src, "vm", g.features
+
+
+def replay_program(seed, index):
+    """(source, expected replay key, features): a supported program ending in one
+    deliberate documented run-time condition (TRIGGERS), cycled so every reason
+    is exercised. Tracked separately: CP12 must remove every replay (D-013)."""
+    trigger, expect = TRIGGERS[index % len(TRIGGERS)]
+    for attempt in range(50):
+        rng = random.Random(seed * 15485863 + index * 101 + attempt)
+        g = Supported(rng)
+        src = g.program(trigger)
+        if src.rstrip().split("\n")[-1] == trigger.split("\n")[-1]:
+            return src, expect, g.features
+    raise RuntimeError(f"could not place trigger {trigger!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -822,7 +832,7 @@ def check_supported(nift, work, item, timeout):
         problem = None
         if vm != legacy:
             problem = "output differs"
-        elif not key.startswith(expect):
+        elif (key != expect) if expect == "vm" else not key.startswith(expect):
             problem = f"expected {expect}, got {key}"
         return i, key, problem, src, legacy, vm
     finally:
@@ -874,9 +884,8 @@ def suite_supported(args, work, out):
                 failures.append((f"supported seed {args.seed} index {i}", problem, src, legacy, vm))
     report_failures(failures)
     vm_n = tally.get("vm", 0)
-    replays = {k: n for k, n in tally.items() if k.startswith("replayed")}
-    print(f"supported-subset generator: {args.count} programs (seed {args.seed}); outcome vm {vm_n} "
-          f"({100.0 * vm_n / max(1, args.count):.1f} %), deliberate replays {sum(replays.values())} {replays}; "
+    print(f"supported-subset generator: {args.count} programs (seed {args.seed}); entirely on the VM {vm_n} "
+          f"({100.0 * vm_n / max(1, args.count):.1f} %, required 100 %); outcomes {dict(tally)}; "
           f"{len(failures)} failure(s)")
     missing = [f for f in REQUIRED_FEATURES if not features.get(f)]
     if args.count >= 200 and missing:
@@ -884,6 +893,29 @@ def suite_supported(args, work, out):
         failures.append(("features", "missing", "", None, None))
     out["supported"] = {"seed": args.seed, "count": args.count, "outcomes": dict(tally),
                         "failures": len(failures), "features": dict(features)}
+    return len(failures)
+
+
+def suite_replay(args, work, out):
+    """Runtime replay cases (CP11 only, D-013; CP12 removes them): each must
+    replay with its documented reason and match legacy exactly (stdout, stderr,
+    exit status), so the replay duplicated nothing."""
+    count = max(len(TRIGGERS), args.count // 10)
+    items = []
+    for i in range(count):
+        src, expect, feats = replay_program(args.seed, i)
+        items.append((i, src, expect, feats))
+    tally, failures = collections.Counter(), []
+    with cf.ThreadPoolExecutor(args.jobs) as pool:
+        for i, key, problem, src, legacy, vm in pool.map(lambda it: check_supported(args.nift, work, it,
+                                                                                      args.timeout), items):
+            tally[key] += 1
+            if problem:
+                failures.append((f"replay seed {args.seed} index {i}", problem, src, legacy, vm))
+    report_failures(failures)
+    print(f"runtime-replay cases (CP12 backlog): {count} programs (seed {args.seed}); outcomes {dict(tally)}; "
+          f"{len(failures)} failure(s)")
+    out["replay"] = {"seed": args.seed, "count": count, "outcomes": dict(tally), "failures": len(failures)}
     return len(failures)
 
 
@@ -924,7 +956,7 @@ def suite_unsupported(args, work, out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
-    ap.add_argument("--suite", default="both", choices=["supported", "unsupported", "both"])
+    ap.add_argument("--suite", default="both", choices=["supported", "replay", "unsupported", "both"])
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--count", type=int, default=400)
     ap.add_argument("--jobs", type=int, default=2)
@@ -942,6 +974,8 @@ def main():
         failures = 0
         if args.suite in ("supported", "both"):
             failures += suite_supported(args, work, out)
+        if args.suite in ("replay", "both"):
+            failures += suite_replay(args, work, out)
         if args.suite in ("unsupported", "both"):
             failures += suite_unsupported(args, work, out)
     finally:
