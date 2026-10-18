@@ -543,3 +543,20 @@ must be removed or justified when build recovery integrates.
   groups can be escaped; Windows job objects have breakaway and inherited-handle
   caveats); no general-purpose supervisor. CP17 owns the handle
   representation. Public-API alternatives use parser-verified Nift code.
+
+## D-030 — `run()` public syntax and process-lifetime changes (owner, 2026-10-19)
+- **Syntax: alternative A.** `run()` takes a trailing options object (e.g.
+  `{"mode": "stream", "timeout_ms": 5000}`) covering capture, streaming,
+  interactive input, detached execution, deadlines and cancellation. Passing an
+  object to `run()` is fatal today, so no working program changes meaning.
+  Unknown option keys are fatal for `run()`.
+- **Approved behaviour changes (old/new tests and migration notes each):**
+  C1 background descendants of `run()` are terminated when their execution
+  context ends; C2 SIGTERM to Nift terminates its managed children (the pinned
+  `process_capture.sh` check flips); C3 each managed pipeline runs in its own
+  process group.
+- **Defaults:** 2,000 ms grace before forced termination; detaching inside a
+  build is a loud error; cleaning up a still-running managed process at context
+  end prints a warning without changing the exit status.
+- Design record: CP16 `cp16-host-ops-design.md` §11–§12 (`runtime-2-cp16-design`
+  @d4310bc); parser-checked examples in `tests/runtime2/cp16/syntax/`.
