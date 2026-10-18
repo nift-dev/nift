@@ -1,0 +1,2 @@
+error: $ROOT/syn_stray_brace.f:2:1: unknown value or malformed expression: }
+print("b")

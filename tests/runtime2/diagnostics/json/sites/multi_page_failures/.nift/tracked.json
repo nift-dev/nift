@@ -1,0 +1,7 @@
+{
+  "tracked": [
+    {"name": "/", "title": "index", "template": "templates/template.html"},
+    {"name": "a", "title": "a", "template": "templates/template.html"},
+    {"name": "b", "title": "b", "template": "templates/template.html"}
+  ]
+}

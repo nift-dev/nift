@@ -1,0 +1,1 @@
+error: $ROOT/syn_if_no_block_after_output.f:3:1: function if requires a block

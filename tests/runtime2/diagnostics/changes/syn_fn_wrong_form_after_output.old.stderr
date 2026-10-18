@@ -1,0 +1,1 @@
+error: $ROOT/syn_fn_wrong_form_after_output.f:2:1: fn requires '(name(args))'

@@ -1,0 +1,26 @@
+# case	decision	kind	baseline-case	note
+call_error_in_callee	D-018c	old-vs-new	call_error_in_callee	callee error from top level: return statement + 'return: ' prefix -> failing expression, no prefix
+call_error_two_deep	D-018c	old-vs-new	call_error_two_deep	'return: return: ' at the inner return -> 2:10; .new captured from the CP12 VM
+call_error_struct_method	D-018c	old-vs-new	call_error_struct_method	method body error: prefix removed, failing expression
+call_error_in_if_condition	D-018c	old-vs-new	call_error_in_if_condition	callee in an if condition
+try_error_after_output_in_function	D-018c	old-vs-new	try_error_after_output_in_function	uncatchable callee error inside try; output kept; still fatal (D-022#2)
+try_uncatchable_in_callee	D-018c	old-vs-new	try_uncatchable_in_callee	still fatal (D-022#2 staged)
+call_recursion_limit	D-001#4	old-vs-new	call_recursion_limit	64-frame limit -> frame budget; .new captured from the CP12 VM
+loop_type_wording	D-009#1	old-vs-new	loop_type_wording	loop wording -> canonical wording; .new captured from the CP12 VM
+syn_unclosed_paren	D-022#3	old-vs-new	syn_unclosed_paren	syntax error before execution: 'before' no longer printed; message/location unchanged
+syn_stray_brace	D-022#3	old-vs-new	syn_stray_brace	syntax error before execution: 'a' no longer printed
+syn_trailing_comma_call	D-022#3	old-vs-new	-	'expression cannot be empty' before execution
+syn_after_effect	D-022#3	old-vs-new	-	no program-initiated effects: the file written before the malformed statement is not created
+syn_import_module_syntax	D-022#3	old-vs-new	-	import validated when loaded: main output before the import kept; module output not printed
+syn_malformed_in_untaken_branch	D-022#3	old-vs-new	-	legacy exit 0 (branch never runs) -> syntax error; .new message derived from legacy's rule (verify with the prevalidator)
+syn_malformed_in_uncalled_function	D-022#3	old-vs-new	-	legacy exit 0 (never called) -> syntax error; .new message derived from legacy's rule (verify with the prevalidator)
+syn_fn_wrong_form_after_output	D-022#3	guard	-	translator error: legacy already reports it before execution; must stay identical
+syn_if_no_block_after_output	D-022#3	guard	-	translator error: already before execution; must stay identical
+syn_string_index_runtime	D-022#3	guard	-	valid syntax, VM-unsupported, run-time error only when reached: the prevalidator must NOT reject it
+try_uncatchable_undefined_callable	site-dx	old-vs-new	try_uncatchable_undefined_callable	legacy try-body position fix (feature-site-dx; D-018/D-020): 1:10 -> 4:3; still fatal
+try_uncatchable_index	site-dx	old-vs-new	try_uncatchable_index	1:12 -> 3:8; still fatal
+try_uncatchable_binding_type	site-dx	old-vs-new	try_uncatchable_binding_type	1:1 -> 3:3; still fatal
+try_uncatchable_div_zero	site-dx	old-vs-new	try_uncatchable_div_zero	1:1 -> 2:9; still fatal
+try_error_in_catch	site-dx	old-vs-new	try_error_in_catch	catch-body-relative 1:21 -> 5:9
+try_catch_io_direct	site-dx	old-vs-new	try_catch_io_direct	caught error origin 1:10/1:1 -> 5:10/10:12
+throw_non_error	site-dx	old-vs-new	throw_non_error	reported at the try (1:1) -> at the throw (1:7)

@@ -1,0 +1,1 @@
+error: $ROOT/throw_non_error.f:1:1: throw expression must evaluate to Error

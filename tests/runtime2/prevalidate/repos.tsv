@@ -1,0 +1,20 @@
+# repo	url	commit	units	note
+nift-dev_lab	https://github.com/nift-dev/lab.git	88efbf181add21ac15c27aea700792ed1bbfaff2	0	no Nift script units (no .f/.nft; no @script in templates/ or content/)
+nift-dev_nift-dev.github.io	https://github.com/nift-dev/nift-dev.github.io.git	7400024218e72e27131815a9cdc56e61fe1e6cf7	0	published site output (HTML-escaped samples), no Nift sources; source lives in the site repo
+nift-experiments_agora	https://github.com/nift-experiments/agora.git	c6bbe6ed3be77358d327dfcf03920ed193179708	2	
+nift-experiments_ai-sdk	https://github.com/nift-experiments/ai-sdk.git	6d07d2f06a96d33deac0384514574d069cce98b7	1	
+nift-experiments_capgo	https://github.com/nift-experiments/capgo.git	590c1eecb23eeb7ac091f8affca5c0e45b852a64	5	
+nift-experiments_cloudflare-docs	https://github.com/nift-experiments/cloudflare-docs.git	0f4b75b1befcd42540bd7ebaf737c411e6d9686d	0	no Nift script units (no .f/.nft; no @script in templates/ or content/)
+nift-experiments_deno	https://github.com/nift-experiments/deno.git	7d663e4212d8f976b8ba0b29d819b9331db24522	1	
+nift-experiments_docker	https://github.com/nift-experiments/docker.git	77f79f065e3076d02bf591ee41f487bbbaa038e9	1	
+nift-experiments_spacex	https://github.com/nift-experiments/spacex.git	a467f6f85cdd6684739943612fb9e1bf72e592f2	0	no Nift script units (no .f/.nft; no @script in templates/ or content/)
+nift-experiments_tanstack-rewrite	https://github.com/nift-experiments/tanstack-rewrite.git	4df533907b5b82ff842f7a58d2cdf13dea7f7735	7	
+nift-experiments_tanstack	https://github.com/nift-experiments/tanstack.git	7af3af0141e09248dacfc11f722c495abadd96a4	1	
+nift-experiments_temporal	https://github.com/nift-experiments/temporal.git	8d82e1a1f746a8c690abb700fb493855ae822bcc	1	
+nift-packages_curl	https://github.com/nift-packages/curl.git	1d615772e887255c3d93cec13143609bab4f6d09	1	
+nift-packages_imagemagick	https://github.com/nift-packages/imagemagick.git	80d1c0932a4e10bb01823ea47835549125ad9502	1	
+nift-packages_mysql	https://github.com/nift-packages/mysql.git	ceb0321924f57335c296ea0a2ef02565e1f7d68d	1	
+nift-packages_postgres	https://github.com/nift-packages/postgres.git	fa2f660d9cee22f1258840314a1af5887770115d	1	
+nift-packages_redis	https://github.com/nift-packages/redis.git	6aeb92b574b16e4a1bebd4c00a71c60ea1b3c42b	1	
+nift-packages_sqlite	https://github.com/nift-packages/sqlite.git	176e7965c1a4b1680ebc9660eae43004435462e8	1	
+nift-packages_vips	https://github.com/nift-packages/vips.git	f4ada5372742c970a8c535a5fa14b5e7480f282c	1	

@@ -1,35 +1,49 @@
 # CP13 — Errors, try/catch, diagnostics parity (design)
 
-Status: **design and fixtures only** (no runtime code). Branch
-`runtime-2-cp13-design`, base `runtime-2` @`8de2049`. Observations of the VM
-are from the CP12 phase A working binary (`nift-cp12/nift`; branch
-`runtime-2-cp12-dev`, HEAD `0bd5f06` at capture time; D-018, not yet certified); legacy from `runtime-2` @`8de2049` and v4.12.0
-(`ce8cd36`). checkpoints.md row: *CP13 | Errors, try/catch, diagnostics
-parity | CP12 | Diagnostic corpus byte-identical*.
+Status: **design approved by the owner (D-022 and refinements); fixtures,
+specifications and gates prepared; no runtime code yet.** Branch
+`runtime-2-cp13-design`, rebased on `runtime-2` @`1633043` (D-022
+refinements). Observations of the VM are from the CP12 phase A working binary
+(`nift-cp12/nift`; branch `runtime-2-cp12-dev`, HEAD `0bd5f06` at capture
+time; D-018, not yet certified); legacy from `runtime-2` @`8de2049` and
+v4.12.0 (`ce8cd36`). checkpoints.md row: *CP13 | Errors, try/catch,
+diagnostics parity | CP12 | Diagnostic corpus byte-identical*.
 
-Inputs: D-009 #1/#5/#7, D-013–D-021, `semantics.md` (Errors), CP11/CP12
+Inputs: D-009 #1/#5/#7, D-013–D-022, `semantics.md` (Errors), CP10–CP12
 records, `src/Diagnostic.h`, legacy error paths (`Parser::fail`,
 `fail_recoverable`, `@__try`/`@__throw` in `ParserTemplate.cpp`, script
 translation in `ParserScript.cpp`, `run_script_source` in `CLI.cpp`,
 `ProjectInfo::print_build_error`), the VM's `script_runner.cpp`, Assessment A
 §4.2/§4.10/§8.1–3 and site review part 2.
 
+## Decisions in force (D-022, owner, 2026-10-18)
+
+| # | Decision | Where in this record |
+| --- | --- | --- |
+| 1 | Opt-in JSON diagnostics (`--format=json` / `NIFT_FORMAT=json`), versioned schema with code, severity, message, primary span, context, full call chain and the exact text line; `eval --json` errors are JSON; text output byte-identical; call chains in JSON only | (c), `../diagnostics-schema.md` |
+| 2 | Catchability staged: CP13 reproduces today's caught/fatal split exactly; widening is a later language checkpoint for both engines. Specific codes for index, type and other language errors now | (d), (g) |
+| 3 | Syntax errors reported before anything runs (no output, no effects), with old/new tests | (f) |
+| R1 | Prevalidation applies to **both** engines while fallback exists; whole unit before any instruction; imports validated when loaded; syntax validation is not static validation; one authoritative parser (CP10); zero false rejections over every corpus **and real projects**, as a permanent gate (evidence, not proof) | (f) |
+| R2 | Identity (code), severity and catchability are separate; adding a code never changes catchability; both engines emit the same codes; tests assert codes and the unchanged split | (g) |
+| R3 | Future checkpoint: catchable ordinary runtime errors on both engines; internal VM failures and resource exhaustion stay distinct | (d) |
+| R4 | The 89-case corpus stays the untouched baseline; approved changes get separate old-vs-new tests tied to decisions | (b) |
+| C | Coordinator: try/catch body positions fixed in legacy by feature-site-dx (also uncaught errors in try/catch bodies, and the `$`-line drop investigation); prefixes other than `return:` kept for parity (carried as frames in JSON); the VM's uncoloured `error:` is a defect | (a), (b), (h) |
+
 ## Objective
 
 1. Every error class a CP13-scope program can raise is reported by the VM
    exactly as legacy reports it, except where an owner decision approves a
-   change (D-009 #1, D-001 #4, D-018c), and the gate proves it on a fixed
-   corpus, byte for byte.
+   change (D-001 #4, D-009 #1, D-018c, D-022), proven on a fixed corpus byte
+   for byte, with every approved change pinned by its own old-vs-new test.
 2. `throw`, `try`/`catch`, `error()` and Error values run on the VM with one
-   meaning everywhere (D-018).
-3. The internal diagnostic the VM produces carries what structured output
-   and stacks need (code, span, frames) at zero hot-path cost, so the
-   owner can choose the user-visible expansion (section c) without
-   re-plumbing.
+   meaning everywhere (D-018) and today's catchable/fatal split.
+3. One coherent diagnostic model on both engines: code, severity,
+   catchability, span and call chain, emitted as JSON on request.
+4. Syntax errors are rejected before any instruction runs, on both engines,
+   without ever rejecting a valid program.
 
-Out of scope here: anything that changes the default text of a diagnostic
-beyond approved decisions; template execution on the VM (CP24); host-op
-errors on the VM (CP16).
+Out of scope: template execution on the VM (CP24); host-op errors on the VM
+(CP16); widening catchability (future checkpoint, (d)).
 
 ---
 
@@ -59,18 +73,18 @@ statement appear; the VM streams and flushes stdout before writing stderr).
 
 | Id | Class (fixtures) | Legacy behaviour | VM on CP12 | Gap for CP13 |
 | --- | --- | --- | --- | --- |
-| S1 | Syntax / translation (`syn_*`) | Most syntax errors are found **at run time** by the textual evaluator: `syn_unclosed_paren` prints `before`, then fails at 2:6 with a message that quotes the **rest of the file** (multi-line message); `syn_stray_brace` likewise. `fn add(a,b)` → `fn requires '(name(args))'`; `if(x) stmt` → `function if requires a block`. **Silent:** unterminated string/array → exit 0, rest of file dropped (Assessment A #1); a script line starting with `$` is template text and is silently dropped (`syn_dollar_line_silent`, new finding) | `parse-error` or `opaque:legacy-runtime-error`: falls back, so legacy's run-time timing is preserved | Decision needed (Q5): the VM detects syntax errors before execution, so the `before` line would not be printed. Today the compiler refuses such units, which keeps parity at the price of never running them |
+| S1 | Syntax / translation (`syn_*`) | Most syntax errors are found **at run time** by the textual evaluator: `syn_unclosed_paren` prints `before`, then fails at 2:6 with a message that quotes the **rest of the file** (multi-line message); `syn_stray_brace` likewise. `fn add(a,b)` → `fn requires '(name(args))'`; `if(x) stmt` → `function if requires a block`. **Silent:** unterminated string/array → exit 0, rest of file dropped (Assessment A #1); a script line starting with `$` is template text and is silently dropped (`syn_dollar_line_silent`, new finding) | `parse-error` or `opaque:legacy-runtime-error`: falls back, so legacy's run-time timing is preserved | Decision needed (decided: D-022 #3, section (f)): the VM detects syntax errors before execution, so the `before` line would not be printed. Today the compiler refuses such units, which keeps parity at the price of never running them |
 | S2 | Names (`name_*`) | `unknown value or malformed expression: x`; `undefined callable: f`; `assignment to undefined binding`; `binding already declared in this scope`; no `assert` | fallback (`unresolved-name`, `callable:*`, `assign-free-name`, `static-error:redeclared`) | Phase B resolver decides which names are statically unresolved; the errors are then run-time errors at the use (parity) or refusals |
 | S3 | Types (`type_*`) | Binding type/const errors; concatenation with a callable; `print` of an aggregate; ordering comparison message names the internal **`@if`** directive; unknown method reported as `unknown value or malformed expression: s.nosuch()`; **silent coercion** `1 + "s"` → `1s` (Assessment A #3) | `type_binding_mismatch`, `type_add_int_string` on the VM, identical; others refused (`type:*`, `method:*`, `expression:Lambda`, `declare-const`) | Parity for refused ones as the type rules are admitted; `1 + "s"` belongs to site-dx/D-019 |
 | S4 | Arithmetic (`arith_*`) | division/modulo by zero, int64 overflow, fractional modulo | VM, identical (overflow case refused: `number-literal`) | — |
 | S5 | Index/member (`idx_*`) | canonical messages (`JSON array index 5 is out of range in 'a[5]'`, `JSON object has no key`, `value has no member`, negative index, element/member assignment) | VM, identical where compiled | — |
-| S6 | Calls (`call_*`) | Errors in a callee called from top level are reported at the **`return` statement** with one `return: ` prefix per return passed (`call_error_two_deep`: `return: return: `); a statement error inside the callee is at the failing expression; loop-called callees at the failing expression; lambda errors carry a `lambda body error: ` prefix; arity `callable argument count mismatch: f`; `print(a, b)` → `print: expected one value`; recursion limit 64 | Two-deep case ran on the VM: `2:10: value has no member: missing` (approved D-018c); recursion completes (D-001 #4); the rest refused (`free-name`, `statement:StructDecl`, `expression:Lambda`, `static-error:arity`) | r2 goldens fix the D-018c intent for 4 more cases; the prefixes other than `return: ` need a decision (Q7) |
+| S6 | Calls (`call_*`) | Errors in a callee called from top level are reported at the **`return` statement** with one `return: ` prefix per return passed (`call_error_two_deep`: `return: return: `); a statement error inside the callee is at the failing expression; loop-called callees at the failing expression; lambda errors carry a `lambda body error: ` prefix; arity `callable argument count mismatch: f`; `print(a, b)` → `print: expected one value`; recursion limit 64 | Two-deep case ran on the VM: `2:10: value has no member: missing` (approved D-018c); recursion completes (D-001 #4); the rest refused (`free-name`, `statement:StructDecl`, `expression:Lambda`, `static-error:arity`) | old-vs-new tests in `changes/` pin the D-018c intent for 4 more cases; the prefixes other than `return: ` need a decision (decided: kept for parity, carried as frames in JSON) |
 | S7 | Loops (`loop_*`) | Output before the error kept; legacy loop wording `cannot change binding type: x` | VM: canonical wording (approved D-009 #1), `for` refused (`statement:For`) | — |
 | S8 | `throw` (`throw_*`) | `throw error(m)` uncaught → `error: …:<throw line>:<col>: m` (position baked in at translation: accurate, also inside functions and loops); `throw "x"` → `throw expression must evaluate to Error` (reported at the enclosing `try`, 1:1); invalid custom code → `error: invalid user Error code` | **refused**: `statement:Throw`, `callable:error` (`error()` itself is not compiled) | Compile `throw` and `error()` |
-| S9 | `try`/`catch` (`try_*`) | Catch binding exposes `message`, `code`, `category`, `source` (absolute path), `line`, `column`, `cause`; `stringify()` gives JSON. Custom `user.*` codes and cause chains (≤16). Rethrow keeps the **original** origin. Nested try, try in functions/loops, `break`/`return` through `try` all work. Output printed inside the try before the throw is kept. The catch binding is scoped to the catch block. **Defect:** errors inside a `try` or `catch` body get positions relative to the body text (`try_error_in_catch` 1:21 for 5:9) | **refused** (`statement:Try`) | Compile try/catch; positions accurate (r2) |
+| S9 | `try`/`catch` (`try_*`) | Catch binding exposes `message`, `code`, `category`, `source` (absolute path), `line`, `column`, `cause`; `stringify()` gives JSON. Custom `user.*` codes and cause chains (≤16). Rethrow keeps the **original** origin. Nested try, try in functions/loops, `break`/`return` through `try` all work. Output printed inside the try before the throw is kept. The catch binding is scoped to the catch block. **Defect:** errors inside a `try` or `catch` body get positions relative to the body text (`try_error_in_catch` 1:21 for 5:9) | **refused** (`statement:Try`) | Compile try/catch; positions accurate (`changes/`, site-dx) |
 | S10 | Catchability (`try_uncatchable_*`, `try_catch_*`) | Catchable = diagnostics whose code has disposition `Recoverable` (`Diagnostic.h`): `user.raised`, `io.*`, `stream.*`, `json.parse_failed`, `schema.rejected`, `package.not_installed`, `package/io.import_source_unreadable`, `ffi.library_load_failed`, `ffi.symbol_not_found` — mechanically, `fail_recoverable` sets `active_recoverable_` and `@__try` catches only when it is set. Everything else is fatal **even inside `try`** (undefined callable, index, binding type, division by zero, callee errors): D-009 #7 "A for now". **Defect:** those fatal errors are reported at body-relative positions (`1:1`, `1:10`, `1:12`), and a caught io error's `line:column` is body-relative (`1:10`, `1:1`; site review #3) while one raised in a callee is right (`3:13`) | refused | Reproduce the split exactly (option D, section d); positions accurate |
 | S11 | Imports, threads, processes | `import: ` frame prefix with the module's own position; missing import catchable; thread failure `thread: return: …` at the `return`; `run("missing")` → `launched:true`, exit 127, empty stderr (Assessment A #4) | refused (`statement:Import`, `callable:thread`, `callable:run`) | Phase B (imports), CP16 (processes), CP22 (threads) |
-| S12 | `-e` / `eval` | see surfaces | `-e` runs on the VM | `eval --json` errors are text (Q8) |
+| S12 | `-e` / `eval` | see surfaces | `-e` runs on the VM | `eval --json` errors are text (decided: JSON, D-022 #1) |
 | S13 | Templates (`tpl_*`, sites) | Multi-line build diagnostics with excerpt and caret, last-good output kept, exit 1. **Silent:** unknown root `$[nosuch]`/`$[titel]` published literally, exit 0 (Assessment A #2); unknown `@directive` passes through (documented for CSS) | not on the VM until CP24 | parity fixtures only; the VM must reproduce them in CP24 |
 
 Other legacy findings recorded for the decision log:
@@ -101,233 +115,358 @@ D-001 #4, D-009 #1), 63 fall back before execution and 2 (`eval`) never
 reach the VM; the 9 site cases are legacy-only. Leading refusal reasons:
 `statement:Try` (20), `callable:*` (7, two of them `callable:error`),
 `opaque:legacy-runtime-error` (5), `unresolved-name`/`free-name` (5),
-`statement:Throw` (3), `parse-error` (2), `type:*` (4). With
-`--expect r2` 11 cases fail, all because the unit falls back and legacy
+`statement:Throw` (3), `parse-error` (2), `type:*` (4). With the
+intended expectations (now `changes/ --expect new`) 11 cases failed, all because the unit falls back and legacy
 prints the old text (4 D-018c callee positions, 5 positions of fatal
 errors inside `try`, 2 try/catch-body position defects).
 
----
-
-## (b) The diagnostic corpus and "byte-identical"
-
-**Corpus.** The gate corpus is:
-
-1. `tests/runtime2/diagnostics/` (this checkpoint; scripts, `-e`/`eval`
-   argument cases, site cases);
-2. the error probes already pinned: `tests/runtime2/semantics/errors_*`,
-   `*_error_location`, `loop_type_mismatch`, `recursion_limit`, and every
-   `tests/runtime2/vm-corpus/*/` case whose golden exit status is non-zero;
-3. the CP10 parser error corpus (`rt_parser_negative.py`) for S1.
-
-**What is compared.** stdout, stderr and exit status, as bytes, from one run
-in a fresh copy of the case directory with a fixed environment (`env -i`,
-`PATH`, temporary `HOME`/`TMPDIR`, `LANG=C`, `LC_ALL=C`, `TZ=UTC`, stdin
-`/dev/null`, stdout/stderr not a TTY, so no colour). The only normalisation
-is replacing the copy's real path by `$ROOT` (as `vm_corpus.sh`). Site
-cases also drop `time taken:` lines and append the published files listed in
-`<case>.publish` and the presence of `.nift/.unfinished`.
-
-**Which expectation.** Per case: `<case>.r2.{stdout,stderr,exit}` when it
-exists, else the legacy golden `<case>.{stdout,stderr,exit}`. An `.r2`
-golden exists only for a change an owner decision approves and names in
-`MANIFEST.tsv` (`approved:D-018c`, `approved:D-009#1`, `approved:D-001#4`;
-`catchability` and `defect` cases carry r2 goldens that change positions
-only). Three goldens were captured from the CP12 VM and match the approved
-shapes; the others are written from the D-018c rule (failing expression's
-start, no `return: ` prefix) and verified against the source. After D-018c
-"byte-identical" therefore means: identical to legacy **except** an
-enumerated set of position/prefix/wording changes, each pinned to exact
-bytes, never a pattern-based approval. (The pattern-based D-018c policy in
-`vm_policies.py` stays for generated programs; the corpus is stricter.)
-
-**Gate (proposed exit criteria).**
-
-* `run.sh --binary ./nift --vm --expect r2`: 0 FAIL. A case that falls back
-  passes only if legacy's output already equals the expectation, so every
-  `.r2` case must actually run on the VM (or legacy must be fixed).
-* `run.sh --binary ./nift --expect legacy` with the VM off: 0 FAIL (legacy
-  unchanged, D-006), and the same on the v4.12 binary with `--expect v412`.
-* VM coverage of the corpus reported, never a threshold (D-016).
-* `site-dx` cases are reported as `EXPECTED-CHANGE` and do not fail the
-  run; when site-dx changes legacy, its branch regenerates those goldens.
-
-**Not covered by byte comparison:** stdout/stderr interleaving (captured
-separately); TTY colour (VM defect listed above, needs a pty test);
-messages containing absolute paths outside the case directory.
 
 ---
 
-## (c) Structured diagnostics proposal
+## (b) The diagnostic corpus, "byte-identical", and old-vs-new tests
 
-### What exists to build on
+**Baseline (untouched, R4).** `tests/runtime2/diagnostics/scripts/` and
+`sites/`: 89 cases, goldens `<case>.{stdout,stderr,exit}` = what legacy
+prints today (runtime-2 = v4.12 except `tpl_script_try_catch`, kept as
+`.v412.*`). These expectations are never edited to make new code pass.
+`MANIFEST.tsv` classifies each case: `parity` (66), `approved:<decision>`
+(10: the case's behaviour is superseded by an approved change and checked in
+`changes/`), `site-dx` (13: legacy itself is being changed by
+feature-site-dx — the four Assessment A reproducers, `1 + "s"`, the
+`$`-line drop and the seven try/catch-body position cases).
 
-`Diagnostic` (code, message, origin with span, frames with kind/label/site),
-the code taxonomy with dispositions, `eval --json`/`--capabilities` contract
-v1, `NIFT_VM_STATS` and `NIFT_TRACE_HOST` JSONL, and on the VM: heap frames
-(`Vm::frames_`: return pc + proto per activation), `Proto::offsets` (source
-offset of every instruction, read only on the cold path) and
-`Proto::notes` (expression text, binding/function names).
+**Changes (separate old-vs-new tests).** `tests/runtime2/diagnostics/changes/`:
+25 cases, each tied to a decision in `changes/MANIFEST.tsv`:
+`<case>.old.*` = legacy behaviour before the change, `<case>.new.*` = intended
+behaviour (a missing `.new` stream means unchanged).
 
-### Proposed interface (one discoverable mode)
-
-* `--format=json` (global option) or `NIFT_FORMAT=json`; listed in
-  `nift --capabilities` / `eval --capabilities` as
-  `"diagnostics": {"formats": ["text","json"], "schema": 1}`.
-* Diagnostics go to stderr as JSON Lines, one object per diagnostic; stdout
-  is unchanged; exit statuses unchanged. A build emits one object per failed
-  page plus one `{"nift_summary":1,…}` object.
-* Schema v1:
-
-```json
-{"nift_diagnostic": 1,
- "severity": "error",
- "code": "native.name_error", "disposition": "fatal",
- "message": "unknown value or malformed expression: undefined_name",
- "span": {"file": "/abs/b.f", "line": 3, "column": 14, "length": 14},
- "context": {"kind": "script", "page": null, "unit": "/abs/b.f"},
- "frames": [
-   {"kind": "callable", "name": "bad", "file": "/abs/b.f", "line": 3, "column": 14},
-   {"kind": "script", "name": "<top>", "file": "/abs/b.f", "line": 5, "column": 7}],
- "frames_omitted": 0, "frames_complete": true,
- "hint": null,
- "text": "error: /abs/b.f:3:14: unknown value or malformed expression: undefined_name"}
-```
-
-`text` is the exact text-mode line, so a consumer can always fall back to it
-and the corpus can check JSON and text from one run. Frames: innermost
-first; capped at 64 (first 32 and last 32, `frames_omitted` counts the
-rest; deep recursion stays bounded). `context.kind`: script, eval, page,
-template, import, thread.
-
-### How the VM provides it cheaply
-
-* Error sites already stop with `(message, offset)`; add a `DiagnosticCode`
-  per raising opcode/native (a byte in the fault record) — no hot-path
-  instruction.
-* On a stop, walk `frames_` once: for each activation the callee proto
-  name, and the caller's call site = `offsets[ret - 1]` in the caller's
-  proto. O(depth) on the error path only; nothing is recorded per call.
-* Spans: `offsets` gives the start; the length comes from re-parsing the
-  failing node on the cold path (the AST is cheap to rebuild) or from a
-  parallel `ends` array (+4 bytes per instruction; not recommended).
-* Caught errors: the same walk fills the Error value's origin (and could fill
-  a `stack` member later, see expansion).
-
-### How legacy would emit it
-
-`Parser::fail` already builds a `Diagnostic`; a JSON printer at the three
-report points (`run_script_source`, `ProjectInfo::print_build_error`,
-`eval`) serialises it. Gaps: codes are `internal.legacy_failure` for most
-language errors (needs a message→code table over the message families in
-`ParserExpression.cpp`, `ParserTemplate.cpp` and `Ast.cpp`; the fixtures
-cover the common ones), frames have no sites (legacy emits
-`frames_complete: false` with kind and label only), and try-body positions
-are wrong until fixed (S9/S10). Since CP25 deletes legacy, legacy should get
-only the printer and the code table, not frame sites.
-
-### Cost and trade-offs
-
-| Item | Cost | Risk / trade-off |
+| Decision | Cases | Kind |
 | --- | --- | --- |
-| Codes + frames inside VmResult (no output change) | ~1–2 days; cold path only | none for parity; needed by catchable errors anyway |
-| Message→code table (VM direct; legacy by message family) | ~2 days | codes become a public contract; taxonomy gaps (no index/type code) |
-| JSON printer + flag + capabilities | ~2–3 days incl. schema tests | another contract to keep stable; `eval --json` errors change (contract v2) |
-| Full stacks in JSON | small on the VM; legacy incomplete | VM and legacy differ in `frames_complete` until CP25 |
-| Stacks in default text output | small | breaks byte parity of every in-function error; needs new r2 goldens corpus-wide |
-| Hints (did-you-mean, canonical syntax) | medium; needs phase B scope data | wording churn; keep out of `message` |
+| D-018c (accurate locations, no `return:` prefix) | 6 | old-vs-new |
+| D-001 #4 (frame budget) | 1 | old-vs-new (`.new` captured from the CP12 VM) |
+| D-009 #1 (canonical wording) | 1 | old-vs-new (`.new` captured from the CP12 VM) |
+| D-022 #3 (syntax before execution) | 7 + 3 guards | old-vs-new: no output, no effects (`syn_after_effect` checks a file is not created), import validated when loaded; guards: translator errors already pre-execution, and `"abc"[1]` (valid syntax, run-time error) must not be rejected |
+| site-dx try/catch-body positions (coordinator decision C) | 7 | old-vs-new, still fatal (D-022 #2) |
 
-### Scope split
+The D-018c `.new` files other than the CP12 captures were written from the
+rule (failing expression's start, no prefix) and are verified when the VM
+runs them; the two `syn_malformed_in_*` `.new` messages are derived from
+legacy's message for the same statement and are verified by the
+prevalidator (T8).
 
-**In CP13 gate scope (no new user-visible behaviour):** codes and frames in
-the VM's internal diagnostic and in VM Error values; the classification
-table shared by catchability and (later) JSON; the corpus and runner; the
-VM `error:` colour fix.
+**Codes (D-022 #2, R2).** `changes/CODES.tsv`: the expected JSON `code` and
+`catchable` for all 89 baseline cases and the changes cases;
+`codes_check.py` derives the code of every fatal case from its legacy
+message with `code-table.tsv` and requires `catchable=no` for every case
+that ends in a fatal diagnostic (adding codes never changes catchability):
+97 rows, 0 unmapped.
 
-**Proposed expansion, needs owner approval (D-019):**
-E1 `--format=json`/`NIFT_FORMAT` with schema v1 for script, `-e`, `eval`
-and build; E2 full call chains in JSON (VM complete, legacy partial);
-E3 taxonomy additions; E4 `eval --json` errors as JSON (contract 2);
-E5 text-mode stack lines (`  at bad (b.f:3:14)`), opt-in or default;
-E6 hints. Recommended: E1+E2+E3 in a CP13b slice after the gate passes
-(text unchanged, so the gate is unaffected); E4 with E1; E5 opt-in only;
-E6 after phase B.
+**What is compared.** stdout, stderr and exit status as bytes from one run in
+a fresh copy of the case directory with `env -i` (`PATH`, temporary
+`HOME`/`TMPDIR`, `LANG=C`, `LC_ALL=C`, `TZ=UTC`), stdin `/dev/null`, no
+TTY; the copy's real path becomes `$ROOT`. Site cases drop `time taken:`
+lines and append the published files listed in `<case>.publish` and the
+presence of `.nift/.unfinished`; script cases may list created files in
+`<case>.files` (effects check).
+
+**Runner verdicts** (`run.sh`): baseline differences on `site-dx` cases are
+`EXPECTED-CHANGE` (also on `changes --expect old`); with `--vm`, baseline
+differences on `approved:*` cases are `SUPERSEDED`; anything else is a FAIL.
+
+**Measured (design phase).**
+
+| Run | Result |
+| --- | --- |
+| baseline, legacy (runtime-2) / v4.12 (`--expect v412`) / CP12 binary with the VM off | 89/89 each |
+| changes `--expect old`, legacy | 25/25 |
+| changes `--expect new`, CP12 binary, `NIFT_VM=1` | 6/25 (3 guards + the 3 CP12 captures); the 19 others fall back to legacy (mostly `statement:Try`, `opaque:legacy-runtime-error`) |
+
+**Gate (exit criteria).** (1) baseline on legacy (VM off): 0 FAIL;
+(2) baseline with `--vm`: 0 FAIL (differences only on `approved:*`/`site-dx`
+cases); (3) changes `--expect new --vm`: 0 FAIL — every old-vs-new case
+actually exhibits its new behaviour; (4) `codes_check.py` and
+`json_check.py --binary` pass; (5) the zero-false-rejection gate passes in
+`check` mode ((f)); VM coverage reported, never a threshold (D-016).
+
+**Make.** `make test-runtime2-diagnostics` (baseline, changes `old`,
+codes, schema validation of the JSON fixtures) and
+`make test-runtime2-prevalidate-gate` (proxy mode) exist now. They are **not
+yet in the certification guard's REQUIRED list**
+(`tests/runtime2/certification_guard.sh`); they join it, with the `new`
+suite and `check` mode, when the VM work (T2–T4) and the prevalidator (T8)
+land.
 
 ---
 
-## (d) Catchable errors (D-009 #7)
+## (c) Structured diagnostics (D-022 #1)
 
-Today's rule (documented on the public "Recoverable errors" page):
-operational failures are recoverable; programmer, invariant and policy
-failures are fatal. D-009 #7 keeps that for the initial migration and
-records the objective that ordinary runtime failures become structured,
-catchable exceptions while internal errors, memory exhaustion and
-termination stay distinct.
+Specified in [`../diagnostics-schema.md`](../diagnostics-schema.md) with the
+JSON Schema [`../diagnostics-schema-v1.json`](../diagnostics-schema-v1.json).
+Summary: `--format=json` / `NIFT_FORMAT=json`; stderr becomes JSON Lines
+only (no colour or formatting), stdout and exit statuses unchanged; record =
+`code`, `severity`, `catchable`, `message` (without compatibility
+prefixes), primary `span`, `context` (kind, entry, page, `phase`
+validate/run, engine), `frames` innermost first with call sites (capped at
+64; `frames_complete=false` on legacy), optional `cause` chain and `hint`,
+and `text` = the exact text-mode rendering; builds add one summary record;
+`eval --json` failures are records (eval contract 2).
 
-| Option | Behaviour | Compatibility | Assessment |
-| --- | --- | --- | --- |
-| A — exact split | VM catches exactly the Recoverable codes | none | required for the gate |
-| B — VM-only widening | VM catches ordinary runtime errors, legacy does not | a program's meaning depends on the engine | rejected: violates D-013/D-018 |
-| C — widen everywhere | `try` catches `native.name_error`, `native.invalid_argument`, `native.invalid_operation`, `native.arithmetic_error`, index/type errors (new codes, E3) on both engines; never `internal.*`, `native.limit_exceeded` (recursion, memory), `policy.*`, syntax/translation errors | programs that today stop inside `try` would run their `catch`; probes `errors_try_catch`, `errors_catch_index` and the `try_uncatchable_*` fixtures change; the public page's "what stays fatal" changes; legacy needs `fail()` to raise recoverable values for those codes, including its prepared loop evaluator (`ExecOutcome::Recoverable`) | a language change (D-015 list) needing owner approval |
-| D — staged (recommended) | CP13 implements A with the catch decision as one table lookup on the code's disposition; C later flips the table (plus legacy) as its own approved change with old/new tests | none now | keeps CP13 a parity checkpoint |
+How the VM provides the chain cheaply: error sites already stop with
+`(message, offset)`; the stop walks `Vm::frames_` once (callee proto name,
+caller call site = `Proto::offsets[ret − 1]`), O(depth) on the error path
+only, nothing recorded per call. Legacy fills kinds and labels from
+`Diagnostic::frames` (callables, imports, `@script`, futures, threads)
+without call sites. Text mode is untouched, so the byte-identical gate is
+unaffected.
 
-Further notes: on the VM, in CP13 only `user.raised` is reachable as a
-catchable error, because io/json/ffi errors come from host operations that
-the VM refuses until CP16; the io fixtures stay on legacy until then.
-Rethrow must keep the original origin; output already printed is never
-withdrawn; `break`/`continue`/`return` leave a `try` normally; the handler
-table is per proto (zero cost on entry), unwinding pops VM frames to the
-handler's frame.
+Fixtures: `tests/runtime2/diagnostics/json/` (nested calls, uncaught throw,
+caught error, imported code, syntax before execution, `eval`, two page
+failures in one build), validated against the schema now; `json_check.py
+--binary` checks valid JSON Lines only, no terminal escapes, unchanged exit
+and stdout, records as a multiset, `text` byte for byte.
+
+---
+
+## (d) Catchable errors (D-009 #7, D-022 #2, R3)
+
+**CP13: option D (staged) — decided.** The VM reproduces today's split
+exactly: catchable = user throws and the recoverable operational failures
+(`io.*`, `stream.*`, `json.parse_failed`, `schema.rejected`, package and
+FFI loading); everything else is fatal even inside `try`. The catch decision
+is one lookup of the raise's catchability, never of its code. On the VM in
+CP13 only `user.raised` is reachable as catchable (host operations arrive in
+CP16), so the io/json cases stay legacy-routed until then.
+
+**Future language checkpoint (recorded, R3): "catchable runtime errors".**
+Both engines (never VM-only, D-018), as its own approved change with
+old-vs-new tests. Ordinary runtime errors become catchable Error values with
+their codes: `native.name_error`, `native.undefined_callable`,
+`native.type_error`, `native.index_out_of_bounds`,
+`native.member_not_found`, `native.arity_error`,
+`native.integer_overflow`, `native.division_by_zero`,
+`native.arithmetic_error`, `native.invalid_argument`,
+`native.invalid_operation`, `native.mutation_denied`. Stay distinct, never
+ordinary exceptions: `internal.*` (VM internal failures, invariants),
+resource exhaustion (`native.limit_exceeded`: recursion budget, memory
+budget; `internal.resource_exhausted`), termination/signals, and syntax or
+translation errors (rejected before execution). `policy.*` catchability is
+a decision for that checkpoint. Affected pinned behaviour:
+`semantics/errors_try_catch`, `semantics/errors_catch_index`, baseline
+`try_uncatchable_*`, the public "Recoverable errors" page.
+
+---
+
+## (f) Syntax prevalidation on both engines (D-022 #3, R1)
+
+**Design.** One authoritative parser: the CP10 rt parser (`rt::parse_script`)
+is the validator. CP10 already reproduces every parse-time rejection of the
+legacy translator with the identical message and line:column (CP10 gate 1)
+and marks constructs it reads but does not compile as Opaque. A new
+`rt::prevalidate(source, path)` runs in `run_script_source` (`CLI.cpp`)
+**before engine selection** — so a unit routed to legacy cannot bypass it —
+and in the `-e`, `eval` and stdin paths; on failure it prints the
+diagnostic (text, or JSON with `phase: "validate"`, `engine: "none"`),
+exits 1 (eval: 2), and nothing has run: no output, no effects. A passing
+check guarantees only valid syntax (not static validity).
+
+| Outcome | Parser result | Behaviour |
+| --- | --- | --- |
+| invalid syntax | parse error, or an Opaque node of the new reason **`LegacyMalformed`** | rejected before execution, both engines |
+| valid, VM-unsupported | Opaque `TemplateText`, `IrregularLegacyParse`, `StructBody`, `DeferredTranslation` (well-formed body), `NestingLimit`, **`LegacyRuntimeReject`**; or a compiler refusal | accepted; runs on legacy, never rejected by the validator |
+| valid, run-time-determined | compiled | runs normally (may still fail at run time) |
+
+**The split CP10 needs (T8).** Today `OpaqueReason::LegacyRuntimeError`
+(47 sites in `src/rt/{control_flow,declarations,expr_literals,expr_parser,expr_postfix,statement_parser}.cpp`)
+mixes truly malformed statements with grammatical forms legacy merely
+evaluates differently. Measured over the in-repo corpora (first Opaque per
+file, legacy run in a temporary copy): of 101 files whose first Opaque is
+`legacy-runtime-error`, **26 run successfully on legacy** (`f (1)` with a
+space, `while (…)`, a multi-line `return [1,\n 2]`, single-quoted strings in
+object literals, methods on literals, `throw(1)` as a call, plus the two
+`syn_malformed_in_*` probes whose malformed code never runs) — classing all
+such sites as invalid would reject valid programs. Of the 75 that fail on
+legacy, 66 fail on the Opaque's line with a syntax-family message
+(`unknown value or malformed expression`, `expression cannot be empty`,
+`invalid callable signature`, removed `await(…)`, C-style `@for`,
+malformed lambda/destructuring/declaration/enum/object literal forms,
+`unterminated parameter value expression`); the rest fail with semantic
+errors (`assignment to undefined binding`, `print` arity) or elsewhere.
+Each of the 47 sites is therefore classified individually, and a site
+becomes `LegacyMalformed` only if a differential oracle shows legacy fails
+on that statement whenever it executes, with the message the validator will
+print (CP10's legacy-oracle harness, extended to execute the isolated
+statement).
+
+**Legacy run-time "syntax" errors that move before execution:** unbalanced
+or stray delimiters and malformed expressions (`unknown value or malformed
+expression: (1 + 2…`), empty operands and trailing commas (`expression
+cannot be empty`), unterminated literals (wording from site-dx), and the
+malformed declaration/lambda/signature/enum/object/loop forms above, when the
+oracle confirms them. Their text stays legacy's (message and location); only
+the timing changes (no prior output). Not moving: anything grammatical
+(`"abc"[1]`, semantic errors). Translator errors (`fn add(a,b)`, `if(x)
+stmt`) are already pre-execution in legacy (guards).
+
+**Units.** Entry points (script file, `-e`, `eval`, stdin) are validated
+whole before the first instruction. Imports are validated when loaded
+(legacy import loader in `ParserScript.cpp`; VM import in phase B), without
+preloading unrelated files: output of the importer before the import stays
+(`syn_import_module_syntax`). Template pages: all `@script` bodies of a page
+are validated before the page renders (a page is already published
+atomically); `$[...]` expression syntax in templates keeps legacy timing
+until the template compiler (CP24).
+
+**Zero-false-rejection gate (permanent, R1).**
+`tests/runtime2/prevalidate/gate.py` (`make
+test-runtime2-prevalidate-gate`): every corpus the project has — CP10's
+legacy cases and error corpus, VM corpus, semantics, rt-diff corpus,
+diagnostics, cp410 probes, `tests/*.f`, scripts extracted from the shell
+smoke tests, optionally the nift-regression-suite (extracted offline) — plus
+**real projects**: 26 units (16 entry scripts, 3 imports, 7 template
+`@script` bodies) vendored under `tests/runtime2/prevalidate/projects/` from
+19 repositories pinned in `repos.tsv`/`projects.tsv` (commit, origin,
+sha256; no network at test time; `extract_projects.py` refreshes them):
+nift-experiments tanstack, tanstack-rewrite, spacex, agora, temporal, deno,
+docker, ai-sdk, capgo, cloudflare-docs; nift-dev nift-dev.github.io, lab;
+nift-packages curl, imagemagick, mysql, postgres, redis, sqlite, vips (the
+seven packages known locally — the org listing is not reachable from this
+session). Four repositories contain no script units (recorded with the
+reason). Every rejection must be one legacy also fails on at that line
+(in-repo files run once in a temporary copy); external code is never run —
+any rejection there fails until classified by hand in
+`expected_rejections.tsv`. Passing is evidence, not proof, that every valid
+program is accepted.
+
+Measured now in proxy mode (CP10 parse failures = rejections; the
+`legacy-runtime-error` Opaques the split must decide = pending):
+
+| Corpus | Units | Accepted | Rejected (legacy also fails) | False rejections | Pending split |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| CP10 legacy cases | 257 | 158 | 35 | 0 | 64 |
+| CP10 syntax errors | 34 | 0 | 34 | 0 | 0 |
+| VM corpus | 122 | 116 | 1 | 0 | 5 |
+| semantics | 57 | 54 | 0 | 0 | 3 |
+| rt-diff corpus | 15 | 15 | 0 | 0 | 0 |
+| CP13 diagnostics | 104 | 87 | 4 | 0 | 13 |
+| cp410 probes | 120 | 120 | 0 | 0 | 0 |
+| tests/*.f | 1 | 1 | 0 | 0 | 0 |
+| smoke-test extracts | 1,780 | 1,762 | 0 | 0 | 18 |
+| real projects (19 repos) | 26 | 26 | 0 | 0 | 0 |
+| nift-regression-suite extracts | 126 | 126 | 0 | 0 | 0 |
+| **total** | **2,642** | | **74** | **0** | **103** |
+
+In `check` mode (after T8) the pending column disappears: each pending unit
+is accepted or rejected by the real validator and every rejection is
+checked against legacy.
+
+---
+
+## (g) Error model and the message-to-code table (D-022 #2, R2)
+
+Three independent properties per diagnostic: **code** (identity),
+**severity** (error/warning/note), **catchable** (decided by the raise).
+`DiagnosticCodeInfo::disposition` stays only as the default for
+`fail_recoverable`/`fail_fatal`; the Diagnostic records `catchable` per
+raise. Both engines emit the same codes; JSON carries them; text is
+unchanged.
+
+**Naming.** `Diagnostic.h` names codes `domain.snake_name`; the domain for
+errors raised by Nift's own runtime is `native.` (`native.name_error`,
+`native.arithmetic_error`, …). The owner's examples
+(`runtime.index_out_of_bounds`, …) therefore become `native.*` codes —
+a new `runtime.` domain would duplicate `native.` — and existing codes are
+reused where apt.
+
+**New codes (7, appended; all default Fatal, i.e. exactly today's
+behaviour):** `native.undefined_callable`, `native.type_error`,
+`native.index_out_of_bounds`, `native.member_not_found`,
+`native.arity_error`, `native.integer_overflow`,
+`native.division_by_zero`. Reused: `native.syntax_error` (malformed
+expressions, unterminated literals), `native.translation_error` (statement
+forms rejected by the translator), `native.name_error` (undefined names,
+assignment to an undefined binding, redeclaration),
+`native.mutation_denied` (const), `native.arithmetic_error` (fractional
+modulo, non-finite results), `native.limit_exceeded` (recursion),
+`native.invalid_argument` (`error()` arguments, invalid user codes),
+`native.invalid_control`, `native.invalid_operation` (string indexing),
+`io.open_failed` (also the fatal `@input` miss: same identity, different
+catchability), `user.*` (thrown Errors carry their own code).
+
+**Table.** `tests/runtime2/diagnostics/code-table.tsv`: ordered regexes over
+the message after removing compatibility prefixes; `unknown value or
+malformed expression: X` is split by the shape of X (identifier path →
+`native.name_error`, method call → `native.member_not_found`, string index
+→ `native.invalid_operation`, otherwise `native.syntax_error`). The VM sets
+codes at the raising instruction (no table); legacy maps in `Parser::fail`
+when no explicit code was given (a C++ table generated from, or checked
+against, `code-table.tsv`). Coverage on the corpus: 97 rows, 0 unmapped.
+
+**Patch prepared, not applied** (site-dx may touch diagnostics):
+`/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp13/cp13-diagnostic-codes.patch`
+— appends the seven codes and their texts, adds `DiagnosticSeverity` and
+`Diagnostic::{severity, catchable}` (`make_diagnostic` sets `catchable`
+from the default disposition, so existing raises keep their behaviour);
+`git apply --check` clean on this branch, header compiles stand-alone.
+
+---
+
+## (h) The `$`-line drop (D-019: establish before changing)
+
+Minimal reproducer kept (`scripts/syn_dollar_line_silent.f`, baseline,
+class `site-dx`). Findings shared with feature-site-dx in
+`scratchpad/site-review/dollar-line.md`: the script translator passes any
+statement starting with `$` or `@` through verbatim as template text
+(`ParserScript.cpp`, intended for `$[...]` values and `@directives`), so
+`$o := …`, `$x`, `@nosuchdirective(…)` vanish with exit 0, while `$[nosuch]`
+errors. Not documented script syntax; one test
+(`tests/v43_cp124_json_object_wall.sh`) passes vacuously because of it.
+Assessment: defect candidate. Behaviour unchanged until established; the CP10
+parser currently reads such lines as `TemplateText` (valid, legacy-routed),
+so if they are ruled invalid the rule changes in the parser (and translator)
+and they fail under prevalidation.
 
 ---
 
 ## (e) Work breakdown
 
-| Task | Content | Owned files | Depends on |
-| --- | --- | --- | --- |
-| T1 Corpus wiring | `make test-runtime2-diagnostics`; add (b)'s other corpora; pty colour test | `tests/runtime2/diagnostics/**`, one Makefile target | none (can start now) |
-| T2 VM diagnostic record | code + frame walk in the fault/`VmResult`; colour fix; text unchanged | `src/rt/vm.{h,cpp}`, `src/rt/vm_ops.cpp`, `src/rt/proto.h`, `src/rt/script_runner.cpp` | CP12: `VmResult`, `StopReason`, `Vm::Frame`, `Proto::offsets/notes`, `error_line`, `NIFT_VM_STATS` schema frozen |
-| T3 throw / error() / Error members | compile `throw`, `error(m, code, cause)`, members, `stringify` | `src/rt/compiler_*.cpp` (new `compiler_try.cpp`), `src/rt/opcodes.h`, `src/rt/error.{h,cpp}`, `src/rt/native.cpp` | CP12 refusal-reason names, kind inference (`rt/infer*.h`), `legacy_names` |
-| T4 try/catch | handler tables, unwinding, catch binding scope, rethrow, control flow through try; option A table | same as T3 + `src/rt/vm.cpp` | T2, T3; CP12 phase B resolver (catch binding scope) |
-| T5 Code table | message family → `DiagnosticCode` for VM sites (and legacy, if E1) | new `src/rt/diagnostic_codes.{h,cpp}`; `src/Diagnostic.h` only if E3 approved | T2 |
-| T6 Policies and probes | extend `vm_policies.py` D-018c to try bodies; r2 probes in `semantics.md` | `tests/runtime2/vm_policies.py`, `vm_d018.py`, `semantics.md` | CP12 certified (it owns these files now) |
-| T7 Try-body positions in legacy | pass the try/catch `SourceView` into `parse()` (`ParserTemplate.cpp` `@__try`) | `src/ParserTemplate.cpp` | site-dx (owner of the legacy fix) or Q6 |
-| T8 Syntax-error timing | per Q5 | `src/rt/script_runner.cpp`, `src/rt/parser.cpp` | Q5 |
-| T9 Expansion (E1–E6) | JSON printer, flag, capabilities | new `src/DiagnosticJson.{h,cpp}`, `src/CLI.cpp`, `src/ProjectInfo.cpp`, `script_runner.cpp` | owner approval; T2, T5 |
+| Task | Content | Owned files | Depends on | State |
+| --- | --- | --- | --- | --- |
+| T1 Corpus wiring | make targets; baseline/changes split; codes and JSON fixture checks | `tests/runtime2/diagnostics/**`, `tests/runtime2/prevalidate/**`, Makefile targets | — | **done** (not in REQUIRED yet) |
+| T2 VM diagnostic record | code, severity, catchable and frame walk in the stop; colour defect fix; text unchanged | `src/rt/vm.{h,cpp}`, `src/rt/vm_ops.cpp`, `src/rt/proto.h`, `src/rt/script_runner.cpp` | CP12 `VmResult`/`Fault`/`StopReason`, `Vm::Frame`, `Proto::offsets/notes`, `script_runner` reporting | waits for CP12 |
+| T3 throw / error() / Error members | compile `throw`, `error(m, code, cause)`, members, `stringify` | `src/rt/compiler_*.cpp` (+ `compiler_try.cpp`), `src/rt/opcodes.h`, `src/rt/error.{h,cpp}`, `src/rt/native.cpp` | CP12 refusal names, `rt/infer.h`, `legacy_names` | waits for CP12 |
+| T4 try/catch | handler tables, unwinding, catch scope, rethrow keeps origin, control flow through try; option D catch rule | as T3 + `src/rt/vm.cpp` | T2, T3, CP12 phase B resolver | waits |
+| T5 Codes | apply the patch; VM codes at sites; legacy table in `Parser::fail`; `catchable` per raise | `src/Diagnostic.h`, new `src/DiagnosticCodes.{h,cpp}`, `src/Parser.cpp` (`fail`) | site-dx done with diagnostics files; T2 | patch ready |
+| T6 Policies and probes | extend `vm_policies.py` D-018c to try bodies; semantics.md Errors rows | `tests/runtime2/vm_policies.py`, `vm_d018.py`, `docs/runtime-2/semantics.md` | CP12 certified | waits |
+| T7 Try-body positions (legacy) | `@__try` bodies parsed with their `SourceView` | `src/ParserTemplate.cpp` | feature-site-dx | site-dx |
+| T8 Prevalidator | `LegacyMalformed`/`LegacyRuntimeReject` split of the 47 sites with the oracle; `rt::prevalidate`; hook before engine selection, `-e`/`eval`/stdin, legacy import loader, page `@script` bodies; `NIFT_PREVALIDATE=only` for the gate | `src/rt/ast.h`, `src/rt/{control_flow,declarations,expr_literals,expr_parser,expr_postfix,statement_parser}.cpp`, new `src/rt/prevalidate.{h,cpp}`, `src/CLI.cpp`, `src/ParserScript.cpp` (import), `tests/rt/*` oracle | CP12 has not changed these parser files since `bf32e4f` (checked); re-check before starting; site-dx owns `ParserScript.cpp` now (sequence the import hook after it) | ready to start on the parser split |
+| T9 JSON mode | flag/env, emitter, build summary, eval contract 2, capabilities | new `src/DiagnosticJson.{h,cpp}`, `src/CLI.cpp`, `src/ProjectInfo.cpp`, `src/rt/script_runner.cpp` | T2, T5 | spec done |
+| T10 Real-project refresh | re-extract pinned units when a repo moves; review new rejections | `tests/runtime2/prevalidate/{extract_projects.py,projects.tsv,repos.tsv,projects/}` | — | done for the current pins |
 
-CP12 interfaces that must be stable before T2–T6 start: `VmResult`/`Fault`
-and `StopReason`; `Vm::Frame` and frame-stack layout; `Proto` offsets and
-notes; `script_runner.cpp` reporting (`error_line`, `internal_failure`,
-`Stats`); compiler refusal reason strings (`statement:Try`,
-`statement:Throw`, `callable:error`); `rt/infer.h`; phase B resolver scope
-API; `vm_policies.py` `classify()`. T1 can proceed now; T7 belongs with
-site-dx.
-
-## Questions for the owner
-
-1. Q1 Approve E1 (JSON mode, schema v1) and E2 (full chains in JSON) for a
-   CP13b slice?
-2. Q2 Stacks in text output: JSON only (recommended), opt-in text, or default
-   text (breaks byte parity)?
-3. Q3 Taxonomy: add `native.index_error`/`native.type_error`, or map onto
-   `native.invalid_argument`/`native.invalid_operation`?
-4. Q4 Catchability: confirm option D now (C later as its own change)?
-5. Q5 Syntax errors: keep legacy's run-time timing (refuse such units) or
-   report before execution on the VM (prior output not printed)?
-6. Q6 Try/catch body positions: legacy fix under site-dx (recommended) or a
-   D-018c extension on the VM only?
-7. Q7 Prefixes other than `return: ` (`lambda body error: `, `thread: `,
-   `import: `, `future: `): keep, or move into frames?
-8. Q8 `eval --json` errors as JSON (eval contract 2) together with E1?
+CP12 interfaces that must be stable before T2–T6: `VmResult`/`Fault` and
+`StopReason`; `Vm::Frame` and the frame stack; `Proto` offsets and notes;
+`script_runner.cpp` reporting (`error_line`, `internal_failure`, `Stats`);
+compiler refusal reasons (`statement:Try`, `statement:Throw`,
+`callable:error`); `rt/infer.h`; the phase B resolver scope API;
+`vm_policies.py` `classify()`; and, for T8, the `OpaqueReason` enum and the
+four parser files if CP12 phase B edits them.
 
 ## Risks
 
-* The r2 goldens written by rule (not yet produced by a VM) may differ in
-  span start conventions; they are reviewed when T3/T4 run them.
-* Catchable io errors cannot be tested on the VM before CP16.
-* The legacy try-body defect affects positions of fatal errors too; if
-  site-dx fixes it, legacy goldens change (expected).
+* Rule-derived `.new` goldens (D-018c, `syn_malformed_in_*`) may differ in
+  span start conventions; they are confirmed or corrected (with a record)
+  when the VM/prevalidator first runs them — never by editing the baseline.
+* The `LegacyRuntimeError` split is the crux of zero false rejections; the
+  26 legacy-OK units show it cannot be done by reason alone.
+* Template `$[...]` syntax keeps run-time timing until CP24 (scope note in
+  (f)).
+* Catchable io errors cannot be exercised on the VM before CP16.
 
 ## Deliverables and commits
 
-This design, `tests/runtime2/diagnostics/` (scripts, sites, goldens,
-`MANIFEST.tsv`, `run.sh`). Local commit on `runtime-2-cp13-design`.
+This record; `../diagnostics-schema.md` and `../diagnostics-schema-v1.json`;
+`tests/runtime2/diagnostics/` (baseline 89 cases, `changes/` 25 cases with
+`MANIFEST.tsv` and `CODES.tsv`, `code-table.tsv`, `codes_check.py`, `json/`
+fixtures, `json_check.py`, `run.sh`); `tests/runtime2/prevalidate/`
+(`gate.py`, pinned real-project units, `repos.tsv`, `projects.tsv`,
+`extract_projects.py`); Makefile targets; the `Diagnostic.h` patch and the
+`$`-line note in scratch. Local commits on `runtime-2-cp13-design`.

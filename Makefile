@@ -1371,6 +1371,25 @@ test-runtime2-process-capture: $(TARGET)
 test-runtime2-vm-corpus: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/vm_corpus.sh
 
+# CP13 diagnostic corpus (docs/runtime-2/checkpoints/cp13-diagnostics-design.md):
+# the 89-case baseline (byte-identical legacy text), the old-behaviour side of
+# every approved change (changes/, decisions in changes/MANIFEST.tsv) and the
+# message-to-code table check. The NEW side (--suite changes --expect new
+# --vm) and the zero-false-rejection gate join once the CP13 VM and
+# prevalidator land; until then these are not in the certification guard's
+# REQUIRED list.
+test-runtime2-diagnostics: $(TARGET)
+	bash tests/runtime2/diagnostics/run.sh --binary "$(CURDIR)/$(TARGET)"
+	bash tests/runtime2/diagnostics/run.sh --binary "$(CURDIR)/$(TARGET)" --suite changes --expect old
+	python3 tests/runtime2/diagnostics/codes_check.py
+	python3 tests/runtime2/diagnostics/json_check.py
+
+# Syntax prevalidation: zero false rejections over every corpus and the
+# vendored real-project units (permanent requirement, D-022). Proxy mode until
+# the prevalidator exists (NIFT_PREVALIDATE_MODE=check afterwards).
+test-runtime2-prevalidate-gate: $(TARGET)
+	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --mode $${NIFT_PREVALIDATE_MODE:-proxy}
+
 test-runtime2-clock-lifecycle: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/clock_lifecycle.sh
 # Runtime 2.0 CP08: differential harness self-check (A = B = this binary) over

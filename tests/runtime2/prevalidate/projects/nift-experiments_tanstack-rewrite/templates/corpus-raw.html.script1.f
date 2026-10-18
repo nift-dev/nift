@@ -1,0 +1,1 @@
+ fn(rawHtml(path)) { f := file(path); f.open(); value := f.read_all(); f.close(); return value; } 

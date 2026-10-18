@@ -1,0 +1,1 @@
+error: $ROOT/try_uncatchable_undefined_callable.f:1:10: undefined callable: undefined_fn
