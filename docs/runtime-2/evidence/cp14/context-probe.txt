@@ -1,0 +1,28 @@
+CONTEXT-DEPENDENT obj.length: o.length()
+    top,top-arg,fn               error error: unknown value or malformed expression: o.length()
+    loop,fn-loop                 ok int | [3]
+    loop-arg                     ok [3]
+CONTEXT-DEPENDENT num.to_double: x.to_double()
+    top,top-arg,fn               error error: to_double: unsupported for this value
+    loop,fn-loop                 ok float | [2.5]
+    loop-arg                     ok [2.5]
+SHAPE-DEPENDENT pair.trim.large:
+    first                        ok ["ab"]
+    second                       ok ["\u000b ab"]
+SHAPE-DEPENDENT pair.keys.arity:
+    first                        ok [["b","a","c"]]
+    second                       error error: keys: expected no arguments
+SHAPE-DEPENDENT pair.trim.forms:
+    first                        ok ["\u000b ab \u000b"]
+    second                       ok ["ab"]
+SHAPE-DEPENDENT pair.substr.units:
+    first                        ok ["�"]
+    second                       ok ["t"]
+SHAPE-DEPENDENT pair.sum.exact:
+    first                        ok [9007199254740992]
+    second                       ok [9007199254740994]
+SHAPE-DEPENDENT pair.range.exact:
+    first                        ok [[9007199254740992]]
+    second                       ok [[9007199254740993]]
+context_probe: 200 cases x 6 contexts, 2 context-dependent; 8 pairs, 6 shape-dependent
+context_probe: PASS (inventory pinned)

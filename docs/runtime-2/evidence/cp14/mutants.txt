@@ -1,0 +1,11 @@
+M1 trim strips every isspace byte            DETECTED  builtins-diff: 2999 checks, 8 failures
+M2 index_of counts code points               DETECTED  builtins-diff: 2999 checks, 2 failures
+M3 glob without the dot-file rule            DETECTED  builtins-diff: 2999 checks, 3 failures
+M4 min/max accept mixed kinds                DETECTED  builtins-diff: 2999 checks, 49 failures
+M5 sum exact for large integers              DETECTED  builtins-diff: 2999 checks, 9 failures
+M6 -0.0 is not a size                        DETECTED  builtins-diff: 2999 checks, 2 failures
+M7 split drops a trailing empty field        DETECTED  builtins-diff: 2999 checks, 19 failures
+M8 merge moves replaced keys to the end      DETECTED  builtins-diff: 2999 checks, 11 failures
+M9 to_int rejects a leading plus             DETECTED  builtins-diff: 2999 checks, 5 failures
+M10 unique keeps the last duplicate          DETECTED  builtins-diff: 2999 checks, 5 failures
+builtins_mutants: 10/10 detected (M1-M6 and M7-M10 in two runs)

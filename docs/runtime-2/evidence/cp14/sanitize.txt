@@ -1,0 +1,59 @@
+mkdir -p ".build/rt-san"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all tests/rt/builtins_unit.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp -o ".build/rt-san/builtins-unit"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all tests/rt/builtins_diff.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp -o ".build/rt-san/builtins-diff"
+".build/rt-san/builtins-unit"
+builtins-unit: 462 checks, 0 failures
+".build/rt-san/builtins-diff" "$LEGACY" ${RT_BUILTINS_SEED:-20261018} ${RT_BUILTINS_SAN_CASES:-2000}
+builtins-diff: seed 20261018, 2000 cases (1997 compared, 312 legacy errors, 3 refused by rule W1) in 312 legacy runs
+  arr.chunk              40 cases,   17 errors
+  arr.contains           40 cases,    3 errors
+  arr.drop               40 cases,   15 errors
+  arr.empty              40 cases,    3 errors
+  arr.first              40 cases,    5 errors
+  arr.flatten            40 cases,    3 errors
+  arr.from_entries       40 cases,   26 errors
+  arr.indexOf            40 cases,    1 errors
+  arr.join               40 cases,    5 errors
+  arr.last               40 cases,    8 errors
+  arr.length             40 cases,    2 errors
+  arr.max                40 cases,   16 errors
+  arr.min                40 cases,   15 errors
+  arr.size               40 cases,    0 errors
+  arr.slice              40 cases,   13 errors
+  arr.sum                40 cases,   15 errors
+  arr.take               40 cases,    7 errors
+  arr.unique             40 cases,    1 errors
+  fn.max                 40 cases,   11 errors
+  fn.min                 40 cases,    7 errors
+  fn.range               40 cases,    5 errors
+  obj.empty              40 cases,    0 errors
+  obj.entries            38 cases,    0 errors
+  obj.get                40 cases,    3 errors
+  obj.has                40 cases,    2 errors
+  obj.keys               40 cases,    0 errors
+  obj.merge              40 cases,    3 errors
+  obj.merge_deep         40 cases,    2 errors
+  obj.omit               40 cases,    5 errors
+  obj.pick               40 cases,    6 errors
+  obj.size               40 cases,    3 errors
+  obj.values             39 cases,    0 errors
+  str.contains           40 cases,    1 errors
+  str.empty              40 cases,    1 errors
+  str.ends_with          40 cases,    3 errors
+  str.index_of           40 cases,    2 errors
+  str.last_index_of      40 cases,    4 errors
+  str.length             40 cases,    0 errors
+  str.replace            40 cases,   11 errors
+  str.split              40 cases,    0 errors
+  str.starts_with        40 cases,    2 errors
+  str.substr             40 cases,   16 errors
+  str.to_double          40 cases,   23 errors
+  str.to_int             40 cases,   33 errors
+  str.to_lower           40 cases,    2 errors
+  str.to_string          40 cases,    1 errors
+  str.to_upper           40 cases,    5 errors
+  str.trim               40 cases,    3 errors
+  str.trim_end           40 cases,    0 errors
+  str.trim_start         40 cases,    3 errors
+builtins-diff: 1997 checks, 0 failures
+make exit 0

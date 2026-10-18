@@ -1,0 +1,92 @@
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/builtins_unit.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp -o ".build/rt/builtins-unit"
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/builtins_diff.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp -o ".build/rt/builtins-diff"
+".build/rt/builtins-unit"
+builtins-unit: 463 checks, 0 failures
+".build/rt/builtins-diff" "$LEGACY" ${RT_BUILTINS_SEED:-20261018} ${RT_BUILTINS_CASES:-5000}
+builtins-diff: seed 20261018, 5000 cases (4988 compared, 822 legacy errors, 12 refused by rule W1) in 823 legacy runs
+  arr.chunk             100 cases,   36 errors
+  arr.contains          100 cases,    5 errors
+  arr.drop              100 cases,   36 errors
+  arr.empty             100 cases,    5 errors
+  arr.first             100 cases,   17 errors
+  arr.flatten           100 cases,    4 errors
+  arr.from_entries      100 cases,   59 errors
+  arr.indexOf           100 cases,    3 errors
+  arr.join              100 cases,   12 errors
+  arr.last              100 cases,   28 errors
+  arr.length            100 cases,    6 errors
+  arr.max               100 cases,   38 errors
+  arr.min               100 cases,   35 errors
+  arr.size              100 cases,    4 errors
+  arr.slice             100 cases,   42 errors
+  arr.sum               100 cases,   42 errors
+  arr.take              100 cases,   27 errors
+  arr.unique            100 cases,    4 errors
+  fn.max                100 cases,   26 errors
+  fn.min                100 cases,   19 errors
+  fn.range              100 cases,    6 errors
+  obj.empty             100 cases,    0 errors
+  obj.entries            96 cases,    0 errors
+  obj.get               100 cases,    8 errors
+  obj.has               100 cases,    7 errors
+  obj.keys               95 cases,    0 errors
+  obj.merge             100 cases,   10 errors
+  obj.merge_deep        100 cases,    9 errors
+  obj.omit              100 cases,   10 errors
+  obj.pick              100 cases,   15 errors
+  obj.size              100 cases,    7 errors
+  obj.values             97 cases,    0 errors
+  str.contains          100 cases,   11 errors
+  str.empty             100 cases,    7 errors
+  str.ends_with         100 cases,    8 errors
+  str.index_of          100 cases,    6 errors
+  str.last_index_of     100 cases,   12 errors
+  str.length            100 cases,    3 errors
+  str.replace           100 cases,   24 errors
+  str.split             100 cases,    4 errors
+  str.starts_with       100 cases,    7 errors
+  str.substr            100 cases,   46 errors
+  str.to_double         100 cases,   68 errors
+  str.to_int            100 cases,   78 errors
+  str.to_lower          100 cases,    5 errors
+  str.to_string         100 cases,    1 errors
+  str.to_upper          100 cases,    8 errors
+  str.trim              100 cases,    5 errors
+  str.trim_end          100 cases,    5 errors
+  str.trim_start        100 cases,    4 errors
+builtins-diff: 4988 checks, 0 failures
+python3 tools/rt-lint.py src/rt/natives
+PASS rt-lint: 0 problem(s)
+python3 tests/runtime2/builtins/context_probe.py --nift "$LEGACY" \
+	--expect-file tests/runtime2/builtins/context_dependent.txt
+CONTEXT-DEPENDENT obj.length: o.length()
+    top,top-arg,fn               error error: unknown value or malformed expression: o.length()
+    loop,fn-loop                 ok int | [3]
+    loop-arg                     ok [3]
+CONTEXT-DEPENDENT num.to_double: x.to_double()
+    top,top-arg,fn               error error: to_double: unsupported for this value
+    loop,fn-loop                 ok float | [2.5]
+    loop-arg                     ok [2.5]
+SHAPE-DEPENDENT pair.trim.large:
+    first                        ok ["ab"]
+    second                       ok ["\u000b ab"]
+SHAPE-DEPENDENT pair.keys.arity:
+    first                        ok [["b","a","c"]]
+    second                       error error: keys: expected no arguments
+SHAPE-DEPENDENT pair.trim.forms:
+    first                        ok ["\u000b ab \u000b"]
+    second                       ok ["ab"]
+SHAPE-DEPENDENT pair.substr.units:
+    first                        ok ["�"]
+    second                       ok ["t"]
+SHAPE-DEPENDENT pair.sum.exact:
+    first                        ok [9007199254740992]
+    second                       ok [9007199254740994]
+SHAPE-DEPENDENT pair.range.exact:
+    first                        ok [[9007199254740992]]
+    second                       ok [[9007199254740993]]
+context_probe: 200 cases x 6 contexts, 2 context-dependent; 8 pairs, 6 shape-dependent
+context_probe: PASS (inventory pinned)
+make exit 0
