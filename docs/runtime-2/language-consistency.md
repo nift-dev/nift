@@ -48,3 +48,8 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L33 | Two UTF-8 validators: `length`/`split` lenient, `encode`/`decode` strict | One validation policy | medium | R | CP15 B-Q1 |
 | L34 | Encoding name must be exactly `"utf-8"` (`"UTF-8"` rejected) | Case-insensitive standard names | low | R | CP15 B-Q3 |
 | L35 | `copy(a, b)` evaluates `a, b` as one expression instead of reporting an arity error | `runtime.arity_error` | medium | R | CP15 J-Q3 |
+| L36 | `validate` schema `pattern` uses backtracking `std::regex`: deep input crashes (SIGSEGV), `^(a|aa)+$` hangs (ReDoS); a match-time regex error is reported as a recoverable rejection | Bounded, non-backtracking matching; loud fatal error on limits | correctness | R | CP15 review R1 |
+| L37 | Malformed schemas (unresolvable or self-recursive `$ref`) are reported lazily as catchable `schema.rejected`, only when that path is reached | Schema errors are loud and reported up front | medium | R | CP15 review N2 |
+| L38 | `uniqueItems` validation is O(n²) | Linear (hash-based) | medium | R | CP15 review N3 |
+| L39 | `{"a": 1e-400}.a == 0` is false; `to_int("1e-400")` errors; `abs(INT64_MIN)` is the double `9.223372036854776e+18` typed `int` | Consistent underflow and exact integer results (with L14, L32) | correctness | R | CP15 review N6 |
+| L40 | Values nested deeper than the JSON limit crash `validate` in legacy (unbounded recursion) | Loud `limit.exceeded` (VM does this from CP15) | correctness | A (CP15) | CP15 review R2 |
