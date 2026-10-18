@@ -170,8 +170,14 @@ server; it is only an idea here.
 
 ### `tests/serve_smoke.sh` (`make test-serve`, in `make test` via the wiring)
 
-Linux runs everything, macOS runs the portable lifecycle core (1–3), and other
-systems skip with a message. Every wait is bounded, an EXIT trap kills anything
+Linux runs everything. macOS runs the portable lifecycle core (1–3) and
+reports checks 4–15 as SKIPPED; they are counted as skipped, never as passed.
+Other systems, or a host without `python3`, exit 77, the project's honest-skip
+status, which `make test-serve` reports as `test-serve: SKIPPED`. The script
+runs under `set -o pipefail`. Exit statuses that legitimately mean "no match"
+(`grep` 1, `pgrep` 1) are handled explicitly, and any other status fails the
+check. A failure of `find`, `stat` or `sha256sum` in the tree hash fails the
+test. Every wait is bounded, an EXIT trap kills anything
 started, and a final sweep checks that no PID survives. The test runs from a
 project subdirectory to exercise root discovery.
 
@@ -218,7 +224,12 @@ run for the first time at the next cross-platform milestone.
 After the rebase onto `runtime-2` @`8957559`, with the wiring commit applied
 and run through the shared heavy-job gate:
 
-- `bash tests/serve_smoke.sh`: **49 passed, 0 failed**. IPv6 was **skipped**:
+- `bash tests/serve_smoke.sh` (via `make test-serve`): **49 passed, 1 skipped
+  (IPv6), 0 failed**. `make test-test-integrity` is clean. The skip paths were
+  checked with a fake `uname`: an unknown OS gives exit 77 (and `make
+  test-serve` prints SKIPPED), no `python3` gives exit 77, and "Darwin" runs
+  the portable core (12 passed) with checks 4–15 reported as SKIPPED. That is
+  a simulation on Linux, not a macOS run. IPv6 was **skipped**:
   this host's kernel has no IPv6, and `--host ::1` gives `error: cannot create
   a socket for host '::1': Address family not supported by protocol`.
 - Manual confirmations:

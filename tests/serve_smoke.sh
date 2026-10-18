@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
 # `nift serve` smoke test. Linux runs everything; macOS runs the portable
 # lifecycle core (serve, fetch, Ctrl+C/SIGINT, SIGTERM, force-kill with no
-# leftover child); other systems skip. Bounded waits; every server started
-# here is stopped and checked; the EXIT trap kills anything remaining.
+# leftover child) and reports the Linux-only checks as SKIPPED. Other systems,
+# or no python3, exit 77 (the project's honest-skip status; `make test-serve`
+# reports it as skipped). Bounded waits; every server started here is stopped
+# and checked; the EXIT trap kills anything remaining.
 set -u
+set -o pipefail
 set -m   # job control: background jobs keep SIGINT (non-interactive bash would ignore it)
 
 case "$(uname -s)" in
     Linux) FULL=1 ;;
     Darwin) FULL=0 ;;
-    *) echo "SKIP: serve_smoke.sh runs on Linux (full) and macOS (lifecycle core); Windows uses tests/serve_windows_lifecycle.ps1"; exit 0 ;;
+    *) echo "SKIP: serve_smoke.sh runs on Linux (full) and macOS (lifecycle core); Windows uses tests/serve_windows_lifecycle.ps1"; exit 77 ;;
 esac
 
 NIFT_BIN=${NIFT_BIN:-$(pwd)/nift}
 NIFT_BIN=$(cd "$(dirname "$NIFT_BIN")" && pwd)/$(basename "$NIFT_BIN")
-PY=$(command -v python3) || { echo "SKIP: python3 not available"; exit 0; }
+PY=$(command -v python3) || { echo "SKIP: python3 not available; nift serve requires it, nothing was tested"; exit 77; }
 TIMEOUT=$(command -v timeout || true)
 realpath_py() { "$PY" -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$1"; }
 WORK=$(realpath_py "$(mktemp -d "${TMPDIR:-/tmp}/nift-serve-smoke.XXXXXX")")
 PIDS=()
-fail=0; passes=0
+fail=0; passes=0; skips=0
 START_ENV=()
 
 cleanup() {
@@ -32,7 +35,7 @@ trap cleanup EXIT
 
 ok()  { passes=$((passes+1)); echo "ok   - $1"; }
 bad() { fail=1; echo "FAIL - $1"; [ -n "${2:-}" ] && [ -f "$2" ] && sed 's/^/       /' "$2"; }
-skip() { echo "skip - $1"; }
+skip() { skips=$((skips+1)); echo "SKIPPED - $1"; }
 
 free_port() { "$PY" -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])'; }
 # port_free HOST PORT: 0 when nothing is listening (connection refused).
@@ -64,7 +67,17 @@ except Exception: print("down")
 EOF
 }
 # wait_gone PATTERN: up to 5 s for no process matching PATTERN (pgrep -f).
-wait_gone() { for _ in $(seq 50); do pgrep -f "$1" >/dev/null || return 0; sleep 0.1; done; return 1; }
+# pgrep: 0 = still running, 1 = none (gone); anything else is an error and
+# fails the check (status 2) rather than reading as "gone".
+wait_gone() {
+    local st
+    for _ in $(seq 50); do
+        pgrep -f "$1" >/dev/null; st=$?
+        case $st in 0) ;; 1) return 0 ;; *) echo "pgrep failed with status $st" >&2; return 2 ;; esac
+        sleep 0.1
+    done
+    return 1
+}
 # hold_port HOST PORT: a listener owned by the test; sets HOLD.
 hold_port() {
     "$PY" -c 'import socket,sys,time;s=socket.socket();s.bind((sys.argv[1],int(sys.argv[2])));s.listen();print(1,flush=True);time.sleep(60)' "$1" "$2" > "$WORK/hold.out" &
@@ -106,7 +119,22 @@ run_path() {
     (cd "$PROJ" && PATH="$path" exec "$TIMEOUT" 20 "$NIFT_BIN" serve "$@") >"$WORK/$name.out" 2>"$WORK/$name.err"
     STATUS=$?
 }
+# tree_hash DIR: hash of names, sizes, mtimes, modes and contents. pipefail
+# (set above) makes a find/sort/stat/sha256sum failure the function's status;
+# callers treat a nonzero status as a test failure.
 tree_hash() { (cd "$1" && find . -print0 | LC_ALL=C sort -z | xargs -0 stat -c '%n %s %Y %f' && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum; }
+
+# fd_targets PID [MINFD]: readlink of each open fd. An fd can close
+# between the glob and readlink (e.g. the glob's own directory fd);
+# such a vanished fd is skipped, not an error. A readlink failure on an fd
+# that still exists is emitted as "unreadable:<fd>" and fails the caller.
+fd_targets() {
+    local fd
+    for fd in /proc/"$1"/fd/*; do
+        [ "${fd##*/}" -ge "${2:-0}" ] || continue
+        readlink "$fd" 2>/dev/null || [ ! -e "$fd" ] || echo "unreadable:$fd"
+    done
+}
 
 # --- fixture project -------------------------------------------------------
 PROJ="$WORK/site"; mkdir -p "$PROJ"
@@ -114,7 +142,8 @@ PROJ="$WORK/site"; mkdir -p "$PROJ"
 mkdir -p "$PROJ/content/sub"
 RUN_CWD="$PROJ/content/sub"   # discovery walks up from a subdirectory
 head -c 4096 /dev/urandom > "$PROJ/public/blob.bin"
-[ "$FULL" = 1 ] && BEFORE=$(tree_hash "$PROJ")
+BEFORE=
+if [ "$FULL" = 1 ]; then BEFORE=$(tree_hash "$PROJ") || { bad "tree hash of the fixture project failed (before)"; BEFORE=; }; fi
 
 # ===== portable lifecycle core (Linux + macOS) ==============================
 
@@ -127,15 +156,27 @@ if start default --port "$P"; then
         # Ignore descriptors the test shell itself inherited (fds 0-2, a
         # `flock` lock file, a harness socket): only what Nift/Python opened
         # counts.
-        inherited=$(for fd in /proc/$$/fd/*; do readlink "$fd"; done 2>/dev/null | sort -u)
-        fds=$(for fd in /proc/$SPID/fd/*; do [ "${fd##*/}" -ge 3 ] && readlink "$fd"; done 2>/dev/null \
-              | grep -vxF -f <(printf '%s\n' "$inherited"))
-        socks=$(printf '%s\n' "$fds" | grep -c "^socket:")
+        inherited=$(fd_targets $$ | sort -u)
+        server_fds=$(fd_targets "$SPID" 3)
+        # grep exit status: 0 = lines selected, 1 = none selected (a valid
+        # result here), 2+ = error (a test failure).
+        fds=$(grep -vxF -f <(printf '%s\n' "$inherited") <<<"$server_fds"); st=$?
+        [ "$st" -le 1 ] || bad "grep failed filtering fds (status $st)"
+        printf '%s\n' "$fds" > "$WORK/fds.txt"
+        case $'\n'"$server_fds$inherited" in *$'\n'unreadable:*) bad "could not read a /proc fd link" "$WORK/fds.txt" ;; esac
+        socks=$(grep -c "^socket:" <<<"$fds"); st=$?
+        [ "$st" -le 1 ] || bad "grep failed counting sockets (status $st)"
+        [ "$socks" = 1 ] && ok "only the listening socket is open (probe socket not inherited)" || bad "server has $socks sockets" "$WORK/fds.txt"
         # stdout/stderr point into $WORK (the test's own redirects); anything
         # else under a temp dir, or an unlinked file, would be a Nift temp file.
-        if echo "$fds" | grep -v "^$WORK/" | grep -q -e '^/tmp' -e '^/var/tmp' -e '(deleted)'; then bad "server holds a temporary file"; else ok "no temporary files held by the server"; fi
-        echo "$fds" > "$WORK/fds.txt"
-        [ "$socks" = 1 ] && ok "only the listening socket is open (probe socket not inherited)" || bad "server has $socks sockets" "$WORK/fds.txt"
+        outside=$(grep -v "^$WORK/" <<<"$fds"); st=$?
+        [ "$st" -le 1 ] || bad "grep failed filtering \$WORK paths (status $st)"
+        grep -q -e '^/tmp' -e '^/var/tmp' -e '(deleted)' <<<"$outside"; st=$?
+        case $st in
+            0) bad "server holds a temporary file" "$WORK/fds.txt" ;;
+            1) ok "no temporary files held by the server" ;;
+            *) bad "grep failed checking for temporary files (status $st)" ;;
+        esac
         [ "$(cat /proc/$SPID/comm 2>/dev/null)" = "python3" ] && ok "nift exec'd Python (same PID)" || bad "exec: comm=$(cat /proc/$SPID/comm 2>/dev/null)"
     fi
     fetch "http://127.0.0.1:$P/blob.bin" "$WORK/blob.got" && cmp -s "$WORK/blob.got" "$PROJ/public/blob.bin" \
@@ -166,7 +207,8 @@ else bad "forcekill start" "$WORK/forcekill.err"; fi
 
 if [ "$FULL" != 1 ]; then
     for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -0 "$p" 2>/dev/null && { bad "leftover pid $p"; kill -KILL "$p"; }; done
-    echo "serve_smoke (macOS lifecycle core): $passes passed, $([ $fail = 0 ] && echo 0 || echo some) failed"
+    skip "Linux-only checks 4-15 (custom host, --dir variants, symlink resolution, option validation, Python discovery and probe, occupied port and race, isolation, project unchanged) were NOT run on $(uname -s)"
+    echo "serve_smoke (macOS lifecycle core): $passes passed, $skips skipped, $([ $fail = 0 ] && echo 0 || echo some) failed"
     exit $fail
 fi
 
@@ -345,11 +387,21 @@ ls "$WORK"/shadow-*-ran >/dev/null 2>&1 && bad "cwd/PYTHONPATH module shadowed t
 [ -z "$(find "$SHADOW" "$PROJ" -name __pycache__ 2>/dev/null)" ] && ok "no __pycache__ written in cwd or project" || bad "__pycache__ written"
 
 # 15. nift serve modified nothing in the project (content, .nift metadata, deps, mtimes)
-AFTER=$(tree_hash "$PROJ")
-[ "$BEFORE" = "$AFTER" ] && ok "project tree unchanged (hash incl. .nift, sizes, mtimes)" || bad "project tree changed"
+if AFTER=$(tree_hash "$PROJ") && [ -n "$BEFORE" ]; then
+    [ "$BEFORE" = "$AFTER" ] && ok "project tree unchanged (hash incl. .nift, sizes, mtimes)" || bad "project tree changed"
+else
+    bad "tree hash of the fixture project failed (after), so 'project unchanged' is unproven"
+fi
 
 # No leftover servers from this run.
 for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -0 "$p" 2>/dev/null && { bad "leftover pid $p"; kill -KILL "$p"; }; done
-pgrep -f "http.server" -a 2>/dev/null | grep -F "$WORK" >/dev/null && bad "an http.server serving under $WORK is still running"
-echo "serve_smoke: $passes passed, $([ $fail = 0 ] && echo 0 || echo some) failed"
+# pgrep: 1 = no http.server at all (fine); 0 = inspect the list; else error.
+servers=$(pgrep -af "http.server"); st=$?
+case $st in
+    0) grep -qF "$WORK" <<<"$servers"; gst=$?
+       case $gst in 0) bad "an http.server serving under $WORK is still running" ;; 1) ;; *) bad "grep failed (status $gst)" ;; esac ;;
+    1) ;;
+    *) bad "pgrep failed with status $st" ;;
+esac
+echo "serve_smoke: $passes passed, $skips skipped, $([ $fail = 0 ] && echo 0 || echo some) failed"
 exit $fail

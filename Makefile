@@ -1138,10 +1138,15 @@ test-collections: $(TARGET)
 test-commands: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/commands_smoke.sh
 
-# `nift serve` smoke: full on Linux, lifecycle core on macOS (needs python3,
-# binds loopback ports). Windows: tests/serve_windows_lifecycle.ps1 (pwsh).
+# `nift serve` smoke: full on Linux, lifecycle core on macOS with the
+# Linux-only checks reported as SKIPPED (needs python3, binds loopback ports).
+# Exit 77 (unsupported platform, or no python3) is the project's honest skip
+# and is reported as skipped, never as a pass. Windows:
+# tests/serve_windows_lifecycle.ps1 (pwsh).
 test-serve: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/serve_smoke.sh
+	@NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/serve_smoke.sh; st=$$?; \
+	  if [ $$st -eq 77 ]; then echo "test-serve: SKIPPED (unsupported platform or python3 unavailable; nothing was tested)"; \
+	  else exit $$st; fi
 .PHONY: test-serve
 test: test-serve
 
