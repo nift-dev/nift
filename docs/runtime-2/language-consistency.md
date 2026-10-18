@@ -41,3 +41,10 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L26 | Chained presentation methods (`o.stringify().stringify()`) idempotent at top level but re-encode in loop code | One behaviour | correctness | X | CP14 Q14 |
 | L27 | `return` ends at the line break, so `return {` + multi-line literal fails | Multi-line return values continue to the matching close | correctness | A (CP13) | D-025 |
 | L28 | A `;` inside a quoted string at the top level of a `return` value ends the statement (`return "a;b"` fails) | Statement terminators are recognised only outside strings | correctness | R | CP13 |
+| L29 | A `{...}` literal that is valid JSON is parsed as JSON, while `[...]` evaluates its elements as Nift expressions (`"é"`, `-0` and big integers differ by bracket shape) | One literal meaning regardless of bracket shape | correctness | R (VM refuses shape-dependent literals, W9) | CP15 J-Q1 |
+| L30 | `validate(schema, "x")` with a quoted literal fails at top level, works in loops | One behaviour | correctness | R (VM refuses, W10) | CP15 J-Q2 |
+| L31 | Argument checking of `abs`/`round` and `encode`/`decode` differs between top level and loop code | One argument-checking rule | medium | R | CP15 N-Q2, B-Q2 |
+| L32 | `abs`/`floor`/`ceil`/`round` go through doubles, inexact beyond 2^53 | Exact on integers (as L14) | correctness | R | CP15 N-Q1 |
+| L33 | Two UTF-8 validators: `length`/`split` lenient, `encode`/`decode` strict | One validation policy | medium | R | CP15 B-Q1 |
+| L34 | Encoding name must be exactly `"utf-8"` (`"UTF-8"` rejected) | Case-insensitive standard names | low | R | CP15 B-Q3 |
+| L35 | `copy(a, b)` evaluates `a, b` as one expression instead of reporting an arity error | `runtime.arity_error` | medium | R | CP15 J-Q3 |
