@@ -133,10 +133,12 @@ jobs:
       - name: Clean + parallel aggregate target (make -j2 test-all)
         run: |
           make clean
+          # Load-sensitive wall-clock guards are deferred here and run alone in
+          # the next step (docs/runtime-2/certification.md); thresholds unchanged.
           # Surface the failing recipes as annotations (readable via the API
           # when job logs are not reachable).
           set +e
-          make -j2 test-all > test-all.log 2>&1
+          NIFT_DEFER_LOAD_SENSITIVE=1 make -j2 test-all > test-all.log 2>&1
           rc=$?
           set -e
           tail -200 test-all.log
@@ -146,6 +148,17 @@ jobs:
             grep -nE '^make(\[[0-9]+\])?: \*\*\* \[' test-all.log | sed -e 's/%/%25/g' -e 's/^/::error title=failed recipe::/'
             grep -nE '^(FAIL missed|FAIL rt-diff|FAIL \[|DIFF |AssertionError|RuntimeError)' test-all.log | head -8 | sed -e 's/%/%25/g' -e 's/^/::error title=failure::/'
             grep -nE -B4 '^make(\[[0-9]+\])?: \*\*\* \[' test-all.log | grep -vE '^[0-9]+-(g\+\+|cc|mkdir) ' | tail -30 | sed -e 's/%/%25/g' -e 's/^/::error title=context::/'
+            exit "$rc"
+          fi
+      - name: Load-sensitive measurements, exclusively (make test-load-sensitive)
+        run: |
+          set +e
+          make test-load-sensitive > load-sensitive.log 2>&1
+          rc=$?
+          set -e
+          cat load-sensitive.log
+          if [ "$rc" -ne 0 ]; then
+            grep -nE 'FAIL|regression|blocked|Error' load-sensitive.log | head -8 | sed -e 's/%/%25/g' -e 's/^/::error title=load-sensitive (exclusive)::/'
             exit "$rc"
           fi
       - name: Build-boundary non-destructive proof (serial)

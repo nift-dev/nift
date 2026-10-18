@@ -846,6 +846,25 @@ test-bindings: test-binding-warnings test-go-binding test-csharp-binding test-no
 # Make; prerequisite order carries no sequencing meaning.
 test-all: test test-embed test-bindings test-build-boundary test-host-seam test-conformance test-runtime2-rt-diff-selftest
 
+# Load-sensitive measurements (docs/runtime-2/certification.md): wall-clock
+# guards whose thresholds are unchanged and which must run with no competing
+# workload. Plain `make test-all` runs them as before. With
+# NIFT_DEFER_LOAD_SENSITIVE=1 (CI's parallel `make -j2 test-all`) the recipe
+# lines prefixed with $(LOAD_SENSITIVE_DEFER) only print a "deferred" line, and
+# CI runs `make test-load-sensitive` alone in a separate step.
+ifeq ($(NIFT_DEFER_LOAD_SENSITIVE),1)
+LOAD_SENSITIVE_DEFER = @echo "deferred (load-sensitive, run exclusively by make test-load-sensitive):"
+else
+LOAD_SENSITIVE_DEFER =
+endif
+# Exactly the wall-clock scripts, serially, regardless of NIFT_DEFER_LOAD_SENSITIVE.
+.PHONY: test-load-sensitive
+test-load-sensitive: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_scaling_guard.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/scripting_perf_guard.sh
+
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
 test: test-runtime2-certification-guard test-rt-value test-rt-lint test-runtime2-process-capture test-runtime2-vm-corpus test-runtime2-modified-race test-runtime2-clock-lifecycle test-runtime2-dynamic-reads test-runtime2-fs-freedom test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes test-runtime2-rt-diff \
@@ -1008,7 +1027,7 @@ test-v48-map-set-index: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_index_smoke.sh
 
 test-v48-map-set-scaling: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_scaling_guard.sh
+	$(LOAD_SENSITIVE_DEFER) NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_scaling_guard.sh
 
 test-v48-prepared-object-literal-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_parity.sh
@@ -1259,7 +1278,7 @@ CERTIFY_CI_TARGETS := bh2-test-integrity test-build-boundary-nondestructive test
 	test-crash-recovery test-filesystem-boundary test-filesystem-type test-guarantee-registry-ci \
 	test-incremental-state-transitions test-init-functional-truth test-ownership-unit \
 	test-pagination-equivalence test-parser-value-composition test-v44-automation test-v44-hooks \
-	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform
+	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform test-load-sensitive
 .PHONY: certify certify-targets
 # The certified set: test-all plus every suite the CI workflows run.
 certify-targets: test-all $(CERTIFY_CI_TARGETS)
@@ -1273,7 +1292,7 @@ test-runtime2-certification-guard:
 
 # Runtime 2.0 CP07: process capture parity and no leaked capture files.
 test-runtime2-process-capture: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
+	$(LOAD_SENSITIVE_DEFER) NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
 
 # Runtime 2.0 VM regression corpus (golden outputs from the canonical evaluator).
 test-runtime2-vm-corpus: $(TARGET)
@@ -1748,7 +1767,7 @@ test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 	tests/v44_ast_differential_corpus.sh
 	tests/v44_root_path_corruption_reproducers.sh
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
+	$(LOAD_SENSITIVE_DEFER) NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_struct_variadic_methods_smoke.sh

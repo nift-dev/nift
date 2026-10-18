@@ -85,6 +85,21 @@ passes (the re-run result is recorded in the reason). A failure seen only in a
 concurrent context — `make -j test-all`, or a CI runner shared with other jobs
 — is recorded as a load-sensitive observation, not as resolved by a later pass.
 
+**CI runs them exclusively too.** `NIFT_DEFER_LOAD_SENSITIVE=1` makes the
+recipes of `test-v44-language-foundation` (its `v44_perf_scaling_smoke.sh` line
+only), `test-v48-map-set-scaling` and `test-runtime2-process-capture` print
+`deferred (load-sensitive, run exclusively by make test-load-sensitive): …`
+instead of running the wall-clock script. Test integrity guards runs
+`NIFT_DEFER_LOAD_SENSITIVE=1 make -j2 test-all` and then, as a separate step
+with nothing else running in the job, `make test-load-sensitive`, which runs
+exactly `v44_perf_scaling_smoke.sh`, `v48_map_set_scaling_guard.sh`,
+`runtime2/process_capture.sh` and `scripting_perf_guard.sh` serially. Without
+the variable (local `make test` / `make test-all`) nothing changes: the guards
+run in their usual targets. `make certify` removes the variable from the
+environment, keeps all of these targets exclusive, and also reaches
+`test-load-sensitive` (via `certify-targets`, so the CI step stays covered by
+`certification_guard.sh`). Thresholds are unchanged.
+
 Open observation: `test-v44-language-foundation` failed in CI at `974dcb3`
 (`make -j2 test-all`; map n=40k 85 ms, n=80k 450 ms, ratio 5.3 > 3.5) and in one
 concurrent local certify run (0.1 s, log not retained), and passed alone and in
@@ -97,6 +112,14 @@ so map insertion is linear in work; eight runs alone gave wall-clock ratios
 machine. Still classified load-sensitive, not resolved: the guard keeps its
 bound, runs exclusively under `make certify`, and a Callgrind instruction-ratio
 companion is the candidate controlled measurement if it fails again.
+
+Second CI observation: at `f3208f4` (run 39100545658, job "Production binding
+gates (Go, C#, Node, Python) on Linux") the same guard failed inside
+`make -j2 test-all`: map n=40k 52 ms, n=80k 232 ms, ratio 4.46 > 3.5. Both CI
+failures (`974dcb3`, `f3208f4`) happened in a concurrent context and are
+recorded as load-sensitive observations, **not resolved** — neither by later
+passing runs nor by the CI restructuring above, which only removes the
+competing workload from the measurement.
 
 Every target runs with a **private TMPDIR** (removed afterwards). Many C++
 tests create fixed names under the temp directory

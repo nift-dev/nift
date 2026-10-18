@@ -58,6 +58,7 @@ LOAD_SENSITIVE = {
     "test-v48-map-set-scaling": "tests/v48_map_set_scaling_guard.sh: wall-clock scaling ratio",
     "test-scripting-perf": "tests/scripting_perf_guard.sh: wall-clock budgets",
     "test-runtime2-process-capture": "process_capture.sh: background descendant must not block (<280 ms)",
+    "test-load-sensitive": "the four wall-clock scripts above, serially (CI's exclusive step)",
 }
 for _t, _why in LOAD_SENSITIVE.items():
     EXCLUSIVE.setdefault(_t, "load-sensitive: " + _why)
@@ -118,7 +119,9 @@ def recipe_runs_make(text):
 
 def clean_env():
     env = dict(os.environ)
-    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
+    # NIFT_DEFER_LOAD_SENSITIVE (CI only) would skip the load-sensitive
+    # guards; certification always runs them (exclusively).
+    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES", "NIFT_DEFER_LOAD_SENSITIVE"):
         env.pop(k, None)
     return env
 
