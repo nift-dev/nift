@@ -14,9 +14,10 @@ stderr and exit status must be identical, except for:
              fails with "callable recursion depth exceeded", the VM went past
              legacy's 64-frame limit (beyond_legacy_depth in its statistics),
              with legacy's output as a prefix of the VM's, and either
-             completed without a diagnostic or stopped with its own
-             "callable recursion depth exceeded" error at its frame or memory
-             budget (CP12: never a replay).
+             completed without a diagnostic or stopped with a program error
+             reported by the VM (its own "callable recursion depth exceeded"
+             at its frame or memory budget, or the program's error deeper
+             than legacy can go; CP12: never a replay).
   endless    both engines hit the time limit (not compared).
 
 Any other difference, any `internal-error` outcome, any missing statistics
@@ -86,7 +87,7 @@ def classify_difference(legacy, vm, st):
     if (st and st.get("beyond_legacy_depth") and legacy[2] == 1 and RECURSION_ERROR.match(legacy[1])
             and vm[0].startswith(legacy[0])
             and ((st.get("outcome") == "vm" and vm[2] == 0 and vm[1] == b"")
-                 or (st.get("outcome") == "vm-error" and vm[2] == 1 and VM_RECURSION_ERROR.match(vm[1])))):
+                 or (st.get("outcome") == "vm-error" and vm[2] == 1))):
         return "approved"
     return "diff"
 
