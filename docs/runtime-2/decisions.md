@@ -282,3 +282,24 @@ CP12 (replay removal) started from CP11 `bf32e4f` while CP11 certifies.
   3. Errors are reported where they occur, not at the call site of a
      loop-called function or at the outermost loop statement.
 - CP12 phase A removes its dual-compilation machinery accordingly.
+
+## D-019 — AI assessments: collaborative opinions and controlled evaluations (owner, 2026-10-18)
+- Two complementary kinds, never conflated, each disclosing how it was produced:
+  (a) **collaborative AI engineering opinions** — agents investigate, are
+  challenged with evidence and counterexamples, dogfood, and revise; this stays
+  the philosophy of the public AI Opinion page; (b) **controlled comparative
+  AI-DX evaluations** — pre-registered tasks, frozen scoring, hidden oracles,
+  comparable treatment of competitors; required for empirical claims.
+  Challenging with evidence is encouraged; pressuring towards a score is not.
+- AI-DX is reported as **observed** (with current model familiarity) and
+  **intrinsic** (with adequate docs and interfaces).
+- Competitor scores without equivalent probing are preliminary hypotheses with
+  lowered confidence; Nift's are not inflated to compensate.
+- Assessment A (2026-10-18) silent-failure reproducers are preserved and each
+  is investigated (intentional / defect / undocumented rule) before any change;
+  template `$[...]` passthrough is not changed without studying legitimate uses.
+- Investigate (not yet in scope): structured diagnostics and full stacks in
+  CP13, programmatic definitions/references/scopes from the CP12 resolver, and
+  CP16 effect recording as a basis for execution inspection; present trade-offs
+  before expanding any checkpoint. Assessment B: different model family, bounded
+  pilot first. None of this delays Runtime 2.0.
