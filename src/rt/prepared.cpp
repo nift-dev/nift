@@ -14,10 +14,9 @@ namespace nift::rt {
 
 namespace {
 
-using Visit = std::function<bool(NodeId, const Node&)>;  // false stops the walk
-
-// Pre-order walk of the subtree `id`; stops (returns false) when `visit` does.
-bool walk(const Ast& ast, NodeId id, const Visit& visit) {
+// Pre-order walk of the subtree `id`; stops (returns false) when `visit`
+// (bool(NodeId, const Node&)) does.
+template <class Visit> bool walk(const Ast& ast, NodeId id, const Visit& visit) {
     if (id == kNoNode) return true;
     const Node& n = ast.at(id);
     if (!visit(id, n)) return false;
@@ -33,17 +32,18 @@ public:
     Analysis(const Ast& ast, NodeId root, const UnitPlan& plan) : ast_(ast), root_(root), plan_(plan) {}
 
     PreparedRefusal run() {
-        collect_declared_names();
         mark_prepared_functions();
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
             check_regions(ast_.at(plan_.functions[f]).b, marked_[f]);
-        if (!result_.refused) check_regions(root_, false);
+        if (!result_.refused) top_level([this](NodeId id) { check_regions(id, false); return !result_.refused; });
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f) {
-            visible_names(static_cast<int>(f));
+            caller_ = static_cast<int>(f);
+            visible_ready_ = false;
             walk(ast_, ast_.at(plan_.functions[f]).b, [this](NodeId, const Node& n) { return check_string_args(n); });
         }
         if (!result_.refused) {
-            visible_names(-1);
+            caller_ = -1;
+            visible_ready_ = false;
             top_level([this](NodeId id) {
                 return walk(ast_, id, [this](NodeId, const Node& n) { return check_string_args(n); });
             });
@@ -64,7 +64,7 @@ private:
     }
 
     // Calls `visit` for each top-level statement other than a function.
-    bool top_level(const std::function<bool(NodeId)>& visit) const {
+    template <class Visit> bool top_level(const Visit& visit) const {
         const Node& program = ast_.at(root_);
         const NodeId* list = ast_.list(program);
         for (std::uint32_t k = 0; k < program.count; ++k)
@@ -168,7 +168,7 @@ private:
 
     // Calls `visit` for every `while` not nested in another one (nested loops
     // are prepared with their outermost loop); false stops.
-    bool outermost_loops(NodeId id, const std::function<bool(const Node&)>& visit) {
+    template <class Visit> bool outermost_loops(NodeId id, const Visit& visit) {
         if (id == kNoNode) return true;
         const Node& n = ast_.at(id);
         if (n.kind == NodeKind::While) return visit(n);
@@ -248,9 +248,17 @@ private:
     }
 
     // Legacy's bind_call_param types a quoted argument from its unquoted text.
-    int quoted_type(const TextType& type, bool& risky) const {
+    int quoted_type(const TextType& type, bool& risky) {
         if (type.kind == TextType::Kind::Known) return type.known;
         if (type.kind == TextType::Kind::Binding) {
+            if (!visible_ready_) {  // computed only when a string literal names something
+                if (!names_collected_) {
+                    collect_declared_names();
+                    names_collected_ = true;
+                }
+                visible_names(caller_);
+                visible_ready_ = true;
+            }
             if (visible_.count(type.binding) || type.binding.substr(0, 2) == "__") risky = true;
             return -1;
         }
@@ -276,6 +284,9 @@ private:
     NodeId root_;
     const UnitPlan& plan_;
     std::unordered_set<std::string_view> global_names_, visible_;
+    int caller_ = -1;
+    bool visible_ready_ = false;
+    bool names_collected_ = false;
     std::vector<std::unordered_set<std::string_view>> function_names_;
     std::vector<std::vector<std::size_t>> callers_;
     std::vector<bool> marked_;
