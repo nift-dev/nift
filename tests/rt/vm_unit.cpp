@@ -182,6 +182,11 @@ void check_errors() {
     const Case refused[] = {
         {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", "context:object-length"},
         {"x := 1\ni := 0\nwhile(i < 2) { x = x + 0.5; i += 1 }\n", "context:assignment-type"},
+        // A double-typed binding holding a string: the prepared check fails,
+        // the canonical one passes (found by the adversarial gate).
+        {"i := 0\nwhile (i < 1) { i += 1\nb0 := \"\" + 1.5\nb1 := b0 + 0.5\nb1 = b0\nprint(b1) }\n",
+         "context:assignment-type"},
+        {"i := 0\nwhile (i < 1) { i += 1\nv := \"a\" + 1.0\nv = v\nprint(v) }\n", "context:assignment-type"},
         {"x := 0\ni := 0\nwhile(i < 1) { i += 1; print(-x) }\n", "context:negative-zero"},
         // A fused condition takes the comparison's kind check (an ordering
         // of a string and a number reached the VM as an internal failure).

@@ -45,16 +45,18 @@ bool UnitCompiler::declare(const Node& node) {
 // `x = e`: the canonical check of the type legacy derives from the text and
 // the value (nift_binding_type_from_text). Legacy's prepared path checks the
 // value's type only (P4); in loop code where the two could disagree the
-// assignment is refused (D-018, context:assignment-type). They can only
-// disagree for a target whose binding type may be int (a double binding
-// accepts both), and not when the text's type is the target's own (`x = x`:
-// the textual type is the binding's, or the value's when that is int).
+// assignment is refused (D-018, context:assignment-type). For a numeric
+// value they cannot disagree when the target's binding type is always double
+// (both verdicts accept any number) or when the text's type is the target's
+// own (`x = x`); a string held by a double-typed binding (`s := "" + 1.5`)
+// fails only the prepared check, so other values get no exemption.
 bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const TextType type = infer_text_type(type_text(ast_.at(node.b)));
     const std::string_view target = text(ast_.at(node.a));
+    const bool numeric = (kinds(node.b) & static_cast<std::uint8_t>(~kKindNumber)) == 0;
     const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;
-    if (loop_reachable() && !own_type && type_mismatch_possible(type, kinds(node.b), scope_index()) &&
-        !always_double_[scope_index()].count(target))
+    const bool exempt = numeric && (own_type || always_double_[scope_index()].count(target));
+    if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
