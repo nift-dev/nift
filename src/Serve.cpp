@@ -6,7 +6,8 @@
 //    supervisor: Ctrl+C/SIGTERM reach Python directly, nothing can be
 //    orphaned, and the exit status is Python's own.
 //  - Windows: launch-and-wait through the existing nift_run_process (inherited
-//    console, argv vector, no capture) and return Python's exit code.
+//    console, argv vector, no capture) and return Python's exit code. A
+//    kill-on-close job object keeps a force-killed Nift from orphaning Python.
 #include "Serve.h"
 
 #include <cstdio>
@@ -302,6 +303,18 @@ int run_serve(int argc, char** argv) {
     console::error("cannot start " + python.program + ": " + std::strerror(error));
     return error == ENOENT ? 127 : 126;
 #else
+    // No orphan if Nift is force-killed: Nift joins a kill-on-close job and
+    // Python inherits the membership. The handle is never closed, so it
+    // closes when Nift's process ends, killing whatever is left in the job.
+    // Best effort: if the job cannot be created, configured or assigned (e.g.
+    // an enclosing job forbids nesting before Windows 8), carry on without it.
+    if (HANDLE job = CreateJobObjectW(nullptr, nullptr)) {
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits) ||
+            !AssignProcessToJobObject(job, GetCurrentProcess()))
+            CloseHandle(job);
+    }
     SetConsoleCtrlHandler(serve_ctrl_handler, TRUE);
     ProcessSpec spec;
     spec.program = python.program;

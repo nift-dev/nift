@@ -96,10 +96,17 @@ console: Nift installs a console control *handler* that returns TRUE (it keeps
 waiting). Python receives the event, exits 0, and Nift returns 0. A handler is
 used rather than `SetConsoleCtrlHandler(NULL, TRUE)` because that ignore flag
 is inherited by children and would stop Python seeing Ctrl+C. Closing the
-console window terminates both processes. Known limit, kept simple by owner
-decision: if Nift alone is force-killed (Task Manager / `taskkill /F` on Nift's
-PID), Python keeps running. A kill-on-close job object would close that gap
-in about 8 lines if wanted later.
+console window terminates both processes. Force-kill: before launching,
+Nift creates a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and
+assigns *itself* to it (`nift_run_process` exposes no child handle). Python
+inherits the membership, and Nift never closes the handle. If Nift is
+force-killed (Task Manager / `taskkill /F`), the handle closes with the process
+and Windows kills Python. On a normal exit Python has already ended. This is
+best effort and has minimal error handling: if the job cannot be created,
+configured or assigned (for example an enclosing job that forbids nesting on
+Windows versions before 8), Nift carries on without it, and only that
+force-kill case can then orphan Python. The job is about 8 lines with no
+monitoring thread or signal forwarding, so it is not supervision machinery.
 
 ## Not in scope
 
@@ -147,7 +154,8 @@ runs from a project subdirectory to exercise root discovery.
 
 **Not tested:** macOS (expected identical to Linux: same exec path, BSD
 sockets), Windows (no MinGW toolchain or Windows headers on this host, so the
-`_WIN32` branch is **not compiled** here), and IPv6 end-to-end. These are for
+`_WIN32` branch, including the job object, is **not compiled or run**
+here), and IPv6 end-to-end. These are for
 the next cross-platform milestone.
 
 ## Website
@@ -159,3 +167,7 @@ required, development only). Release-coupled website item for the queue once
 it exists on the integration branch: add a `nift serve` entry to
 `content/docs/commands.html` with the same three points, earliest supporting
 version = the release containing this feature.
+
+**At integration:** add that item to `docs/handover/PENDING-WEBSITE.md`. The
+queue file is introduced by feature-site-dx and does not exist at this
+branch's base (`36a8e73`), so it was deliberately not created or edited here.
