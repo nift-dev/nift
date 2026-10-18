@@ -50,22 +50,14 @@ non-interactive use (a service, a background job), stop the process.
 - **Warnings.** Build warnings (below) are printed to stderr when the page that
   produces them is rebuilt. Warnings recorded earlier for unchanged pages are
   summarised in one line.
-- **Partial failures (temporary workaround).** Suppose a failed build had
-  already written other pages. It then leaves `.nift/.unfinished`, the marker
-  that makes later builds ask for `nift build --repair`. If the watcher's own
-  attempt created the marker (absent before, present after), the next attempt
-  runs as `build --repair`. A marker that already existed is never taken over:
-  the watcher prints "unfinished build detected" and keeps watching until you
-  run `nift build --repair`. Two edge cases:
-  - **Race.** A marker created by another process between the "before" check
-    and the build is indistinguishable from the watcher's own.
-  - **Interruption.** Stopping the watcher with SIGTERM or Ctrl-C while a
-    build is running can leave a stale marker, as for any interrupted build.
-    Prefer `q` in a terminal.
-
-  This workaround is a single removable unit (`BuildAutoRepairWorkaround` in
-  `src/CLI.cpp`). It goes away when build recovery (ordinary failures leave no
-  marker) is integrated.
+- **Failed pages and `--repair`.** With build recovery (D-020), an ordinary
+  page error never needs `nift build --repair`. A failed page keeps its
+  last good output and is listed in `.nift/failed.json`. The next build after
+  your fix rebuilds it, and `--auto` does this on its own. The watcher never
+  runs `--repair`.
+- **Stopping the watcher.** Prefer `q` in a terminal. A SIGTERM or Ctrl-C
+  during a build is an interrupted build. Build recovery handles it
+  automatically on the next build.
 - **Limitation.** While a build is failing, the watcher does not watch inputs
   outside the project root (for example, files read through `--fs-root`). Save
   any project file to retry.
@@ -241,9 +233,11 @@ unchanged.
   unknown $[...] values".
 - **Pages with no unknown values** render identically either way, so they are
   not rebuilt.
-- **Turning strict off** needs no rebuild. A strict build that succeeded
-  recorded no unknown values. A strict build that failed left the page's
-  previous non-strict metadata and output in place.
+- **Turning strict off.** A strict build that succeeded recorded no unknown
+  values, so nothing is rebuilt. A strict build that failed kept the page's
+  last good output. Build recovery also lists the page as failed
+  (`.nift/failed.json`), so the next ordinary build rebuilds it once and
+  succeeds; `status` shows "previous build of this page failed" until then.
 
 So with no source edits, toggling strict on, off, on, off gives
 fail/ok/fail/ok, and build, status and exit status agree at every step.

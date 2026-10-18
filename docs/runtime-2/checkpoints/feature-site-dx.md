@@ -1,6 +1,6 @@
 # feature-site-dx: website-generator DX fixes
 
-Status: implemented on branch `feature-site-dx` (from `runtime-2` @`825c90a`),
+Status: implemented on branch `feature-site-dx` (from `runtime-2` @`825c90a`, rebased onto `runtime-2` @`e9198eb`),
 under review. Not certified: the owner runs `make certify`. Only the legacy
 (shipping) engine changes. Under `src/rt/` the only edit is a comment in
 `lexer.cpp`.
@@ -33,11 +33,9 @@ in `docs/BUILD-DIAGNOSTICS.md`. Website work is queued in
     of the project tree that skips `.nift/`, `.git/`, `node_modules/` and the
     output directory, so a failing page is not re-rendered every 200 ms.
   - On success after a failure it prints `build succeeded again`.
-  - If the failing build created `.nift/.unfinished` (the marker was absent
-    before that attempt and present after it), the next attempt runs as
-    `build --repair`.
-  - A marker that was already present is never taken over. The watcher
-    reports "unfinished build detected" once and keeps watching.
+  - (Originally: if the failing build created `.nift/.unfinished`, the next
+    attempt ran as `build --repair`. Removed after the rebase onto
+    feature-build-recovery, D-020: ordinary failures no longer need repair.)
   - Warnings from successful builds are printed to stderr as well.
   - The command is documented (`docs/BUILD-DIAGNOSTICS.md` and
     `nift commands`).
@@ -391,10 +389,10 @@ Fixes:
   All 14 remaining are in plain template text and silenceable with `\@`,
   `\$[` or `--no-warn`. (Round 2: no further maths-suffix exemption; the
   owner prefers explicit `\$[`.)
-- **R5: watcher repair workaround.** The workaround is now one class,
-  `BuildAutoRepairWorkaround` in `src/CLI.cpp`, with a construction and four
-  calls. It is to be deleted when build recovery integrates. The documentation
-  covers the marker-takeover race window and SIGTERM during a build.
+- **R5: watcher repair workaround.** It was isolated in round 1 and then
+  removed after the rebase onto `runtime-2` @`e9198eb` (feature-build-recovery,
+  D-020), because ordinary page errors no longer leave a marker that needs
+  `--repair`. The watcher only ever runs ordinary incremental builds.
 - **R6: `run()`.**
   - **Missing interpreter.** A missing `#!` interpreter (ENOENT from execve
     of an existing file) gives `interpreter not found: /x (from ./script)`
@@ -486,10 +484,8 @@ Fixes:
 
 ## Proposals (not implemented)
 
-- **P1. `.nift/.unfinished` lock-out softening.** On a clean error exit,
-  record the failed pages as stale and remove the marker. Keep the marker
-  only for crashes and signals. `--auto` now works around this for its own
-  failures only.
+- **P1. `.nift/.unfinished` lock-out softening.** Done separately by
+  feature-build-recovery (D-020), on which this branch is now rebased.
 - **P2. Strict by default for new projects.** Have `nift init` write
   `"strict-values": true`, and make it the default in the next major version
   with `false` as the opt-out. The legacy suite line `META_UNKNOWN=$[not-real]`

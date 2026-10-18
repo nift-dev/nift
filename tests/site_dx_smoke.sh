@@ -275,7 +275,10 @@ PY
 out=$("$NIFT" build --all 2>&1); rc=$?
 [ $rc -ne 0 ] && grep -q 'unknown value \$\[nosuch\]; strict-values is on' <<<"$out" && pass "\"strict-values\": true" || fail "strict config: $out"
 printf '<p>$[title] \\$[nosuch] $[0,1]$ $[ x + 1 ]</p>\n' > content/index.html
-out=$("$NIFT" build --repair 2>&1); rc=$?
+# about.html has unknown values inside <pre>/<script>/comments, which strict
+# rejects (strict is context-free); make it clean for this check.
+printf '<p>About</p>\n' > content/about.html
+out=$("$NIFT" build 2>&1); rc=$?
 [ $rc -eq 0 ] && grep -qF '<p>index $[nosuch] $[0,1]$ $[ x + 1 ]</p>' public/index.html && pass "strict leaves escapes and non-identifier text alone" || fail "strict passthrough: rc=$rc $out"
 python3 - <<'PY'
 import json; p='.nift/config.json'; d=json.load(open(p)); d['config']['strict-values']='yes'; json.dump(d,open(p,'w'),indent=2)
@@ -340,7 +343,13 @@ check_step() { # label build-args status-args expect(fail|ok)
     [ $rb -ne 0 ] && grep -q 'strict-values is on' <<<"$b" && grep -q 'strict-values is on and the page published unknown' <<<"$s" \
       && pass "toggle $1: status reports, build fails" || fail "toggle $1: rb=$rb build=$b status=$s"
   else
-    [ $rb -eq 0 ] && grep -q 'up to date' <<<"$s" && pass "toggle $1: status up to date, build ok" || fail "toggle $1: rb=$rb build=$b status=$s"
+    # After a failed strict build, build recovery (D-020) records the page as
+    # failed, so status lists it once ("previous build of this page failed")
+    # and the next ordinary build rebuilds it successfully; afterwards both
+    # agree that everything is up to date.
+    local s2; s2=$("$NIFT" status 2>&1)
+    { grep -q 'up to date' <<<"$s" || grep -q 'previous build of this page failed' <<<"$s"; } && [ $rb -eq 0 ] && grep -q 'up to date' <<<"$s2" \
+      && pass "toggle $1: build ok, then status up to date" || fail "toggle $1: rb=$rb build=$b status=$s after=$s2"
   fi
 }
 check_step "cli on" "--strict" "--strict" fail
@@ -476,7 +485,7 @@ echo '<h1>About v1</h1>' > content/about.html
 "$NIFT" build --auto > ../auto.out 2> ../auto.err < /dev/null &
 auto_pid=$!
 wait_for() { # condition-command timeout-tenths
-  local n=0; while [ $n -lt "$2" ]; do eval "$1" && return 0; sleep 0.1; n=$((n + 1)); done; return 1
+  local n=0; while [ $n -lt "$2" ]; do eval "$1" 2>/dev/null && return 0; sleep 0.1; n=$((n + 1)); done; return 1
 }
 wait_for 'grep -q "non-interactive" ../auto.out' 50 || fail "auto did not start"
 sleep 0.5
@@ -490,15 +499,41 @@ kill -0 "$auto_pid" 2>/dev/null && pass "auto stays alive after an error" || fai
 echo '<h1>About v3</h1>' > content/about.html
 wait_for 'grep -q "About v3" public/about.html' 80 && pass "auto recovers when the error is fixed" || fail "auto did not rebuild after fix"
 wait_for 'grep -q "build succeeded again" ../auto.err' 30 && pass "auto reports recovery" || fail "recovery message"
-# A failure after other pages were written leaves .unfinished; the session
-# that created it repairs automatically on the next change.
+# End to end with build recovery (D-020): an ordinary page error while other
+# pages build fine never needs --repair; the watcher never runs it (a
+# "pre build --repair" hook would record it), the fixed build matches a clean
+# build, and status shows no failed pages.
+kill "$auto_pid" 2>/dev/null; wait "$auto_pid" 2>/dev/null
+python3 - <<'PY'
+import json; p='.nift/config.json'; d=json.load(open(p)); d['config']['pre build --repair']='repair-ran.f'
+json.dump(d,open(p,'w'),indent=2)
+PY
+printf 'run("sh", "-c", "echo repair >> repair-ran.log")\n' > repair-ran.f
+"$NIFT" build --auto > ../auto2.out 2> ../auto2.err < /dev/null &
+auto_pid=$!
+wait_for 'grep -q "non-interactive" ../auto2.out' 50
 echo '<h1>Home v2</h1>' > content/index.html
 echo '<h1>About v4</h1>@input("nope.html")' > content/about.html
-wait_for '[ -e .nift/.unfinished ] || [ "$(grep -c "nope.html" ../auto.err)" -ge 1 ]' 80
-sleep 0.6
+wait_for 'grep -q "nope.html" ../auto2.err' 100 && pass "recovery: page error observed" || fail "recovery: error not reported"
+[ ! -e .nift/.unfinished ] && pass "recovery: an ordinary page error leaves no .unfinished marker" || fail "recovery: marker left"
+wait_for 'grep -q "Home v2" public/index.html' 50 && pass "recovery: the other page was built" || fail "recovery: index not built"
 echo '<h1>About v5</h1>' > content/about.html
-wait_for 'grep -q "About v5" public/about.html && [ ! -e .nift/.unfinished ]' 100 && pass "auto recovers from its own partial failure" || fail "partial failure recovery (marker: $(ls -a .nift))"
-grep -q "Home v2" public/index.html && pass "other page output current" || fail "index not rebuilt"
+wait_for 'grep -q "About v5" public/about.html' 100 && pass "recovery: fixed page rebuilt by --auto" || fail "recovery: fix not built"
+wait_for 'grep -q "build succeeded again" ../auto2.err' 50 && pass "recovery: success reported" || fail "recovery: no success message"
+[ ! -e repair-ran.log ] && ! grep -q 'repair' ../auto2.err .nift/build-auto.log && pass "recovery: no --repair path ran" || fail "recovery: repair ran ($(cat repair-ran.log 2>/dev/null))"
+kill "$auto_pid" 2>/dev/null; wait "$auto_pid" 2>/dev/null; auto_pid=""
+out=$("$NIFT" status 2>&1)
+grep -q 'up to date' <<<"$out" && ! grep -q 'previous build of this page failed' <<<"$out" && pass "recovery: status shows no failed pages" || fail "recovery: status: $out"
+python3 - <<'PY' && pass "recovery: no failed pages recorded" || fail "recovery: failed.json not empty"
+import json,os,sys
+p='.nift/failed.json'
+sys.exit(0 if not os.path.exists(p) or not json.load(open(p)).get('failed') else 1)
+PY
+rm -rf ../auto-clean && cp -a . ../auto-clean && (cd ../auto-clean && rm -f public/*.html && "$NIFT" build --all >/dev/null 2>&1)
+diff -r public ../auto-clean/public >/dev/null && pass "recovery: output matches a clean build" || fail "recovery: output differs from a clean build: $(diff -r public ../auto-clean/public | head -5)"
+"$NIFT" build --auto > ../auto.out 2> ../auto.err < /dev/null &
+auto_pid=$!
+wait_for 'grep -q "non-interactive" ../auto.out' 50
 kill -0 "$auto_pid" 2>/dev/null && pass "auto still alive" || fail "auto exited later"
 kill "$auto_pid" 2>/dev/null; wait "$auto_pid" 2>/dev/null; auto_pid=""
 
@@ -564,7 +599,7 @@ d['config']['pre build']='hook.f'; d['config']['build-threads']=1
 json.dump(d,open(p,'w'),indent=2)
 PY
   printf 'run("sh", "-c", "date +%%%%N > public/stamp.txt; %s")\n' "$2" > hook.f
-  printf 'run("sh", "-c", "echo start >> public/hook.log; sleep 1; echo end >> public/hook.log")\n' > content/zslow.pre-build.f
+  printf 'r := run("sh", "-c", "echo start >> public/hook.log; sleep 1; echo end >> public/hook.log")\n' > content/zslow.pre-build.f
   echo '<p>slow</p>@input("public/stamp.txt")' > content/zslow.html
   echo '<p>v0</p>' > content/index.html
   "$NIFT" build --all >/dev/null 2>&1 || fail "watch $1: initial build: $("$NIFT" build --all 2>&1 | head -5)"

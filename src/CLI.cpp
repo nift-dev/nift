@@ -192,27 +192,6 @@ private:
     std::set<std::string> previous_changed_;
 };
 
-// feature-site-dx: TEMPORARY, single removable unit. Ordinary build failures
-// that had already written outputs leave .nift/.unfinished, after which every
-// build refuses until `--repair`. When the watcher's own failed build created
-// the marker (absent before, present after), the next attempt runs as
-// `build --repair`. A marker present before an attempt is never taken over.
-// Remove this class and its call sites (construction plus four calls) when feature-build-recovery
-// integrates (ordinary failures will then leave no marker).
-// Known window: another process creating the marker between before_build()
-// and the build is indistinguishable from our own; SIGTERM/SIGINT during a
-// build can leave a stale marker, exactly as for any interrupted build.
-class BuildAutoRepairWorkaround {
-public:
-    explicit BuildAutoRepairWorkaround(fs::path root) : marker_(std::move(root) / ".nift/.unfinished") {}
-    void before_build() { std::error_code e; marker_before_ = fs::exists(marker_, e); }
-    bool repair() const { return repair_next_; }
-    void after_failure() { std::error_code e; if (!marker_before_ && fs::exists(marker_, e)) repair_next_ = true; }
-    void after_success() { repair_next_ = false; }
-private:
-    fs::path marker_;
-    bool marker_before_ = false, repair_next_ = false;
-};
 
 bool valid_runtime_platform(const std::string& value) {
     if (value.empty()) return false;
@@ -2366,7 +2345,6 @@ int run_cli(int argc, char** argv) {
             // diagnostics) as well as written to the log.
             //
             // Retry policy: BuildAutoRetryPolicy (above).
-            BuildAutoRepairWorkaround repair_workaround(project.root);
             BuildAutoRetryPolicy retry_policy(project.root, project.config.output_dir);
             std::string last_reported;
             bool stop_requested = false;
@@ -2384,7 +2362,6 @@ int run_cli(int argc, char** argv) {
                 if (retry_policy.should_attempt()) {
                     const bool was_failing = retry_policy.failing();
                     retry_policy.before_attempt();
-                    repair_workaround.before_build();
                     std::string captured_output;
                     int result = 0;
                     {
@@ -2395,7 +2372,7 @@ int run_cli(int argc, char** argv) {
                         else {
                             apply_checks(fresh);
                             fresh.build_mode_hint_ = "auto";
-                            result = repair_workaround.repair() ? fresh.build_all(true, false, /*repair=*/true) : fresh.build_all(false);
+                            result = fresh.build_all(false);
                         }
                         captured_output = capture.str();
                     }
@@ -2411,7 +2388,6 @@ int run_cli(int argc, char** argv) {
                                       << captured_output << std::flush;
                             last_reported = key;
                         }
-                        repair_workaround.after_failure();
                         const std::string report = retry_policy.after_failure();
                         if (!report.empty()) std::cerr << console::warning_label() << ' ' << report << '\n' << std::flush;
                     } else {
@@ -2426,7 +2402,6 @@ int run_cli(int argc, char** argv) {
                         }
                         last_reported = key;
                         retry_policy.after_success();
-                        repair_workaround.after_success();
                     }
                 }
 
