@@ -113,6 +113,11 @@ private:
     // the value (kinds) in scope `scope` (functions 0..n-1, main n).
     bool may_double(const TextType& type, std::size_t scope) const;
     bool type_mismatch_possible(const TextType& type, std::uint8_t kinds, std::size_t scope) const;
+    // Can the binding-type check of an assignment of a value of kinds
+    // `value` to binding `b` fail? Legacy words that error differently in
+    // loop code (D-018c), so such loop code is refused
+    // (context:assignment-error, review round 2).
+    bool binding_error_possible(const Binding& b, std::uint8_t value) const;
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
     // Where an error raised by `node` is reported: its own start (D-018c).
     std::uint32_t site(const Node& node) const { return node.begin; }

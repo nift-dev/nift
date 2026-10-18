@@ -1,5 +1,7 @@
 #include "rt/infer_types.h"
 
+#include <cmath>
+
 // rt-lint: cold-file compile-time analysis, once per unit
 
 namespace nift::rt::infer_detail {
@@ -126,14 +128,52 @@ bool block_falls_through(const Ast& ast, NodeId block) {
     return true;
 }
 
+long literal_position(std::string_view digits) {
+    if (digits.empty() || digits.size() >= 9 || digits.find_first_not_of("0123456789") != std::string_view::npos)
+        return -1;
+    return std::stol(std::string(digits));
+}
+
+std::uint8_t Constants::set(std::size_t nodes, NodeId id, double v) {
+    if (values.empty()) values.assign(nodes, std::nan(""));
+    values[id] = v;
+    return std::trunc(v) == v ? kKindInt : kKindFrac;
+}
+
+bool Constants::has(NodeId id) const { return !values.empty() && !std::isnan(values[id]); }
+
+bool fold_constant(Op op, double l, double r, double& out) {
+    switch (op) {
+        case Op::Add: out = l + r; break;
+        case Op::Sub: out = l - r; break;
+        case Op::Mul: out = l * r; break;
+        case Op::Div: if (r == 0) return false; out = l / r; break;
+        case Op::Mod:
+            if (r == 0 || std::trunc(l) != l || std::trunc(r) != r) return false;
+            out = std::fmod(l, r);
+            break;
+        default: return false;
+    }
+    return std::isfinite(out);
+}
+
 std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r) {
     std::uint8_t out = 0;
     if (op == Op::Add && ((l & kKindString) || (r & kKindString))) out |= kKindString;
     if ((l & kKindNumber) && (r & kKindNumber)) {
         const bool frac = (l & kKindFrac) || (r & kKindFrac);
+        // A fraction plus or minus an integer, or divided by one, stays a
+        // fraction (review round 2: precise binding types for
+        // context:assignment-error; magnitudes below 2^52, where doubles hold
+        // fractions at all).
+        const bool frac_int = (l & kKindNumber) == kKindFrac && (r & kKindNumber) == kKindInt;
+        const bool int_frac = (l & kKindNumber) == kKindInt && (r & kKindNumber) == kKindFrac;
         switch (op) {
-            case Op::Div: out |= kKindNumber; break;
+            case Op::Div: out |= frac_int ? kKindFrac : kKindNumber; break;
             case Op::Mod: out |= kKindInt; break;
+            case Op::Add: case Op::Sub:
+                out |= (frac_int || int_frac) ? kKindFrac : frac ? kKindNumber : kKindInt;
+                break;
             default: out |= frac ? kKindNumber : kKindInt; break;
         }
     }

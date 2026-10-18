@@ -33,6 +33,9 @@ bool UnitCompiler::declare(const Node& node) {
     if (!no_alias(node.b, node) || !expr_to(node.b, reg)) return false;
     std::uint16_t text_type = 0;
     const TextType& inferred = text_type_at(node.b);
+    binding.decl_kinds = kinds(node.b);
+    binding.decl_text_double = inferred.kind == TextType::Kind::Known && inferred.known == 3;
+    binding.decl_may_double = may_double(inferred, scope_index());
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
@@ -58,6 +61,7 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const bool exempt = numeric && (own_type || always_double_[scope_index()].count(target));
     if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
+    if (loop_reachable() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
@@ -124,6 +128,7 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
             }
         }
     }
+    if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
     const std::size_t check = fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
     fb_->note(check, std::string(text(target)));
     fb_->release_to(mark);

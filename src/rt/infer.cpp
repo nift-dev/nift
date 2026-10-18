@@ -32,12 +32,9 @@ public:
         for (std::size_t f = 0; f < n; ++f) params_[f].assign(ast.at(plan.functions[f]).count, empty_ty());
     }
 
-    // Monotone unions over a finite (depth-capped) lattice: terminates.
-    // Worklist over the call graph (review CP12 round 1, D1): a unit (main or
-    // a function) is walked again only when its bindings, a parameter or a
-    // callee's return grew, so a call chain converges in O(chain) walks; a
-    // unit's last walk sees its final inputs. Out of budget the result is
-    // "not converged" (never "know nothing") and the compiler refuses.
+    // Monotone unions over a finite (depth-capped) lattice. Worklist over the call graph (review D1): a unit
+    // is re-walked only when its bindings, a parameter or a callee's return grew; its last walk sees its final
+    // inputs. Out of budget: "not converged" (never "know nothing"), and the compiler refuses.
     UnitKinds run(std::size_t max_walks) {
         const std::size_t n = plan_.functions.size();
         callers_.assign(n, {});
@@ -101,6 +98,9 @@ private:
         return nullptr;
     }
 
+    // Constant-folded literal arithmetic (doubles; only the kind is used).
+    TyRef constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
+
     TyRef record(NodeId id, TyRef t) {
         result_.kinds[id] = t->kinds;
         return t;
@@ -119,8 +119,7 @@ private:
             case NodeKind::Number: {
                 Value v;
                 if (!decode_number_literal(ast_.text(n), v)) t = kinds_ty(kKindNumber);
-                else if (v.is(Kind::Int) || std::trunc(v.as_double()) == v.as_double()) t = kinds_ty(kKindInt);
-                else t = kinds_ty(kKindFrac);
+                else t = constant(id, v.is(Kind::Int) ? static_cast<double>(v.as_int()) : v.as_double());
                 break;
             }
             case NodeKind::String: t = kinds_ty(kKindString); break;
@@ -135,6 +134,7 @@ private:
                 const TyRef o = expr(n.a);
                 t = kinds_ty(n.op == Op::Not ? kKindBool
                                              : static_cast<std::uint8_t>(o->kinds & (kKindNumber | kKindUnknown)));
+                if (n.op == Op::Neg && constants_.has(n.a)) t = constant(id, -constants_.at(n.a));
                 break;
             }
             case NodeKind::Binary: {
@@ -142,6 +142,9 @@ private:
                 switch (n.op) {
                     case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
                         t = kinds_ty(arithmetic_kinds(n.op, l->kinds, r->kinds));
+                        if (double v = 0; constants_.has(n.a) && constants_.has(n.b) &&
+                                          fold_constant(n.op, constants_.at(n.a), constants_.at(n.b), v))
+                            t = constant(id, v);  // literal arithmetic: its exact kind (review round 2)
                         break;
                     default: t = kinds_ty(kKindBool); break;
                 }
@@ -178,11 +181,7 @@ private:
                 std::string key;
                 const bool literal = k.kind == NodeKind::String && k.count == 0 && ast_.text(k).size() >= 2;
                 if (literal) key = std::string(ast_.text(k).substr(1, ast_.text(k).size() - 2));
-                long position = -1;
-                const std::string_view digits = ast_.text(k);
-                if (k.kind == NodeKind::Number && !digits.empty() && digits.size() < 9 &&
-                    digits.find_first_not_of("0123456789") == std::string_view::npos)
-                    position = std::stol(std::string(digits));
+                const long position = k.kind == NodeKind::Number ? literal_position(ast_.text(k)) : -1;
                 t = element_of(o, literal ? &key : nullptr, false, position);
                 break;
             }
@@ -284,7 +283,7 @@ private:
                 const TyRef v = expr(n.b);
                 const Node& target = ast_.at(n.a);
                 if (target.kind == NodeKind::Ident) {
-                    if (TyRef* var = find(ast_.text(target))) merge_local(*var, v);
+                    if (TyRef* var = find(ast_.text(target))) { merge_local(*var, v); record(n.a, *var); }
                 } else if (target.kind == NodeKind::Index) {
                     expr(target.b);
                     add_element(ast_.at(target.a), v);
@@ -367,7 +366,8 @@ private:
         const Node& fn = ast_.at(plan_.functions[f]);
         scopes_.assign(1, Scope());
         const NodeId* params = ast_.list(fn);
-        for (std::uint32_t k = 0; k < fn.count; ++k) declare(ast_.text(ast_.at(params[k])), params[k], params_[f][k]);
+        for (std::uint32_t k = 0; k < fn.count; ++k)  // record: the parameter's binding kinds
+            declare(ast_.text(ast_.at(params[k])), params[k], record(params[k], params_[f][k]));
         statements(ast_.at(fn.b));
         if (block_falls_through(ast_, fn.b)) merge_return(kinds_ty(kKindNull));
     }
@@ -380,6 +380,7 @@ private:
     std::vector<TyRef> returns_;
     std::vector<TyRef> vars_;
     std::vector<std::size_t> persist_index_;
+    Constants constants_;
     std::vector<Scope> scopes_;
     std::vector<std::set<std::size_t>> callers_;  // per function: the units reading its return
     std::deque<std::size_t> queue_;

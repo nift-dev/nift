@@ -432,6 +432,13 @@ class Supported:
             x = self.literal(k, scope)
         if k in ("a", "o") and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", x):
             x = self.literal(k, scope)  # never bind an aggregate from a place
+        if k == "d" and text_type(x, self.bt) != "d":
+            # CP12 review round 2: a double binding is declared from a text
+            # legacy types double, so its binding type never depends on
+            # whether a computed value happens to be integral (loop-code
+            # assignments that could fail the binding-type check are refused,
+            # context:assignment-error). x + 0.5 - 0.5 == x for these values.
+            x = f"{self.par(x)} + 0.5 - 0.5"
         scope.append((v, k, True))
         tt = text_type(x, self.bt)
         self.bt[v] = k if tt == "n" else tt

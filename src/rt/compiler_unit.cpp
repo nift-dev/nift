@@ -96,6 +96,20 @@ const TextType& UnitCompiler::text_type_at(NodeId id) const {
     return *slot;
 }
 
+bool UnitCompiler::binding_error_possible(const Binding& b, std::uint8_t value) const {
+    if ((b.decl_kinds | value) & kKindUnknown) return true;
+    // Binding types (tags) the declaration can give, and value tags: an int
+    // value is accepted by a double binding; any other pair must be equal.
+    std::uint8_t tags = static_cast<std::uint8_t>(b.decl_kinds & ~kKindInt);
+    if (b.decl_kinds & kKindInt) tags |= b.decl_text_double ? kKindFrac : kKindInt;
+    if (b.decl_may_double) tags |= kKindFrac;  // "double" is the Frac bit here
+    for (std::uint8_t binding = 1; binding < 0x80; binding <<= 1)
+        for (std::uint8_t v = 1; v < 0x80; v <<= 1)
+            if ((tags & binding) && (value & v) && binding != v && !(v == kKindInt && binding == kKindFrac))
+                return true;
+    return false;
+}
+
 bool UnitCompiler::may_double(const TextType& type, std::size_t scope) const {
     switch (type.kind) {
         case TextType::Kind::Known: return type.known == 3;
@@ -218,6 +232,8 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         Binding binding;
         binding.reg = regs[k];
         binding.typed = true;
+        binding.decl_kinds = kinds(params[k]);
+        binding.decl_may_double = may_double_[f].count(name) != 0;
         if (!fb_->alloc(binding.type_reg)) return builder_ok();
         type_regs[k] = binding.type_reg;
         fb_->set_offset(param.begin);

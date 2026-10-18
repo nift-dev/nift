@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace nift::rt::infer_detail {
@@ -37,6 +38,17 @@ bool same(const TyRef& a, const TyRef& b);
 TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long position = -1);
 // Can control reach the end of `block` (a Block node)?
 bool block_falls_through(const Ast& ast, NodeId block);
+// The value of an integer literal index (`a[2]`), or -1.
+long literal_position(std::string_view digits);
+// Folded literal arithmetic per node (doubles: only the kind is used).
+struct Constants {
+    std::vector<double> values;  // NaN: not constant
+    std::uint8_t set(std::size_t nodes, NodeId id, double v);  // returns the kind (Int / Frac)
+    bool has(NodeId id) const;
+    double at(NodeId id) const { return values[id]; }
+};
+// `l op r` on literal values (finite result, no division or modulo by zero).
+bool fold_constant(Op op, double l, double r, double& out);
 // Result kinds of `l op r` for an arithmetic operator.
 std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r);
 

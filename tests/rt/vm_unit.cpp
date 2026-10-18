@@ -38,6 +38,8 @@ void check_outputs() {
         {"print(\"a\" + 1 + 2)\nprint(1 + 2 + \"a\")\n", "a12\n3a\n"},
         {"print(\"x\" + true + null + 1.5)\n", "xtruenull1.5\n"},
         {"x := 1\nx += 2\nx++\nprint(x)\n", "4\n"},
+        {"x := 0\ni := 0\nwhile (i < 3) { i += 1\nx = x + 1\nx += 2 }\nprint(x)\n", "9\n"},
+        {"d := 1.5\ni := 0\nwhile (i < 2) { i += 1\nd = d + 1\nd = 2 }\nprint(d)\n", "2\n"},
         {"s := \"ab\"\ns += \"cd\"\nprint(s.length())\n", "4\n"},
         {"w := \"h\xc3\xa9llo\"\nprint(w.length())\n", "5\n"},
         {"print(1 && \"a\")\nprint(0 || \"\")\nprint(null ?? 3)\n", "true\nfalse\n3\n"},
@@ -210,6 +212,12 @@ void check_errors() {
         {"s := \"a\" + 0.5\ni := 0\nwhile(i < 1) { i += 1; s += \"b\" }\n", "context:string-append-type"},
         {"fn(f(p)) { p = 1\nreturn p }\ni := 0\nwhile(i < 1) { i += 1; print(f(2.0 * i)) }\n",
          "context:parameter-type"},
+        // Review round 2: a loop-code assignment whose binding-type check
+        // could fail (legacy words that error differently there, D-018c).
+        {"x := 0\ni := 0\nwhile (i < 1) { i += 1\nx = \"s\" }\n", "context:assignment-error"},
+        {"n := 7\nh := 5.5\ni := 0\nwhile (i < 1) { i += 1\nn += h }\n", "context:assignment-error"},
+        {"fn(f(a)) {\nx := 1\nx = a\nreturn x }\ni := 0\nwhile (i < 1) { i += 1\nprint(f(\"s\")) }\n",
+         "context:assignment-error"},
         {"a := [1]\nb := a\n", "aliasing"},
         {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
         {"print([1])\n", "type:print"},

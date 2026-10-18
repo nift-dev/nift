@@ -24,6 +24,12 @@ struct Binding {
     std::uint16_t reg = 0;
     std::uint16_t type_reg = 0;
     bool typed = false;  // has a binding-type register (only bindings that are ever assigned)
+    // CP12 review round 2: the inferred kinds of the declaring value (or the
+    // parameter's arguments) and whether the declaring text may give the
+    // binding type double; 0xff = unknown.
+    std::uint8_t decl_kinds = 0xff;
+    bool decl_text_double = false;  // the declaring text is always typed double
+    bool decl_may_double = false;   // ... or may be (a binding it names may be double)
 };
 
 class Scopes {

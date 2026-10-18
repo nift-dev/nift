@@ -42,8 +42,10 @@ BODIES = {
     "logic": 'print(1 && "a")\nprint(0 || "")\nprint(!true)\nprint(null ?? 3)\nprint(2 ?? 3)\n'
              'print((1 < 2 ? "y" : "n"))\nprint(!(1 == 2))\n',
     # CP12 (D-018): `%=` on a binding that may hold a fraction is refused in
-    # loop code (context:modulo-assignment), so `/=` uses its own binding.
-    "bindings": "x := 1\nx = 2\nx += 3\nx -= 1\nx *= 4\nx %= 5\nprint(x)\nz := 8\nz /= 2\nprint(z)\n"
+    # loop code (context:modulo-assignment), so `/=` uses its own binding;
+    # review round 2: `/=` may make a fraction, which an int binding rejects
+    # (context:assignment-error in loop code), so that binding is a double.
+    "bindings": "x := 1\nx = 2\nx += 3\nx -= 1\nx *= 4\nx %= 5\nprint(x)\nz := 8.0\nz /= 2\nprint(z)\n"
                 "y := 1.5\ny = 2\n"
                 "print(y)\nn := 0\nn++\nn--\n++n\nprint(n)\ns := \"ab\"\ns += \"cd\"\nprint(s)\n",
     "aggregates": 'a := [1, 2, 3]\na.push(4)\na[0] = 9\nprint(a[0] + a.length() + a.size())\n'
@@ -125,6 +127,10 @@ UNSUPPORTED = [
     ("context-assignment", "x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i += 1 }\n", "context:assignment-type"),
     ("context-modulo", "x := 7\nx /= 2\ni := 0\nwhile (i < 1) { x %= 2; i += 1 }\nprint(x)\n",
      "context:modulo-assignment"),
+    ("context-assignment-error", "z := 8\ni := 0\nwhile (i < 2) { z /= 2; i += 1 }\nprint(z)\n",
+     "context:assignment-error"),
+    ("context-assignment-error-kind", "x := 0\ni := 0\nwhile (i < 1) { x = \"s\"; i += 1 }\n",
+     "context:assignment-error"),
     ("context-negative-zero", "x := 0\ni := 0\nwhile (i < 1) { print(-x); i += 1 }\n", "context:negative-zero"),
     ("context-object-length", "fn(n(o)) { return o.length() }\ni := 0\nwhile (i < 1) { print(n({\"k\": 1})); "
                               "i += 1 }\n", "context:object-length"),
