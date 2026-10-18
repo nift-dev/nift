@@ -147,6 +147,17 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b, bool prepared
     }
     if (prepared_code) fb_->at(op).flags |= kInstrReeval;
     caller_site(op);
+    // Legacy's prepared `s += t` on two strings appends to the binding's value
+    // in place and returns without the binding type check (ParserTemplate.cpp
+    // execute_prepared: `use_count()==2` branch; a binding's string value is
+    // never shared there), so a text-typed binding (`s := "a" + 0.5`, a double
+    // binding holding a string) keeps its type.
+    const std::uint8_t l = kinds(node.a), r = node.b != kNoNode ? kinds(node.b) : 0;
+    if (prepared() && node.kind == NodeKind::CompoundAssign && node.op == Op::AddAssign && l == kKindString &&
+        r == kKindString) {
+        fb_->release_to(mark);
+        return builder_ok();
+    }
     const std::size_t check = fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
     fb_->note(check, std::string(text(target)));
     caller_site(check);
@@ -166,6 +177,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
     if (!numbers && !strings && !((l | r) & kKindUnknown)) return fail(node, "type:compound-assignment");
+
     if (!reevaluated(node, node.b)) return compound_op(node, b, false);
     std::size_t note = 0;
     {
