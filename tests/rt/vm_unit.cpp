@@ -464,6 +464,46 @@ void check_code_shape() {
 
 } // namespace
 
+// CP12 review round 1, D2: integer arithmetic at the int64 bounds.
+// INT64_MIN % -1 trapped with SIGFPE in the Mod fast path (now 0, as legacy
+// and CP09); AddI computed x + offset before its range check (signed
+// overflow, UB, near INT64_MIN/MAX). test-rt-vm-sanitize runs these under
+// UBSan. Kept self-contained so it applies to CP11 (runtime-2) as well.
+void check_integer_bounds() {
+    using Stop = decltype(VmResult().reason);  // StopReason (CP12) / BailReason (CP11)
+    const char* min = "q := 2147483648\nm := (0 - q * q) * 2\n";  // INT64_MIN
+    const Case outputs[] = {
+        {"n := 0 - 1\nprint(m % n)\nprint(m % (0 - 1))\nm %= n\nprint(m)\n", "0\n0\n0\n"},
+        {"i := 0\nwhile (i < 2) { i += 1\nprint(m % (0 - 1)) }\n", "0\n0\n"},
+        {"print(m / (0 - 1))\nprint(m % 7)\nprint(m % (0 - 7))\n", "9.223372036854776e+18\n-1\n-1\n"},
+    };
+    for (const Case& c : outputs) {
+        const std::string source = std::string(min) + c.source;
+        const rt_vm_tool::Run r = rt_vm_tool::run(source.c_str());
+        CHECK(r.reason.empty() && r.result.reason == Stop::None && r.output == c.output);
+        if (r.output != c.output) std::fprintf(stderr, "  program: %s  got [%s]\n", source.c_str(), r.output.c_str());
+    }
+    {
+        const rt_vm_tool::Run r =
+            rt_vm_tool::run("fn(f(a, b)) { return a % b }\nq := 2147483648\nprint(f((0 - q * q) * 2, 0 - 1))\n");
+        CHECK(r.reason.empty() && r.result.reason == Stop::None && r.output == "0\n");
+    }
+    const Case errors[] = {
+        {"m--\n", "signed 64-bit integer overflow"},
+        {"m -= 1\n", "signed 64-bit integer overflow"},
+        {"x := 0 - (m + 1)\nx++\n", "signed 64-bit integer overflow"},
+        {"x := 0\nprint(5 % x)\n", "modulo by zero"},
+        {"x := 0\nprint(5 / x)\n", "division by zero"},
+    };
+    for (const Case& c : errors) {
+        const std::string source = std::string(min) + c.source;
+        const rt_vm_tool::Run r = rt_vm_tool::run(source.c_str());
+        CHECK(r.reason.empty() && r.result.reason == Stop::Error && r.result.message == c.output);
+        if (r.result.message != c.output)
+            std::fprintf(stderr, "  program: %s  got [%s]\n", source.c_str(), r.result.message.c_str());
+    }
+}
+
 int main() {
     check_outputs();
     check_fallbacks();
@@ -478,5 +518,6 @@ int main() {
     check_code_shape();
     check_round3_fallbacks();
     check_deep_inputs();
+    check_integer_bounds();
     return rt_test::finish("rt vm unit");
 }
