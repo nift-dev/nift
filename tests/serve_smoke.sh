@@ -124,9 +124,13 @@ if start default --port "$P"; then
     grep -qx "Serving: $PROJ/public" "$WORK/default.out" && grep -qx "URL:     http://127.0.0.1:$P/" "$WORK/default.out" \
         && grep -q "^Press Ctrl+C to stop.$" "$WORK/default.out" && ok "banner (default dir, custom port)" || bad "banner" "$WORK/default.out"
     if [ "$FULL" = 1 ]; then
-        # fds 0-2 are inherited from whoever runs the test; count only fds >= 3.
-        socks=$(for fd in /proc/$SPID/fd/*; do [ "${fd##*/}" -ge 3 ] && readlink "$fd"; done 2>/dev/null | grep -c "^socket:")
-        fds=$(for fd in /proc/$SPID/fd/*; do readlink "$fd"; done 2>/dev/null)
+        # Ignore descriptors the test shell itself inherited (fds 0-2, a
+        # `flock` lock file, a harness socket): only what Nift/Python opened
+        # counts.
+        inherited=$(for fd in /proc/$$/fd/*; do readlink "$fd"; done 2>/dev/null | sort -u)
+        fds=$(for fd in /proc/$SPID/fd/*; do [ "${fd##*/}" -ge 3 ] && readlink "$fd"; done 2>/dev/null \
+              | grep -vxF -f <(printf '%s\n' "$inherited"))
+        socks=$(printf '%s\n' "$fds" | grep -c "^socket:")
         # stdout/stderr point into $WORK (the test's own redirects); anything
         # else under a temp dir, or an unlinked file, would be a Nift temp file.
         if echo "$fds" | grep -v "^$WORK/" | grep -q -e '^/tmp' -e '^/var/tmp' -e '(deleted)'; then bad "server holds a temporary file"; else ok "no temporary files held by the server"; fi
