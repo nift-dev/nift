@@ -8,8 +8,11 @@
    VM outcome (vm / fallback / replayed, with reason) must match the EXPECT
    manifest. Scripts expected to run on the VM must also produce the same
    output under NIFT_VM=require (genuine VM execution, no legacy at all).
-2. Generated programs (vm_gen.py) and mutated near-miss programs: legacy vs
-   NIFT_VM=1, all three channels identical; outcomes are tallied.
+2. Generated programs (vm_gen.py, the general-language generator: original
+   distribution, representative Nift including unsupported constructs) and
+   mutated near-miss programs: legacy vs NIFT_VM=1, all three channels
+   identical. The VM-execution, replay and fallback shares (by reason) are
+   reported as the coverage metric; there is no coverage threshold (D-016).
 3. --rt-diff: tools/rt-diff over the shared corpora with the CP11 policy file
    (approved D-001 recursion-budget differences only); per-script outcomes
    are collected through tools/rt-vm/nift-vm.
@@ -189,12 +192,30 @@ def generated(args, work):
             failures += 1
     print(f"generated: {args.gen} programs; outcomes {dict(tally.most_common())}")
     print(f"mutants: {args.gen} programs; outcomes {dict(mtally.most_common())}")
-    ran = tally.get("vm", 0)
-    print(f"generated programs completed on the VM: {ran} of {args.gen}")
-    if args.gen >= 50 and ran < args.gen // 5:
-        print("FAIL generated: fewer than 20% of the generated programs ran on the VM (generator drifted)")
-        failures += 1
+    # Coverage of the general generator is a measured outcome, never a
+    # threshold (D-016): report the shares, fail only on differences.
+    share = coverage_shares(tally, args.gen)
+    print(f"general generator coverage (seed {args.seed}): ran on the VM {share['vm']} of {args.gen} "
+          f"({share['vm_pct']:.1f} %), replayed {share['replayed']} ({share['replayed_pct']:.1f} %), "
+          f"fell back {share['fallback']} ({share['fallback_pct']:.1f} %)")
+    print(f"  replay reasons: {share['replay_reasons']}")
+    print(f"  fallback reasons: {share['fallback_reasons']}")
+    if args.gen_report:
+        with open(args.gen_report, "w") as f:
+            json.dump({"seed": args.seed, "count": args.gen, "generated": share,
+                       "mutants": coverage_shares(mtally, args.gen)}, f, indent=1, sort_keys=True)
     return failures
+
+
+def coverage_shares(tally, total):
+    replay = collections.Counter({k.split(":", 1)[1]: n for k, n in tally.items() if k.startswith("replayed:")})
+    fallback = collections.Counter({k.split(":", 1)[1]: n for k, n in tally.items() if k.startswith("fallback:")})
+    vm = tally.get("vm", 0)
+    pct = lambda n: 100.0 * n / max(1, total)  # noqa: E731
+    return {"vm": vm, "vm_pct": pct(vm), "replayed": sum(replay.values()), "replayed_pct": pct(sum(replay.values())),
+            "fallback": sum(fallback.values()), "fallback_pct": pct(sum(fallback.values())),
+            "replay_reasons": dict(replay.most_common()), "fallback_reasons": dict(fallback.most_common()),
+            "other": {k: n for k, n in tally.items() if k != "vm" and not k.startswith(("replayed:", "fallback:"))}}
 
 
 def rt_diff(args, work):
@@ -253,6 +274,7 @@ def main():
     ap.add_argument("--rt-diff", action="store_true")
     ap.add_argument("--rt-diff-gen", type=int, default=200)
     ap.add_argument("--outcomes", help="write rt-diff per-script VM outcomes (JSON)")
+    ap.add_argument("--gen-report", help="write the general generator's coverage shares (JSON)")
     args = ap.parse_args()
     args.nift = os.path.abspath(args.nift)
     work = tempfile.mkdtemp(prefix="nift-vm-parity-")
