@@ -96,20 +96,32 @@ class rules (`tools/rt-diff/policies/cp12-vm.json`) and `vm_parity.py`
 confirms each class approval against the VM statistics. A pair is identical
 or matches exactly one named policy; anything else fails.
 
-Narrowed in review round 1 (the first versions approved real bugs, see
-Reviews): every approval is attributed to the line or error it approves.
+Review round 2 (the VM must never vouch for its own output): no policy
+reads the VM's statistics as evidence; what a policy approves is checked
+against legacy and against the program itself.
 
-| Policy | Requires (evidence) | Shape approved |
+| Policy | Shape approved | Independent check |
 | --- | --- | --- |
-| `D-001#4 recursion` | `beyond_legacy_depth` | legacy fails only with `callable recursion depth exceeded`; its output a prefix of the VM's; the VM completed or stopped with a program error |
-| `D-018a numbers` | `large_lines` (per output line), `derived_lines`, outcome `vm`/`vm-error` | a changed line: same text once whole-word numbers and booleans are abstracted, its VM line in `large_lines`, every changed number pair with a large member (|n| ≥ 2^53, e-notation, inf, nan) — small numbers or booleans only on a line in `derived_lines` (a large operand's consequence: `big - big2`, `m == m + 0`); a legacy line the VM does not print: an exact repeat of an adjacent legacy line at an attributed position (re-evaluated calls); after a VM stop with `signed 64-bit integer overflow` / `arithmetic result is not finite` in loop code (`error_in_loop_path`, statistics naming its line and column, the stop attributed) legacy's continuation is not compared; otherwise stderr equal or D-018c |
-| `D-018c diagnostics` | outcome `vm-error`; statistics' line/column = the VM diagnostic's; the source; `error_in_loop_path` for the wording map and loop positions | same stdout, both exit 1 with one diagnostic on the same file; messages equal once legacy's `return: ` prefixes are removed, or (loop code only) legacy's loop wording is the canonical message's legacy form (same binding; an index error for `invalid index`; an element-assignment error for `invalid index target`); the VM position is the failing site verified against the source (quoted expression, assigned binding, index target, member, operator — never the enclosing statement); legacy's on the same line at or before it, or (loop code) a `while` statement or a statement with a call; without the source only identical positions |
+| `D-001#4 recursion` | legacy fails only with `callable recursion depth exceeded`; its output a prefix of the VM's; the VM completed or stopped with a program error | legacy's output and error |
+| `D-018c diagnostics` | same stdout, both exit 1 with one diagnostic on the same file; messages equal once legacy's `return: ` prefixes are removed, or legacy's loop wording `invalid index` / `invalid index target` with the canonical message | the VM position equals the failing node derived from the CP10 AST (`tests/runtime2/vm_sites.py`: the unique node that can raise the message within the statement legacy reports — or, where legacy reports a loop statement or a call site, within the program — with constant operands evaluated exactly in Python to find which operation fails); every field legacy's wording omits (index, key) equals the constant the source gives at that node, otherwise not approved |
 
-`tests/runtime2/vm_policy_negative.py` pins the narrowing: 35 synthetic VM
-bugs (every case of the reviewer's mask.py, given the evidence a genuine
-run of that shape carries) are rejected and 10 genuine shapes approved.
-rt-diff's D-018 class rules classify with each entry's own VM statistics
-and program (`rt-diff --b-vm-stats`) through the same `classify`.
+There is **no D-018a (numbers) policy and no deleted-line rule** any more.
+Generated programs keep values within ±2^53 where legacy computes in
+doubles (generator constants narrowed; the former-replay generator no
+longer emits large numbers in loop-evaluator code, recursion beyond 64
+frames, or loop index errors whose index the source does not fix). The
+real programs that need D-018a / D-001#4 are pinned with results computed
+independently of the VM (`tests/runtime2/vm_golden.py`, 108 programs from
+the former-replay suite; the reviewer's D4 shapes in `vm_review_cp12.py`;
+`vm_d018.py` and `vm_engine_selection.py` pinned cases). Loop-code
+assignments whose binding-type check could fail are refused at compile time
+(`context:assignment-error`), so legacy's loop wording "cannot change binding
+type" is never approved. Exact integer arithmetic at the bounds is checked
+for every int opcode against Python ints (`vm_int_bounds.py`, 2,682
+programs). `vm_policy_negative.py`: the reviewer's mask.py and mask2.py
+synthetic bugs (52) are rejected, 5 genuine shapes approved. The live
+mutation gate (`make test-rt-vm-mutants`, see Reviews round 2) is the
+acceptance criterion.
 
 `tests/runtime2/vm_d018.py` runs each approved change on legacy (old) and
 the VM (new) side by side — 13 live cases, including the same function
@@ -176,6 +188,7 @@ The `context:*` reasons are in "D-018 consequences" above.
 | `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` |
 | `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, in loop code | legacy abandons preparing the loop body |
 | `param-type-unpredicted` | (defensive) a parameter type read the analysis did not predict | — |
+| `context:assignment-error` | (review round 2) an assignment or compound assignment in loop-evaluator code whose binding-type check could fail (the value's kinds include one the declaration's binding type does not accept) | legacy reports "cannot change binding type: x" at the statement, outermost loop statement or call site; canonical "cannot assign T to U binding 'x'" at the assignment |
 | `analysis-limit:kinds` | (defensive) the kind inference did not converge within its budget (review round 1, D1) | — |
 
 ## Tests
@@ -190,6 +203,17 @@ Final build `aeefaa7`, idle host (2 vCPU). Logs: `../evidence/cp12/`.
 | `vm_context_consistency.py` | 126 (body, argument) pairs × 5 contexts: VM results identical across contexts in every case; 68 pairs ran on the VM in all 5 contexts; **legacy itself is context-dependent on 63 pairs** |
 | extra adversarial seeds 2 and 3 (count 200) | 32,221 programs each, 0 non-approved differences |
 | `make test-rt-value`, `make test-rt-parser`, rt-lint, `legacy_names.py --check`, `certification_guard.sh` | PASS |
+
+Review round 2 (final build): `test-rt-vm` PASS (rt-diff 813 entries, 0
+differing, 7 approved; adversarial 37,421 programs, 0 non-approved, 99
+D-018c + 69 D-001#4; former replay 1,645 programs, 292 D-018c; supported
+generator 500/500 on the VM; golden 108; int bounds 2,682; policy negatives
+52/5; review reproducers 87), `test-rt-vm-mutants` PASS (8/8 rejected),
+`test-rt-vm-sanitize` clean (ASan+UBSan, incl. golden and int bounds), perf
+guards (`test-load-sensitive`) PASS, callgrind hot paths unchanged (flat call
+425, fib 285/call, loop 109), rt-lint and certification guard PASS. Extra seeds: adversarial 2,
+3, 4, former replay 2, 3, supported/unsupported generators 1-4 at 500: 0
+failures.
 
 Review round 1 (final build, `make -j2`): `test-rt-vm` PASS (unit 40,303
 checks; rt-diff 813 entries, 0 differing, 8 approved, each confirmed from
@@ -256,10 +280,10 @@ no optimisation was attempted (owner priority: replay removal and coverage).
   whose legacy meaning differs from the canonical one; they are
   conservative (kind- and name-level), so some units that would behave
   identically are refused. Measured below.
-* **Approved differences are policy-checked, not unbounded.** Each policy
-  needs VM evidence attributed to the line or error it approves and a
-  narrow shape; `vm_d018.py` pins both sides, `vm_policy_negative.py` the
-  rejection of synthetic bugs (review round 1).
+* **Approved differences are checked independently of the VM** (review
+  round 2): D-018c against the CP10 AST and exact evaluation, D-001#4
+  against legacy; D-018a only as pinned results computed in Python; the
+  live mutation gate is the acceptance test.
 * **D-018a consequences on control flow.** A loop branch taken on a value
   derived from a large operand can differ from legacy; no policy approves
   such a divergence (it fails a gate, visibly). Static refusal would need a
@@ -296,6 +320,38 @@ check), add_local 183 (180), if_branch 244 (236). Not material: no
 scoreboard row; wall times were not re-measured (host not idle: another
 agent's test runs).
 
+### Round 2 (verification of round 1)
+
+D1, D2, D3, D4 and R2 were closed. The policy narrowing was not: the VM
+produced its own evidence, so a bug in an operation created the evidence
+that approved its wrong output (`mask2.py`: 11 of 11 synthetic bugs
+approved).
+
+| Finding | Fix | Test |
+| --- | --- | --- |
+| D-018a self-attestation: `arith_slow` marked any large or failed result as evidence, so a wrong large value (`x 4` → `x 1152921504606846976`, `2` → `1e+300`) or a spurious overflow in small-number loop code approved itself, the latter dropping legacy's remaining output | **D-018a policy removed** from every differential gate. Generators keep values within ±2^53 where legacy computes in doubles (adversarial constants `1000000`/`1e15` → `1000`/`1e5`, general generator `123456789`/`4000000000` → `12345`/`40000`; the former-replay generator emits no large numbers in loop-evaluator code). The programs that genuinely need D-018a are pinned with independently computed results (below) | `vm_golden.py`, `vm_int_bounds.py`, mutants 2 and 3 |
+| `derived_lines` per output line: every small value or boolean on such a line could change (`0 7` → `0 13`) | removed with D-018a | `vm_policy_negative.py` (mask2) |
+| Deleted-line rule approved a dropped iteration that repeats its neighbour | removed; exactly-once evaluation is pinned (`vm_d018.py`, `vm_engine_selection.py` exact VM results) | mutant 4 |
+| D-018c site check: an operator anywhere in the rest of the expression (`4 / 2 + 1 / z` at column 6 approved) | the VM position must equal the failing node derived independently from the CP10 AST (`vm_sites.py`): the unique candidate within legacy's reported statement (or the program for loop/call-site reports), constant operands evaluated exactly in Python to find the failing operation; no longer any "legacy position equals VM position" shortcut | mask2, mutant 5 |
+| D-018c mappings did not check content (wrong index number; "cannot assign bool to array binding") | `invalid index` / `invalid index target` approved only when every omitted field equals the constant the source gives at that node (else not approved: those programs are pinned or not generated); legacy's binding wording is never mapped: such loop code is refused, `context:assignment-error` (inference made precise enough that the supported subset stays 100 % on the VM: literal arithmetic folded, a fraction ± or ÷ an integer stays a fraction) | mask2, mutants 6 and 7 |
+
+**Independent oracles.** `vm_golden.py`: the 108 former-replay programs (seed 1) that needed D-018a (65), D-001#4 (33) or an unverifiable loop index (10), each with a stated reason; expected stdout from Python ints (W = 2^53 − 1, 2000000000², ...), error positions from the CP10 AST with exact evaluation or a written hand derivation, recursion results from the recursion's definition — legacy and the VM are not consulted. `vm_int_bounds.py`: 2,682 programs, every int opcode (+, −, *, %, unary −, `+=` `-=` `*=` `%=`, `+= k`, `++`, `--`) at 0, ±1, ±3, ±7, 1000, 32767, ±(2^53−1), ±2^53, 2^53+1, 2^62, 2^63−1, −2^63+1, −2^63, with and without the checked dispatch, against Python ints. The reviewer's D4 shapes (9) and the D-018 live cases are pinned the same way.
+
+**Mutation gate** (`make test-rt-vm-mutants`, in `make test`, hence certify): one extra link of nift with `-DNIFT_VM_MUTANTS` (the mutant code exists only there; `src/rt/vm_mutants.h`), mutant chosen by `NIFT_VM_MUTANT`. Suites per run: int bounds, golden, review reproducers, D-018 cases, supported subset (100), vm_parity (corpus, 100 generated, rt-diff over the shared corpora), adversarial (40/120 per family), former replay (60/family). Unmutated: every suite passes. Result (`make test-rt-vm-mutants`, with rt-diff): unmutated passes every suite; all 8 mutants rejected —
+
+| Mutant | Rejected by |
+| --- | --- |
+| 1 Sub → Add in the checked table | int bounds, golden, review, former replay |
+| 2 large slow-path result off by 1000 | int bounds, golden, review, D-018, parity, adversarial, former replay |
+| 3 spurious AddI overflow (small operands) | int bounds, golden, supported, parity, adversarial, former replay |
+| 4 dropped loop iteration | int bounds, golden, D-018, supported, parity, adversarial, former replay |
+| 5 wrong error column | int bounds, golden, review, D-018, parity, adversarial, former replay |
+| 6 wrong index number in the message | golden, D-018, parity, adversarial, former replay |
+| 7 wrong kinds in the assignment message | D-018, parity, adversarial, former replay |
+| 8 Mod fast-path sign | int bounds, supported, parity, adversarial |
+
+Approvals before → after (seed 1, the gate sizes): former replay 66 D-018a + 33 D-001#4 + 321 D-018c → 0 D-018a (65 pinned, 1 now refused) + 0 D-001#4 in the generated suite (33 pinned) + 292 D-018c (1,645 generated programs; 1,185 on the VM); adversarial 69 D-001#4 + 1,636 D-018c → 69 D-001#4 + 99 D-018c (12,918 on the VM, was 14,654: ≈1,500 loop binding-wording cases are now refused before execution, `context:assignment-error`); rt-diff 8 → 7 (3 D-001#4 class, 2 D-018c class, 2 exact D-001#4 rules; shared corpora 101 of 786 on the VM, was 103). Remaining policy approvals: D-001#4 recursion (legacy is the oracle up to its 64 frames) and D-018c diagnostics checked against the AST.
+
 ## Commits
 
 `968bcf0` remove bail-and-replay; `5bc14be` invariant and former-replay
@@ -314,3 +370,11 @@ Review round 1: `f580d08` D2 (INT64_MIN % -1, AddI; CP11 backport
 `09ee120` on `runtime-2-d2-int64`), `8370e3f` D3, `158be8c` D1, `96e9fb2`
 compile cost, `0bd5f06` per-line policies, operand evidence and R2,
 `ad0de0d` checked dispatch for the operand evidence, then this record.
+(Branch rebased by the coordinator onto `runtime-2` @`b61e3a5`; round-1
+hashes are now `676dd28` D2, `7f0fbf9` D3, `54e041a` D1, `1e94f82`,
+`83720e2`, `4d97ae7`, `7b863f4`.)
+
+Review round 2: `de74f26` loop-assignment refusal and precise kinds,
+`54a418a` policies checked against the program (D-018a removed), `96f3fe3`
+generators within ±2^53, golden results and int bounds, `3a0637d` live
+mutation gate, then this record.
