@@ -451,3 +451,24 @@ must be removed or justified when build recovery integrates.
   or `--dir` (no containment), defaults 127.0.0.1:8000; no live reload, watch,
   proxy, HTTPS or C++ server. Local development only; Python 3 is required and
   never installed automatically.
+
+## D-027 — Integration first; JSON fast path; honest platform guarantees (owner, 2026-10-18)
+- **Integration order after CP12 certifies:** CP14 natives wired into the VM,
+  then CP13, then CP15; the first complete `records20k` run at 100% VM is the
+  next major milestone. CP12 must not become an endless effort to perfect a
+  restricted subset: after the current fix verification, findings outside the
+  accepted subset are handled by refusal/narrowing or recorded for later, and
+  only defects in what the VM accepts block integration.
+- **Compile-analysis guards:** the CP12 compile-cost improvements (kind
+  inference on a 500-function program, compilation of a 500-function chain)
+  become callgrind regression guards.
+- **JSON:** after CP15 integrates, parse JSON directly into VM values (no
+  intermediate document), measured for throughput, allocations and memory
+  against CPython, Bun and Node on equivalent workloads. Not a blocker for the
+  initial CP15 integration.
+- **No compatibility machinery** for contextual or source-shape-dependent legacy
+  behaviour: the VM refuses such constructs and the register records them.
+- **Platform guarantees are claimed only where established.** `nift serve` on
+  Windows guarantees no orphaned server only when the kill-on-close job object
+  is in place; otherwise it warns. The cross-platform gate tests process
+  termination and child cleanup, not only compilation.
