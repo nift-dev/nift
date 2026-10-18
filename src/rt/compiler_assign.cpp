@@ -32,7 +32,7 @@ bool UnitCompiler::declare(const Node& node) {
     if (!new_binding(name, target, reg, binding)) return false;
     if (!no_alias(node.b, node) || !expr_to(node.b, reg)) return false;
     std::uint16_t text_type = 0;
-    const TextType inferred = infer_text_type(type_text(ast_.at(node.b)));
+    const TextType& inferred = text_type_at(node.b);
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
@@ -51,7 +51,7 @@ bool UnitCompiler::declare(const Node& node) {
 // own (`x = x`); a string held by a double-typed binding (`s := "" + 1.5`)
 // fails only the prepared check, so other values get no exemption.
 bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
-    const TextType type = infer_text_type(type_text(ast_.at(node.b)));
+    const TextType& type = text_type_at(node.b);
     const std::string_view target = text(ast_.at(node.a));
     const bool numeric = (kinds(node.b) & static_cast<std::uint8_t>(~kKindNumber)) == 0;
     const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;

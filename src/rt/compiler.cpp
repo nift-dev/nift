@@ -26,7 +26,7 @@ bool UnitCompiler::builder_ok() {
     return false;
 }
 
-bool UnitCompiler::begin(std::string name, NodeId body) {
+bool UnitCompiler::begin(std::string name, NodeId body, const std::unordered_set<std::string_view>* assigned) {
     fb_ = std::make_unique<FunctionBuilder>(std::move(name));
     scopes_ = Scopes();
     scopes_.push();
@@ -36,7 +36,8 @@ bool UnitCompiler::begin(std::string name, NodeId body) {
     call_args_ = 0;
     index_depth_ = 0;
     assigned_.clear();
-    collect_assigned(ast_, body, assigned_);
+    if (assigned) assigned_ = *assigned;  // computed once by the unit analyses
+    else collect_assigned(ast_, body, assigned_);
     update_flags();
     return true;
 }
@@ -49,7 +50,23 @@ bool UnitCompiler::finish(std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     in_function_ = false;
-    begin("", program);
+    // collect_assigned over the whole program, reusing the function bodies'
+    // sets (a declaration's name and parameters are never assigned).
+    std::unordered_set<std::string_view> assigned;
+    {
+        std::size_t next_fn = 0;
+        const Node& root = ast_.at(program);
+        const NodeId* items = ast_.list(root);
+        for (std::uint32_t k = 0; k < root.count; ++k) {
+            if (next_fn < plan_.functions.size() && items[k] == plan_.functions[next_fn]) {
+                assigned.insert(assigned_fn_[next_fn].begin(), assigned_fn_[next_fn].end());
+                ++next_fn;
+            } else {
+                collect_assigned(ast_, items[k], assigned);
+            }
+        }
+    }
+    begin("", program, &assigned);
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {

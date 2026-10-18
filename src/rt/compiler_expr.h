@@ -54,7 +54,10 @@ private:
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
     void compute_may_double();
-    bool begin(std::string name, NodeId body);
+    bool begin(std::string name, NodeId body, const std::unordered_set<std::string_view>* assigned = nullptr);
+    // The text type of a node's type text (infer_text_type), memoised per
+    // node: the unit analyses and the compiler ask for the same nodes.
+    const TextType& text_type_at(NodeId id) const;
     bool finish(std::unique_ptr<Proto>& out);
     bool statements(const Node& block);
     bool statement(NodeId id);
@@ -139,6 +142,8 @@ private:
     std::string_view text(const Node& node) const { return ast_.text(node); }
 
     bool probe_ = false;
+    mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
+    std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;
     const Ast& ast_;
     const UnitPlan& plan_;

@@ -28,9 +28,10 @@ struct ArgUse {
 // assignment targets and the bindings named by declaration and assignment
 // texts; and, per user-call argument, the bindings its text names (read only
 // when the callee's parameter is observable).
-void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body, std::unordered_set<std::string_view>& out,
+void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
+                 const std::unordered_set<std::string_view>& assigned, std::unordered_set<std::string_view>& out,
                  std::vector<ArgUse>& args) {
-    collect_assigned(ast, body, out);
+    out.insert(assigned.begin(), assigned.end());
     std::vector<NodeId> stack{body};
     while (!stack.empty()) {
         const NodeId id = stack.back();
@@ -63,8 +64,10 @@ UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, co
     observable_.resize(count);
     std::vector<std::unordered_set<std::string_view>> names(count);
     std::vector<std::vector<ArgUse>> args(count);
+    assigned_fn_.resize(count);
     for (std::size_t f = 0; f < count; ++f) {
-        typed_names(ast, plan, ast.at(plan.functions[f]).b, names[f], args[f]);
+        collect_assigned(ast, ast.at(plan.functions[f]).b, assigned_fn_[f]);
+        typed_names(ast, plan, ast.at(plan.functions[f]).b, assigned_fn_[f], names[f], args[f]);
         observable_[f].assign(ast.at(plan.functions[f]).count, false);
     }
     // Fixpoint: an argument's named bindings are read when the callee's
@@ -84,6 +87,13 @@ UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, co
         }
     }
     compute_may_double();
+}
+
+const TextType& UnitCompiler::text_type_at(NodeId id) const {
+    if (text_types_.empty()) text_types_.resize(ast_.size());
+    std::shared_ptr<const TextType>& slot = text_types_[id];
+    if (!slot) slot = std::make_shared<const TextType>(infer_text_type(type_text(ast_.at(id))));
+    return *slot;
 }
 
 bool UnitCompiler::may_double(const TextType& type, std::size_t scope) const {
@@ -129,7 +139,7 @@ void UnitCompiler::compute_may_double() {
             if (n.kind == NodeKind::FnDecl && scope == count) continue;
             if (n.kind == NodeKind::Declare && ast_.at(n.a).kind == NodeKind::Ident) {
                 const std::string_view name = text(ast_.at(n.a));
-                const TextType type = n.b != kNoNode ? infer_text_type(type_text(ast_.at(n.b))) : TextType();
+                const TextType type = n.b != kNoNode ? text_type_at(n.b) : TextType();
                 if (n.b != kNoNode && type.kind == TextType::Kind::Known && type.known == 3) {
                     if (!other.count(name)) always_double_[scope].insert(name);
                 } else {
@@ -156,7 +166,7 @@ void UnitCompiler::compute_may_double() {
                 const Node& n = ast_.at(id);
                 if (n.kind == NodeKind::FnDecl && scope == count) continue;  // main: skip function bodies
                 if (n.kind == NodeKind::Declare && n.b != kNoNode && ast_.at(n.a).kind == NodeKind::Ident) {
-                    const bool dbl = may_double(infer_text_type(type_text(ast_.at(n.b))), scope) ||
+                    const bool dbl = may_double(text_type_at(n.b), scope) ||
                                      (kinds(n.b) & (kKindFrac | kKindUnknown));
                     if (dbl && may_double_[scope].insert(text(ast_.at(n.a))).second) changed = true;
                 }
@@ -167,7 +177,7 @@ void UnitCompiler::compute_may_double() {
                         const std::size_t g = fn->second - 1u;
                         const Node& callee = ast_.at(plan_.functions[g]);
                         for (std::uint32_t k = 0; k < n.count && k < callee.count; ++k) {
-                            const bool dbl = may_double(infer_text_type(type_text(ast_.at(list[k]))), scope) ||
+                            const bool dbl = may_double(text_type_at(list[k]), scope) ||
                                              (kinds(list[k]) & (kKindFrac | kKindUnknown));
                             const std::string_view param = text(ast_.at(ast_.list(callee)[k]));
                             if (dbl && may_double_[g].insert(param).second) changed = true;
@@ -194,7 +204,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     in_function_ = true;
     function_ = f;
     const Node& node = ast_.at(plan_.functions[f]);
-    begin(std::string(text(ast_.at(node.a))), node.b);
+    begin(std::string(text(ast_.at(node.a))), node.b, &assigned_fn_[f]);
     const NodeId* params = ast_.list(node);
     std::vector<std::uint16_t> regs(node.count);
     for (std::uint32_t k = 0; k < node.count; ++k)

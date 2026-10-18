@@ -69,7 +69,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         // the callee can observe a difference (D-018).
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (observable_[f][k] &&
-                type_mismatch_possible(infer_text_type(type_text(ast_.at(args[k]))), kinds(args[k]), scope_index()))
+                type_mismatch_possible(text_type_at(args[k]), kinds(args[k]), scope_index()))
                 return fail(ast_.at(args[k]), "context:parameter-type");
     }
     if (!is_native && !pass_param_types(f, node.count, args, base)) return false;

@@ -83,8 +83,7 @@ bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint1
 }
 
 bool UnitCompiler::text_type_operand(NodeId value, std::uint16_t& operand) {
-    const Node& node = ast_.at(value);
-    return text_type_of(infer_text_type(type_text(node)), node, operand);
+    return text_type_of(text_type_at(value), ast_.at(value), operand);
 }
 
 // A textual call: legacy's bind_call_param types each parameter from the
@@ -105,7 +104,7 @@ bool UnitCompiler::pass_param_types(std::size_t f, std::uint32_t argc, const Nod
         const Node& arg = ast_.at(args[k]);
         const std::uint16_t mark = fb_->top();
         std::uint16_t operand = 0;
-        if (!text_type_of(infer_text_type(type_text(arg)), arg, operand)) return false;
+        if (!text_type_of(text_type_at(args[k]), arg, operand)) return false;
         const auto dst = static_cast<std::uint16_t>(base + argc + k);
         if (operand & kConstantBit) fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(operand & ~kConstantBit));
         else if (operand != dst) fb_->emit(OpCode::Move, dst, operand);
