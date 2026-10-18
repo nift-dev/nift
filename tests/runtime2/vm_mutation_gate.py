@@ -69,16 +69,21 @@ def wrapper(binary, mutant, d):
     return path
 
 
-def run_suites(nift, rt_diff, label):
+def run_suites(nift, rt_diff, label, logs):
     rejected = []
     for name, cmd in suites(nift, rt_diff):
         start = time.time()
         p = subprocess.run(cmd, capture_output=True, text=True)
         tail = (p.stdout.strip().splitlines() or [""])[-1][:160]
+        log = os.path.join(logs, f"{label}-{name}.log")
+        with open(log, "w") as f:
+            f.write(f"$ {' '.join(cmd)}\nexit {p.returncode}\n--- stdout\n{p.stdout}\n--- stderr\n{p.stderr}")
         print(f"  [{label}] {name}: {'PASS' if p.returncode == 0 else 'REJECT'} ({time.time() - start:.0f}s) {tail}",
               flush=True)
         if p.returncode != 0:
             rejected.append(name)
+            if label == "0":  # the unmutated binary must pass: show why it did not
+                print("\n".join("      | " + x for x in (p.stdout + p.stderr).strip().splitlines()[-25:]), flush=True)
     return rejected
 
 
@@ -87,19 +92,23 @@ def main():
     ap.add_argument("--nift", required=True, help="the -DNIFT_VM_MUTANTS build")
     ap.add_argument("--mutants", default=",".join(str(k) for k in MUTANTS))
     ap.add_argument("--rt-diff", action="store_true", help="also run rt-diff over the shared corpora")
+    ap.add_argument("--logs", help="directory for every suite's full output (default: a temporary directory)")
     args = ap.parse_args()
     binary = os.path.abspath(args.nift)
     d = tempfile.mkdtemp(prefix="nift-vm-mutants-")
+    logs = args.logs or os.path.join(d, "logs")
+    os.makedirs(logs, exist_ok=True)
+    print(f"full suite outputs: {logs}")
     failures = 0
     print("unmutated (NIFT_VM_MUTANT=0):", flush=True)
-    rejected = run_suites(wrapper(binary, 0, d), args.rt_diff, "0")
+    rejected = run_suites(wrapper(binary, 0, d), args.rt_diff, "0", logs)
     if rejected:
         failures += 1
         print(f"FAIL unmutated binary rejected by {rejected}")
     results = {}
     for m in (int(x) for x in args.mutants.split(",") if x):
         print(f"mutant {m} ({MUTANTS[m]}):", flush=True)
-        results[m] = run_suites(wrapper(binary, m, d), args.rt_diff, str(m))
+        results[m] = run_suites(wrapper(binary, m, d), args.rt_diff, str(m), logs)
         if not results[m]:
             failures += 1
             print(f"FAIL mutant {m} ({MUTANTS[m]}) survived every suite")

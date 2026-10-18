@@ -233,11 +233,11 @@ def coverage_shares(tally, total):
 
 
 def rt_diff(args, work):
-    stats_dir = os.path.join(REPO, ".build", "rt-vm")
-    os.makedirs(stats_dir, exist_ok=True)
-    stats = os.path.join(work, "rt-diff-stats.jsonl")
-    with open(os.path.join(stats_dir, "stats-path"), "w") as f:
-        f.write(stats)
+    # Each entry's VM statistics come from rt-diff itself (--b-vm-stats, per
+    # entry and run). The shared .build/rt-vm/stats-path file is not used: two
+    # concurrent runs (test-rt-vm and test-rt-vm-mutants under certify) wrote
+    # and removed the same file, and the second removal failed after rt-diff
+    # had passed (CP12 round-2 certify: FLAKY test-rt-vm-mutants).
     corpora = ["tests/runtime2/vm-corpus", "tests/runtime2/semantics", "tests/runtime2/rt-diff-corpus",
                "tests/conformance/cases", "docs/evidence/cp410-competitiveness/probes"]
     cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", args.nift, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
@@ -249,10 +249,7 @@ def rt_diff(args, work):
     for c in corpora:
         cmd += ["--corpus", c]
     env = dict(os.environ, NIFT_VM_BIN=args.nift)
-    try:
-        p = subprocess.run(cmd, cwd=REPO, env=env)
-    finally:
-        os.unlink(os.path.join(stats_dir, "stats-path"))
+    p = subprocess.run(cmd, cwd=REPO, env=env)
     tally = collections.Counter()
     seen = {}
     report = json.load(open(os.path.join(work, "rt-diff-report.json")))
