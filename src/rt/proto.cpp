@@ -21,7 +21,6 @@ const char* stop_reason_name(StopReason reason) {
         case StopReason::None: return "none";
         case StopReason::Error: return "error";
         case StopReason::Internal: return "internal";
-        case StopReason::Reeval: return "reeval";
     }
     return "?";
 }

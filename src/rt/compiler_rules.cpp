@@ -116,9 +116,9 @@ bool UnitCompiler::pass_param_types(std::size_t f, std::uint32_t argc, const Nod
 
 void UnitCompiler::update_flags() {
     if (!fb_) return;
-    std::uint8_t flags = prepared() ? kInstrPrepared : 0;
-    if (return_site_ != kNoSite) flags |= kInstrReturnPrefix;
-    fb_->set_flags(flags);
+    // Evidence only (VM stats, D-018 difference policies): code legacy runs
+    // on its prepared evaluator. It does not change what the VM computes.
+    fb_->set_flags(loop_region() ? kInstrLoopPath : 0);
 }
 
 namespace {
@@ -198,22 +198,6 @@ Span legacy_span(const Ast& ast, const Node& n) {
 
 std::uint32_t UnitCompiler::prepared_begin(const Node& node) const { return legacy_span(ast_, node).begin; }
 std::uint32_t UnitCompiler::prepared_end(const Node& node) const { return legacy_span(ast_, node).end; }
-
-// The source offset legacy reports for an error raised by `node` (CP12):
-//  * prepared evaluator: the start of the failing node's span, parentheses
-//    around it included (src/Ast.cpp failure_origin);
-//  * textual evaluator: the start of the failing expression (parentheses
-//    excluded), except inside an `if`/`else if` condition (the `if`), a
-//    `return` expression (the `return`, message prefixed "return: ") and
-//    index brackets (the index expression).
-std::uint32_t UnitCompiler::site(const Node& node) const {
-    if (prepared()) return prepared_begin(node);
-    if (if_site_ != kNoSite) return if_site_;
-    if (return_site_ != kNoSite) return return_site_;
-    if (index_site_ != kNoSite) return index_site_;
-    return node.begin;
-}
-
 
 // Does legacy's prepared evaluator run this statement (parse_statement
 // accepts it), or its textual one (StmtKind::Legacy)?

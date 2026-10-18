@@ -64,13 +64,9 @@ std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, s
 }
 
 std::size_t FunctionBuilder::note(std::size_t at, std::string text) {
-    proto_->note_table.push_back(Note{std::move(text), 0});
+    proto_->note_table.push_back(Note{std::move(text)});
     proto_->notes[at] = static_cast<std::uint32_t>(proto_->note_table.size());
     return proto_->note_table.size() - 1;
-}
-
-void FunctionBuilder::set_note_alt(std::size_t note_index, std::size_t target) {
-    proto_->note_table[note_index].alt = static_cast<std::uint32_t>(target);
 }
 
 bool FunctionBuilder::patch(std::size_t at, std::size_t target) {
@@ -92,7 +88,7 @@ bool is_jump(OpCode op) {
     switch (op) {
         case OpCode::Jmp: case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull:
         case OpCode::JmpNotLt: case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe:
-        case OpCode::JmpNotEq: case OpCode::JmpNotNe: case OpCode::JmpLarge: return true;
+        case OpCode::JmpNotEq: case OpCode::JmpNotNe: return true;
         default: return false;
     }
 }
@@ -103,65 +99,7 @@ void mark_register(std::vector<bool>& read, std::uint16_t operand) {
 
 } // namespace
 
-void FunctionBuilder::layout_cold() {
-    if (cold_.empty()) return;
-    auto& code = proto_->code;
-    const std::size_t n = code.size();
-    constexpr std::size_t kNone = static_cast<std::size_t>(-1);
-    std::vector<char> state(n, 0);  // 1 moved, 2 skipped
-    for (const Cold& c : cold_) {
-        state[c.skip] = 2;
-        for (std::size_t i = c.begin; i < c.end; ++i) state[i] = 1;
-    }
-    std::vector<std::size_t> position(n, kNone), order;
-    for (std::size_t i = 0; i < n; ++i)
-        if (!state[i]) { position[i] = order.size(); order.push_back(i); }
-    const std::size_t normal = order.size();
-    std::vector<std::size_t> back_to;  // per appended jump: the old index it returns to
-    for (const Cold& c : cold_) {
-        for (std::size_t i = c.begin; i < c.end; ++i) { position[i] = order.size(); order.push_back(i); }
-        order.push_back(kNone - back_to.size());
-        back_to.push_back(c.end);
-    }
-    const auto map = [&](std::size_t t) {
-        while (t < n && position[t] == kNone) ++t;  // a deleted skip jump: the next instruction
-        return t < n ? position[t] : normal;
-    };
-    std::vector<Instr> out;
-    std::vector<std::uint32_t> offsets, notes;
-    for (std::size_t k = 0; k < order.size(); ++k) {
-        Instr in;
-        std::size_t target = kNone;
-        if (order[k] > n) {  // the jump back from a cold block
-            const std::size_t which = kNone - order[k];
-            in.op = OpCode::Jmp;
-            in.flags = out.back().flags;
-            target = map(back_to[which]);
-            offsets.push_back(offsets.back());
-            notes.push_back(0);
-        } else {
-            in = code[order[k]];
-            if (is_jump(in.op))
-                target = map(static_cast<std::size_t>(static_cast<long>(order[k]) + 1 + jump_offset(in.c)));
-            offsets.push_back(proto_->offsets[order[k]]);
-            notes.push_back(proto_->notes[order[k]]);
-        }
-        if (target != kNone) {
-            const long distance = static_cast<long>(target) - static_cast<long>(k + 1);
-            if (distance < -32768 || distance > 32767) error_ = "jump distance exceeds 16 bits";
-            in.c = jump_operand(static_cast<int>(distance));
-        }
-        out.push_back(in);
-    }
-    for (Note& note : proto_->note_table) note.alt = static_cast<std::uint32_t>(map(note.alt));
-    code = std::move(out);
-    proto_->offsets = std::move(offsets);
-    proto_->notes = std::move(notes);
-    cold_.clear();
-}
-
 void FunctionBuilder::drop_unread_types() {
-    layout_cold();
     auto& code = proto_->code;
     std::vector<bool> read(proto_->nregs + 1u, false);
     for (const Instr& in : code) {
@@ -202,7 +140,6 @@ void FunctionBuilder::drop_unread_types() {
     code = std::move(out);
     proto_->offsets = std::move(offsets);
     proto_->notes = std::move(notes);
-    for (Note& note : proto_->note_table) note.alt = static_cast<std::uint32_t>(position[note.alt]);
 }
 
 std::unique_ptr<Proto> FunctionBuilder::finish() { return std::move(proto_); }

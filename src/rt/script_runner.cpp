@@ -33,7 +33,9 @@ struct Stats {
     bool beyond_legacy_depth = false;
     int executions = 0;         // times the unit started executing on the VM (0 or 1)
     int legacy_executions = 0;  // 1 when the unit was handed to legacy (before anything executed)
-    std::uint64_t reevaluations = 0;
+    // Evidence for the D-018 difference policies (rt/vm.h).
+    std::uint64_t large_numbers = 0, large_in_loop_path = 0;
+    bool error_in_loop_path = false;
     std::string path;
 };
 
@@ -57,7 +59,8 @@ void report(const Stats& s) {
          << ",\"instructions\":" << s.instructions << ",\"source_bytes\":" << s.source_bytes
          << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
          << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
-         << ",\"reevaluations\":" << s.reevaluations << ",\"path\":\""
+         << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
+         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false") << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
         std::cerr << line.str() << std::flush;
@@ -216,7 +219,9 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
     stats.beyond_legacy_depth = result.beyond_legacy_depth;
-    stats.reevaluations = result.reevaluations;
+    stats.large_numbers = result.large_numbers;
+    stats.large_in_loop_path = result.large_in_loop_path;
+    stats.error_in_loop_path = result.error_in_loop_path;
     write_stdout(output, nullptr);
     if (result.reason == StopReason::None) {
         if (result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
@@ -228,14 +233,11 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     locate_into(stats, source, result.offset);
     if (result.reason == StopReason::Error) {
-        // A program error, reported exactly as legacy reports it.
+        // A program error, in legacy's format, at the failing expression.
         stats.outcome = "vm-error";
         stats.reason = result.message;
         report(stats);
-        std::string message;
-        for (std::uint32_t k = 0; k < result.return_prefixes; ++k) message += "return: ";
-        message += result.message;
-        error_line(source_path, stats, message);
+        error_line(source_path, stats, result.message);
         exit_code = 1;
         return true;
     }

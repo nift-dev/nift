@@ -10,14 +10,10 @@ so NIFT_VM=1 is legacy by construction and the program is only counted.
 Every program that compiles is run on legacy and with NIFT_VM=1; stdout,
 stderr and exit status must be identical, except for:
 
-  approved   the D-001#4 recursion budget (classify_difference): legacy
-             fails with "callable recursion depth exceeded", the VM went past
-             legacy's 64-frame limit (beyond_legacy_depth in its statistics),
-             with legacy's output as a prefix of the VM's, and either
-             completed without a diagnostic or stopped with a program error
-             reported by the VM (its own "callable recursion depth exceeded"
-             at its frame or memory budget, or the program's error deeper
-             than legacy can go; CP12: never a replay).
+  approved   one of the named approved-difference policies of
+             vm_policies.py (D-001#4 recursion budget; CP12 D-018a numbers,
+             D-018c diagnostics), each keyed to evidence
+             in the VM statistics; counted per policy.
   endless    both engines hit the time limit (not compared).
 
 Any other difference, any `internal-error` outcome, any missing statistics
@@ -42,10 +38,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import vm_adversarial_gen as gen  # noqa: E402
-
-RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
-VM_RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded[^\n]*\n\Z")
-
+import vm_policies  # noqa: E402
 
 def base_env(cwd, extra):
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
@@ -79,17 +72,9 @@ def run(nift, path, cwd, mode, extra, timeout):
 
 
 def classify_difference(legacy, vm, st):
-    """'same', 'approved' (D-001#4), 'endless' or 'diff'."""
-    if legacy == vm:
-        return "same"
-    if legacy[2] == "timeout" and vm[2] == "timeout":
-        return "endless"
-    if (st and st.get("beyond_legacy_depth") and legacy[2] == 1 and RECURSION_ERROR.match(legacy[1])
-            and vm[0].startswith(legacy[0])
-            and ((st.get("outcome") == "vm" and vm[2] == 0 and vm[1] == b"")
-                 or (st.get("outcome") == "vm-error" and vm[2] == 1))):
-        return "approved"
-    return "diff"
+    """'same', 'approved:<policy>' (vm_policies.py), 'endless' or 'diff'."""
+    verdict, policy = vm_policies.classify(legacy, vm, st)
+    return f"approved:{policy}" if verdict == "approved" else verdict
 
 
 def outcome_key(st):
@@ -188,8 +173,9 @@ def main():
         total.update(v)
         ran = sum(n for k, n in tally[family].items() if k in ("vm", "vm-error"))
         errors = sum(n for k, n in tally[family].items() if k == "vm-error")
+        approved = ", ".join(f"{k[9:]} {n}" for k, n in sorted(v.items()) if k.startswith("approved:")) or "none"
         print(f"{family}: {sum(v.values())} programs; ran on the VM {ran} ({errors} ending in a program error), "
-              f"fallback {v['fallback']}; same {v['same']}, approved D-001#4 {v['approved']}, "
+              f"fallback {v['fallback']}; same {v['same']}, approved ({approved}), "
               f"endless {v['endless']}, DIFF {v['diff'] + v['fail']}")
         top = ", ".join(f"{k} {n}" for k, n in tally[family].most_common(8))
         print(f"  outcomes: {top}")
@@ -199,8 +185,9 @@ def main():
                        "families": {k: dict(v) for k, v in tally.items()},
                        "verdicts": {k: dict(v) for k, v in verdicts.items()}}, f, indent=1, sort_keys=True)
     bad = total["diff"] + total["fail"]
+    approved = {k[9:]: n for k, n in sorted(total.items()) if k.startswith("approved:")}
     print(("PASS" if not bad else "FAIL") + f" vm adversarial: {sum(total.values())} programs, {bad} non-approved "
-          f"differences, {total['approved']} approved (D-001#4), {total['endless']} endless, "
+          f"differences, {sum(approved.values())} approved {approved}, {total['endless']} endless, "
           f"{total['fallback']} static fallbacks")
     return 1 if bad else 0
 

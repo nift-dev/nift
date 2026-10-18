@@ -35,6 +35,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace nift::rt {
 
@@ -42,6 +43,9 @@ struct PreparedRefusal {
     bool refused = false;
     std::string reason;
     std::uint32_t offset = 0;
+    // Functions legacy may call from prepared (loop) code, transitively
+    // (over-approximated): their bodies run on its prepared evaluator.
+    std::vector<bool> loop_called;
 };
 
 PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan);

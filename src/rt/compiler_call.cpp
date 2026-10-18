@@ -2,12 +2,11 @@
 
 #include "rt/alias.h"
 #include "rt/atom.h"
-#include "rt/legacy_quirks.h"
 #include "rt/native.h"
 #include "rt/prepared_parse.h"
 
-// Calls (user functions by variant, natives), methods, member and index reads
-// (CP11, CP12).
+// Calls (user functions, natives), methods, member and index reads (CP11,
+// CP12). Errors are reported at the failing expression (D-018c).
 
 namespace nift::rt::detail {
 
@@ -31,22 +30,12 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const NodeId* args = ast_.list(node);
     if (node.count != arity) return fail(node, "static-error:arity");
     const std::size_t f = is_native ? 0 : fn->second - 1u;
-    // print(path) on the prepared path: legacy resolves the path as a location
-    // (its messages for a missing element are the textual ones).
-    if (kQuirkPrintPathReresolve && is_native && node.count == 1 && prepared()) {  // LEGACY QUIRK Q2
-        const NodeKind arg = ast_.at(args[0]).kind;
-        if (arg == NodeKind::Index || arg == NodeKind::Member) {
-            // When the location is missing, legacy resolves the whole path again
-            // on its textual path (expression_statement compiles that code).
-            if (!print_statement_) return fail(ast_.at(args[0]), "print-path-nested");
-            print_path_ = args[0];
-        }
-    }
     // Legacy evaluates a call with an argument its prepared parser rejects on
     // the textual path, arguments and callee included (Ast.cpp Kind::Call,
-    // legacy_with_span): such a call is compiled as textual code.
+    // legacy_with_span): such a call is not loop-evaluator code, which the
+    // context refusals (D-018) and the VM statistics' loop evidence follow.
     const bool saved_textual = textual_statement_;
-    if (prepared())
+    if (loop_region())
         for (std::uint32_t k = 0; k < node.count; ++k) {
             const Node& arg = ast_.at(args[k]);
             const std::uint32_t b = prepared_begin(arg);
@@ -74,16 +63,23 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!expr_to(args[k], reg)) return false;
     }
     if (!is_native) --call_args_;
-    print_path_ = kNoNode;
-    const Variant variant = prepared() ? Variant::Prepared : Variant::Textual;
-    if (!is_native && variant == Variant::Textual && !pass_param_types(f, node.count, args, base)) return false;
+    if (!is_native && loop_reachable()) {
+        // Legacy's prepared call types a parameter from the value only, the
+        // canonical one from the argument's text and value (P5): refused where
+        // the callee can observe a difference (D-018).
+        for (std::uint32_t k = 0; k < node.count; ++k)
+            if (observable_[f][k] &&
+                type_mismatch_possible(infer_text_type(type_text(ast_.at(args[k]))), kinds(args[k]), scope_index()))
+                return fail(ast_.at(args[k]), "context:parameter-type");
+    }
+    if (!is_native && !pass_param_types(f, node.count, args, base)) return false;
     fb_->set_offset(site(node));
     if (is_native) {
         fb_->emit(OpCode::CallNative, base, static_cast<std::uint16_t>(native.id),
                   static_cast<std::uint16_t>(node.count));
     } else {
         const std::size_t at =
-            fb_->emit(OpCode::Call, base, proto_for(f, variant), static_cast<std::uint16_t>(node.count));
+            fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
         fb_->note(at, std::string(name));
     }
     std::uint16_t slot = base;
@@ -104,6 +100,10 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (!kinds_within(callee.a, size ? kKindAggregate : static_cast<std::uint8_t>(kKindAggregate | kKindString), node,
                       "type:length"))
         return false;
+    // Legacy's prepared `length()` counts an object's members; the canonical
+    // one rejects an object (D-018).
+    if (!size && loop_reachable() && (kinds(callee.a) & (kKindObject | kKindUnknown)))
+        return fail(node, "context:object-length");
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;
     if (!reg_any(callee.a, receiver)) return false;
@@ -128,13 +128,8 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (!reg_any(node.a, object)) return false;
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
-    const bool path = print_path_ == id_of(node);
     fb_->set_offset(site(node));
-    const std::size_t at = fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
-    if (path) {
-        fb_->at(at).flags |= kInstrPathText;
-        fb_->note(at, std::string());
-    }
+    fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
     fb_->release_to(mark);
     return true;
 }
@@ -150,19 +145,13 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
     if (!reg_any(node.a, object_reg)) return false;
-    // Textual: an error inside the brackets is reported at the index expression.
-    const std::uint32_t saved_site = index_site_;
-    if (!prepared()) index_site_ = site(node);
     ++index_depth_;
     const bool key_ok = expr_any(node.b, key);
     --index_depth_;
-    index_site_ = saved_site;
     if (!key_ok) return false;
-    const bool path = print_path_ == id_of(node);
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::GetIndex, dst, object_reg, key);
     fb_->note(at, std::string(text(node)));
-    if (path) fb_->at(at).flags |= kInstrPathText;
     fb_->release_to(mark);
     return true;
 }

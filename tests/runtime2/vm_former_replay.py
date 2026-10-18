@@ -17,22 +17,24 @@ top level, from loops, from both, nested calls, a function's own loop):
   types        binding type changes (int to double, string to number, ...),
                compound assignments and increments, element type changes
   numbers      numeric boundaries: 2^53 +- k, int64 overflow, -0, large
-               doubles, values a loop statement re-evaluates textually
-               (including a call with output in that statement)
+               doubles, values legacy re-evaluates in a loop statement
+               (including a call with output in that statement; D-018a)
   recursion    depths around legacy's 64 frames and the VM's budget, memory
   aggregates   declarations, returns, pushes, literals and element
                assignments from places holding scalars or aggregates
   methods      length() / size() / push on every receiver kind
   calls        functions invoking functions, errors deep in call chains,
-               "return: " prefixes, both evaluator variants of one function
+               "return: " prefixes, one function called from both legacy
+               evaluators (CP12 D-018: one VM meaning)
   loops        loop bodies with statements legacy's prepared parser rejects
                (ternaries), print(path), calls with rejected arguments
   output       megabytes of output followed by an end, an error, a large
                number or the recursion limit
 
 Every program must either run on the VM (outcome vm or vm-error) with
-stdout, stderr and exit status identical to legacy's (or the approved
-D-001#4 recursion difference), or be refused before execution (outcome
+stdout, stderr and exit status identical to legacy's (or a difference
+approved by a named policy of vm_policies.py: D-001#4 recursion, D-018a
+numbers, D-018c diagnostics), or be refused before execution (outcome
 fallback, vm_executions 0, execute_us 0) with legacy's output. A `replayed`
 outcome, a unit executed other than exactly once, an internal error or any
 other difference fails. The outcome shares are reported.
@@ -177,7 +179,7 @@ def check(nift, item, work, timeout):
             problem = "fallback after VM execution started"
         elif st["outcome"] not in ("vm", "vm-error", "fallback"):
             problem = f"unexpected outcome {st['outcome']}"
-        elif verdict not in ("same", "approved", "endless"):
+        elif verdict not in ("same", "endless") and not verdict.startswith("approved:"):
             problem = "output differs from legacy"
         return family, name, key, verdict, problem, source, legacy, vm
     finally:
@@ -214,7 +216,8 @@ def main():
             for family, name, key, verdict, problem, source, legacy, vm in pool.map(
                     lambda it: check(nift, it, work, args.timeout), items):
                 tally[family][key.split(":", 1)[0] if key.startswith("fallback") else key] += 1
-                tally[family]["approved D-001#4"] += verdict == "approved"
+                if verdict.startswith("approved:"):
+                    tally[family][verdict] += 1
                 if problem:
                     failures.append((name, key, problem, source, legacy, vm))
     finally:
@@ -238,7 +241,7 @@ def main():
     print(f"former replay suite (seed {args.seed}): {n} programs; on the VM {on_vm} "
           f"({100.0 * on_vm / max(1, n):.1f} %: vm {total['vm']}, vm-error {total['vm-error']}), "
           f"refused before execution {total['fallback']}, replayed 0 required (seen {total['replayed']}), "
-          f"approved D-001#4 {total['approved D-001#4']}")
+          f"approved {dict(sorted((k[9:], n) for k, n in total.items() if k.startswith('approved:')))}")
     print(("PASS" if not failures else "FAIL") + f" vm former replay: {len(failures)} failure(s)")
     return 1 if failures else 0
 

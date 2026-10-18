@@ -19,32 +19,25 @@ namespace nift::rt {
 
 // Why execution stopped before the end of the program (CP12: there is no
 // replay; engine selection is final before the first instruction runs).
-//   Error     a run-time error of the program, reported like legacy reports it
-//             (message, position, exit status 1): the VM reproduces every
-//             run-time error the compiled subset can reach (the compiler
-//             refuses constructs whose legacy error it cannot reproduce).
+//   Error     a run-time error of the program, reported at the failing
+//             expression (message, position, exit status 1): the VM reports
+//             every run-time error the compiled subset can reach (the
+//             compiler refuses constructs whose meaning it cannot fix).
 //   Internal  an unexpected VM failure (bad opcode, broken invariant):
 //             reported as such (exit 70), never disguised as a legacy run.
-//   Reeval    internal only, never returned by Vm::run: a prepared-context
-//             statement produced a number legacy re-evaluates textually.
-enum class StopReason : std::uint8_t { None, Error, Internal, Reeval };
+enum class StopReason : std::uint8_t { None, Error, Internal };
 const char* stop_reason_name(StopReason reason);
 
-// Instruction flags (Instr::flags). Read only on slow and error paths.
+// Instruction flags (Instr::flags). Evidence only: they never change what an
+// instruction computes (CP12, D-018: one meaning in every context).
 enum : std::uint8_t {
-    kInstrPrepared = 1u << 0,      // legacy's prepared (loop) evaluator semantics, else textual
-    kInstrReeval = 1u << 1,        // prepared compound/increment: a large operand re-evaluates the statement
-    kInstrPathText = 1u << 2,      // index/member/length errors use the textual (JSON path) message
-    kInstrReturnPrefix = 1u << 3,  // inside a textual `return` statement: errors get a "return: " prefix
-    kInstrCallerSite = 1u << 4,    // a statement-level error of a prepared function: reported at its call
+    kInstrLoopPath = 1u << 0,  // code legacy runs on its prepared (loop) evaluator: VM stats only
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's
-// source, a binding or function name) and the re-evaluation target of a
-// kInstrReeval instruction.
+// source, a binding or function name).
 struct Note {
     std::string text;
-    std::uint32_t alt = 0;  // re-evaluation target (pc)
 };
 
 struct Proto {

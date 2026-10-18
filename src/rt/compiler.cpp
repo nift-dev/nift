@@ -33,7 +33,6 @@ bool UnitCompiler::begin(std::string name, NodeId body) {
     loops_.clear();
     loop_depth_ = 0;
     textual_statement_ = false;
-    return_site_ = if_site_ = index_site_ = kNoSite;
     call_args_ = 0;
     index_depth_ = 0;
     assigned_.clear();
@@ -50,7 +49,6 @@ bool UnitCompiler::finish(std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     in_function_ = false;
-    variant_ = Variant::Textual;
     begin("", program);
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
@@ -72,7 +70,6 @@ bool UnitCompiler::statements(const Node& block) {
         const Node& node = ast_.at(list[k]);
         if ((node.kind == NodeKind::Break || node.kind == NodeKind::Continue) && k + 1 < block.count)
             return fail(node, "jump-not-last");
-        if (&block == loop_body_) loop_site_ = node.begin;
         if (!statement(list[k])) return false;
     }
     return true;
@@ -81,14 +78,15 @@ bool UnitCompiler::statements(const Node& block) {
 bool UnitCompiler::statement(NodeId id) {
     const Node& node = ast_.at(id);
     const std::uint16_t mark = fb_->top();
-    // Inside prepared code, a statement legacy's prepared parser rejects is
-    // run by legacy's textual evaluator (StmtKind::Legacy).
+    // Inside loop code, a statement legacy's prepared parser rejects is run
+    // by legacy's textual evaluator (StmtKind::Legacy): it is not loop code
+    // for the context checks. An `if` condition or `return` expression the
+    // prepared parser rejects makes legacy abandon preparing the whole loop
+    // body: refused (after the statement's own checks, so their reasons come
+    // first).
     const bool saved_textual = textual_statement_;
-    // An `if` condition or `return` expression the prepared parser rejects
-    // makes legacy abandon preparing the whole loop body: refused (after the
-    // statement's own checks, so their reasons come first).
     bool unpreparable = false;
-    if (prepared() && !statement_preparable(node)) {
+    if (loop_reachable() && !statement_preparable(node)) {
         if (node.kind == NodeKind::If || node.kind == NodeKind::Return) unpreparable = true;
         else if (node.kind != NodeKind::While) textual_statement_ = true;
     }
@@ -121,12 +119,7 @@ bool UnitCompiler::statement(NodeId id) {
 
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
-    // Textual `if`: legacy reports an error of the condition at the `if`.
-    const std::uint32_t saved_if = if_site_;
-    if (!prepared()) if_site_ = node.begin;
-    const bool cond_ok = false_jump(node.a, to_else);
-    if_site_ = saved_if;
-    if (!cond_ok) return false;
+    if (!false_jump(node.a, to_else)) return false;
     const Node& body = ast_.at(node.b);
     scopes_.push();
     const bool ok = statements(body);
@@ -142,7 +135,8 @@ bool UnitCompiler::if_chain(const Node& node) {
     bool other_ok = false;
     if (other.kind == NodeKind::If) {
         other_ok = if_chain(other);
-        if (other_ok && prepared() && !statement_preparable(other)) other_ok = fail(other, "prepared-unpreparable");
+        if (other_ok && loop_reachable() && !statement_preparable(other))
+            other_ok = fail(other, "prepared-unpreparable");
     } else {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
@@ -169,12 +163,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     if (ok) {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
-        const Node* saved_body = loop_body_;
-        const std::uint32_t saved_site = loop_site_;
-        if (loop_depth_ == 1) loop_body_ = &ast_.at(node.b);
         ok = statements(ast_.at(node.b));
-        loop_body_ = saved_body;
-        loop_site_ = saved_site;
         fb_->release_to(mark);
         scopes_.pop();
     }
@@ -200,20 +189,13 @@ bool UnitCompiler::return_statement(const Node& node) {
     }
     if (!no_alias(node.a, node)) return false;
     if (!in_function_ && !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
-    // Textual `return`: legacy reports errors of the expression at the
-    // statement, prefixed "return: " (also for errors in calls made there).
-    const std::uint32_t saved = return_site_;
-    if (!prepared()) return_site_ = node.begin;
-    update_flags();
+    // Errors in the expression are reported where they occur, without
+    // legacy's "return: " prefixes (approved changes D-009#5, D-018).
     std::uint16_t value = 0;
-    const bool ok = temp(value) && expr_to(node.a, value);
-    if (ok) {
-        fb_->set_offset(node.begin);
-        fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
-    }
-    return_site_ = saved;
-    update_flags();
-    return ok;
+    if (!temp(value) || !expr_to(node.a, value)) return false;
+    fb_->set_offset(node.begin);
+    fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
+    return true;
 }
 
 bool UnitCompiler::loop_jump(const Node& node) {
@@ -249,8 +231,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
     // aggregate value is an error there); only calls are compiled.
     if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
     std::uint16_t scratch = 0;
-    if (!temp(scratch)) return false;
-    return print_statement(node, scratch);
+    return temp(scratch) && expr_to(node.a, scratch);
 }
 
 } // namespace detail
@@ -280,7 +261,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root) {
         return result;
     }
     const UnitKinds kinds = infer_unit_kinds(ast, root, plan);
-    detail::UnitCompiler compiler(ast, plan, kinds);
+    detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();

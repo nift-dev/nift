@@ -3,9 +3,11 @@
 #include "rt/literal.h"
 #include "rt/native.h"
 
-// Declarations, assignments, compound assignments and increments (CP11, CP12),
-// including the textual re-evaluation code legacy runs for a prepared
-// statement whose value is a large number.
+// Declarations, assignments, compound assignments and increments (CP11,
+// CP12). One meaning everywhere (D-018): legacy's canonical (textual)
+// binding-type rules and CP09 arithmetic; constructs whose legacy behaviour
+// in loop code (legacy's prepared evaluator) could differ from that are
+// refused before execution ("context:*").
 
 namespace nift::rt::detail {
 
@@ -20,18 +22,6 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     return true;
 }
 
-
-bool UnitCompiler::declare_value(const Node& node, std::uint16_t reg) {
-    if (!no_alias(node.b, node)) return false;
-    if (!reevaluated(node, node.b)) return expr_to(node.b, reg);
-    if (!expr_to(node.b, reg)) return false;
-    fb_->set_offset(node.begin);
-    const std::size_t large = fb_->emit(OpCode::JmpLarge, reg);
-    const std::size_t join = fb_->emit(OpCode::Jmp);
-    fb_->patch(large, fb_->here());
-    return textual_copy(join, [&] { return expr_to(node.b, reg); });  // LEGACY QUIRK Q1
-}
-
 bool UnitCompiler::declare(const Node& node) {
     if (node.flags & (kFlagConst | kFlagImmut)) return fail(node, "declare-const");
     const Node& target = ast_.at(node.a);
@@ -40,38 +30,41 @@ bool UnitCompiler::declare(const Node& node) {
     std::uint16_t reg = 0;
     Binding binding;
     if (!new_binding(name, target, reg, binding)) return false;
-    if (!declare_value(node, reg)) return false;
+    if (!no_alias(node.b, node) || !expr_to(node.b, reg)) return false;
     std::uint16_t text_type = 0;
     const TextType inferred = infer_text_type(type_text(ast_.at(node.b)));
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
-    // A declaration referring to another binding inside prepared-reachable
-    // code was refused (rt/prepared.h, review round 2 M1/N1); elsewhere legacy
-    // types it from that binding's type at run time, which BindType reproduces.
+    // A declaration in loop code whose binding type legacy's prepared path
+    // would derive differently was refused (rt/prepared.h, prepared-decl-type).
     if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
     return true;
 }
 
-// The value check and move of `x = e`, for the current evaluator: the textual
-// path checks the type legacy derives from the text and the value
-// (nift_binding_type_from_text), the prepared path the value's type (P4).
+// `x = e`: the canonical check of the type legacy derives from the text and
+// the value (nift_binding_type_from_text). Legacy's prepared path checks the
+// value's type only (P4); in loop code where the two could disagree the
+// assignment is refused (D-018, context:assignment-type). They can only
+// disagree for a target whose binding type may be int (a double binding
+// accepts both), and not when the text's type is the target's own (`x = x`:
+// the textual type is the binding's, or the value's when that is int).
 bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
+    const TextType type = infer_text_type(type_text(ast_.at(node.b)));
+    const std::string_view target = text(ast_.at(node.a));
+    const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;
+    if (loop_reachable() && !own_type && type_mismatch_possible(type, kinds(node.b), scope_index()) &&
+        !always_double_[scope_index()].count(target))
+        return fail(node, "context:assignment-type");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
-    fb_->set_offset(statement_site(node));
-    std::size_t check = 0;
-    if (prepared()) {
-        check = fb_->emit(OpCode::CheckType, value, b.type_reg);
-    } else {
-        std::uint16_t text_type = 0;
-        if (!text_type_operand(node.b, text_type)) return false;
-        fb_->set_offset(statement_site(node));
-        check = fb_->is_untyped_constant(text_type) ? fb_->emit(OpCode::CheckType, value, b.type_reg)
-                                                    : fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
-    }
+    std::uint16_t text_type = 0;
+    if (!text_type_of(type, ast_.at(node.b), text_type)) return false;
+    fb_->set_offset(node.begin);
+    const std::size_t check = fb_->is_untyped_constant(text_type)
+                                  ? fb_->emit(OpCode::CheckType, value, b.type_reg)
+                                  : fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
     fb_->note(check, std::string(text(ast_.at(node.a))));
-    caller_site(check);
     fb_->emit(OpCode::Move, b.reg, value);
     return true;
 }
@@ -88,10 +81,9 @@ bool UnitCompiler::assign(const Node& node) {
             !kinds_within(target.b, kKindNumber, target, "type:element-assignment") || !no_alias(node.b, node))
             return false;
         if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
-        fb_->set_offset(statement_site(node));
+        fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
-        caller_site(at);
         return true;
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");
@@ -99,68 +91,39 @@ bool UnitCompiler::assign(const Node& node) {
     if (!binding) return fail(target, "assign-free-name");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
-    if (!reevaluated(node, node.b)) return assign_value(node, b);
-    // Prepared code, then (for a large value) the statement's textual code.
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t value = 0;
-    if (!temp(value) || !expr_to(node.b, value)) return false;
-    fb_->set_offset(statement_site(node));
-    const std::size_t large = fb_->emit(OpCode::JmpLarge, value);
-    const std::size_t check = fb_->emit(OpCode::CheckType, value, b.type_reg);
-    fb_->note(check, std::string(text(target)));
-    caller_site(check);
-    fb_->emit(OpCode::Move, b.reg, value);
-    const std::size_t done = fb_->emit(OpCode::Jmp);
-    fb_->release_to(mark);
-    fb_->patch(large, fb_->here());
-    return textual_copy(done, [&] { return assign_value(node, b); });  // LEGACY QUIRK Q1
+    return assign_value(node, b);
 }
 
-bool UnitCompiler::compound_op(const Node& node, const Binding& b, bool prepared_code) {
+bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     const Node& target = ast_.at(node.a);
     const std::uint16_t mark = fb_->top();
-    std::size_t op = 0;
     if (node.kind == NodeKind::IncDec) {
         const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
-        fb_->set_offset(statement_site(node));
-        op = fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(up ? 1 : -1));
+        fb_->set_offset(node.begin);
+        fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(up ? 1 : -1));
     } else {
         const Node& rhs = ast_.at(node.b);
         Value small;
         std::uint16_t value = 0;
         if (node.op == Op::AddAssign && rhs.kind == NodeKind::Number && decode_number_literal(text(rhs), small) &&
             small.is(Kind::Int) && small.as_int() <= 32767) {
-            fb_->set_offset(statement_site(node));
-            op = fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(static_cast<int>(small.as_int())));
+            fb_->set_offset(node.begin);
+            fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(static_cast<int>(small.as_int())));
         } else {
             if (!expr_any(node.b, value)) return false;
-            fb_->set_offset(statement_site(node));
+            fb_->set_offset(node.begin);
             switch (node.op) {
-                case Op::AddAssign: op = fb_->emit(OpCode::AddAssign, b.reg, value); break;
-                case Op::SubAssign: op = fb_->emit(OpCode::Sub, b.reg, b.reg, value); break;
-                case Op::MulAssign: op = fb_->emit(OpCode::Mul, b.reg, b.reg, value); break;
-                case Op::DivAssign: op = fb_->emit(OpCode::Div, b.reg, b.reg, value); break;
-                case Op::ModAssign: op = fb_->emit(OpCode::Mod, b.reg, b.reg, value); break;
+                case Op::AddAssign: fb_->emit(OpCode::AddAssign, b.reg, value); break;
+                case Op::SubAssign: fb_->emit(OpCode::Sub, b.reg, b.reg, value); break;
+                case Op::MulAssign: fb_->emit(OpCode::Mul, b.reg, b.reg, value); break;
+                case Op::DivAssign: fb_->emit(OpCode::Div, b.reg, b.reg, value); break;
+                case Op::ModAssign: fb_->emit(OpCode::Mod, b.reg, b.reg, value); break;
                 default: return fail(node, "compound-operator");
             }
         }
     }
-    if (prepared_code) fb_->at(op).flags |= kInstrReeval;
-    caller_site(op);
-    // Legacy's prepared `s += t` on two strings appends to the binding's value
-    // in place and returns without the binding type check (ParserTemplate.cpp
-    // execute_prepared: `use_count()==2` branch; a binding's string value is
-    // never shared there), so a text-typed binding (`s := "a" + 0.5`, a double
-    // binding holding a string) keeps its type.
-    const std::uint8_t l = kinds(node.a), r = node.b != kNoNode ? kinds(node.b) : 0;
-    if (prepared() && node.kind == NodeKind::CompoundAssign && node.op == Op::AddAssign && l == kKindString &&
-        r == kKindString) {
-        fb_->release_to(mark);
-        return builder_ok();
-    }
     const std::size_t check = fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
     fb_->note(check, std::string(text(target)));
-    caller_site(check);
     fb_->release_to(mark);
     return builder_ok();
 }
@@ -177,19 +140,18 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
     if (!numbers && !strings && !((l | r) & kKindUnknown)) return fail(node, "type:compound-assignment");
-
-    if (!reevaluated(node, node.b)) return compound_op(node, b, false);
-    std::size_t note = 0;
-    {
-        const std::size_t first = fb_->here();
-        if (!compound_op(node, b, true)) return false;
-        // The flagged operation is the first instruction with kInstrReeval.
-        for (std::size_t i = first; i < fb_->here(); ++i)
-            if (fb_->at(i).flags & kInstrReeval) note = fb_->note(i, std::string());
+    if (loop_reachable()) {
+        // Legacy's prepared `%=` computes fmod on any numbers (the canonical
+        // rule requires integer-valued operands).
+        if (node.op == Op::ModAssign && ((l | r) & (kKindFrac | kKindUnknown)))
+            return fail(node, "context:modulo-assignment");
+        // Legacy's prepared `s += t` on strings skips the binding type check
+        // (execute_prepared appends in place), so a binding typed double that
+        // holds a string keeps it there and fails canonically.
+        if (node.op == Op::AddAssign && ((l | r) & kKindString) && may_double_[scope_index()].count(text(target)))
+            return fail(node, "context:string-append-type");
     }
-    const std::size_t done = fb_->emit(OpCode::Jmp);
-    fb_->set_note_alt(note, fb_->here());
-    return textual_copy(done, [&] { return compound_op(node, b, false); });  // LEGACY QUIRK Q1
+    return compound_op(node, b);
 }
 
 bool UnitCompiler::inc_dec(const Node& node) {
@@ -199,15 +161,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     if (!binding) return fail(target, "assign-free-name");
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
-    if (!reevaluated(node, node.a)) return compound_op(node, b, false);
-    const std::size_t first = fb_->here();
-    if (!compound_op(node, b, true)) return false;
-    std::size_t note = 0;
-    for (std::size_t i = first; i < fb_->here(); ++i)
-        if (fb_->at(i).flags & kInstrReeval) note = fb_->note(i, std::string());
-    const std::size_t done = fb_->emit(OpCode::Jmp);
-    fb_->set_note_alt(note, fb_->here());
-    return textual_copy(done, [&] { return compound_op(node, b, false); });  // LEGACY QUIRK Q1
+    return compound_op(node, b);
 }
 
 } // namespace nift::rt::detail

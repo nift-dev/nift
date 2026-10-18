@@ -158,11 +158,14 @@ void check_errors() {
         {"a := [1]\na[0] = \"s\"\nprint(a[0])\n", StopReason::None, "s\n"},
         {"o := {\"k\": 1}\nprint(o.size())\n", StopReason::None, "1\n"},
         {"o := {\"k\": 1}\nprint(o.length())\n", StopReason::Error, "unknown value or malformed expression: o.length()"},
-        {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", StopReason::None, "1\n"},
-        {"x := 1\ni := 0\nwhile(i < 2) { x = x + 0.5; i += 1 }\n", StopReason::Error, "cannot change binding type: x"},
-        // Prepared statement with a large value: legacy re-evaluates it textually.
+        {"x := 1\nx = x + 0.5\n", StopReason::Error, "cannot assign double to int binding 'x'"},
+        // D-018a: one number rule everywhere, each statement evaluated once
+        // (legacy prints 9007199254740992 for the second, a loop double).
         {"w := 9007199254740991\ni := 0\nwhile(i < 1) { i += 1; q := w + 2; print(q); print(w + 2) }\n",
-         StopReason::None, "9007199254740993\n9007199254740992\n"},
+         StopReason::None, "9007199254740993\n9007199254740993\n"},
+        // D-018c: errors at the failing expression, no "return: " prefix.
+        {"fn(f(a)) { return a[2] }\nprint(f([1]))\n", StopReason::Error,
+         "JSON array index 2 is out of range in 'a[2]'"},
     };
     for (const ErrorCase& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -174,8 +177,20 @@ void check_errors() {
             std::fprintf(stderr, "  program: %s  stop [%s] %s\n", c.source, stop_reason_name(r.result.reason),
                          r.result.message.c_str());
     }
-    // Former replay reasons now refused before execution.
+    // Former replay reasons, and context-dependent legacy behaviour (D-018),
+    // refused before execution.
     const Case refused[] = {
+        {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", "context:object-length"},
+        {"x := 1\ni := 0\nwhile(i < 2) { x = x + 0.5; i += 1 }\n", "context:assignment-type"},
+        {"x := 0\ni := 0\nwhile(i < 1) { i += 1; print(-x) }\n", "context:negative-zero"},
+        // A fused condition takes the comparison's kind check (an ordering
+        // of a string and a number reached the VM as an internal failure).
+        {"fn(f(p)) {\nif (p > 1) { return 1 }\nreturn 0\n}\nprint(f(\"s\"))\n", "type:>"},
+        {"s := \"a\"\nwhile (s < 1) { s = \"b\" }\n", "type:<"},
+        {"x := 7.5\ni := 0\nwhile(i < 1) { i += 1; x %= 2 }\n", "context:modulo-assignment"},
+        {"s := \"a\" + 0.5\ni := 0\nwhile(i < 1) { i += 1; s += \"b\" }\n", "context:string-append-type"},
+        {"fn(f(p)) { p = 1\nreturn p }\ni := 0\nwhile(i < 1) { i += 1; print(f(2.0 * i)) }\n",
+         "context:parameter-type"},
         {"a := [1]\nb := a\n", "aliasing"},
         {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
         {"print([1])\n", "type:print"},
@@ -238,7 +253,7 @@ void check_frame_budget() {
     const char* deeper = "fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) + 1 }\nprint(d(100000))\n";
     const rt_vm_tool::Run too_deep = rt_vm_tool::run(deeper);
     CHECK(too_deep.result.reason == StopReason::Error && too_deep.result.beyond_legacy_depth);
-    CHECK(too_deep.result.message == "callable recursion depth exceeded: d" && too_deep.result.return_prefixes == 0);
+    CHECK(too_deep.result.message == "callable recursion depth exceeded: d");
     VmOptions small;
     small.max_frames = 10;
     CHECK(rt_vm_tool::run("fn(d(n)) { if(n == 0) { return 0 } return d(n - 1) }\nprint(d(9))\n", small).result.reason ==
@@ -432,12 +447,13 @@ void check_code_shape() {
     CHECK(c.program != nullptr);
     if (!c.program) return;
     const std::string text = disassemble(*c.program);
-    CHECK(text.find("Call 4 1 2 flags=1") != std::string::npos);  // prepared variant, arguments in place
-    CHECK(text.find("Call 4 2 2") != std::string::npos);          // textual variant (re-evaluation code)
-    CHECK(text.find("JmpLarge 4") != std::string::npos);          // large value: textual re-evaluation
+    // CP12 (D-018): one proto per function, whatever the calling context;
+    // flags=1 (kInstrLoopPath) is evidence only.
+    CHECK(text.find("Call 4 1 2 flags=1") != std::string::npos);  // arguments in place
     CHECK(text.find("JmpNotLt") != std::string::npos);            // fused loop condition
-    CHECK(text.find("AddI 1 1 1 flags=3") != std::string::npos);  // i += 1, prepared, re-evaluable
-    CHECK(c.program->protos.size() == 3);
+    CHECK(text.find("AddI 1 1 1 flags=1") != std::string::npos);  // i += 1
+    CHECK(text.find("JmpLarge") == std::string::npos);            // no re-evaluation code
+    CHECK(c.program->protos.size() == 2);
     CHECK(c.program->protos[1]->nparams == 2);
 }
 

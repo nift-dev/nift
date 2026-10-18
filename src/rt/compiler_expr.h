@@ -3,21 +3,20 @@
 // per-unit compiler state it shares with statement compilation
 // (compiler.cpp). Internal to the compiler.
 //
-// CP12: every instruction is compiled for the legacy evaluator that would run
-// it (textual or prepared, kInstrPrepared), and every instruction that can
-// fail carries the source position legacy reports for that failure in that
-// context ("error sites", compiler_rules.cpp). A function reachable from both
-// kinds of context is compiled twice (one Proto per variant); the variant of a
-// call is fixed by the calling context, so no decision is left to run time.
+// CP12 (D-018): one compiled representation per function and one meaning for
+// every expression wherever it appears: legacy's canonical (textual)
+// semantics. Legacy runs loop bodies and the functions called from them on a
+// second (prepared) evaluator; where a construct in such code could behave
+// differently there, the unit is refused before execution
+// ("context:*" reasons, compiler_rules.cpp), except for the approved
+// differences (D-018: exactly-once evaluation, keys of print(path) evaluated
+// once, errors reported where they occur; D-009#1/#5).
 #include "rt/ast.h"
 #include "rt/codegen.h"
 #include "rt/infer.h"
 #include "rt/resolver.h"
 #include "rt/text_type.h"
 
-#include <array>
-#include <functional>
-#include <deque>
 
 #include <cstdint>
 #include <memory>
@@ -28,16 +27,12 @@
 
 namespace nift::rt::detail {
 
-enum class Variant : std::uint8_t { Textual = 0, Prepared = 1 };
-
 class UnitCompiler {
 public:
-    UnitCompiler(const Ast& ast, const UnitPlan& plan, const UnitKinds& kinds);
+    UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
+                 const std::vector<bool>& loop_called);
 
-    // compiler.cpp
-    // Compiles main, then every function variant a compiled call needs (and a
-    // textual variant of each function no call reaches, so its body is still
-    // checked), into `program`.
+    // Compiles main (proto 0) and every function (proto k + 1) into `program`.
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
     std::uint32_t offset() const { return offset_; }
@@ -50,8 +45,8 @@ private:
 
     // compiler.cpp: statements
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
-    bool compile_function(std::size_t f, Variant variant, std::unique_ptr<Proto>& out);
-    std::uint16_t proto_for(std::size_t f, Variant variant);
+    bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
+    void compute_may_double();
     bool begin(std::string name, NodeId body);
     bool finish(std::unique_ptr<Proto>& out);
     bool statements(const Node& block);
@@ -63,10 +58,8 @@ private:
     bool if_chain(const Node& node);
     bool while_loop(const Node& node);
     bool return_statement(const Node& node);
-    bool reevaluated(const Node& node, NodeId value) const;
-    bool declare_value(const Node& node, std::uint16_t reg);
     bool assign_value(const Node& node, const Binding& b);
-    bool compound_op(const Node& node, const Binding& b, bool prepared_code);
+    bool compound_op(const Node& node, const Binding& b);
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
@@ -99,16 +92,20 @@ private:
     bool text_type_of(const TextType& type, const Node& at, std::uint16_t& operand);
     bool text_type_operand(NodeId value, std::uint16_t& operand);
     bool pass_param_types(std::size_t f, std::uint32_t argc, const NodeId* args, std::uint16_t base);
-    // compiler_rules.cpp: legacy context, error sites and kind checks (CP12)
-    bool prepared() const { return (variant_ == Variant::Prepared || loop_depth_ > 0) && !textual_statement_; }
+    // compiler_rules.cpp: legacy contexts and kind checks (CP12, D-018)
+    // Code legacy runs on its prepared evaluator: a loop region of this
+    // function (except statements legacy runs textually), or anywhere in a
+    // function called from such code.
+    bool loop_region() const { return loop_depth_ > 0 && !textual_statement_; }
+    bool loop_reachable() const { return loop_region() || (in_function_ && loop_called_[function_]); }
     void update_flags();
-    // compiler_quirks.cpp: legacy behaviours reproduced pending an owner
-    // decision, each behind a switch in rt/legacy_quirks.h.
-    void caller_site(std::size_t at);
-    bool textual_copy(std::size_t skip, const std::function<bool()>& textual_code);
-    bool print_statement(const Node& node, std::uint16_t scratch);
-    std::uint32_t site(const Node& node) const;
-    std::uint32_t statement_site(const Node& node) const;
+    // A binding type legacy derives from `type` may differ from the type of
+    // the value (kinds) in scope `scope` (functions 0..n-1, main n).
+    bool may_double(const TextType& type, std::size_t scope) const;
+    bool type_mismatch_possible(const TextType& type, std::uint8_t kinds, std::size_t scope) const;
+    std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
+    // Where an error raised by `node` is reported: its own start (D-018c).
+    std::uint32_t site(const Node& node) const { return node.begin; }
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
@@ -126,29 +123,24 @@ private:
     const UnitPlan& plan_;
     const UnitKinds& kinds_;
     std::unique_ptr<FunctionBuilder> fb_;
-    // Variants: proto index per (function, variant), 0 = not yet requested.
-    std::vector<std::array<std::uint16_t, 2>> variant_proto_;
-    std::deque<std::pair<std::size_t, Variant>> pending_;
-    std::uint16_t next_proto_ = 1;
+    NodeId root_ = kNoNode;
+    const std::vector<bool>& loop_called_;  // functions called from loop code (rt/prepared.h)
     // Parameters whose binding type is observable in the body (assigned, or
-    // named in a text whose type legacy infers): a textual call passes their
-    // text-derived types (legacy bind_call_param, P5).
+    // named in a text whose type legacy infers): every call passes their
+    // text-derived types (legacy bind_call_param, the canonical P5 rule).
     std::vector<std::vector<bool>> observable_;
+    // Per scope (functions, then main): names whose binding type may be
+    // double, so that the binding can hold a value of another type.
+    std::vector<std::unordered_set<std::string_view>> may_double_;
+    // Per scope: names whose binding type is always double (every
+    // declaration typed double by its text): any number is assignable.
+    std::vector<std::unordered_set<std::string_view>> always_double_;
     // Context of the code being compiled.
-    Variant variant_ = Variant::Textual;
+    std::size_t function_ = 0;
     int loop_depth_ = 0;
-    bool textual_statement_ = false;  // a statement legacy runs textually inside prepared code
-    std::uint32_t return_site_ = kNoSite;  // textual `return`: errors at the statement
-    std::uint32_t if_site_ = kNoSite;      // textual `if` condition: errors at the `if`
-    std::uint32_t index_site_ = kNoSite;   // textual index key: errors at the index expression
-    int call_args_ = 0;                    // inside user-call arguments
-    int index_depth_ = 0;                  // inside index brackets
-    std::uint32_t loop_site_ = kNoSite;    // the outermost loop body's statement being compiled
-    const Node* loop_body_ = nullptr;      // the outermost loop body (main or a textual variant)
-    NodeId print_path_ = kNoNode;          // the path argument of a prepared print()
-    bool print_statement_ = false;         // compiling a print statement's call
-    NodeId id_of(const Node& node) const { return static_cast<NodeId>(&node - &ast_.at(0)); }
-    static constexpr std::uint32_t kNoSite = 0xffffffffu;
+    bool textual_statement_ = false;  // a statement legacy runs textually inside loop code
+    int call_args_ = 0;               // inside user-call arguments
+    int index_depth_ = 0;             // inside index brackets
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;

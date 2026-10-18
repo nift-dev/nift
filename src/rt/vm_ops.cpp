@@ -52,58 +52,6 @@ bool concatenate(const Value& left, const Value& right, Value& out, Fault& fault
     return true;
 }
 
-// A double result of legacy's prepared evaluator, held as Int when that is
-// the same value (integral, below 2^53, not -0) so the fast paths apply.
-Value prepared_number(double d) {
-    if (std::trunc(d) == d && std::fabs(d) < double(kSafeInteger) && !(d == 0 && std::signbit(d)))
-        return Value::integer(static_cast<std::int64_t>(d));
-    return Value::number(d);
-}
-
-// Legacy src/Ast.cpp numeric binary operators: doubles, no overflow checks.
-bool prepared_arithmetic(OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
-    const double l = number_approx(left), r = number_approx(right);
-    double result = 0;
-    switch (op) {
-        case OpCode::Add: result = l + r; break;
-        case OpCode::Sub: result = l - r; break;
-        case OpCode::Mul: result = l * r; break;
-        case OpCode::Div:
-            if (number_is_zero(right)) return raise(fault, StopReason::Error, "division by zero");
-            result = l / r;
-            break;
-        default:
-            if (number_is_zero(right)) return raise(fault, StopReason::Error, "modulo by zero");
-            if (!number_is_integer(left) || !number_is_integer(right))
-                return raise(fault, StopReason::Error, "modulo requires integer-valued operands");
-            result = std::fmod(l, r);
-            break;
-    }
-    if (!std::isfinite(result)) return raise(fault, StopReason::Error, "arithmetic result is not finite");
-    out = prepared_number(result);
-    return true;
-}
-
-bool prepared_compound(OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
-    const double l = number_approx(left), r = number_approx(right);
-    double result = 0;
-    switch (op) {
-        case OpCode::Add: result = l + r; break;
-        case OpCode::Sub: result = l - r; break;
-        case OpCode::Mul: result = l * r; break;
-        case OpCode::Div:
-            if (r == 0) return raise(fault, StopReason::Error, "division by zero");
-            result = l / r;
-            break;
-        default:
-            if (r == 0) return raise(fault, StopReason::Error, "modulo by zero");
-            result = std::fmod(l, r);
-            break;
-    }
-    out = prepared_number(result);
-    return true;
-}
-
 std::string integer_text(std::int64_t v) {
     char buffer[24];
     const auto result = std::to_chars(buffer, buffer + sizeof buffer, v);
@@ -118,23 +66,21 @@ const std::string& note_text(const Note* note) {
 } // namespace
 
 bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
+    static_cast<void>(in);
     if (op == OpCode::Add && (left.is(Kind::String) || right.is(Kind::String)))
         return concatenate(left, right, out, fault);
     if (!left.is_number() || !right.is_number()) return internal(fault, "arithmetic");
-    if (prepared(in)) {
-        if (in.flags & kInstrReeval) {
-            // A prepared compound assignment or increment (ParserTemplate.cpp
-            // execute_prepared): a large operand re-evaluates the statement
-            // textually; otherwise doubles, with only the zero-divisor checks.
-            if (is_large(left) || is_large(right))  // LEGACY QUIRK Q1 (rt/legacy_quirks.h)
-                return raise(fault, StopReason::Reeval, "large operand");
-            return prepared_compound(op, left, right, out, fault);
-        }
-        return prepared_arithmetic(op, left, right, out, fault);
-    }
+    // Evidence for the D-018 number policy (VM stats): an operand or result
+    // legacy calls large, or a result out of range.
+    const bool large = is_large(left) || is_large(right);
     Value result;
     std::string error;
-    if (!arithmetic(arith_op(op), left, right, result, error)) return raise(fault, StopReason::Error, error);
+    if (!arithmetic(arith_op(op), left, right, result, error)) {
+        if (large || error.find("overflow") != std::string::npos || error.find("not finite") != std::string::npos)
+            fault.large = true;
+        return raise(fault, StopReason::Error, error);
+    }
+    if (large || is_large(result)) fault.large = true;
     out = static_cast<Value&&>(result);
     return true;
 }
@@ -174,9 +120,8 @@ bool compare_slow(OpCode op, const Value& left, const Value& right, bool& result
 
 bool negate_slow(const Instr& in, const Value& value, Value& out, Fault& fault) {
     if (!value.is_number()) return internal(fault, "negation");
-    // Prepared: runtime_number_negate flips the double (0 becomes -0) and the
-    // spelling of an exact big number; textual: CP09 negate.
-    if (prepared(in) && value.is(Kind::Int) && value.as_int() == 0) { out = Value::number(-0.0); return true; }
+    static_cast<void>(in);
+    if (is_large(value)) fault.large = true;
     out = negate(value);
     return true;
 }
@@ -218,15 +163,13 @@ const char* binding_type_name(std::int64_t tag) {
     }
 }
 
-bool binding_type_error(const Instr& in, std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault) {
-    if (prepared(in)) return raise(fault, StopReason::Error, "cannot change binding type: " + note_text(note));
+bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault) {
     return raise(fault, StopReason::Error,
                  std::string("cannot assign ") + binding_type_name(assigned) + " to " + binding_type_name(binding) +
                      " binding '" + note_text(note) + "'");
 }
 
-bool get_index(const Instr& in, const Note* note, const Value& object, const Value& key, Value& out, Fault& fault) {
-    const bool textual = !prepared(in);
+bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault) {
     if (object.is(Kind::Array) && key.is_number()) {
         const auto& items = array_items(object);
         std::int64_t i = 0;
@@ -235,11 +178,6 @@ bool get_index(const Instr& in, const Note* note, const Value& object, const Val
             out = items[static_cast<std::size_t>(i)];
             return true;
         }
-        // print(path) on the prepared path: a valid position past the end is
-        // resolved again textually (legacy's location failure).
-        if (prepared(in) && (in.flags & kInstrPathText) && integral)  // LEGACY QUIRK Q2
-            return raise(fault, StopReason::Reeval, "location");
-        if (!textual) return raise(fault, StopReason::Error, "invalid index");
         if (integral)
             return raise(fault, StopReason::Error,
                          "JSON array index " + integer_text(i) + " is out of range in '" + note_text(note) + "'");
@@ -254,20 +192,16 @@ bool get_index(const Instr& in, const Note* note, const Value& object, const Val
                 return true;
             }
         }
-        if (prepared(in) && (in.flags & kInstrPathText))  // LEGACY QUIRK Q2
-            return raise(fault, StopReason::Reeval, "location");
-        if (!textual) return raise(fault, StopReason::Error, "invalid index");
         return raise(fault, StopReason::Error, "JSON object has no key '" + std::string(string_view_of(key)) + "'");
     }
     return internal(fault, "index");
 }
 
-bool set_index(const Instr& in, const Note* note, Value& object, const Value& key, const Value& value, Fault& fault) {
+bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault) {
     if (!object.is(Kind::Array) || !key.is_number()) return internal(fault, "element assignment");
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;
     if (!integral || static_cast<std::uint64_t>(i) >= array_size(object)) {
-        if (prepared(in)) return raise(fault, StopReason::Error, "invalid index target");
         if (integral) return raise(fault, StopReason::Error, "index out of range: " + note_text(note));
         return raise(fault, StopReason::Error,
                      "assignment index does not address an array or object: " + note_text(note));
@@ -277,14 +211,12 @@ bool set_index(const Instr& in, const Note* note, Value& object, const Value& ke
     return true;
 }
 
-bool get_member(const Instr& in, const Value& object, Atom key, Value& out, Fault& fault) {
+bool get_member(const Value& object, Atom key, Value& out, Fault& fault) {
     if (!object.is(Kind::Object)) return internal(fault, "member");
     if (const Value* member = object_get(object, key)) {
         out = *member;
         return true;
     }
-    if (prepared(in) && (in.flags & kInstrPathText))  // LEGACY QUIRK Q2
-        return raise(fault, StopReason::Reeval, "location");
     return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
 }
 
@@ -294,14 +226,14 @@ bool push_value(Value& array, const Value& value, Fault& fault) {
     return true;
 }
 
-bool length_of(const Instr& in, const Note* note, const Value& value, bool size, Value& out, Fault& fault) {
+bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault) {
     if (value.is(Kind::Array)) {
         out = Value::integer(static_cast<std::int64_t>(array_size(value)));
         return true;
     }
     if (value.is(Kind::Object)) {
-        // size() counts members everywhere; length() only on the prepared path.
-        if (!size && !prepared(in))
+        // size() counts members; length() rejects an object.
+        if (!size)
             return raise(fault, StopReason::Error, "unknown value or malformed expression: " + note_text(note));
         out = Value::integer(static_cast<std::int64_t>(object_size(value)));
         return true;

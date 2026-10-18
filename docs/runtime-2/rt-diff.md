@@ -139,6 +139,19 @@ Exact rules are tried first; an unused class policy is not a failure.
 such approval to show a completed run beyond legacy's 64 frames
 (`tools/rt-diff/policies/cp11-vm.json`).
 
+CP12 (D-018) adds three classes (`tools/rt-diff/policies/cp12-vm.json`),
+each the corresponding policy of `tests/runtime2/vm_policies.py` (shared with
+the VM harnesses; old and new behaviour side by side in
+`tests/runtime2/vm_d018.py`): `d018-diagnostics` (same stdout, one diagnostic
+each, equal messages once legacy's `return: ` prefixes are removed, the B
+position not before A's), `d018-diagnostics-loop` (the same with legacy's
+loop-evaluator wording mapped to the canonical one and any position) and
+`d018-numbers` (number-only line differences, legacy lines repeated by a
+re-evaluation, a B overflow stop). Both sides must exit consistently across
+runs. `vm_parity.py` requires the VM statistics of every approval of the two
+latter classes to show the evidence (`error_in_loop_path`,
+`large_in_loop_path`).
+
 ## Reproducibility
 
 Generated programs start with `// rt-diff gen.py --seed S index I`; the same

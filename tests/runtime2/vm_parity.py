@@ -15,15 +15,14 @@
    as the coverage metric; there is no coverage threshold (D-016). CP12: a
    `replayed` outcome cannot occur any more and fails the run; every unit
    must have executed exactly once (vm_executions + legacy_executions = 1).
-3. --rt-diff: tools/rt-diff over the shared corpora with the CP11 policy file
-   (approved D-001 recursion-budget differences only); per-script outcomes
-   are collected through tools/rt-vm/nift-vm.
+3. --rt-diff: tools/rt-diff over the shared corpora with the CP11 and CP12
+   policy files (D-001#4 recursion budget; D-018 class rules); per-script
+   outcomes are collected through tools/rt-vm/nift-vm, and every class
+   approval must be confirmed by the evidence in the VM statistics.
 
-A difference is approved only when it is the D-001#4 recursion budget
-(vm_adversarial.classify_difference: legacy fails with "callable recursion
-depth exceeded", the VM went past legacy's 64-frame limit and completed or
-stopped with its own recursion error, legacy's output is a prefix of the
-VM's). Exit 1 on any other difference or expectation mismatch.
+A difference is approved only through a named policy of vm_policies.py
+(D-001#4 recursion budget, D-018a numbers, D-018c diagnostics), each keyed to evidence in the VM statistics. Exit 1 on any
+other difference or expectation mismatch.
 """
 import argparse, collections, json, os, resource, shutil, subprocess, sys, tempfile
 
@@ -31,7 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import vm_gen  # noqa: E402
-from vm_adversarial import classify_difference  # noqa: E402
+import vm_policies  # noqa: E402
 
 CORPUS = os.path.join(HERE, "vm-corpus", "cp11")
 
@@ -125,8 +124,13 @@ def single_execution(st):
         st.get("vm_executions", 0) + st.get("legacy_executions", 0) == 1
 
 
+def classify_difference(a, b, st):
+    v, policy = vm_policies.classify(a, b, st)
+    return f"approved {policy}" if v == "approved" else v
+
+
 def verdict(same, a, b, st):
-    """'same', 'approved' (D-001#4), 'endless' or 'diff'."""
+    """'same', 'approved <policy>' (vm_policies.py), 'endless' or 'diff'."""
     if st is not None and not single_execution(st):
         return "diff"
     if same:
@@ -161,8 +165,8 @@ def corpus(args, work):
         got = outcome_key(st)
         tally[got] += 1
         v = verdict(same, a, b, st)
-        if v == "approved":
-            tally["approved D-001#4"] += 1
+        if v.startswith("approved"):
+            tally[v] += 1
         elif v != "same":
             show(f"corpus {name}", a, b)
             failures += 1
@@ -172,7 +176,7 @@ def corpus(args, work):
         elif st is None or st["outcome"] != want[0] or not st["reason"].startswith(want[1]):
             print(f"FAIL corpus {name}: expected {want[0]} {want[1]}, got {got}")
             failures += 1
-        elif c is not None and c != a and classify_difference(a, c, st) != "approved":
+        elif c is not None and c != a and not classify_difference(a, c, st).startswith("approved"):
             show(f"corpus {name} (NIFT_VM=require)", a, c)
             failures += 1
     print(f"vm corpus: {len(names)} scripts, {failures} failures; outcomes {dict(sorted(tally.items()))}")
@@ -186,7 +190,7 @@ def generated(args, work):
         text = vm_gen.program(args.seed, i)
         same, a, b, st, _ = compare(args.nift, text, "gen.f", work, args.timeout)
         v = verdict(same, a, b, st)
-        tally["nonterminating" if v == "endless" else "approved D-001#4" if v == "approved" else outcome_key(st)] += 1
+        tally["nonterminating" if v == "endless" else v if v.startswith("approved") else outcome_key(st)] += 1
         if v == "diff":
             show(f"generated seed {args.seed} index {i}", a, b)
             failures += 1
@@ -195,7 +199,7 @@ def generated(args, work):
         mtext, kind = vm_gen.mutate(text, args.seed, i)
         same, a, b, st, _ = compare(args.nift, mtext, "mut.f", work, args.timeout)
         v = verdict(same, a, b, st)
-        mtally["nonterminating" if v == "endless" else "approved D-001#4" if v == "approved" else outcome_key(st)] += 1
+        mtally["nonterminating" if v == "endless" else v if v.startswith("approved") else outcome_key(st)] += 1
         if v == "diff":
             show(f"mutant ({kind}) seed {args.seed} index {i}", a, b)
             print("  program:\n" + "\n".join("    " + l for l in mtext.splitlines()))
@@ -236,6 +240,7 @@ def rt_diff(args, work):
                "tests/conformance/cases", "docs/evidence/cp410-competitiveness/probes"]
     cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", args.nift, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
+           "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
            "--report", os.path.join(work, "rt-diff-report.json")]
     for c in corpora:
@@ -257,14 +262,22 @@ def rt_diff(args, work):
     # The class rule is textual; the VM statistics must confirm each approval.
     bad_class = 0
     report = json.load(open(os.path.join(work, "rt-diff-report.json")))
+    evidence = {
+        "cp11-recursion-budget-class": lambda v: v.get("beyond_legacy_depth"),
+        "cp12-d018-diagnostics": lambda v: v["outcome"] == "vm-error",
+        "cp12-d018-diagnostics-loop": lambda v: v["outcome"] == "vm-error" and v.get("error_in_loop_path"),
+        "cp12-d018-numbers": lambda v: v.get("large_in_loop_path", 0) > 0,
+    }
+    approvals = collections.Counter()
     for r in report["results"]:
-        if not any(d["policy"] == "cp11-recursion-budget-class" for d in r["approved"]):
-            continue
-        # rt-diff runs copies of the entry, so statistics are matched by file name.
-        same_name = [v for k, v in raw.items() if os.path.basename(k) == os.path.basename(r["path"])]
-        if not any(v["outcome"] in ("vm", "vm-error") and v.get("beyond_legacy_depth") for v in same_name):
-            print(f"FAIL rt-diff class approval for {r['id']} not confirmed by VM statistics")
-            bad_class += 1
+        for policy in sorted({d["policy"] for d in r["approved"] if d["policy"] in evidence}):
+            approvals[policy] += 1
+            # rt-diff runs copies of the entry, so statistics are matched by file name.
+            same_name = [v for k, v in raw.items() if os.path.basename(k) == os.path.basename(r["path"])]
+            if not any(v["outcome"] in ("vm", "vm-error") and evidence[policy](v) for v in same_name):
+                print(f"FAIL rt-diff class approval {policy} for {r['id']} not confirmed by VM statistics")
+                bad_class += 1
+    print(f"rt-diff class approvals (confirmed by VM statistics): {dict(sorted(approvals.items()))}")
     if bad_class:
         return 1
     if args.outcomes:

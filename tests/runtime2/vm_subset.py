@@ -41,7 +41,10 @@ BODIES = {
                   'print("a" < "b")\nprint([1, 2] == [1, 2])\nprint({"k": 1} == {"k": 1})\n',
     "logic": 'print(1 && "a")\nprint(0 || "")\nprint(!true)\nprint(null ?? 3)\nprint(2 ?? 3)\n'
              'print((1 < 2 ? "y" : "n"))\nprint(!(1 == 2))\n',
-    "bindings": "x := 1\nx = 2\nx += 3\nx -= 1\nx *= 4\nx /= 2\nx %= 5\nprint(x)\ny := 1.5\ny = 2\n"
+    # CP12 (D-018): `%=` on a binding that may hold a fraction is refused in
+    # loop code (context:modulo-assignment), so `/=` uses its own binding.
+    "bindings": "x := 1\nx = 2\nx += 3\nx -= 1\nx *= 4\nx %= 5\nprint(x)\nz := 8\nz /= 2\nprint(z)\n"
+                "y := 1.5\ny = 2\n"
                 "print(y)\nn := 0\nn++\nn--\n++n\nprint(n)\ns := \"ab\"\ns += \"cd\"\nprint(s)\n",
     "aggregates": 'a := [1, 2, 3]\na.push(4)\na[0] = 9\nprint(a[0] + a.length() + a.size())\n'
                   'o := {"k": [1, {"z": 4}], "n": 2}\nprint(o.k[1].z)\nprint(o["n"])\nw := "héllo"\nprint(w.length())\n',
@@ -118,6 +121,17 @@ UNSUPPORTED = [
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),
     ("jump-outside-loop", "break\n", "jump-outside-loop"),
+    # CP12 (D-018): legacy behaviour that depends on the calling context.
+    ("context-assignment", "x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i += 1 }\n", "context:assignment-type"),
+    ("context-modulo", "x := 7\nx /= 2\ni := 0\nwhile (i < 1) { x %= 2; i += 1 }\nprint(x)\n",
+     "context:modulo-assignment"),
+    ("context-negative-zero", "x := 0\ni := 0\nwhile (i < 1) { print(-x); i += 1 }\n", "context:negative-zero"),
+    ("context-object-length", "fn(n(o)) { return o.length() }\ni := 0\nwhile (i < 1) { print(n({\"k\": 1})); "
+                              "i += 1 }\n", "context:object-length"),
+    ("context-string-append", "s := \"a\" + 0.5\ni := 0\nwhile (i < 1) { s += \"b\"; i += 1 }\nprint(s)\n",
+     "context:string-append-type"),
+    ("context-parameter", "fn(f(p)) { p = 1\nreturn p }\ni := 0\nwhile (i < 1) { print(f(2.0 * i)); i += 1 }\n",
+     "context:parameter-type"),
     # Review round 3 (F1): only a local name or an unsigned integer literal index.
     ("index-target-call", "fn(f()) { return 0 }\na := [1]\na[f()] = f()\n", "index-target"),
     ("index-target-dot", "a := [1, 2, 3]\na[a.length() - 1] = 9\nprint(a[2])\n", "index-target"),

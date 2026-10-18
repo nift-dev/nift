@@ -61,7 +61,6 @@ namespace nift::rt {
     X(GetMember)  /* R[a] = R[b].(atom c)                                       */                    \
     X(Push)       /* R[a].push(RK[b])                                           */                    \
     X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
-    X(JmpLarge)   /* if R[a] is a number legacy calls large, pc += int16 c      */                    \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */
 

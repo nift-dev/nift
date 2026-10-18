@@ -36,9 +36,13 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vm_policies  # noqa: E402
+
 FILE_WRITE = ('f := file("log.txt")\nf.open("a")\nf.write("line\\n")\nf.save()\nf.close()\n')
 
-# (name, source, expected NIFT_VM=1 outcome, extra environment)
+# (name, source, expected NIFT_VM=1 outcome, extra environment); a difference
+# from legacy must be approved by the policy named in APPROVED.
 CASES = [
     ("vm-prints", 'fn(f(x)) { print("f" + x)\nreturn x * 2 }\nprint("start")\ni := 0\n'
                   'while (i < 5) { print("loop " + i)\ns := f(i)\ni += 1 }\nprint(f(9))\n', "vm", {}),
@@ -47,8 +51,9 @@ CASES = [
     ("vm-error-in-function", 'fn(g(a, k)) { print("g " + k)\nreturn a[k] }\na := [1, 2]\nk := 0\n'
                              'while (k < 4) { print(g(a, k))\nk += 1 }\n', "vm-error", {}),
     ("vm-overflow-in-loop", 'x := 3\ni := 0\nwhile (i < 80) { print(x)\nx = x * 2\ni += 1 }\n', "vm-error", {}),
-    # Legacy re-evaluates a loop statement whose value reaches 2^53 on its
-    # textual path, calls included: the call prints twice under legacy too.
+    # D-018a: legacy re-evaluates a loop statement whose value reaches 2^53 on
+    # its textual path, calls included (the call prints twice); the VM
+    # evaluates it once (approved difference, vm_policies.py).
     ("vm-large-reevaluation", 'fn(loud(x)) { print("loud " + x)\nreturn x }\nw := 9007199254740991\n'
                               'i := 0\nwhile (i < 2) { t := loud(w + i) + 2\nprint(t)\ni += 1 }\n', "vm", {}),
     ("vm-large-output-then-error", 'i := 0\nwhile (i < 200000) { print("line " + i)\ni += 1 }\nprint(1 % 0)\n',
@@ -63,6 +68,16 @@ CASES = [
     ("internal-failure", 'print("start")\ns := "abcdefghijklmnopq"\nk := 0\nwhile (k < 22) { s += s\nk += 1 }\n'
                          'print(s.length())\n', "internal-error", {"NIFT_VM_HEAP_BUDGET": str(4 << 20)}),
 ]
+
+
+APPROVED = {
+    "vm-error-in-function": "D-018c diagnostics",  # legacy's loop wording "invalid index"
+    "vm-large-reevaluation": "D-018a numbers",
+    "vm-recursion-budget": "D-001#4 recursion",
+}
+# Lines the VM must print exactly once per iteration where legacy printed them
+# twice (exactly-once evaluation).
+ONCE = {"vm-large-reevaluation": ("loud 9007199254740991", "loud 9007199254740992")}
 
 
 def run(nift, d, mode, extra):
@@ -142,10 +157,16 @@ def main():
                 continue
             # A, C, D: identical observable behaviour, every effect once.
             if vm != legacy:
-                if not (expect == "vm-error" and name == "vm-recursion-budget" and vm[0] == legacy[0]
-                        and b"callable recursion depth exceeded" in legacy[1] and st.get("beyond_legacy_depth")):
-                    fail(name, f"differs from legacy: exit {legacy[2]}/{vm[2]} stderr {legacy[1][:120]!r} / "
-                               f"{vm[1][:120]!r}")
+                verdict, policy = vm_policies.classify(legacy, vm, st)
+                if verdict != "approved" or policy != APPROVED.get(name):
+                    fail(name, f"differs from legacy ({verdict} {policy}): exit {legacy[2]}/{vm[2]} "
+                               f"stderr {legacy[1][:120]!r} / {vm[1][:120]!r}")
+            elif name in APPROVED:
+                fail(name, f"expected the approved difference {APPROVED[name]}, got identical behaviour")
+            for line in ONCE.get(name, ()):
+                n_vm, n_legacy = vm[0].decode().splitlines().count(line), legacy[0].decode().splitlines().count(line)
+                if n_vm != 1 or n_legacy != 2:
+                    fail(name, f"{line!r}: VM {n_vm} times (want 1), legacy {n_legacy} (want 2)")
             if vm_ops != legacy_ops:
                 fail(name, f"host operations differ: legacy {dict(legacy_ops)} vm {dict(vm_ops)}")
             if FILE_WRITE in source and (vm_ops[("save", "log.txt")] != 1 or legacy_ops[("save", "log.txt")] != 1):

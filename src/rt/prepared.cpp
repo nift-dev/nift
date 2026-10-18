@@ -45,6 +45,7 @@ public:
 
     PreparedRefusal run() {
         mark_prepared_functions();
+        result_.loop_called = marked_;
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
             check_regions(ast_.at(plan_.functions[f]).b, marked_[f]);
         if (!result_.refused) top_level([this](NodeId id) { check_regions(id, false); return !result_.refused; });
@@ -65,7 +66,11 @@ public:
 
 private:
     bool refuse(const Node& at, const char* reason) {
-        if (!result_.refused) result_ = {true, reason, at.begin};
+        if (!result_.refused) {
+            result_.refused = true;
+            result_.reason = reason;
+            result_.offset = at.begin;
+        }
         return false;
     }
 

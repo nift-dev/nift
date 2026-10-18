@@ -99,7 +99,6 @@ void Vm::flush_if_needed(std::string& output) {
 }
 
 namespace {
-inline bool large_number(const Value& v) { return v.is(Kind::Int) ? !safe_integer(v.as_int()) : is_large(v); }
 inline const Note* note_at(const Proto* proto, const Instr* pc) {
     return proto->note(static_cast<std::size_t>(pc - proto->code.data()));
 }
@@ -115,6 +114,7 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 #endif
 #define NEXT() { ++pc; DISPATCH(); }
 #define FAIL() goto bail
+#define NOTE_LARGE if (fault.large) note_large(pc, fault);
 #define ARITH(name, builtin, extra)                                                                  \
     OP(name) {                                                                                       \
         const Value& l = RK(pc->b); const Value& r = RK(pc->c); std::int64_t v;                      \
@@ -122,7 +122,7 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
             R[pc->a] = Value::integer(v); NEXT();                                                    \
         }                                                                                            \
         if (!arith_slow(*pc, OpCode::name, l, r, R[pc->a], fault) || !memory_ok(fault)) FAIL();      \
-        NEXT();                                                                                      \
+        NOTE_LARGE NEXT();                                                                           \
     }
 #define COMPARE(name, base, expr, left, right, store)                                                \
     OP(name) {                                                                                       \
@@ -175,7 +175,7 @@ VmResult Vm::run(std::string& output) {
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
         }
         if (!arith_slow(*pc, OpCode::Mod, l, r, R[pc->a], fault)) FAIL();
-        NEXT();
+        NOTE_LARGE NEXT();
     }
     OP(AddI) {
         Value& x = R[pc->b];
@@ -183,7 +183,7 @@ VmResult Vm::run(std::string& output) {
             R[pc->a] = Value::integer(x.as_int() + jump_offset(pc->c)); NEXT();
         }
         if (!arith_slow(*pc, OpCode::Add, x, Value::integer(jump_offset(pc->c)), R[pc->a], fault)) FAIL();
-        NEXT();
+        NOTE_LARGE NEXT();
     }
     OP(AddAssign) {
         Value& x = R[pc->a]; const Value& y = RK(pc->b); std::int64_t v;
@@ -191,7 +191,7 @@ VmResult Vm::run(std::string& output) {
             x = Value::integer(v); NEXT();
         }
         if (!add_assign_slow(*pc, x, y, fault) || !memory_ok(fault)) FAIL();
-        NEXT();
+        NOTE_LARGE NEXT();
     }
     COMPARE(Eq, Eq, x == y, pc->b, pc->c, SET_RESULT)
     COMPARE(Ne, Ne, x != y, pc->b, pc->c, SET_RESULT)
@@ -213,18 +213,16 @@ VmResult Vm::run(std::string& output) {
     OP(CheckAssign) {  // textual `x = e`: the type legacy derives from the text and the value
         const std::int64_t assigned = text_binding_type(RK(pc->c).as_int(), R[pc->a]);
         if (tag_assignable(assigned, R[pc->b].as_int())) NEXT();
-        binding_type_error(*pc, assigned, R[pc->b].as_int(), note_at(proto, pc), fault);
+        binding_type_error(assigned, R[pc->b].as_int(), note_at(proto, pc), fault);
         FAIL();
     }
     OP(CheckType) {
         const std::int64_t to = R[pc->b].as_int();
         const std::int64_t tag = fast_tag(R[pc->a]);
         if (tag_assignable(tag, to)) NEXT();
-        binding_type_error(*pc, tag, to, note_at(proto, pc), fault);
+        binding_type_error(tag, to, note_at(proto, pc), fault);
         FAIL();
     }
-    // LEGACY QUIRK Q1: a large value continues at the textual code.
-    OP(JmpLarge) { pc += large_number(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(Call) {
         const Proto* callee = protos_[pc->b];
         const std::size_t callee_base = base + pc->a;
@@ -258,58 +256,42 @@ VmResult Vm::run(std::string& output) {
     OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) {
         if (!cold(*pc, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();
-        NEXT();
+        NOTE_LARGE NEXT();
     }
 #if !NIFT_RT_COMPUTED_GOTO
     default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
 #endif
 bail:
-    if (fault.reason == StopReason::Reeval) {
-        if (const Instr* target = reeval_target(proto, pc, fault)) {
-            pc = target;
-            DISPATCH();
-        }
-    }
+    if (fault.large) note_large(pc, fault);
     error_result(result, fault, proto, pc);
 done:
     result.beyond_legacy_depth = beyond_legacy_depth_;
-    result.reevaluations = reevaluations_;
+    result.large_numbers = large_numbers_;
+    result.large_in_loop_path = large_in_loop_path_;
     return result;
 }
 
-// LEGACY QUIRKS Q1/Q2 (rt/legacy_quirks.h): legacy re-evaluates this prepared
-// statement on its textual path: the run continues at the statement's
-// textual code (a cold block after the function body).
-const Instr* Vm::reeval_target(const Proto* proto, const Instr* pc, Fault& fault) {
-    const Note* note = proto->note(static_cast<std::size_t>(pc - proto->code.data()));
-    if (!note) {
-        fault.reason = StopReason::Internal;
-        fault.message = "re-evaluation without a target";
-        return nullptr;
-    }
-    ++reevaluations_;
-    fault = Fault();
-    return proto->code.data() + note->alt;
+// Evidence only: is `pc` running in code legacy runs on its prepared (loop)
+// evaluator? Its own flag, or a call made from such code below it.
+bool Vm::in_loop_path(const Instr* pc) const {
+    if (pc->flags & kInstrLoopPath) return true;
+    for (const Frame& frame : frames_)
+        if ((frame.ret - 1)->flags & kInstrLoopPath) return true;
+    return false;
+}
+
+void Vm::note_large(const Instr* pc, Fault& fault) {
+    fault.large = false;
+    ++large_numbers_;
+    if (in_loop_path(pc)) ++large_in_loop_path_;
 }
 
 void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const {
     result.reason = fault.reason;
     result.message = fault.message;
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
-    // LEGACY QUIRK Q3: a statement-level error of a function legacy runs
-    // prepared is reported at the call in the caller.
-    if ((pc->flags & kInstrCallerSite) && !frames_.empty()) {
-        const Frame& caller = frames_.back();
-        result.offset = caller.proto->offsets[static_cast<std::size_t>(caller.ret - 1 - caller.proto->code.data())];
-    }
-    // Legacy prefixes "return: " once per textual `return` the error passes
-    // through, except for its recursion-depth error (ParserTemplate.cpp).
-    if (!beyond_legacy_depth_) {
-        result.return_prefixes = (pc->flags & kInstrReturnPrefix) ? 1u : 0u;
-        for (const Frame& frame : frames_)
-            if ((frame.ret - 1)->flags & kInstrReturnPrefix) ++result.return_prefixes;
-    }
+    result.error_in_loop_path = in_loop_path(pc);
 }
 
 bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
@@ -343,11 +325,11 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
             object_set(R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
-        case OpCode::GetIndex: if (!get_index(in, note, R[in.b], RK(in.c), out, fault)) return false; break;
-        case OpCode::SetIndex: return set_index(in, note, R[in.a], RK(in.b), RK(in.c), fault);
-        case OpCode::GetMember: if (!get_member(in, R[in.b], Atom{in.c}, out, fault)) return false; break;
+        case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
+        case OpCode::SetIndex: return set_index(note, R[in.a], RK(in.b), RK(in.c), fault);
+        case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
         case OpCode::Push: return push_value(R[in.a], RK(in.b), fault);
-        case OpCode::Length: if (!length_of(in, note, R[in.b], in.c != 0, out, fault)) return false; break;
+        case OpCode::Length: if (!length_of(note, R[in.b], in.c != 0, out, fault)) return false; break;
         case OpCode::TypeMeet:
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));

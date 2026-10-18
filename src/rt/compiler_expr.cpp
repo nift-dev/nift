@@ -108,7 +108,7 @@ bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant
             const Node& operand = ast_.at(node.a);
             if (node.op != Op::Neg || operand.kind != NodeKind::Number) break;
             if (!decode_number_literal(text(operand), value)) return fail(operand, "number-literal");
-            // -0 stays a run-time negation (the VM bails on integer -0).
+            // -0 stays a run-time negation.
             if (value.is(Kind::Int) && value.as_int() != 0) { value = Value::integer(-value.as_int()); return true; }
             if (value.is(Kind::Double) && value.as_double() != 0) {
                 value = Value::number(-value.as_double());
@@ -243,6 +243,10 @@ bool UnitCompiler::ternary(const Node& node, std::uint16_t dst) {
 
 bool UnitCompiler::unary(const Node& node, std::uint16_t dst) {
     if (node.op != Op::Not && !kinds_within(node.a, kKindNumber, node, "type:unary")) return false;
+    // Legacy's prepared negation of an integer 0 gives -0 (the canonical one
+    // 0): refused in loop code where the operand may be an integer (D-018).
+    if (node.op == Op::Neg && loop_reachable() && (kinds(node.a) & (kKindInt | kKindUnknown)))
+        return fail(node, "context:negative-zero");
     const std::uint16_t mark = fb_->top();
     std::uint16_t operand = 0;
     if (!reg_any(node.a, operand)) return false;
@@ -310,6 +314,11 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
     const OpCode fused = node.kind == NodeKind::Binary ? fused_not_jump(node.op) : OpCode::Nop;
     if (fused != OpCode::Nop) {
         if (!comparison_chain_ok(node)) return false;
+        // The fused form takes the same kind check as the plain comparison
+        // (found by vm_context_consistency.py: `if (p > 1)` with a string p).
+        const bool ordering = node.op != Op::Eq && node.op != Op::Ne;
+        if (ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)))
+            return fail(node, std::string("type:") + op_name(node.op));
         std::uint16_t left = 0, right = 0;
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
         fb_->set_offset(node.begin);

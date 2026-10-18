@@ -593,7 +593,47 @@ def recursion_budget_matches(a, b):
     return True
 
 
-CLASS_RULES = {"recursion-budget": recursion_budget_matches}
+sys.path.insert(0, os.path.join(REPO, "tests", "runtime2"))
+import vm_policies  # noqa: E402  (the shared approved-difference policies, CP12)
+
+
+def _single_outcome(a, b):
+    """Both sides ran consistently (every run the same exit status) and each
+    combined run is that side's stdout then its stderr."""
+    if not a["exit"] or not b["exit"] or len(set(a["exit"])) != 1 or len(set(b["exit"])) != 1:
+        return None
+    for side in (a, b):
+        if side["combined"] and any(run != side["stdout"] + side["stderr"] for run in side["combined"]):
+            return None
+    return (a["stdout"], a["stderr"], a["exit"][0]), (b["stdout"], b["stderr"], b["exit"][0])
+
+
+def _d018(check, outcome_from_exit, loop):
+    """A D-018 policy of vm_policies.py, assuming the VM evidence it needs
+    (`loop`); vm_parity.py confirms that evidence from the VM statistics for
+    every approval of a class whose id ends in -loop or -numbers."""
+    def matches(a, b):
+        runs = _single_outcome(a, b)
+        if runs is None:
+            return False
+        legacy, vm = runs
+        st = {"outcome": "vm-error" if vm[2] == 1 else "vm" if outcome_from_exit else "",
+              "error_in_loop_path": loop, "large_in_loop_path": 1 if loop else 0}
+        return bool(check(legacy, vm, st))
+    return matches
+
+
+def _diagnostics(legacy, vm, st):
+    return (legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
+            and vm_policies.diagnostics_match(legacy[1], vm[1], st))
+
+
+CLASS_RULES = {
+    "recursion-budget": recursion_budget_matches,
+    "d018-diagnostics": _d018(_diagnostics, True, False),
+    "d018-diagnostics-loop": _d018(_diagnostics, True, True),
+    "d018-numbers": _d018(vm_policies.numbers_match, True, True),
+}
 
 
 def load_policies(paths):

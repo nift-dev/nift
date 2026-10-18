@@ -2,6 +2,8 @@
 # <script> <vm|vm-error|fallback> [reason or message prefix]. Every script must also match legacy byte
 # for byte. CP12: the former `replayed` outcomes (replay_*.f, review_r1/r5) are now `vm` or `vm-error`
 # (the VM reproduces legacy's result or error itself) or a static `fallback` (refused before execution).
+# CP12 D-018: one meaning in every context; differences only through the named policies of
+# tests/runtime2/vm_policies.py, and context-dependent legacy behaviour refused (`context:*`).
 arith.f vm 
 arrays.f vm 
 control.f vm 
@@ -39,7 +41,7 @@ replay_index_assign_type.f vm-error index out of range: 5
 replay_int_overflow.f vm-error signed 64-bit integer overflow
 typed_double_binding.f vm
 replay_large_literal_result.f vm
-replay_loop_type_change.f vm-error cannot change binding type: x
+replay_loop_type_change.f fallback context:assignment-type  # D-018: legacy loop check by value, canonical by text
 replay_member_assign.f fallback static-error:member-assign
 replay_missing_member.f vm-error value has no member: b
 replay_modulo_float.f vm-error modulo requires integer-valued operands

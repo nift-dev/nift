@@ -9,9 +9,8 @@
 // budget (semantics.md "Recursion", approved change D-001).
 //
 // CP12: a run either completes or stops with a program error that the VM
-// reports itself, exactly as legacy would (message, source position, the
-// "return: " prefixes legacy adds through textual `return` statements, exit
-// status 1), or with an internal failure (exit 70). Nothing is ever re-run
+// reports itself (legacy's message format, the position of the failing
+// expression, exit status 1; D-018c), or with an internal failure (exit 70). Nothing is ever re-run
 // on the legacy engine: the engine was selected before the first
 // instruction. Output is streamed: the buffer is handed to `flush` whenever
 // it grows past `flush_threshold` and at the end of the run.
@@ -57,12 +56,17 @@ struct VmOptions {
 struct VmResult {
     StopReason reason = StopReason::None;  // None: the program completed
     std::string message;                   // legacy's message (Error) or the failure (Internal)
-    std::uint32_t offset = 0;              // source offset legacy reports for the error
-    std::uint32_t return_prefixes = 0;     // "return: " prefixes legacy adds to the message
+    std::uint32_t offset = 0;              // source offset of the failing expression
     bool returned = false;                 // the script ended with `return value`
     std::string return_text;               // rendering of that value
     bool beyond_legacy_depth = false;      // the call depth exceeded legacy's 64 frames
-    std::uint64_t reevaluations = 0;       // prepared statements re-run on their textual code
+    // Evidence for the D-018 difference policies (never a change of
+    // behaviour): arithmetic that met a number legacy calls large (or went
+    // out of range), how much of it ran in code legacy runs on its prepared
+    // (loop) evaluator, and whether the error did.
+    std::uint64_t large_numbers = 0;
+    std::uint64_t large_in_loop_path = 0;
+    bool error_in_loop_path = false;
 };
 
 class Vm {
@@ -85,7 +89,8 @@ private:
     bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     void flush_if_needed(std::string& output);
-    const Instr* reeval_target(const Proto* proto, const Instr* pc, Fault& fault);
+    bool in_loop_path(const Instr* pc) const;
+    void note_large(const Instr* pc, Fault& fault);
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
     bool memory_ok(Fault& fault);
 #if defined(__GNUC__)
@@ -99,7 +104,8 @@ private:
     std::vector<Value> stack_;
     std::vector<Frame> frames_;
     std::vector<const Proto*> protos_;
-    std::uint64_t reevaluations_ = 0;
+    std::uint64_t large_numbers_ = 0;
+    std::uint64_t large_in_loop_path_ = 0;
     bool beyond_legacy_depth_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
