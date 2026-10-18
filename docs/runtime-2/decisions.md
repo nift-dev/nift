@@ -265,3 +265,20 @@ avoids unstable interfaces of the previous one; corrections are rebased in, and
 a checkpoint is never certified on an obsolete base. On the 2-vCPU host only
 CPU-light work overlaps certification; performance is measured on an idle host.
 CP12 (replay removal) started from CP11 `bf32e4f` while CP11 certifies.
+
+## D-018 — One meaning everywhere; first deliberate semantic changes (owner, 2026-10-18)
+- Language-wide rule for Runtime 2.0: the same expression and the same function
+  have the same meaning wherever they appear — top level, inside a loop, inside
+  another function. A function has one compiled representation; no
+  per-context variants to reproduce legacy's two evaluators.
+- Where legacy's behaviour depends on context, the VM refuses the construct
+  before execution (coverage may drop) and the excluded behaviour plus the
+  intended consistent semantics are recorded for later checkpoints.
+- Approved changes (VM differs from legacy deliberately; each with old/new
+  regression tests and a narrow differential policy):
+  1. Exactly-once evaluation: a loop assignment whose value reaches 2^53 is not
+     re-evaluated; its calls run once.
+  2. `print(path)` with a missing element evaluates the path's keys once.
+  3. Errors are reported where they occur, not at the call site of a
+     loop-called function or at the outermost loop statement.
+- CP12 phase A removes its dual-compilation machinery accordingly.
