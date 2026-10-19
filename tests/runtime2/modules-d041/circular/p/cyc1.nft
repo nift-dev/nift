@@ -1,0 +1,2 @@
+import("cyc2.nft")
+print("cyc1")

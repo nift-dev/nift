@@ -1,0 +1,5 @@
+import("../c.nft")
+import("d.nft")
+fn(af()) { return cf() + df() }
+export(af)
+export(cf)

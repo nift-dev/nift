@@ -1,0 +1,14 @@
+{
+ "about": "One shared instance: functions exported through two importers update the same module state.",
+ "legacy": "differs: legacy gives each importer its own instance (1, 1) (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n1\n2\n3\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

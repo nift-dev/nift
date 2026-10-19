@@ -1,0 +1,14 @@
+{
+ "about": "main imports c directly and through a: one instance, so state is shared along both paths.",
+ "legacy": "differs: legacy initialises c twice and the counters are separate (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n1\n2\n3\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

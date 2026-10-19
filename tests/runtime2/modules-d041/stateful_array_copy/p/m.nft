@@ -1,0 +1,7 @@
+xs := [1]
+fn(add(v)) { xs.push(v)
+return xs.length() }
+fn(get()) { return xs.stringify() }
+export(xs)
+export(add)
+export(get)

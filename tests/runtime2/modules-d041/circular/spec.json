@@ -1,0 +1,14 @@
+{
+ "about": "A cycle is an explicit error before the cyclic module runs again (nothing is printed).",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "",
+   "exit": 1,
+   "stderr_contains": "script import cycle through $P/p/cyc1.nft"
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+{
+ "about": "Changing a module rebuilds every page that imported it, directly or through another module; each rebuilt page gets fresh instances; an unchanged project rebuilds nothing.",
+ "legacy": "differs on page c only (x101 y101) (L45)",
+ "steps": [
+  {
+   "run": [
+    "build",
+    "--all"
+   ],
+   "exit": 0
+  },
+  {
+   "run": [
+    "build"
+   ],
+   "stdout_contains": "up to date",
+   "exit": 0
+  },
+  {
+   "edit": {
+    "data/m.nft": [
+     "n := 0",
+     "n := 100"
+    ]
+   }
+  },
+  {
+   "run": [
+    "build"
+   ],
+   "exit": 0,
+   "stdout_contains": "dependency changed: data/m.nft",
+   "public": {
+    "a.html": "page a\n\n101 102\n",
+    "b.html": "page b\n\n101 102\n",
+    "c.html": "page c\n\n\nx101 y102\n"
+   },
+   "dependencies": {
+    "a": [
+     "content/a.html",
+     "data/m.nft"
+    ],
+    "b": [
+     "content/b.html",
+     "data/m.nft"
+    ],
+    "c": [
+     "content/c.html",
+     "data/m.nft",
+     "data/x.nft",
+     "data/y.nft"
+    ]
+   }
+  },
+  {
+   "edit": {
+    "data/y.nft": [
+     "\"y\"",
+     "\"Y\""
+    ]
+   }
+  },
+  {
+   "run": [
+    "build"
+   ],
+   "exit": 0,
+   "stdout_contains": "dependency changed: data/y.nft",
+   "stdout_lacks": "built a",
+   "public": {
+    "a.html": "page a\n\n101 102\n",
+    "b.html": "page b\n\n101 102\n",
+    "c.html": "page c\n\n\nx101 Y102\n"
+   }
+  }
+ ]
+}

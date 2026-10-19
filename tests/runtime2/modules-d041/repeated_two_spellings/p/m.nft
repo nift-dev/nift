@@ -1,0 +1,5 @@
+print("m runs")
+mv := [1]
+fn(mf(x)) { return x + 1 }
+export(mv)
+export(mf)

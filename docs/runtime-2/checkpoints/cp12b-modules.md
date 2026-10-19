@@ -1,7 +1,11 @@
 # CP12 phase B — modules: legacy semantics (probed) and the VM design
 
-Status: probes recorded, semantics drafted; implementation authorised by the
-owner (decision 2) once these semantics are verified — not started. Probes:
+Status: semantics probed; **decided by D-041** (initialise once per execution
+context, shared instance with an explicit lifecycle, exports copied under
+D-040). VM side in progress: module graph and loader (`src/rt/module_graph.*`,
+`src/rt/module_loader.*`, below); the D-041 fixtures
+(`tests/runtime2/modules-d041`, below). The legacy side waits for
+feature-host-deps to integrate (coordinator, 2026-10-20). Probes:
 `tests/runtime2/semantics-modules/<probe>/` (program in `p/`, expected
 stdout/stderr/exit recorded from legacy, D-015; each probe is also an
 rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
@@ -18,7 +22,7 @@ rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
 | Caching | **none**: every `import` executes the module again in a fresh environment; a diamond runs the shared module twice (`c runs` twice) | `diamond`, `repeated` |
 | Execution | the module runs immediately, at the import statement, in isolated scopes (no access to the importer's bindings); its output appears in program order | `side_effect_order`, `module_free_unbound` |
 | Exports | `export(name)` lists a binding, function or struct of the module's top level; after the module finished, exactly the listed names are installed in the importer: variables into the importer's **current innermost scope** (block-scoped: gone after the block), functions and structs into the importer's **global** function/struct tables; an importer re-exports names it imported (`export(cf)` in `b`) | `diamond`, `not_reexported`, `in_block`, `struct_export` |
-| Values | an exported variable is the module's binding value at the end of the module (copied: pushing to it in the importer is local) | `export_copy` |
+| Values | an exported variable is a **live alias** of the module's binding: the importer's writes (`n += 10`, `xs.push(9)`) change the module's state and the module's functions' later writes are seen by the importer (L50; D-041 #4 makes it a copy). The `export_copy` probe does not distinguish (correction of the earlier "copied" reading, found while writing the D-041 fixtures) | `export_copy`, `modules-d041/stateful_*` |
 | Module lexical environment | exported functions resolve the module's own top-level bindings and private functions through the module environment as it is **at the end of the module** (a binding declared after `export` is visible); never through the caller (a caller's local of the same name is not seen; an unbound name is an error even if the caller has it) — modules are **lexically scoped** already | `module_private`, `module_private_late`, `module_vs_caller_local`, `module_free_unbound` |
 | Collisions | importing a name that already exists in the importer (binding in any active scope, function, struct) is an error, `export collides with existing binding: <name>`, after the module ran (its side effects happened); this makes a repeated import of the same module an error | `export_collision`, `repeated`, `same_file_two_spellings`, `in_function` (second call) |
 | Import in a function | runs at each call; the exports go to the global tables, so the second call collides | `in_function` |
@@ -28,8 +32,9 @@ rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
 
 Quirks for the register (not fixed here): exports land in the innermost
 scope for variables but the global tables for functions (L44); every import
-re-runs the module and repeated imports collide (L45); the `import: `
-prefix repeats per level (L46).
+re-runs the module and repeated imports collide (L45, resolved by D-041); the
+`import: ` prefix repeats per level (L46); exported variables are live
+aliases (L50, resolved by D-041 #4).
 
 ## VM design (proposed; owner decision 2)
 
@@ -45,18 +50,21 @@ prefix repeats per level (L46).
   swapped for CP16's host read when it lands. A missing file, a cycle, a
   non-literal path: the unit is refused before execution (legacy then reports
   its own error) — no partial execution.
-* **Compile once, initialise per import.** Each distinct module (by canonical
-  identity) is parsed and compiled once per program graph; every `import`
-  statement is a call of that module's initialiser proto, which runs the
-  module top level again in a fresh environment, exactly as legacy's
-  per-import execution (`diamond`: twice). Compilation caching never changes
-  initialisation.
+* **Compile once, initialise once per context (D-041).** Each distinct
+  module (by canonical identity) is parsed and compiled once per program
+  graph; the first `import` in a context initialises the instance
+  (uninitialised → initialising → initialised | failed); later imports bind
+  the same instance's exports; importing a module that is `initialising` is
+  the cycle error; one that `failed` reports the same failure without running
+  it again. Compilation caching never changes initialisation.
+  *Superseded draft:* initialise per import (legacy's re-run).
 * **Exports** become stores at the import site: functions bound statically
-  (the importer's function table gets the module's protos, closed over that
-  initialisation's module environment); variables declared in the importer's
-  current scope. A collision that can happen is refused statically
-  (`import-collision`: legacy fails after running the module); since a repeated
-  import of the same module always collides, it is refused too.
+  (the importer's function table gets the module's protos, closed over the
+  instance's module environment); variables copied (D-040) into the
+  importer's current scope. Binding the same declaration again (a repeated
+  import, two spellings, a re-export of it) is a rebind, not an error; a
+  clash with a *different* binding is refused statically (`import-collision`:
+  legacy fails after running the module).
 * **Module environment**: a module's top-level bindings live in that
   initialisation's environment (heap object); its functions read them as
   module globals (the H1 mechanism, with the environment instead of main's
@@ -119,7 +127,8 @@ that their functions mutate).
 | D-038 (lexical) | module functions resolve module names lexically (legacy does already, probes `module_vs_caller_local`, `module_free_unbound`) | same | same |
 | Cost when it matters | shared mutable module state across importers (e.g. `id.f`'s counter) — correct for "module = singleton" designs | re-execution cost per import; diamonds duplicate output; repeated imports fail | none: affected programs (0 today) run on legacy |
 
-Recommendation: **C now, A as the target**. C is A's implementation with the
+*Decided by D-041: A.* Option C survives only as a temporary switch (below).
+Original recommendation: **C now, A as the target**. C is A's implementation with the
 cases where A and B differ refused before execution (D-015: refuse rather
 than reproduce or silently change); it needs no legacy change and no
 compatibility machinery, and it costs no coverage on any corpus. When the
@@ -149,3 +158,80 @@ explicit build-level facility, not module state. Dependencies (module paths,
 and absent modules where the host records absence) are recorded per
 `PageRender`/`BuildHook`, so each page rebuilds exactly when one of its
 modules changes.
+
+## Implementation (VM side, D-041)
+
+`src/rt/module_loader.{h,cpp}` — the only module file access in `src/rt`
+(`load_module_source`, legacy's "script is not readable" wording; to be
+replaced by CP16's host read) and `module_identity` (legacy's
+`stable_import_identity`: weakly canonical, case-folded on Windows).
+
+`src/rt/module_graph.{h,cpp}` — `build_module_graph(entry ast, root,
+entry path, options)`, run before anything executes:
+
+* resolution with legacy's rules (relative to the importing module's
+  directory, the entry script's for the unit, the current directory without
+  one; `\` read as `/`; absolute and lexically normalised; optional project
+  root confinement for builds: `import-outside-project`);
+* each module read and parsed once per program by identity
+  (`Module::legacy_initialisations` counts how often today's legacy would run
+  it — the migration fixture data);
+* `dependencies` (every module read, first-read order) and `absent` (looked
+  for, unreadable) for CP24 / the page dependency record (to hook into
+  feature-host-deps' record once it integrates, not a parallel mechanism);
+* explicit refusals before execution: `import-dynamic`, `import-package`,
+  `import-nested` (imports in functions, blocks, `try`), `import-missing`,
+  `import-cycle`, `import-parse-error`, `import-opaque:<class>`,
+  `import-collision` (a different binding; the same declaration again is a
+  rebind, tracked per export origin through re-exports), `export-missing`
+  (no earlier top-level binding, function or import of that name),
+  `export-duplicate`, `export-nested`, `export-struct` (structs: B4),
+  `module-return`, `import-limit`.
+
+Unit tests: `tests/rt/vm_modules_unit.cpp` plans every legacy probe
+(`semantics-modules`, 25) under both policies, the D-041 script fixtures,
+resolution details (relative chains, two spellings, absent files, project
+root) and rebinding.
+
+### Temporary scaffolding: `import-reinitialised` (removal item)
+
+`InitPolicy` is the single initialisation switch. The default is
+`OncePerContext` (D-041). `RefuseReinitialisation` refuses units where
+today's legacy would initialise a module again (`import-reinitialised`); it
+exists only in case the VM's initialise-once lands before legacy's (D-041
+#2) and is never part of the module design.
+**Removal condition: legacy and the VM both implement and verify
+initialise-once (the D-041 fixtures pass on both engines). It must not
+survive into CP25.** Tracked in the delivery forecast's scaffolding list.
+
+## D-041 fixtures (independently specified)
+
+`tests/runtime2/modules-d041/<fixture>/` — a program or project in `p/` and
+`spec.json` with the expected behaviour **written from D-041, not recorded
+from an engine**; run by `tests/runtime2/modules_d041.py --nift <binary>`.
+`--legacy-today` checks that the fixtures marked `agrees` pass on today's
+legacy and those marked `differs` (with the register entry) still fail, so
+the specification stays honest until legacy implements initialise-once.
+Today: legacy-today PASS (14 fixtures: 4 agree, 10 differ as recorded).
+
+| Fixture | D-041 expectation | Today's legacy |
+| --- | --- | --- |
+| `repeated` | one initialisation; the second import rebinds (`m runs`, `2`, `[1]`) | runs twice, collision (L45) |
+| `repeated_two_spellings` | `m.nft` and `./sub/../m.nft` are one module | runs twice, collision (L45) |
+| `export_clash` | a different binding of the same name: collision error after the module ran | agrees |
+| `diamond` | the shared module runs once | twice (L45) |
+| `diamond_stateful` | state shared through two importers (1, 2, 3) | separate instances (1, 1, 2) |
+| `nested_chain` | relative paths per importer; names reach main only through re-export | agrees |
+| `nested_shared` | direct and indirect imports share one instance | separate (L45) |
+| `circular`, `self_cycle` | explicit cycle error, nothing runs twice | agrees |
+| `stateful_export_copy` | exported `n` is a copy: `0`, `10`, module counter continues `3` | live alias `2`, `12`, `13` (L50) |
+| `stateful_array_copy` | exported array is a copy (`[1]`, module `[1,2]`, importer `[1,9]`) | shared (L50) |
+| `failed_init` | a failed module is not run again; the second import reports the same failure | runs again |
+| `page_isolation` (build) | pages `a`, `b` each get a fresh instance (`1 2`); within page `c` one instance (`x1 y2`); imported modules in each page's dependencies | page `c`: `x1 y1` |
+| `rebuild` (build) | editing `m.nft` rebuilds `a`, `b`, `c` with fresh instances; editing `y.nft` rebuilds only `c`; no change rebuilds nothing | page `c` differs |
+
+Interpretations to confirm (no design round requested; flagged in case the
+owner reads D-041 differently): a sequential re-import after a failed
+initialisation reports the same failure (D-041 #1 states it for concurrent
+imports); a repeated import rebinds rather than collides (option A as
+proposed and adopted).

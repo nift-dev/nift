@@ -1,0 +1,14 @@
+{
+ "about": "Two spellings of one file are one module (canonical identity): initialised once, exports rebound.",
+ "legacy": "differs: legacy runs the module again and fails with a collision (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n3\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "about": "Lifecycle: a module whose initialisation failed is \"failed\"; a later import observes the same failure without running the module again.",
+ "legacy": "differs: legacy runs the module again (\"bad runs\" twice) (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "bad runs\ncaught 1: boom\ncaught 2: boom\nend\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

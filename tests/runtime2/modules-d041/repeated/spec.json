@@ -1,0 +1,14 @@
+{
+ "about": "The same module imported twice by one importer: initialised once; the second import rebinds the same exports (not an error, cp12b-modules.md option A as adopted by D-041).",
+ "legacy": "differs: legacy runs the module again and fails with a collision (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n2\n[1]\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

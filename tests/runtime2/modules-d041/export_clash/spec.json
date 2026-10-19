@@ -1,0 +1,14 @@
+{
+ "about": "An export that clashes with a different binding of the importer is still an error (after the module initialised).",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n",
+   "exit": 1,
+   "stderr_contains": "export collides with existing binding: mf"
+  }
+ ]
+}

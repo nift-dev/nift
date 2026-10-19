@@ -1,0 +1,6 @@
+print("main start")
+import("a.nft")
+import("b.nft")
+print(af())
+print(cf())
+print("main end")

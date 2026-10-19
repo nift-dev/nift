@@ -1,0 +1,35 @@
+{
+ "about": "Each page render is its own context: a and b each get a fresh instance of m (1 2); within page c, x and y share one instance (x1 y2). Module imports are page dependencies.",
+ "legacy": "differs on page c only: legacy initialises m twice there (x1 y1) (L45)",
+ "steps": [
+  {
+   "run": [
+    "build",
+    "--all"
+   ],
+   "stdout": "m runs\nm runs\nm runs\n\ud83d\udce6 3 files built successfully\n",
+   "exit": 0,
+   "public": {
+    "a.html": "page a\n\n1 2\n",
+    "b.html": "page b\n\n1 2\n",
+    "c.html": "page c\n\n\nx1 y2\n"
+   },
+   "dependencies": {
+    "a": [
+     "content/a.html",
+     "data/m.nft"
+    ],
+    "b": [
+     "content/b.html",
+     "data/m.nft"
+    ],
+    "c": [
+     "content/c.html",
+     "data/m.nft",
+     "data/x.nft",
+     "data/y.nft"
+    ]
+   }
+  }
+ ]
+}

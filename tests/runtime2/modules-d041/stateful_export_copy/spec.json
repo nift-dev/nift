@@ -1,0 +1,14 @@
+{
+ "about": "D-040/D-041 #4: an exported value is a copy taken when the module finishes initialising; the importer's writes stay local and the module's later writes are not seen; exported functions keep the module's state.",
+ "legacy": "differs: legacy exports a live alias of the module binding (2, 12, 13) (L50)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n1\n2\n0\n10\n3\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

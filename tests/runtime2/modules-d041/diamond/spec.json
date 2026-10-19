@@ -1,0 +1,14 @@
+{
+ "about": "a and b both import c: c is initialised once and both importers get its exports.",
+ "legacy": "differs: legacy prints \"c runs\" twice (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "main start\na runs\nc runs\nb runs\naf:cf\ncf\nmain end\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

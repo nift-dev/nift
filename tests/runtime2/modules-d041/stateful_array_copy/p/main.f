@@ -1,0 +1,6 @@
+import("m.nft")
+print(add(2))
+print(xs.stringify())
+xs.push(9)
+print(get())
+print(xs.stringify())

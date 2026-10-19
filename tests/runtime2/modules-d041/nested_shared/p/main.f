@@ -1,0 +1,5 @@
+import("c.nft")
+import("a.nft")
+print(inc())
+print(fa())
+print(inc())

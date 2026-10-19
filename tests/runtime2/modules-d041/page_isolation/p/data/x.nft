@@ -1,0 +1,3 @@
+import("m.nft")
+fn(xf()) { return "x" + inc() }
+export(xf)

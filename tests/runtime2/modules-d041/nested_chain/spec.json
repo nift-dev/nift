@@ -1,0 +1,14 @@
+{
+ "about": "main -> a -> c with paths relative to each importer; c's exports reach main only when a re-exports them.",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "c runs\ncd\nc\n",
+   "exit": 1,
+   "stderr_contains": "unknown value or malformed expression: cv"
+  }
+ ]
+}

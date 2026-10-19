@@ -1,0 +1,2 @@
+fn(df()) { return "d" }
+export(df)

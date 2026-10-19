@@ -1,0 +1,2 @@
+print("bad runs")
+throw error("boom")
