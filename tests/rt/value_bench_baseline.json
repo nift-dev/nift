@@ -1,0 +1,12 @@
+{
+ "comment": "L7 step 2.1 baseline (D-040 identity summary bit accepted, about +3 % on object set); locked from make bench-rt-value at -O2",
+ "toolchain": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+ "tolerance": 0.02,
+ "rt_ir": {
+  "copy (1000 copies of a 10k-string array)": 4654649,
+  "push (100k numbers)": 13232126,
+  "index only (1M reads)": 4000200,
+  "object set (128k sets, 64 keys)": 13759108,
+  "object get only (128k gets, 64 keys)": 5121113
+ }
+}
