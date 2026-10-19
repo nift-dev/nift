@@ -35,9 +35,14 @@ int main() {
         registry_fingerprint *= 1099511628211ULL;
     }
     // Filesystem metadata inspection added io.metadata_failed in e0390f4;
-    // CP13 (D-025) renamed the language codes and added seven runtime.* codes.
-    assert(static_cast<int>(DiagnosticCode::Count) == 69);
-    assert(registry_fingerprint == 17050003444344975066ULL);
+    // CP13 (D-025) renamed the language codes and added seven runtime.* codes;
+    // CP17 (D-035/D-039) added 25 typed-handle codes (runtime.handle_closed is
+    // the only Recoverable one).
+    assert(static_cast<int>(DiagnosticCode::Count) == 94);
+    assert(registry_fingerprint == 7839200204562411593ULL);
+    assert(registered_codes.count("runtime.handle_closed") == 1);
+    assert(nift::detail::diagnostic_code_info(DiagnosticCode::RuntimeHandleClosed).disposition ==
+           DiagnosticDisposition::Recoverable);
     assert(registered_codes.count("io.metadata_failed") == 1);
     assert(nift::detail::diagnostic_code_info(DiagnosticCode::IoMetadataFailed).disposition ==
            DiagnosticDisposition::Recoverable);

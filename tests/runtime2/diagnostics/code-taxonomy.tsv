@@ -36,3 +36,28 @@ native.resource_transfer_denied	runtime.resource_transfer_denied	NativeResourceT
 native.limit_exceeded	limit.exceeded	NativeLimitExceeded	limit, value	recursion/frame budget, nesting and other explicit limits (never an ordinary exception)
 internal.resource_exhausted	limit.resource_exhausted	InternalResourceExhausted	resource	memory or other resource exhausted (not an implementation defect)
 native.system_service_failed	host.service_failed	NativeSystemServiceFailed	service	non-I/O host service failure (clock, randomness, ...)
+new	runtime.handle_closed	RuntimeHandleClosed	kind	operation on a handle that was closed or reclaimed (close() itself is idempotent; D-035)
+new	internal.handle_not_a_handle	InternalHandleNotAHandle	kind	a non-handle value reached a handle position (compiler defect, W13)
+new	internal.handle_kind_mismatch	InternalHandleKindMismatch	kind, expected	a handle of another kind reached a handle position
+new	internal.handle_foreign	InternalHandleForeign	kind	a handle issued by another handle table (another run or isolate)
+new	internal.handle_forged	InternalHandleForged	kind	a handle that was never issued
+new	internal.handle_type_mismatch	InternalHandleTypeMismatch	kind	a handle resource resolved as the wrong host type
+new	internal.handle_not_owned	InternalHandleNotOwned	kind	a handle used outside its owning context (or a context nested in it)
+new	internal.handle_not_counted	InternalHandleNotCounted	kind	reference counting on an uncounted handle
+new	internal.handle_context_closed	InternalHandleContextClosed	context	handle operation in an ended, ending or cancelling execution context
+new	internal.handle_unknown_context	InternalHandleUnknownContext	context	execution context never issued
+new	internal.handle_unknown_kind	InternalHandleUnknownKind	kind	handle kind not registered
+new	internal.handle_kind_registered	InternalHandleKindRegistered	kind	handle kind registered twice
+new	internal.handle_null_resource	InternalHandleNullResource	kind	handle created for a null resource
+new	internal.handle_cleanup_failed	InternalHandleCleanupFailed	kind, reason, detail	Failed: known alive after forced termination, without a more specific code (D-035: nonzero exit)
+new	internal.handle_cleanup_threw	InternalHandleCleanupThrew	kind, reason	Lost: a cleanup hook threw, so termination could not be confirmed
+new	internal.handle_cleanup_unresolved	InternalHandleCleanupUnresolved	kind, reason	Lost: a cleanup outcome was never reported
+new	internal.handle_cleanup_lost	InternalHandleCleanupLost	kind, reason	Lost: termination could not be confirmed, without a more specific code
+new	internal.handle_cleanup_incomplete	InternalHandleCleanupIncomplete	kind, reason	CleanupIncomplete: known to have ended (exited) but reaping or handle cleanup could not be completed; never 'alive'
+new	runtime.detach_in_build	RuntimeDetachInBuild	kind	detach inside a build (D-030); processes use process.detach_in_build
+new	process.detach_in_build	ProcessDetachInBuild		detach of a process inside a build (D-030)
+new	runtime.detach_failed	RuntimeDetachFailed	kind	detachment could not be established (ownership not transferred, or the promised lifetime cannot hold: already terminating); D-039
+new	runtime.transfer_out_of_build	RuntimeTransferOutOfBuild	kind	host-internal: a transfer that would move a resource out of a build
+new	runtime.cleanup_failed	RuntimeCleanupFailed	kind, state	close() whose resource settled Failed, Lost or CleanupIncomplete synchronously; the diagnostic carries the failure's own code (D-035: exit 1)
+new	internal.handle_invalid_cause	InternalHandleInvalidCause	cause	begin_termination with a cause other than exited, deadline or cancel
+new	internal.handle_reentrant_close	InternalHandleReentrantClose		close_context or shutdown called from inside a cleanup hook of the same table

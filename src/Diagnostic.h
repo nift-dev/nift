@@ -93,6 +93,33 @@ enum class DiagnosticCode {
     RuntimeArityError,
     RuntimeIntegerOverflow,
     RuntimeDivisionByZero,
+    // CP17 (D-035): typed-handle codes. Appended; all Fatal except
+    // runtime.handle_closed, which is catchable by owner decision.
+    RuntimeHandleClosed,
+    InternalHandleNotAHandle,
+    InternalHandleKindMismatch,
+    InternalHandleForeign,
+    InternalHandleForged,
+    InternalHandleTypeMismatch,
+    InternalHandleNotOwned,
+    InternalHandleNotCounted,
+    InternalHandleContextClosed,
+    InternalHandleUnknownContext,
+    InternalHandleUnknownKind,
+    InternalHandleKindRegistered,
+    InternalHandleNullResource,
+    InternalHandleCleanupFailed,
+    InternalHandleCleanupThrew,
+    InternalHandleCleanupUnresolved,
+    InternalHandleCleanupLost,
+    InternalHandleCleanupIncomplete,
+    RuntimeDetachInBuild,
+    ProcessDetachInBuild,
+    RuntimeDetachFailed,
+    RuntimeTransferOutOfBuild,
+    RuntimeCleanupFailed,
+    InternalHandleInvalidCause,
+    InternalHandleReentrantClose,
     Count,
 };
 
@@ -175,6 +202,31 @@ inline DiagnosticCodeInfo diagnostic_code_info(DiagnosticCode code) {
         NIFT_DIAGNOSTIC_CASE(RuntimeArityError, "runtime.arity_error", Fatal);
         NIFT_DIAGNOSTIC_CASE(RuntimeIntegerOverflow, "runtime.integer_overflow", Fatal);
         NIFT_DIAGNOSTIC_CASE(RuntimeDivisionByZero, "runtime.division_by_zero", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeHandleClosed, "runtime.handle_closed", Recoverable);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleNotAHandle, "internal.handle_not_a_handle", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleKindMismatch, "internal.handle_kind_mismatch", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleForeign, "internal.handle_foreign", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleForged, "internal.handle_forged", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleTypeMismatch, "internal.handle_type_mismatch", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleNotOwned, "internal.handle_not_owned", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleNotCounted, "internal.handle_not_counted", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleContextClosed, "internal.handle_context_closed", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleUnknownContext, "internal.handle_unknown_context", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleUnknownKind, "internal.handle_unknown_kind", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleKindRegistered, "internal.handle_kind_registered", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleNullResource, "internal.handle_null_resource", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupFailed, "internal.handle_cleanup_failed", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupThrew, "internal.handle_cleanup_threw", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupUnresolved, "internal.handle_cleanup_unresolved", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupLost, "internal.handle_cleanup_lost", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupIncomplete, "internal.handle_cleanup_incomplete", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeDetachInBuild, "runtime.detach_in_build", Fatal);
+        NIFT_DIAGNOSTIC_CASE(ProcessDetachInBuild, "process.detach_in_build", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeDetachFailed, "runtime.detach_failed", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeTransferOutOfBuild, "runtime.transfer_out_of_build", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeCleanupFailed, "runtime.cleanup_failed", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleInvalidCause, "internal.handle_invalid_cause", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalHandleReentrantClose, "internal.handle_reentrant_close", Fatal);
         case DiagnosticCode::Count: break;
 #undef NIFT_DIAGNOSTIC_CASE
     }
