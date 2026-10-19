@@ -25,6 +25,8 @@ struct LifeRecord {
 
 bool is_settled(LifeState state);
 TerminationCause cause_of(ReleaseReason reason);
+// The settled state an outcome reports (Pending as a final report: Lost).
+LifeState settled_state(CleanupOutcome::Result result);
 
 class LifecycleStore {
 public:

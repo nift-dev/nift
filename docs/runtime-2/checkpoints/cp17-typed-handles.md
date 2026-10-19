@@ -146,34 +146,38 @@ and reports them through the completion API. Exactly one component decides
 and records whether cleanup Completed, Failed or was Lost: the table.
 
 **States** (`LifeState`), per resource, independent of whether its handle is
-open:
+open (owner definitions):
 
 ```
-Active ──(termination begins)──▶ Terminating ──(ticket completed once)──▶ Completed | Failed | Lost
+Active ──(termination begins)──▶ Terminating ──(ticket completed once)──▶ Completed | Failed | Lost | CleanupIncomplete
 ```
 
 | State | Meaning |
 |---|---|
 | `Active` | in use; nothing has started terminating it |
-| `Terminating` | termination started (graceful termination in progress is **not** a failure) |
-| `Completed` | Nift has no further obligation: reaped/closed, or for a detached process its bookkeeping released while it lives on |
-| `Failed` | the OS gave a definitive failure, or the bounded procedure was exhausted without success |
-| `Lost` | termination could not be confirmed. Never described as "still running" |
+| `Terminating` | termination started; graceful termination in progress is **not** a failure |
+| `Completed` | the required cleanup finished (reaped / closed; for a detached process: Nift's bookkeeping released while the process lives on) |
+| `Failed` | the resource is **known to be alive** after forced termination |
+| `Lost` | termination **could not be confirmed**; never described as "still running" |
+| `CleanupIncomplete` | the resource is **known to have ended** (exited, closed) but reaping or handle cleanup could not be completed; never described as "still alive", never `Lost` |
 
-**Failure detail** (`FailureDetail`, on every `CleanupFailure`) keeps the
-three process cases apart, so a report never calls an exited process alive or
-lost (D-035):
+**Outcomes → states → exit status → handle** (CP16 reports OS facts only; the
+table maps them):
 
-| Reported with | State | Detail | Default code / message |
-|---|---|---|---|
-| `alive_after_kill(code, msg)` | `Failed` | `AliveAfterKill`: leftover known to be alive after SIGKILL / forced termination | `internal.handle_cleanup_failed`, "still alive after forced termination" |
-| `lost(code, msg)` | `Lost` | `Unconfirmed`: termination could not be confirmed | `internal.handle_cleanup_lost`, "termination could not be confirmed" |
-| `exited_cleanup_incomplete(code, msg)` | `Failed` | `ExitedCleanupIncomplete`: known to have exited, but reaping or handle cleanup could not be completed | `internal.handle_cleanup_incomplete`, "exited, but cleanup could not be completed" |
-| `failure(code, msg)` | `Failed` | `Other` | `internal.handle_cleanup_failed`, "cleanup failed" |
+| CP16 reports | State | Default code / message | D-035 exit rule | Handle afterwards |
+|---|---|---|---|---|
+| `completed()` | `Completed` | — | no effect | open handle stays open; once closed, uses give `runtime.handle_closed` |
+| `alive_after_kill(code, msg)` | `Failed` | `internal.handle_cleanup_failed`, "still alive after forced termination" | nonzero (1) unless an earlier error / signal status (kept) | same |
+| `lost(code, msg)` | `Lost` | `internal.handle_cleanup_lost`, "termination could not be confirmed" | nonzero, same rule | same |
+| `cleanup_incomplete(code, msg)` (= `exited_cleanup_incomplete`, `failure`) | `CleanupIncomplete` | `internal.handle_cleanup_incomplete`, "ended, but cleanup could not be completed" | nonzero, same rule | same |
+| hook threw / ticket never completed / `pending()` given as final | `Lost` | `internal.handle_cleanup_threw` / `internal.handle_cleanup_unresolved` | nonzero, same rule | same |
 
-`Lost` is always `Unconfirmed` and `Unconfirmed` is always `Lost` (the table
-normalises a mismatched report). All four force a nonzero exit; the original
-error stays primary.
+The settled state is the resource's, not the handle's: a deadline that ends
+in `Failed` while the handle is open leaves the handle usable (its result is
+CP16's); only closing the handle makes uses answer `runtime.handle_closed`
+(and `close()` again is Ok). `CloseReport::final_exit_status(original)`:
+a nonzero `original` (the first error, or a signal-derived 130/143) stays
+primary; otherwise any `Failed`, `Lost` or `CleanupIncomplete` gives 1.
 
 **What starts termination** (`TerminationCause`), exactly once per resource,
 first event wins, whoever it is:
@@ -212,24 +216,22 @@ cleanup began, the `cause` that started termination (if any), and `ticket`:
 from any thread, exactly once (`true` if it settled the lifecycle; a second
 call, or a moved-from ticket, returns `false`). `pending()` is not a final
 outcome. A ticket destroyed or overwritten without being completed settles the
-resource as `Failed` with `internal.handle_cleanup_unresolved`, so no context
+resource as `Lost` with `internal.handle_cleanup_unresolved`, so no context
 waits forever on a lost report. A hook that returns `pending()` without taking
 the ticket gets the same.
 
 **How the close report and the final result are derived:** every `Failed` or
 `Lost` settle (synchronous or asynchronous, while the handle was open or
 after) is recorded as a `CleanupFailure` (handle, kind, owner, reason, cause,
-state, detail, context label, code, message) against the resource's owner at settle time (detached:
+state, context label, code, message) against the resource's owner at settle time (detached:
 the shutdown report). `close_context` appends each context's failures in
 settle order after all its obligations settled, so the `CloseReport` is final.
 `cleanup_failed()` is true when any failure was recorded, and
 `final_exit_status(original)` gives the run's status: a nonzero `original`
 (the earlier error, or a signal-derived 130/143 during SIGTERM) stays primary;
 otherwise a cleanup failure makes it 1 (D-020/D-035). Default codes:
-`internal.handle_cleanup_failed`, `internal.handle_cleanup_lost`,
-`internal.handle_cleanup_incomplete`, `internal.handle_cleanup_threw`,
-`internal.handle_cleanup_unresolved`; CP16 passes specific ones
-(`process.kill_failed`, `process.lost`, `process.reap_failed`, ...).
+as in the table above; CP16 passes specific ones (`process.kill_failed`,
+`process.lost`, `process.reap_failed`, ...).
 
 ### Errors (D-020, D-022, D-025, D-035)
 
@@ -345,7 +347,7 @@ settled); if `e.owner == kDetached` return `completed()` (bookkeeping only);
 if the group already exited and was reaped, `completed()`; otherwise start
 the §11.4 sequence asynchronously, hand `std::move(*e.ticket)` to the reaper
 and return `pending()`; the reaper reports `completed()`, `alive_after_kill()`,
-`lost()` or `exited_cleanup_incomplete()`. Warnings (§11.3/§11.5) are CP16's,
+`lost()` or `cleanup_incomplete()` / `exited_cleanup_incomplete()`. Warnings (§11.3/§11.5) are CP16's,
 using `e.context_label` and `e.context_error`; whether the process was still
 running is CP16's knowledge, and `Lost` is never phrased as running.
 
@@ -390,10 +392,10 @@ mapping: Recoverable → catchable error with the code, Internal →
 |---|---|
 | `tests/rt/handle_table_unit.cpp` | status codes (all distinct) and classes, CP09 `check()`, registration, identity layout, forgery matrix (string, int, null, kind, foreign tag, unknown slot, generation 0 / future / max, rewritten kind byte), closed after release and after reuse by another kind, generation wrap and retirement, churn reclamation (200,000 steps, capacity 64), capacity limit |
 | `tests/rt/handle_table_ownership.cpp` | access rules, identity vs ownership, detach/transfer as single steps, build-family bans, `context_in_build`, close ordering across a build with pages and a hook (LIFO; an older handle resolvable inside a newer one's hook), failing hooks (failure / `std::exception` / non-exception) all reported with the rest still cleaned, explicit-release failure in the close report, idempotent `close`, closed and unknown contexts, destructor shutdown, counted references, native interface |
-| `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, definitive failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); exited-but-cleanup-incomplete next to the other two cases, and a mismatched Lost report normalised |
+| `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, alive-after-kill failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); every settled state (Completed, Failed, Lost, CleanupIncomplete) settled while the handle is open and after close: state, default code and message ("alive" only for Failed, "confirm" only for Lost), exit rule, `handle_closed` afterwards; CP16's exited-but-unreaped report |
 | `tests/rt/handle_table_stress.cpp` | 4 workers + a context manager + an asynchronous reaper over one table: random create (counted and not), resolve (always the identified resource), release, retain/drop, detach, deadlines (`begin_termination`), transfer while contexts open and close; a capacity-48 run hitting the limit; `release`/`drop`/`close_context` race on one counted handle; `close_context` blocked on another thread's hook. Every resource is cleaned once and settled once; nothing outlives shutdown |
 | `tests/rt/handle_table_bench.cpp` + `tests/runtime2/cp17/handle_guards.py` | callgrind instruction guards (+10 %) |
-| `tests/runtime2/cp17/handle_mutants.py` | 23 mutants, each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
+| `tests/runtime2/cp17/handle_mutants.py` | 32 mutants (including one per state mapping), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
 | `tests/runtime2/cp17/no_handle_strings.py` | gate: no `\x1fnift` handle string in code under `src/rt`; self-test |
 | `patches/vm-handle-box.patch` (`tests/rt/handle_box_unit.cpp`) | boxed handles: refcounted aliases, equality/hash with plain handles, cross-isolate share, last box schedules cleanup |
 
@@ -414,7 +416,7 @@ RESULTS_PLACEHOLDER
 | O2 | `transfer` host-internal, atomic, refused (optionally reclaimed) into ended/cancelling contexts | Ownership transfer |
 | O3 | `runtime.handle_closed` catchable; forged / foreign / wrong kind fatal `internal.handle_*`; per-kind detach code; `close()` idempotent | Errors, `cp13-handle-codes.patch` |
 | O4 | `NIFT_HANDLE_LIMIT`, named by `limit.exceeded` | Capacity |
-| O5 | cleanup failure → nonzero exit; original error / signal status primary; failure only after the bounded procedure or a definitive OS failure; `Lost` = unconfirmed | Lifecycle and completion API |
+| O5 | cleanup failure (`Failed` alive after forced termination, `Lost` unconfirmed, `CleanupIncomplete` ended but not cleaned up) → nonzero exit; original error / signal status primary; declared only after the bounded procedure or a definitive OS fact | Lifecycle and completion API |
 | O6 | nested contexts may use ancestors' handles; not parents or siblings | Ownership and lifetime |
 
 ## Open questions

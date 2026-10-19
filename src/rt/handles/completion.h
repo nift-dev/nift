@@ -13,7 +13,7 @@ class HandleTable;
 // Issued exactly once per resource, when its lifecycle leaves Active (to the
 // cleanup hook in CleanupEvent::ticket, or by HandleTable::begin_termination).
 // Move-only. complete() settles the lifecycle exactly once; a ticket destroyed
-// without completing settles it as Failed (`internal.handle_cleanup_unresolved`)
+// without completing settles it as Lost (`internal.handle_cleanup_unresolved`)
 // so no context waits forever on a dropped report. The ticket must not
 // outlive its table (shutdown() waits for every ticket of a closed handle).
 class CompletionTicket {
@@ -27,9 +27,9 @@ public:
     CompletionTicket& operator=(CompletionTicket&& other) noexcept;
     ~CompletionTicket();
 
-    // Reports the final outcome: completed(), failure(code, message) or
-    // lost(code, message). pending() is not final and settles as Failed
-    // (`internal.handle_cleanup_unresolved`). Returns true when this call
+    // Reports the final outcome (OS facts): completed(), alive_after_kill(),
+    // lost() or cleanup_incomplete(). pending() is not final and settles as
+    // Lost (`internal.handle_cleanup_unresolved`). Returns true when this call
     // settled the lifecycle; false for an empty or already completed ticket.
     bool complete(CleanupOutcome outcome);
     explicit operator bool() const { return table_ != nullptr; }

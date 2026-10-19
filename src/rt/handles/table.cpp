@@ -185,29 +185,27 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
         try {
             outcome = spec.cleanup(event);
         } catch (const std::exception& e) {
-            outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", e.what());
+            outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", e.what());
             threw = true;
         } catch (...) {
-            outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", "unknown exception");
+            outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", "unknown exception");
             threw = true;
         }
     }
     bool failed = false;
     if (ticket && (threw || outcome.result != CleanupOutcome::Result::Pending)) {
-        failed = outcome.result != CleanupOutcome::Result::Completed;
+        const LifeState state = settled_state(outcome.result);
+        failed = state != LifeState::Completed;
         if (failed && failure) {
-            const bool lost = outcome.result == CleanupOutcome::Result::Lost;
-            *failure = CleanupFailure{t.handle, t.kind, t.owner, started.reason, cause_of(started.reason),
-                                      lost ? LifeState::Lost : LifeState::Failed,
-                                      lost ? FailureDetail::Unconfirmed : outcome.detail, started.label,
-                                      outcome.code, outcome.message};
+            *failure = CleanupFailure{t.handle, t.kind, t.owner, started.reason, cause_of(started.reason), state,
+                                      started.label, outcome.code, outcome.message};
         }
         ticket.complete(std::move(outcome));
     } else if (!started.ticket && threw) {  // a bookkeeping-only hook threw: still loud
         lock.lock();
         failures_of(t.owner).push_back(CleanupFailure{t.handle, t.kind, t.owner, started.reason, started.cause,
-                                                      LifeState::Failed, FailureDetail::Other, started.label,
-                                                      outcome.code, outcome.message});
+                                                      LifeState::Lost, started.label, outcome.code,
+                                                      outcome.message});
         lock.unlock();
     }
     // A ticket the hook left behind with pending() settles here as unresolved.

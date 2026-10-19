@@ -200,10 +200,9 @@ void context_label_and_error() {
     CHECK(r.failures.size() == 2);
     if (r.failures.size() == 2) {
         CHECK(r.failures[0].state == LifeState::Lost && r.failures[0].context_label == "page 'index'" &&
-              r.failures[0].code == "process.lost" && r.failures[0].detail == FailureDetail::Unconfirmed);
+              r.failures[0].code == "process.lost");
         CHECK(r.failures[1].state == LifeState::Failed && r.failures[1].context_label == "build" &&
-              r.failures[1].message == "pid 42 still alive after SIGKILL" &&
-              r.failures[1].detail == FailureDetail::AliveAfterKill);
+              r.failures[1].message == "pid 42 still alive after SIGKILL");
     }
     CHECK(r.final_exit_status(0) == 1 && r.final_exit_status(1) == 1 && r.final_exit_status(143) == 143);
     // A normal end carries no error flag.
@@ -219,46 +218,67 @@ void context_label_and_error() {
     CHECK(f.reaper.seen.size() == 1 && f.reaper.seen[0] == std::make_pair(std::string("script a.f"), false));
 }
 
-// Known to have exited, but reaping / handle cleanup could not be completed:
-// a cleanup failure (nonzero exit), never "alive" and never Lost.
-void exited_but_cleanup_incomplete() {
-    Fixture f;
-    Value a, b, c;
-    f.spawn(a, 0, false);
-    f.spawn(b, 0, false);
-    f.spawn(c, 0, false);
-    deadline(f.t, a, f.reaper, TerminationCause::Exited);  // CP16 saw the exit
-    f.reaper.settle_all(CleanupOutcome::exited_cleanup_incomplete("process.reap_failed", ""));
-    // the other two cases side by side
-    deadline(f.t, b, f.reaper, TerminationCause::Deadline);
-    f.reaper.settle_all(CleanupOutcome::alive_after_kill("", ""));
-    deadline(f.t, c, f.reaper, TerminationCause::Cancel);
-    // A Lost outcome is always "unconfirmed", whatever detail the reporter passed.
-    CleanupOutcome odd = CleanupOutcome::lost("", "");
-    odd.detail = FailureDetail::ExitedCleanupIncomplete;
-    f.reaper.settle_all(odd);
-    CloseReport r = f.t.close_context(f.script);
-    CHECK(r.failures.size() == 3 && r.final_exit_status(0) == 1 && r.final_exit_status(2) == 2);
-    if (r.failures.size() == 3) {
-        const CleanupFailure& x = r.failures[0];
-        CHECK(x.state == LifeState::Failed && x.detail == FailureDetail::ExitedCleanupIncomplete &&
-              x.cause == TerminationCause::Exited && x.code == "process.reap_failed" &&
-              x.message == "exited, but cleanup could not be completed");
-        CHECK(x.message.find("alive") == std::string::npos && x.message.find("confirm") == std::string::npos);
-        CHECK(r.failures[1].detail == FailureDetail::AliveAfterKill && r.failures[1].state == LifeState::Failed &&
-              r.failures[1].message == "still alive after forced termination" &&
-              r.failures[1].code == "internal.handle_cleanup_failed");
-        CHECK(r.failures[2].detail == FailureDetail::Unconfirmed && r.failures[2].state == LifeState::Lost &&
-              r.failures[2].code == "internal.handle_cleanup_lost");
+// Each settled state, its default text, the D-035 exit rule and what the
+// handle answers afterwards. CleanupIncomplete (known to have exited, but
+// reaping / cleanup failed) is a failure but never "alive" and never Lost.
+void settled_states() {
+    struct Case {
+        CleanupOutcome outcome;
+        LifeState state;
+        const char* code;
+        const char* message;
+    };
+    const Case cases[] = {
+        {CleanupOutcome::completed(), LifeState::Completed, "", ""},
+        {CleanupOutcome::alive_after_kill("", ""), LifeState::Failed, "internal.handle_cleanup_failed",
+         "still alive after forced termination"},
+        {CleanupOutcome::lost("", ""), LifeState::Lost, "internal.handle_cleanup_lost",
+         "termination could not be confirmed"},
+        {CleanupOutcome::exited_cleanup_incomplete("", ""), LifeState::CleanupIncomplete,
+         "internal.handle_cleanup_incomplete", "ended, but cleanup could not be completed"},
+    };
+    for (const Case& c : cases) {
+        for (const bool open_handle : {true, false}) {
+            Fixture f;
+            Value h;
+            f.spawn(h, 0, false);
+            if (open_handle) deadline(f.t, h, f.reaper, TerminationCause::Exited);  // settles while open
+            else f.t.close(h, P, f.script);                                        // settles after close
+            f.reaper.settle_all(c.outcome);
+            std::shared_ptr<void> out;
+            LifeState state;
+            TerminationCause cause;
+            if (open_handle) {  // an outcome on an open handle is the resource's, not handle_closed
+                CHECK(f.t.lifecycle(h, P, state, cause) == HandleStatus::Ok && state == c.state);
+                CHECK(f.t.resolve(h, P, f.script, out) == HandleStatus::Ok);
+                CHECK(f.t.close(h, P, f.script) == HandleStatus::Ok);
+            }
+            CHECK(f.t.resolve(h, P, f.script, out) == HandleStatus::Closed);  // closed: runtime.handle_closed
+            CHECK(f.t.close(h, P, f.script) == HandleStatus::Ok);
+            CloseReport r = f.t.close_context(f.script);
+            const bool failure = c.state != LifeState::Completed;
+            CHECK(r.cleanup_failed() == failure && r.final_exit_status(0) == (failure ? 1 : 0));
+            CHECK(r.final_exit_status(2) == 2 && r.final_exit_status(143) == 143);
+            if (failure && r.failures.size() == 1) {
+                const CleanupFailure& x = r.failures[0];
+                CHECK(x.state == c.state && x.code == c.code && x.message == c.message);
+                if (c.state != LifeState::Failed) CHECK(x.message.find("alive") == std::string::npos);
+                if (c.state != LifeState::Lost) CHECK(x.message.find("confirm") == std::string::npos);
+            } else {
+                CHECK(r.failures.empty() == !failure);
+            }
+        }
     }
-    CHECK(std::string(failure_detail_name(FailureDetail::ExitedCleanupIncomplete)) == "exited-cleanup-incomplete");
-    // A default code for an incomplete cleanup.
+    CHECK(std::string(life_state_name(LifeState::CleanupIncomplete)) == "cleanup-incomplete");
+    // CP16's exited-but-unreaped report keeps its own code and message.
     Fixture g;
     Value d;
     g.spawn(d, 0, false);
     deadline(g.t, d, g.reaper, TerminationCause::Exited);
-    g.reaper.settle_all(CleanupOutcome::exited_cleanup_incomplete("", "pid 7 exited; waitpid failed: ECHILD"));
-    r = g.t.close_context(g.script);
-    CHECK(r.failures.size() == 1 && r.failures[0].code == "internal.handle_cleanup_incomplete" &&
-          r.failures[0].message == "pid 7 exited; waitpid failed: ECHILD");
+    g.reaper.settle_all(CleanupOutcome::exited_cleanup_incomplete("process.reap_failed",
+                                                                  "pid 7 exited; waitpid failed: ECHILD"));
+    CloseReport r = g.t.close_context(g.script);
+    CHECK(r.failures.size() == 1 && r.failures[0].state == LifeState::CleanupIncomplete &&
+          r.failures[0].code == "process.reap_failed" && r.failures[0].cause == TerminationCause::Exited &&
+          r.final_exit_status(0) == 1);
 }

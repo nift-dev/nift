@@ -3,7 +3,8 @@
 namespace nift::rt::handles {
 
 bool is_settled(LifeState state) {
-    return state == LifeState::Completed || state == LifeState::Failed || state == LifeState::Lost;
+    return state == LifeState::Completed || state == LifeState::Failed || state == LifeState::Lost ||
+           state == LifeState::CleanupIncomplete;
 }
 
 TerminationCause cause_of(ReleaseReason reason) {
@@ -35,31 +36,30 @@ const LifeRecord* LifecycleStore::find(std::uint64_t id) const {
     return it == records_.end() ? nullptr : &it->second;
 }
 
+LifeState settled_state(CleanupOutcome::Result result) {
+    switch (result) {
+        case CleanupOutcome::Result::Completed: return LifeState::Completed;
+        case CleanupOutcome::Result::Failed: return LifeState::Failed;
+        case CleanupOutcome::Result::CleanupIncomplete: return LifeState::CleanupIncomplete;
+        default: return LifeState::Lost;  // Lost, and Pending reported as final (unconfirmed)
+    }
+}
+
 namespace {
 
-// Lost always means "termination unconfirmed"; Failed never does.
-FailureDetail normalized(const CleanupOutcome& outcome) {
-    if (outcome.result == CleanupOutcome::Result::Lost) return FailureDetail::Unconfirmed;
-    if (outcome.detail == FailureDetail::None || outcome.detail == FailureDetail::Unconfirmed) {
-        return FailureDetail::Other;
-    }
-    return outcome.detail;
-}
-
-const char* default_code(FailureDetail detail) {
-    switch (detail) {
-        case FailureDetail::Unconfirmed: return "internal.handle_cleanup_lost";
-        case FailureDetail::ExitedCleanupIncomplete: return "internal.handle_cleanup_incomplete";
-        default: return "internal.handle_cleanup_failed";
+const char* default_code(LifeState state) {
+    switch (state) {
+        case LifeState::Failed: return "internal.handle_cleanup_failed";
+        case LifeState::CleanupIncomplete: return "internal.handle_cleanup_incomplete";
+        default: return "internal.handle_cleanup_lost";
     }
 }
 
-const char* default_message(FailureDetail detail) {
-    switch (detail) {
-        case FailureDetail::AliveAfterKill: return "still alive after forced termination";
-        case FailureDetail::Unconfirmed: return "termination could not be confirmed";
-        case FailureDetail::ExitedCleanupIncomplete: return "exited, but cleanup could not be completed";
-        default: return "cleanup failed";
+const char* default_message(LifeState state) {
+    switch (state) {
+        case LifeState::Failed: return "still alive after forced termination";
+        case LifeState::CleanupIncomplete: return "ended, but cleanup could not be completed";
+        default: return "termination could not be confirmed";
     }
 }
 
@@ -68,17 +68,12 @@ const char* default_message(FailureDetail detail) {
 bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed) {
     failed = false;
     if (is_settled(record.state)) return false;
-    switch (outcome.result) {
-        case CleanupOutcome::Result::Completed: record.state = LifeState::Completed; return true;
-        case CleanupOutcome::Result::Lost: record.state = LifeState::Lost; break;
-        default: record.state = LifeState::Failed; break;
-    }
+    record.state = settled_state(outcome.result);
+    if (record.state == LifeState::Completed) return true;
     failed = true;
-    const FailureDetail detail = normalized(outcome);
-    failure = CleanupFailure{record.handle, record.kind, record.owner, record.reason, record.cause, record.state,
-                             detail, {},
-                             outcome.code.empty() ? default_code(detail) : std::move(outcome.code),
-                             outcome.message.empty() ? default_message(detail) : std::move(outcome.message)};
+    failure = CleanupFailure{record.handle, record.kind, record.owner, record.reason, record.cause, record.state, {},
+                             outcome.code.empty() ? default_code(record.state) : std::move(outcome.code),
+                             outcome.message.empty() ? default_message(record.state) : std::move(outcome.message)};
     return true;
 }
 

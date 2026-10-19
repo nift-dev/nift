@@ -16,7 +16,7 @@ CompletionTicket& CompletionTicket::operator=(CompletionTicket&& other) noexcept
 
 CompletionTicket::~CompletionTicket() {
     if (table_) {
-        complete(CleanupOutcome::failure("internal.handle_cleanup_unresolved",
+        complete(CleanupOutcome::lost("internal.handle_cleanup_unresolved",
                                          "cleanup outcome was never reported"));
     }
 }
@@ -26,7 +26,7 @@ bool CompletionTicket::complete(CleanupOutcome outcome) {
     if (!table) return false;
     table_ = nullptr;
     if (outcome.result == CleanupOutcome::Result::Pending) {
-        outcome = CleanupOutcome::failure("internal.handle_cleanup_unresolved", "cleanup reported no final outcome");
+        outcome = CleanupOutcome::lost("internal.handle_cleanup_unresolved", "cleanup reported no final outcome");
     }
     return table->settle(record_, std::move(outcome));
 }

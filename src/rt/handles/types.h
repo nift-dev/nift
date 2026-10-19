@@ -39,18 +39,23 @@ enum class ReleaseReason : std::uint8_t {
 };
 const char* release_reason_name(ReleaseReason reason);
 
-// Authoritative lifecycle of a resource (D-035). The table owns it; CP16
-// reports OS outcomes through a CompletionTicket and never decides it.
+// Authoritative lifecycle of a resource (D-035). The table owns it and alone
+// decides it; CP16 only reports OS facts through a CompletionTicket.
 //   Active --(termination begins: close, last reference, context end,
 //             shutdown, or CP16's deadline / cancel / natural exit)--> Terminating
-//   Terminating --(ticket completed exactly once)--> Completed | Failed | Lost
-// Completed: Nift has no further obligation (reaped, closed, or for a detached
-//            process: bookkeeping released while the process lives on).
-// Failed:    the OS gave a definitive failure, or the bounded procedure was
-//            exhausted without success.
-// Lost:      termination could not be confirmed (never "still running").
-// Graceful termination in progress (Terminating) is not a failure.
-enum class LifeState : std::uint8_t { Active, Terminating, Completed, Failed, Lost };
+//   Terminating --(ticket completed exactly once)--> one of the settled states
+// Settled states (owner definitions):
+//   Completed          the required cleanup finished (reaped, closed; for a
+//                      detached process: bookkeeping released, process lives on)
+//   Failed             the resource is known to be alive after forced termination
+//   Lost               termination could not be confirmed (never "still running")
+//   CleanupIncomplete  the resource is known to have ended (exited, closed) but
+//                      reaping or handle cleanup could not be completed (never
+//                      "still alive", never Lost)
+// Failed, Lost and CleanupIncomplete are cleanup failures: the run exits
+// nonzero (CloseReport::final_exit_status). Terminating (graceful termination
+// in progress) is not a failure.
+enum class LifeState : std::uint8_t { Active, Terminating, Completed, Failed, Lost, CleanupIncomplete };
 const char* life_state_name(LifeState state);
 
 // What started termination. Deadline/Cancel/Exited outcomes stay on the
@@ -79,40 +84,36 @@ struct CleanupEvent {
     CompletionTicket* ticket;
 };
 
-// What kind of cleanup failure (D-035). The three process cases are kept apart
-// so a report never calls an exited process "alive" or "lost":
-//   AliveAfterKill          Failed: known to be alive after forced termination
-//   Unconfirmed             Lost:   termination could not be confirmed
-//   ExitedCleanupIncomplete Failed: known to have exited, but reaping or handle
-//                                   cleanup could not be completed
-//   Other                   Failed: any other definitive failure
-enum class FailureDetail : std::uint8_t { None, AliveAfterKill, Unconfirmed, ExitedCleanupIncomplete, Other };
-const char* failure_detail_name(FailureDetail detail);
-
-// What a hook (or a ticket) reports. Completed/Failed/Lost are final; Pending
-// means "scheduled, the moved-out ticket will report".
+// What a hook (or a ticket) reports: OS facts, mapped one to one onto the
+// settled states. Pending means "scheduled, the moved-out ticket will report".
 struct CleanupOutcome {
-    enum class Result : std::uint8_t { Completed, Failed, Lost, Pending };
+    enum class Result : std::uint8_t { Completed, Failed, Lost, CleanupIncomplete, Pending };
     Result result = Result::Completed;
-    std::string code;     // specific code; empty -> a default per detail
-    std::string message;  // empty -> a default per detail
-    FailureDetail detail = FailureDetail::None;
-    static CleanupOutcome success() { return {}; }
+    std::string code;     // specific code; empty -> the state's default
+    std::string message;  // empty -> the state's default
     static CleanupOutcome completed() { return {}; }
-    static CleanupOutcome failure(std::string code, std::string message) {
-        return CleanupOutcome{Result::Failed, std::move(code), std::move(message), FailureDetail::Other};
-    }
+    static CleanupOutcome success() { return {}; }
+    // Known alive after forced termination (SIGKILL / TerminateJobObject).
     static CleanupOutcome alive_after_kill(std::string code, std::string message) {
-        return CleanupOutcome{Result::Failed, std::move(code), std::move(message), FailureDetail::AliveAfterKill};
+        return CleanupOutcome{Result::Failed, std::move(code), std::move(message)};
     }
+    // Termination could not be confirmed.
     static CleanupOutcome lost(std::string code, std::string message) {
-        return CleanupOutcome{Result::Lost, std::move(code), std::move(message), FailureDetail::Unconfirmed};
+        return CleanupOutcome{Result::Lost, std::move(code), std::move(message)};
+    }
+    // Known to have ended (exited, closed), but reaping or cleanup failed.
+    static CleanupOutcome cleanup_incomplete(std::string code, std::string message) {
+        return CleanupOutcome{Result::CleanupIncomplete, std::move(code), std::move(message)};
     }
     static CleanupOutcome exited_cleanup_incomplete(std::string code, std::string message) {
-        return CleanupOutcome{Result::Failed, std::move(code), std::move(message),
-                              FailureDetail::ExitedCleanupIncomplete};
+        return cleanup_incomplete(std::move(code), std::move(message));
     }
-    static CleanupOutcome pending() { return CleanupOutcome{Result::Pending, {}, {}, FailureDetail::None}; }
+    // A cleanup step failed (e.g. a file's final flush): CleanupIncomplete.
+    // Never implies "alive"; use alive_after_kill() for that fact.
+    static CleanupOutcome failure(std::string code, std::string message) {
+        return cleanup_incomplete(std::move(code), std::move(message));
+    }
+    static CleanupOutcome pending() { return CleanupOutcome{Result::Pending, {}, {}}; }
 };
 
 // Runs without the table lock held, on the thread that triggered cleanup
@@ -120,7 +121,8 @@ struct CleanupOutcome {
 // (D-035: schedule, then complete the ticket later). It may resolve, create
 // (in an open context), close or drop other handles, but must not close the
 // context that owns the handle being cleaned. An exception escaping a hook is
-// caught and settles the resource as Failed (`internal.handle_cleanup_threw`).
+// caught and settles the resource as Lost (`internal.handle_cleanup_threw`:
+// whether the resource ended is unknown).
 using CleanupHook = std::function<CleanupOutcome(CleanupEvent&)>;
 
 struct KindSpec {
@@ -132,7 +134,7 @@ struct KindSpec {
     const void* type_tag = nullptr;   // set by register_typed_kind<T>
 };
 
-// A resource whose lifecycle settled Failed or Lost (or whose hook threw),
+// A resource whose lifecycle settled Failed, Lost or CleanupIncomplete,
 // reported in its owner context's CloseReport (detached: shutdown()).
 struct CleanupFailure {
     Value handle;
@@ -140,8 +142,7 @@ struct CleanupFailure {
     ContextId owner = kDetached;
     ReleaseReason reason = ReleaseReason::Explicit;   // why the slot was given up (Explicit if still open)
     TerminationCause cause = TerminationCause::None;  // what started termination
-    LifeState state = LifeState::Failed;              // Failed or Lost
-    FailureDetail detail = FailureDetail::Other;      // Lost <=> Unconfirmed
+    LifeState state = LifeState::Failed;              // Failed, Lost or CleanupIncomplete
     std::string context_label;                        // the owner's label at settle time (empty: detached)
     std::string code;
     std::string message;

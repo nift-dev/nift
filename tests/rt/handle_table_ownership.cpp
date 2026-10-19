@@ -173,7 +173,8 @@ void contexts_and_cleanup() {
         CHECK(r.failures[2].code == "process.kill_failed" && r.failures[2].reason == ReleaseReason::ContextEnd);
         CHECK(r.failures[3].code == "internal.handle_cleanup_threw" && r.failures[3].message == "unknown exception");
         CHECK(r.failures[3].owner == build && r.failures[3].kind == HandleKind::File);
-        CHECK(r.failures[3].state == LifeState::Failed);
+        CHECK(r.failures[3].state == LifeState::Lost);              // a throwing hook: outcome unknown
+        CHECK(r.failures[0].state == LifeState::CleanupIncomplete);  // failure(): never "alive"
     }
     // Everything about the ended contexts now fails closed.
     for (const ContextId c : {build, page_a, page_b, hook}) {

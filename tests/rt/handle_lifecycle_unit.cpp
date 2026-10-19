@@ -273,11 +273,11 @@ void cleanup_failures() {
         CloseReport r = close_with(f, CleanupOutcome::completed());
         CHECK(!r.cleanup_failed() && r.final_exit_status(0) == 0);
     }
-    {   // definitive failure: nonzero; an earlier error and a signal status stay primary
+    {   // Failed (alive after forced termination): nonzero; an earlier error and a signal status stay primary
         Fixture f;
         Value h;
         f.spawn(h, 0, false);
-        CloseReport r = close_with(f, CleanupOutcome::failure("process.kill_failed", "kill: Operation not permitted"));
+        CloseReport r = close_with(f, CleanupOutcome::alive_after_kill("process.kill_failed", "pid 9 alive after SIGKILL"));
         CHECK(r.failures.size() == 1 && r.failures[0].state == LifeState::Failed &&
               r.failures[0].code == "process.kill_failed" && r.failures[0].reason == ReleaseReason::ContextEnd);
         CHECK(r.final_exit_status(0) == 1 && r.final_exit_status(1) == 1 && r.final_exit_status(143) == 143 &&
@@ -328,7 +328,9 @@ void cleanup_failures() {
         { std::lock_guard<std::mutex> lock(f.reaper.mu); f.reaper.queue.clear(); }  // the ticket is dropped
         CloseReport r = f.t.close_context(f.script);
         CHECK(r.failures.size() == 2);
-        for (const CleanupFailure& x : r.failures) CHECK(x.code == "internal.handle_cleanup_unresolved");
+        for (const CleanupFailure& x : r.failures) {
+            CHECK(x.code == "internal.handle_cleanup_unresolved" && x.state == LifeState::Lost);
+        }
     }
     {   // a ticket settles exactly once
         Fixture f;
@@ -382,6 +384,6 @@ int main() {
     transfers(200);
     limit_setting();
     context_label_and_error();
-    exited_but_cleanup_incomplete();
+    settled_states();
     return rt_test::finish("rt handle lifecycle unit");
 }
