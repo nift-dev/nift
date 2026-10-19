@@ -24,3 +24,18 @@ Must not change unless a decision in `decisions.md` approves it.
 | Recursion limit raised from 64 | Design report; D-001 | CP11–CP12 |
 | Candidates for deliberate language changes (break, argument evaluation, value-based typing, declarations in loops, aliasing, catchable errors) | D-015 table (proposed, not yet scheduled) | — |
 | User functions shadow built-ins of the same name | D-009 #3, D-014 | to be scheduled |
+
+## Syntax compatibility (D-045, owner, 2026-10-20)
+
+Runtime 2.0 must accept exactly Nift's established syntax, as implemented by
+legacy Nift and documented at https://nift.dev, and must refuse (before
+execution) anything it does not support rather than reinterpret it. Examples:
+template functions `@fn(name(args)) { … }`, standalone `.f` functions
+`fn(name(args)) { … }`, single-brace bodies in Nift statement syntax, optional
+semicolons. Every checkpoint that adds or extends syntax checks the
+documentation, legacy and the Runtime 2.0 parser, keeps documentation-derived
+executable fixtures run against both engines, and records any
+documentation/legacy disagreement for an owner decision before changing the
+language. Syntax compatibility is part of the certification gates of every such
+checkpoint. Owner-approved language changes (D-036–D-044) are listed as such and
+never confused with compatibility regressions.
