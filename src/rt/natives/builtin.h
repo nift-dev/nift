@@ -16,6 +16,11 @@
 //     promised it would never pass (a compiler defect; exit 70, never guessed).
 //     Status::Memory means the heap budget in the context was exceeded while
 //     building the result (the VM's memory_exceeded path).
+//     Status::Recoverable (CP15) is a program error legacy raises as a
+//     *catchable* Error value (e.g. `validate` rejecting an instance:
+//     code "schema.rejected"); `error` holds the message and
+//     recoverable_code(id) names the code. Until CP13's try/catch the VM treats it as
+//     Error (uncaught legacy behaviour is identical).
 //   * Every heap object a native creates goes through the CP09 constructors
 //     (make_string, make_array, array_push, object_set), so the live-heap total
 //     stays exact (heap_account.h).
@@ -28,7 +33,7 @@
 
 namespace nift::rt::natives {
 
-enum class Status : std::uint8_t { Ok, Error, Internal, Memory };
+enum class Status : std::uint8_t { Ok, Error, Internal, Memory, Recoverable };
 
 // Per-call context. heap_limit = 0 disables the budget check (unit tests).
 struct Context {
@@ -43,10 +48,12 @@ using NativeFn = Status (*)(const Context& context, const Value* args, std::uint
                             std::string& error);
 
 // Kind sets the compiler's kind inference uses (CP12 rt/infer.h bit layout:
-// null, bool, integral number, non-integral number, string, array, object).
+// null, bool, integral number, non-integral number, string, array, object),
+// plus bytes (CP15), which CP12's 8-bit set has no bit for (its 0x80 is
+// Unknown): wiring CP15 widens CP12's set (design record cp15, W8).
 // Duplicated here, not included, so CP14 does not depend on CP12's in-flight
 // headers; the wiring patch static_asserts that both layouts agree.
-using KindSet = std::uint8_t;
+using KindSet = std::uint16_t;
 inline constexpr KindSet kNull = 1u << 0;
 inline constexpr KindSet kBool = 1u << 1;
 inline constexpr KindSet kInt = 1u << 2;
@@ -56,12 +63,13 @@ inline constexpr KindSet kArray = 1u << 5;
 inline constexpr KindSet kObject = 1u << 6;
 inline constexpr KindSet kNumber = kInt | kFrac;
 inline constexpr KindSet kScalar = kNull | kBool | kNumber | kString;
-inline constexpr KindSet kAny = 0x7f;
+inline constexpr KindSet kBytes = 1u << 7;
+inline constexpr KindSet kAny = 0xff;
 
 // The receiver a built-in is called on: a method of a string, array,
 // object, number, bool or null, a method of any value (Any: the presentation
 // methods), or a free function (None).
-enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any };
+enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes };
 
 // How the result kinds follow from the argument kinds (for kind inference).
 enum class ResultRule : std::uint8_t {

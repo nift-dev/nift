@@ -8,8 +8,8 @@
 // The guard is the instruction count of one call's fixed part (kind checks,
 // argument conversion, result construction on a minimal input), excluding
 // per-element and per-byte work. Measured (callgrind, n = 1 workloads of
-// tests/rt/builtins_bench.cpp, rounded up to 10) for the 24 natives with a
-// workload; locked with every size in tests/runtime2/builtins/builtin_guards.json
+// tests/rt/builtins_bench.cpp, rounded up to 10) for the natives with a
+// workload (24 in CP14, 8 more in CP15); locked with every size in tests/runtime2/builtins/builtin_guards.json
 // (+10 %). The others are design targets until their workloads exist.
 
 // ---- F1 string methods ----
@@ -94,3 +94,25 @@ NIFT_RT_BUILTIN(FnIsStruct, "is_struct", None, 1, 1, kBool, Fixed, false, 60)
 NIFT_RT_BUILTIN(FnIsFunction, "is_function", None, 1, 1, kBool, Fixed, false, 60)
 NIFT_RT_BUILTIN(FnIsCollection, "is_collection", None, 1, 1, kBool, Fixed, false, 60)
 NIFT_RT_BUILTIN(FnIsEnum, "is_enum", None, 1, 1, kBool, Fixed, false, 60)
+
+// ---- CP15 N1 number methods ----
+NIFT_RT_BUILTIN(NumToInt, "to_int", Number, 0, 0, kInt, Fixed, true, 180)
+NIFT_RT_BUILTIN(NumAbs, "abs", Number, 0, 0, kNumber, Fixed, false, 100)
+NIFT_RT_BUILTIN(NumFloor, "floor", Number, 0, 0, kInt, Fixed, false, 100)
+NIFT_RT_BUILTIN(NumCeil, "ceil", Number, 0, 0, kInt, Fixed, false, 100)
+NIFT_RT_BUILTIN(NumRound, "round", Number, 0, 0, kInt, Fixed, false, 150)
+
+// ---- CP15 B1 bytes ----
+NIFT_RT_BUILTIN(FnBytes, "bytes", None, 0, 1, kBytes, Fixed, true, 360)
+NIFT_RT_BUILTIN(StrEncode, "encode", String, 1, 1, kBytes, Fixed, true, 370)
+NIFT_RT_BUILTIN(BytesLength, "length", Bytes, 0, 0, kInt, Fixed, false, 60)
+NIFT_RT_BUILTIN(BytesSize, "size", Bytes, 0, 0, kInt, Fixed, false, 60)
+NIFT_RT_BUILTIN(BytesEmpty, "empty", Bytes, 0, 0, kBool, Fixed, false, 60)
+NIFT_RT_BUILTIN(BytesSlice, "slice", Bytes, 1, 2, kBytes, Fixed, true, 360)
+NIFT_RT_BUILTIN(BytesDecode, "decode", Bytes, 1, 1, kString, Fixed, true, 220)
+NIFT_RT_BUILTIN(FnSha256, "sha256", None, 1, 1, kString, Fixed, true, 4540)
+
+// ---- CP15 J1 JSON values (json_parse is an API, not a script built-in) ----
+NIFT_RT_BUILTIN(FnValidate, "validate", None, 2, 2, kAny, Selected, true, 103670)
+NIFT_RT_BUILTIN(FnCopy, "copy", None, 1, 1, kAny, Selected, false, 60)
+NIFT_RT_BUILTIN(FnDeepcopy, "deepcopy", None, 1, 1, kAny, Selected, false, 60)

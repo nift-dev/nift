@@ -1,6 +1,9 @@
 #include "rt/natives/builtin.h"
 
 #include "rt/natives/array_methods.h"
+#include "rt/natives/bytes_methods.h"
+#include "rt/natives/json_methods.h"
+#include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
 #include "rt/natives/object_methods.h"
 #include "rt/natives/string_methods.h"
@@ -24,6 +27,9 @@ constexpr NativeFn kFunctions[] = {
     fn_html_escape, fn_attr_escape, fn_url_encode, fn_type,
     fn_is_null, fn_is_bool, fn_is_number, fn_is_int, fn_is_float, fn_is_string, fn_is_bytes, fn_is_array,
     fn_is_object, fn_is_struct, fn_is_function, fn_is_collection, fn_is_enum,
+    num_to_int, num_abs, num_floor, num_ceil, num_round,
+    fn_bytes, str_encode, bytes_length, bytes_size, bytes_empty, bytes_slice, bytes_decode, fn_sha256,
+    fn_validate, fn_copy, fn_copy,
 };
 
 constexpr BuiltinSpec kSpecs[] = {
