@@ -221,7 +221,7 @@ def checkpoint(reason, lists, ctx=frozenset()):
     if reason == "postfix-receiver":
         return "VM subset", "chained postfix on a call result (a.b().c(), f().k)"
     if reason == "postfix-receiver:member":
-        return "language-cleanup", "member read on a call result or literal (L41)"
+        return "language-cleanup", "member read on a call result or literal (L43)"
     if head in ("binding-name-reserved", "fn-name-reserved", "param-name-reserved"):
         return "language-cleanup", "names legacy reserves (L6, D-009#3)"
     if reason in ("jump-not-last", "shebang-statement"):
@@ -257,7 +257,7 @@ def owner(reason, lists, ctx=frozenset()):
     if reason == "postfix-receiver":
         return "CP12b", "chained postfix (this phase)"
     if reason == "postfix-receiver:member":
-        return "language-cleanup", "L41 member-read message on call results"
+        return "language-cleanup", "L43 member-read message on call results"
     if head in ("free-name", "assign-free-name") and name in ("dynamic-caller", "dynamic-shadow"):
         return "language-cleanup", "L25 lexical scoping (refused; migration diagnostics)"
     importing = "statement:Import" in ctx

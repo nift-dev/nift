@@ -271,7 +271,7 @@ the VM can compile these once it reports legacy's type errors itself.
 `free-name:dynamic-caller` and `-shadow` stay refused by design (L25,
 decision 3); the two curated scripts become compatibility fixtures.
 `postfix-receiver:member` (a member read on a call result or literal;
-introduced with the chained-postfix fix) belongs to language cleanup (L41).
+introduced with the chained-postfix fix) belongs to language cleanup (L43).
 
 ## Combinations (owner request)
 
@@ -302,7 +302,7 @@ curated, +4 projects) and `type:*` as CP13 (+10 curated). Chained postfix
 alone unlocks nothing (every chain also calls a method nobody supports yet);
 on top of the others it adds +10 curated, +5 projects, +23 shared. The
 chained figures assume all chains become compilable; member reads on call
-results stay refused (L41), see `cp12b-resolver.md`.
+results stay refused (L43), see `cp12b-resolver.md`.
 
 ## Residual after all three + CP13–CP16
 

@@ -27,9 +27,9 @@ rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
 | Dependencies | a successfully read module is added to the build's dependencies (`result_.dependencies`); a missing module is not added by the import itself (the failure fails the page) — relevant to templates (CP24), not to standalone scripts | source |
 
 Quirks for the register (not fixed here): exports land in the innermost
-scope for variables but the global tables for functions (L42); every import
-re-runs the module and repeated imports collide (L43); the `import: `
-prefix repeats per level (L44).
+scope for variables but the global tables for functions (L44); every import
+re-runs the module and repeated imports collide (L45); the `import: `
+prefix repeats per level (L46).
 
 ## VM design (proposed; owner decision 2)
 

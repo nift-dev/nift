@@ -108,7 +108,7 @@ index 1.
 | --- | --- | --- | --- | --- |
 | C1 | index link on a call result or literal (`f()[0]`, `[..][i]`, `{..}["k"]`) | S | **done** (`5521a861`) | part of the 28 |
 | C2 | method link on a call result or literal (`f().length()`, `s.trim().upper()`): the chain is admitted; the method itself still needs its owner (CP14, CP15, CP14B, CP15B, CP16) | S | **done** (`5521a861`) | most of the 153 (as their methods land) |
-| C3 | member read on a call result or literal (`f().k`, `{"a": 1}.a`): legacy's missing-member message depends on receiver shape and context (L41) | M: a receiver-shape note in `member()` (compiler_call.cpp, frozen) and the VM message; or language cleanup unifies the message | refused, `postfix-receiver:member` | 6 curated, 1 project (certain) |
+| C3 | member read on a call result or literal (`f().k`, `{"a": 1}.a`): legacy's missing-member message depends on receiver shape and context (L43) | M: a receiver-shape note in `member()` (compiler_call.cpp, frozen) and the VM message; or language cleanup unifies the message | refused, `postfix-receiver:member` | 6 curated, 1 project (certain) |
 | C4 | links on other receivers (parenthesised expressions, numbers, booleans) | — | CP10 Opaque (legacy rejects most of them) | 0 certain after C1/C2 |
 
 Measured with the fix (classify-all, same corpora): alone +0 (104 → 104

@@ -45,7 +45,7 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     // or literal: legacy's missing-member message depends on the receiver's
     // shape and on the context ("JSON value 'f()' has no member 'k'" in
     // textual code, "value has no member: k" in loop code), so it is not
-    // compiled (language-consistency L41).
+    // compiled (language-consistency L43).
     const bool path = left.kind == NodeKind::Ident || left.kind == NodeKind::Member || left.kind == NodeKind::Index;
     if (node.kind == NodeKind::Member && !path && (node.end >= src.size() || src[node.end] != '('))
         return fail(node, "postfix-receiver:member");

@@ -11,7 +11,7 @@ shapes the VM admits must run on the VM (outcome vm/vm-error) — except that
 `fo`, which returns an object literal, cannot be prepared by legacy and is
 refused in loop-called code (`prepared-fn-unprepared`, phase A); member
 reads on call results and literals must be refused before execution
-(`postfix-receiver:member`, language-consistency L41).
+(`postfix-receiver:member`, language-consistency L43).
 """
 import argparse
 import concurrent.futures as cf
