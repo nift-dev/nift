@@ -619,3 +619,21 @@ must be removed or justified when build recovery integrates.
   limits (`ulimit -f`, `ulimit -v`, `timeout`, child cleanup), even when the
   implementation is supposed to enforce them, so one probe cannot disrupt other
   agents or invalidate certification work.
+
+## D-032 — Benchmark tiers and string-performance priorities (owner, 2026-10-19)
+- **Two benchmark tiers.** Quick preliminary benchmarks are wall-clock, minutes
+  long, on a dedicated temporary Linode, with each measurement auto-calibrated to
+  at least 80 ms of work, cold start separate from steady state, outputs and work
+  witnesses verified, and `NIFT_VM=require`. Detailed campaigns (callgrind,
+  scaling, allocations) are reserved for confirmed bottlenecks. Raw evidence keeps
+  machine, flags, runtime versions and commit identifiers.
+- **Claims.** Speculative results stay labelled speculative and enter the official
+  scoreboard only when the checkpoint is certified and integrated; no broad
+  claims of superiority over Python or Bun from preliminary workloads.
+- **String priorities (after CP14 integrates; CP14 is not delayed for them):**
+  cached code-point count for constant-time repeated `length()` (lazy, correct
+  under copy-on-write mutation and concurrency, coordinated with the Unicode
+  cleanup in the consistency register); `to_upper`/`to_lower` profiled with ASCII
+  and non-ASCII separated (a fast ASCII path is fine; Unicode semantics are not
+  traded for speed); allocations per field in `split()`; allocations per object
+  literal. Each optimisation gets its own correctness and performance gates.
