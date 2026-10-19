@@ -654,3 +654,16 @@ must be removed or justified when build recovery integrates.
   mechanism).
 - **Pacing.** CP19 stays on hold until the current integration queue clears; no
   new architectural workstreams for now.
+
+## D-034 — `run()` option details (owner, 2026-10-19)
+- `mode: "pipe"` is an explicit opt-in for pipe capture (which also terminates
+  leftover background processes holding the pipe); `mode: "capture"` keeps
+  today's file capture.
+- `stdin`: `"inherit"` (default, today's behaviour), `"null"`, `{"file": path}`
+  (a recorded, bounded host read), `{"text": string}`; anything else is fatal
+  with a suggestion.
+- Deadlines on started handles are enforced even while the handle is idle (from
+  the reaper), not only when it is next used.
+- After SIGTERM, non-blocked script code may run for at most the documented
+  grace + bound window while managed children are cleaned up; a context that ends
+  on an error terminates its processes without the cleanup warning.
