@@ -119,3 +119,28 @@ accept	-	ok	uncalled	y := "AB".to_upper(,)
 reject	R3-empty-element	fails	fn	x := f(1,)
 reject	R3-empty-element	fails	top	x := f(,1)
 reject	R3-empty-element	ok	dead	x := {"a": 1,}
+# Integration (CP13 phase A certify regression, 0b879df6): `?[` is one
+# token (optional index) and opens like `[`; `?.` is a member link. Optional
+# access on a literal or parenthesised receiver is Opaque in the CP10 parser
+# (legacy decides), so these statements are exactly the regions the
+# prevalidator inspects (an unclosed `?[` is the translator's, as `[`). Defer
+# rule: an R2 finding stands only when the raw characters are unbalanced too.
+accept	-	ok	top	print(null?["x"])
+accept	-	ok	fn	print(null?["x"])
+accept	-	ok	top	print(null?.x)
+accept	-	ok	top	print({"x":2}?["x"])
+accept	-	ok	top	print(null?["x"] ?? 7)
+accept	-	ok	top	print(true ? null?["x"] : 1)
+accept	-	ok	top	print(null?["x"]?.y?["z"]?.w)
+accept	-	ok	top	print(null ?["x"])
+accept	-	ok	top	x := {"k": null?["a"]}
+accept	-	ok	top	x := [null?["q"], 1]
+accept	-	ok	fn	return null?["x"] ?? 0
+accept	-	runtime-error	top	print([null?["a"], null?.b])
+accept	-	runtime-error	top	x := false?[1]:[2]
+accept	-	runtime-error	top	x := true ?[1] : [2]
+accept	-	ok	uncalled	x := null?["x"]
+accept	-	ok	dead	x := null?["x"]
+reject	translator	fails	top	x := null?["x"
+reject	translator	fails	top	x := null?["x")
+reject	R2-stray-closer	silent	top	x := null?["x"]]

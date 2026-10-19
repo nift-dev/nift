@@ -1392,6 +1392,7 @@ test-runtime2-diagnostics: $(TARGET)
 test-runtime2-prevalidate-gate: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	python3 tests/runtime2/prevalidate/rules_test.py --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT) --legacy "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	python3 tests/runtime2/prevalidate/positive_test.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 
 test-runtime2-clock-lifecycle: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/clock_lifecycle.sh

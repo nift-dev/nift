@@ -493,6 +493,41 @@ translator's "invalid callable signature" (`@fn(f(value,))`). This preserves
 legacy's diagnostics and is not a gap (rules rows under "Integration (CP13
 phase A certify finding)" in `tests/runtime2/prevalidate/rules.tsv`).
 
+**Certify regression: optional index `?[` (Linode run on `0b879df6`).**
+`print(null?["x"])` was rejected ("unknown value or malformed expression",
+R2-mismatched) where legacy prints `null` (`tests/v43_final_language_smoke.sh`
+line 8). Cause: the lexer reads `?[` as one token (`QuestionBracket`), which
+the prevalidator's bracket rule did not count as an opener, so the `]`
+closed the `(`. It only showed where the CP10 parser leaves the statement
+Opaque (optional access on a literal or parenthesised receiver: `null?[..]`,
+`(x)?[..]`; on a name it parses), as those are the regions the prevalidator
+checks. Both certifications missed it because, as root, `test-v43-language`
+fails earlier on the root-only FileValue wall smoke (also in the baseline),
+so the target was classified BASELINE-FAILURE. Fix (narrow, owner guidance):
+(1) `?[` opens like `[` and is closed by `]`; (2) **defer rule** (owner
+principle: the pre-check never rejects a construct it does not know): an R2
+finding stands only when a quote-aware scan of the raw characters is
+unbalanced too; otherwise the region is left to the parser and legacy.
+Audit of closely related constructs against legacy (`ParserExpression.cpp`,
+`Ast.cpp` operator set; 89 statement lists × 4 contexts: optional access and
+chains `a?.b?["c"]?.d`, on calls `f()?["x"]`, in `??`/`?:`/literals/call
+arguments/interpolation, multi-line, spaced `null ?["x"]`/`null ?. x`,
+`?.[`, collection operations `@map/@filter/@reduce/@sort`, lambdas, spread,
+compound and bitwise assignments, R4/R5 edges): before the fix 24 false
+rejections or differences, all `?[`; after, 0. No other class of gap was
+found. Noted, not changed (conservative): the CP10 parser marks any postfix
+on `null`/`true`/numbers/parenthesised receivers Opaque, including legacy's
+valid optional access (`null?.x`), so those statements run on legacy.
+Permanent tests: the **positive syntax corpus**
+(`tests/runtime2/prevalidate/positive/`, 17 programs with legacy's exact
+output: optional access and chains, trailing-comma call forms, multi-line
+returns, dangling operators, spacing and quoting quirks) and the **operator
+differential** (`operators.txt`, 346 programs), both run by
+`positive_test.py` in `test-runtime2-prevalidate-gate`: any false rejection
+or difference from legacy fails the gate (7 of the 17 fail on the
+pre-fix binary). 19 rules rows under "Integration (CP13 phase A certify
+regression)".
+
 (History: first integrated speculatively on CP12's tip `6c144bb`, then
 rebased onto `bd1c8a9` and `4b2fc909`; the section below keeps its original
 wording.)

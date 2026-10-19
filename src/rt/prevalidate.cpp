@@ -17,10 +17,15 @@ namespace {
 constexpr const char* kSyntax = "syntax.malformed_expression";
 constexpr const char* kTranslation = "syntax.invalid_statement";
 
-bool is_open(Tok k) { return k == Tok::LParen || k == Tok::LBracket || k == Tok::LBrace; }
+// `?[` (optional index, one token) opens like `[` and is closed by `]`.
+bool is_open(Tok k) {
+    return k == Tok::LParen || k == Tok::LBracket || k == Tok::QuestionBracket || k == Tok::LBrace;
+}
 bool is_close(Tok k) { return k == Tok::RParen || k == Tok::RBracket || k == Tok::RBrace; }
 Tok partner(Tok open) {
-    return open == Tok::LParen ? Tok::RParen : open == Tok::LBracket ? Tok::RBracket : Tok::RBrace;
+    if (open == Tok::LParen) return Tok::RParen;
+    if (open == Tok::LBracket || open == Tok::QuestionBracket) return Tok::RBracket;
+    return Tok::RBrace;
 }
 
 // R4: an operator that needs a right operand; legacy fails ("expression cannot
@@ -98,6 +103,38 @@ std::string malformed(std::string_view src, std::uint32_t at, std::uint32_t end)
     return "unknown value or malformed expression: " + std::string(rest_of(src, at, end));
 }
 
+// Defer rule (certify finding, owner principle: the pre-check never rejects a
+// construct it does not know): an R2 finding stands only when the raw
+// characters of the region are unbalanced too (quote-aware, skipped regions
+// left out). A token the lexer joins with a bracket (`?[`) or any other
+// unknown spelling then defers to the parser and legacy instead of rejecting.
+bool raw_unbalanced(std::string_view src, std::uint32_t begin, std::uint32_t end, const Skips& skips) {
+    std::vector<char> stack;
+    char quote = 0;
+    for (std::uint32_t k = begin; k < end; ++k) {
+        const char c = src[k];
+        if (quote) {
+            if (c == '\\') ++k;
+            else if (c == quote) quote = 0;
+            continue;
+        }
+        const auto skip = skips.find(k);
+        if (skip != skips.end() && skip->second <= end && skip->first > begin) {
+            k = skip->second - 1;
+            continue;
+        }
+        if (c == '"' || c == '\'') quote = c;
+        else if (c == '(') stack.push_back(')');
+        else if (c == '[') stack.push_back(']');
+        else if (c == '{') stack.push_back('}');
+        else if (c == ')' || c == ']' || c == '}') {
+            if (stack.empty() || stack.back() != c) return true;
+            stack.pop_back();
+        }
+    }
+    return quote != 0 || !stack.empty();
+}
+
 // R1/R2 first: an unterminated literal or unbalanced brackets decide the
 // statement before any operand rule (legacy fails on the bracket).
 bool check_balance(std::string_view src, std::uint32_t begin, std::uint32_t end, const Skips& skips,
@@ -137,6 +174,7 @@ bool check_balance(std::string_view src, std::uint32_t begin, std::uint32_t end,
         }
         if (t.kind == Tok::End) {
             if (stack.empty()) return false;
+            if (!raw_unbalanced(src, begin, end, skips)) return true;  // defer: no finding, region not checked
             const std::uint32_t at = stack.front().anchor;
             out.take(at, malformed(src, at, end), "R2-unclosed");
             return true;
@@ -147,11 +185,13 @@ bool check_balance(std::string_view src, std::uint32_t begin, std::uint32_t end,
             if (operand_expected) operand_start = t.begin;
         } else if (is_close(t.kind)) {
             if (stack.empty()) {
+                if (!raw_unbalanced(src, begin, end, skips)) return true;  // defer
                 const std::uint32_t at = operand_expected ? t.begin : operand_start;
                 out.take(at, malformed(src, at, end), "R2-stray-closer");
                 return true;
             }
             if (partner(stack.back().token.kind) != t.kind) {
+                if (!raw_unbalanced(src, begin, end, skips)) return true;  // defer
                 const std::uint32_t at = stack.back().anchor;
                 out.take(at, malformed(src, at, end), "R2-mismatched");
                 return true;
