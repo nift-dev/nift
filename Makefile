@@ -266,8 +266,13 @@ test-rt-lint:
 	python3 tools/rt-lint.py --self-test
 	python3 tools/rt-lint.py src/rt
 
-# ASan+UBSan build of the rt tests (GCC/Clang on Linux or macOS).
+# ASan+UBSan build of the rt tests (GCC/Clang on Linux or macOS). ASan
+# reserves its shadow memory up front, so this target must run without
+# `ulimit -v` (it refuses to start under one); the address-space tests
+# (value-d040 large_accounting, under ulimit -v) run in test-rt-value instead.
 test-rt-value-sanitize:
+	@if [ "$$(ulimit -v)" != unlimited ]; then \
+		echo "test-rt-value-sanitize: run without ulimit -v (ASan shadow memory; found $$(ulimit -v) KiB)"; exit 1; fi
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_property.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-property"
@@ -284,7 +289,7 @@ test-rt-value-sanitize:
 		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
 		echo "PASS stale reference detected: $$m"; done
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
-	"$(TEST_DIR)/rt-san/value-d040" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1}
+	"$(TEST_DIR)/rt-san/value-d040" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1} no-large
 
 # Runtime 2.0 CP17 typed handles (src/rt/handle.*, src/rt/handles/): unit,
 # concurrency stress (ASan/UBSan and TSan), callgrind guard, and the

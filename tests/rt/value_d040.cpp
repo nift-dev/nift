@@ -549,7 +549,10 @@ void plain_stores_never_walk() {
 // The header field holds 2^24 - 1 granules (1 GiB - 64 bytes); objects beyond
 // it are counted exactly in a side table. Whatever the size, the live total
 // (which the VM heap budget reads) must equal the sum of the exact footprints.
-// Storage is reserved, not touched; run under ulimit -v (test-rt-value).
+// Storage is reserved, not touched; runs in test-rt-value under ulimit -v.
+// The ASan build skips it (argument `no-large`): ASan reserves its shadow
+// memory up front and cannot run under ulimit -v, and these address-space
+// tests need the non-ASan allocator and the limit.
 Value big_string(std::size_t capacity) {
     auto* so = new StringObject(std::string());
     so->text.reserve(capacity);
@@ -729,6 +732,7 @@ void tag_masking() {
 int main(int argc, char** argv) {
     const unsigned long seed = argc > 1 ? std::strtoul(argv[1], nullptr, 10) : 20261020ul;
     const long scale = argc > 2 ? std::strtol(argv[2], nullptr, 10) : 1;
+    const bool large = !(argc > 3 && std::string(argv[3]) == "no-large");
     rng.seed(seed);
     structs();
     nested_cow(300 * scale);
@@ -737,7 +741,8 @@ int main(int argc, char** argv) {
     summary_bit(300 * scale);
     cycle_checker(400 * scale);
     plain_stores_never_walk();
-    large_accounting();
+    if (large) large_accounting();
+    else std::printf("large_accounting skipped (no-large)\n");
     cow_metadata();
     tag_masking();
     std::printf("seed %lu scale %ld\n", seed, scale);
