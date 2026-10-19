@@ -57,7 +57,10 @@ struct UnitPlan {
 };
 
 // Collects the top-level functions of `root` (a Program) and checks the
-// admission rules for them.
+// admission rules for them. A declaration may follow statements (CP12 phase
+// B) when no earlier top-level statement can reach that function through
+// calls (else `fn-called-before-declaration`): legacy registers a function
+// when its declaration runs, and compile-time binding is exact then.
 UnitPlan plan_unit(const Ast& ast, NodeId root);
 
 // Every name that is the target of `=`, a compound assignment or `++`/`--`

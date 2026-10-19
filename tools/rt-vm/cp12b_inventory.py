@@ -172,7 +172,7 @@ def checkpoint(reason, lists, ctx=frozenset()):
         return "CP16/CP24", "legacy script/template bindings (args, env, page...)"
     if reason == "unresolved-name":
         return "CP12b", "GETDYN/dynamic lookup (top-level name not declared)"
-    if reason in ("fn-after-statement", "fn-redeclared", "binding-shadows-fn", "param-shadows-fn",
+    if reason in ("fn-after-statement", "fn-called-before-declaration", "fn-redeclared", "binding-shadows-fn", "param-shadows-fn",
                   "statement:FnDecl"):
         return "CP12b", "resolver: function declarations"
     if reason in ("fn-as-value", "call-binding", "expression:Lambda", "callee"):

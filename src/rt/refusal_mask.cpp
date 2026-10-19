@@ -333,7 +333,7 @@ bool Masker::mask_at(std::uint32_t offset, const std::string& reason) {
         ++rung_[offset];  // a repeat at this offset is consequential
         return true;
     }
-    if (reason == "fn-after-statement" && !hoisted_) {
+    if ((reason == "fn-after-statement" || reason == "fn-called-before-declaration") && !hoisted_) {
         hoist_functions();
         return true;
     }
