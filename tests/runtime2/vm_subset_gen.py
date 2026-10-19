@@ -1122,7 +1122,7 @@ REQUIRED_FEATURES = [
     "loop:top", "loop:top:nested", "loop:fn", "jump", "while:mutual", "while:call", "recursion",
     "recursion:mutual", "call:recursive", "jump:fn", "jump:top", "param:i", "param:d", "param:s", "param:b", "param:a",
     "param:o", "param:push", "return:i", "return:d", "return:s", "return:b", "return:a", "ternary", "coalesce",
-    "logical", "not", "access", "top-return", "loop:calls-every-function",
+    "logical", "not", "access", "top-return", "loop:calls-every-function", "fn:after-statement",
 ] + [f"cmp:{k}:{op}" for k in ("i", "d", "s") for op in CMP] + [
     f"cmp:{k}:{op}" for k in ("b", "a", "o", "mixed", "null") for op in ("==", "!=")]
 
