@@ -395,7 +395,7 @@ mapping: Recoverable → catchable error with the code, Internal →
 | `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, alive-after-kill failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); every settled state (Completed, Failed, Lost, CleanupIncomplete) settled while the handle is open and after close: state, default code and message ("alive" only for Failed, "confirm" only for Lost), exit rule, `handle_closed` afterwards; CP16's exited-but-unreaped report |
 | `tests/rt/handle_table_stress.cpp` | 4 workers + a context manager + an asynchronous reaper over one table: random create (counted and not), resolve (always the identified resource), release, retain/drop, detach, deadlines (`begin_termination`), transfer while contexts open and close; a capacity-48 run hitting the limit; `release`/`drop`/`close_context` race on one counted handle; `close_context` blocked on another thread's hook. Every resource is cleaned once and settled once; nothing outlives shutdown |
 | `tests/rt/handle_table_bench.cpp` + `tests/runtime2/cp17/handle_guards.py` | callgrind instruction guards (+10 %) |
-| `tests/runtime2/cp17/handle_mutants.py` | 32 mutants (including one per state mapping), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
+| `tests/runtime2/cp17/handle_mutants.py` | 31 mutants (including one per state mapping), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
 | `tests/runtime2/cp17/no_handle_strings.py` | gate: no `\x1fnift` handle string in code under `src/rt`; self-test |
 | `patches/vm-handle-box.patch` (`tests/rt/handle_box_unit.cpp`) | boxed handles: refcounted aliases, equality/hash with plain handles, cross-isolate share, last box schedules cleanup |
 
@@ -406,7 +406,28 @@ Make targets: `test-rt-handles` (unit, lifecycle, stress, gates, lint),
 
 ### Results (2-vCPU shared host, GCC 13.3)
 
-RESULTS_PLACEHOLDER
+Tip `11148415` (base `runtime-2` @6181549b), GCC 13.3, 2-vCPU shared host.
+Heavy runs went through `scratchpad/heavy.sh` with `nice make -j1`.
+
+| Run | Result |
+|---|---|
+| `make test-rt-handles` | unit 230 / 0; lifecycle 186 / 0; stress 515 / 0 (about 1.5 M handles created and cleaned at capacity 512, 0.2 M at capacity 48); handle-string gate 0 problems (self-test 8/8); rt-lint 0; transfer gate clean |
+| `make test-rt-handles-sanitize` (ASan + UBSan, `-fno-sanitize-recover=all`) | unit 230 / 0; lifecycle 186 / 0; stress 315 / 0; no reports |
+| `make test-rt-handles-tsan` | lifecycle 186 / 0; stress 315 / 0; no reports |
+| `handle_mutants.py` | 31 mutants, 31 killed (including one per state mapping; `settle-twice` was dropped as unreachable, because each record gets exactly one ticket) |
+| callgrind guards (marginal Ir per iteration) | create+resolve+release 2,091; resolve 251; counted lifecycle 2,165; context + 4 handles + close 8,443. Before D-035 these were 1,256 / 250 / 1,368 / 5,055: lifecycle records, tickets and settles cost about +830 Ir per handle; resolve is unchanged. The new baseline is recorded at +10 % in `handle_guards.json`. |
+| `make test-rt-value` | unit 82, regress 277, round 2 28, property 1,867,405 checks; 0 failures (also with both value patches applied) |
+| `vm-handle-box.patch` (scratch worktree, both patches applied) | `handle_box_unit` 12 / 0 under ASan+UBSan; `make test-rt-value` and `make test-rt-handles` pass |
+| earlier: TSan lock-removal mutant | TSan reports a data race (exit 66) |
+
+One hang was found during development, and it was a defect in the test. With
+the build-on-error test, the main thread was in `close_context` → `close_one`
+waiting for the page's obligation, while the test's settler thread waited for
+two queued tickets. The build's process is scheduled only after the page
+settles, so the second ticket never came. That ordering is correct behaviour;
+the test now settles one ticket at a time. An ASan use-after-free in the first
+version came from hook state destroyed before the table; the contract under
+Shutdown covers it.
 
 ## Owner decisions (D-035)
 
