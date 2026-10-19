@@ -44,6 +44,23 @@ HandleStatus ContextTree::may_access(ContextId accessor, ContextId owner) const 
     return HandleStatus::NotOwned;
 }
 
+HandleStatus ContextTree::cancel(ContextId id) {
+    HandleStatus status;
+    ExecContext* c = find(id, status);
+    if (!c) return status;
+    if (c->state == ContextState::Closing) return HandleStatus::ContextClosed;
+    std::vector<ContextId> work{id};
+    while (!work.empty()) {
+        ExecContext& each = contexts_[work.back()];
+        work.pop_back();
+        if (each.state == ContextState::Open) each.state = ContextState::Cancelling;
+        for (const ContextId child : each.children) {
+            if (contexts_.count(child)) work.push_back(child);
+        }
+    }
+    return HandleStatus::Ok;
+}
+
 void ContextTree::collect(ContextId id, std::vector<ContextId>& order) {
     ExecContext& c = contexts_[id];
     c.state = ContextState::Closing;

@@ -3,11 +3,14 @@
 // returns new handles, over rt::Value only (no RuntimeValue, no strings).
 //
 // CP16 adds a `handles::HandleAccess handles;` member to natives::Context.
-// Status mapping for natives (handle_error_class):
-//   Internal -> natives::Status::Internal (exit 70: the compiler admits handle
-//               values only where they cannot be forged, so this is a defect)
-//   Limit    -> the Limit status CP16 adds (limit.exceeded)
-//   Error    -> natives::Status::Error (fatal program error with the code)
+// Status mapping for natives (handle_error_class, D-035):
+//   Recoverable -> a catchable error with the code (`runtime.handle_closed`)
+//   Internal    -> natives::Status::Internal (exit 70: the compiler admits handle
+//                  values only where they cannot be forged, so this is a defect)
+//   Limit       -> the Limit status CP16 adds (limit.exceeded, names NIFT_HANDLE_LIMIT)
+//   Error       -> natives::Status::Error (fatal program error with the code)
+// Scripts can close and detach handles; ownership transfer is host-internal
+// and deliberately has no native entry point (D-035).
 #include "rt/handles/table.h"
 
 #include <string>
@@ -37,6 +40,13 @@ HandleStatus native_handle_arg(const HandleAccess& access, std::string_view buil
     if (status != HandleStatus::Ok) describe_handle_failure(status, builtin, kind, arg, access.table, error);
     return status;
 }
+
+// close(h): idempotent (closing a closed handle is Ok).
+HandleStatus native_handle_close(const HandleAccess& access, std::string_view builtin, const Value& arg,
+                                 HandleKind kind, std::string& error);
+// detach(h): refused inside builds with the kind's code.
+HandleStatus native_handle_detach(const HandleAccess& access, std::string_view builtin, const Value& arg,
+                                  HandleKind kind, std::string& error);
 
 // Creates a handle for `resource`, owned by the native's context, into `out`.
 HandleStatus native_handle_result(const HandleAccess& access, std::string_view builtin, HandleKind kind,

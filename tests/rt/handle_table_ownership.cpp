@@ -143,15 +143,16 @@ void contexts_and_cleanup() {
     t.create(build, HandleKind::File, res(9201), v);    // hook throws a non-exception
     t.create(build, HandleKind::Custom, res(5), v);
     t.create(build, HandleKind::File, res(6), v);
-    // A failing hook on an explicit release is reported to the caller; the
-    // slot is reclaimed anyway.
+    // A failing hook on an explicit release is reported to the caller and in
+    // the owner's close report (D-035); the slot is reclaimed anyway.
     Value doomed;
     t.create(page_b, HandleKind::File, res(9002), doomed);
     CleanupFailure failure;
     CHECK(t.release(doomed, HandleKind::File, page_b, &failure) == HandleStatus::CleanupFailed);
     CHECK(failure.code == "process.kill_failed" && failure.reason == ReleaseReason::Explicit &&
           failure.owner == page_b && failure.message == "kill refused");
-    CHECK(t.release(doomed, HandleKind::File, page_b) == HandleStatus::Stale);
+    CHECK(t.release(doomed, HandleKind::File, page_b) == HandleStatus::Closed);
+    CHECK(t.close(doomed, HandleKind::File, page_b) == HandleStatus::Ok);  // close() is idempotent
     log.events.clear();
     // Opening under a closing or closed context fails.
     CloseReport r = t.close_context(build);
@@ -164,12 +165,15 @@ void contexts_and_cleanup() {
     CHECK(log.events == expected);
     CHECK(resolved_in_hook == 1);  // the older handle was still live during the newer one's hook
     CHECK(created_in_hook == static_cast<int>(HandleStatus::ContextClosed));
-    CHECK(r.failures.size() == 3);
-    if (r.failures.size() == 3) {
-        CHECK(r.failures[0].code == "internal.handle_cleanup_threw" && r.failures[0].message == "hook threw");
-        CHECK(r.failures[1].code == "process.kill_failed" && r.failures[1].reason == ReleaseReason::ContextEnd);
-        CHECK(r.failures[2].code == "internal.handle_cleanup_threw" && r.failures[2].message == "unknown exception");
-        CHECK(r.failures[2].owner == build && r.failures[2].kind == HandleKind::File);
+    CHECK(r.failures.size() == 4 && r.cleanup_failed() && r.final_exit_status(0) == 1);
+    if (r.failures.size() == 4) {  // per context in close order, each in settle order
+        CHECK(r.failures[0].code == "process.kill_failed" && r.failures[0].reason == ReleaseReason::Explicit &&
+              r.failures[0].owner == page_b);
+        CHECK(r.failures[1].code == "internal.handle_cleanup_threw" && r.failures[1].message == "hook threw");
+        CHECK(r.failures[2].code == "process.kill_failed" && r.failures[2].reason == ReleaseReason::ContextEnd);
+        CHECK(r.failures[3].code == "internal.handle_cleanup_threw" && r.failures[3].message == "unknown exception");
+        CHECK(r.failures[3].owner == build && r.failures[3].kind == HandleKind::File);
+        CHECK(r.failures[3].state == LifeState::Failed);
     }
     // Everything about the ended contexts now fails closed.
     for (const ContextId c : {build, page_a, page_b, hook}) {
@@ -180,7 +184,7 @@ void contexts_and_cleanup() {
     }
     CHECK(t.close_context(999999).status == HandleStatus::UnknownContext);
     std::shared_ptr<void> out;
-    CHECK(t.resolve(first, HandleKind::File, kAnyAccessor, out) == HandleStatus::Stale);
+    CHECK(t.resolve(first, HandleKind::File, kAnyAccessor, out) == HandleStatus::Closed);
     TableStats st = t.stats();
     CHECK(st.live == 0 && st.contexts == 0);
     // Child closed explicitly before its parent; the parent then has only its own.
@@ -221,8 +225,7 @@ void counted_references() {
         HandleRef b = a;                              // a second reference to the same resource
         HandleRef c = HandleRef::share(t, counted);
         CHECK(a && b && c);
-        // No premature cleanup: the owner cannot release while others still refer.
-        CHECK(t.release(counted, P, s) == HandleStatus::InUse);
+        // Dropping references never cleans up while another reference lives.
         a.reset();
         b.reset();
         CHECK(log.cleaned[2] == 0 && serial_of(t, counted, P, s) == 2);
@@ -231,11 +234,11 @@ void counted_references() {
         CHECK(log.cleaned[2] == 0);
     }  // last reference gone: abandoned, cleaned exactly once
     CHECK(log.cleaned[2] == 1 && log.events.back() == "2:abandoned");
-    CHECK(t.drop(counted) == HandleStatus::Stale && !HandleRef::share(t, counted));
+    CHECK(t.drop(counted) == HandleStatus::Closed && !HandleRef::share(t, counted));
     // Owner release with exactly the creator's reference left consumes it.
     Value solo;
     t.create(s, P, res(3), solo, CreateOptions{true});
-    CHECK(t.release(solo, P, s) == HandleStatus::Ok && log.cleaned[3] == 1 && t.drop(solo) == HandleStatus::Stale);
+    CHECK(t.release(solo, P, s) == HandleStatus::Ok && log.cleaned[3] == 1 && t.drop(solo) == HandleStatus::Closed);
     // Context end cleans counted handles regardless of references; the
     // references then hold a stale identity, and dropping them is harmless.
     Value held;
@@ -286,7 +289,7 @@ void native_interface() {
     std::shared_ptr<Other> o;
     CHECK(native_handle_arg<Other>(access, "read", h, HandleKind::File, o, error) == HandleStatus::TypeMismatch);
     t.close_context(s);
-    CHECK(native_handle_arg<Res>(access, "read", h, HandleKind::File, r, error) == HandleStatus::Stale);
+    CHECK(native_handle_arg<Res>(access, "read", h, HandleKind::File, r, error) == HandleStatus::Closed);
     CHECK(native_handle_result(access, "file", HandleKind::File, res(2), h, error) == HandleStatus::ContextClosed);
     CHECK(error.find("internal.handle_context_closed") != std::string::npos);
 }

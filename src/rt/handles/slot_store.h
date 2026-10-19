@@ -30,6 +30,7 @@ enum class SlotState : std::uint8_t { Free, Live, Retired };
 struct Slot {
     std::shared_ptr<void> resource;
     ContextId owner = kDetached;
+    std::uint64_t record = 0;        // the resource's lifecycle record
     std::uint32_t generation = 1;
     std::uint32_t refs = 0;          // counted handles only; saturates (immortal)
     std::uint32_t prev = kNil, next = kNil;
@@ -44,6 +45,7 @@ struct Taken {
     Value handle;
     HandleKind kind = HandleKind::None;
     ContextId owner = kDetached;
+    std::uint64_t record = 0;
     std::shared_ptr<void> resource;
 };
 

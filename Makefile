@@ -265,10 +265,11 @@ test-rt-value-sanitize:
 RT_HANDLE_SOURCES := src/rt/handle.cpp $(sort $(wildcard src/rt/handles/*.cpp)) src/rt/value.cpp src/rt/string.cpp \
 	src/rt/heap_account.cpp
 RT_HANDLE_DEPS := $(RT_HANDLE_SOURCES) src/rt/handle.h $(wildcard src/rt/handles/*.h) src/rt/value.h \
-	tests/rt/rt_test.h tests/rt/handle_test_support.h
+	tests/rt/rt_test.h tests/rt/handle_test_support.h tests/rt/handle_lifecycle_unit_more.inc
 RT_HANDLE_UNIT_SOURCES := tests/rt/handle_table_unit.cpp tests/rt/handle_table_ownership.cpp
 RT_HANDLE_UNIT := $(TEST_DIR)/rt/handle-unit$(EXEEXT)
 RT_HANDLE_STRESS := $(TEST_DIR)/rt/handle-stress$(EXEEXT)
+RT_HANDLE_LIFECYCLE := $(TEST_DIR)/rt/handle-lifecycle$(EXEEXT)
 RT_HANDLE_BENCH := $(TEST_DIR)/rt/handle-bench$(EXEEXT)
 RT_HANDLE_TSAN_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread
 
@@ -280,18 +281,25 @@ $(RT_HANDLE_STRESS): tests/rt/handle_table_stress.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
+$(RT_HANDLE_LIFECYCLE): tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) -o "$@"
+
 $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/handle_table_bench.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
-test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS)
+test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE)
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_UNIT)"
+	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_LIFECYCLE)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_STRESS)" $${RT_HANDLE_STRESS_MS:-2000} $${RT_HANDLE_RACE_ROUNDS:-500}
 	python3 tests/runtime2/cp17/no_handle_strings.py --self-test
 	python3 tests/runtime2/cp17/no_handle_strings.py src/rt
 	python3 tools/rt-lint.py src/rt/handle.h src/rt/handle.cpp src/rt/handles
+	# D-035: ownership transfer is host-internal; natives never reach it.
+	! grep -n 'transfer *(' src/rt/handles/native_access.h src/rt/handles/native_access.cpp
 
 test-rt-handles-sanitize:
 	mkdir -p "$(TEST_DIR)/rt-san"
@@ -299,7 +307,10 @@ test-rt-handles-sanitize:
 		-o "$(TEST_DIR)/rt-san/handle-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-stress"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-lifecycle"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-stress" $${RT_HANDLE_STRESS_MS:-2000} \
 		$${RT_HANDLE_RACE_ROUNDS:-300}
 
@@ -307,6 +318,9 @@ test-rt-handles-tsan:
 	mkdir -p "$(TEST_DIR)/rt-tsan"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-tsan/handle-stress"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-tsan/handle-lifecycle"
+	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/handle-lifecycle"
 	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/handle-stress" \
 		$${RT_HANDLE_STRESS_MS:-3000} $${RT_HANDLE_RACE_ROUNDS:-300}
 

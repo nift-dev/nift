@@ -14,14 +14,10 @@ std::uint32_t next_table_tag() {
     return tag;
 }
 
-void append(std::vector<CleanupFailure>& to, std::vector<CleanupFailure>& from) {
-    for (CleanupFailure& f : from) to.push_back(std::move(f));
-    from.clear();
-}
-
 } // namespace
 
-HandleTable::HandleTable(TableOptions options) : store_(next_table_tag(), options.capacity) {}
+HandleTable::HandleTable(TableOptions options)
+    : store_(next_table_tag(), options.capacity), invalid_setting_(std::move(options.invalid_setting)) {}
 
 HandleTable::~HandleTable() { shutdown(); }
 
@@ -46,6 +42,11 @@ HandleStatus HandleTable::open_context(ContextKind kind, ContextId parent, Conte
     return contexts_.open(kind, parent, out);
 }
 
+HandleStatus HandleTable::cancel_context(ContextId id) {
+    std::lock_guard<std::mutex> lock(mu_);
+    return contexts_.cancel(id);
+}
+
 HandleStatus HandleTable::context_in_build(ContextId id, bool& in_build) const {
     std::lock_guard<std::mutex> lock(mu_);
     HandleStatus status;
@@ -58,12 +59,18 @@ HandleStatus HandleTable::create(ContextId owner, HandleKind kind, std::shared_p
                                  CreateOptions options) {
     std::unique_lock<std::mutex> lock(mu_);
     HandleStatus status = HandleStatus::Ok;
-    if (!kinds_[static_cast<std::uint8_t>(kind)].registered) status = HandleStatus::UnknownKind;
+    if (!invalid_setting_.empty()) status = HandleStatus::InvalidSetting;
+    else if (!kinds_[static_cast<std::uint8_t>(kind)].registered) status = HandleStatus::UnknownKind;
     else if (!resource) status = HandleStatus::NullResource;
     ExecContext* c = status == HandleStatus::Ok ? contexts_.find(owner, status) : nullptr;
     if (c && c->state != ContextState::Open) status = HandleStatus::ContextClosed;
     if (status == HandleStatus::Ok) status = store_.allocate(kind, resource, owner, options.counted, c->handles, out);
-    if (status == HandleStatus::Ok) ++created_;
+    if (status == HandleStatus::Ok) {
+        std::uint32_t index = 0;
+        store_.classify(out, kind, index);
+        store_.slot(index).record = records_.add(kind, out, owner);
+        ++created_;
+    }
     lock.unlock();  // a refused resource is destroyed without the lock
     return status;
 }
@@ -96,18 +103,59 @@ HandleStatus HandleTable::owner_of(const Value& handle, HandleKind kind, Context
     return status;
 }
 
+HandleStatus HandleTable::lifecycle(const Value& handle, HandleKind kind, LifeState& state,
+                                    TerminationCause& cause) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    std::uint32_t index = 0;
+    const HandleStatus status = store_.classify(handle, kind, index);
+    if (status != HandleStatus::Ok) return status;
+    const LifeRecord* r = records_.find(store_.slot(index).record);
+    state = r->state;
+    cause = r->cause;
+    return status;
+}
+
 OwnerList* HandleTable::list_of(ContextId owner) {
     if (owner == kDetached) return &detached_;
     ExecContext* c = contexts_.find(owner);
     return c ? &c->handles : nullptr;
 }
 
-Taken HandleTable::take_locked(std::uint32_t index) {
+std::size_t* HandleTable::obligations_of(ContextId owner) {
+    if (owner == kDetached) return &detached_obligations_;
+    ExecContext* c = contexts_.find(owner);
+    return c ? &c->obligations : nullptr;
+}
+
+std::vector<CleanupFailure>& HandleTable::failures_of(ContextId owner) {
+    ExecContext* c = owner == kDetached ? nullptr : contexts_.find(owner);
+    return c ? c->failures : detached_failures_;
+}
+
+HandleTable::Started HandleTable::begin_cleanup_locked(std::uint32_t index, ReleaseReason reason) {
     const ContextId owner = store_.slot(index).owner;
-    Taken taken = store_.take(index, *list_of(owner));
+    const std::uint64_t id = store_.slot(index).record;
+    Started started{store_.take(index, *list_of(owner)), reason, LifeState::Active, TerminationCause::None, false};
     if (owner == kDetached) ++detached_in_flight_;
     else ++contexts_.find(owner)->in_flight;
-    return taken;
+    LifeRecord& r = *records_.find(id);
+    started.state = r.state;
+    started.cause = r.cause;
+    r.slot_live = false;
+    r.reason = reason;
+    if (r.state == LifeState::Active) {   // this cleanup starts termination and holds the ticket
+        r.state = LifeState::Terminating;
+        r.cause = cause_of(reason);
+        r.ticket_issued = started.ticket = true;
+    }
+    if (is_settled(r.state)) {
+        records_.erase(id);               // nothing left to wait for
+    } else {
+        r.obligation = true;              // the owner waits until the resource settles
+        ++*obligations_of(owner);
+        ++obligations_;
+    }
+    return started;
 }
 
 void HandleTable::finish_locked(ContextId owner) {
@@ -117,22 +165,64 @@ void HandleTable::finish_locked(ContextId owner) {
     idle_.notify_all();
 }
 
-bool HandleTable::run_hook(const Taken& taken, ReleaseReason reason, CleanupFailure& failure) const {
-    const KindSpec& spec = kinds_[static_cast<std::uint8_t>(taken.kind)].spec;  // immutable once registered
-    if (!spec.cleanup) return true;
-    CleanupOutcome outcome;
-    try {
-        outcome = spec.cleanup(CleanupEvent{taken.kind, taken.handle, taken.owner, reason, taken.resource});
-    } catch (const std::exception& e) {
-        outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", e.what());
-    } catch (...) {
-        outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", "unknown exception");
+bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lock, CleanupFailure* failure) {
+    Taken& t = started.taken;
+    const KindSpec& spec = kinds_[static_cast<std::uint8_t>(t.kind)].spec;  // immutable once registered
+    CompletionTicket ticket = started.ticket ? CompletionTicket(this, t.record) : CompletionTicket();
+    lock.unlock();
+    CleanupOutcome outcome = CleanupOutcome::completed();
+    CleanupEvent event{t.kind, t.handle, t.owner, started.reason, t.resource, started.state, started.cause,
+                       started.ticket ? &ticket : nullptr};
+    bool threw = false;
+    if (spec.cleanup) {
+        try {
+            outcome = spec.cleanup(event);
+        } catch (const std::exception& e) {
+            outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", e.what());
+            threw = true;
+        } catch (...) {
+            outcome = CleanupOutcome::failure("internal.handle_cleanup_threw", "unknown exception");
+            threw = true;
+        }
     }
-    if (outcome.ok) return true;
-    failure = CleanupFailure{taken.handle, taken.kind, taken.owner, reason,
-                             outcome.code.empty() ? handle_status_code(HandleStatus::CleanupFailed) : outcome.code,
-                             std::move(outcome.message)};
-    return false;
+    bool failed = false;
+    if (ticket && (threw || outcome.result != CleanupOutcome::Result::Pending)) {
+        failed = outcome.result != CleanupOutcome::Result::Completed;
+        if (failed && failure) {
+            const bool lost = outcome.result == CleanupOutcome::Result::Lost;
+            *failure = CleanupFailure{t.handle, t.kind, t.owner, started.reason, cause_of(started.reason),
+                                      lost ? LifeState::Lost : LifeState::Failed, outcome.code, outcome.message};
+        }
+        ticket.complete(std::move(outcome));
+    } else if (!started.ticket && threw) {  // a bookkeeping-only hook threw: still loud
+        lock.lock();
+        failures_of(t.owner).push_back(CleanupFailure{t.handle, t.kind, t.owner, started.reason, started.cause,
+                                                      LifeState::Failed, outcome.code, outcome.message});
+        lock.unlock();
+    }
+    // A ticket the hook left behind with pending() settles here as unresolved.
+    { CompletionTicket leftover(std::move(ticket)); }
+    t.resource.reset();  // the table's reference dies outside the lock (the reaper may keep its own)
+    lock.lock();
+    finish_locked(t.owner);
+    return failed;
+}
+
+HandleStatus HandleTable::close_locked(std::uint32_t index, std::unique_lock<std::mutex>& lock,
+                                       CleanupFailure* failure) {
+    Started started = begin_cleanup_locked(index, ReleaseReason::Explicit);
+    return run_cleanup(started, lock, failure) ? HandleStatus::CleanupFailed : HandleStatus::Ok;
+}
+
+HandleStatus HandleTable::close(const Value& handle, HandleKind kind, ContextId accessor, CleanupFailure* failure) {
+    std::unique_lock<std::mutex> lock(mu_);
+    std::uint32_t index = 0;
+    HandleStatus status = store_.classify(handle, kind, index);
+    if (status == HandleStatus::Closed) return HandleStatus::Ok;  // close() is idempotent (D-035)
+    if (status != HandleStatus::Ok) return status;
+    status = contexts_.may_access(accessor, store_.slot(index).owner);
+    if (status != HandleStatus::Ok) return status;
+    return close_locked(index, lock, failure);
 }
 
 HandleStatus HandleTable::release(const Value& handle, HandleKind kind, ContextId expected_owner,
@@ -141,51 +231,8 @@ HandleStatus HandleTable::release(const Value& handle, HandleKind kind, ContextI
     std::uint32_t index = 0;
     const HandleStatus status = store_.classify(handle, kind, index);
     if (status != HandleStatus::Ok) return status;
-    const Slot& s = store_.slot(index);
-    if (s.owner != expected_owner) return HandleStatus::NotOwned;
-    if (s.counted && s.refs > 1) return HandleStatus::InUse;  // includes saturated (immortal) counts
-    Taken taken = take_locked(index);
-    lock.unlock();
-    CleanupFailure f;
-    const bool ok = run_hook(taken, ReleaseReason::Explicit, f);
-    taken.resource.reset();  // the last table reference dies outside the lock
-    lock.lock();
-    finish_locked(taken.owner);
-    if (ok) return HandleStatus::Ok;
-    if (failure) *failure = std::move(f);
-    return HandleStatus::CleanupFailed;
-}
-
-HandleStatus HandleTable::detach(const Value& handle, HandleKind kind, ContextId expected_owner) {
-    std::lock_guard<std::mutex> lock(mu_);
-    std::uint32_t index = 0;
-    HandleStatus status = store_.classify(handle, kind, index);
-    if (status != HandleStatus::Ok) return status;
-    if (expected_owner == kDetached || store_.slot(index).owner != expected_owner) return HandleStatus::NotOwned;
-    ExecContext* c = contexts_.find(expected_owner, status);
-    if (!c) return status;
-    if (c->state != ContextState::Open) return HandleStatus::ContextClosed;
-    if (c->build_family) return HandleStatus::DetachForbidden;
-    store_.move(index, c->handles, detached_, kDetached);
-    return HandleStatus::Ok;
-}
-
-HandleStatus HandleTable::transfer(const Value& handle, HandleKind kind, ContextId expected_owner,
-                                   ContextId new_owner) {
-    std::lock_guard<std::mutex> lock(mu_);
-    std::uint32_t index = 0;
-    HandleStatus status = store_.classify(handle, kind, index);
-    if (status != HandleStatus::Ok) return status;
     if (store_.slot(index).owner != expected_owner) return HandleStatus::NotOwned;
-    if (expected_owner == kDetached || new_owner == kDetached) return HandleStatus::TransferForbidden;
-    ExecContext* from = contexts_.find(expected_owner, status);
-    if (!from) return status;
-    ExecContext* to = contexts_.find(new_owner, status);
-    if (!to) return status;
-    if (from->state != ContextState::Open || to->state != ContextState::Open) return HandleStatus::ContextClosed;
-    if (from->build_family && !to->build_family) return HandleStatus::TransferForbidden;
-    if (new_owner != expected_owner) store_.move(index, from->handles, to->handles, new_owner);
-    return HandleStatus::Ok;
+    return close_locked(index, lock, failure);
 }
 
 HandleStatus HandleTable::retain(const Value& handle) {
@@ -207,89 +254,52 @@ HandleStatus HandleTable::drop(const Value& handle) {
     Slot& s = store_.slot(index);
     if (!s.counted) return HandleStatus::NotCounted;
     if (s.refs == SlotStore::kImmortalRefs || --s.refs > 0) return HandleStatus::Ok;
-    Taken taken = take_locked(index);
-    lock.unlock();
-    CleanupFailure f;
-    const bool ok = run_hook(taken, ReleaseReason::Abandoned, f);
-    taken.resource.reset();
-    lock.lock();
-    if (!ok) {  // queued for the owner's CloseReport: an abandoned handle has nobody to report to now
-        ExecContext* c = taken.owner == kDetached ? nullptr : contexts_.find(taken.owner);
-        (c ? c->pending : detached_failures_).push_back(std::move(f));
-    }
-    finish_locked(taken.owner);
+    Started started = begin_cleanup_locked(index, ReleaseReason::Abandoned);
+    run_cleanup(started, lock, nullptr);  // the hook schedules; failures settle into the owner's report
     return HandleStatus::Ok;
 }
 
-void HandleTable::close_one(ContextId id, CloseReport& report, std::unique_lock<std::mutex>& lock) {
-    ExecContext* c = contexts_.find(id);
-    if (!c) return;  // already ended by a concurrent close
-    append(report.failures, c->pending);
-    while (c && c->handles.tail != kNil) {
-        Taken taken = take_locked(c->handles.tail);  // newest first
-        lock.unlock();
-        CleanupFailure f;
-        const bool ok = run_hook(taken, ReleaseReason::ContextEnd, f);
-        taken.resource.reset();
-        lock.lock();
-        finish_locked(taken.owner);
-        ++report.cleaned;
-        if (!ok) report.failures.push_back(std::move(f));
-        c = contexts_.find(id);
+bool HandleTable::settle(std::uint64_t id, CleanupOutcome&& outcome) {
+    std::lock_guard<std::mutex> lock(mu_);
+    LifeRecord* r = records_.find(id);
+    if (!r) return false;
+    CleanupFailure failure;
+    bool failed = false;
+    if (!LifecycleStore::settle(*r, std::move(outcome), failure, failed)) return false;
+    ++settled_;
+    if (failed) failures_of(r->owner).push_back(std::move(failure));
+    if (r->obligation) {
+        r->obligation = false;
+        if (std::size_t* n = obligations_of(r->owner)) --*n;
+        --obligations_;
     }
-    // Hooks other threads started (release, last drop, a concurrent close)
-    // finish before the context is gone.
-    idle_.wait(lock, [&] { c = contexts_.find(id); return !c || c->in_flight == 0; });
-    if (!c) return;
-    append(report.failures, c->pending);
-    contexts_.erase(id);
-    ++report.contexts;
+    if (!r->slot_live) records_.erase(id);
     idle_.notify_all();
+    return true;
 }
 
-CloseReport HandleTable::close_context(ContextId id) {
-    CloseReport report;
-    std::unique_lock<std::mutex> lock(mu_);
-    ExecContext* c = contexts_.find(id, report.status);
-    if (!c) return report;
-    if (c->state != ContextState::Open) { report.status = HandleStatus::ContextClosed; return report; }
-    for (const ContextId each : contexts_.begin_close(id)) close_one(each, report, lock);
-    return report;
-}
-
-CloseReport HandleTable::shutdown() {
-    CloseReport report;
-    std::unique_lock<std::mutex> lock(mu_);
-    // Repeats until nothing is left: a hook may open contexts or create handles.
-    for (;;) {
-        const std::vector<ContextId> roots = contexts_.roots();
-        ContextId newest_open = kDetached;
-        for (auto it = roots.rbegin(); it != roots.rend() && newest_open == kDetached; ++it) {
-            const ExecContext* c = contexts_.find(*it);
-            if (c && c->state == ContextState::Open) newest_open = *it;
+HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
+                                            CompletionTicket& ticket, TerminationStart* info) {
+    CompletionTicket issued;
+    TerminationStart start;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        std::uint32_t index = 0;
+        const HandleStatus status = store_.classify(handle, kind, index);
+        if (status != HandleStatus::Ok) return status;
+        LifeRecord& r = *records_.find(store_.slot(index).record);
+        start.state = r.state;
+        start.cause = r.cause;
+        if (r.state == LifeState::Active) {
+            r.state = LifeState::Terminating;
+            r.cause = cause;
+            r.ticket_issued = start.started = true;
+            issued = CompletionTicket(this, store_.slot(index).record);
         }
-        if (newest_open != kDetached) {
-            for (const ContextId each : contexts_.begin_close(newest_open)) close_one(each, report, lock);
-            continue;
-        }
-        if (!roots.empty()) { idle_.wait(lock); continue; }  // closes running on other threads
-        if (detached_.tail != kNil) {
-            Taken taken = take_locked(detached_.tail);
-            lock.unlock();
-            CleanupFailure f;
-            const bool ok = run_hook(taken, ReleaseReason::Shutdown, f);
-            taken.resource.reset();
-            lock.lock();
-            finish_locked(kDetached);
-            ++report.cleaned;
-            if (!ok) report.failures.push_back(std::move(f));
-            continue;
-        }
-        if (detached_in_flight_ == 0) break;
-        idle_.wait(lock);
     }
-    append(report.failures, detached_failures_);
-    return report;
+    if (info) *info = start;
+    if (issued) ticket = std::move(issued);  // outside the lock: replacing a ticket may settle it
+    return HandleStatus::Ok;
 }
 
 TableStats HandleTable::stats() const {
@@ -300,8 +310,11 @@ TableStats HandleTable::stats() const {
     s.retired = store_.retired();
     s.detached = detached_.count;
     s.contexts = contexts_.size();
+    s.records = records_.size();
+    s.pending_obligations = obligations_;
     s.created = created_;
     s.cleaned = cleaned_;
+    s.settled = settled_;
     return s;
 }
 

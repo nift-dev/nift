@@ -13,14 +13,14 @@ HandleStatus SlotStore::classify(const Value& handle, HandleKind expected, std::
     const Slot& s = slots_[i];
     switch (s.state) {
         case SlotState::Live:
-            if (generation < s.generation) return HandleStatus::Stale;
+            if (generation < s.generation) return HandleStatus::Closed;
             if (generation > s.generation || s.kind != expected) return HandleStatus::Forged;
             index = i;
             return HandleStatus::Ok;
         case SlotState::Free:  // the slot's generation is the next one to issue
-            return generation < s.generation ? HandleStatus::Stale : HandleStatus::Forged;
+            return generation < s.generation ? HandleStatus::Closed : HandleStatus::Forged;
         case SlotState::Retired:  // the last generation was issued and released
-            return HandleStatus::Stale;
+            return HandleStatus::Closed;
     }
     return HandleStatus::Forged;
 }
@@ -51,10 +51,11 @@ HandleStatus SlotStore::allocate(HandleKind kind, std::shared_ptr<void>& resourc
 
 Taken SlotStore::take(std::uint32_t index, OwnerList& list) {
     Slot& s = slots_[index];
-    Taken taken{handle_of(index), s.kind, s.owner, std::move(s.resource)};
+    Taken taken{handle_of(index), s.kind, s.owner, s.record, std::move(s.resource)};
     unlink(index, list);
     s.resource.reset();
     s.owner = kDetached;
+    s.record = 0;
     s.refs = 0;
     s.counted = false;
     --live_;

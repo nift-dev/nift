@@ -28,12 +28,16 @@ Value with_generation(const Value& h, std::uint32_t generation) {
 }
 
 void status_codes() {
-    CHECK(std::strcmp(handle_status_code(HandleStatus::Stale), "internal.handle_stale") == 0);
+    CHECK(std::strcmp(handle_status_code(HandleStatus::Closed), "runtime.handle_closed") == 0);
     CHECK(std::strcmp(handle_status_code(HandleStatus::Forged), "internal.handle_forged") == 0);
     CHECK(std::strcmp(handle_status_code(HandleStatus::LimitExceeded), "limit.exceeded") == 0);
     CHECK(std::strcmp(handle_status_code(HandleStatus::DetachForbidden), "runtime.detach_in_build") == 0);
     CHECK(handle_error_class(HandleStatus::LimitExceeded) == HandleErrorClass::Limit);
-    CHECK(handle_error_class(HandleStatus::Stale) == HandleErrorClass::Internal);
+    CHECK(handle_error_class(HandleStatus::Closed) == HandleErrorClass::Recoverable);  // D-035: catchable
+    CHECK(handle_error_class(HandleStatus::Forged) == HandleErrorClass::Internal);
+    CHECK(handle_error_class(HandleStatus::Foreign) == HandleErrorClass::Internal);
+    CHECK(handle_error_class(HandleStatus::KindMismatch) == HandleErrorClass::Internal);
+    CHECK(handle_error_class(HandleStatus::TransferForbidden) == HandleErrorClass::Internal);
     CHECK(handle_error_class(HandleStatus::DetachForbidden) == HandleErrorClass::Error);
     CHECK(handle_error_class(HandleStatus::Ok) == HandleErrorClass::None);
     // Every status has a distinct, non-empty code.
@@ -53,11 +57,11 @@ void registry_statuses() {
     CHECK(reg.check(Value::handle(HandleKind::Timer, 0, 0)) == HandleStatus::KindMismatch);
     CHECK(reg.check(Value::handle(HandleKind::File, 7, 0)) == HandleStatus::Forged);
     CHECK(reg.check(with_generation(a, 1)) == HandleStatus::Forged);
-    CHECK(reg.release(a) && reg.check(a) == HandleStatus::Stale);
+    CHECK(reg.release(a) && reg.check(a) == HandleStatus::Closed);
     CHECK(reg.check(with_generation(a, 1)) == HandleStatus::Forged);  // the free slot's next generation
     CHECK(reg.set_free_slot_generation_for_test(a.handle_id(), HandleRegistry::kMaxGeneration));
     Value b = reg.add(std::make_shared<int>(2));
-    CHECK(reg.release(b) && reg.check(b) == HandleStatus::Stale && reg.retired() == 1);  // retired, not forged
+    CHECK(reg.release(b) && reg.check(b) == HandleStatus::Closed && reg.retired() == 1);  // retired, not forged
     CHECK(!reg.set_free_slot_generation_for_test(b.handle_id(), 5));
 }
 
@@ -128,25 +132,25 @@ void forgery_and_staleness() {
     CHECK(st(h, HandleKind::File) == HandleStatus::Ok && out);
     // Release, then reuse of the same slot by another kind.
     CHECK(t.release(h, HandleKind::File, s) == HandleStatus::Ok);
-    CHECK(st(h, HandleKind::File) == HandleStatus::Stale && !out);
+    CHECK(st(h, HandleKind::File) == HandleStatus::Closed && !out);
     CHECK(st(with_generation(h, 2), HandleKind::File) == HandleStatus::Forged);  // next generation, not yet issued
     Value reused;
     CHECK(t.create(s, HandleKind::Process, res(13), reused) == HandleStatus::Ok);
     CHECK(std::uint32_t(reused.handle_id()) == std::uint32_t(h.handle_id()) && reused.handle_generation() == 2);
-    CHECK(st(h, HandleKind::File) == HandleStatus::Stale);
-    CHECK(st(Value::handle(HandleKind::Process, h.handle_id(), 1), HandleKind::Process) == HandleStatus::Stale);
+    CHECK(st(h, HandleKind::File) == HandleStatus::Closed);
+    CHECK(st(Value::handle(HandleKind::Process, h.handle_id(), 1), HandleKind::Process) == HandleStatus::Closed);
     CHECK(serial_of(t, reused, HandleKind::Process, s) == 13);
     // Stale handles cannot be released, retained, dropped, detached or moved.
-    CHECK(t.release(h, HandleKind::File, s) == HandleStatus::Stale);
-    CHECK(t.retain(h) == HandleStatus::Stale && t.drop(h) == HandleStatus::Stale);
-    CHECK(t.detach(h, HandleKind::File, s) == HandleStatus::Stale);
-    CHECK(t.transfer(h, HandleKind::File, s, s) == HandleStatus::Stale);
+    CHECK(t.release(h, HandleKind::File, s) == HandleStatus::Closed);
+    CHECK(t.retain(h) == HandleStatus::Closed && t.drop(h) == HandleStatus::Closed);
+    CHECK(t.detach(h, HandleKind::File, s) == HandleStatus::Closed);
+    CHECK(t.transfer(h, HandleKind::File, s, s) == HandleStatus::Closed);
     CHECK(log.cleaned[10] == 1);  // released once, never again
     // Error text for natives names the reason and the code.
     std::string error;
-    describe_handle_failure(HandleStatus::Stale, "read", HandleKind::File, h, &t, error);
-    CHECK(error.find("read: stale handle") == 0 && error.find("file handle") != std::string::npos &&
-          error.find("internal.handle_stale") != std::string::npos);
+    describe_handle_failure(HandleStatus::Closed, "read", HandleKind::File, h, &t, error);
+    CHECK(error.find("read: handle is closed") == 0 && error.find("file handle") != std::string::npos &&
+          error.find("runtime.handle_closed") != std::string::npos);
     describe_handle_failure(HandleStatus::NotAHandle, "read", HandleKind::File, make_string("x"), &t, error);
     CHECK(error.find("got string") != std::string::npos);
 }
@@ -176,7 +180,7 @@ void generation_wrap() {
     CHECK(std::uint32_t(c.handle_id()) != slot);  // retired: never reused, generations never wrap to 1
     std::shared_ptr<void> out;
     for (const Value& v : {first, a, b, with_generation(b, 1)}) {
-        CHECK(t.resolve(v, HandleKind::Timer, s, out) == HandleStatus::Stale && !out);
+        CHECK(t.resolve(v, HandleKind::Timer, s, out) == HandleStatus::Closed && !out);
     }
     CHECK(!t.set_free_generation_for_test(slot, 5));  // retired slots stay retired
 }
@@ -233,7 +237,7 @@ void capacity_limit() {
     std::string error;
     HandleAccess access{&t, s};
     CHECK(native_handle_result(access, "open", HandleKind::File, res(5), h, error) == HandleStatus::LimitExceeded);
-    CHECK(error.find("limit.exceeded") != std::string::npos && error.find("capacity") != std::string::npos);
+    CHECK(error.find("limit.exceeded") != std::string::npos && error.find("(4 handles, NIFT_HANDLE_LIMIT)") != std::string::npos);
     CHECK(t.release(hs[2], HandleKind::File, s) == HandleStatus::Ok);
     CHECK(t.create(s, HandleKind::File, res(6), h) == HandleStatus::Ok);
 }

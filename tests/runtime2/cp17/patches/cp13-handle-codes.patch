@@ -1,0 +1,86 @@
+diff -ruN a/src/Diagnostic.h b/src/Diagnostic.h
+--- a/src/Diagnostic.h	2026-10-19 20:12:35.159342159 +1100
++++ b/src/Diagnostic.h	2026-10-19 20:12:35.196932762 +1100
+@@ -93,6 +93,28 @@
+     RuntimeArityError,
+     RuntimeIntegerOverflow,
+     RuntimeDivisionByZero,
++    // CP17 (D-035): typed-handle codes. Appended; all Fatal except
++    // runtime.handle_closed, which is catchable by owner decision.
++    RuntimeHandleClosed,
++    InternalHandleNotAHandle,
++    InternalHandleKindMismatch,
++    InternalHandleForeign,
++    InternalHandleForged,
++    InternalHandleTypeMismatch,
++    InternalHandleNotOwned,
++    InternalHandleNotCounted,
++    InternalHandleContextClosed,
++    InternalHandleUnknownContext,
++    InternalHandleUnknownKind,
++    InternalHandleKindRegistered,
++    InternalHandleNullResource,
++    InternalHandleCleanupFailed,
++    InternalHandleCleanupThrew,
++    InternalHandleCleanupUnresolved,
++    InternalHandleCleanupLost,
++    RuntimeDetachInBuild,
++    ProcessDetachInBuild,
++    RuntimeTransferOutOfBuild,
+     Count,
+ };
+ 
+@@ -175,6 +197,26 @@
+         NIFT_DIAGNOSTIC_CASE(RuntimeArityError, "runtime.arity_error", Fatal);
+         NIFT_DIAGNOSTIC_CASE(RuntimeIntegerOverflow, "runtime.integer_overflow", Fatal);
+         NIFT_DIAGNOSTIC_CASE(RuntimeDivisionByZero, "runtime.division_by_zero", Fatal);
++        NIFT_DIAGNOSTIC_CASE(RuntimeHandleClosed, "runtime.handle_closed", Recoverable);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleNotAHandle, "internal.handle_not_a_handle", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleKindMismatch, "internal.handle_kind_mismatch", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleForeign, "internal.handle_foreign", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleForged, "internal.handle_forged", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleTypeMismatch, "internal.handle_type_mismatch", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleNotOwned, "internal.handle_not_owned", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleNotCounted, "internal.handle_not_counted", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleContextClosed, "internal.handle_context_closed", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleUnknownContext, "internal.handle_unknown_context", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleUnknownKind, "internal.handle_unknown_kind", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleKindRegistered, "internal.handle_kind_registered", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleNullResource, "internal.handle_null_resource", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupFailed, "internal.handle_cleanup_failed", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupThrew, "internal.handle_cleanup_threw", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupUnresolved, "internal.handle_cleanup_unresolved", Fatal);
++        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupLost, "internal.handle_cleanup_lost", Fatal);
++        NIFT_DIAGNOSTIC_CASE(RuntimeDetachInBuild, "runtime.detach_in_build", Fatal);
++        NIFT_DIAGNOSTIC_CASE(ProcessDetachInBuild, "process.detach_in_build", Fatal);
++        NIFT_DIAGNOSTIC_CASE(RuntimeTransferOutOfBuild, "runtime.transfer_out_of_build", Fatal);
+         case DiagnosticCode::Count: break;
+ #undef NIFT_DIAGNOSTIC_CASE
+     }
+diff -ruN a/tests/runtime2/diagnostics/code-taxonomy.tsv b/tests/runtime2/diagnostics/code-taxonomy.tsv
+--- a/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-19 20:12:35.164962611 +1100
++++ b/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-19 20:12:35.199732553 +1100
+@@ -36,3 +36,23 @@
+ native.limit_exceeded	limit.exceeded	NativeLimitExceeded	limit, value	recursion/frame budget, nesting and other explicit limits (never an ordinary exception)
+ internal.resource_exhausted	limit.resource_exhausted	InternalResourceExhausted	resource	memory or other resource exhausted (not an implementation defect)
+ native.system_service_failed	host.service_failed	NativeSystemServiceFailed	service	non-I/O host service failure (clock, randomness, ...)
++new	runtime.handle_closed	RuntimeHandleClosed	kind	operation on a handle that was closed or reclaimed (close() itself is idempotent; D-035)
++new	internal.handle_not_a_handle	InternalHandleNotAHandle	kind	a non-handle value reached a handle position (compiler defect, W13)
++new	internal.handle_kind_mismatch	InternalHandleKindMismatch	kind, expected	a handle of another kind reached a handle position
++new	internal.handle_foreign	InternalHandleForeign	kind	a handle issued by another handle table (another run or isolate)
++new	internal.handle_forged	InternalHandleForged	kind	a handle that was never issued
++new	internal.handle_type_mismatch	InternalHandleTypeMismatch	kind	a handle resource resolved as the wrong host type
++new	internal.handle_not_owned	InternalHandleNotOwned	kind	a handle used outside its owning context (or a context nested in it)
++new	internal.handle_not_counted	InternalHandleNotCounted	kind	reference counting on an uncounted handle
++new	internal.handle_context_closed	InternalHandleContextClosed	context	handle operation in an ended or ending execution context
++new	internal.handle_unknown_context	InternalHandleUnknownContext	context	execution context never issued
++new	internal.handle_unknown_kind	InternalHandleUnknownKind	kind	handle kind not registered
++new	internal.handle_kind_registered	InternalHandleKindRegistered	kind	handle kind registered twice
++new	internal.handle_null_resource	InternalHandleNullResource	kind	handle created for a null resource
++new	internal.handle_cleanup_failed	InternalHandleCleanupFailed	kind, reason	cleanup failed without a more specific code (D-035: the run exits nonzero)
++new	internal.handle_cleanup_threw	InternalHandleCleanupThrew	kind, reason	a cleanup hook threw
++new	internal.handle_cleanup_unresolved	InternalHandleCleanupUnresolved	kind, reason	a cleanup outcome was never reported
++new	internal.handle_cleanup_lost	InternalHandleCleanupLost	kind, reason	termination could not be confirmed (Lost) without a more specific code
++new	runtime.detach_in_build	RuntimeDetachInBuild	kind	detach inside a build (D-030); processes use process.detach_in_build
++new	process.detach_in_build	ProcessDetachInBuild		detach of a process inside a build (D-030)
++new	runtime.transfer_out_of_build	RuntimeTransferOutOfBuild	kind	host-internal: a transfer that would move a resource out of a build

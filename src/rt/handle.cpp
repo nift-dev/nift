@@ -9,10 +9,9 @@ const char* handle_status_code(HandleStatus status) {
         case HandleStatus::KindMismatch: return "internal.handle_kind_mismatch";
         case HandleStatus::Foreign: return "internal.handle_foreign";
         case HandleStatus::Forged: return "internal.handle_forged";
-        case HandleStatus::Stale: return "internal.handle_stale";
+        case HandleStatus::Closed: return "runtime.handle_closed";
         case HandleStatus::TypeMismatch: return "internal.handle_type_mismatch";
         case HandleStatus::NotOwned: return "internal.handle_not_owned";
-        case HandleStatus::InUse: return "internal.handle_in_use";
         case HandleStatus::NotCounted: return "internal.handle_not_counted";
         case HandleStatus::ContextClosed: return "internal.handle_context_closed";
         case HandleStatus::UnknownContext: return "internal.handle_unknown_context";
@@ -22,6 +21,7 @@ const char* handle_status_code(HandleStatus status) {
         case HandleStatus::DetachForbidden: return "runtime.detach_in_build";
         case HandleStatus::TransferForbidden: return "runtime.transfer_out_of_build";
         case HandleStatus::LimitExceeded: return "limit.exceeded";
+        case HandleStatus::InvalidSetting: return "runtime.invalid_argument";
         case HandleStatus::CleanupFailed: return "internal.handle_cleanup_failed";
     }
     return "internal.handle_unknown_status";
@@ -34,10 +34,9 @@ const char* handle_status_text(HandleStatus status) {
         case HandleStatus::KindMismatch: return "handle of the wrong kind";
         case HandleStatus::Foreign: return "handle from another handle table";
         case HandleStatus::Forged: return "handle was never issued";
-        case HandleStatus::Stale: return "stale handle (released)";
+        case HandleStatus::Closed: return "handle is closed";
         case HandleStatus::TypeMismatch: return "handle resource has another type";
         case HandleStatus::NotOwned: return "handle is not owned by this context";
-        case HandleStatus::InUse: return "handle still has other references";
         case HandleStatus::NotCounted: return "handle is not reference counted";
         case HandleStatus::ContextClosed: return "execution context has ended";
         case HandleStatus::UnknownContext: return "unknown execution context";
@@ -46,7 +45,8 @@ const char* handle_status_text(HandleStatus status) {
         case HandleStatus::NullResource: return "null handle resource";
         case HandleStatus::DetachForbidden: return "detaching is not allowed inside a build";
         case HandleStatus::TransferForbidden: return "transfer would move a resource out of the build";
-        case HandleStatus::LimitExceeded: return "handle table capacity exceeded";
+        case HandleStatus::LimitExceeded: return "handle limit exceeded";
+        case HandleStatus::InvalidSetting: return "invalid handle limit setting";
         case HandleStatus::CleanupFailed: return "handle cleanup failed";
     }
     return "unknown handle status";
@@ -55,9 +55,10 @@ const char* handle_status_text(HandleStatus status) {
 HandleErrorClass handle_error_class(HandleStatus status) {
     switch (status) {
         case HandleStatus::Ok: return HandleErrorClass::None;
+        case HandleStatus::Closed: return HandleErrorClass::Recoverable;
         case HandleStatus::LimitExceeded: return HandleErrorClass::Limit;
-        case HandleStatus::DetachForbidden:
-        case HandleStatus::TransferForbidden: return HandleErrorClass::Error;
+        case HandleStatus::InvalidSetting:
+        case HandleStatus::DetachForbidden: return HandleErrorClass::Error;
         default: return HandleErrorClass::Internal;
     }
 }
@@ -80,12 +81,12 @@ HandleStatus HandleRegistry::check(const Value& handle) const {
     if (id >= slots_.size()) return HandleStatus::Forged;
     const Slot& slot = slots_[id];
     const std::uint32_t generation = handle.handle_generation();
-    if (generation < slot.generation) return HandleStatus::Stale;
+    if (generation < slot.generation) return HandleStatus::Closed;
     if (generation > slot.generation) return HandleStatus::Forged;
     if (slot.resource) return HandleStatus::Ok;
     // Same generation, no resource: a retired slot's last (released) handle,
     // or a free slot's next generation, which has not been issued yet.
-    return slot.retired ? HandleStatus::Stale : HandleStatus::Forged;
+    return slot.retired ? HandleStatus::Closed : HandleStatus::Forged;
 }
 
 std::shared_ptr<void> HandleRegistry::resolve(const Value& handle) const {

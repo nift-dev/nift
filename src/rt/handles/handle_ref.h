@@ -37,7 +37,8 @@ public:
     }
     ~HandleRef() { reset(); }
 
-    // Drops this reference (the last one cleans the resource up, Abandoned).
+    // Drops this reference; the last one schedules cleanup (Abandoned) and
+    // never blocks. Dropping a reference to a closed handle does nothing.
     void reset() {
         if (table_) table_->drop(handle_);
         table_ = nullptr;

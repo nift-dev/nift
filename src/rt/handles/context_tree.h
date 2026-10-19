@@ -12,7 +12,10 @@
 
 namespace nift::rt::handles {
 
-enum class ContextState : std::uint8_t { Open, Closing };
+// Open: normal. Cancelling: cancel_context() was called (a superseded --auto
+// pass, a cancelled worker): no new handles, children, detaches or inbound
+// transfers; existing handles stay until close. Closing: close in progress.
+enum class ContextState : std::uint8_t { Open, Cancelling, Closing };
 
 struct ExecContext {
     ContextKind kind = ContextKind::Script;
@@ -22,7 +25,8 @@ struct ExecContext {
     std::vector<ContextId> children;   // in open order
     OwnerList handles;                 // owned handles in creation order
     std::size_t in_flight = 0;         // cleanup hooks running for handles taken from this context
-    std::vector<CleanupFailure> pending;  // failures of abandoned handles, reported at close
+    std::size_t obligations = 0;       // closed handles whose resources are not settled yet
+    std::vector<CleanupFailure> failures;  // Failed/Lost settles, reported at close
 };
 
 class ContextTree {
@@ -42,6 +46,9 @@ public:
     // which they are cleaned: descendants before ancestors, later-opened
     // siblings first (reverse of open order, like destructors).
     std::vector<ContextId> begin_close(ContextId id);
+    // Marks `id` and every open descendant Cancelling. ContextClosed when
+    // `id` is already closing.
+    HandleStatus cancel(ContextId id);
     // Forgets a fully cleaned context (detaching it from its parent).
     void erase(ContextId id);
     std::vector<ContextId> roots() const { return roots_; }

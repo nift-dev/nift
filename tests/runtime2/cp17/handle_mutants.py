@@ -3,28 +3,36 @@
 
 Each mutant removes one rule of the handle table (generation check, owner
 check, LIFO cleanup, build-family detach ban, ...) in a private copy of
-src/rt/handle* and src/rt/handles, rebuilds tests/rt/handle_table_unit and
-requires the suite to fail. Usage: handle_mutants.py [workdir]
+src/rt/handle* and src/rt/handles, rebuilds the unit and lifecycle suites and
+requires one of them to fail (a hang counts: each run has a 120 s timeout). Usage: handle_mutants.py [workdir]
 """
 import os, shutil, subprocess, sys, tempfile
 R=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 S=sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix='cp17-mutants-')
 M=[
- ("stale-resolves","src/rt/handles/slot_store.cpp","if (generation < s.generation) return HandleStatus::Stale;\n            if (generation > s.generation","if (generation > s.generation"),
+ ("closed-resolves","src/rt/handles/slot_store.cpp","if (generation < s.generation) return HandleStatus::Closed;\n            if (generation > s.generation","if (generation > s.generation"),
+ ("closed-as-forged","src/rt/handles/slot_store.cpp","return generation < s.generation ? HandleStatus::Closed : HandleStatus::Forged;","return HandleStatus::Forged;"),
  ("no-gen-bump","src/rt/handles/slot_store.cpp","++s.generation;  // every","s.generation += 0;  // every"),
- ("no-owner-check-release","src/rt/handles/table.cpp","if (s.owner != expected_owner) return HandleStatus::NotOwned;\n    if (s.counted","if (s.counted"),
- ("no-inuse","src/rt/handles/table.cpp","if (s.counted && s.refs > 1) return HandleStatus::InUse;","") ,
- ("fifo-close","src/rt/handles/table.cpp","take_locked(c->handles.tail);  // newest first","take_locked(c->handles.head);"),
- ("detach-in-build","src/rt/handles/table.cpp","if (c->build_family) return HandleStatus::DetachForbidden;",""),
- ("transfer-out-of-build","src/rt/handles/table.cpp","if (from->build_family && !to->build_family) return HandleStatus::TransferForbidden;",""),
+ ("no-owner-check-release","src/rt/handles/table.cpp","if (store_.slot(index).owner != expected_owner) return HandleStatus::NotOwned;\n    return close_locked","return close_locked"),
+ ("close-not-idempotent","src/rt/handles/table.cpp","if (status == HandleStatus::Closed) return HandleStatus::Ok;  // close() is idempotent",""),
+ ("fifo-close","src/rt/handles/table_contexts.cpp","begin_cleanup_locked(c->handles.tail, ReleaseReason::ContextEnd);  // newest first","begin_cleanup_locked(c->handles.head, ReleaseReason::ContextEnd);"),
+ ("detach-in-build","src/rt/handles/table_contexts.cpp","if (c->build_family) return HandleStatus::DetachForbidden;",""),
+ ("transfer-out-of-build","src/rt/handles/table_contexts.cpp","if (from->build_family && !to->build_family) return HandleStatus::TransferForbidden;",""),
+ ("transfer-into-cancelling","src/rt/handles/table_contexts.cpp","bool accepts_handles(const ExecContext& c) { return c.state == ContextState::Open; }","bool accepts_handles(const ExecContext& c) { return c.state != ContextState::Closing; }"),
+ ("no-reclaim-on-refusal","src/rt/handles/table_contexts.cpp","if (policy == TransferPolicy::ReclaimOnRefusal) {","if (false) {"),
  ("access-anyone","src/rt/handles/context_tree.cpp","if (accessor == owner || owner == kDetached","if (true || owner == kDetached"),
  ("create-in-closing","src/rt/handles/table.cpp","if (c && c->state != ContextState::Open) status = HandleStatus::ContextClosed;",""),
  ("no-tag-check","src/rt/handles/slot_store.cpp","if (static_cast<std::uint32_t>(id >> 32) != tag_) return HandleStatus::Foreign;",""),
  ("no-kind-check","src/rt/handles/slot_store.cpp","generation > s.generation || s.kind != expected","generation > s.generation"),
  ("no-retire","src/rt/handles/slot_store.cpp","if (s.generation == kMaxGeneration) {  // a bump","if (false) {  // a bump"),
- ("hook-failure-swallowed","src/rt/handles/table.cpp","    if (outcome.ok) return true;\n    failure","    return true;\n    failure"),
+ ("hook-failure-swallowed","src/rt/handles/lifecycle.cpp","        case CleanupOutcome::Result::Lost: record.state = LifeState::Lost; break;\n        default: record.state = LifeState::Failed; break;","        default: record.state = LifeState::Completed; return true;"),
+ ("settle-twice","src/rt/handles/lifecycle.cpp","if (is_settled(record.state)) return false;",""),
+ ("double-termination","src/rt/handles/table.cpp","        if (r.state == LifeState::Active) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;","        if (true) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;"),
+ ("close-ignores-obligations","src/rt/handles/table_contexts.cpp","return !c || (c->in_flight == 0 && c->obligations == 0);","return !c || c->in_flight == 0;"),
+ ("unreported-ticket-forgotten","src/rt/handles/completion.cpp","    if (table_) {\n        complete(","    if (false) {\n        complete("),
  ("drop-no-abandon","src/rt/handles/table.cpp","--s.refs > 0) return HandleStatus::Ok;","--s.refs >= 0) return HandleStatus::Ok;"),
  ("no-capacity","src/rt/handles/slot_store.cpp","if (slots_.size() >= capacity_) return HandleStatus::LimitExceeded;",""),
+ ("limit-setting-ignored","src/rt/handles/table.cpp","if (!invalid_setting_.empty()) status = HandleStatus::InvalidSetting;","if (false) status = HandleStatus::InvalidSetting;"),
 ]
 res=[]
 for name,f,old,new in M:
@@ -34,10 +42,14 @@ for name,f,old,new in M:
     p=os.path.join(d,f); t=open(p).read(); assert old in t,(name); open(p,'w').write(t.replace(old,new,1))
     srcs=[d+'/src/rt/handle.cpp']+[os.path.join(d,'src/rt/handles',x) for x in os.listdir(d+'/src/rt/handles') if x.endswith('.cpp')]+[R+'/src/rt/'+x for x in ['value.cpp','string.cpp','heap_account.cpp']]
     exe=d+'/t'
-    c=subprocess.run(['nice','g++','-std=c++17','-O1','-pthread','-I'+d+'/src','-I'+R+'/src','-I'+R+'/tests/rt',R+'/tests/rt/handle_table_unit.cpp',R+'/tests/rt/handle_table_ownership.cpp']+srcs+['-o',exe],capture_output=True,text=True)
-    if c.returncode: res.append((name,'COMPILE-FAIL '+c.stderr[:200])); continue
+    flags=['nice','g++','-std=c++17','-O1','-pthread','-I'+d+'/src','-I'+R+'/src','-I'+R+'/tests/rt']
+    c=subprocess.run(flags+[R+'/tests/rt/handle_table_unit.cpp',R+'/tests/rt/handle_table_ownership.cpp']+srcs+['-o',exe],capture_output=True,text=True)
+    c2=subprocess.run(flags+[R+'/tests/rt/handle_lifecycle_unit.cpp']+srcs+['-o',exe+'2'],capture_output=True,text=True)
+    if c.returncode or c2.returncode: res.append((name,'COMPILE-FAIL '+(c.stderr+c2.stderr)[:300])); shutil.rmtree(d); continue
     r=subprocess.run(['timeout','120',exe],capture_output=True,text=True)
-    killed = r.returncode!=0
+    r2=subprocess.run(['timeout','120',exe+'2'],capture_output=True,text=True)
+    killed = r.returncode!=0 or r2.returncode!=0
+    r.stdout = r.stdout + r2.stdout + ('(timeout)' if r2.returncode == 124 or r.returncode == 124 else '')
     res.append((name,'KILLED' if killed else 'SURVIVED', (r.stdout.strip().splitlines() or [''])[-1]))
     shutil.rmtree(d)
 for x in res: print(*x)

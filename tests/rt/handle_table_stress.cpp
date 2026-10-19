@@ -24,22 +24,50 @@ using namespace nift::rt::handles;
 
 namespace {
 
-std::atomic<long> g_alive{0}, g_twice{0}, g_wrong{0}, g_cleaned{0};
+std::atomic<long> g_alive{0}, g_twice{0}, g_wrong{0}, g_cleaned{0}, g_settle_twice{0};
 
 struct Res {
     long serial;
     std::atomic<int> cleaned{0};
+    std::atomic<int> settled{0};   // final outcomes reported for this resource
     explicit Res(long s) : serial(s) { ++g_alive; }
     ~Res() { --g_alive; }
 };
 
+// Asynchronous completion (CP16's reaper): tickets are completed later by
+// another thread; it keeps its own reference to the resource meanwhile.
+struct Reaper {
+    std::mutex mu;
+    std::vector<std::pair<std::shared_ptr<Res>, CompletionTicket>> queue;
+    void push(std::shared_ptr<Res> r, CompletionTicket t) {
+        std::lock_guard<std::mutex> lock(mu);
+        queue.emplace_back(std::move(r), std::move(t));
+    }
+    void drain() {
+        std::vector<std::pair<std::shared_ptr<Res>, CompletionTicket>> work;
+        { std::lock_guard<std::mutex> lock(mu); work.swap(queue); }
+        for (auto& [r, t] : work) {
+            if (r->settled.fetch_add(1) != 0) ++g_settle_twice;
+            t.complete(r->serial % 13 == 0 ? CleanupOutcome::lost("test.lost", "unconfirmed")
+                                           : CleanupOutcome::completed());
+        }
+    }
+};
+Reaper g_reaper;
+
 KindSpec counting_kind() {
     KindSpec spec;
     spec.name = "stress";
-    spec.cleanup = [](const CleanupEvent& e) {
-        Res* r = static_cast<Res*>(e.resource.get());
+    spec.cleanup = [](CleanupEvent& e) {
+        auto r = std::static_pointer_cast<Res>(e.resource);
         if (r->cleaned.fetch_add(1) != 0) ++g_twice;
         ++g_cleaned;
+        if (!e.ticket) return CleanupOutcome::pending();  // a deadline already started termination
+        if (r->serial % 5 == 0) {                         // schedule; complete later on the reaper thread
+            g_reaper.push(r, std::move(*e.ticket));
+            return CleanupOutcome::pending();
+        }
+        if (r->settled.fetch_add(1) != 0) ++g_settle_twice;
         if (r->serial % 17 == 0) return CleanupOutcome::failure("test.fail", "failing hook");
         return CleanupOutcome::success();
     };
@@ -124,7 +152,20 @@ void worker(HandleTable& t, Board& board, std::atomic<long>& serials, std::atomi
                 }
                 break;
             case 7:
-                if (board.pick(rng, e)) t.detach(e.handle, K, e.owner);
+                if (board.pick(rng, e)) {
+                    if (rng() % 2) {
+                        t.detach(e.handle, K, e.owner);
+                    } else {  // a deadline: termination starts while the handle stays open
+                        std::shared_ptr<Res> r;
+                        CompletionTicket ticket;
+                        TerminationStart info;
+                        if (t.resolve_as<Res>(e.handle, K, kAnyAccessor, r) == HandleStatus::Ok &&
+                            t.begin_termination(e.handle, K, TerminationCause::Deadline, ticket, &info) ==
+                                HandleStatus::Ok && info.started) {
+                            g_reaper.push(r, std::move(ticket));
+                        }
+                    }
+                }
                 break;
             default:
                 if (board.pick(rng, e)) t.transfer(e.handle, K, e.owner, board.context(rng));
@@ -160,7 +201,9 @@ void context_manager(HandleTable& t, Board& board, std::atomic<bool>& stop, long
 void random_stress(int seconds_ms, std::uint32_t capacity) {
     long refused_alive = 0, closed_failures = 0;
     {
-        HandleTable t(TableOptions{capacity});
+        TableOptions options;
+        options.capacity = capacity;
+        HandleTable t(options);
         t.register_typed_kind<Res>(HandleKind::File, counting_kind());
         Board board;
         std::atomic<long> serials{0};
@@ -169,13 +212,18 @@ void random_stress(int seconds_ms, std::uint32_t capacity) {
         for (unsigned i = 0; i < 4; ++i)
             threads.emplace_back(worker, std::ref(t), std::ref(board), std::ref(serials), std::ref(stop), 100 + i);
         std::thread manager(context_manager, std::ref(t), std::ref(board), std::ref(stop), std::ref(closed_failures));
+        std::atomic<bool> reaping{true};
+        std::thread reaper([&] { while (reaping) { g_reaper.drain(); std::this_thread::yield(); } g_reaper.drain(); });
         std::this_thread::sleep_for(std::chrono::milliseconds(seconds_ms));
         stop = true;
         for (std::thread& th : threads) th.join();
         manager.join();
         const TableStats before = t.stats();
-        const CloseReport r = t.shutdown();
+        const CloseReport r = t.shutdown();  // waits for the reaper to settle every obligation
+        reaping = false;
+        reaper.join();
         const TableStats after = t.stats();
+        CHECK(after.records == 0 && after.pending_obligations == 0 && after.settled == after.created);
         CHECK(after.live == 0 && after.contexts == 0 && after.detached == 0);
         CHECK(after.cleaned == after.created && after.created > 0);
         std::printf("stress: %llu created, %llu cleaned, %zu slots (cap %u), %zu live before shutdown, "
@@ -185,7 +233,7 @@ void random_stress(int seconds_ms, std::uint32_t capacity) {
         CHECK(before.slots <= capacity);
         refused_alive = g_alive.load();  // board entries hold only Values: no resources
     }
-    CHECK(g_twice == 0 && g_wrong == 0);
+    CHECK(g_twice == 0 && g_wrong == 0 && g_settle_twice == 0);
     CHECK(refused_alive == 0 && g_alive == 0);
 }
 
@@ -193,6 +241,8 @@ void random_stress(int seconds_ms, std::uint32_t capacity) {
 // one of them cleans it up.
 void exactly_once_race(int rounds) {
     Res* seen = nullptr;
+    std::atomic<bool> reaping{true};
+    std::thread reaper([&] { while (reaping) { g_reaper.drain(); std::this_thread::yield(); } });
     for (int i = 0; i < rounds; ++i) {
         HandleTable t;
         t.register_typed_kind<Res>(HandleKind::Process, counting_kind());
@@ -213,7 +263,9 @@ void exactly_once_race(int rounds) {
         CHECK(seen->cleaned.load() == 1);
         res.reset();
     }
-    CHECK(g_twice == 0);
+    reaping = false;
+    reaper.join();
+    CHECK(g_twice == 0 && g_settle_twice == 0);
 }
 
 

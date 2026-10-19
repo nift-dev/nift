@@ -29,10 +29,10 @@ enum class HandleStatus : std::uint8_t {
     KindMismatch,       // a handle of another kind than the operation expects
     Foreign,            // issued by another table (another run or isolate)
     Forged,             // never issued: unknown slot, or a generation not yet issued
-    Stale,              // issued once, released since (the slot may hold a newer resource)
+    Closed,             // issued once, closed or reclaimed since (D-035: valid-but-closed,
+                        // never misread as forged; the slot may hold a newer resource)
     TypeMismatch,       // resolve_as<T> with a T other than the kind's registered type
     NotOwned,           // the caller is not the owner the operation requires
-    InUse,              // explicit release of a counted handle other references still use
     NotCounted,         // retain/drop on a handle created without reference counting
     ContextClosed,      // the context has ended or is ending
     UnknownContext,     // the context id was never issued by this table
@@ -41,16 +41,19 @@ enum class HandleStatus : std::uint8_t {
     NullResource,       // create() with a null resource
     DetachForbidden,    // detach inside a build context (D-030)
     TransferForbidden,  // a transfer that would move a resource out of build ownership
-    LimitExceeded,      // the table's capacity is reached (D-020/D-028: loud)
+    LimitExceeded,      // the table's capacity (NIFT_HANDLE_LIMIT) is reached (D-020/D-028: loud)
+    InvalidSetting,     // NIFT_HANDLE_LIMIT has an invalid value (reported, never replaced)
     CleanupFailed,      // the kind's cleanup hook failed; the slot is reclaimed anyway
 };
 
-// How a failure surfaces: Internal = a VM/compiler/host invariant broke (the
-// compiler admits handle values only where they cannot be forged, so a failed
-// resolution is never a user state; exit 70, "never guessed"); Limit = resource
-// exhaustion (`limit.exceeded`, never an ordinary exception); Error = a fatal
-// program error with a `runtime.*` code.
-enum class HandleErrorClass : std::uint8_t { None, Internal, Limit, Error };
+// How a failure surfaces (D-035): Recoverable = a catchable program error
+// (`runtime.handle_closed`: the handle was valid and has been closed or
+// reclaimed); Internal = a VM/compiler/host invariant broke (forged, foreign or
+// wrong-kind handles: the compiler admits handle values only where they cannot
+// be forged; exit 70, "never guessed"); Limit = resource exhaustion
+// (`limit.exceeded`, never an ordinary exception); Error = a fatal program
+// error with a `runtime.*` code.
+enum class HandleErrorClass : std::uint8_t { None, Recoverable, Internal, Limit, Error };
 
 const char* handle_status_code(HandleStatus status);   // e.g. "internal.handle_stale"
 const char* handle_status_text(HandleStatus status);   // e.g. "stale handle (released)"
@@ -63,10 +66,10 @@ public:
     // Stores `resource` and returns its handle. A null resource is rejected:
     // the result is Null and no slot is used.
     Value add(std::shared_ptr<void> resource);
-    // Returns the resource, or null for a stale, foreign or released handle.
+    // Returns the resource, or null for a closed, foreign or forged handle.
     std::shared_ptr<void> resolve(const Value& handle) const;
     // Classifies `handle` the way resolve() treats it, with a specific reason
-    // (NotAHandle, KindMismatch, Forged, Stale or Ok).
+    // (NotAHandle, KindMismatch, Forged, Closed or Ok).
     HandleStatus check(const Value& handle) const;
     // Releases the slot; later resolves of the same handle fail.
     bool release(const Value& handle);
