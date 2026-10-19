@@ -62,8 +62,12 @@ def find_f(base):
 def extract(src, dst, recursive):
     dirs = sorted({d for d, _, ns in os.walk(src) for n in ns if n.endswith('.sh')}) if recursive else [src]
     for i, d in enumerate(dirs):
-        subprocess.run([sys.executable, os.path.join(ROOT, 'tools/rt-diff/extract_smoke.py'), '--tests', d,
-                        '--out', os.path.join(dst, str(i))], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        done = subprocess.run([sys.executable, os.path.join(ROOT, 'tools/rt-diff/extract_smoke.py'), '--tests', d,
+                               '--out', os.path.join(dst, str(i))], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.PIPE)
+        if done.returncode != 0:
+            raise SystemExit(f'gate: extracting the smoke scripts of {d} failed: '
+                             f'{done.stderr.decode(errors="replace")[-300:]}')
     return find_f(dst)
 
 
@@ -125,8 +129,10 @@ def validate(nift, path, mode, work, tool):
     if os.path.exists(stats):
         os.remove(stats)
     env.update(NIFT_VM='classify', NIFT_VM_STATS=stats)
-    subprocess.run([nift, name], cwd=cwd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                   timeout=20, stdin=subprocess.DEVNULL)
+    classified = subprocess.run([nift, name], cwd=cwd, env=env, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=20, stdin=subprocess.DEVNULL)
+    if classified.returncode != 0:  # classify exits 0 whenever it classifies
+        return 'reject', '', f'classify exit {classified.returncode}', 0
     try:
         rec = json.loads(open(stats).read().splitlines()[-1])
     except (OSError, ValueError, IndexError):

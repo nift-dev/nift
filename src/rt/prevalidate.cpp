@@ -5,6 +5,7 @@
 #include "rt/parser.h"
 
 #include <map>
+#include <set>
 #include <vector>
 
 // rt-lint: cold-file runs once per unit before execution; never on a hot path
@@ -177,6 +178,13 @@ struct Frame {
     bool call = false;
     bool print = false;
     std::uint32_t element = 0;  // start of the current element
+    // R3 (empty element) applies here: brackets, braces, grouping
+    // parentheses, and the arguments of a call to a function declared in the
+    // unit. Not the arguments of a method call, a built-in or any other name
+    // (legacy reports the callee's own arity error when the call runs:
+    // `.replace("A","x",)`, `.to_upper(,)`, `print(1,)`), nor a function
+    // signature (`fn(f(a,))`: the translator's "invalid callable signature").
+    bool r3 = true;
 };
 
 std::uint32_t operand_anchor(const std::vector<Frame>& stack, std::uint32_t value_start, bool empty_element) {
@@ -188,7 +196,7 @@ std::uint32_t operand_anchor(const std::vector<Frame>& stack, std::uint32_t valu
 }
 
 void check_region(std::string_view src, std::uint32_t begin, std::uint32_t end, const Skips& skips,
-                  Finding& out) {
+                  const std::set<std::string_view>& functions, Finding& out) {
     if (check_balance(src, begin, end, skips, out)) return;
     Lexer lex(src, begin, end);
     std::vector<Frame> stack;
@@ -223,7 +231,7 @@ void check_region(std::string_view src, std::uint32_t begin, std::uint32_t end, 
                      "R5-missing-left-operand");
             return;
         }
-        if (t.kind == Tok::Comma && !stack.empty() && (prev == Tok::Comma || is_open(prev))) {
+        if (t.kind == Tok::Comma && !stack.empty() && stack.back().r3 && (prev == Tok::Comma || is_open(prev))) {
             if (stack.back().kind == Tok::LParen && !stack.back().call && is_open(prev))
                 out.take(t.begin, malformed(src, t.begin, end), "R3-empty-element");  // `(,1)`
             else
@@ -231,7 +239,7 @@ void check_region(std::string_view src, std::uint32_t begin, std::uint32_t end, 
             return;
         }
         if (is_close(t.kind)) {
-            if (prev == Tok::Comma) {
+            if (prev == Tok::Comma && stack.back().r3) {
                 const bool object = stack.back().kind == Tok::LBrace;
                 out.take(operand_anchor(stack, value_start, true),
                          object ? "object literal: trailing comma" : "expression cannot be empty", "R3-empty-element");
@@ -243,6 +251,7 @@ void check_region(std::string_view src, std::uint32_t begin, std::uint32_t end, 
             f.call = !operand_expected && t.kind != Tok::LBrace;
             const std::string_view callee = src.substr(operand_start, t.begin - operand_start);
             f.print = f.call && callee == "print";  // rt-lint: allow-string-compare cold path, once per call
+            if (f.call && t.kind == Tok::LParen) f.r3 = functions.count(callee) != 0;
             if (operand_expected) operand_start = t.begin;
             stack.push_back(f);
             element_pending = true;
@@ -274,6 +283,12 @@ Prevalidation prevalidate(std::string_view source) {
         result.rule = "translator";
         return result;
     }
+    // Functions declared in the unit (R3 in call arguments, Frame::r3).
+    std::set<std::string_view> functions;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const Node& node = ast.at(id);
+        if (node.kind == NodeKind::FnDecl && node.a != kNoNode) functions.insert(ast.text(ast.at(node.a)));
+    }
     Finding finding;
     for (const auto& deferred : ast.deferred_errors())
         finding.take(deferred.offset, deferred.message, "deferred-translator", kTranslation);
@@ -289,7 +304,7 @@ Prevalidation prevalidate(std::string_view source) {
     for (NodeId id = 0; id < ast.size(); ++id) {
         const Node& node = ast.at(id);
         if (node.kind == NodeKind::Opaque && node.reason == OpaqueReason::LegacyRuntimeError)
-            check_region(source, node.begin, node.end, skips, finding);
+            check_region(source, node.begin, node.end, skips, functions, finding);
     }
     if (finding.found) {
         result.ok = false;

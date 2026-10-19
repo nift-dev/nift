@@ -102,3 +102,20 @@ accept	-	ok	fn	return {\n"a": 1,\n"b": [2,\n3]\n}
 accept	-	ok	fn	return (1 +\n2)
 accept	-	ok	fn	return\nprint("x")
 reject	R2-unclosed	fails	fn	return [1,
+# Integration (CP13 phase A certify finding): commas in the arguments of a
+# call whose callee is not a function declared in the unit (a method, a
+# built-in, any other name) and in function signatures are not R3: legacy
+# reports the callee's arity error when the call runs, or the translator's
+# "invalid callable signature" (tests/v44_cp2_variadic_functions_smoke.sh,
+# tests/v410_large_string_parity.py). User-function calls stay R3 (D-022 #3).
+accept	-	runtime-error	top	y := "AB".to_upper().replace("A","x",)
+accept	-	runtime-error	top	y := "AB".to_upper(,).replace("A","x")
+accept	-	runtime-error	top	print(1,)
+accept	-	runtime-error	top	@fn(g(value,)){ return null }
+accept	-	runtime-error	top	@fn(g(,value)){ return null }
+accept	-	runtime-error	top	fn(g(a,)) { return a }
+accept	-	ok	dead	y := "AB".replace("A","x",)
+accept	-	ok	uncalled	y := "AB".to_upper(,)
+reject	R3-empty-element	fails	fn	x := f(1,)
+reject	R3-empty-element	fails	top	x := f(,1)
+reject	R3-empty-element	ok	dead	x := {"a": 1,}

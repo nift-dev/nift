@@ -58,6 +58,11 @@ for source in "$EMBED"/src/Parser*.cpp; do
   PARSER_SOURCES="$PARSER_SOURCES src/${source##*/}"
 done
 [ -n "$PARSER_SOURCES" ] || { echo "error: no src/Parser*.cpp sources found" >&2; exit 1; }
+# The CP10 parser and CP13 prevalidator that src/ParserScript.cpp calls
+# (shared list, src/rt/parser-sources.txt).
+[ -f "$EMBED/src/rt/parser-sources.txt" ] || { echo "error: src/rt/parser-sources.txt missing" >&2; exit 1; }
+RT_PARSER_SOURCES="$(grep -v '^#' "$EMBED/src/rt/parser-sources.txt" | tr '\n' ' ')"
+PARSER_SOURCES="$PARSER_SOURCES $RT_PARSER_SOURCES"
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \

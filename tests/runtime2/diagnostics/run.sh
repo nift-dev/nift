@@ -51,6 +51,7 @@
 # changes case is thus checked against exactly one expectation (guards, which
 # have no .new files, against both).
 set -u
+set -o pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 BOTH_ENGINES="D-022#3 D-025"

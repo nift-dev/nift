@@ -483,6 +483,16 @@ record (T2), `throw`/`error()` (T3) and try/catch (T4) on the VM, JSON
 diagnostics mode (T9), and `eval` prevalidation. Where phase B touches files
 the integration owner holds, it follows CP15 and the records20k work.
 
+**Deliberate decision (certify finding, approved):** R3 (empty element) in
+call arguments applies only when the callee is a bare name of a function
+declared in the unit (`f(1,)`, D-022 #3 `changes/syn_trailing_comma_call`).
+Commas in the arguments of method calls, built-ins and other names, and in
+function signatures, are left to legacy, which reports the callee's own
+arity error when the call runs (`.replace("A","x",)`, `print(1,)`) or the
+translator's "invalid callable signature" (`@fn(f(value,))`). This preserves
+legacy's diagnostics and is not a gap (rules rows under "Integration (CP13
+phase A certify finding)" in `tests/runtime2/prevalidate/rules.tsv`).
+
 (History: first integrated speculatively on CP12's tip `6c144bb`, then
 rebased onto `bd1c8a9` and `4b2fc909`; the section below keeps its original
 wording.)

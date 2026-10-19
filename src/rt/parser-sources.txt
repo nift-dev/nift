@@ -1,0 +1,18 @@
+# The CP10 parser and the CP13 syntax prevalidator: self-contained (no other
+# src/rt file, no RuntimeValue). One path per line, relative to the repository
+# root. Legacy's script translator (src/ParserScript.cpp, import hook) and the
+# CLI call rt::prevalidate / rt::locate, so every build that compiles
+# src/Parser*.cpp without the whole src/rt must compile these too: the
+# Makefile (RT_PARSER_SOURCES), bindings/python/build.sh and setup.py,
+# bindings/node/build.sh. (Go and C# load libnift_c, built from all objects.)
+src/rt/lexer.cpp
+src/rt/ast.cpp
+src/rt/source_scan.cpp
+src/rt/parser.cpp
+src/rt/statement_parser.cpp
+src/rt/declarations.cpp
+src/rt/control_flow.cpp
+src/rt/expr_parser.cpp
+src/rt/expr_postfix.cpp
+src/rt/expr_literals.cpp
+src/rt/prevalidate.cpp

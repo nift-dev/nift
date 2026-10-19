@@ -61,7 +61,9 @@ def run_case(nift, path, flag, work):
     env = dict(PATH=os.environ['PATH'], HOME=work, TMPDIR=work, LANG='C', LC_ALL='C', TZ='UTC', NIFT_FORMAT='json')
     if os.path.isdir(path):  # site
         os.makedirs(case)
-        subprocess.run([nift, 'init'], cwd=case, env=dict(env, NIFT_FORMAT='text'), capture_output=True)
+        init = subprocess.run([nift, 'init'], cwd=case, env=dict(env, NIFT_FORMAT='text'), capture_output=True)
+        if init.returncode != 0:
+            raise SystemExit(f'json_check: nift init failed for {path}: {init.stderr.decode(errors="replace")[-300:]}')
         shutil.copytree(path, case, dirs_exist_ok=True)
         argv = [nift, 'build', '--all']
     else:

@@ -8,7 +8,6 @@ tests/rt/legacy-cases/c1_if_html_comment.f	R2-stray-closer	`<!-- } -->` is not s
 tests/rt/legacy-cases/c1_neg_depth.f	R2-stray-closer	`x := )`: closer without opener
 tests/rt/legacy-cases/c1_unbalanced_close.f	R2-stray-closer	a lone `}` statement
 tests/rt/legacy-cases/c1_unbalanced_open.f	R2-unclosed	a lone `{` never closed
-tests/rt/legacy-cases/c2_fp1.f	R3-empty-element	`fn(f(a,))`: trailing comma leaves an empty parameter
 tests/rt/legacy-cases/c2_pt2.f	R3-empty-element	`[a,] := xs`: empty pattern element
 tests/rt/legacy-cases/c2_pt5.f	R3-empty-element	`[a, b, ] := xs`: empty pattern element
 tests/rt/legacy-cases/c2_trailing_comma.f	R3-empty-element	`[1,2,]`: empty array element

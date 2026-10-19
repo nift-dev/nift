@@ -55,6 +55,12 @@ PARSER_SOURCES = sorted(glob.glob(os.path.join(NATIVE, "src", "Parser*.cpp")))
 if os.path.join(NATIVE, "src", "Parser.cpp") not in PARSER_SOURCES:
     raise SystemExit("staged native sources are missing Parser.cpp")
 
+# The CP10 parser and CP13 prevalidator that src/ParserScript.cpp calls
+# (shared list, src/rt/parser-sources.txt).
+with open(os.path.join(NATIVE, "src", "rt", "parser-sources.txt"), encoding="utf-8") as _list:
+    RT_PARSER_SOURCES = [os.path.join(NATIVE, line.strip()) for line in _list
+                         if line.strip() and not line.startswith("#")]
+PARSER_SOURCES += RT_PARSER_SOURCES
 sources = [os.path.join(BASE, s) for s in CABI_SOURCES] + PARSER_SOURCES
 sources.append(os.path.join(BASE, "src", "nift_module.cc"))
 

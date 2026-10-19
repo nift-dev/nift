@@ -2109,9 +2109,8 @@ test: test-source-translation
 
 # Runtime 2.0 CP10: script lexer/parser (src/rt). Not linked into nift yet;
 # compiled only into these test binaries.
-RT_PARSER_SOURCES := src/rt/lexer.cpp src/rt/ast.cpp src/rt/source_scan.cpp src/rt/parser.cpp src/rt/statement_parser.cpp \
-	src/rt/declarations.cpp src/rt/control_flow.cpp src/rt/expr_parser.cpp src/rt/expr_postfix.cpp src/rt/expr_literals.cpp \
-	src/rt/prevalidate.cpp
+# One shared list (also read by the Python and Node binding builds).
+RT_PARSER_SOURCES := $(filter-out \#%,$(shell grep -v '^\#' src/rt/parser-sources.txt))
 RT_PARSER_HEADERS := src/rt/lexer.h src/rt/ast.h src/rt/source_scan.h src/rt/parser.h src/rt/parser_internal.h \
 	src/rt/statement_parser.h src/rt/declarations.h src/rt/control_flow.h src/rt/expr_parser.h src/rt/expr_postfix.h \
 	src/rt/expr_literals.h src/rt/prevalidate.h tests/rt/rt_parser_tool.h
