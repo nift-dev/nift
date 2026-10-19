@@ -851,3 +851,41 @@ Verification: independently specified tests for repeated, diamond, circular,
 nested and stateful imports, page-render isolation and rebuilds, in both
 engines; corpus and real-package gates preserved. No further module-design round
 unless implementation evidence raises a genuinely open question.
+
+## D-042 — Shell file commands and exactly-once command dispatch (owner, 2026-10-20; CP19)
+
+Evidence: `checkpoints/shell-fs-commands-review.md` (branch `shell-fs-review`,
+ed355b82). The shell turns `cp a b` into `cp("a","b")` and, if that call fails
+for any reason, re-runs the line as the external command: `rm -i a` deletes
+without prompting, `rm nope` reports success, `rm a d1` executes twice,
+`rm [ab].txt` silently does nothing; the same fallback applies to `mkdir`,
+`touch` and user functions. Native `cat` reads whole files into memory.
+
+1. **Shell invocations of `ls`, `cp`, `mv`, `rm`, `cat` resolve to external
+   executables through `PATH`.** No `lst`/`cpy`/`mve`/`rmv`/`catf` names.
+2. **Exactly-once dispatch (central CP19 acceptance requirement):** a command is
+   classified before execution, never after observing whether an attempt
+   succeeded. A failed native call is never retried as an external command; the
+   failure status is preserved and no hidden duplicate side effects occur. This
+   applies to every command, including `mkdir`, `touch` and user functions.
+3. **Deterministic precedence**, documented and tested: explicit Nift
+   function-call syntax, shell functions/aliases, `PATH` executables, explicit
+   executable paths, an explicit external-command escape (`command`) where
+   supported. Shell-state built-ins such as `cd` stay.
+4. **Compatibility:** website shell documentation updated with migration notes;
+   common GNU/uutils commands and flags tested; `.f` scripts keep their
+   native-function interfaces; on Windows a useful command-not-found diagnostic,
+   never a silent native substitute.
+5. **Tests:** permanent regressions for all five (`rm -i` never silently
+   deletes; missing files fail as the external command does; partial failures
+   never execute twice; globbing applied exactly once; pipelines and
+   stdin/stdout/stderr consistent), plus a general exactly-once side-effect test
+   covering failed native calls and user functions.
+6. **Scheduling:** approved CP19 work; does not interrupt CP15, host-deps or CP12B.
+   The preliminary benchmark stands as evidence.
+
+**Pending (owner refinement, same day):** whether the native scripting functions
+move into an explicit `native.*` namespace (`native.cp(...)`, multi-source forms
+preserved) with the old global names deprecated under language cleanup, instead
+of staying as `cp()` etc. A bounded feasibility and migration investigation is
+running; no public API change until decided.
