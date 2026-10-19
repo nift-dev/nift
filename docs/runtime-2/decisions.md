@@ -955,3 +955,29 @@ Also decided (owner, same day):
    multi-source forms are preserved.
 4. **Process ownership:** agents terminate only processes they own, by verified
    PID/process group, never by command-name matching.
+
+## D-045 — Syntax compatibility is a strict requirement (owner, 2026-10-20)
+
+Runtime 2.0 preserves Nift's established syntax as implemented by legacy Nift
+and documented at https://nift.dev. It is a faster, more consistent
+implementation of Nift, not a new language that resembles it.
+
+- No Python-, JavaScript-, C- or other-language-inspired syntax because it is
+  easier to compile. Before implementing or extending any syntax, check (1) the
+  documentation at nift.dev, (2) current legacy behaviour, (3) the Runtime 2.0
+  parser/compiler behaviour.
+- Functions: templates `@fn(name(args)) { … }`; standalone `.f` scripts
+  `fn(name(args)) { … }`; bodies use Nift statement syntax with single braces;
+  semicolons are optional (nift.dev/docs/functions-fragments.html).
+- Applies to CP12B, CP12C, L7, closures, modules, structs, loops, native calls
+  (`native::`) and every later checkpoint, and is referenced in every DeepSeek
+  handover.
+- Verification: executable syntax fixtures derived from the published
+  documentation (documentation examples become regression fixtures wherever
+  practical), run against legacy and the VM; unsupported syntax is refused before
+  execution, never silently reinterpreted; intentional owner-approved changes are
+  distinguished from compatibility regressions; where legacy and the
+  documentation disagree the discrepancy is recorded and decided before any
+  change. Syntax compatibility is part of the relevant certification gates.
+- Active implementations are checked for syntax discrepancies during their
+  normal review; no separate large audit and no interruption of running jobs.
