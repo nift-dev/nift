@@ -981,3 +981,39 @@ implementation of Nift, not a new language that resembles it.
   change. Syntax compatibility is part of the relevant certification gates.
 - Active implementations are checked for syntax discrepancies during their
   normal review; no separate large audit and no interruption of running jobs.
+
+## D-046 — D-045 reconciliation decisions (owner, 2026-10-20)
+
+From CP12B's three-way check (nift.dev, legacy, approved semantics;
+`cp12b-modules.md`/`cp12b-structs.md` @390847ea) and stage 4's oracle:
+
+1. **Declaration typing (stage 4).** Established textual declaration typing is
+   the rule on every path: a double-declared binding never becomes an int because
+   its value is integral; copying a parameter into a declaration preserves its
+   declared type. Legacy's loop-path value typing is recorded as an inconsistency
+   (register), not a feature. The VM keeps refusing where the type cannot be
+   established. Oracle, cross-type tests and the nine planted defects stay.
+2. **M1 — exports: D-041 #4 is reversed.** `export(name)` exports the binding
+   (shared access to the module's storage location), as nift.dev documents and
+   legacy does; the copy rule rested on an incorrect description of legacy.
+   Values assigned into the location follow D-040 value semantics. Repeated
+   imports within a context preserve the same exported binding locations.
+   Initialise-once per context and failure caching (D-041) are unchanged.
+3. **S1 — structs: D-040 value semantics retained** as a deliberate
+   compatibility change from the documented reference semantics. Before L7
+   integrates: inventory the documented examples and fixtures that rely on
+   implicit struct sharing, provide migration guidance, and confirm important
+   shared-state patterns (e.g. recursive fragment state, shared traversal state)
+   stay expressible with approved mechanisms; any capability that would be lost
+   comes back to the owner. `copy()` stays valid if practical, documented. Prepare
+   nift.dev changes; publish with the release.
+4. **M2 — module function scoping: D-038 lexical retained.** Free names resolve
+   through the definition environment; imported functions keep access to their
+   module's private lexical bindings. Deliberate compatibility change;
+   documentation updates prepared.
+5. **M3 — trailing `//` comments** are a legacy parser defect: accepted in both
+   engines, with nift.dev-derived fixtures after declarations, assignments,
+   calls, returns and closing delimiters; validation stays before execution.
+6. **Process:** every proposed language-semantics change carries a minimal
+   executable legacy reproducer and the relevant documentation excerpt (two
+   decisions so far rested on inaccurate descriptions of legacy).
