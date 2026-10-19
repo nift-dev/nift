@@ -1,0 +1,165 @@
+# CP15 integration gate run: tested commit e9a55ff4 (tree 01ede2df9313ced8c09ad9a2d19a00ad710c7c67) on 53bc509a.
+# heavy.sh --priority, D-031 limits (lim.sh). Lines selected from the full log; $S = scratch directory.
+HEAD e9a55ff4 dirty=0
+### 07:27 $S/lim.sh 7200 asan nice make -j1 nift .build/rt-parse-dump
+### exit 0
+### 07:27 $S/lim.sh 1800 6291456 python3 tests/runtime2/vm_builtins.py --nift $S/cp15wt/nift
+PASS vm built-ins: 67 supported programs (12 bodies x 5 contexts, on the VM, identical to legacy), 26 error programs, 31 refusals, 2 budget stops; 0 failure(s)
+### exit 0
+### 07:27 $S/lim.sh 600 4194304 sh -c env NIFT_LIM=$S/lim.sh TMPDIR=$S/negzero python3 docs/runtime-2/evidence/cp15/integration/negzero_probe.py $S/nift-cp13 4b2fc909-vm | tee docs/runtime-2/evidence/cp15/integration/negzero-4b2fc909.txt
+### exit 0
+### 07:27 $S/lim.sh 600 4194304 sh -c env NIFT_LIM=$S/lim.sh TMPDIR=$S/negzero python3 docs/runtime-2/evidence/cp15/integration/negzero_probe.py $S/cp15wt/nift cp15 | tee docs/runtime-2/evidence/cp15/integration/negzero-cp15.txt
+### exit 0
+### 07:27 $S/lim.sh 5400 8388608 nice make -j1 test-rt-vm
+rt vm unit: 40312 checks, 0 failures
+PASS rt-lint: 0 problem(s)
+rt-diff VM outcomes over 786 distinct scripts: {'fallback:fn-after-statement': 214, 'vm': 84, 'fallback:fn-flags': 56, 'fallback:statement:Import': 55, 'fallback:statement:StructDecl': 26, 'fallback:callable:inject': 24, 'vm-error': 20, 'fallback:aliasing': 19, 'fallback:method:sort_by': 19, 'fallback:statement:Try': 17, 'fallback:callable:map': 16, 'fallback:expression:Lambda': 14, 'fallback:postfix-receiver': 14, 'fallback:callable:thread': 12, 'fallback:opaque:legacy-runtime-error': 11, 'fallback:statement:Export': 10, 'fallback:method:map': 9, 'fallback:fn-name-reserved': 8, 'fallback:prepared-decl-type': 8, 'fallback:statement:For': 7, 'fallback:callable:set': 6, 'fallback:opaque:template-text': 6, 'fallback:declare-const': 5, 'fallback:static-error:redeclared': 5, 'fallback:type:print': 5, 'fallback:unresolved-name': 5, 'fallback:number-literal': 5, 'fallback:callable:getenv': 5, 'fallback:callable:mutex': 5, 'fallback:static-error:arity': 4, 'fallback:string-literal': 4, 'fallback:callable:file': 4, 'fallback:callable:run': 4, 'fallback:assign-free-name': 3, 'fallback:callable:timer': 3, 'fallback:expression-statement': 3, 'fallback:free-name': 3, 'fallback:index-target': 3, 'fallback:interpolation': 3, 'fallback:binding-name-reserved': 3, 'fallback:callable:ls': 3, 'fallback:statement:Command': 3, 'fallback:callable:ffi_open': 3, 'fallback:method:sort': 2, 'fallback:statement:Throw': 2, 'fallback:callable:nope': 2, 'fallback:shebang-statement': 2, 'fallback:static-error:member-assign': 2, 'fallback:string-arg-type': 2, 'fallback:context:assignment-error': 2, 'fallback:callable:cat': 2, 'fallback:builtin-bytes:bytes': 2, 'fallback:callable:open': 2, 'fallback:callable:minify': 2, 'fallback:method:nope': 1, 'fallback:callable:err': 1, 'fallback:callable:exit': 1, 'fallback:callable:error': 1, 'fallback:type:+': 1, 'fallback:type:increment': 1, 'fallback:context:assignment-type': 1, 'fallback:type:unary': 1, 'fallback:type:<': 1, 'fallback:type:script-return': 1, 'fallback:type:compound-assignment': 1, 'fallback:prepared-fn-unprepared': 1, 'fallback:jump-not-last': 1, 'fallback:type:length': 1, 'fallback:alias-argument': 1, 'fallback:path-in-call-argument': 1, 'fallback:call-binding': 1, 'fallback:param-name-reserved': 1, 'fallback:callable:warn': 1, 'fallback:callable:read': 1, 'fallback:callable:project_root': 1, 'fallback:jump-outside-loop': 1, 'fallback:declare-pattern': 1, 'fallback:opaque:irregular-legacy-parse': 1, 'fallback:fn-param': 1, 'fallback:opaque:struct-body': 1, 'fallback:callable:ffi_callback': 1, 'fallback:callable:platform': 1}
+PASS vm parity
+PASS vm adversarial: 37470 programs, 0 non-approved differences, 170 approved {'D-001#4 recursion': 69, 'D-018c diagnostics': 101}, 0 endless, 24402 static fallbacks
+PASS vm subset suites: 49 supported programs (NIFT_VM=require, identical to legacy), 65 unsupported programs (refused before execution); 0 failure(s)
+supported-subset generator: 500 programs (seed 1); entirely on the VM 500 (100.0 %, required 100 %); outcomes {'vm': 500}; 0 failure(s)
+supported-subset generator: built-in calls 9474 (30 distinct); narrowed shapes: double-via-binding-assign 6
+former replay cases: 50 programs (seed 1); outcomes {'vm-error': 28, 'fallback:type:<': 6, 'fallback:type:unary': 6, 'vm': 5, 'fallback:aliasing': 5}; replayed 0; 0 failure(s)
+unsupported generator: 512 programs (seed 1; 500 as in CP14, 12 with constructs added since), 39 constructs; refused before execution with the expected reason: 512; 0 failure(s)
+PASS vm generated subset suites: 0 failure(s)
+PASS vm built-ins: 67 supported programs (12 bodies x 5 contexts, on the VM, identical to legacy), 26 error programs, 31 refusals, 2 budget stops; 0 failure(s)
+PASS vm known-refused: 4 programs still refused with their reason; 0 failure(s)
+PASS vm engine selection: 12 cases, 0 failure(s)
+PASS vm former replay: 0 failure(s)
+PASS vm D-018: 12 live cases (old vs new), 23 policy boundary cases, 0 failure(s)
+PASS vm context consistency: 0 failure(s)
+PASS vm policy negatives: 52 synthetic bugs rejected, 5 genuine shapes approved, 0 failure(s)
+PASS vm review reproducers: 87 programs, 0 failure(s)
+PASS vm golden: 108 pinned programs (expected results computed independently of the VM), 0 failure(s)
+PASS vm int bounds: 2682 programs (Python exact ints), 0 failure(s)
+### exit 0
+### 07:34 $S/lim.sh 5400 8388608 env RT_VM_SEED=2 nice make -j1 test-rt-vm
+rt vm unit: 40312 checks, 0 failures
+PASS rt-lint: 0 problem(s)
+rt-diff VM outcomes over 786 distinct scripts: {'fallback:fn-after-statement': 211, 'vm': 84, 'fallback:fn-flags': 54, 'fallback:statement:Import': 51, 'fallback:statement:StructDecl': 27, 'fallback:callable:inject': 24, 'vm-error': 20, 'fallback:statement:Try': 19, 'fallback:aliasing': 19, 'fallback:method:sort_by': 19, 'fallback:callable:map': 16, 'fallback:expression:Lambda': 14, 'fallback:postfix-receiver': 12, 'fallback:opaque:legacy-runtime-error': 11, 'fallback:callable:thread': 11, 'fallback:statement:Export': 10, 'fallback:statement:For': 9, 'fallback:method:map': 9, 'fallback:fn-name-reserved': 8, 'fallback:prepared-decl-type': 8, 'fallback:callable:getenv': 8, 'fallback:callable:file': 6, 'fallback:callable:set': 6, 'fallback:opaque:template-text': 6, 'fallback:declare-const': 5, 'fallback:static-error:redeclared': 5, 'fallback:type:print': 5, 'fallback:unresolved-name': 5, 'fallback:number-literal': 5, 'fallback:callable:mutex': 5, 'fallback:static-error:arity': 4, 'fallback:interpolation': 4, 'fallback:binding-name-reserved': 4, 'fallback:callable:run': 4, 'fallback:assign-free-name': 3, 'fallback:callable:timer': 3, 'fallback:expression-statement': 3, 'fallback:string-literal': 3, 'fallback:free-name': 3, 'fallback:index-target': 3, 'fallback:call-binding': 3, 'fallback:callable:ls': 3, 'fallback:statement:Command': 3, 'fallback:callable:ffi_open': 3, 'fallback:statement:Throw': 2, 'fallback:callable:nope': 2, 'fallback:shebang-statement': 2, 'fallback:static-error:member-assign': 2, 'fallback:string-arg-type': 2, 'fallback:context:assignment-error': 2, 'fallback:callable:cat': 2, 'fallback:builtin-bytes:bytes': 2, 'fallback:callable:open': 2, 'fallback:callable:minify': 2, 'fallback:method:nope': 1, 'fallback:callable:err': 1, 'fallback:callable:exit': 1, 'fallback:method:sort': 1, 'fallback:callable:error': 1, 'fallback:type:+': 1, 'fallback:type:increment': 1, 'fallback:context:assignment-type': 1, 'fallback:type:unary': 1, 'fallback:type:<': 1, 'fallback:type:script-return': 1, 'fallback:type:compound-assignment': 1, 'fallback:prepared-fn-unprepared': 1, 'fallback:jump-not-last': 1, 'fallback:type:length': 1, 'fallback:alias-argument': 1, 'fallback:path-in-call-argument': 1, 'fallback:param-name-reserved': 1, 'fallback:callable:warn': 1, 'fallback:callable:read': 1, 'fallback:callable:project_root': 1, 'fallback:jump-outside-loop': 1, 'fallback:declare-pattern': 1, 'fallback:opaque:irregular-legacy-parse': 1, 'fallback:fn-param': 1, 'fallback:opaque:struct-body': 1, 'fallback:callable:ffi_callback': 1, 'fallback:callable:platform': 1}
+PASS vm parity
+PASS vm adversarial: 37470 programs, 0 non-approved differences, 167 approved {'D-001#4 recursion': 66, 'D-018c diagnostics': 101}, 0 endless, 24433 static fallbacks
+PASS vm subset suites: 49 supported programs (NIFT_VM=require, identical to legacy), 65 unsupported programs (refused before execution); 0 failure(s)
+supported-subset generator: 500 programs (seed 2); entirely on the VM 500 (100.0 %, required 100 %); outcomes {'vm': 500}; 0 failure(s)
+supported-subset generator: built-in calls 9468 (30 distinct); narrowed shapes: double-via-binding-assign 3
+former replay cases: 50 programs (seed 2); outcomes {'vm-error': 28, 'fallback:type:<': 6, 'fallback:type:unary': 6, 'vm': 5, 'fallback:aliasing': 5}; replayed 0; 0 failure(s)
+unsupported generator: 512 programs (seed 2; 500 as in CP14, 12 with constructs added since), 39 constructs; refused before execution with the expected reason: 512; 0 failure(s)
+PASS vm generated subset suites: 0 failure(s)
+PASS vm built-ins: 67 supported programs (12 bodies x 5 contexts, on the VM, identical to legacy), 26 error programs, 31 refusals, 2 budget stops; 0 failure(s)
+PASS vm known-refused: 4 programs still refused with their reason; 0 failure(s)
+PASS vm engine selection: 12 cases, 0 failure(s)
+PASS vm former replay: 0 failure(s)
+PASS vm D-018: 12 live cases (old vs new), 23 policy boundary cases, 0 failure(s)
+PASS vm context consistency: 0 failure(s)
+PASS vm policy negatives: 52 synthetic bugs rejected, 5 genuine shapes approved, 0 failure(s)
+PASS vm review reproducers: 87 programs, 0 failure(s)
+PASS vm golden: 108 pinned programs (expected results computed independently of the VM), 0 failure(s)
+PASS vm int bounds: 2682 programs (Python exact ints), 0 failure(s)
+### exit 0
+### 07:43 $S/lim.sh 5400 8388608 nice make -j1 test-rt-vm-mutants
+PASS vm mutation gate: unmutated passes, 8 mutants, 8 rejected, 0 failure(s)
+### exit 0
+### 08:05 $S/lim.sh 3600 8388608 nice make -j1 test-rt-builtins
+PASS natives link without RuntimeValue/legacy_bridge/render and do not include them
+builtins-diff: 4980 checks, 0 failures
+PASS rt-lint: 0 problem(s)
+context_probe: PASS (inventory pinned)
+### exit 0
+### 08:05 $S/lim.sh 3600 8388608 nice make -j1 .build/rt/builtins-diff
+### exit 0
+### 08:05 $S/lim.sh 7200 8388608 nice python3 tests/runtime2/builtins/builtins_mutants.py $S/cp15wt/nift
+M1 trim strips every isspace byte            DETECTED  builtins-diff: 2988 checks, 2 failures
+M2 index_of counts code points               DETECTED  builtins-diff: 2988 checks, 2 failures
+M3 glob without the dot-file rule            DETECTED  builtins-diff: 2988 checks, 2 failures
+M4 min/max accept mixed kinds                DETECTED  builtins-diff: 2988 checks, 26 failures
+M5 sum exact for large integers              DETECTED  builtins-diff: 2988 checks, 5 failures
+M6 -0.0 is not a size                        DETECTED  builtins-diff: 2988 checks, 2 failures
+M7 split drops a trailing empty field        DETECTED  builtins-diff: 2988 checks, 10 failures
+M8 merge moves replaced keys to the end      DETECTED  builtins-diff: 2988 checks, 8 failures
+M9 to_int rejects a leading plus             DETECTED  builtins-diff: 2988 checks, 4 failures
+M10 unique keeps duplicates                  DETECTED  builtins-diff: 2988 checks, 6 failures
+M11 JSON escapes in upper-case hex           DETECTED  builtins-diff: 2988 checks, 8 failures
+M12 prettify indents by four                 DETECTED  builtins-diff: 2988 checks, 18 failures
+M13 attr_escape keeps apostrophes            DETECTED  builtins-diff: 2988 checks, 5 failures
+M14 large doubles in fixed notation          DETECTED  builtins-diff: 2988 checks, 7 failures
+M15 is_number accepts numeric strings        DETECTED  builtins-diff: 2988 checks, 5 failures
+M16 abs exact for integers                   DETECTED  builtins-diff: 2988 checks, 3 failures
+M17 bytes accepts 256                        DETECTED  builtins-diff: 2988 checks, 2 failures
+M18 decode accepts any byte sequence         DETECTED  builtins-diff: 2988 checks, 1 failures
+M19 json_parse drops exact spellings         DETECTED  builtins-diff: 2988 checks, 83 failures
+M20 sha256 hashes one byte less              DETECTED  builtins-diff: 2988 checks, 11 failures
+M21 validate accepts rejected instances      DETECTED  builtins-diff: 2988 checks, 18 failures
+M22 round half to even                       DETECTED  builtins-diff: 2988 checks, 4 failures
+M23 validate rejection is fatal, not catchable DETECTED  builtins-diff: 2988 checks, 18 failures
+builtins_mutants: 23/23 detected
+### exit 0
+### 08:10 $S/lim.sh 3600 8388608 nice make -j1 test-rt-builtins-guards
+python3 tests/runtime2/builtins/builtins_guards.py ".build/rt/builtins-bench" \
+builtins_guards: 35 workloads, 0 guard failures
+### exit 0
+### 08:10 $S/lim.sh 3600 8388608 nice python3 benchmarks/runtime2/vm_compare.py --nift $S/cp15wt/nift --baseline /home/claude/review/baseline-src/nift --groups ops,fib --out $S/callgrind-cp15A.jsonl --label CP15-A
+### exit 0
+### 08:12 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_subset_gen.py --nift $S/nift-cp13 --suite supported --seed 1 --count 500 > $S/rates15/cp14-sub-1.log 2>&1
+### exit 1
+### 08:12 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_parity.py --nift $S/nift-cp13 --gen 300 --seed 1 --rt-diff > $S/rates15/cp14-par-1.log 2>&1
+### exit 0
+### 08:13 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_subset_gen.py --nift $S/nift-cp13 --suite supported --seed 2 --count 500 > $S/rates15/cp14-sub-2.log 2>&1
+### exit 1
+### 08:13 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_parity.py --nift $S/nift-cp13 --gen 300 --seed 2 --rt-diff > $S/rates15/cp14-par-2.log 2>&1
+### exit 0
+### 08:18 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_subset_gen.py --nift $S/cp15wt/nift --suite supported --seed 1 --count 500 > $S/rates15/cp15-sub-1.log 2>&1
+### exit 0
+### 08:19 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_parity.py --nift $S/cp15wt/nift --gen 300 --seed 1 --rt-diff > $S/rates15/cp15-par-1.log 2>&1
+### exit 0
+### 08:20 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_subset_gen.py --nift $S/cp15wt/nift --suite supported --seed 2 --count 500 > $S/rates15/cp15-sub-2.log 2>&1
+### exit 0
+### 08:20 $S/lim.sh 3600 8388608 sh -c nice python3 tests/runtime2/vm_parity.py --nift $S/cp15wt/nift --gen 300 --seed 2 --rt-diff > $S/rates15/cp15-par-2.log 2>&1
+### exit 0
+### 08:25 $S/lim.sh 3600 asan nice make -j1 test-rt-builtins-sanitize
+builtins-diff: 1993 checks, 0 failures
+### exit 0
+### 08:27 $S/lim.sh 10800 asan nice make -j1 test-rt-vm-sanitize
+rt vm unit: 40312 checks, 0 failures
+PASS vm parity
+PASS vm adversarial: 3619 programs, 0 non-approved differences, 59 approved {'D-001#4 recursion': 48, 'D-018c diagnostics': 11}, 0 endless, 2267 static fallbacks
+PASS vm subset suites: 49 supported programs (NIFT_VM=require, identical to legacy), 65 unsupported programs (refused before execution); 0 failure(s)
+supported-subset generator: 80 programs (seed 2); entirely on the VM 80 (100.0 %, required 100 %); outcomes {'vm': 80}; 0 failure(s)
+supported-subset generator: built-in calls 1695 (30 distinct); narrowed shapes: double-via-binding-assign 0
+former replay cases: 9 programs (seed 2); outcomes {'vm-error': 5, 'fallback:type:<': 1, 'fallback:type:unary': 1, 'vm': 1, 'fallback:aliasing': 1}; replayed 0; 0 failure(s)
+unsupported generator: 82 programs (seed 2; 80 as in CP14, 2 with constructs added since), 35 constructs; refused before execution with the expected reason: 82; 0 failure(s)
+PASS vm generated subset suites: 0 failure(s)
+PASS vm built-ins: 67 supported programs (12 bodies x 5 contexts, on the VM, identical to legacy), 26 error programs, 31 refusals, 2 budget stops; 0 failure(s)
+PASS vm engine selection: 12 cases, 0 failure(s)
+PASS vm former replay: 0 failure(s)
+PASS vm D-018: 12 live cases (old vs new), 23 policy boundary cases, 0 failure(s)
+PASS vm context consistency: 0 failure(s)
+PASS vm review reproducers: 87 programs, 0 failure(s)
+PASS vm golden: 108 pinned programs (expected results computed independently of the VM), 0 failure(s)
+PASS vm int bounds: 2682 programs (Python exact ints), 0 failure(s)
+### exit 0
+
+# Rates (rates15/*.log): before = CP14 VM (f271af9a binary), after = CP15; same generators.
+## cp14-sub-1
+supported-subset generator: 500 programs (seed 1); entirely on the VM 203 (40.6 %, required 100 %); outcomes {'fallback:number-literal': 294, 'vm': 203, 'fallback:prepared-decl-type': 2, 'fallback:context:negative-zero': 1}; 297 failure(s)
+supported-subset generator: built-in calls 9474 (30 distinct); narrowed shapes: double-via-binding-assign 6
+## cp14-sub-2
+supported-subset generator: 500 programs (seed 2); entirely on the VM 233 (46.6 %, required 100 %); outcomes {'vm': 233, 'fallback:number-literal': 262, 'fallback:prepared-decl-type': 3, 'fallback:context:negative-zero': 2}; 267 failure(s)
+supported-subset generator: built-in calls 9468 (30 distinct); narrowed shapes: double-via-binding-assign 3
+## cp15-sub-1
+supported-subset generator: 500 programs (seed 1); entirely on the VM 500 (100.0 %, required 100 %); outcomes {'vm': 500}; 0 failure(s)
+supported-subset generator: built-in calls 9474 (30 distinct); narrowed shapes: double-via-binding-assign 6
+## cp15-sub-2
+supported-subset generator: 500 programs (seed 2); entirely on the VM 500 (100.0 %, required 100 %); outcomes {'vm': 500}; 0 failure(s)
+supported-subset generator: built-in calls 9468 (30 distinct); narrowed shapes: double-via-binding-assign 3
+## cp14-par-1
+generated: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 192, 'vm': 67, 'fallback:prepared-fn-unprepared': 7, 'fallback:prepared-decl-type': 7, 'vm-error': 5, 'fallback:type:*': 4, 'fallback:type:%': 4, 'fallback:type:<': 4, 'fallback:type:-': 3, 'fallback:static-error:arity': 2, 'fallback:type:unary': 2, 'fallback:context:negative-zero': 1, 'fallback:type:+': 1, 'fallback:type:compound-assignment': 1}
+mutants: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 158, 'no-stats': 50, 'vm': 34, 'fallback:opaque:legacy-runtime-error': 14, 'fallback:prepared-decl-type': 6, 'fallback:prepared-fn-unprepared': 4, 'fallback:type:%': 3, 'vm-error': 3, 'fallback:static-error:redeclared': 3, 'fallback:expression-statement': 2, 'fallback:assign-free-name': 2, 'fallback:type:*': 2, 'fallback:type:<': 2, 'fallback:type:unary': 2, 'fallback:shebang-statement': 2, 'fallback:type:-': 2, 'fallback:unresolved-name': 1, 'fallback:context:negative-zero': 1, 'fallback:object-key': 1, 'fallback:type:+': 1, 'fallback:context:object-length': 1, 'fallback:expression:Await': 1, 'fallback:fn-after-statement': 1, 'fallback:declare-const': 1, 'fallback:type:compound-assignment': 1, 'fallback:static-error:arity': 1, 'fallback:callable:prit': 1}
+## cp14-par-2
+generated: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 187, 'vm': 67, 'fallback:prepared-fn-unprepared': 12, 'fallback:type:-': 9, 'fallback:type:<': 8, 'fallback:prepared-decl-type': 7, 'fallback:type:unary': 3, 'fallback:context:assignment-type': 1, 'fallback:type:*': 1, 'fallback:type:>=': 1, 'fallback:type:+': 1, 'nonterminating': 1, 'fallback:context:string-append-type': 1, 'vm-error': 1}
+mutants: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 150, 'no-stats': 58, 'vm': 35, 'fallback:opaque:legacy-runtime-error': 11, 'fallback:prepared-fn-unprepared': 9, 'fallback:type:-': 6, 'fallback:prepared-decl-type': 6, 'fallback:statement:For': 4, 'fallback:type:<': 4, 'fallback:type:unary': 2, 'fallback:assign-free-name': 2, 'fallback:context:assignment-type': 1, 'fallback:object-key': 1, 'fallback:static-error:redeclared': 1, 'fallback:shebang-statement': 1, 'fallback:type:%': 1, 'fallback:type:>=': 1, 'fallback:type:+': 1, 'fallback:string-literal': 1, 'nonterminating': 1, 'fallback:fn-after-statement': 1, 'fallback:expression-statement': 1, 'fallback:declare-const': 1, 'fallback:unresolved-name': 1}
+## cp15-par-1
+generated: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 192, 'vm': 67, 'fallback:prepared-fn-unprepared': 7, 'fallback:prepared-decl-type': 7, 'vm-error': 5, 'fallback:type:*': 4, 'fallback:type:%': 4, 'fallback:type:<': 4, 'fallback:type:-': 3, 'fallback:static-error:arity': 2, 'fallback:type:unary': 2, 'fallback:context:negative-zero': 1, 'fallback:type:+': 1, 'fallback:type:compound-assignment': 1}
+mutants: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 158, 'no-stats': 50, 'vm': 34, 'fallback:opaque:legacy-runtime-error': 14, 'fallback:prepared-decl-type': 6, 'fallback:prepared-fn-unprepared': 4, 'fallback:type:%': 3, 'vm-error': 3, 'fallback:static-error:redeclared': 3, 'fallback:expression-statement': 2, 'fallback:assign-free-name': 2, 'fallback:type:*': 2, 'fallback:type:<': 2, 'fallback:type:unary': 2, 'fallback:shebang-statement': 2, 'fallback:type:-': 2, 'fallback:unresolved-name': 1, 'fallback:context:negative-zero': 1, 'fallback:object-key': 1, 'fallback:type:+': 1, 'fallback:context:object-length': 1, 'fallback:expression:Await': 1, 'fallback:fn-after-statement': 1, 'fallback:declare-const': 1, 'fallback:type:compound-assignment': 1, 'fallback:static-error:arity': 1, 'fallback:callable:prit': 1}
+## cp15-par-2
+generated: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 187, 'vm': 67, 'fallback:prepared-fn-unprepared': 12, 'fallback:type:-': 9, 'fallback:type:<': 8, 'fallback:prepared-decl-type': 7, 'fallback:type:unary': 3, 'fallback:context:assignment-type': 1, 'fallback:type:*': 1, 'fallback:type:>=': 1, 'fallback:type:+': 1, 'nonterminating': 1, 'fallback:context:string-append-type': 1, 'vm-error': 1}
+mutants: 300 programs; outcomes {'fallback:opaque:irregular-legacy-parse': 150, 'no-stats': 58, 'vm': 35, 'fallback:opaque:legacy-runtime-error': 11, 'fallback:prepared-fn-unprepared': 9, 'fallback:type:-': 6, 'fallback:prepared-decl-type': 6, 'fallback:statement:For': 4, 'fallback:type:<': 4, 'fallback:type:unary': 2, 'fallback:assign-free-name': 2, 'fallback:context:assignment-type': 1, 'fallback:object-key': 1, 'fallback:static-error:redeclared': 1, 'fallback:shebang-statement': 1, 'fallback:type:%': 1, 'fallback:type:>=': 1, 'fallback:type:+': 1, 'fallback:string-literal': 1, 'nonterminating': 1, 'fallback:fn-after-statement': 1, 'fallback:expression-statement': 1, 'fallback:declare-const': 1, 'fallback:unresolved-name': 1}

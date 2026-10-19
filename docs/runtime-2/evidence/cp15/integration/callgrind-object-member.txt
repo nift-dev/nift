@@ -1,0 +1,15 @@
+# object_member variants, callgrind Ir (N=4000, N=8000), NIFT_VM=require; cp14 = f271af9a binary, cp15 = tested e9a55ff4.
+# Program: o := {"alpha": 1, "beta": 2, "gamma": 3, <member>}; loop: s += o.delta. json = "delta": 4, int = "delta": 4 + 0, double = "delta": 4.0 + 0.
+json 4000 cp14 4315950
+json 4000 cp15 5508361
+json 8000 cp14 5847950
+json 8000 cp15 8232361
+int 4000 cp14 4323421
+int 4000 cp15 4373057
+int 8000 cp14 5855421
+int 8000 cp15 5889057
+double 4000 cp14 4325238
+double 4000 cp15 4374882
+double 8000 cp14 5857238
+double 8000 cp15 5890882
+# marginal Ir per iteration: json cp14 383, cp15 681; int cp14 383, cp15 379; double cp14 383, cp15 379.

@@ -1,0 +1,30 @@
+supported seed 1 index 81: outcome vm '' (expected vm); legacy exit 0, stdout 281 bytes; NIFT_VM=require run identical to legacy (stdout, stderr, exit): True
+supported seed 1 index 402: outcome vm '' (expected vm); legacy exit 0, stdout 38 bytes; NIFT_VM=require run identical to legacy (stdout, stderr, exit): True
+supported seed 2 index 6: outcome vm '' (expected vm); legacy exit 0, stdout 49 bytes; NIFT_VM=require run identical to legacy (stdout, stderr, exit): True
+supported seed 2 index 14: outcome vm '' (expected vm); legacy exit 0, stdout 105 bytes; NIFT_VM=require run identical to legacy (stdout, stderr, exit): True
+supported seed 2 index 96: outcome vm '' (expected vm); legacy exit 0, stdout 84 bytes; NIFT_VM=require run identical to legacy (stdout, stderr, exit): True
+unsupported seed 1 index 409: outcome fallback 'prepared-fn-unprepared' (expected fallback 'prepared-fn-unprepared'); legacy exit 0, stdout 89 bytes; NIFT_VM=1 run identical to legacy (stdout, stderr, exit): True
+unsupported seed 1 index 487: outcome fallback 'string-arg-type' (expected fallback 'string-arg-type'); legacy exit 0, stdout 49 bytes; NIFT_VM=1 run identical to legacy (stdout, stderr, exit): True
+
+texttype-digit-root (vm_builtins.py), program:
+  fn(h()) {
+  d3 := {"m": -1e-400, "n": 3}
+  print(d3.stringify())
+  return 0
+  }
+  dj := {"a": 1, "m": -1e-400, "s": "x"}
+  print(dj.stringify())
+  print(dj.m)
+  i := 0
+  while (i < 1) { i += 1
+  d2 := {"m": -1e-400, "n": 2}
+  print(d2.stringify())
+  h() }
+legacy exit 0
+NIFT_VM=require exit 0 "outcome":"vm"
+stdout (legacy):
+  {"a":1,"m":-1e-400,"s":"x"}
+  -1e-400
+  {"m":-1e-400,"n":2}
+  {"m":-1e-400,"n":3}
+VM stdout and stderr byte-identical to legacy

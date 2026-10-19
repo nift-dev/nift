@@ -326,6 +326,68 @@ type -1 for such a root, everywhere; every other unresolved name is handled
 as before (case: `texttype-digit-root`, top level, loop body and a function
 called from a loop).
 
+### Integration gate run (`spec-integration-cp15`, tested tree `01ede2df`)
+
+2026-10-20, `heavy.sh --priority`, D-031 limits (`lim.sh`: timeout, `ulimit -v`,
+`ulimit -f`, child cleanup). Tested commit `e9a55ff4` on `53bc509a` (tree
+`01ede2df9313ced8c09ad9a2d19a00ad710c7c67`); the labelled commits have exactly
+this tree, and the rebase onto `runtime-2` adds docs only. Selected lines:
+`../evidence/cp15/integration/gates.txt`.
+
+| Gate | Result |
+| --- | --- |
+| `vm_builtins.py` | 67 supported (12 bodies × 5 contexts + top-level cases), 26 error programs, 31 refusals, 2 budget stops, validate depth limit: 0 failures |
+| `negzero_probe.py` (37 shapes) | `4b2fc909` VM: 10 differ, 12 refused, 15 same; CP15: 0 differ, 6 refused, 31 same |
+| `make test-rt-vm` (seed 1, seed 2) | PASS: rt vm unit 40,312 checks; parity; adversarial 37,470, 0 non-approved; subset suites; supported generator 500/500 (both seeds); unsupported 512/512 (500 as in CP14 + 12 with constructs added since); former replay 0 failures; every other step |
+| `make test-rt-vm-mutants` | unmutated passes, 8/8 mutants rejected |
+| `make test-rt-builtins` | PASS (differential 4,980 compared, 0 failures) |
+| `builtins_mutants.py` | 23/23 detected |
+| `make test-rt-builtins-guards` | 35 workloads, 0 guard failures |
+| `make test-rt-builtins-sanitize` | 1,993 checks, 0 failures |
+| `make test-rt-vm-sanitize` | PASS (every step, ASan/UBSan) |
+
+Generator rates (before = CP14 VM, the `f271af9a` binary; after = CP15; same
+generators, same seeds):
+
+| Generator | Seed | CP14 VM | CP15 VM |
+| --- | --- | --- | --- |
+| supported, CP14's generator (CP14 certification) | 1 / 2 | 500/500 / 500/500 | 500/500 / 500/500 (the same programs: identity proof) |
+| supported, with the JSON-only members | 1 | 203/500 on the VM: refused 294 `number-literal`, 2 `prepared-decl-type`, 1 `context:negative-zero`; 0 silent differences | 500/500 |
+| supported, with the JSON-only members | 2 | 233/500: refused 262 `number-literal`, 3 `prepared-decl-type`, 2 `context:negative-zero`; 0 silent differences | 500/500 |
+| general (`vm_parity --gen 300`) | 1 | 72/300 on the VM (67 `vm`, 5 `vm-error`) | identical outcomes |
+| general | 2 | 68/300 (67 `vm`, 1 `vm-error`) | identical outcomes |
+
+Narrowed patterns: one, unchanged from CP14 (`double-via-binding-assign`,
+applied 6 times at seed 1, 3 at seed 2, as in CP14's certification).
+
+Callgrind (`vm_compare.py --groups ops,fib`, marginal instructions per
+operation, CP14 certification run vs this run): loop 109 → 104, add_local
+183 → 179, call 425 → 422, array_index 407 → 403, array_push 348 → 343,
+string_concat 3,260 → 3,255, if_branch 244 → 237, fib 287 per call (both);
+**object_member 383 → 681**. Not a slower operation: the loop's bytecode is
+identical; the workload's literal `{"alpha": 1, ..., "delta": 4}` is JSON,
+so W9 reads it with `json_parse`, which holds JSON numbers as doubles exactly
+as legacy's `runtime_from_json` (legacy, the CP14 VM and CP15 agree on every
+observable probe: arithmetic, overflow, binding types, stringify), and
+`s += o.delta` takes the mixed int/double path. The same loop over a member
+built as an int (`4 + 0`) or a computed double (`4.0 + 0`) costs 379 on
+CP15 (383 on CP14) (`../evidence/cp15/integration/callgrind-object-member.txt`).
+Open (owner/coordinator decision): accept, give `AddAssign` an
+integral-double fast path, or hold integral JSON numbers as ints where that
+is provably unobservable.
+
+Text-typing decisions (the digit-led root, compared with the run on the
+previous tested tree `4aef1542`): rt-diff and parity outcome lines are
+identical; in the adversarial suite (37,470 programs per seed) one program
+per seed moved from a fallback to the VM (seed 1 `context` family, `same`
+887 → 888; seed 2 `context` 706 → 707 `vm`), and 9 (seed 1) / 12 (seed 2)
+programs that stopped at `prepared-decl-type` now stop at a later refusal
+(`prepared-fn-unprepared`, `number-literal`, `context:negative-zero`);
+non-approved differences 0 and approved counts unchanged. The 5 supported and
+2 unsupported generator programs that failed on that tree run on the VM
+byte-identical to legacy, or are refused with their expected reason
+(`../evidence/cp15/integration/texttype-digit-root-programs.txt`).
+
 ## Evidence
 
 `../evidence/cp15/`: `unit-diff-probe.txt`, `diff-seeds.txt`, `sanitize.txt`,
