@@ -1400,6 +1400,23 @@ test-sha256: $(SHA256_UNIT) $(SHA256_UNIT_SANITIZED) $(SHA256_UNIT_PORTABLE) $(T
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/sha256_builtins.sh
 test: test-sha256
 
+# feature-host-deps (D-028): every read API records its dependency (incl.
+# absence and unreadable paths), file().copy/move without project-root
+# containment, bounded whole reads (NIFT_READ_LIMIT, fatal limit error). See
+# docs/runtime-2/checkpoints/feature-host-deps.md. read_limit.py runs its
+# memory cases under RLIMIT_AS.
+READ_LIMIT_UNIT := $(TEST_DIR)/read-limit-unit$(EXEEXT)
+$(READ_LIMIT_UNIT): tests/read_limit_unit.cpp src/ReadLimit.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -Isrc $(CXXFLAGS) tests/read_limit_unit.cpp -o "$@"
+.PHONY: test-runtime2-host-deps
+test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
+	"$(READ_LIMIT_UNIT)"
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/host_deps.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
+test: test-runtime2-host-deps
+
 # feature-site-dx: website-generator DX fixes (build --auto resilience,
 # unterminated literals, try/catch locations, run() launched, template
 # warnings, strict values). See docs/runtime-2/checkpoints/feature-site-dx.md.

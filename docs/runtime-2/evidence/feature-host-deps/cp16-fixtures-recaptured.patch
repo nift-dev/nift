@@ -1,0 +1,274 @@
+diff -ruN a/tests/runtime2/cp16/expected/fs_eacces/trace.jsonl cp16/expected/fs_eacces/trace.jsonl
+--- a/tests/runtime2/cp16/expected/fs_eacces/trace.jsonl	2026-10-19 10:30:12.399703030 +1100
++++ b/tests/runtime2/cp16/expected/fs_eacces/trace.jsonl	2026-10-19 11:52:22.901048800 +1100
+@@ -1,6 +1,7 @@
+ {"ctx":"script","op":"touch","arg":"$BASE/w/ro/new.txt","res":""}
+ {"ctx":"script","op":"mkdir","arg":"$BASE/w/ro/sub","res":""}
+ {"ctx":"script","op":"open","arg":"$BASE/w/ro/in.txt","res":"rw"}
++{"ctx":"script","op":"read","arg":"$BASE/w/ro/in.txt","res":"2"}
+ {"ctx":"script","op":"save","arg":"$BASE/w/ro/in.txt","res":""}
+ {"ctx":"script","op":"copy-to","arg":"$BASE/w/copy.txt","res":""}
+ {"ctx":"script","op":"copy-to","arg":"$BASE/w/ro/copy.txt","res":""}
+diff -ruN a/tests/runtime2/cp16/expected/fs_read/trace.jsonl cp16/expected/fs_read/trace.jsonl
+--- a/tests/runtime2/cp16/expected/fs_read/trace.jsonl	2026-10-19 10:30:46.259701284 +1100
++++ b/tests/runtime2/cp16/expected/fs_read/trace.jsonl	2026-10-19 11:52:22.922581933 +1100
+@@ -4,6 +4,7 @@
+ {"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+ {"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
+ {"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
++{"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
+ {"ctx":"script","op":"open","arg":"$BASE/w/bin.dat","res":"r"}
+ {"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
+ {"ctx":"script","op":"open","arg":"$BASE/w/vals.txt","res":"r"}
+diff -ruN a/tests/runtime2/cp16/expected/fs_write/trace.jsonl cp16/expected/fs_write/trace.jsonl
+--- a/tests/runtime2/cp16/expected/fs_write/trace.jsonl	2026-10-19 10:30:13.472090589 +1100
++++ b/tests/runtime2/cp16/expected/fs_write/trace.jsonl	2026-10-19 11:52:22.941190699 +1100
+@@ -8,9 +8,11 @@
+ {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"a"}
+ {"ctx":"script","op":"save","arg":"$BASE/w/w.txt","res":""}
+ {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"rw"}
++{"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"19"}
+ {"ctx":"script","op":"save","arg":"$BASE/w/w.txt","res":""}
+ {"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"25"}
+ {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"rw"}
++{"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"25"}
+ {"ctx":"script","op":"open","arg":"$BASE/w/vals.txt","res":"w"}
+ {"ctx":"script","op":"save","arg":"$BASE/w/vals.txt","res":""}
+ {"ctx":"script","op":"read","arg":"$BASE/w/vals.txt","res":"33"}
+diff -ruN a/tests/runtime2/cp16/expected/site_contain/files.txt cp16/expected/site_contain/files.txt
+--- a/tests/runtime2/cp16/expected/site_contain/files.txt	2026-10-19 10:30:15.019706519 +1100
++++ b/tests/runtime2/cp16/expected/site_contain/files.txt	2026-10-19 11:52:22.995505605 +1100
+@@ -3,14 +3,22 @@
+ d tmp/ 755
+ d w/ 755
+ f ext/by-cp.txt 644 8 d4e4877bac978b79
++f ext/by-file-copy.txt 644 8 d4e4877bac978b79
+ d w/.nift/ 755
+ d w/content/ 755
+ d w/data/ 755
++d w/public/ 755
+ d w/templates/ 755
+ f w/.nift/.lock (nift metadata)
+ f w/.nift/config.json (nift metadata)
+-f w/.nift/failed.json (nift metadata)
++d w/.nift/content/ 755
++d w/.nift/public/ 755
++d w/.nift/templates/ 755
+ f w/.nift/tracked.json (nift metadata)
++f w/.nift/content/index.html.hash (nift metadata)
++f w/.nift/public/index.info.json (nift metadata)
++f w/.nift/templates/template.html.hash (nift metadata)
+ f w/content/index.html 644 184 cecb19e5de5678a1
+ f w/data/p.txt 644 8 d4e4877bac978b79
++f w/public/index.html 644 44 bb16e1bfc77f77a5
+ f w/templates/template.html 644 37 12c5e448e367a89a
+diff -ruN a/tests/runtime2/cp16/expected/site_contain/steps.txt cp16/expected/site_contain/steps.txt
+--- a/tests/runtime2/cp16/expected/site_contain/steps.txt	2026-10-19 10:30:15.007732705 +1100
++++ b/tests/runtime2/cp16/expected/site_contain/steps.txt	2026-10-19 11:52:22.994700466 +1100
+@@ -1,24 +1,12 @@
+ == step 1: nift build --all
+-exit 1
++exit 0
+ -- stdout
+-0 of 1 files built successfully
++📦 1 file built successfully
+ time taken: $T seconds
+ -- stderr
+-error: while building /
+-  content/index.html:2:45
+-  copy: path must stay inside the Nift project
+-    B:@script { fb := file("data/p.txt"); fc := fb.copy("../ext/by-file-copy.txt"); return "copied" }
+-                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ == step 2: nift status
+ exit 0
+ -- stdout
+ Nift status
+-1 of 1 tracked file needs rebuilding
+-
+-/
+-  ↳ previous build of this page failed
+-  ↳ generated output is missing
+-  ↳ page build metadata is missing
+-
+-run nift build to rebuild this file
++✓ all 1 tracked file is up to date
+ -- stderr
+diff -ruN a/tests/runtime2/cp16/expected/site_deps/deps.json cp16/expected/site_deps/deps.json
+--- a/tests/runtime2/cp16/expected/site_deps/deps.json	2026-10-19 10:30:15.563726904 +1100
++++ b/tests/runtime2/cp16/expected/site_deps/deps.json	2026-10-19 11:52:23.210287045 +1100
+@@ -6,8 +6,10 @@
+   "dependencies": [
+    "content/index.html",
+    "data/at.json",
++   "data/bytes.txt",
+    "data/cat.txt",
+    "data/file.txt",
++   "data/ifstream.txt",
+    "data/inj.json",
+    "data/open.txt",
+    "data/part.html",
+@@ -19,8 +21,10 @@
+   "dependency-hashes": {
+    "content/index.html": "908104364561598654",
+    "data/at.json": "8686831917336683803",
++   "data/bytes.txt": "11561118954450971347",
+    "data/cat.txt": "1640639993685903018",
+    "data/file.txt": "504985901252051590",
++   "data/ifstream.txt": "5756062953677647449",
+    "data/inj.json": "4019507551379446311",
+    "data/open.txt": "4989352667989678064",
+    "data/part.html": "13642413092450587795",
+@@ -43,8 +47,10 @@
+   "dependencies": [
+    "content/index.html",
+    "data/at.json",
++   "data/bytes.txt",
+    "data/cat.txt",
+    "data/file.txt",
++   "data/ifstream.txt",
+    "data/inj.json",
+    "data/open.txt",
+    "data/part.html",
+@@ -56,8 +62,10 @@
+   "dependency-hashes": {
+    "content/index.html": "908104364561598654",
+    "data/at.json": "10511485757519589046",
++   "data/bytes.txt": "1386060760756083916",
+    "data/cat.txt": "1643492126848914677",
+    "data/file.txt": "507873218787166001",
++   "data/ifstream.txt": "5753210820514635790",
+    "data/inj.json": "5844161391562351554",
+    "data/open.txt": "4988413685059375095",
+    "data/part.html": "13643369667566942140",
+diff -ruN a/tests/runtime2/cp16/expected/site_deps/files.txt cp16/expected/site_deps/files.txt
+--- a/tests/runtime2/cp16/expected/site_deps/files.txt	2026-10-19 10:30:15.567707041 +1100
++++ b/tests/runtime2/cp16/expected/site_deps/files.txt	2026-10-19 11:52:23.210454841 +1100
+@@ -16,8 +16,10 @@
+ f w/.nift/tracked.json (nift metadata)
+ f w/.nift/content/index.html.hash (nift metadata)
+ f w/.nift/data/at.json.hash (nift metadata)
++f w/.nift/data/bytes.txt.hash (nift metadata)
+ f w/.nift/data/cat.txt.hash (nift metadata)
+ f w/.nift/data/file.txt.hash (nift metadata)
++f w/.nift/data/ifstream.txt.hash (nift metadata)
+ f w/.nift/data/inj.json.hash (nift metadata)
+ f w/.nift/data/open.txt.hash (nift metadata)
+ f w/.nift/data/part.html.hash (nift metadata)
+diff -ruN a/tests/runtime2/cp16/expected/site_deps/steps.txt cp16/expected/site_deps/steps.txt
+--- a/tests/runtime2/cp16/expected/site_deps/steps.txt	2026-10-19 10:30:15.555724782 +1100
++++ b/tests/runtime2/cp16/expected/site_deps/steps.txt	2026-10-19 11:52:23.209960470 +1100
+@@ -59,6 +59,7 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
+   ↳ dependency changed: data/open.txt
+@@ -73,8 +74,10 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/open.txt
+ 
+ run nift build to rebuild this file
+@@ -87,8 +90,10 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/sha.txt
+ 
+@@ -102,8 +107,10 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/inj.json
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/sha.txt
+@@ -118,8 +125,10 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/inj.json
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/sha.txt
+@@ -135,8 +144,10 @@
+ 1 of 1 tracked file needs rebuilding
+ 
+ /
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/inj.json
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/readval.txt
+@@ -154,8 +165,10 @@
+ 
+ /
+   ↳ dependency changed: data/at.json
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/inj.json
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/readval.txt
+@@ -173,8 +186,10 @@
+ 
+ /
+   ↳ dependency changed: data/at.json
++  ↳ dependency changed: data/bytes.txt
+   ↳ dependency changed: data/cat.txt
+   ↳ dependency changed: data/file.txt
++  ↳ dependency changed: data/ifstream.txt
+   ↳ dependency changed: data/inj.json
+   ↳ dependency changed: data/open.txt
+   ↳ dependency changed: data/part.html
+@@ -190,8 +205,10 @@
+ cat-2
+ built /
+     ↳ dependency changed: data/at.json
++    ↳ dependency changed: data/bytes.txt
+     ↳ dependency changed: data/cat.txt
+     ↳ dependency changed: data/file.txt
++    ↳ dependency changed: data/ifstream.txt
+     ↳ dependency changed: data/inj.json
+     ↳ dependency changed: data/open.txt
+     ↳ dependency changed: data/part.html
+diff -ruN a/tests/runtime2/cp16/expected/site_deps/trace.jsonl cp16/expected/site_deps/trace.jsonl
+--- a/tests/runtime2/cp16/expected/site_deps/trace.jsonl	2026-10-19 10:30:15.559709495 +1100
++++ b/tests/runtime2/cp16/expected/site_deps/trace.jsonl	2026-10-19 11:52:23.210172623 +1100
+@@ -7,6 +7,7 @@
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/cat.txt","res":"6"}
+ {"ctx":"/","op":"open","arg":"$BASE/w/data/file.txt","res":"r"}
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/file.txt","res":"7"}
++{"ctx":"/","op":"read","arg":"$BASE/w/data/bytes.txt","res":"8"}
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/sha.txt","res":"6"}
+ {"ctx":"/","op":"stat","arg":"$BASE/w/data/stat.txt","res":"file"}
+ {"ctx":"/","op":"open","arg":"$BASE/w/data/readval.txt","res":"r"}
+@@ -32,6 +33,7 @@
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/cat.txt","res":"6"}
+ {"ctx":"/","op":"open","arg":"$BASE/w/data/file.txt","res":"r"}
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/file.txt","res":"7"}
++{"ctx":"/","op":"read","arg":"$BASE/w/data/bytes.txt","res":"9"}
+ {"ctx":"/","op":"read","arg":"$BASE/w/data/sha.txt","res":"6"}
+ {"ctx":"/","op":"stat","arg":"$BASE/w/data/stat.txt","res":"file"}
+ {"ctx":"/","op":"open","arg":"$BASE/w/data/readval.txt","res":"r"}

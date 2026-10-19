@@ -4,6 +4,9 @@
 #include "Parser.h"
 #include "ReadObservation.h"
 #include "HostTrace.h"
+#include "ReadLimit.h"
+
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -56,6 +59,108 @@ void Parser::observe_streamed_read(const fs::path& path, std::uint64_t size, con
     if (snapshot) host_.observe_dependency_hash(path, *snapshot);
 }
 
+void Parser::observe_failed_read(const fs::path& path) {
+    if (standalone_script_host_ || host_.root().empty()) return;
+    std::error_code error;
+    const auto status = fs::status(path, error);
+    if (!error && !fs::exists(status)) { observe_presence(path, false); return; }
+    if (error && (error == std::errc::no_such_file_or_directory || error == std::errc::not_a_directory)) {
+        observe_presence(path, false);
+        return;
+    }
+    result_.observed.unreadable[nift::observe::spell(host_.root(), path)] = filesystem::read_access_error(path);
+}
+
+void Parser::observe_stream_open(const fs::path& path) {
+    if (standalone_script_host_ || host_.root().empty()) return;
+    result_.dependencies.insert(host_.relative(path));
+    // Hashed at open: an edit made while the page streams the file leaves the
+    // recorded snapshot different from the file, so the next build rebuilds.
+    if (read_snapshot_wanted()) host_.observe_dependency_hash(path, filesystem::hash_path_streamed(path));
+}
+
+void Parser::observe_page_member(const std::string& page, const std::string& member) {
+    if (member != "content" && member != "metadata") return;
+    if (standalone_script_host_ || host_.root().empty()) return;
+    nift::RuntimeValue relative;
+    std::string ignored;
+    if (!host_.resolve_page_member(page, "path", relative, ignored) || !relative.is_string()) return;
+    const fs::path source = (host_.root() / relative.string).lexically_normal();
+    std::error_code error;
+    if (fs::exists(source, error) && !error) observe_stream_open(source);
+    else observe_failed_read(source);
+}
+
+bool Parser::read_limit(const std::string& operation, std::uint64_t& limit, std::string& error) {
+    const auto setting = nift::readlimit::current();
+    if (!setting.valid) {
+        active_recoverable_.reset();
+        return fail_fatal(nift::detail::DiagnosticCode::NativeInvalidArgument,
+                          nift::readlimit::invalid_message(operation, setting), error);
+    }
+    limit = setting.bytes;
+    return true;
+}
+
+bool Parser::fail_read_limit(const std::string& operation, const std::string& what, std::uint64_t limit, std::string& error) {
+    // Never an ordinary (catchable) error: drop any pending recoverable value.
+    active_recoverable_.reset();
+    return fail_fatal(nift::detail::DiagnosticCode::NativeLimitExceeded,
+                      nift::readlimit::exceeded_message(operation, what, limit), error);
+}
+
+namespace {
+template <class Buffer>
+ParserWholeRead read_whole_impl(const fs::path& path, Buffer& out, std::uint64_t limit) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        std::error_code status_error;
+        const auto status = fs::status(path, status_error);
+        const bool missing = (!status_error && !fs::exists(status)) ||
+                             status_error == std::errc::no_such_file_or_directory ||
+                             status_error == std::errc::not_a_directory;
+        return missing ? ParserWholeRead::Missing : ParserWholeRead::OpenFailed;
+    }
+    // st_size only pre-sizes the buffer and rejects a regular file that is
+    // already too large without reading it; the bound itself is enforced
+    // while reading (FIFOs and devices report 0, files can grow).
+    std::uint64_t hint = 0;
+    std::error_code size_error;
+    if (fs::is_regular_file(path, size_error)) {
+        const auto size = fs::file_size(path, size_error);
+        if (!size_error) {
+            if (size > limit) return ParserWholeRead::Limit;
+            hint = size;
+        }
+    }
+    Buffer data;
+    switch (nift::readlimit::read_bounded(in, data, limit, std::numeric_limits<std::uint64_t>::max(), hint)) {
+        case nift::readlimit::Status::Ok: out = std::move(data); return ParserWholeRead::Ok;
+        case nift::readlimit::Status::Exceeded: return ParserWholeRead::Limit;
+        case nift::readlimit::Status::ReadError: break;
+    }
+    return ParserWholeRead::ReadFailed;
+}
+} // namespace
+
+Parser::WholeRead Parser::read_whole_file(const std::string& operation, const fs::path& path, std::string& out,
+                                          std::string& error) {
+    std::uint64_t limit = 0;
+    if (!read_limit(operation, limit, error)) return WholeRead::Limit;
+    const auto outcome = read_whole_impl(path, out, limit);
+    if (outcome == WholeRead::Limit) fail_read_limit(operation, path.generic_string(), limit, error);
+    return outcome;
+}
+
+Parser::WholeRead Parser::read_whole_file(const std::string& operation, const fs::path& path, nift::RuntimeBytes& out,
+                                          std::string& error) {
+    std::uint64_t limit = 0;
+    if (!read_limit(operation, limit, error)) return WholeRead::Limit;
+    const auto outcome = read_whole_impl(path, out, limit);
+    if (outcome == WholeRead::Limit) fail_read_limit(operation, path.generic_string(), limit, error);
+    return outcome;
+}
+
 bool Parser::read_snapshot_wanted() const {
     return !standalone_script_host_ && !host_.root().empty() && host_.observe_dependencies;
 }
@@ -68,6 +173,10 @@ void Parser::observe_metadata_read(const fs::path& path) {
 
 void Parser::note_written(const fs::path& path, const char* op) {
     if (nift::trace::enabled()) trace_host(op, path, "");
+    note_written_untraced(path);
+}
+
+void Parser::note_written_untraced(const fs::path& path) {
     if (standalone_script_host_ || host_.root().empty()) return;
     std::error_code error;
     const fs::path absolute = fs::absolute(path, error);

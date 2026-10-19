@@ -85,6 +85,13 @@ std::uint64_t hash_bytes(const std::string& contents);
 inline constexpr std::uint64_t kHashBytesSeed = 14695981039346656037ull;
 std::uint64_t hash_bytes_update(std::uint64_t hash, const void* data, std::size_t size);
 std::uint64_t hash_path(const std::filesystem::path& path);
+// feature-host-deps: hash_path's value without holding the file in memory
+// (regular files are hashed in chunks; other kinds exactly as hash_path).
+std::uint64_t hash_path_streamed(const std::filesystem::path& path);
+// feature-host-deps: "" when `path` can be opened for reading right now,
+// otherwise a stable token for the failure ("errno:13", "win:5"). Never
+// blocks (FIFOs are probed non-blocking) and reads no data.
+std::string read_access_error(const std::filesystem::path& path);
 std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);
 bool stored_hash_changed(const std::filesystem::path& root, const std::filesystem::path& path);
 bool write_stored_hash(const std::filesystem::path& root, const std::filesystem::path& path);

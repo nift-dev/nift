@@ -54,6 +54,9 @@ private:
     std::string warning_text_;
 };
 
+// feature-host-deps: outcome of a bounded whole-file read (Parser::read_whole_file).
+enum class ParserWholeRead { Ok, Missing, OpenFailed, ReadFailed, Limit };
+
 class Parser {
     friend struct SourceTranslationTestAccess;
     friend struct RtParserOracleAccess;  // CP10 legacy-translation oracle (tests/rt)
@@ -171,6 +174,8 @@ private:
     // A path the page itself created, changed or removed: observations of it
     // are dropped when page-info is written (it is output, not input).
     void note_written(const std::filesystem::path& path, const char* op = "write");
+    // The same without a trace line (operations outside trace v1, e.g. minify's output).
+    void note_written_untraced(const std::filesystem::path& path);
     // Runtime 2.0 CP08: Host-operation trace (no-op unless NIFT_TRACE_HOST is set).
     void trace_host(const char* op, const std::filesystem::path& path, const std::string& result) const;
     void observe_metadata_read(const std::filesystem::path& path);
@@ -181,6 +186,28 @@ private:
     // True when a read must produce a dependency snapshot (page render in a
     // hash/hybrid build); lets streaming readers skip computing it otherwise.
     bool read_snapshot_wanted() const;
+    // feature-host-deps (D-028): a read that could not open `path`. A missing
+    // path is an absence observation (stale when it appears, like exists());
+    // an existing one is recorded as unreadable (stale when that changes).
+    void observe_failed_read(const std::filesystem::path& path);
+    // feature-host-deps: a file-backed input stream opened successfully: an
+    // ordinary dependency, recorded at open, snapshotted (hash/hybrid) from
+    // the file's content at open without holding it in memory. Not traced
+    // (stream operations are outside trace v1).
+    void observe_stream_open(const std::filesystem::path& path);
+    // feature-host-deps: page("x").content / .metadata read page x's content
+    // file; record it as a dependency (or its absence) like any other read.
+    void observe_page_member(const std::string& page, const std::string& member);
+    // feature-host-deps: the configured whole-read limit (NIFT_READ_LIMIT);
+    // false with a fatal error when the setting is invalid.
+    bool read_limit(const std::string& operation, std::uint64_t& limit, std::string& error);
+    // Fatal, uncatchable limit error for a bounded read.
+    bool fail_read_limit(const std::string& operation, const std::string& what, std::uint64_t limit, std::string& error);
+    using WholeRead = ParserWholeRead;
+    // Reads a whole file (not a directory) under the read limit. On Limit the
+    // fatal error is already set. Records nothing.
+    WholeRead read_whole_file(const std::string& operation, const std::filesystem::path& path, std::string& out, std::string& error);
+    WholeRead read_whole_file(const std::string& operation, const std::filesystem::path& path, nift::RuntimeBytes& out, std::string& error);
     void observe_listing(const std::string& key, const std::filesystem::path& path);
     void observe_environment(const std::string& name, const nift::HostResult& value);
     // Consume a callable's return into `out`, propagating any location that the

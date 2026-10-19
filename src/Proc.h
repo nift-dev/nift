@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
@@ -33,9 +34,13 @@ struct ProcessStageResult { bool launched=false; int exit_code=-1; std::string e
 // `error` report an exec/setup failure. For a pipeline the top-level
 // launched/error keep their pre-feature meaning (stages were started /
 // parent-side setup failure); `stages` carries each stage's launch result.
-struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; bool exec_failed=false; std::vector<ProcessStageResult> stages; };
-ProcessResult nift_run_process(const ProcessSpec& spec, bool capture=true, bool stream=false);
-ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture=true, bool stream=false);
+// feature-host-deps (D-028): capture_limit bounds each captured stream read
+// back into memory (0 = unbounded, the historical behaviour for callers that
+// do not pass one). Past it the capture is released, never truncated, and
+// capture_limit_exceeded names the stream ("stdout"/"stderr").
+struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; bool exec_failed=false; std::vector<ProcessStageResult> stages; std::string capture_limit_exceeded; };
+ProcessResult nift_run_process(const ProcessSpec& spec, bool capture=true, bool stream=false, std::uint64_t capture_limit=0);
+ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture=true, bool stream=false, std::uint64_t capture_limit=0);
 bool nift_find_executable(const std::string& name, std::string& path);
 
 enum class ShellJobState { Running, Stopped, Done };

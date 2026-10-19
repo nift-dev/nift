@@ -1,4 +1,5 @@
 #include "Proc.h"
+#include "ReadLimit.h"
 #include "ProcessTestHooks.h"
 #include "PreparedProcessPOSIX.h"
 #include "ProcessPOSIX.h"
@@ -15,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 extern char **environ;
 #else
 #include <windows.h>
@@ -98,10 +100,21 @@ static int open_temp(std::string& path, size_t stage){
     if(fd>=0)nift_process_test_temp(path);
     return fd;
 }
-// Reads the whole capture through its descriptor, from offset 0.
-static std::string read_fd_all(int fd){
+// Reads the whole capture through its descriptor, from offset 0. With a
+// limit (feature-host-deps, D-028) the buffer never holds or reserves more
+// than `limit` bytes: one byte past it marks the capture as exceeded and
+// releases it (background descendants may still be appending, so the file
+// size is only a hint).
+static std::string read_fd_all(int fd,std::uint64_t limit=0,bool* exceeded=nullptr){
     std::string data;char buffer[65536];off_t offset=0;
-    for(;;){ssize_t n=pread(fd,buffer,sizeof buffer,offset);if(n<0){if(errno==EINTR)continue;break;}if(n==0)break;data.append(buffer,static_cast<std::size_t>(n));offset+=n;}
+    if(limit){struct stat info{};if(fstat(fd,&info)==0&&info.st_size>0){if(static_cast<std::uint64_t>(info.st_size)>limit){if(exceeded)*exceeded=true;return {};}data.reserve(static_cast<std::size_t>(info.st_size));}}
+    for(;;){
+        std::size_t request=sizeof buffer;
+        if(limit){const std::uint64_t held=data.size();const std::uint64_t room=held<limit?limit-held:0;if(room<request)request=static_cast<std::size_t>(room+1);}
+        ssize_t n=pread(fd,buffer,request,offset);if(n<0){if(errno==EINTR)continue;break;}if(n==0)break;
+        if(limit&&static_cast<std::uint64_t>(n)>limit-data.size()){std::string().swap(data);if(exceeded)*exceeded=true;return {};}
+        if(limit)nift::readlimit::reserve_within(data,data.size()+static_cast<std::size_t>(n),limit);
+        data.append(buffer,static_cast<std::size_t>(n));offset+=n;}
     return data;
 }
 // feature-site-dx: parent-side wording for a failure the child reported.
@@ -129,7 +142,7 @@ static std::string exec_failure_message(const ProcessSpec& spec,const PreparedPr
     default: return "cannot execute "+spec.program+": "+std::strerror(error);
     }
 }
-ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
+ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream,std::uint64_t capture_limit){
     nift_trace_spawn(specs);
     std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
     ProcessResult r;if(specs.empty()){r.error="empty pipeline";return r;}std::string op,ep;int ofd=-1,efd=-1;if(capture){ofd=open_temp(op,0);efd=open_temp(ep,1);if(ofd<0||efd<0){if(ofd>=0)close(ofd);if(efd>=0)close(efd);r.error="cannot create capture files";return r;}}
@@ -208,8 +221,10 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     // launch failures are reported in r.stages.
     if (specs.size() == 1 && r.launched && r.error.empty() && !exec_error.empty()) { r.launched = false; r.error = exec_error; r.exec_failed = true; }
     if (capture) {
-        r.out = read_fd_all(ofd);
-        r.err = read_fd_all(efd);
+        bool out_exceeded=false,err_exceeded=false;
+        r.out = read_fd_all(ofd,capture_limit,&out_exceeded);
+        if(!out_exceeded) r.err = read_fd_all(efd,capture_limit,&err_exceeded);
+        if(out_exceeded||err_exceeded){r.out.clear();r.err.clear();r.capture_limit_exceeded=out_exceeded?"stdout":"stderr";stream=false;}
         if (stream) { std::cout << r.out; std::cerr << r.err; }
     }
     if (ofd >= 0) close(ofd);
@@ -217,7 +232,7 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     if(foreground&&isatty(STDIN_FILENO)){ tcsetpgrp(STDIN_FILENO,getpgrp()); sigaction(SIGTTOU,&otto,nullptr);sigaction(SIGTTIN,&otin,nullptr);sigaction(SIGINT,&oint,nullptr);sigaction(SIGQUIT,&oquit,nullptr); }
     return r;
 }
-ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream){return nift_run_pipeline({s},capture,stream);}
+ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream,std::uint64_t capture_limit){return nift_run_pipeline({s},capture,stream,capture_limit);}
 #else
 // Windows process backend (CreateProcessW). Semantics mirror the Unix path:
 // direct spawn (no shell), real OS pipes between pipeline stages, capture via
@@ -342,7 +357,7 @@ HANDLE child_stdio(HANDLE source,DWORD access,size_t stage) {
 }
 } // namespace
 
-ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture, bool stream) {
+ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture, bool stream, std::uint64_t capture_limit) {
     nift_trace_spawn(specs);
     ProcessResult r;
     int exec_failure_code = 0;
@@ -491,13 +506,24 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     if (capture) {
         // Read through the keeper handles: the named file may not be opened
         // again without FILE_SHARE_DELETE, and closing the keepers deletes it.
-        auto read_handle = [](HANDLE h) {
+        // feature-host-deps (D-028): bounded like the POSIX read_fd_all.
+        auto read_handle = [capture_limit](HANDLE h, bool& exceeded) {
             std::string data; LARGE_INTEGER zero{}; if (!SetFilePointerEx(h, zero, nullptr, FILE_BEGIN)) return data;
             char buffer[65536]; DWORD got = 0;
-            while (ReadFile(h, buffer, sizeof buffer, &got, nullptr) && got > 0) data.append(buffer, got);
+            for (;;) {
+                DWORD request = sizeof buffer;
+                if (capture_limit) { const std::uint64_t room = data.size() < capture_limit ? capture_limit - data.size() : 0; if (room < request) request = static_cast<DWORD>(room + 1); }
+                if (!ReadFile(h, buffer, request, &got, nullptr) || got == 0) break;
+                if (capture_limit && static_cast<std::uint64_t>(got) > capture_limit - data.size()) { std::string().swap(data); exceeded = true; return data; }
+                if (capture_limit) nift::readlimit::reserve_within(data, data.size() + got, capture_limit);
+                data.append(buffer, got);
+            }
             return data;
         };
-        r.out = read_handle(okeep); r.err = read_handle(ekeep);
+        bool out_exceeded = false, err_exceeded = false;
+        r.out = read_handle(okeep, out_exceeded);
+        if (!out_exceeded) r.err = read_handle(ekeep, err_exceeded);
+        if (out_exceeded || err_exceeded) { r.out.clear(); r.err.clear(); r.capture_limit_exceeded = out_exceeded ? "stdout" : "stderr"; stream = false; }
         // MSYS2/Cygwin children write CRLF to redirected output in text mode,
         // so normalize captured output to LF; exact-output callers (run(),
         // cmd().run(), tests comparing stdout) otherwise see trailing \r.
@@ -519,5 +545,5 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     if (!ok && r.error.empty()) r.error = "pipeline failed";
     return r;
 }
-ProcessResult nift_run_process(const ProcessSpec& s, bool capture, bool stream) { return nift_run_pipeline({s}, capture, stream); }
+ProcessResult nift_run_process(const ProcessSpec& s, bool capture, bool stream, std::uint64_t capture_limit) { return nift_run_pipeline({s}, capture, stream, capture_limit); }
 #endif

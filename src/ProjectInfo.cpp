@@ -1129,6 +1129,18 @@ void ProjectInfo::append_read_observations(std::string& output, const ReadObserv
         }
         output += "}";
     }
+    if (!observed.unreadable.empty()) {
+        output += ",\n  \"unreadable\": {";
+        std::size_t i = 0;
+        for (const auto& [path, token] : observed.unreadable) {
+            output += i++ ? ", \"" : "\"";
+            json::Document::append_escaped_string(output, path);
+            output += "\": \"";
+            json::Document::append_escaped_string(output, token);
+            output += "\"";
+        }
+        output += "}";
+    }
     if (!observed.listings.empty()) {
         output += ",\n  \"listings\": {";
         std::size_t i = 0;
@@ -1183,6 +1195,14 @@ void ProjectInfo::read_observation_reasons(const json::Document& document, std::
                 fs::is_regular_file(status) ? "file" : fs::is_directory(status) ? "directory" : "other";
             if (!current.empty() && (!kind.is_string() || kind.string != current))
                 reasons.push_back("path changed type: " + path);
+        }
+    }
+    // feature-host-deps: a read that could not open an existing path (e.g.
+    // permissions) is stale once the path opens differently (or at all).
+    if (document.has("unreadable") && document["unreadable"].is_object()) {
+        for (const auto& [path, token] : document["unreadable"].object) {
+            const std::string current = filesystem::read_access_error(nift::observe::resolve(root, path));
+            if (!token.is_string() || token.string != current) reasons.push_back("path readability changed: " + path);
         }
     }
     if (document.has("listings") && document["listings"].is_object()) {
@@ -1630,7 +1650,7 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
             const std::string as_dependency=relative(written);
             const std::string as_observation=nift::observe::spell(root,written);
             target.dependencies.erase(as_dependency);
-            target.reqs.erase(as_observation);target.observed.absent.erase(as_observation);target.observed.kinds.erase(as_observation);
+            target.reqs.erase(as_observation);target.observed.absent.erase(as_observation);target.observed.kinds.erase(as_observation);target.observed.unreadable.erase(as_observation);
         }
     };
     auto item_script = [&](const std::string& phase, RenderResult* returned=nullptr) {

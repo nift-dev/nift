@@ -106,16 +106,20 @@ struct ReadObservations {
     std::map<std::string, std::string> kinds;                   // existing path -> "file"/"dir"/...
     std::set<std::filesystem::path> written;                    // absolute paths this render wrote/removed
     std::optional<std::string> platform;                       // platform() value the render observed
+    // feature-host-deps: existing paths a read could not open -> failure token
+    // (filesystem::read_access_error); stale when the token changes.
+    std::map<std::string, std::string> unreadable;
     void merge(const ReadObservations& other) {
         absent.insert(other.absent.begin(), other.absent.end());
         kinds.insert(other.kinds.begin(), other.kinds.end());
+        unreadable.insert(other.unreadable.begin(), other.unreadable.end());
         written.insert(other.written.begin(), other.written.end());
         if (other.platform) platform = other.platform;
         listings.insert(other.listings.begin(), other.listings.end());
         env.insert(other.env.begin(), other.env.end());
         environment_snapshot = environment_snapshot || other.environment_snapshot;
     }
-    bool empty() const { return absent.empty() && listings.empty() && env.empty() && kinds.empty() && !environment_snapshot && !platform; }
+    bool empty() const { return absent.empty() && listings.empty() && env.empty() && kinds.empty() && unreadable.empty() && !environment_snapshot && !platform; }
 };
 
 struct RenderResult {

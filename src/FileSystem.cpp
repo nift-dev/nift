@@ -10,6 +10,7 @@
 #include <thread>
 #include <sys/stat.h>
 #include <unordered_map>
+#include <vector>
 #ifndef _WIN32
 #include <dirent.h>
 #endif
@@ -787,7 +788,55 @@ static std::uint64_t hash_directory(const fs::path& directory) {
 std::uint64_t hash_path(const fs::path& path) {
     std::error_code error;
     if (fs::is_directory(path, error)) return hash_directory(path);
-    return hash_bytes(read_file(path));
+    // feature-host-deps: the same value as hash_bytes(read_file(path)) without
+    // holding the file in memory (dependency files can be arbitrarily large).
+    return hash_path_streamed(path);
+}
+
+std::uint64_t hash_path_streamed(const fs::path& path) {
+    std::error_code error;
+    const auto status = fs::status(path, error);
+    if (!error && fs::is_directory(status)) return hash_path(path);
+    // hash_path hashes read_file(path): the first file_size bytes of a
+    // regular file, nothing for anything else (devices and FIFOs are never read).
+    if (error || !fs::is_regular_file(status)) return kHashBytesSeed;
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) return kHashBytesSeed;
+    const std::streamoff size = file.tellg();
+    if (size <= 0) return kHashBytesSeed;
+    file.seekg(0);
+    std::uint64_t hash = kHashBytesSeed;
+    std::vector<char> chunk(static_cast<std::size_t>(std::min<std::uint64_t>(static_cast<std::uint64_t>(size), 64 * 1024)));
+    std::uint64_t remaining = static_cast<std::uint64_t>(size);
+    while (remaining > 0) {
+        const std::size_t want = static_cast<std::size_t>(std::min<std::uint64_t>(remaining, chunk.size()));
+        file.read(chunk.data(), static_cast<std::streamsize>(want));
+        const std::streamsize got = file.gcount();
+        if (got <= 0) break;
+        hash = hash_bytes_update(hash, chunk.data(), static_cast<std::size_t>(got));
+        remaining -= static_cast<std::uint64_t>(got);
+        if (static_cast<std::size_t>(got) < want) break;
+    }
+    // read_file yields "" when the full read fails; keep the same value.
+    if (remaining != 0) return kHashBytesSeed;
+    return hash;
+}
+
+std::string read_access_error(const fs::path& path) {
+#ifdef _WIN32
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return "win:" + std::to_string(static_cast<unsigned long>(GetLastError()));
+    CloseHandle(handle);
+    return {};
+#else
+    int fd;
+    do fd = ::open(path.c_str(), O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return "errno:" + std::to_string(errno);
+    ::close(fd);
+    return {};
+#endif
 }
 
 fs::path hash_file_path(const fs::path& root, const fs::path& path) {

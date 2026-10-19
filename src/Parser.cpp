@@ -2,6 +2,7 @@
 #include "HostTrace.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "ReadLimit.h"
 #include "ParserAsyncPool.h"
 #include "ParserHelpers.h"
 #include "FrontMatter.h"
@@ -914,9 +915,15 @@ bool Parser::stream_open(std::shared_ptr<StreamInstance> stream,
                                     "ofstream: cannot open path", error);
     } else {
         stream->input = std::make_shared<std::ifstream>(path, std::ios::binary);
-        if (!*stream->input)
+        // feature-host-deps (D-028): a file-backed input stream is a build
+        // dependency, recorded at open; a failed open is recorded like a
+        // failed open() (absence, or unreadable), so a later fix rebuilds.
+        if (!*stream->input) {
+            observe_failed_read(path);
             return fail_recoverable(nift::detail::DiagnosticCode::StreamOpenFailed,
                                     "ifstream: cannot open path", error);
+        }
+        observe_stream_open(path);
     }
     stream->open = true;
     stream->closed = false;
@@ -985,11 +992,16 @@ Parser::StreamExtraction Parser::stream_extract_token(StreamInstance& stream,
                                     "extraction: input failure", error), StreamExtraction::Backend;
         return StreamExtraction::Eof;
     }
+    std::uint64_t limit = 0;
+    if (!read_limit("extraction", limit, error)) return StreamExtraction::Backend;
     std::string token;
     char c = 0;
     while (stream.input->get(c)) {
         if (std::isspace(static_cast<unsigned char>(c))) break;
-        token.push_back(c);
+        if (!nift::readlimit::append_bounded(token, c, limit)) {
+            fail_read_limit("extraction", "a token of " + stream.path.generic_string(), limit, error);
+            return StreamExtraction::Backend;
+        }
     }
     if (stream.input->bad())
         return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,
@@ -1309,6 +1321,7 @@ bool Parser::resolve_json_value(const std::string& expression,
                     error = perr.empty() ? ("page has no member: " + member) : perr;
                     return true;
                 }
+                observe_page_member(current->string.substr(11), member);
                 current = std::make_shared<const nift::RuntimeValue>(std::move(resolved));
                 continue;
             }
