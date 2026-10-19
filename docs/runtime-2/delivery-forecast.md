@@ -43,7 +43,8 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
 | **CP12 phase A** (engine selection, replay removed) | ✓ | ✓ (2 rounds) | ✓ @ebc2656 | ✓ bd1c8a9 | pending | CP11 | — | — | planted-defect gate permanent |
 | **CP12 phase B** (globals, `GETDYN`, modules, structs, enums) | started 2026-10-19 (inventory) | | | | | CP12A | large | **high** | the coverage engine; agent assigned |
 | CP13 diagnostics | ✓ (on `spec-integration`) | ✓ (design) | | | | CP12A | small | low | some gates rerun on new base pending |
-| CP14 built-ins A | ✓ | ✓ | ✓ @6c26404 | ✓ 2026-10-19 | pending | CP12A | certification | low | coverage unchanged by itself (104/788) |
+| **CP14 phase A** (F1/F2/F3/F6, 73 natives) | ✓ | ✓ | ✓ @6c26404 | ✓ 2026-10-19 | pending | CP12A | certification | low | coverage unchanged by itself (104/788) |
+| **CP14 phase B** (F4 mutating ×9, F5 callbacks ×17: `map`, `sort_by`, `filter`…) | design only | ✓ (design) | | | | CP12B place model (F4); native→compiled callbacks (F5) | medium | medium | `sort_by` 19, `map` 9 corpus refusals |
 | CP15 built-ins B | natives ✓, wiring written | ✓ (natives) | | | | CP14 | small–medium | low | time natives moved to CP16 |
 | records20k coverage | designed | | | | | CP14 | small | low–medium | push of fresh values; loop-called fns returning objects |
 | CP16 host ops | started (host layer) | design ✓ | | | | CP14, CP17, host-deps | large | **high** | D-028–D-031 decided |
