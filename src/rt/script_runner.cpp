@@ -2,6 +2,7 @@
 
 #include "rt/compiler.h"
 #include "rt/parser.h"
+#include "rt/refusal_inventory.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
 
@@ -41,6 +42,7 @@ struct Stats {
     std::string path;
     std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
     bool catchable = false;  // vm-error: legacy raises it as a catchable Error
+    std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
 };
 
 std::string json_escape(const std::string& text) {
@@ -73,7 +75,8 @@ void report(const Stats& s) {
     };
     list("large_lines", s.large_lines);
     list("derived_lines", s.derived_lines);
-    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false") << ",\"path\":\""
+    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false") << s.inventory_json
+         << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
         std::cerr << line.str() << std::flush;
@@ -103,7 +106,7 @@ void error_line(const std::filesystem::path& path, const Stats& stats, const std
 
 // The unit cannot run on the VM. Under NIFT_VM=require that is an error.
 bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, int& exit_code) {
-    if (mode == VmMode::Classify) {
+    if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
         stats.outcome = "fallback";
         report(stats);
         exit_code = 0;
@@ -161,6 +164,7 @@ VmMode vm_mode_from_environment() {
     if (!value || !*value || std::string(value) == "0") return VmMode::Off;
     if (std::string(value) == "require") return VmMode::Require;
     if (std::string(value) == "classify") return VmMode::Classify;
+    if (std::string(value) == "classify-all") return VmMode::ClassifyAll;
     return VmMode::On;
 }
 
@@ -184,8 +188,26 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
 
 namespace {
 
+// NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
+void add_inventory(const std::string& source, Stats& stats) {
+    const RefusalInventory inventory = inventory_refusals(source);
+    std::string out = ",\"reasons\":[";
+    for (std::size_t k = 0; k < inventory.items.size(); ++k) {
+        const InventoryItem& item = inventory.items[k];
+        const Location where = locate(source, item.offset);
+        out += (k ? ",{" : "{") + std::string("\"reason\":\"") + json_escape(item.reason) +
+               "\",\"line\":" + std::to_string(where.line) + ",\"column\":" + std::to_string(where.column) +
+               ",\"consequential\":" + (item.consequential ? "true" : "false") + "}";
+    }
+    out += "],\"inventory_complete\":" + std::string(inventory.complete ? "true" : "false") +
+           ",\"inventory_stop\":\"" + json_escape(inventory.stop) + "\",\"inventory_rounds\":" +
+           std::to_string(inventory.rounds);
+    stats.inventory_json = out;
+}
+
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code) {
+    if (mode == VmMode::ClassifyAll) add_inventory(source, stats);
     const auto t0 = Clock::now();
     Ast ast(source);
     const ParseResult parsed = parse_script(ast);
@@ -212,7 +234,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     stats.protos = compiled.program->protos.size();
     for (const auto& proto : compiled.program->protos) stats.instructions += proto->code.size();
-    if (mode == VmMode::Classify) {
+    if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
         stats.outcome = "compiled";
         report(stats);
         exit_code = 0;
