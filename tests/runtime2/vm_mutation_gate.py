@@ -18,6 +18,8 @@ bug with NIFT_VM_MUTANT=n (src/rt/vm_mutants.h):
   6 wrong index number in the index message
   7 wrong kinds in the assignment-type message
   8 the Mod fast path's sign
+  9 BindType ignores a text type held in a register (stage 4: a declaration
+    from a parameter binds with the unknown type)
 
 Each suite runs at a modest size: vm_int_bounds (every int opcode at the
 bounds, Python ints), vm_golden (pinned D-018 results), vm_review_cp12,
@@ -39,7 +41,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 MUTANTS = {1: "Sub dispatched to Add in the checked table", 2: "large slow-path result off by 1000",
            3: "spurious overflow in AddI (small operands)", 4: "dropped loop iteration",
            5: "wrong error column", 6: "wrong index number in the index message",
-           7: "wrong kinds in the assignment-type message", 8: "Mod fast path sign"}
+           7: "wrong kinds in the assignment-type message", 8: "Mod fast path sign",
+           9: "BindType ignores the text type register"}
 
 
 def suites(nift, rt_diff):
@@ -57,6 +60,7 @@ def suites(nift, rt_diff):
         ("adversarial", [py, t("vm_adversarial.py"), "--nift", nift, "--seed", "3", "--count", "40",
                          "--per-family", "120"]),
         ("former-replay", [py, t("vm_former_replay.py"), "--nift", nift, "--seed", "3", "--sample", "60"]),
+        ("records", [py, t("vm_records_coverage.py"), "--nift", nift]),
     ]
     return out
 

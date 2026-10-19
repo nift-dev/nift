@@ -6,6 +6,8 @@
 //   M2 large slow-path results off by 1000 (vm_ops)   M6 wrong index number in the message (vm_ops)
 //   M3 spurious overflow in AddI for small operands   M7 wrong kinds in the assignment message (vm_ops)
 //   M4 a dropped loop iteration (i += 1 from 1 to 3)  M8 the Mod fast path's sign
+//   M9 BindType ignores a text type held in a register (a declaration from a
+//      parameter, stage 4) and binds with the unknown type -1
 #include "rt/vm_ops.h"
 
 #ifdef NIFT_VM_MUTANTS
@@ -20,9 +22,11 @@
     if (vm_mutant() == 1) (table)[static_cast<std::size_t>(OpCode::Sub)] = &&LC_Add;
 #define MUTATE_ERROR_OFFSET(offset) \
     if (vm_mutant() == 5) ++(offset);
+#define BIND_TEXT(c) ((vm_mutant() == 9 && !((c) & kConstantBit)) ? std::int64_t{-1} : RK(c).as_int())
 #else
 #define MUTATE_ADDI(x, offset)
 #define MUTATE_MOD(v) (v)
 #define MUTATE_CHECKED_TABLE(table)
 #define MUTATE_ERROR_OFFSET(offset)
+#define BIND_TEXT(c) (RK(c).as_int())
 #endif

@@ -15,7 +15,19 @@ CP12 refusals lifted with their safety conditions, as differential suites.
   REFUSED     the shapes whose difference is observable stay refused before
               execution with the reason: an argument with an effect
               (prepared-fn-unprepared), a pushed aggregate taken from a place
-              (aliasing: legacy pushes a location reference).
+              (aliasing: legacy pushes a location reference), a declaration
+              in a prepared function from any text but one parameter name
+              (prepared-decl-type).
+  PARAM_DECL  the third lift (coordinator ruling on `pad`): in a prepared
+              function, `x := p` (p a parameter) takes p's bound type from the
+              type register. The same function called with string, int,
+              double, array and object arguments, from loops and from top
+              level, with later reassignments of the declared binding to
+              another type: NIFT_VM=1 (any engine path) must give legacy's
+              output byte for byte, including legacy's binding-type errors;
+              the ones marked `vm` must run on the VM. The top-level `1e2`
+              case (a double-typed binding holding an integral value) binds
+              differently if the register is ignored (mutant 9).
 
   vm_records_coverage.py --nift ./nift
 """
@@ -47,7 +59,33 @@ SUPPORTED = [
     ('up_while_cond', 'fn(f(p)) { return (p > 0 ? 1 : 0) }\ni := 0\nwhile (i < 3 && f(i) < 5) { print(i); i += 1 }\n'),
 ]
 
+PARAM_DECL = [
+    # (name, must run on the VM, source)
+    ("pd_types_loop", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
+     'vals := ["a", 2, 2.5, [1, "b"], {"k": 1}]\ni := 0\nwhile (i < 5) { f(vals[i]); i += 1 }\nf("top")\nf(7)\n'),
+    ("pd_types_literals", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\ni := 0\n'
+     'while (i < 1) { f("a"); f(2); f(2.5); f([1, 2]); f({"k": 1}); i += 1 }\n'),
+    ("pd_pad", True, 'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
+     'names := ["item0", "it", "x"]\nk := 0\nr := ""\nwhile (k < 3) { r += pad(names[k], 6) + ";"; k += 1 }\n'
+     'print(r)\nprint(pad("top", 5))\n'),
+    ("pd_register_type_top", True, 'fn(f(p)) {\n  out := p\n  print(out)\n  out = 2.5\n  print(out)\n  return 0\n}\n'
+     'x := 1e2\nprint(x)\nf(x)\nv := 100\nf(v)\n'),
+    ("pd_reassign_double_then_string", False, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\n'
+     'i := 0\nwhile (i < 1) { f(2.5); i += 1 }\nwhile (i < 2) { f("a"); i += 1 }\n'),
+    ("pd_reassign_double_then_int", False, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\n'
+     'i := 0\nwhile (i < 1) { f(2.5); i += 1 }\nwhile (i < 2) { f(3); i += 1 }\n'),
+    ("pd_reassign_string_loop_top", False, 'fn(f(s)) {\n  out := s\n  out = "x"\n  print(out)\n  return 0\n}\n'
+     'i := 0\nwhile (i < 1) { f("a"); i += 1 }\nf("b")\nwhile (i < 2) { f(3); i += 1 }\n'),
+    ("pd_reassign_untyped_args", False, 'fn(f(s)) {\n  out := s\n  out = 7\n  print(out)\n  return 0\n}\n'
+     'vals := [2.5, 3, "z"]\ni := 0\nwhile (i < 3) { f(vals[i]); i += 1 }\n'),
+    ("pd_register_type_loop", False, 'fn(f(p)) {\n  out := p\n  print(out)\n  out = 2.5\n  print(out)\n  return 0\n}\n'
+     'x := 1e2\ni := 0\nwhile (i < 1) { f(x); i += 1 }\nv := 100\nwhile (i < 2) { f(v); i += 1 }\n'),
+    ("pd_reassign_top_only", True, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\nf(2.5)\nf("a")\n'),
+]
+
 REFUSED = [
+    ("decl-param-expression", 'fn(f(s)) {\n  out := s + ""\n  return out\n}\ni := 0\nwhile (i < 1) { print(f("a")); i += 1 }\n',
+     "prepared-decl-type"),
     ("effect-argument", 'fn(g(x)) { print("g " + x)\nreturn x }\nfn(f(p)) { return (true ? p : 0) }\n'
      'i := 0\nwhile (i < 1) { print(f(g(i))); i += 1 }\n', "prepared-fn-unprepared"),
     ("call-argument", 'fn(g(x)) { return x }\nfn(f(p)) { return (p ?? 0) }\ni := 0\n'
@@ -107,12 +145,26 @@ def main():
                         if vm != legacy or not st or st.get("vm_executions", 0) != 0:
                             failures.append(f"{name}: not refused before execution or output differs")
                 shutil.rmtree(d, ignore_errors=True)
+        for name, vm_required, source in PARAM_DECL:
+            d = tempfile.mkdtemp(dir=work)
+            with open(os.path.join(d, "p.f"), "w") as f:
+                f.write(source)
+            legacy, _ = run(nift, d, None, a.timeout)
+            auto, st = run(nift, d, "1", a.timeout)
+            outcome = st and st.get("outcome")
+            if auto != legacy:
+                failures.append(f"{name}: NIFT_VM=1 output differs ({outcome})\n  legacy {legacy}\n  auto   {auto}")
+            elif vm_required and outcome not in ("vm", "vm-error"):
+                failures.append(f"{name}: not on the VM ({outcome}, {st and st.get('reason')})")
+            print(f"param-decl {name}: {outcome} {st and st.get('reason')!r}, identical to legacy: {auto == legacy}")
+            shutil.rmtree(d, ignore_errors=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for f in failures:
         print("FAIL " + f)
     print(("PASS" if not failures else "FAIL") + f" vm records coverage: {len(SUPPORTED)} supported shapes on the VM "
-          f"(identical to legacy), {len(REFUSED)} refused; {len(failures)} failure(s)")
+          f"(identical to legacy), {len(REFUSED)} refused, {len(PARAM_DECL)} parameter-declaration programs "
+          f"identical to legacy; {len(failures)} failure(s)")
     return 1 if failures else 0
 
 

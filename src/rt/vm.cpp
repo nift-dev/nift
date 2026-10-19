@@ -246,7 +246,7 @@ VmResult Vm::run(std::string& output) {
     OP(JmpFalse) { pc += truth(R[pc->a]) ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
     OP(JmpTrue) { pc += truth(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(JmpNotNull) { pc += R[pc->a].is_null() ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
-    OP(BindType) { R[pc->a] = Value::integer(text_binding_type(RK(pc->c).as_int(), R[pc->b])); NEXT(); }
+    OP(BindType) { R[pc->a] = Value::integer(text_binding_type(BIND_TEXT(pc->c), R[pc->b])); NEXT(); }
     OP(CheckAssign) {  // textual `x = e`: the type legacy derives from the text and the value
         const std::int64_t assigned = text_binding_type(RK(pc->c).as_int(), R[pc->a]);
         if (tag_assignable(assigned, R[pc->b].as_int())) NEXT();

@@ -49,7 +49,7 @@ public:
         mark_unpreparable_functions();
         check_unpreparable_calls();
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
-            check_regions(ast_.at(plan_.functions[f]).b, marked_[f]);
+            check_regions(ast_.at(plan_.functions[f]).b, marked_[f], plan_.functions[f]);
         if (!result_.refused) top_level([this](NodeId id) { check_regions(id, false); return !result_.refused; });
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f) {
             caller_ = static_cast<int>(f);
@@ -168,10 +168,15 @@ private:
     // types of the bindings visible at that loop's header; that is the
     // binding the VM resolves unless the name is (re)declared inside the
     // loop (a loop-local shadow, as in `a := 2.5; b := a`).
-    void check_regions(NodeId body, bool prepared_function) {
+    void check_regions(NodeId body, bool prepared_function, NodeId fn = kNoNode) {
         if (prepared_function) {
+            std::unordered_set<std::string_view> params;
+            walk(ast_, fn, [&](NodeId, const Node& n) {
+                if (n.kind == NodeKind::Param) params.insert(ast_.text(n));
+                return true;
+            });
             walk(ast_, body,
-                 [this](NodeId, const Node& n) { return check_declaration(n, nullptr); });
+                 [&](NodeId, const Node& n) { return check_declaration(n, nullptr, &params); });
             return;
         }
         outermost_loops(body, [this](const Node& n) {
@@ -218,11 +223,17 @@ private:
 
     // Legacy types the declaration from the text after `:=` (decl_type),
     // evaluated when the body is prepared.
-    bool check_declaration(const Node& n, const std::unordered_set<std::string_view>* risky_names) {
+    // Stage 4 ruling: in a prepared function, a declaration whose text is
+    // exactly one parameter name takes that parameter's bound type (its type
+    // register, P5), as legacy's BindType; any other text naming a binding is
+    // refused.
+    bool check_declaration(const Node& n, const std::unordered_set<std::string_view>* risky_names,
+                           const std::unordered_set<std::string_view>* params = nullptr) {
         if (n.kind != NodeKind::Declare) return true;
         const std::string_view src = ast_.source();
         const std::uint32_t op = detail::find_in(src, ":=", n.begin, n.end);
         if (op == n.end) return refuse(n, "prepared-decl-type");
+        if (params && params->count(detail::trim(src.substr(op + 2, n.end - op - 2)))) return true;
         if (refers_to(infer_text_type(src.substr(op + 2, n.end - op - 2)), risky_names))
             return refuse(n, "prepared-decl-type");
         return true;
