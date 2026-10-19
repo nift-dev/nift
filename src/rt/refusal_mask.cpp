@@ -306,6 +306,20 @@ bool Masker::unchain(std::uint32_t offset) {
         if (left == NodeKind::Ident || left == NodeKind::Member || left == NodeKind::Index) continue;
         const NodeId p = parent_[id];
         NodeId target = id;
+        // Shape of the refused access, for the inventory: receiver -> access.
+        const Node& recv = ast_.at(n.a);
+        std::string shape = node_kind_name(recv.kind);
+        if (recv.kind == NodeKind::Call && recv.a != kNoNode) {
+            const Node& callee = ast_.at(recv.a);
+            if (callee.kind == NodeKind::Ident) shape = "call(" + std::string(ast_.text(callee)) + ")";
+            else if ((callee.kind == NodeKind::Member || callee.kind == NodeKind::SafeMember) && callee.b != kNoNode)
+                shape = "method(" + std::string(ast_.text(ast_.at(callee.b))) + ")";
+        }
+        if (n.kind == NodeKind::Index) shape += "->index";
+        else if (p != kNoNode && ast_.at(p).kind == NodeKind::Call && ast_.at(p).a == id)
+            shape += "->method:" + std::string(ast_.text(ast_.at(n.b)));
+        else shape += "->member";
+        detail_ = shape;
         if (n.kind == NodeKind::Member && p != kNoNode && ast_.at(p).kind == NodeKind::Call && ast_.at(p).a == id) {
             target = p;
             const std::string_view name = ast_.text(ast_.at(n.b));
@@ -329,7 +343,8 @@ bool Masker::unchain(std::uint32_t offset) {
 bool Masker::mask_at(std::uint32_t offset, const std::string& reason) {
     reindex();
     extra_.clear();
-    if (reason == "postfix-receiver" && unchain(offset)) {
+    detail_.clear();
+    if (reason.rfind("postfix-receiver", 0) == 0 && unchain(offset)) {
         ++rung_[offset];  // a repeat at this offset is consequential
         return true;
     }

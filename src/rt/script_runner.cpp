@@ -6,6 +6,7 @@
 #include "rt/unit_check.h"
 #include "rt/vm.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -188,6 +189,14 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
 
 namespace {
 
+// The source line containing `offset` (at most 160 bytes), for the inventory.
+std::string line_text(const std::string& source, std::uint32_t offset) {
+    const std::size_t begin = source.rfind('\n', offset == 0 ? 0 : offset - 1);
+    const std::size_t from = begin == std::string::npos || offset == 0 ? 0 : begin + 1;
+    const std::size_t end = source.find('\n', offset);
+    return source.substr(from, std::min<std::size_t>((end == std::string::npos ? source.size() : end) - from, 160));
+}
+
 // NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
 void add_inventory(const std::string& source, Stats& stats) {
     const RefusalInventory inventory = inventory_refusals(source);
@@ -197,7 +206,10 @@ void add_inventory(const std::string& source, Stats& stats) {
         const Location where = locate(source, item.offset);
         out += (k ? ",{" : "{") + std::string("\"reason\":\"") + json_escape(item.reason) +
                "\",\"line\":" + std::to_string(where.line) + ",\"column\":" + std::to_string(where.column) +
-               ",\"consequential\":" + (item.consequential ? "true" : "false") + "}";
+               ",\"consequential\":" + (item.consequential ? "true" : "false") +
+               (item.detail.empty() ? std::string() : ",\"detail\":\"" + json_escape(item.detail) + "\"" +
+                                                         ",\"text\":\"" + json_escape(line_text(source, item.offset)) +
+                                                         "\"") + "}";
     }
     out += "],\"inventory_complete\":" + std::string(inventory.complete ? "true" : "false") +
            ",\"inventory_stop\":\"" + json_escape(inventory.stop) + "\",\"inventory_rounds\":" +

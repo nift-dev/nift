@@ -28,6 +28,9 @@ public:
     // Reasons the last mask_at proved without a compilation (the method name
     // of a chained call refused as `postfix-receiver`); cleared by the call.
     std::vector<std::string> take_extra() { return std::move(extra_); }
+    // The shape of the access the last mask_at unchained (`postfix-receiver`):
+    // `<receiver>-><access>`, e.g. `method(trim)->method:upper`; else empty.
+    const std::string& detail() const { return detail_; }
 
 private:
     void reindex();
@@ -56,6 +59,7 @@ private:
     std::unordered_map<std::uint32_t, std::size_t> rung_;
     bool hoisted_ = false;
     std::vector<std::string> extra_;
+    std::string detail_;
     bool spill_name_found_ = false;
     std::pair<std::uint32_t, std::uint32_t> spill_name_{0, 0};  // source span
 };

@@ -82,7 +82,7 @@ RefusalInventory inventory_refusals(std::string_view source, std::size_t max_rou
     Ast ast(source);
     const ParseResult parsed = parse_script(ast);
     if (!parsed.ok) {
-        inventory.items.push_back({"parse-error", parsed.error.offset, false});
+        inventory.items.push_back({"parse-error", parsed.error.offset, false, {}});
         inventory.complete = false;
         inventory.stop = "parse-error";
         return inventory;
@@ -94,7 +94,7 @@ RefusalInventory inventory_refusals(std::string_view source, std::size_t max_rou
         const NodeId opaque = first_opaque_node(ast, parsed.root);
         if (opaque == kNoNode) break;
         inventory.items.push_back(
-            {std::string("opaque:") + opaque_reason_name(ast.at(opaque).reason), ast.at(opaque).begin, false});
+            {std::string("opaque:") + opaque_reason_name(ast.at(opaque).reason), ast.at(opaque).begin, false, {}});
         if (inventory.items.size() >= max_rounds || !masker.mask_opaque(opaque)) {
             inventory.complete = false;
             inventory.stop = "opaque-limit";
@@ -112,15 +112,16 @@ RefusalInventory inventory_refusals(std::string_view source, std::size_t max_rou
         if (compiled.program) break;
         const bool consequential = masker.consequential(compiled.offset, compiled.reason);
         inventory.items.push_back(
-            {free_names.refine(compiled.reason, compiled.offset), compiled.offset, consequential});
+            {free_names.refine(compiled.reason, compiled.offset), compiled.offset, consequential, {}});
         if (terminal(compiled.reason)) {
             inventory.complete = false;
             inventory.stop = compiled.reason;
             break;
         }
         const bool masked = masker.mask_at(compiled.offset, compiled.reason);
+        inventory.items.back().detail = masker.detail();
         for (std::string& extra : masker.take_extra())
-            inventory.items.push_back({std::move(extra), compiled.offset, false});
+            inventory.items.push_back({std::move(extra), compiled.offset, false, {}});
         if (!masked) {
             inventory.complete = false;
             inventory.stop = "unmaskable:" + compiled.reason;

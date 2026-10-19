@@ -35,6 +35,7 @@ struct InventoryItem {
     std::string reason;  // as NIFT_VM_STATS reports it (`opaque:*`, compiler reasons)
     std::uint32_t offset = 0;
     bool consequential = false;
+    std::string detail;  // postfix-receiver: the refused access's shape (refusal_mask.h)
 };
 
 struct RefusalInventory {
