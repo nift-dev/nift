@@ -363,6 +363,38 @@ problem. Allowances are counted and reported per run: bounded run (80 steps ×
 3 modes) 2, soak rerun under the lock (250 steps × 1 seed × 3 modes) 1, with 0
 problems.
 
+### Equal-timestamp allowance in `tests/build_recovery.py` (fix-cert-flakes)
+
+`tests/build_recovery.py` asserted "following build is a no-op" without the
+allowance above, and from 2026-10-19 failed 1–4 hybrid checks per run on an
+idle host (`built b ↳ dependency changed: content/b.html`, varying cases).
+Captures (pre-build `stat` of every file; old page-info kept by hard link):
+in every failure the dependency's mtime was **nanosecond-identical** to the
+page-info's (e.g. both `1792372126.509780118`), the output had the same
+stamp, `nift status` afterwards was up to date and the extra rebuild changed
+no byte. Kernel 6.18 (HZ=250) uses multigrain timestamps on ext4: a coarse
+stamp is max(jiffy clock, floor), the floor being the last fine-grained
+stamp issued anywhere. The test's Python write gets a fine-grained stamp;
+when the page-info is written in the same jiffy with no other fine-grained
+stamp issued in between, it receives that exact value. Measured with
+`write source; nift build; compare` × 200: idle 125/200 equal (hybrid
+rebuilt all 125, modified 0 thanks to its tick-hashes), 2 CPU burners 9/200,
+a process issuing fine-grained stamps alongside 0/200. So the failure depends
+on how quiet the host is, not on the change under test.
+
+Not changed in the runtime: in hybrid an equal stamp cannot tell an edit
+landing in the build's last tick from one before its read, and snapshots of
+dependencies the host did not observe are taken after rendering, so letting
+the hash decide on equal stamps would weaken hybrid's same-tick detection.
+The rebuild is wasted work, never stale output. The test now uses the
+randomized tester's confirmed-on-disk rule: one extra rebuild is allowed
+only if every rebuilt page's every reason is "dependency changed: X" with
+mtime(X) == mtime(page-info) read before that build, **and the extra rebuild
+changes no output or page-info byte**; the build after must be a no-op.
+Allowances are counted in the PASS line. `equal_tick_allowance_contract`
+forces equal stamps: unchanged bytes are accepted once; changed bytes with
+an equal stamp are rebuilt and never accepted as a no-op.
+
 ## Overlap with feature-site-dx
 
 `build --auto` (src/CLI.cpp, watch loop) is not changed here: on this branch

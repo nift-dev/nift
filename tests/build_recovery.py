@@ -126,9 +126,90 @@ def same_as_clean(root, scratch, label):
           not (root / ".nift/failed.json").exists() and not list(root.rglob("*.nift-tmp-*")))
 
 
-def up_to_date(root, label):
+def _mtimes(root):
+    return {p.relative_to(root).as_posix(): p.stat().st_mtime_ns for p in root.rglob("*") if p.is_file()}
+
+
+def _equal_tick(before, out):
+    """True only if every page the build rebuilt was rebuilt solely because a
+    dependency's mtime EQUALS that page's page-info mtime, both read from disk
+    before the build (same rule as tests/build_recovery_random.py)."""
+    page, ok, seen = None, True, False
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("built "):
+            page = line[len("built "):]
+            seen = True
+        elif line.startswith("↳ "):
+            reason = line[2:]
+            prefix = "dependency changed: "
+            info = before.get(f".nift/public/{page}.info.json") if page else None
+            dep = before.get(reason[len(prefix):]) if reason.startswith(prefix) else None
+            if info is None or dep is None or dep != info:
+                ok = False
+    return seen and ok
+
+
+equal_tick_allowances = []
+
+
+def settle(root):
+    """The build after a successful build must be a no-op. modified/hybrid
+    rebuild conservatively when a dependency's mtime EQUALS the page-info
+    mtime (CP01 rule): on a multigrain-timestamp kernel an idle host stamps a
+    page-info written in the same tick as the source edit with the source's
+    exact nanosecond mtime. So exactly one extra rebuild is allowed, only when
+    the tester confirms that condition from disk, and only if that rebuild
+    changes no output or page-info byte (the output was not stale: the extra
+    build was wasted work, not a correction). The build after it must be a
+    no-op. Returns (ok, allowed, output)."""
+    before, snap = _mtimes(root), snapshot(root)
     rc, out = run(root, "build")
-    check(f"{label}: following build is a no-op", rc == 0 and "up to date" in out, out[-400:])
+    if rc == 0 and "up to date" in out:
+        return True, False, out
+    if not (rc == 0 and _equal_tick(before, out)):
+        return False, False, out
+    after = snapshot(root)
+    changed = sorted(k for k in set(snap) | set(after) if snap.get(k) != after.get(k))
+    if changed:
+        return False, True, f"equal-timestamp rebuild changed {', '.join(changed[:6])} (output was stale)\n{out}"
+    rc, out2 = run(root, "build")
+    return rc == 0 and "up to date" in out2, True, out + out2
+
+
+def up_to_date(root, label):
+    ok, allowed, out = settle(root)
+    if ok and allowed:
+        equal_tick_allowances.append(label)
+    check(f"{label}: following build is a no-op", ok, out[-600:])
+
+
+def equal_tick_allowance_contract(scratch):
+    """The allowance is exercised deterministically (forced equal stamps) and
+    cannot hide a stale output: equal stamps + unchanged bytes is allowed once;
+    equal stamps + changed bytes must rebuild with the new content and is
+    never accepted as a no-op."""
+    for mode in ("modified", "hybrid"):
+        root = scratch / f"equal-tick-{mode}"
+        project(root, mode)
+        run(root, "build")
+        info_ns = (root / ".nift/public/a.info.json").stat().st_mtime_ns
+        os.utime(root / "content/a.html", ns=(info_ns, info_ns))
+        ok, allowed, out = settle(root)
+        if mode == "hybrid":
+            check(f"equal-tick {mode}: unchanged source with equal stamp is a confirmed allowance", ok and allowed, out[-400:])
+        else:  # modified mode: no tick-hash record for a forced stamp, same CP01 rule
+            check(f"equal-tick {mode}: unchanged source with equal stamp settles", ok, out[-400:])
+        stale = (root / "public/a.html").read_bytes()
+        write(root, "content/a.html", "<p>a-equal-tick</p>\n")
+        info_ns = (root / ".nift/public/a.info.json").stat().st_mtime_ns
+        os.utime(root / "content/a.html", ns=(info_ns, info_ns))
+        ok, allowed, out = settle(root)
+        check(f"equal-tick {mode}: changed source with equal stamp is never a no-op", not ok, out[-400:])
+        check(f"equal-tick {mode}: changed source with equal stamp is rebuilt",
+              (root / "public/a.html").read_bytes() != stale and b"a-equal-tick" in (root / "public/a.html").read_bytes())
+        same_as_clean(root, scratch, f"equal-tick {mode}")
+        shutil.rmtree(root)
 
 
 # ---------------------------------------------------------------- ordinary failures
@@ -599,10 +680,13 @@ def main():
         pagination_without_failed_list(scratch)
         symlinked_outputs(scratch)
         failed_list_hygiene(scratch)
+        equal_tick_allowance_contract(scratch)
+    allowances = (f"; {len(equal_tick_allowances)} confirmed equal-timestamp extra rebuild(s) allowed"
+                  + (f" ({', '.join(equal_tick_allowances)})" if equal_tick_allowances else ""))
     if fails:
-        print(f"build recovery: {len(fails)} of {checks} checks FAILED")
+        print(f"build recovery: {len(fails)} of {checks} checks FAILED{allowances}")
         return 1
-    print(f"PASS build recovery (D-020): {checks} checks, modes {','.join(MODES)}")
+    print(f"PASS build recovery (D-020): {checks} checks, modes {','.join(MODES)}{allowances}")
     return 0
 
 
