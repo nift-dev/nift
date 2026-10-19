@@ -16,6 +16,7 @@
 #include "rt/atom.h"
 #include "rt/heap_account.h"
 #include "rt/natives/builtin.h"
+#include "rt/natives/json_methods.h"
 #include "rt/string.h"
 
 #include <valgrind/callgrind.h>
@@ -54,7 +55,20 @@ struct Workload {
     // Builds the arguments for size n; `reps` calls are measured (conversions
     // run n calls on n different inputs).
     std::function<std::vector<std::vector<Value>>(std::size_t n)> inputs;
+    NativeFn direct = nullptr;  // a native API that is not a table entry (json_parse)
 };
+
+Status json_parse_native(const Context& context, const Value* args, std::uint32_t, Value& out, std::string& error) {
+    return json_parse(context, string_view_of(args[0]), out, error);
+}
+
+std::string json_records(std::size_t n) {
+    std::string t = "{\"items\": [";
+    for (std::size_t k = 0; k < n; ++k)
+        t += (k ? "," : "") + std::string("{\"id\": ") + std::to_string(k) + ", \"name\": \"n\\u00e9" +
+             std::to_string(k) + "\", \"big\": 9007199254740993, \"x\": 2.5}";
+    return t + "]}";
+}
 
 std::vector<std::vector<Value>> one(std::vector<Value> args) { return {static_cast<std::vector<Value>&&>(args)}; }
 
@@ -135,6 +149,37 @@ std::vector<Workload> workloads() {
         {"obj.merge", BuiltinId::ObjMerge, [](std::size_t n) { return one({object_of(n), object_of(4)}); }},
         {"any.stringify", BuiltinId::Stringify, [](std::size_t n) { return one({records(n)}); }},
         {"any.prettify", BuiltinId::Prettify, [](std::size_t n) { return one({records(n)}); }},
+        // CP15
+        {"json.parse", BuiltinId::Count, [](std::size_t n) { return one({make_string(json_records(n))}); },
+         json_parse_native},
+        {"fn.validate", BuiltinId::FnValidate, [](std::size_t n) {
+             Value schema;
+             std::string e;
+             json_parse(Context{}, R"({"type": "object", "properties": {"items": {"type": "array", "items": )"
+                                   R"({"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}}}})",
+                        schema, e);
+             Value doc;
+             json_parse(Context{}, json_records(n), doc, e);
+             return one({schema, doc}); }},
+        {"fn.sha256", BuiltinId::FnSha256, [](std::size_t n) { return one({text_of(n)}); }},
+        {"fn.bytes", BuiltinId::FnBytes, [](std::size_t n) {
+             Value a = make_array(n);
+             for (std::size_t k = 0; k < n; ++k) array_push(a, Value::integer(static_cast<std::int64_t>(k % 256)));
+             return one({a}); }},
+        {"str.encode", BuiltinId::StrEncode, [s](std::size_t n) { return one({text_of(n), s("utf-8")}); }},
+        {"bytes.decode", BuiltinId::BytesDecode, [s](std::size_t n) {
+             return one({make_bytes(std::vector<std::uint8_t>(n, 'a')), s("utf-8")}); }},
+        {"bytes.slice", BuiltinId::BytesSlice, [i](std::size_t n) {
+             return one({make_bytes(std::vector<std::uint8_t>(n, 1)), i(static_cast<std::int64_t>(n / 4)),
+                         i(static_cast<std::int64_t>(3 * n / 4))}); }},
+        {"num.round", BuiltinId::NumRound, [](std::size_t n) {
+             std::vector<std::vector<Value>> calls;
+             for (std::size_t k = 0; k < n; ++k) calls.push_back({Value::number(static_cast<double>(k) + 0.5)});
+             return calls; }},
+        {"num.to_int", BuiltinId::NumToInt, [](std::size_t n) {
+             std::vector<std::vector<Value>> calls;
+             for (std::size_t k = 0; k < n; ++k) calls.push_back({Value::number(static_cast<double>(k))});
+             return calls; }},
     };
 }
 
@@ -150,14 +195,14 @@ int main(int argc, char** argv) {
         auto calls = w.inputs(n);
         std::vector<Value> results(calls.size());
         std::string error;
-        const BuiltinSpec& spec = builtin_spec(w.id);
+        const NativeFn fn = w.direct ? w.direct : builtin_spec(w.id).fn;
         const std::size_t heap_before = live_heap_bytes();
         g_allocations = g_bytes = 0;
         g_counting = true;
         CALLGRIND_ZERO_STATS;
         for (std::size_t k = 0; k < calls.size(); ++k)
-            if (call_builtin(spec, context, calls[k].data(), static_cast<std::uint32_t>(calls[k].size()), results[k],
-                             error) != Status::Ok) {
+            if (fn(context, calls[k].data(), static_cast<std::uint32_t>(calls[k].size()), results[k], error) !=
+                Status::Ok) {
                 std::fprintf(stderr, "%s failed: %s\n", w.name, error.c_str());
                 return 1;
             }

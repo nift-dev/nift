@@ -12,3 +12,12 @@ pair.trim.large
 fmt.chain
 fmt.chain.concat
 fmt.chain.pretty
+# CP15 (cp15-builtins-design.md N-Q2, B-Q2, J-Q1, J-Q2)
+num.abs.args
+num.round.args
+bytes.decode.args
+bytes.encode.args
+json.validate.lit
+pair.json.escape
+pair.json.negzero
+pair.json.bigint

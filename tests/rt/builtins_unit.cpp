@@ -6,7 +6,9 @@
 
 #include "rt/compare.h"
 #include "rt/decimal.h"
+#include "rt/natives/bytes_methods.h"
 #include "rt/natives/format_methods.h"
+#include "rt/natives/json_methods.h"
 #include "rt/natives/object_methods.h"
 #include "rt/natives/support.h"
 
@@ -84,7 +86,7 @@ void table() {
     CHECK(find_builtin(Receiver::String, "size") == nullptr);   // legacy: unsupported for strings
     CHECK(find_builtin(Receiver::Array, "index_of") == nullptr);  // arrays spell it indexOf
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
-    CHECK(builtin_count() == 73);
+    CHECK(builtin_count() == 89);
     CHECK(find_builtin(Receiver::Number, "to_string") && find_builtin(Receiver::Any, "stringify"));
     CHECK(find_builtin(Receiver::Number, "to_double") == nullptr);  // Q4: context-dependent in legacy
 }
@@ -321,6 +323,79 @@ void formatting() {
     CHECK(mismatches == 0);
 }
 
+void batch_b() {
+    // N1 numbers
+    CHECK(ok(call(BuiltinId::NumAbs, {d(-2.5)}), "float | [2.5]"));
+    CHECK(ok(call(BuiltinId::NumAbs, {i(-9007199254740993)}), "int | [9007199254740992]"));  // via double (N-Q1)
+    CHECK(ok(call(BuiltinId::NumFloor, {d(-2.5)}), "int | [-3]"));
+    CHECK(ok(call(BuiltinId::NumCeil, {d(-2.5)}), "int | [-2]"));
+    CHECK(ok(call(BuiltinId::NumRound, {d(-2.5)}), "int | [-3]"));
+    CHECK(ok(call(BuiltinId::NumRound, {d(0.5)}), "int | [1]"));
+    CHECK(err(call(BuiltinId::NumRound, {d(0.5), i(0)}), "round: expected no arguments"));
+    CHECK(ok(call(BuiltinId::NumToInt, {i(9007199254740993)}), "int | [9007199254740993]"));
+    CHECK(ok(call(BuiltinId::NumToInt, {d(-3.0)}), "int | [-3]"));
+    CHECK(err(call(BuiltinId::NumToInt, {d(2.5)}), "to_int: invalid or out-of-range integer"));
+    CHECK(err(call(BuiltinId::NumToInt, {d(1e19)}), "to_int: invalid or out-of-range integer"));
+    CHECK(call(BuiltinId::NumAbs, {s("1")}).status == Status::Internal);
+    // B1 bytes
+    Result b = call(BuiltinId::FnBytes, {arr({i(97), d(98.0), i(0), i(255)})});
+    CHECK(b.status == Status::Ok && b.out.is(Kind::Bytes) && bytes_of(b.out).size() == 4 && bytes_of(b.out)[3] == 255);
+    CHECK(call(BuiltinId::FnBytes, {}).status == Status::Ok);
+    CHECK(err(call(BuiltinId::FnBytes, {arr({i(256)})}), "bytes: array values must be integers from 0 to 255"));
+    CHECK(err(call(BuiltinId::FnBytes, {arr({d(1.5)})}), "bytes: array values must be integers from 0 to 255"));
+    CHECK(err(call(BuiltinId::FnBytes, {s("ab")}), "bytes: expected an array of integers"));
+    CHECK(err(call(BuiltinId::FnBytes, {arr({}), arr({})}), "bytes: expected zero arguments or one byte array"));
+    CHECK(ok(call(BuiltinId::BytesLength, {b.out}), "int | [4]"));
+    CHECK(ok(call(BuiltinId::BytesEmpty, {b.out}), "bool | [false]"));
+    Result sl = call(BuiltinId::BytesSlice, {b.out, i(1), i(3)});
+    CHECK(sl.status == Status::Ok && bytes_of(sl.out) == std::vector<std::uint8_t>({98, 0}));
+    CHECK(err(call(BuiltinId::BytesSlice, {b.out, i(-1)}), "slice: invalid start"));
+    Result e = call(BuiltinId::StrEncode, {s("h\xc3\xa9"), s("utf-8")});
+    CHECK(e.status == Status::Ok && bytes_of(e.out).size() == 3);
+    CHECK(ok(call(BuiltinId::BytesDecode, {e.out, s("utf-8")}), "string | [\"h\xc3\xa9\"]"));
+    CHECK(err(call(BuiltinId::StrEncode, {s("a"), s("UTF-8")}), "encode: encoding must be exactly 'utf-8'"));
+    CHECK(err(call(BuiltinId::StrEncode, {s("a")}), "encode: expected encoding"));
+    CHECK(err(call(BuiltinId::StrEncode, {s("\xed\xa0\x80"), s("utf-8")}), "encode: invalid UTF-8 text"));  // surrogate
+    CHECK(ok(call(BuiltinId::StrLength, {s("\xed\xa0\x80")}), "int | [1]"));  // B-Q1: length is lenient
+    CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({0xff}), s("utf-8")}), "decode: invalid UTF-8"));
+    CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({0xc0, 0x80}), s("utf-8")}), "decode: invalid UTF-8"));
+    CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({}), s("latin1")}), "decode: encoding must be exactly 'utf-8'"));
+    CHECK(ok(call(BuiltinId::FnSha256, {s("abc")}),
+             "string | [\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"]"));
+    CHECK(ok(call(BuiltinId::FnSha256, {make_bytes({97, 98, 99})}),
+             "string | [\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"]"));
+    CHECK(err(call(BuiltinId::FnSha256, {i(1)}), "sha256: expected a string or bytes value"));
+    CHECK(err(call(BuiltinId::FnSha256, {}), "sha256: expected one string or bytes value"));
+    CHECK(err(call(BuiltinId::Stringify, {arr({b.out})}), "bytes values are not serializable"));
+    CHECK(ok(call(BuiltinId::FnType, {b.out}), "string | [\"bytes\"]"));
+    // J1 JSON values
+    Context context;
+    Value v;
+    std::string error;
+    CHECK(json_parse(context, "[9007199254740993, 0.0, -0, 1E2, 1e400, \"\\u00e9\\n\", {\"a\": [true, null]}]", v,
+                     error) == Status::Error);  // 1e400: not finite
+    CHECK(error.find("finite") != std::string::npos);
+    CHECK(json_parse(context, "[9007199254740993, 0.0, -0, 1E2, 1e-400, \"\\u00e9\\n\", {\"a\": [true, null]}]", v,
+                     error) == Status::Ok);
+    CHECK(shown(v) == "ok array | [[9007199254740993,0.0,-0,100,1e-400,\"\xc3\xa9\\n\",{\"a\":[true,null]}]]");
+    CHECK(array_items(v)[1].is(Kind::Decimal) && array_items(v)[3].is(Kind::Double));
+    CHECK(json_parse(context, "{\"a\": 1, \"a\": 2}", v, error) == Status::Error);
+    CHECK(json_parse(context, "[1,]", v, error) == Status::Error);
+    const Value schema = obj({{"type", s("string")}});
+    CHECK(ok(call(BuiltinId::FnValidate, {schema, s("x")}), "string | [\"x\"]"));
+    Result rejected = call(BuiltinId::FnValidate, {schema, i(1)});
+    CHECK(rejected.status == Status::Recoverable && rejected.error == "validate: at $: expected string, received number");
+    CHECK(err(call(BuiltinId::FnValidate, {obj({{"type", i(1)}}), i(1)}),
+              "validate: type must be a string or array of strings at #"));
+    CHECK(err(call(BuiltinId::FnValidate, {schema, make_bytes({1})}), "validate: bytes values are not JSON serializable"));
+    CHECK(err(call(BuiltinId::FnValidate, {schema}), "validate: expected schema and value"));
+    const Value nested = arr({arr({i(1)}), obj({{"k", i(2)}})});
+    Result copied = call(BuiltinId::FnDeepcopy, {nested});
+    CHECK(copied.status == Status::Ok && equal(copied.out, nested));
+    array_push(array_mut(copied.out)[0], i(9));  // mutating the copy leaves the original (COW)
+    CHECK(shown(nested) == "ok array | [[[1],{\"k\":2}]]");
+}
+
 // Receivers are never changed, `out` may alias the receiver's register, and
 // self-referential calls (o.merge(o)) respect the CP09 reference contract
 // (enforced by relocation under ASan).
@@ -395,6 +470,7 @@ int main() {
     arrays();
     objects();
     formatting();
+    batch_b();
     aliasing_and_cow();
     heap_accounting();
     return rt_test::finish("builtins-unit");

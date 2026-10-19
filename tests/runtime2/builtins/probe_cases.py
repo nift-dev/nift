@@ -250,6 +250,58 @@ CASES = [
     ("fmt.is_enum", [], "is_enum(1)"),
     ("fmt.is_bool.args", [], "is_bool()"),
 
+    # ---- CP15: numbers ----
+    ("num.abs", ['x := -2.5'], "x.abs()"),
+    ("num.abs.big", ['x := -9007199254740993'], "x.abs()"),
+    ("num.abs.args", ['x := -2.5'], "x.abs(1)"),
+    ("num.floor", ['x := -2.5'], "x.floor()"),
+    ("num.ceil", ['x := -2.5'], "x.ceil()"),
+    ("num.round", ['x := -2.5'], "x.round()"),
+    ("num.round.half", ['x := 0.5'], "x.round()"),
+    ("num.round.args", ['x := 2.5'], "x.round(0)"),
+    ("num.to_int.frac", ['x := 2.5'], "x.to_int()"),
+    ("num.to_int.big", ['x := 9007199254740993'], "x.to_int()"),
+    ("num.to_int.args", ['x := 2'], "x.to_int(1)"),
+    ("num.floor.lit", [], "(2.5).floor()"),
+    # ---- CP15: bytes ----
+    ("bytes.make", [], "bytes([97, 98, 0, 255])"),
+    ("bytes.empty", [], "bytes()"),
+    ("bytes.bad", [], "bytes([256])"),
+    ("bytes.notarray", [], 'bytes("ab")'),
+    ("bytes.args", [], "bytes([1], [2])"),
+    ("bytes.length", ['b := bytes([1, 2, 3])'], "b.length()"),
+    ("bytes.size", ['b := bytes([1, 2, 3])'], "b.size()"),
+    ("bytes.length.args", ['b := bytes([1, 2, 3])'], "b.length(1)"),
+    ("bytes.empty.m", ['b := bytes([1, 2, 3])'], "b.empty()"),
+    ("bytes.slice", ['b := bytes([1, 2, 3])'], "b.slice(1).length()"),
+    ("bytes.slice.bad", ['b := bytes([1, 2, 3])'], "b.slice(-1)"),
+    ("bytes.decode", ['b := bytes([104, 195, 169])'], 'b.decode("utf-8")'),
+    ("bytes.decode.bad", ['b := bytes([255])'], 'b.decode("utf-8")'),
+    ("bytes.decode.enc", ['b := bytes([104])'], 'b.decode("latin1")'),
+    ("bytes.decode.args", ['b := bytes([104])'], "b.decode()"),
+    ("bytes.encode", S, 's.encode("utf-8").length()'),
+    ("bytes.encode.enc", S, 's.encode("UTF-8")'),
+    ("bytes.encode.args", S, "s.encode()"),
+    ("bytes.stringify", ['b := bytes([1])'], "b.stringify()"),
+    ("bytes.type", ['b := bytes([1])'], "type(b)"),
+    ("bytes.eq", ['b := bytes([1])'], "b == bytes([1])"),
+    ("bytes.sha", ['b := bytes([97, 98, 99])'], "sha256(b)"),
+    ("str.sha", [], 'sha256("abc")'),
+    ("str.sha.num", [], "sha256(1)"),
+    ("str.sha.args", [], 'sha256("a", "b")'),
+    # ---- CP15: JSON values ----
+    ("json.validate", ['sc := {"type": "string"}', 'v := "x"'], "validate(sc, v)"),
+    ("json.validate.lit", ['sc := {"type": "string"}'], 'validate(sc, "x")'),
+    ("json.validate.reject", ['sc := {"type": "string"}', 'v := 1'], "validate(sc, v)"),
+    ("json.validate.badschema", ['sc := {"type": 1}', 'v := 1'], "validate(sc, v)"),
+    ("json.validate.args", ['sc := {"type": "string"}'], "validate(sc)"),
+    ("json.copy", ['a := [[1], {"k": 2}]'], "copy(a)"),
+    ("json.deepcopy", ['a := [[1], {"k": 2}]'], "deepcopy(a)"),
+    ("json.literal.big", [], "[9007199254740993, 1e400, 0.0, -0, 1E2, 12345678901234567890123]"),
+    ("json.literal.dup", [], '{"a": 1, "a": 2}'),
+    ("json.literal.dup.arr", [], '[{"a": 1, "a": 2}]'),
+    ("json.literal.esc", [], '["\\u00e9\\n"]'),
+
 ]
 
 # (id, setup, expression, equivalent expression): the two must mean the same.
@@ -263,6 +315,12 @@ PAIRS = [
     # keys/values/entries on a binding ignore extra arguments; on any other
     # receiver they are an arity error.
     ("pair.keys.arity", O, "o.keys(1)", '{"b": 1, "a": [2], "c": {"d": 3}}.keys(1)'),
+    # CP15 J-Q1: `[...]` literals evaluate their elements as Nift expressions,
+    # `{...}` literals that are valid JSON are parsed as JSON: the same text
+    # means different values ("\\u00e9", -0, integers beyond int64).
+    ("pair.json.escape", [], '["\\u00e9"][0]', '{"k": "\\u00e9"}.k'),
+    ("pair.json.negzero", [], '[-0][0]', '{"k": -0}.k'),
+    ("pair.json.bigint", [], '[12345678901234567890123][0]', '{"k": 12345678901234567890123}.k'),
     ("pair.trim.forms", ['w := "\x0b ab \x0b"'], "w.trim()", "w.trim_start().trim_end()"),
     ("pair.indexOf.forms", ['a := ["x", "y"]'], 'a.indexOf("y")', 'a.find_index(v => v == "y")'),
     ("pair.length.units", ['u := "\u00e9t\u00e9"'], "u.length()", "u.substr(0).split(\"\").size()"),

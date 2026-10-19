@@ -2449,7 +2449,8 @@ test: test-call-semantics
 # compiler/VM). RT_BUILTINS_LEGACY: the legacy nift binary used as oracle.
 RT_BUILTINS_LEGACY ?= $(CURDIR)/$(TARGET)
 RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp compare.cpp \
-	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp
+	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
+	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
 RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/natives/*.inc) \
 	$(RT_BUILTINS_CORE) $(wildcard src/rt/*.h) src/RuntimeValue.h tests/rt/rt_test.h tests/rt/builtins_support.h
@@ -2469,12 +2470,12 @@ $(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_BUILTINS_DEPS)
 # and render.cpp (a call into them fails the link), and the sources must not
 # include their headers.
 RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp \
-	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp)
+	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 .PHONY: test-rt-builtins-isolation test-rt-builtins-guards
 test-rt-builtins-isolation: $(RT_BUILTINS_BENCH)

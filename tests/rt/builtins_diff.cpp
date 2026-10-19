@@ -11,6 +11,8 @@
 #include "rt_test.h"
 
 #include "rt/natives/builtin.h"
+#include "rt/natives/json_methods.h"
+#include "Sha256.h"
 
 #include <cctype>
 #include <cstdio>
@@ -115,6 +117,35 @@ Value text_argument(const Value& receiver) {
     return make_string(random_text(2));
 }
 
+// Bytes: mostly the UTF-8 encoding of random text (decodable), sometimes
+// arbitrary bytes.
+Value random_bytes(bool text) {
+    std::vector<std::uint8_t> data;
+    if (text && chance(80)) {
+        const std::string t = random_text();
+        data.assign(t.begin(), t.end());
+    } else {
+        const std::size_t n = pick(9);
+        for (std::size_t k = 0; k < n; ++k) data.push_back(static_cast<std::uint8_t>(pick(256)));
+    }
+    return make_bytes(static_cast<std::vector<std::uint8_t>&&>(data));
+}
+
+const char* const kSchemas[] = {
+    R"({"type": "string"})", R"({"type": "number"})", R"({"type": ["array", "null"]})",
+    R"({"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}})",
+    R"({"type": "array", "items": {"type": "string"}, "minItems": 1})", R"({"enum": [1, "a", null]})",
+    R"({"type": "string", "minLength": 2, "maxLength": 4})", R"({"type": 1})", R"({"minimum": 0, "maximum": 10})",
+    R"({"type": "object", "additionalProperties": false, "properties": {"b": {}}})", R"({"const": [1]})",
+};
+
+Value parsed(const char* text) {
+    Value v;
+    std::string error;
+    json_parse(Context{}, text, v, error);
+    return v;
+}
+
 Value entries_array() {
     Value a = make_array();
     const std::size_t n = pick(5);
@@ -151,6 +182,7 @@ std::vector<Value> arguments(BuiltinId id) {
         case Receiver::Bool: args.push_back(Value::boolean(chance(50))); break;
         case Receiver::Null: args.push_back(Value()); break;
         case Receiver::Any: args.push_back(chance(70) ? random_array(0) : random_value(0)); break;
+        case Receiver::Bytes: args.push_back(random_bytes(id == BuiltinId::BytesDecode)); break;
         case Receiver::None: break;
     }
     const Value receiver = args.empty() ? Value() : args[0];
@@ -187,6 +219,25 @@ std::vector<Value> arguments(BuiltinId id) {
             case BuiltinId::FnHtmlEscape: case BuiltinId::FnAttrEscape: case BuiltinId::FnUrlEncode:
                 a = chance(80) ? make_string(random_text() + (chance(30) ? "<a href='x'>&\"/" : "")) : random_value(0);
                 break;
+            case BuiltinId::FnBytes: {
+                a = make_array();
+                const std::size_t n = pick(6);
+                for (std::size_t j = 0; j < n; ++j)
+                    array_push(a, chance(90) ? Value::integer(static_cast<std::int64_t>(pick(256)))
+                                             : (chance(50) ? Value::integer(256 + static_cast<std::int64_t>(pick(3)) - 1)
+                                                           : random_number()));
+                if (chance(25)) array_push(a, Value::integer(chance(50) ? 256 : (chance(50) ? 255 : -1)));  // boundaries
+                if (chance(5)) a = random_scalar();
+                break;
+            }
+            case BuiltinId::StrEncode: case BuiltinId::BytesDecode:
+                a = chance(85) ? make_string("utf-8") : make_string(chance(50) ? "UTF-8" : "latin1");
+                break;
+            case BuiltinId::FnSha256: a = chance(45) ? make_string(random_text()) : (chance(80) ? random_bytes(false) : random_scalar()); break;
+            case BuiltinId::BytesSlice: a = index_argument(static_cast<std::int64_t>(bytes_of(receiver).size())); break;
+            case BuiltinId::FnValidate:
+                a = k == 0 && chance(90) ? parsed(kSchemas[pick(sizeof kSchemas / sizeof kSchemas[0])]) : random_value(0);
+                break;
             case BuiltinId::ObjMerge: case BuiltinId::ObjMergeDeep:
                 a = chance(90) ? random_object(0) : random_value(1);
                 break;
@@ -206,8 +257,44 @@ std::vector<Value> arguments(BuiltinId id) {
     return args;
 }
 
+// Random JSON text for json_parse (CP15): number spellings that legacy keeps
+// exactly (big integers, zero with fraction or sign, |exponent| >= 300) and
+// ordinary ones, string escapes, nesting, unique keys, random spacing.
+const char* const kJsonNumbers[] = {"0", "-0", "0.0", "-0.0", "1", "-17", "2.5", "1e2", "1E+2", "-1.5e-3", "1e300",
+                                    "1e-300", "9007199254740993", "12345678901234567890123", "123456789012345",
+                                    "1234567890123456", "0.1", "100.000", "5e-324", "1.7976931348623157e308",
+                                    "-9223372036854775808", "3.0e0"};
+const char* const kJsonStrings[] = {"\"\"", "\"a\"", "\"\\u00e9\"", "\"\\n\\t\\\"\\\\\"", "\"\\u0041\\u00df\"",
+                                    "\"\xc3\xa9\xe6\x97\xa5\"", "\"\\/\"", "\"\\ud83d\\ude00\"", "\"x y\"",
+                                    "\"\\u0001\""};
+
+std::string space() { return chance(30) ? (chance(50) ? " " : "  ") : ""; }
+
+std::string random_json(int depth, bool top) {
+    if (!top && (depth >= 3 || chance(55))) {
+        switch (pick(5)) {
+            case 0: return chance(50) ? "true" : (chance(50) ? "false" : "null");
+            case 1: case 2: return kJsonNumbers[pick(sizeof kJsonNumbers / sizeof kJsonNumbers[0])];
+            default: return kJsonStrings[pick(sizeof kJsonStrings / sizeof kJsonStrings[0])];
+        }
+    }
+    // Top level: an object. Legacy JSON-parses a structured literal only when
+    // it is a JSON object (`{...}`); an array literal's elements are Nift
+    // expressions (design record J-Q1), so they are not json_parse cases.
+    const bool array = !top && chance(50);
+    std::string out = array ? "[" : "{";
+    const std::size_t n = pick(5);
+    for (std::size_t k = 0; k < n; ++k) {
+        out += k ? "," + space() : space();
+        if (!array) out += "\"" + std::string(kKeys[k % 6]) + "\"" + space() + ":" + space();
+        out += random_json(depth + 1, false);
+    }
+    return out + space() + (array ? "]" : "}");
+}
+
 struct Case {
-    BuiltinId id;
+    BuiltinId id;  // BuiltinId::Count: a json_parse case (`json`)
+    std::string json;
     std::vector<Value> args;
     std::string expected;  // the native's outcome
     std::string legacy;    // the legacy outcome
@@ -224,23 +311,38 @@ bool refused(const Case& c) {
     // chain does not match, and the call is "unknown value or malformed
     // expression" (Q12) - also refused by W1.
     const bool presentation = c.id == BuiltinId::Stringify || c.id == BuiltinId::Prettify || c.id == BuiltinId::Highlight;
-    return (listing || presentation) && c.args.size() != 1;
+    // copy/deepcopy take their whole argument text as one expression (a
+    // second argument is an expression error, not an arity message).
+    const bool copy = c.id == BuiltinId::FnCopy || c.id == BuiltinId::FnDeepcopy;
+    return ((listing || presentation) && c.args.size() != 1) || (copy && c.args.size() != 1);
 }
 
 std::string native_outcome(const Case& c) {
     Value out;
     std::string error;
+    if (c.id == BuiltinId::Count) {
+        const Status parsed_status = json_parse(Context{}, c.json, out, error);
+        return parsed_status == Status::Ok ? builtins_test::shown(out) : "json-error " + error;
+    }
     const Status status = call_builtin(builtin_spec(c.id), Context{}, c.args.data(),
                                        static_cast<std::uint32_t>(c.args.size()), out, error);
+    if (status == Status::Ok && out.is(Kind::Bytes)) {
+        const auto& data = bytes_of(out);
+        return "ok bytes | " + nift::crypto::sha256_hex(nift::crypto::sha256_bytes(data.data(), data.size()));
+    }
     if (status == Status::Ok) return builtins_test::shown(out);
-    if (status == Status::Error) return "error " + error;
+    if (status == Status::Error || status == Status::Recoverable) return "error " + error;
     return "native-status " + std::to_string(static_cast<int>(status)) + " " + error;
 }
 
 std::string program_lines(const Case& c, std::size_t n) {
-    const BuiltinSpec& spec = builtin_spec(c.id);
     std::ostringstream p;
     p << "print(\"@" << n << "\")\n";
+    if (c.id == BuiltinId::Count) {  // a structured literal: legacy's strict JSON fast path
+        p << "r" << n << " := " << c.json << "\nprint(type(r" << n << "))\nprint([r" << n << "].stringify())\n";
+        return p.str();
+    }
+    const BuiltinSpec& spec = builtin_spec(c.id);
     for (std::size_t k = 0; k < c.args.size(); ++k) p << "c" << n << "_" << k << " := " << builtins_test::literal(c.args[k]) << "\n";
     std::string call;
     std::size_t first = 0;
@@ -248,7 +350,10 @@ std::string program_lines(const Case& c, std::size_t n) {
     call += std::string(spec.name) + "(";
     for (std::size_t k = first; k < c.args.size(); ++k) call += (k > first ? ", c" : "c") + std::to_string(n) + "_" + std::to_string(k);
     call += ")";
-    p << "r" << n << " := " << call << "\nprint(type(r" << n << "))\nprint([r" << n << "].stringify())\n";
+    p << "r" << n << " := " << call << "\nprint(type(r" << n << "))\n";
+    // Bytes cannot be stringified: their SHA-256 identifies the content.
+    if (c.expected.rfind("ok bytes", 0) == 0) p << "print(sha256(r" << n << "))\n";
+    else p << "print([r" << n << "].stringify())\n";
     return p.str();
 }
 
@@ -292,6 +397,7 @@ std::size_t run_batch(const std::string& nift, const std::string& dir, std::vect
         if (lines[k] != "@" + std::to_string(n)) break;
         if (k + 2 >= lines.size() || lines[k + 1].rfind('@', 0) == 0) break;
         cases[n].legacy = "ok " + lines[k + 1] + " | " + lines[k + 2];
+        if (cases[n].expected.rfind("ok bytes", 0) == 0 && lines[k + 1] == "bytes") cases[n].legacy = "ok bytes | " + lines[k + 2];
         k += 3;
         ++n;
     }
@@ -318,8 +424,10 @@ int main(int argc, char** argv) {
 
     std::vector<Case> cases;
     for (std::size_t n = 0; n < count; ++n) {
-        Case c{static_cast<BuiltinId>(n % builtin_count()), {}, {}, {}};
-        c.args = arguments(c.id);
+        // One case in eight is a json_parse case (CP15).
+        Case c{n % 8 == 7 ? BuiltinId::Count : static_cast<BuiltinId>((n - n / 8) % builtin_count()), {}, {}, {}, {}};
+        if (c.id == BuiltinId::Count) c.json = random_json(0, true);
+        else c.args = arguments(c.id);
         c.expected = native_outcome(c);
         cases.push_back(static_cast<Case&&>(c));
     }
@@ -335,9 +443,10 @@ int main(int argc, char** argv) {
         const Case& c = cases[n];
         if (n < shown_cases)
             std::printf("%s  native: %s\n  legacy: %s\n", program_lines(c, n).c_str(), c.expected.c_str(), c.legacy.c_str());
-        const BuiltinSpec& spec = builtin_spec(c.id);
-        static const char* const kPrefix[] = {"fn.", "str.", "arr.", "obj.", "num.", "bool.", "null.", "any."};
-        auto& row = per[kPrefix[static_cast<int>(spec.receiver)] + std::string(spec.name)];
+        static const char* const kPrefix[] = {"fn.", "str.", "arr.", "obj.", "num.", "bool.", "null.", "any.", "bytes."};
+        auto& row = per[c.id == BuiltinId::Count ? std::string("json.parse (literal)")
+                                                 : kPrefix[static_cast<int>(builtin_spec(c.id).receiver)] +
+                                                       std::string(builtin_spec(c.id).name)];
         if (refused(c)) { ++refused_cases; continue; }
         ++row.first;
         if (c.legacy.rfind("error", 0) == 0) { ++row.second; ++errors; }

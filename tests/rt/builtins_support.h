@@ -90,6 +90,16 @@ inline std::string literal(const Value& v) {
         case Kind::Int: return std::to_string(v.as_int());
         case Kind::Double: return nift::RuntimeValue(v.as_double()).dump(0);
         case Kind::Decimal: return std::string(nift::rt::decimal_spelling(v));
+        case Kind::Bytes: {
+            std::string out = "bytes([";
+            bool first = true;
+            for (std::uint8_t b : nift::rt::bytes_of(v)) {
+                if (!first) out += ", ";
+                first = false;
+                out += std::to_string(b);
+            }
+            return out + "])";
+        }
         case Kind::String: {
             std::string out = "\"";
             for (char c : nift::rt::string_view_of(v)) {

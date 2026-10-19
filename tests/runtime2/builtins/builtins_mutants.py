@@ -16,6 +16,7 @@ import tempfile
 NATIVES = "src/rt/natives"
 CORE = ["value", "string", "aggregate", "atom", "heap_account", "compare", "number", "decimal", "render", "error",
         "handle", "legacy_bridge"]
+EXTRA = ["src/RuntimeValue.cpp", "src/Sha256.cpp", "src/JsonSchema.cpp"]
 FLAGS = ["-Isrc", "-Iinclude", "-Itests/rt", "-std=c++17", "-O2", "-pthread"]
 
 MUTANTS = [
@@ -59,6 +60,24 @@ MUTANTS = [
      "converted = std::to_chars(buffer, buffer + sizeof buffer, d, std::chars_format::fixed);"),
     ("M15 is_number accepts numeric strings", "format_methods.cpp",
      'same(t, "int") || same(t, "float"))', 'same(t, "int") || same(t, "float") || same(t, "string"))'),
+    ("M16 abs exact for integers", "number_methods.cpp",
+     '    return rounded(args, argc, out, error, "abs", absolute);',
+     '    if (argc == 1 && args[0].is(Kind::Int)) { out = Value::integer(std::llabs(args[0].as_int())); '
+     'return Status::Ok; }\n    return rounded(args, argc, out, error, "abs", absolute);'),
+    ("M17 bytes accepts 256", "bytes_methods.cpp",
+     "if (v.as_int() < 0 || v.as_int() > 255) return false;", "if (v.as_int() < 0 || v.as_int() > 256) return false;"),
+    ("M18 decode accepts any byte sequence", "bytes_methods.cpp",
+     '    if (!strict_utf8(text)) return fail(error, "decode: invalid UTF-8");', ""),
+    ("M19 json_parse drops exact spellings", "json_methods.cpp",
+     "case json::Type::StrNumber: out = make_decimal(static_cast<std::string&&>(doc.string), doc.num); return true;",
+     "case json::Type::StrNumber: out = Value::number(doc.num); return true;"),
+    ("M20 sha256 hashes one byte less", "bytes_methods.cpp",
+     "digest = nift::crypto::sha256_bytes(text.data(), text.size());",
+     "digest = nift::crypto::sha256_bytes(text.data(), text.empty() ? 0 : text.size() - 1);"),
+    ("M21 validate accepts rejected instances", "json_methods.cpp",
+     "    if (!jsonschema::validate(instance, schema, message)) {", "    if (false) {"),
+    ("M22 round half to even", "number_methods.cpp",
+     "double nearest(double d) { return std::round(d); }", "double nearest(double d) { return std::nearbyint(d); }"),
 ]
 
 
@@ -80,9 +99,10 @@ def main():
             out = os.path.join(work, name + ".o")
             compile_object("src/rt/%s.cpp" % name, out)
             objects.append(out)
-        out = os.path.join(work, "RuntimeValue.o")
-        compile_object("src/RuntimeValue.cpp", out)
-        objects.append(out)
+        for source in EXTRA:
+            out = os.path.join(work, os.path.basename(source)[:-4] + ".o")
+            compile_object(source, out)
+            objects.append(out)
         natives = {}
         for name in sorted(os.listdir(NATIVES)):
             if name.endswith(".cpp"):
