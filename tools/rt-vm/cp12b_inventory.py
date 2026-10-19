@@ -220,6 +220,8 @@ def checkpoint(reason, lists, ctx=frozenset()):
         return "VM subset (D-018/kinds)", "compiler precision"
     if reason == "postfix-receiver":
         return "VM subset", "chained postfix on a call result (a.b().c(), f().k)"
+    if reason == "postfix-receiver:member":
+        return "language-cleanup", "member read on a call result or literal (L41)"
     if head in ("binding-name-reserved", "fn-name-reserved", "param-name-reserved"):
         return "language-cleanup", "names legacy reserves (L6, D-009#3)"
     if reason in ("jump-not-last", "shebang-statement"):
@@ -229,6 +231,108 @@ def checkpoint(reason, lists, ctx=frozenset()):
     if reason in ("nesting-limit", "too-many-functions") or head in ("limit", "analysis-limit"):
         return "limits", "analysis limits"
     return "VM subset", "expression/statement subset (" + reason + ")"
+
+
+# ---- owners (D-036: every refusal reason has a named checkpoint or phase) ----
+
+CONCURRENCY = {"mutex", "thread", "lock", "unlock", "try_lock", "locked", "store", "fetch_add", "load", "done",
+               "start", "pause", "resume", "stop", "paused", "start_private_async", "await"}
+PROCESS = {"cmd", "pipe"}
+HOST_MORE = {"close", "cwd", "elapsed", "open_bytes", "sha256_file", "project_root", "write_document", "save",
+             "write", "open"}
+ERRORS = {"error", "err", "warn", "throw", "try", "catch", "exit", "nope", "undefined_fn", "undefined_thing"}
+SUBSET_FORMS = {"declare-const", "declare-pattern", "assign-target", "compound-target", "index-target",
+                "index-assign-target", "incdec-target", "expression:IncDec", "spread", "fn-param", "jump-outside-loop",
+                "string-arg-type", "postfix-spelling", "text-type-name", "trailing-comma", "object-key",
+                "object-duplicate-key", "comparison-chain", "prefix-not-precedence", "binary-operator",
+                "unary-operator", "logical-operator", "compound-operator", "expression-nesting", "method-arity",
+                "push-receiver", "postfix-receiver-call", "statement:FnDecl"}
+
+
+def owner(reason, lists, ctx=frozenset()):
+    """(owning checkpoint or phase, scope) for every refusal reason."""
+    head, _, name = reason.partition(":")
+    if reason in ("fn-after-statement", "fn-called-before-declaration"):
+        return "CP12b", "B1 declaration order (done)"
+    if reason == "postfix-receiver":
+        return "CP12b", "chained postfix (this phase)"
+    if reason == "postfix-receiver:member":
+        return "language-cleanup", "L41 member-read message on call results"
+    if head in ("free-name", "assign-free-name") and name in ("dynamic-caller", "dynamic-shadow"):
+        return "language-cleanup", "L25 lexical scoping (refused; migration diagnostics)"
+    importing = "statement:Import" in ctx
+    if head in ("free-name", "assign-free-name", "unresolved-name"):
+        if name == "legacy-binding":
+            return "CP16/CP24", "legacy script/template bindings (args, env, page)"
+        if importing and name in ("", "undeclared", "unanalysed"):
+            return "CP12b", "modules (imported binding)"
+        if name in ("global", "unanalysed"):
+            return "CP12b", "globals"
+        return "CP13", "undefined name (legacy run-time error)"
+    if reason in ("fn-as-value", "call-binding", "expression:Lambda", "callee", "statement:For", "statement:FnDecl"):
+        return "CP12C", "functions as values, closures, lambdas, for"
+    if head in ("callable", "method"):
+        for cp in ("CP14", "CP15"):
+            if name in lists[cp]:
+                return cp, "built-ins"
+        if head == "method" and name in LAMBDA_METHODS:
+            return "CP14B", "callback-taking collection methods"
+        if importing and name not in LEGACY:
+            return "CP12b", "modules (imported function or module member)"
+        if head == "method" and ctx & set(STRUCTISH):
+            return "CP12b", "structs (method of a user struct)"
+        if name.startswith("ffi_"):
+            return "CP18", "FFI"
+        if name in CONCURRENCY or name.startswith("atomic"):
+            return "CP22/CP23", "concurrency (threads, mutexes, atomics)"
+        if name in PROCESS:
+            return "CP16/CP20", "processes and pipelines"
+        if name in HOST or name in HOST_MORE:
+            return "CP16", "host ops (files, environment, time)"
+        if name in TEMPLATE:
+            return "CP24", "template functions"
+        if name in ERRORS:
+            return "CP13", "errors (undefined callable, error/warn/throw)"
+        if name == "push":
+            return "CP14", "push as an expression (records20k, integration owner)"
+        if head == "callable" and name not in LEGACY:
+            # A unit's own name whose declaration is refused: its construct owns it.
+            if ctx & set(STRUCTISH):
+                return "CP12b", "structs (constructor call)"
+            if "fn-flags" in ctx:
+                return "CP22/CP24", "fn[async] (CP22), @fn deferred bodies (CP24)"
+            return "CP13", "errors (undefined callable, error/warn/throw)"
+        return "CP15B", "remaining pure built-ins and methods"
+    if reason in ("statement:Try", "statement:Throw", "parse-error") or head in ("static-error", "type"):
+        return "CP13", "errors, try/catch, type errors with legacy diagnostics, prevalidation"
+    if head == "context" or head.startswith("prepared"):
+        return "language-cleanup", "D-018 loop-evaluator differences (L1-L4)"
+    if reason in ("aliasing", "alias-argument", "path-in-call-argument", "path-in-index", "param-type-unpredicted"):
+        return "language-cleanup", "L7 aliasing / location references (records20k aliasing: CP14 integration)"
+    if reason in STRUCTISH or reason == "statement:EnumDecl":
+        return "CP12b", "structs" if reason in STRUCTISH else "enums (B6 deferred)"
+    if reason in ("statement:Import", "statement:Export"):
+        return "CP12b", "modules"
+    if reason == "fn-flags":
+        return "CP22/CP24", "fn[async] (CP22), @fn deferred bodies (CP24)"
+    if reason == "expression:Await":
+        return "CP22", "await"
+    if reason == "statement:Command":
+        return "CP19", "shell"
+    if reason in ("opaque:template-text", "opaque:deferred-translation", "expression-statement",
+                  "statement:TemplateStmt"):
+        return "CP24", "template-only constructs"
+    if head == "opaque" or reason in ("jump-not-last", "shebang-statement"):
+        return "language-cleanup", "legacy parse/run-time quirks (D-014, D-022)"
+    if head in ("binding-name-reserved", "fn-name-reserved", "param-name-reserved"):
+        return "language-cleanup", "L6 names legacy reserves"
+    if reason in ("interpolation", "string-literal", "number-literal"):
+        return "CP15B", "string and number literal spellings, interpolation"
+    if reason in SUBSET_FORMS:
+        return "CP12C", "statement and binding forms (const, destructuring, element targets, spread)"
+    if reason in ("nesting-limit", "too-many-functions") or head in ("limit", "analysis-limit"):
+        return "CP12C", "compiler limits"
+    return "CP12C", "other statement/expression forms (" + reason + ")"
 
 
 def script_sets(rows):
