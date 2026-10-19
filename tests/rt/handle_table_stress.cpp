@@ -216,6 +216,39 @@ void exactly_once_race(int rounds) {
     CHECK(g_twice == 0);
 }
 
+
+// close_context returns only after a hook another thread started for one of
+// its handles (here: an explicit release) has finished.
+void close_waits_for_inflight_hook() {
+    std::atomic<bool> in_hook{false}, allow{false}, hook_done{false}, closed{false};
+    bool done_before_close = false;
+    {
+        HandleTable t;
+        KindSpec spec;
+        spec.name = "slow";
+        spec.cleanup = [&](const CleanupEvent&) {
+            in_hook = true;
+            while (!allow.load()) std::this_thread::yield();
+            hook_done = true;
+            return CleanupOutcome::success();
+        };
+        t.register_typed_kind<Res>(HandleKind::Timer, spec);
+        ContextId c;
+        t.open_context(ContextKind::Script, kDetached, c);
+        Value h;
+        t.create(c, HandleKind::Timer, std::make_shared<Res>(1), h);
+        std::thread releaser([&] { t.release(h, HandleKind::Timer, c); });
+        while (!in_hook.load()) std::this_thread::yield();
+        std::thread closer([&] { t.close_context(c); done_before_close = hook_done.load(); closed = true; });
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(!closed.load());
+        allow = true;
+        releaser.join();
+        closer.join();
+    }
+    CHECK(closed.load() && done_before_close);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -224,5 +257,6 @@ int main(int argc, char** argv) {
     random_stress(ms, 512);
     random_stress(ms / 4, 48);  // small table: the capacity limit is hit under contention
     exactly_once_race(rounds);
+    close_waits_for_inflight_hook();
     return rt_test::finish("rt handle table stress");
 }
