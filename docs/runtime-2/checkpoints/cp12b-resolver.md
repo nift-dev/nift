@@ -134,6 +134,24 @@ the plan to the inference, and the D-018 analyses' scope for globals
 together). Decision 3 (L25): ordinary globals and module bindings must not
 be compile errors; only caller-dependent lookups stay refused.
 
+## Tests run (round 2: chained postfix, H1 below the compiler)
+
+At `2f424e1b` (before the rebase onto `runtime-2` @`1de92ee9`; the rebased
+branch is re-validated, see below), through `heavy.sh`:
+
+| Gate | Result |
+| --- | --- |
+| `make test-rt-vm` | **PASS**: vm-unit 40,320; globals unit 23; prepared-parser 100,136; rt-diff 816 entries, 0 differing, 7 approved; adversarial 37,449, 0 non-approved; subset suites 50/66; supported generator 500/500 on the VM; unsupported 500/500; engine selection, former replay, D-018, context consistency, policy negatives, review 87, golden 108, int bounds 2,682; vm_inventory 13; **vm_chain 96 programs (24 shapes × 4 contexts), 0 failures**; module probes 25 and struct probes 26 (legacy) PASS |
+| `make test-rt-vm-mutants` | **PASS**: 8/8 rejected, unmutated passes |
+| hot paths (callgrind) | flat call **420** (425), loop **104** (109), add_local 178 (183), if_branch 236 (244), fib **285** (285) per call — the two new opcodes as ordinary dispatch entries; the cold-path variant had cost +1 (426 / 109 / 184 / 286) and was replaced |
+| `make test-rt-vm-sanitize` | **clean** (globals unit and vm_chain included) |
+| supported generator with chains (`b7d60330`, needs test hook) | seed 1 at 500 and seed 2 at 300: 100 % on the VM (`chain` in 374 of 500); seed 3 index 154 is refused `context:assignment-error` by the pre-change binary too: a generator precision gap the shifted random stream exposes, not a chain problem (to fix with the generator owner) |
+
+Inventory after the fix (`classify-all`, same corpora): curated 104 (no
+change alone), with modules 154, with modules + globals 156, with modules +
+functions as values + CP13–CP16 **260 curated, 14 projects, 283 shared**;
+member reads (L43) would add 2 curated.
+
 ## Effort of the greedy-climb features
 
 S = days, resolver/compiler only; M = a week or two, compiler + VM + tests;
