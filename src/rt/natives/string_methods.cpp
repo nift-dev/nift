@@ -56,15 +56,33 @@ Status trimmed(const Value* args, std::uint32_t argc, Value& out, std::string& e
     return Status::Ok;
 }
 
+// Explicit ASCII case conversion. This is byte-for-byte identical to the C
+// locale's toupper/tolower for all 256 byte values, but it is independent of
+// the process locale and avoids a ctype call per byte. Bytes >= 0x80 are
+// never changed: the CP14 contract is ASCII-only case conversion, so invalid
+// UTF-8 and multi-byte sequences pass through unchanged.
+struct AsciiCaseTable {
+    unsigned char map[256]{};
+    constexpr explicit AsciiCaseTable(bool upper) {
+        for (int c = 0; c < 256; ++c) map[c] = static_cast<unsigned char>(c);
+        if (upper) {
+            for (int c = 'a'; c <= 'z'; ++c) map[c] = static_cast<unsigned char>(c - ('a' - 'A'));
+        } else {
+            for (int c = 'A'; c <= 'Z'; ++c) map[c] = static_cast<unsigned char>(c + ('a' - 'A'));
+        }
+    }
+};
+constexpr AsciiCaseTable kAsciiUpper(true);
+constexpr AsciiCaseTable kAsciiLower(false);
+
 Status cased(const Value* args, std::uint32_t argc, Value& out, std::string& error, std::string_view name,
              bool upper) {
     std::string_view text;
     if (!receiver(args, argc, text)) return internal(error, "case receiver");
     if (!no_arguments(argc, name, error)) return Status::Error;
     std::string result(text);
-    for (char& c : result)
-        c = static_cast<char>(upper ? std::toupper(static_cast<unsigned char>(c))
-                                    : std::tolower(static_cast<unsigned char>(c)));
+    const AsciiCaseTable& table = upper ? kAsciiUpper : kAsciiLower;
+    for (char& c : result) c = static_cast<char>(table.map[static_cast<unsigned char>(c)]);
     out = make_string(static_cast<std::string&&>(result));
     return Status::Ok;
 }
