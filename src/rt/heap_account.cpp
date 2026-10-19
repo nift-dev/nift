@@ -9,6 +9,7 @@ namespace nift::rt {
 namespace {
 
 thread_local std::size_t live_bytes = 0;
+thread_local std::size_t charged_bytes = 0;  // heap_charge (atoms), included in live_bytes
 
 // Objects whose footprint reaches the granule field's maximum are counted
 // exactly here instead (keyed by object): the header records only the
@@ -131,6 +132,13 @@ std::size_t live_heap_bytes() noexcept {
 std::size_t heap_saturated_objects() noexcept { return saturated_count; }
 
 bool heap_accounting_overflowed() noexcept { return overflowed; }
+
+void heap_charge(std::size_t bytes) noexcept {
+    live_bytes += bytes;
+    charged_bytes += bytes;
+}
+
+std::size_t heap_charged_bytes() noexcept { return charged_bytes; }
 
 std::size_t heap_footprint(const HeapObject* object) noexcept { return exact_bytes(raw_footprint(object)); }
 

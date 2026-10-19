@@ -2,6 +2,16 @@
 // Atom table (CP09): interned object keys with stable integer ids. Object
 // lookup compares atoms, never strings. One table per isolate (decision 7);
 // `AtomTable::current()` is the calling thread's isolate table.
+//
+// Budget (memory investigation C2): interning a new atom charges its bytes
+// (the text plus the table's per-entry overhead, kAtomEntryOverhead) to the
+// thread's live heap total (rt/heap_account.h), which every VM heap budget
+// on that thread reads. Several execution contexts can share a thread and
+// therefore this table: the bytes are charged once, to the context that
+// interns the atom first (the one running at that moment); a later context
+// that reuses the atom is not charged again, and nothing is released until
+// the table is reclaimed with its context (CP23, context lifetime). Lookups
+// (`find`, re-interning an existing atom) charge nothing.
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -19,6 +29,12 @@ struct Atom {
 
 class AtomTable {
 public:
+    // Per-entry bytes beyond the text's own storage: the std::string object,
+    // the vector slot and the hash node (key view, id, cached hash, next
+    // pointer) plus its bucket slot, rounded up.
+    static constexpr std::size_t kAtomEntryOverhead = 96;
+    static std::size_t entry_bytes(std::string_view text) noexcept;
+
     AtomTable();
     Atom intern(std::string_view text);
     // Returns false when `text` has never been interned (lookups of unknown

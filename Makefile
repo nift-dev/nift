@@ -210,6 +210,7 @@ RT_VALUE_D040 := $(TEST_DIR)/rt/value-d040$(EXEEXT)
 RT_VALUE_DESTROY_OOM := $(TEST_DIR)/rt/value-destroy-oom$(EXEEXT)
 RT_VALUE_DESTROY_OOM_SMALL := $(TEST_DIR)/rt/value-destroy-oom-small$(EXEEXT)
 RT_HEAP_ACCOUNT_OOM := $(TEST_DIR)/rt/heap-account-oom$(EXEEXT)
+RT_ATOM_BUDGET := $(TEST_DIR)/rt/atom-budget$(EXEEXT)
 RT_VALUE_CYCLE_BENCH := $(TEST_DIR)/rt/value-cycle-bench$(EXEEXT)
 RT_VALUE_CYCLE_BENCH_OFF := $(TEST_DIR)/rt/value-cycle-bench-off$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
@@ -259,6 +260,11 @@ $(RT_HEAP_ACCOUNT_OOM): tests/rt/heap_account_oom.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_SATURATED_SLOTS=1 tests/rt/heap_account_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# Memory investigation C2: interned atoms count against the heap budget.
+$(RT_ATOM_BUDGET): tests/rt/atom_budget.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/atom_budget.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
@@ -267,7 +273,10 @@ $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 $(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK tests/rt/value_cycle_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
-.PHONY: bench-rt-value-cycle test-rt-heap-saturation test-rt-memory-c1
+.PHONY: bench-rt-value-cycle test-rt-heap-saturation test-rt-memory-c1 test-rt-memory-c2
+# Memory investigation C2 end to end: new atoms count against the budget.
+test-rt-memory-c2: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/memory_c2.sh
 # Memory investigation C1 end to end: running out of memory mid-script ends
 # with the original error, never an abort in the release (workers only).
 test-rt-memory-c1: $(TARGET)
@@ -279,7 +288,7 @@ test-rt-heap-saturation: $(TARGET)
 bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
 	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
 
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL) $(RT_HEAP_ACCOUNT_OOM)
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL) $(RT_HEAP_ACCOUNT_OOM) $(RT_ATOM_BUDGET)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
 	"$(RT_VALUE_ROUND2)"
@@ -288,6 +297,7 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_VALUE_DESTROY_OOM)"
 	"$(RT_VALUE_DESTROY_OOM_SMALL)"
 	"$(RT_HEAP_ACCOUNT_OOM)"
+	"$(RT_ATOM_BUDGET)"
 
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test

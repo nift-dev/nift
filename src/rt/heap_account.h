@@ -44,4 +44,13 @@ std::size_t heap_saturated_objects() noexcept;
 // every budget check fails rather than under-counting. Sticky for the thread.
 bool heap_accounting_overflowed() noexcept;
 
+// Memory that is not a heap object but grows with the script (memory
+// investigation C2: the interned-atom table). Charged once, when it is
+// created, to this thread's live total (the execution context running at
+// that moment), and never released here: the atom table lives as long as
+// its thread. Reclaiming it at context end is CP23's (context lifetime).
+void heap_charge(std::size_t bytes) noexcept;
+// Bytes charged through heap_charge on this thread (tests, stats).
+std::size_t heap_charged_bytes() noexcept;
+
 } // namespace nift::rt

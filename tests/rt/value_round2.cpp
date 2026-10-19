@@ -115,7 +115,8 @@ void bridge_depth() {
 }
 
 void heap_accounting() {
-    const std::size_t base = live_heap_bytes();
+    std::size_t base = live_heap_bytes();
+    const std::size_t charged0 = heap_charged_bytes();
     {
         Value s = make_string(std::string(100000, 'x'));
         CHECK(live_heap_bytes() >= base + 100000 && live_heap_bytes() < base + 100000 + 1024);
@@ -137,6 +138,10 @@ void heap_accounting() {
         const Value deep = nest(100000, make_string(std::string(64, 'd')));
         CHECK(live_heap_bytes() >= before + 100000 * sizeof(ArrayObject));
     }
+    // The 200 new atoms stay charged (C2: the atom table lives as long as the
+    // thread; reclaiming it is CP23's); every value is gone.
+    CHECK(heap_charged_bytes() - charged0 >= 200 * AtomTable::kAtomEntryOverhead);
+    base += heap_charged_bytes() - charged0;
     CHECK(live_heap_bytes() == base);  // everything freed: the count returns exactly
     // An object never retallied (direct construction in host code) counts 0.
     { Value f = Value::adopt(new FunctionObject()); CHECK(live_heap_bytes() == base); }

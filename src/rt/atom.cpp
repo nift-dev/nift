@@ -1,8 +1,15 @@
 #include "rt/atom.h"
 
+#include "rt/heap_account.h"
+
 namespace nift::rt {
 
 AtomTable::AtomTable() { intern(""); }
+
+std::size_t AtomTable::entry_bytes(std::string_view text) noexcept {
+    // libstdc++ keeps up to 15 characters inside the std::string object.
+    return kAtomEntryOverhead + (text.size() > 15 ? text.size() + 1 : 0);
+}
 
 Atom AtomTable::intern(std::string_view text) {
     const auto found = ids_.find(text);
@@ -11,7 +18,13 @@ Atom AtomTable::intern(std::string_view text) {
     // stay valid as the vector grows.
     names_.push_back(std::make_unique<std::string>(text));
     const auto id = static_cast<std::uint32_t>(names_.size() - 1);
-    ids_.emplace(std::string_view(*names_.back()), id);
+    try {
+        ids_.emplace(std::string_view(*names_.back()), id);
+    } catch (...) {
+        names_.pop_back();  // keep names_ and ids_ in step if the map cannot grow
+        throw;
+    }
+    heap_charge(entry_bytes(text));  // C2: charged once, on the intern path only
     return Atom{id};
 }
 

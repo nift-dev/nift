@@ -403,6 +403,41 @@ prototypes on `memcheck-repro` 7fab21a6).
 * **Hot path.** `heap_retally`'s common path is unchanged (the side table is
   reached only at the field's maximum).
 
+### 6.3 C2: interned atoms count against the heap budget
+
+* **Defect.** The atom table (object keys, field names) grew outside the VM
+  heap budget: memcheck2 ran 3,000,000 rounds of `c2_atoms2.f` (a new
+  generated key per round) under a 16 MiB budget to exit 0 at 511 MB RSS.
+* **Fix (intern path only).** `AtomTable::intern` charges each new entry,
+  `kAtomEntryOverhead` (96 bytes: the `std::string`, the vector slot, the
+  hash node and its bucket) plus the text's heap storage (beyond the
+  15-character inline buffer), through `heap_charge` to the thread's live
+  heap total, which every VM budget check reads. Lookups (`find`, re-interning
+  an existing key) charge nothing; `intern` also keeps `names_` and `ids_` in
+  step if the map cannot grow.
+* **Which context pays (owner requirement).** Accounting is per thread, and
+  the atom table is per thread, shared by every execution context that runs
+  on it. Rule: the bytes are charged once, to the context that interns the
+  atom first (the one running when the live total grows); a later context
+  reusing the atom is not charged again, but it does see the earlier charge
+  in the thread's total, as it sees any other memory still held on that
+  thread. Nothing is released before the table itself is.
+* **Owner of reclamation: CP23** (context lifetime): trimming or dropping
+  the table when its context ends, and per-context totals if contexts on one
+  thread must not see each other's charges. Until then the charge is the
+  honest amount held.
+* **Tests (permanent).** `tests/rt/atom_budget.cpp` (in `test-rt-value`):
+  exact charge per new atom (short and long), none for re-interning or
+  lookups, growth visible for 100,000 keys, another thread's table charged to
+  that thread only. `tests/runtime2/memory_c2.sh` (`make test-rt-memory-c2`,
+  with the memcheck scripts `c2_atoms2.f`, `c2_atoms3.f`, `c2_control2.f`):
+  under 16 MiB, 1,000 rounds run, 1,000,000 rounds are refused with "memory
+  budget exceeded", the 1,000-key control runs 3,000,000 rounds.
+  `value_round2`'s accounting check now allows for the 200 atoms it interns
+  (they stay charged).
+* **Status.** Unit tests local; the end-to-end script runs in the worker job
+  (needs a `nift` build).
+
 ## 7. Remaining gates
 
 * **REMOTE JOB** (worker), covering:
