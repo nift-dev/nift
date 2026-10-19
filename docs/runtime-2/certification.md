@@ -218,3 +218,37 @@ Conclusion (D-033): remote Linux certification is equivalent; it becomes the
 default for subsequent checkpoints. Wall time is dominated by serial exclusive
 targets (`test-build-boundary-nondestructive` alone ~21 min), so more cores help
 little; the gain is no queue and no contention with development work.
+
+## Open defect on `runtime-2`: `-0` in JSON-valid object literals (found 2026-10-20)
+
+Found by the CP15 integration owner while building the W9 differential set; not
+caught by any certification of CP12 phase A or CP14 phase A.
+
+| Program | Legacy | VM (`NIFT_VM=require`, since 4b2fc909) |
+|---|---|---|
+| `o := {"b": -0}` then `print(o.stringify())` | `{"b":-0}` | `{"b":0}` |
+| `[{"b": -0}]`, `{"a": {"b": -0}, "c": .5}` | keeps `-0` | `0` |
+
+Both exit 0, so the difference is silent. Legacy parses a JSON-valid `{...}` as
+JSON (keeping `-0`); the VM evaluated it as a Nift literal. `0.0` and `-0.0` were
+already refused (`number-literal`). The shared differential generators never
+produced `-0` inside an object literal, which is why rt-diff and the adversarial
+suite stayed clean.
+
+Disposition: fixed by CP15's W9 JSON path (option A); no backport to the CP13
+phase A candidate, which is mid-certification. CP15's evidence must show the
+4b2fc909 failure and the fix on the same cases, extend the probes to other `-0`
+shapes, and add `-0` and similar value-preservation edges to the supported
+generator. Closed only when CP15 integrates.
+
+## Remote environment: Go and .NET were never actually installed (corrects the CP14 record)
+
+The CP14 section above says the remote script was fixed to install Go from the
+official tarball and .NET from Microsoft's feed. That fix was never exercised to
+success: on the CP13 phase A run (2026-10-20) `dl.google.com` returned 404 for
+every Go tarball from ap-southeast, and the script installed the .NET 8 SDK while
+the bindings target `net10.0`. Both binding targets were therefore unverified
+remotely for CP14 as well. `cert.sh` now installs Go from the
+`proxy.golang.org` toolchain zip and .NET from channel 10.0, with a loud warning
+if either is missing. The issue counts as resolved only after a fresh instance
+passes both binding targets with no manual steps.
