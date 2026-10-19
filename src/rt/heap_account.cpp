@@ -2,7 +2,7 @@
 
 #include "rt/heap.h"
 
-#include <unordered_map>
+#include <limits>
 
 namespace nift::rt {
 
@@ -16,12 +16,43 @@ thread_local std::size_t live_bytes = 0;
 // always sees the real size however large one object is or however many
 // saturate (memory investigation concern 3: budgets must not be bypassed by
 // large values). Only objects of 1 GiB or more ever enter this table.
-thread_local std::unordered_map<const HeapObject*, std::size_t>* saturated = nullptr;
+//
+// The table is a fixed array: accounting runs inside noexcept paths
+// (destruction, retally after a resize) and must never allocate (memory
+// investigation C1 and its follow-up). More than kSaturatedSlots live objects
+// of 1 GiB or more cannot be counted exactly; that case sets `overflowed`,
+// after which live_heap_bytes() reports the maximum, so every budget check
+// fails ("memory budget exceeded") instead of under-counting.
+struct Saturated {
+    const HeapObject* object;
+    std::size_t bytes;
+};
+// Tests build with a smaller table (-DNIFT_RT_SATURATED_SLOTS=1) to reach
+// the overflow without reserving hundreds of GiB.
+#ifndef NIFT_RT_SATURATED_SLOTS
+#define NIFT_RT_SATURATED_SLOTS 256
+#endif
+constexpr std::size_t kSaturatedSlots = NIFT_RT_SATURATED_SLOTS;
+thread_local Saturated saturated[kSaturatedSlots];
+thread_local std::size_t saturated_count = 0;
+thread_local bool overflowed = false;
 
-std::unordered_map<const HeapObject*, std::size_t>& saturated_table() {
-    // Never freed: lives as long as the thread (no destruction-order issues).
-    if (!saturated) saturated = new std::unordered_map<const HeapObject*, std::size_t>();
-    return *saturated;
+Saturated* find_saturated(const HeapObject* object) noexcept {
+    for (std::size_t i = 0; i < saturated_count; ++i)
+        if (saturated[i].object == object) return &saturated[i];
+    return nullptr;
+}
+
+// False when the table is full (the caller marks the accounting overflowed).
+bool set_saturated(const HeapObject* object, std::size_t bytes) noexcept {
+    if (Saturated* s = find_saturated(object)) { s->bytes = bytes; return true; }
+    if (saturated_count == kSaturatedSlots) return false;
+    saturated[saturated_count++] = Saturated{object, bytes};
+    return true;
+}
+
+void erase_saturated(const HeapObject* object) noexcept {
+    if (Saturated* s = find_saturated(object)) *s = saturated[--saturated_count];
 }
 
 // 24 bits (1 GiB); larger objects are counted exactly in `saturated`.
@@ -81,22 +112,25 @@ void record(HeapObject* object, std::size_t granules) {
     object->counted[2] = static_cast<std::uint8_t>(granules >> 16);
 }
 
-std::size_t exact_bytes(std::size_t raw) { return ((raw + kHeapGranule - 1) / kHeapGranule) * kHeapGranule; }
+std::size_t exact_bytes(std::size_t raw) noexcept { return ((raw + kHeapGranule - 1) / kHeapGranule) * kHeapGranule; }
 
 // The bytes currently counted for `object` (exact for saturated objects).
-std::size_t counted_bytes(const HeapObject* object) {
+std::size_t counted_bytes(const HeapObject* object) noexcept {
     const std::size_t granules = recorded(object);
     if (granules != kMaxGranules) return granules * kHeapGranule;
-    const auto& table = saturated_table();
-    const auto it = table.find(object);
-    return it == table.end() ? granules * kHeapGranule : it->second;
+    const Saturated* s = find_saturated(object);
+    return s ? s->bytes : granules * kHeapGranule;  // not found: counted at the field value (overflow)
 }
 
 } // namespace
 
-std::size_t live_heap_bytes() noexcept { return live_bytes; }
+std::size_t live_heap_bytes() noexcept {
+    return overflowed ? std::numeric_limits<std::size_t>::max() : live_bytes;
+}
 
-std::size_t heap_saturated_objects() noexcept { return saturated ? saturated->size() : 0; }
+std::size_t heap_saturated_objects() noexcept { return saturated_count; }
+
+bool heap_accounting_overflowed() noexcept { return overflowed; }
 
 std::size_t heap_footprint(const HeapObject* object) noexcept { return exact_bytes(raw_footprint(object)); }
 
@@ -107,14 +141,14 @@ namespace {
 #if defined(__GNUC__)
 __attribute__((noinline))
 #endif
-void retally_saturated(HeapObject* object, std::size_t raw, std::size_t granules) {
+void retally_saturated(HeapObject* object, std::size_t raw, std::size_t granules) noexcept {
     const std::size_t before = counted_bytes(object);
     std::size_t now = granules * kHeapGranule;
     if (granules == kMaxGranules) {
-        now = exact_bytes(raw);
-        saturated_table()[object] = now;  // may throw bad_alloc: noexcept terminates, as any OOM here would
+        if (set_saturated(object, exact_bytes(raw))) now = exact_bytes(raw);
+        else overflowed = true;  // cannot count exactly: report over budget from now on
     } else {
-        saturated_table().erase(object);
+        erase_saturated(object);
     }
     live_bytes += now - before;  // modular: correct for shrinking too
     record(object, granules);
@@ -136,7 +170,7 @@ void heap_retally(HeapObject* object) noexcept {
 
 void heap_untally(HeapObject* object) noexcept {
     live_bytes -= counted_bytes(object);
-    if (recorded(object) == kMaxGranules) saturated_table().erase(object);
+    if (recorded(object) == kMaxGranules) erase_saturated(object);
     record(object, 0);
 }
 

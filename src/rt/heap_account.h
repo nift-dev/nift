@@ -39,4 +39,9 @@ std::size_t heap_footprint(const HeapObject* object) noexcept;
 // Live objects counted in the exact side table (1 GiB or more); tests.
 std::size_t heap_saturated_objects() noexcept;
 
+// True once more objects of 1 GiB or more were live at the same time than the
+// fixed side table holds (256): live_heap_bytes() then reports SIZE_MAX, so
+// every budget check fails rather than under-counting. Sticky for the thread.
+bool heap_accounting_overflowed() noexcept;
+
 } // namespace nift::rt

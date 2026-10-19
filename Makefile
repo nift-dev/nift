@@ -209,6 +209,7 @@ RT_VALUE_ROUND2 := $(TEST_DIR)/rt/value-round2$(EXEEXT)
 RT_VALUE_D040 := $(TEST_DIR)/rt/value-d040$(EXEEXT)
 RT_VALUE_DESTROY_OOM := $(TEST_DIR)/rt/value-destroy-oom$(EXEEXT)
 RT_VALUE_DESTROY_OOM_SMALL := $(TEST_DIR)/rt/value-destroy-oom-small$(EXEEXT)
+RT_HEAP_ACCOUNT_OOM := $(TEST_DIR)/rt/heap-account-oom$(EXEEXT)
 RT_VALUE_CYCLE_BENCH := $(TEST_DIR)/rt/value-cycle-bench$(EXEEXT)
 RT_VALUE_CYCLE_BENCH_OFF := $(TEST_DIR)/rt/value-cycle-bench-off$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
@@ -252,6 +253,12 @@ $(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 tests/rt/value_destroy_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# The exact side table never allocates; a full table reports over budget
+# (one-slot build; reserves ~2 GiB of address space, never touched).
+$(RT_HEAP_ACCOUNT_OOM): tests/rt/heap_account_oom.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_SATURATED_SLOTS=1 tests/rt/heap_account_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
@@ -272,7 +279,7 @@ test-rt-heap-saturation: $(TARGET)
 bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
 	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
 
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL)
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL) $(RT_HEAP_ACCOUNT_OOM)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
 	"$(RT_VALUE_ROUND2)"
@@ -280,6 +287,7 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_VALUE_D040)" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1}
 	"$(RT_VALUE_DESTROY_OOM)"
 	"$(RT_VALUE_DESTROY_OOM_SMALL)"
+	"$(RT_HEAP_ACCOUNT_OOM)"
 
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test

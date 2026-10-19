@@ -376,6 +376,33 @@ prototypes on `memcheck-repro` 7fab21a6).
 * **Performance.** See §5 for the guard run of this tip (value bench and
   release workloads).
 
+### 6.2 Accounting follow-up (review item 4): the side table never allocates
+
+* **Defect** (in this branch's cd56fc1f, same class as C1). The exact side
+  table for objects of 1 GiB or more (§3) was a lazily created
+  `std::unordered_map`; `heap_retally` (`noexcept`, called after every
+  resize) inserted into it, so an exhausted heap meant `std::terminate`.
+* **Fix.** A fixed thread-local array of 256 entries (linear search; only
+  objects of 1 GiB or more enter it, so it is short and off the hot path).
+  `counted_bytes`, `heap_retally` and `heap_untally` never allocate. If more
+  than 256 such objects are live at once on a thread, the object is counted
+  at the field's maximum and the accounting is marked overflowed:
+  `live_heap_bytes()` then returns `SIZE_MAX`, so every budget check fails
+  with "memory budget exceeded" instead of under-counting. The flag is
+  sticky for the thread (`heap_accounting_overflowed()`). 256 live objects
+  of 1 GiB need 256 GiB of address space, beyond any configured budget.
+* **Test (permanent).** `tests/rt/heap_account_oom.cpp`, built with a
+  one-slot table (`-DNIFT_RT_SATURATED_SLOTS=1`) and a failing
+  `operator new`; in `test-rt-value` (reserves ~2 GiB of address space,
+  never touched): a saturated object is counted exactly with every
+  allocation failing (no allocation attempted); a second one overflows the
+  table and the live total reads `SIZE_MAX`; releasing both with allocation
+  failing neither throws nor clears the flag. Cause and effect: the first
+  step built against the previous `heap_account.cpp` aborts ("terminate
+  called after throwing an instance of 'std::bad_alloc'", exit 134).
+* **Hot path.** `heap_retally`'s common path is unchanged (the side table is
+  reached only at the field's maximum).
+
 ## 7. Remaining gates
 
 * **REMOTE JOB** (worker), covering:
