@@ -448,16 +448,38 @@ keeps its exit status for its owner) — it fails on a mutant without the
 | D: full suite repeated, 2 CPU burners | 15 | 111 (all zombie checks, rounds 2+) |
 | targeted, with member diagnostics | 600 | 3 (exec window; traces above) |
 
-**After the fixes — verification status: PENDING.** The same four-phase
-campaign and the ASan/UBSan + TSan runs on the fixed build (commit
-`c3952f5`) are queued in `heavy.sh` behind a priority `make certify`
-(more than 75 minutes at the time of writing); the gate was not bypassed.
-Results land in `/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp16dbg/after.summary` (per-phase logs `after.*.log`) and
-`/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp16dbg/san.log`. Evidence available now: the full suite on the fixed build
-(1244 checks, 0 failures, one contained run, no repetition), the orphan
-regression test and its mutant check. Until the campaign reports 0 failures
-in every phase, the flake fix counts as explained but not yet verified under
-stress.
+**Round 2 (after `c3952f5`) was not clean**, so nothing was closed then:
+
+| Phase | Rounds | Failures | Cause |
+|---|---|---|---|
+| A | 300 | 1 | same miss: `read_environ()` gave up when `open()` of `/proc/<pid>/environ` failed, and `tagged()` skipped a pid whose `stat` read failed — both can also happen inside `execve()` |
+| B | 25 | 24 | rounds 2+: zombie checks right after a detached launch whose exec failed (the grandchild, reparented under the subreaper, was not handed to the reaper and was only reaped later by the SIGCHLD scan); fd checks perturbed by host-loop pidfd watches of earlier tests' processes |
+| C | 300 | 0 | |
+| D | 15 | 18 | as B |
+
+Fixes (`bc171c0`): the scan retries a failed open or stat while the process
+still exists (bounded, ~10 ms; per-pid scan notes printed on failure) —
+0 misses in 1418 targeted rounds afterwards; the failed detached grandchild
+goes to the reaper; zombie checks assert the specified bound ("reaped within
+1 s": asynchronous under the subreaper by design); fd-leak checks subtract the
+host loop's own descriptors and re-measure until stable (a persistent leak
+still fails); `low_fd_limit` sizes `RLIMIT_NOFILE` by free descriptor numbers.
+
+**Round 3 (after `bc171c0`): clean — closed.** Same campaign through
+`heavy.sh` under `run_contained.sh` limits, then the sanitizers, in one gate
+job (2026-10-19 23:14–23:40):
+
+| Run | Rounds | Checks | Failures |
+|---|---|---|---|
+| A: leftover test alone, no load | 300 | 3,000 | 0 |
+| B: full suite repeated in one process, no load | 25 | 31,100 | 0 |
+| C: leftover test alone, 2 CPU burners | 300 | 3,000 | 0 |
+| D: full suite repeated, 2 CPU burners | 15 | 18,660 | 0 |
+| `make test-rt-host-sanitize` (ASan+UBSan) | 1 | 497 + 1,244 | 0, no sanitizer reports |
+| `make test-rt-host-tsan` (ThreadSanitizer) | 1 | 1,244 | 0, no TSan warnings |
+
+No tagged test process survived any run. The flake (test scan racing
+`execve()`) and the subreaper zombie defect are closed on this evidence.
 
 ## 8. Lifecycle authority: CP16 reports, CP17 decides (to settle at integration)
 
