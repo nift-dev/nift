@@ -19,6 +19,7 @@ const char* handle_status_code(HandleStatus status) {
         case HandleStatus::KindRegistered: return "internal.handle_kind_registered";
         case HandleStatus::NullResource: return "internal.handle_null_resource";
         case HandleStatus::DetachForbidden: return "runtime.detach_in_build";
+        case HandleStatus::DetachFailed: return "runtime.detach_failed";
         case HandleStatus::TransferForbidden: return "runtime.transfer_out_of_build";
         case HandleStatus::LimitExceeded: return "limit.exceeded";
         case HandleStatus::InvalidSetting: return "runtime.invalid_argument";
@@ -44,6 +45,7 @@ const char* handle_status_text(HandleStatus status) {
         case HandleStatus::KindRegistered: return "handle kind is already registered";
         case HandleStatus::NullResource: return "null handle resource";
         case HandleStatus::DetachForbidden: return "detaching is not allowed inside a build";
+        case HandleStatus::DetachFailed: return "detachment could not be established (already terminating)";
         case HandleStatus::TransferForbidden: return "transfer would move a resource out of the build";
         case HandleStatus::LimitExceeded: return "handle limit exceeded";
         case HandleStatus::InvalidSetting: return "invalid handle limit setting";
@@ -58,7 +60,8 @@ HandleErrorClass handle_error_class(HandleStatus status) {
         case HandleStatus::Closed: return HandleErrorClass::Recoverable;
         case HandleStatus::LimitExceeded: return HandleErrorClass::Limit;
         case HandleStatus::InvalidSetting:
-        case HandleStatus::DetachForbidden: return HandleErrorClass::Error;
+        case HandleStatus::DetachForbidden:
+        case HandleStatus::DetachFailed: return HandleErrorClass::Error;
         default: return HandleErrorClass::Internal;
     }
 }

@@ -106,7 +106,8 @@ public:
     HandleStatus release(const Value& handle, HandleKind kind, ContextId expected_owner,
                          CleanupFailure* failure = nullptr);
     // detach (host, strict): the named owner gives the resource up; nothing
-    // cleans it at context end; shutdown() releases its bookkeeping.
+    // cleans it at context end; shutdown() releases its bookkeeping. A
+    // resource already terminating cannot be detached (DetachFailed, D-039).
     HandleStatus detach(const Value& handle, HandleKind kind, ContextId expected_owner);
     // detach_as (script-facing): the caller must be the owner or nested in it;
     // detaching a detached handle is Ok.
@@ -123,6 +124,8 @@ public:
     // Cancel, Exited) while its handle stays open. The first call while the
     // lifecycle is Active gets the ticket (info.started); later calls, and
     // calls after cleanup began, do not: termination happens exactly once.
+    // A detached resource: info.started is true (CP16 may send the request)
+    // but no ticket is issued and the lifecycle is unchanged (D-039).
     HandleStatus begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
                                    CompletionTicket& ticket, TerminationStart* info = nullptr);
 

@@ -76,7 +76,10 @@ struct CleanupEvent {
     // one source of truth for CP16's warnings; false unless reason is ContextEnd).
     const std::string& context_label;
     bool context_error;
-    // Non-null exactly when `state` was Active: the hook is then responsible
+    // Detached resources (owner == kDetached): never a ticket; the hook only
+    // releases bookkeeping, its result is ignored and the table records
+    // Completed at once (D-039: no supervision kept for a detached outcome).
+    // Otherwise non-null exactly when `state` was Active: the hook is then responsible
     // for the resource's termination and must either return a final outcome
     // or move the ticket out, return pending() and complete it later. Null
     // when termination was already started (a deadline, a cancel) or settled:
@@ -156,6 +159,10 @@ struct CloseReport {
     std::size_t contexts = 0;                 // contexts ended (the context and its descendants)
     std::vector<CleanupFailure> failures;     // in settle order (D-035: every unresolved obligation
                                               // was resolved before this report was produced)
+    // shutdown() only: failures Nift actually knows about for detached
+    // resources (a hook that threw while releasing bookkeeping). D-039: they
+    // never change the exit status, and Nift keeps no supervision to find more.
+    std::vector<CleanupFailure> detached_failures;
     bool cleanup_failed() const { return !failures.empty(); }
     // D-035/D-020: the run's exit status after this cleanup. A nonzero
     // `original` (an earlier error, or a signal-derived 130/143) stays primary;

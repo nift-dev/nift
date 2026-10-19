@@ -76,7 +76,7 @@ CloseReport HandleTable::shutdown() {
         if (detached_in_flight_ == 0 && detached_obligations_ == 0) break;
         idle_.wait(lock);
     }
-    append(report.failures, detached_failures_);
+    append(report.detached_failures, detached_failures_);
     return report;
 }
 
@@ -90,8 +90,10 @@ HandleStatus HandleTable::detach(const Value& handle, HandleKind kind, ContextId
     if (!c) return status;
     if (!accepts_handles(*c)) return HandleStatus::ContextClosed;
     if (c->build_family) return HandleStatus::DetachForbidden;
+    LifeRecord& r = *records_.find(store_.slot(index).record);
+    if (r.state != LifeState::Active) return HandleStatus::DetachFailed;  // termination already started
     store_.move(index, c->handles, detached_, kDetached);
-    records_.find(store_.slot(index).record)->owner = kDetached;
+    r.owner = kDetached;
     return HandleStatus::Ok;
 }
 

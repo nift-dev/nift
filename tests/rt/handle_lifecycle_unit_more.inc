@@ -282,3 +282,73 @@ void settled_states() {
           r.failures[0].code == "process.reap_failed" && r.failures[0].cause == TerminationCause::Exited &&
           r.final_exit_status(0) == 1);
 }
+
+// D-039: close() through any alias; detach established or reported; nothing
+// supervised for a detached resource.
+void close_and_detach_d039() {
+    Fixture f;
+    std::shared_ptr<void> out;
+    std::string error;
+    {   // (a) a second close() through an alias after the first is Ok; every alias then raises handle_closed
+        Value h;
+        auto p = f.spawn(h);
+        HandleRef ref = HandleRef::adopt(f.t, h);
+        Value alias = h;
+        HandleRef alias_ref = ref;
+        CHECK(f.t.close(h, P, f.script) == HandleStatus::Ok);
+        CHECK(f.t.close(alias, P, f.script) == HandleStatus::Ok);  // idempotent through the alias
+        CHECK(native_handle_close(HandleAccess{&f.t, f.script}, "close", alias_ref.value(), P, error) ==
+              HandleStatus::Ok);
+        CHECK(f.t.resolve(alias, P, f.script, out) == HandleStatus::Closed);
+        CHECK(f.t.resolve(alias_ref.value(), P, f.script, out) == HandleStatus::Closed);
+        std::shared_ptr<FakeProcess> fp;
+        CHECK(native_handle_arg<FakeProcess>(HandleAccess{&f.t, f.script}, "wait", alias, P, fp, error) ==
+              HandleStatus::Closed && error.find("runtime.handle_closed") != std::string::npos);
+        CHECK(p->terminate_calls == 1);  // closed once, for every reference
+        ref.reset();
+        alias_ref.reset();
+        CHECK(p->terminate_calls == 1);
+        f.reaper.settle_all(CleanupOutcome::completed());
+    }
+    {   // (b) failure to establish detachment is a reportable operation failure
+        Value h;
+        f.spawn(h, 0, false);
+        deadline(f.t, h, f.reaper, TerminationCause::Deadline);  // termination already started
+        CHECK(f.t.detach_as(h, P, f.script) == HandleStatus::DetachFailed);
+        CHECK(native_handle_detach(HandleAccess{&f.t, f.script}, "detach", h, P, error) == HandleStatus::DetachFailed);
+        CHECK(error.find("runtime.detach_failed") != std::string::npos &&
+              handle_error_class(HandleStatus::DetachFailed) == HandleErrorClass::Error);
+        ContextId owner = 0;
+        CHECK(f.t.owner_of(h, P, owner) == HandleStatus::Ok && owner == f.script);  // ownership unchanged
+        f.reaper.settle_all(CleanupOutcome::completed());
+        CHECK(f.t.close(h, P, f.script) == HandleStatus::Ok);
+        Value g;  // ownership not transferred: a closed handle, and another context's handle
+        f.spawn(g, 0, false);
+        ContextId other;
+        f.t.open_context(ContextKind::Script, kDetached, other);
+        CHECK(f.t.detach_as(g, P, other) == HandleStatus::NotOwned);
+        f.t.close(g, P, f.script);
+        CHECK(f.t.detach_as(g, P, f.script) == HandleStatus::Closed);
+        f.reaper.settle_all(CleanupOutcome::completed());
+        f.t.close_context(other);
+    }
+    {   // (b, c) after a successful detach: a cancel is a request only; nothing is supervised or waited for
+        Value h;
+        auto p = f.spawn(h);
+        CHECK(f.t.detach_as(h, P, f.script) == HandleStatus::Ok);
+        CompletionTicket ticket;
+        TerminationStart info;
+        CHECK(f.t.begin_termination(h, P, TerminationCause::Cancel, ticket, &info) == HandleStatus::Ok);
+        CHECK(info.started && !ticket);  // CP16 may send the request; no outcome is tracked
+        LifeState state;
+        TerminationCause cause;
+        CHECK(f.t.lifecycle(h, P, state, cause) == HandleStatus::Ok && state == LifeState::Active);
+        f.t.drop(h);
+        TableStats st = f.t.stats();
+        CHECK(st.records == 0 && st.pending_obligations == 0 && p->terminate_calls == 0);
+    }
+    CloseReport r = f.t.close_context(f.script);
+    CHECK(r.failures.empty() && r.final_exit_status(0) == 0);
+    r = f.t.shutdown();
+    CHECK(r.failures.empty() && r.detached_failures.empty() && r.final_exit_status(0) == 0);
+}

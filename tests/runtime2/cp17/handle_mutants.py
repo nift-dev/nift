@@ -26,7 +26,7 @@ M=[
  ("no-kind-check","src/rt/handles/slot_store.cpp","generation > s.generation || s.kind != expected","generation > s.generation"),
  ("no-retire","src/rt/handles/slot_store.cpp","if (s.generation == kMaxGeneration) {  // a bump","if (false) {  // a bump"),
  ("failures-swallowed","src/rt/handles/lifecycle.cpp","if (record.state == LifeState::Completed) return true;","if (true) return true;"),
- ("double-termination","src/rt/handles/table.cpp","        if (r.state == LifeState::Active) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;","        if (true) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;"),
+ ("double-termination","src/rt/handles/table.cpp","        } else if (r.state == LifeState::Active) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;","        } else if (true) {\n            r.state = LifeState::Terminating;\n            r.cause = cause;"),
  ("close-ignores-obligations","src/rt/handles/table_contexts.cpp","return !c || (c->in_flight == 0 && c->obligations == 0);","return !c || c->in_flight == 0;"),
  ("unreported-ticket-forgotten","src/rt/handles/completion.cpp","    if (table_) {\n        complete(","    if (false) {\n        complete("),
  ("drop-no-abandon","src/rt/handles/table.cpp","--s.refs > 0) return HandleStatus::Ok;","--s.refs >= 0) return HandleStatus::Ok;"),
@@ -40,6 +40,10 @@ M=[
  ("failure-means-alive","src/rt/handles/types.h","        return cleanup_incomplete(std::move(code), std::move(message));\n    }\n    static CleanupOutcome pending","        return CleanupOutcome{Result::Failed, std::move(code), std::move(message)};\n    }\n    static CleanupOutcome pending"),
  ("throw-as-incomplete","src/rt/handles/table.cpp","outcome = CleanupOutcome::lost(\"internal.handle_cleanup_threw\", e.what());","outcome = CleanupOutcome::cleanup_incomplete(\"internal.handle_cleanup_threw\", e.what());"),
  ("exit-status-ignores-failures","src/rt/handles/types.h","(cleanup_failed() ? 1 : 0)","0"),
+ ("detach-while-terminating","src/rt/handles/table_contexts.cpp","if (r.state != LifeState::Active) return HandleStatus::DetachFailed;",""),
+ ("detached-supervised","src/rt/handles/table.cpp","    if (owner == kDetached) {   // D-039","    if (false) {   // D-039"),
+ ("detached-cancel-ticketed","src/rt/handles/table.cpp","if (store_.slot(index).owner == kDetached) {  // D-039","if (false) {  // D-039"),
+ ("detached-failures-count","src/rt/handles/table_contexts.cpp","append(report.detached_failures, detached_failures_);","append(report.failures, detached_failures_);"),
  ("limit-setting-ignored","src/rt/handles/table.cpp","if (!invalid_setting_.empty()) status = HandleStatus::InvalidSetting;","if (false) status = HandleStatus::InvalidSetting;"),
 ]
 res=[]

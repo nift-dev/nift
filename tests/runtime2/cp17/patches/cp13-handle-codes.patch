@@ -1,7 +1,7 @@
 diff -ruN a/src/Diagnostic.h b/src/Diagnostic.h
---- a/src/Diagnostic.h	2026-10-19 21:31:44.664370453 +1100
-+++ b/src/Diagnostic.h	2026-10-19 21:31:44.726940993 +1100
-@@ -93,6 +93,29 @@
+--- a/src/Diagnostic.h	2026-10-20 01:39:08.025044074 +1100
++++ b/src/Diagnostic.h	2026-10-20 01:39:08.068789301 +1100
+@@ -93,6 +93,30 @@
      RuntimeArityError,
      RuntimeIntegerOverflow,
      RuntimeDivisionByZero,
@@ -27,11 +27,12 @@ diff -ruN a/src/Diagnostic.h b/src/Diagnostic.h
 +    InternalHandleCleanupIncomplete,
 +    RuntimeDetachInBuild,
 +    ProcessDetachInBuild,
++    RuntimeDetachFailed,
 +    RuntimeTransferOutOfBuild,
      Count,
  };
  
-@@ -175,6 +198,27 @@
+@@ -175,6 +199,28 @@
          NIFT_DIAGNOSTIC_CASE(RuntimeArityError, "runtime.arity_error", Fatal);
          NIFT_DIAGNOSTIC_CASE(RuntimeIntegerOverflow, "runtime.integer_overflow", Fatal);
          NIFT_DIAGNOSTIC_CASE(RuntimeDivisionByZero, "runtime.division_by_zero", Fatal);
@@ -55,14 +56,15 @@ diff -ruN a/src/Diagnostic.h b/src/Diagnostic.h
 +        NIFT_DIAGNOSTIC_CASE(InternalHandleCleanupIncomplete, "internal.handle_cleanup_incomplete", Fatal);
 +        NIFT_DIAGNOSTIC_CASE(RuntimeDetachInBuild, "runtime.detach_in_build", Fatal);
 +        NIFT_DIAGNOSTIC_CASE(ProcessDetachInBuild, "process.detach_in_build", Fatal);
++        NIFT_DIAGNOSTIC_CASE(RuntimeDetachFailed, "runtime.detach_failed", Fatal);
 +        NIFT_DIAGNOSTIC_CASE(RuntimeTransferOutOfBuild, "runtime.transfer_out_of_build", Fatal);
          case DiagnosticCode::Count: break;
  #undef NIFT_DIAGNOSTIC_CASE
      }
 diff -ruN a/tests/runtime2/diagnostics/code-taxonomy.tsv b/tests/runtime2/diagnostics/code-taxonomy.tsv
---- a/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-19 21:31:44.670234086 +1100
-+++ b/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-19 21:31:44.727153588 +1100
-@@ -36,3 +36,24 @@
+--- a/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-20 01:39:08.028719157 +1100
++++ b/tests/runtime2/diagnostics/code-taxonomy.tsv	2026-10-20 01:39:08.068927062 +1100
+@@ -36,3 +36,25 @@
  native.limit_exceeded	limit.exceeded	NativeLimitExceeded	limit, value	recursion/frame budget, nesting and other explicit limits (never an ordinary exception)
  internal.resource_exhausted	limit.resource_exhausted	InternalResourceExhausted	resource	memory or other resource exhausted (not an implementation defect)
  native.system_service_failed	host.service_failed	NativeSystemServiceFailed	service	non-I/O host service failure (clock, randomness, ...)
@@ -86,4 +88,5 @@ diff -ruN a/tests/runtime2/diagnostics/code-taxonomy.tsv b/tests/runtime2/diagno
 +new	internal.handle_cleanup_incomplete	InternalHandleCleanupIncomplete	kind, reason	CleanupIncomplete: known to have ended (exited) but reaping or handle cleanup could not be completed; never 'alive'
 +new	runtime.detach_in_build	RuntimeDetachInBuild	kind	detach inside a build (D-030); processes use process.detach_in_build
 +new	process.detach_in_build	ProcessDetachInBuild		detach of a process inside a build (D-030)
++new	runtime.detach_failed	RuntimeDetachFailed	kind	detachment could not be established (ownership not transferred, or the promised lifetime cannot hold: already terminating); D-039
 +new	runtime.transfer_out_of_build	RuntimeTransferOutOfBuild	kind	host-internal: a transfer that would move a resource out of a build

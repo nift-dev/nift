@@ -150,6 +150,11 @@ HandleTable::Started HandleTable::begin_cleanup_locked(std::uint32_t index, Rele
     started.cause = r.cause;
     r.slot_live = false;
     r.reason = reason;
+    if (owner == kDetached) {   // D-039: only Nift's bookkeeping ends; no ticket, no obligation
+        records_.erase(id);
+        ++settled_;
+        return started;
+    }
     if (r.state == LifeState::Active) {   // this cleanup starts termination and holds the ticket
         r.state = LifeState::Terminating;
         r.cause = cause_of(reason);
@@ -302,7 +307,9 @@ HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind
         LifeRecord& r = *records_.find(store_.slot(index).record);
         start.state = r.state;
         start.cause = r.cause;
-        if (r.state == LifeState::Active) {
+        if (store_.slot(index).owner == kDetached) {  // D-039: a request only; no ticket, nothing supervised
+            start.started = true;
+        } else if (r.state == LifeState::Active) {
             r.state = LifeState::Terminating;
             r.cause = cause;
             r.ticket_issued = start.started = true;

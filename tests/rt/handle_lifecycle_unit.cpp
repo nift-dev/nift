@@ -385,5 +385,6 @@ int main() {
     limit_setting();
     context_label_and_error();
     settled_states();
+    close_and_detach_d039();
     return rt_test::finish("rt handle lifecycle unit");
 }

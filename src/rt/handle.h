@@ -40,6 +40,8 @@ enum class HandleStatus : std::uint8_t {
     KindRegistered,     // the kind is already registered
     NullResource,       // create() with a null resource
     DetachForbidden,    // detach inside a build context (D-030)
+    DetachFailed,       // detachment could not be established (D-039): the resource
+                        // is already terminating, so its promised lifetime cannot hold
     TransferForbidden,  // a transfer that would move a resource out of build ownership
     LimitExceeded,      // the table's capacity (NIFT_HANDLE_LIMIT) is reached (D-020/D-028: loud)
     InvalidSetting,     // NIFT_HANDLE_LIMIT has an invalid value (reported, never replaced)

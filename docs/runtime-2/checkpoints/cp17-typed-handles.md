@@ -209,8 +209,13 @@ cleanup began, the `cause` that started termination (if any), and `ticket`:
   the resource already settled): the existing ticket decides; the hook only
   releases bookkeeping and its return value is ignored (an exception is still
   reported as a failure).
-* Detached processes: the hook sees `owner == kDetached`, completes at once
-  and does not touch the process (it survives its last reference).
+* Detached resources (D-039): the hook sees `owner == kDetached` and **no
+  ticket**; it only releases Nift's bookkeeping and does not touch the process
+  (it survives its last reference). Its result is ignored and the table records
+  `Completed` at once: no record, ticket or obligation is kept for a detached
+  resource, and nothing waits for it. `begin_termination` on a detached handle
+  (a script's cancel) returns `info.started` with no ticket and leaves the
+  lifecycle unchanged: a request, not supervision.
 
 **How async completion is reported:** `CompletionTicket::complete(outcome)`
 from any thread, exactly once (`true` if it settled the lifecycle; a second
@@ -227,7 +232,10 @@ state, context label, code, message) against the resource's owner at settle time
 the shutdown report). `close_context` appends each context's failures in
 settle order after all its obligations settled, so the `CloseReport` is final.
 `cleanup_failed()` is true when any failure was recorded, and
-`final_exit_status(original)` gives the run's status: a nonzero `original`
+Failures Nift actually knows about for detached resources (a hook that threw
+while releasing bookkeeping) go to `shutdown()`'s `detached_failures`, which
+never change the exit status (D-039). `final_exit_status(original)` gives the
+run's status: a nonzero `original`
 (the earlier error, or a signal-derived 130/143 during SIGTERM) stays primary;
 otherwise a cleanup failure makes it 1 (D-020/D-035). Default codes:
 as in the table above; CP16 passes specific ones (`process.kill_failed`,
@@ -248,6 +256,7 @@ as in the table above; CP16 passes specific ones (`process.kill_failed`,
 | `ContextClosed` / `UnknownContext` | `internal.handle_context_closed` / `internal.handle_unknown_context` | Internal | context ended, ending or cancelling / never issued |
 | `UnknownKind` / `KindRegistered` / `NullResource` | `internal.handle_unknown_kind` / `..._kind_registered` / `..._null_resource` | Internal | registration and create errors |
 | `DetachForbidden` | per kind: `process.detach_in_build`, else `runtime.detach_in_build` | Error | detach inside a build (D-030) |
+| `DetachFailed` | `runtime.detach_failed` | Error | detachment could not be established: the resource is already terminating, so the promised lifetime cannot hold (D-039). CP16 reports its own failures to set the lifetime up (setsid, job breakaway) as operation failures and does not call `detach` |
 | `TransferForbidden` | `runtime.transfer_out_of_build` | Internal (host-facing only) | transfer out of the build family, or adoption of a detached resource |
 | `LimitExceeded` | `limit.exceeded` | Limit | `run: handle limit exceeded (N handles, NIFT_HANDLE_LIMIT)` |
 | `InvalidSetting` | `runtime.invalid_argument` | Error | `NIFT_HANDLE_LIMIT='x' (expected a handle count from 1 to 4294967295, optionally with K or M)` |
@@ -392,10 +401,10 @@ mapping: Recoverable → catchable error with the code, Internal →
 |---|---|
 | `tests/rt/handle_table_unit.cpp` | status codes (all distinct) and classes, CP09 `check()`, registration, identity layout, forgery matrix (string, int, null, kind, foreign tag, unknown slot, generation 0 / future / max, rewritten kind byte), closed after release and after reuse by another kind, generation wrap and retirement, churn reclamation (200,000 steps, capacity 64), capacity limit |
 | `tests/rt/handle_table_ownership.cpp` | access rules, identity vs ownership, detach/transfer as single steps, build-family bans, `context_in_build`, close ordering across a build with pages and a hook (LIFO; an older handle resolvable inside a newer one's hook), failing hooks (failure / `std::exception` / non-exception) all reported with the rest still cleaned, explicit-release failure in the close report, idempotent `close`, closed and unknown contexts, destructor shutdown, counted references, native interface |
-| `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, alive-after-kill failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); every settled state (Completed, Failed, Lost, CleanupIncomplete) settled while the handle is open and after close: state, default code and message ("alive" only for Failed, "confirm" only for Lost), exit rule, `handle_closed` afterwards; CP16's exited-but-unreaped report |
+| `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, alive-after-kill failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; D-039: a second `close()` through an alias (and through `native_handle_close`) after the first, every alias then `handle_closed`; detach refused while terminating (`runtime.detach_failed`, ownership unchanged), by a non-owner and on a closed handle; a detached cancel is a request with no ticket and nothing retained; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); every settled state (Completed, Failed, Lost, CleanupIncomplete) settled while the handle is open and after close: state, default code and message ("alive" only for Failed, "confirm" only for Lost), exit rule, `handle_closed` afterwards; CP16's exited-but-unreaped report |
 | `tests/rt/handle_table_stress.cpp` | 4 workers + a context manager + an asynchronous reaper over one table: random create (counted and not), resolve (always the identified resource), release, retain/drop, detach, deadlines (`begin_termination`), transfer while contexts open and close; a capacity-48 run hitting the limit; `release`/`drop`/`close_context` race on one counted handle; `close_context` blocked on another thread's hook. Every resource is cleaned once and settled once; nothing outlives shutdown |
 | `tests/rt/handle_table_bench.cpp` + `tests/runtime2/cp17/handle_guards.py` | callgrind instruction guards (+10 %) |
-| `tests/runtime2/cp17/handle_mutants.py` | 31 mutants (including one per state mapping), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
+| `tests/runtime2/cp17/handle_mutants.py` | 35 mutants (including one per state mapping and four for D-039), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
 | `tests/runtime2/cp17/no_handle_strings.py` | gate: no `\x1fnift` handle string in code under `src/rt`; self-test |
 | `patches/vm-handle-box.patch` (`tests/rt/handle_box_unit.cpp`) | boxed handles: refcounted aliases, equality/hash with plain handles, cross-isolate share, last box schedules cleanup |
 
@@ -440,7 +449,14 @@ Shutdown covers it.
 | O5 | cleanup failure (`Failed` alive after forced termination, `Lost` unconfirmed, `CleanupIncomplete` ended but not cleaned up) → nonzero exit; original error / signal status primary; declared only after the bounded procedure or a definitive OS fact | Lifecycle and completion API |
 | O6 | nested contexts may use ancestors' handles; not parents or siblings | Ownership and lifetime |
 
-## Open questions
+## Questions resolved by D-039
+
+Both were approved as D-039: explicit `close()` closes the resource for every
+reference (later uses through any alias raise `runtime.handle_closed`; a
+repeated `close()` through any alias is Ok), and failures after a successful
+detach never change the exit status, while failing to establish detachment is
+a reportable operation failure (`DetachForbidden`, `DetachFailed`, `NotOwned`,
+`Closed`). Original questions, for the record:
 
 * **Q1 — `close()` vs other references.** Explicit `close()` ends a resource
   even while other references exist (they then get `runtime.handle_closed`).

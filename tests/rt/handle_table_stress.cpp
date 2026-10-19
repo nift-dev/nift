@@ -161,7 +161,7 @@ void worker(HandleTable& t, Board& board, std::atomic<long>& serials, std::atomi
                         TerminationStart info;
                         if (t.resolve_as<Res>(e.handle, K, kAnyAccessor, r) == HandleStatus::Ok &&
                             t.begin_termination(e.handle, K, TerminationCause::Deadline, ticket, &info) ==
-                                HandleStatus::Ok && info.started) {
+                                HandleStatus::Ok && ticket) {  // detached: a request, no ticket
                             g_reaper.push(r, std::move(ticket));
                         }
                     }

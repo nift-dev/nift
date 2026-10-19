@@ -258,14 +258,27 @@ void counted_references() {
     keep.reset();
     keep2.reset();
     CHECK(log.cleaned[4] == 1);
-    // A detached counted handle that is abandoned: its failure goes to shutdown().
+    // D-039: a detached handle's hook only releases bookkeeping; its reported
+    // result is ignored (Nift does not supervise the resource). Only what Nift
+    // actually knows (here: a hook that threw) reaches shutdown(), separately,
+    // and never changes the exit status.
     ContextId s2;
     t.open_context(ContextKind::Script, kDetached, s2);
-    t.create(s2, P, res(9004), failing, CreateOptions{true});
+    t.create(s2, P, res(9004), failing, CreateOptions{true});   // its hook reports a failure: ignored
     t.detach(failing, P, s2);
     t.drop(failing);
+    Value throwing;
+    t.create(s2, P, res(9102), throwing, CreateOptions{true});  // its hook throws: known, reported
+    t.detach(throwing, P, s2);
+    t.drop(throwing);
+    TableStats st = t.stats();
+    CHECK(st.records == 0 && st.pending_obligations == 0 && st.detached == 0);  // nothing kept for a report
     r = t.shutdown();
-    CHECK(r.failures.size() == 1 && r.failures[0].owner == kDetached && r.failures[0].reason == ReleaseReason::Abandoned);
+    CHECK(r.failures.empty() && r.detached_failures.size() == 1 && r.final_exit_status(0) == 0);
+    if (r.detached_failures.size() == 1) {
+        CHECK(r.detached_failures[0].owner == kDetached && r.detached_failures[0].reason == ReleaseReason::Abandoned &&
+              r.detached_failures[0].code == "internal.handle_cleanup_threw");
+    }
     for (const auto& [serial, n] : log.cleaned) CHECK(n == 1);
 }
 
