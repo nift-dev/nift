@@ -588,3 +588,13 @@ must be removed or justified when build recovery integrates.
   explicit detachment moves it outside that context. Implementation and tests
   keep these three events distinct. D-030 is complete; no further CP16 design
   expansion.
+- **Read limit vs VM heap (owner).** `NIFT_READ_LIMIT` (per-operation bound on
+  materialising one whole read or capture) and the VM heap budget (total
+  VM-managed memory) are independent controls; both default to 1 GiB for now,
+  neither tracks the other, and the docs state the difference. The remaining
+  unbounded reads (command-style captures; the build engine's template/content
+  loading) stay explicit follow-ups.
+- **Generator honesty (owner).** VM coverage reports include the supported and
+  general generators' acceptance and refusal rates by reason; any narrowing of
+  the supported-subset spec is explicit, kept as must-stay-refused fixtures, and
+  reported.
