@@ -28,6 +28,14 @@ CP12 refusals lifted with their safety conditions, as differential suites.
               the ones marked `vm` must run on the VM. The top-level `1e2`
               case (a double-typed binding holding an integral value) binds
               differently if the register is ignored (mutant 9).
+              Independent oracle (owner): parity with legacy is not enough if
+              both share a defect, so each program also states, from the
+              arguments alone, the printed lines (the value passed, as print
+              and stringify render it) and whether a binding-type error
+              occurs: the declared binding takes the passed value's type, and
+              a reassignment fails exactly when the new value's type differs
+              (an int into a double binding is a number: accepted). Legacy
+              and NIFT_VM=1 must both match it.
 
   vm_records_coverage.py --nift ./nift
 """
@@ -60,7 +68,7 @@ SUPPORTED = [
 ]
 
 PARAM_DECL = [
-    # (name, must run on the VM, source)
+    # (name, must run on the VM, source); the oracle is ORACLE[name]
     ("pd_types_loop", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
      'vals := ["a", 2, 2.5, [1, "b"], {"k": 1}]\ni := 0\nwhile (i < 5) { f(vals[i]); i += 1 }\nf("top")\nf(7)\n'),
     ("pd_types_literals", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\ni := 0\n'
@@ -82,6 +90,27 @@ PARAM_DECL = [
      'x := 1e2\ni := 0\nwhile (i < 1) { f(x); i += 1 }\nv := 100\nwhile (i < 2) { f(v); i += 1 }\n'),
     ("pd_reassign_top_only", True, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\nf(2.5)\nf("a")\n'),
 ]
+
+# name -> (printed lines, a binding-type error ends the run), derived from the
+# arguments by the rule above (pd_pad: s padded with "." to the width).
+ORACLE = {
+    'pd_types_loop': (['"a"', '2', '2.5', '[1,"b"]', '{"k":1}', '"top"', '7'], False),
+    'pd_types_literals': (['"a"', '2', '2.5', '[1,2]', '{"k":1}'], False),
+    'pd_pad': (['item0.;it....;x.....;', 'top..'], False),
+    # Exception, legacy's canonical text typing (outside prepared code a
+    # binding's type comes from its declaring text, nift_binding_type_from_text):
+    # x := 1e2 is a double binding holding 100, so the first call's `out` is
+    # double and `out = 2.5` is accepted; by the value rule alone it would fail.
+    'pd_register_type_top': (['100', '100', '2.5', '100'], True),
+    'pd_reassign_double_then_string': (['1.5'], True),
+    'pd_reassign_double_then_int': (['1.5'], True),
+    'pd_reassign_string_loop_top': (['x', 'x'], True),
+    'pd_reassign_untyped_args': (['7', '7'], True),
+    # In prepared (loop) code legacy types by the value (P4): `out` is int
+    # (100), so `out = 2.5` fails at the first call: the value rule.
+    'pd_register_type_loop': (['100'], True),
+    'pd_reassign_top_only': (['1.5'], True),
+}
 
 REFUSED = [
     ("decl-param-expression", 'fn(f(s)) {\n  out := s + ""\n  return out\n}\ni := 0\nwhile (i < 1) { print(f("a")); i += 1 }\n',
@@ -152,11 +181,18 @@ def main():
             legacy, _ = run(nift, d, None, a.timeout)
             auto, st = run(nift, d, "1", a.timeout)
             outcome = st and st.get("outcome")
+            lines, error = ORACLE[name]
+            want = ("\n".join(lines) + "\n").encode()
+            for label, got in (("legacy", legacy), ("NIFT_VM=1", auto)):
+                if got[0] != want or (got[2] != 0) != error or (error and b"binding" not in got[1]):
+                    failures.append(f"{name}: {label} differs from the oracle: stdout {got[0]!r} exit {got[2]} "
+                                    f"stderr {got[1][-120:]!r}; oracle {want!r} error {error}")
             if auto != legacy:
                 failures.append(f"{name}: NIFT_VM=1 output differs ({outcome})\n  legacy {legacy}\n  auto   {auto}")
             elif vm_required and outcome not in ("vm", "vm-error"):
                 failures.append(f"{name}: not on the VM ({outcome}, {st and st.get('reason')})")
-            print(f"param-decl {name}: {outcome} {st and st.get('reason')!r}, identical to legacy: {auto == legacy}")
+            print(f"param-decl {name}: {outcome} {st and st.get('reason')!r}, identical to legacy: {auto == legacy}, "
+                  f"oracle: {ORACLE[name]}")
             shutil.rmtree(d, ignore_errors=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -164,7 +200,7 @@ def main():
         print("FAIL " + f)
     print(("PASS" if not failures else "FAIL") + f" vm records coverage: {len(SUPPORTED)} supported shapes on the VM "
           f"(identical to legacy), {len(REFUSED)} refused, {len(PARAM_DECL)} parameter-declaration programs "
-          f"identical to legacy; {len(failures)} failure(s)")
+          f"identical to legacy and to the oracle; {len(failures)} failure(s)")
     return 1 if failures else 0
 
 

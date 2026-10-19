@@ -3,11 +3,11 @@
 `records` workload (scoreboard e2e) entirely on the VM, with the suite's work
 witness.
 
-  * n = 5,000 and 10,000 (the suite's legacy maximum): NIFT_VM=require runs it
-    entirely on the VM (statistics outcome `vm`), byte-identical to legacy
-    (stdout, stderr, exit status), and the witness line equals the suite's
-    expectation;
-  * n = 20,000: entirely on the VM, witness equal to the expectation;
+  * n = 5,000, 10,000 and 20,000: NIFT_VM=require runs it entirely on the VM
+    (statistics outcome `vm`), byte-identical to legacy (stdout, stderr, exit
+    status), and the witness line equals the suite's expectation; wall-clock
+    time of each engine is printed (evidence, not a gate: the suite's
+    callgrind/wall runs are the performance measurement);
   * json_transform (reported, not lifted): the reason NIFT_VM=classify gives.
 
   vm_records20k.py --nift ./nift --suite <nift-bench>/benchmarks/runtime2/suite
@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 WITNESS = re.compile(r"^W n=(\d+) ops=(\d+) chk=(-?\d+)$", re.M)
 
@@ -68,7 +69,9 @@ def main():
             d = tempfile.mkdtemp(dir=work)
             with open(os.path.join(d, "p.f"), "w") as f:
                 f.write(records["nift"].format(N=n))
+            t0 = time.perf_counter()
             vm, st = run(nift, d, "require", a.timeout)
+            t_vm = time.perf_counter() - t0
             outcome = st and st.get("outcome")
             m = WITNESS.search(vm[0].decode("utf-8", "replace"))
             got = (int(m.group(1)), int(m.group(3))) if m else None
@@ -78,12 +81,14 @@ def main():
                 failures.append(f"{line}: not entirely on the VM ({st and st.get('reason')})")
             elif got != want:
                 failures.append(f"{line}: witness (n, chk) {got} != expected {want}")
-            if n <= records.get("legacy_max", 10000):
-                legacy, _ = run(nift, d, None, a.timeout)
-                same = legacy == vm
-                line += f"; byte-identical to legacy: {same}"
-                if not same:
-                    failures.append(f"records n={n}: VM output differs from legacy")
+            t0 = time.perf_counter()
+            legacy, _ = run(nift, d, None, a.timeout)
+            t_legacy = time.perf_counter() - t0
+            same = legacy == vm
+            line += (f"; byte-identical to legacy: {same}; wall legacy {t_legacy:.2f} s, VM {t_vm:.2f} s"
+                     + (f" ({t_legacy / t_vm:.1f}x)" if outcome == "vm" and t_vm > 0 else ""))
+            if not same:
+                failures.append(f"records n={n}: VM output differs from legacy")
             print(line)
         d = tempfile.mkdtemp(dir=work)
         with open(os.path.join(d, "p.f"), "w") as f:
