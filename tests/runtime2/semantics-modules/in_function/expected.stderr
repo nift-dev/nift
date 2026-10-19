@@ -1,0 +1,1 @@
+error: $P/p/main.f:1:11: import: export collides with existing binding: mf

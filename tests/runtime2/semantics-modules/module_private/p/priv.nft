@@ -1,0 +1,3 @@
+fn(rd()) { return hidden }
+hidden := 7
+export(rd)

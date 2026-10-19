@@ -1,0 +1,5 @@
+print(2)
+fn(ef()) { print("in ef")
+return 5 }
+print(3)
+export(ef)

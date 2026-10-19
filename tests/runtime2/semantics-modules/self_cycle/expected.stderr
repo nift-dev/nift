@@ -1,0 +1,1 @@
+error: $P/p/main.f:1:1: import: script import cycle through $P/p/main.f

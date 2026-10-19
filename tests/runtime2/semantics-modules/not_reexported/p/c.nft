@@ -1,0 +1,4 @@
+cv := 1
+fn(cf()) { return "cf" }
+export(cf)
+export(cv)

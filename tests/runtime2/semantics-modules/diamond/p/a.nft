@@ -1,0 +1,4 @@
+print("a runs")
+import("c.nft")
+fn(af()) { return "af:" + cf() }
+export(af)

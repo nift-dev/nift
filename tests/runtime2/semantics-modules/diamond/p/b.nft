@@ -1,0 +1,3 @@
+print("b runs")
+import("c.nft")
+export(cf)

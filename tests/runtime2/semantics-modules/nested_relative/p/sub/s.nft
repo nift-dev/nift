@@ -1,0 +1,4 @@
+import("../m2.nft")
+import("t.nft")
+fn(sf()) { return m2f() + tf() }
+export(sf)

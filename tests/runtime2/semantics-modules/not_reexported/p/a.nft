@@ -1,0 +1,2 @@
+import("c.nft")
+export(cf)

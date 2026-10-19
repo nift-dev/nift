@@ -1,0 +1,2 @@
+fn(uf()) { return zz }
+export(uf)

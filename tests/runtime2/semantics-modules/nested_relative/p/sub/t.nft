@@ -1,0 +1,2 @@
+fn(tf()) { return "t" }
+export(tf)

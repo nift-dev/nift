@@ -1,0 +1,1 @@
+error: $P/p/cyc2.nft:1:1: import: import: import: script import cycle through $P/p/cyc1.nft
