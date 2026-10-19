@@ -1,6 +1,6 @@
 # Runtime 2.0 delivery forecast (living)
 
-_Last updated: 2026-10-19 18:40 AEDT. Updated when milestones land or blockers
+_Last updated: 2026-10-20 01:45 AEDT. Updated when milestones land or blockers
 emerge, not continuously. Authoritative per-checkpoint evidence stays in
 `progress.md`; this file tracks state, dependencies, estimates and the forecast._
 
@@ -25,7 +25,7 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
   block 153 (VM subset gap). **About 180 curated scripts depend on features no
   checkpoint owns** (`for` 21, lambdas/functions as values 88, unscheduled
   built-ins 60, methods outside CP14/15 57, lambda-taking methods 38): as
-  scheduled, CP25's zero-fallback gate is unreachable — roadmap decision pending.
+  scheduled, CP25's zero-fallback gate was unreachable. **Decided (D-036): roadmap expanded (CP12C, CP14B, CP15B, natural owners for `cmd`/`mutex`/`ffi_*`); CP25 stays strict.** Modules approved (D-037); lexical scoping adopted (D-038).
 - **Target (owner, 2026-10-19): complete the Runtime 2.0 implementation within
   seven days, with the following week as contingency.** A stretch target, not
   permission to weaken correctness or certification. Workstreams overlap (agents
@@ -49,11 +49,14 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
 | CP09–CP11 | ✓ | ✓ | ✓ | ✓ | ✓ (CI @c6fac06) | — | — | — | |
 | **CP12 phase A** (engine selection, replay removed) | ✓ | ✓ (2 rounds) | ✓ @ebc2656 | ✓ bd1c8a9 | pending | CP11 | — | — | planted-defect gate permanent |
 | **CP12 phase B** (globals, `GETDYN`, modules, structs, enums) | started 2026-10-19 (inventory) | | | | | CP12A | large | **high** | the coverage engine; agent assigned |
+| **CP12 phase B chained calls** (`a.b().c()` on call results) | analysis in progress | | | | | CP12A | TBD (breakdown pending) | medium | 153 curated scripts; D-036 |
+| **CP12 phase C** (functions as values, closures/lambdas, `for`) | | | | | | CP12B | large | **high** | new (D-036); 88 + 21 curated scripts |
 | **CP13 phase A** (prevalidation, multi-line return, `runtime.*` codes, site-DX) | ✓ | ✓ (design) | ✗ @fb9112d (4 FAIL: trailing-comma false rejection ×2, python binding missing `src/rt/parser.cpp`, test-integrity ×6) | | | CP12A | fixes in progress | low–medium | re-certify on Linode after fixes |
 | CP13 phase B (VM `throw`/`try`, structured error records, JSON diagnostics, `eval` prevalidation) | | | | | | CP13A | medium | **medium–high** | corpus scripts waiting on `try`; affects unwinding/cleanup |
 | **CP14 phase A** (F1/F2/F3/F6, 73 natives) | ✓ | ✓ | ✓ @6c26404 | ✓ 2026-10-19 | pending | CP12A | certification | low | coverage unchanged by itself (104/788) |
-| **CP14 phase B** (F4 mutating ×9, F5 callbacks ×17: `map`, `sort_by`, `filter`…) | design only | ✓ (design) | | | | CP12B place model (F4); native→compiled callbacks (F5) | medium | medium | `sort_by` 19, `map` 9 corpus refusals |
-| CP15 built-ins B | natives ✓, wiring written | ✓ (natives) | | | | CP14 | small–medium | low | time natives moved to CP16 |
+| **CP14 phase B** (F4 mutating ×9, F5 callbacks ×17: `map`, `sort_by`, `filter`…; all callback-taking collection methods, D-036) | design only | ✓ (design) | | | | CP12B place model (F4); native→compiled callbacks (F5) | medium | medium | `sort_by` 19, `map` 9 corpus refusals |
+| CP15 built-ins B (phase A) | natives ✓, wiring written | ✓ (natives) | | | | CP14 | small–medium | low | time natives moved to CP16 |
+| **CP15 phase B** (remaining pure built-ins and methods) | | | | | | CP15A, CP12C for callbacks | medium | medium | new (D-036); ~57 methods + pure built-ins |
 | records20k coverage | designed | | | | | CP14 | small | low–medium | push of fresh values; loop-called fns returning objects |
 | CP16 host ops | started (host layer) | design ✓ | | | | CP14, CP17, host-deps | large | **high** | D-028–D-031 decided |
 | CP17 typed handles | started | | | | | (CP16 consumes it) | medium | medium | built before CP16's concrete handles |

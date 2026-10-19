@@ -712,3 +712,57 @@ must be removed or justified when build recovery integrates.
   definitive failure; `Lost` means "termination could not be confirmed"; a
   context never reports final success with cleanup obligations unresolved;
   original errors and signal-derived statuses stay primary.
+
+## D-036 — Roadmap expansion for unowned VM features (owner, 2026-10-20; CP12B inventory)
+
+The CP12B coverage inventory found about 180 curated scripts blocked by features
+no checkpoint owned. Decision: expand the roadmap; **CP25's zero-fallback gate
+stays strict** (no accepted permanent legacy fallback).
+
+- **CP12 phase C:** functions as values, closures/lambdas, `for`-loop compilation.
+- **CP14 phase B:** callback-taking collection methods (with the F4/F5 work).
+- **CP15 phase B:** remaining pure built-ins and methods.
+- Process, concurrency and FFI functions go to their natural checkpoints
+  (`cmd` → CP16/CP20, `mutex` → CP22/CP23, `ffi_*` → CP18), never to a
+  miscellaneous checkpoint. Every refusal category gets a named owner and
+  dependency (table in `checkpoints/cp12b-coverage-inventory.md`).
+- Chained calls on call results (153 curated scripts) are a targeted coverage
+  task inside CP12B.
+- 100 % of the current corpus is a necessary gate, not proof of completeness:
+  supported-generator expansion, real package testing, differential checks and
+  cross-platform certification stay. The acceptance corpus is never narrowed.
+  Corpus coverage and real-package compatibility are tracked separately.
+
+## D-037 — Modules on the VM (owner, 2026-10-20; CP12B)
+
+Approved, subject to verifying legacy semantics first and documenting any
+intentional difference before implementation:
+
+- Literal import paths resolve at compile time, relative to the importing module
+  under Nift's existing path rules; module identity is canonicalised.
+- Each unique module is compiled once per program. **Compilation caching is
+  separate from initialisation**: legacy's observable initialisation and side
+  effects (including diamond imports) are preserved unless a deliberate
+  compatibility decision changes them.
+- Circular, repeated, nested and missing imports are probed and tested with an
+  explicit contract; imports (including missing files where legacy records
+  them) are build dependencies.
+- Unsupported dynamic imports are rejected before execution; no speculative
+  dynamic-import support.
+- Module loading uses CP16's host-read interface once available.
+
+## D-038 — Lexical scoping (owner, 2026-10-20; L25)
+
+Lexical scoping is the target semantics. The VM does not reproduce caller-local
+dynamic lookup. The two curated scripts that depend on it become explicit
+compatibility fixtures demonstrating the difference. The resolver distinguishes
+lexical globals, module bindings and genuinely caller-dependent lookup; only the
+last is refused before execution. Final migration diagnostics belong to the
+language-cleanup checkpoint.
+
+## D-039 — CP17 interim answers (coordinator, 2026-10-20; pending owner objection)
+
+- Explicit `close()` ends the resource even while other references exist; those
+  references then raise `runtime.handle_closed`.
+- Failures of detached resources appear in the shutdown report and do not change
+  the exit status (detaching opts out of ownership).
