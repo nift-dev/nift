@@ -1,0 +1,18 @@
+diff --git a/src/rt/value.h b/src/rt/value.h
+index e340ac73..e849f585 100644
+--- a/src/rt/value.h
++++ b/src/rt/value.h
+@@ -42,7 +42,12 @@ void destroy_heap_object(HeapObject* object);
+ 
+ // Handle kinds are typed tags, never strings (decision 5). Values carry
+ // (kind, id, generation); registries own the resource (rt/handle.h).
+-enum class HandleKind : std::uint8_t { None, Timer, File, Process, Module, Future, Mutex, Atomic, Ffi, Custom };
++// Values are persisted nowhere, but keep existing numbers stable: append new kinds.
++enum class HandleKind : std::uint8_t {
++    None, Timer, File, Process, Module, Future, Mutex, Atomic, Ffi, Custom,
++    Stream,   // CP16: an open Host stream (legacy "\x1fnift:stream:N")
++    Command,  // CP16: a cmd() pipeline builder (legacy "\x1fnift:cmd:N"); started groups are Process
++};
+ 
+ class Value {
+ public:

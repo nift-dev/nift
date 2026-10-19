@@ -258,6 +258,64 @@ test-rt-value-sanitize:
 		echo "PASS stale reference detected: $$m"; done
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 
+# Runtime 2.0 CP17 typed handles (src/rt/handle.*, src/rt/handles/): unit,
+# concurrency stress (ASan/UBSan and TSan), callgrind guard, and the
+# no-legacy-handle-strings gate for VM paths. Not linked into nift yet (CP16
+# adds src/rt/handles/*.cpp to RT_LINK_SOURCES when it uses the table).
+RT_HANDLE_SOURCES := src/rt/handle.cpp $(sort $(wildcard src/rt/handles/*.cpp)) src/rt/value.cpp src/rt/string.cpp \
+	src/rt/heap_account.cpp
+RT_HANDLE_DEPS := $(RT_HANDLE_SOURCES) src/rt/handle.h $(wildcard src/rt/handles/*.h) src/rt/value.h \
+	tests/rt/rt_test.h tests/rt/handle_test_support.h
+RT_HANDLE_UNIT_SOURCES := tests/rt/handle_table_unit.cpp tests/rt/handle_table_ownership.cpp
+RT_HANDLE_UNIT := $(TEST_DIR)/rt/handle-unit$(EXEEXT)
+RT_HANDLE_STRESS := $(TEST_DIR)/rt/handle-stress$(EXEEXT)
+RT_HANDLE_BENCH := $(TEST_DIR)/rt/handle-bench$(EXEEXT)
+RT_HANDLE_TSAN_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread
+
+$(RT_HANDLE_UNIT): $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) -o "$@"
+
+$(RT_HANDLE_STRESS): tests/rt/handle_table_stress.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) -o "$@"
+
+$(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/handle_table_bench.cpp $(RT_HANDLE_SOURCES) -o "$@"
+
+.PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
+# RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
+test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS)
+	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_UNIT)"
+	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_STRESS)" $${RT_HANDLE_STRESS_MS:-2000} $${RT_HANDLE_RACE_ROUNDS:-500}
+	python3 tests/runtime2/cp17/no_handle_strings.py --self-test
+	python3 tests/runtime2/cp17/no_handle_strings.py src/rt
+	python3 tools/rt-lint.py src/rt/handle.h src/rt/handle.cpp src/rt/handles
+
+test-rt-handles-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-san/handle-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-san/handle-stress"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-stress" $${RT_HANDLE_STRESS_MS:-2000} \
+		$${RT_HANDLE_RACE_ROUNDS:-300}
+
+test-rt-handles-tsan:
+	mkdir -p "$(TEST_DIR)/rt-tsan"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-tsan/handle-stress"
+	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/handle-stress" \
+		$${RT_HANDLE_STRESS_MS:-3000} $${RT_HANDLE_RACE_ROUNDS:-300}
+
+# D-031: every run is under ulimit -f and timeout; ulimit -v only where no
+# sanitizer is used (ASan/TSan reserve terabytes of shadow address space).
+# Callgrind instruction guards on create/resolve cost (+10 %); run via heavy.sh.
+test-rt-handles-guards: $(RT_HANDLE_BENCH)
+	python3 tests/runtime2/cp17/handle_guards.py "$(RT_HANDLE_BENCH)" --check tests/runtime2/cp17/handle_guards.json
+
 # Runtime 2.0 CP11: compiler + register VM (src/rt), linked into nift behind
 # NIFT_VM=1. Unit tests in-process; differential parity against the legacy
 # engine (VM corpus expectations, generated programs, rt-diff with policies).
