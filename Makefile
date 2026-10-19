@@ -9,7 +9,7 @@ LDLIBS ?=
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
 PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
 # Runtime 2.0 (src/rt): linked into nift from CP11 (opt-in VM, NIFT_VM=1).
-RT_LINK_SOURCES := $(sort $(wildcard src/rt/*.cpp))
+RT_LINK_SOURCES := $(sort $(wildcard src/rt/*.cpp src/rt/natives/*.cpp))
 CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES)
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
@@ -196,8 +196,8 @@ test-runtime-value: $(RUNTIME_VALUE_TEST)
 
 # Runtime 2.0 CP09 value model (src/rt): unit, randomised differential/property
 # tests against the legacy RuntimeValue, lint, sanitizer build and benchmarks.
-RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp)
-RT_VALUE_HEADERS := $(wildcard src/rt/*.h) tests/rt/rt_test.h tests/rt/legacy_oracle.h
+RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp)
+RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.inc) tests/rt/rt_test.h tests/rt/legacy_oracle.h
 RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
 RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
 RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
@@ -288,6 +288,7 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/r
 	python3 tests/runtime2/vm_subset.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
 		--count $${RT_VM_SUBSET_GEN:-500}
+	python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_former_replay.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} \
 		--sample $${RT_VM_FORMER:-600}
@@ -316,6 +317,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(SAN_TARGET)" --suite both \
 		--seed $${RT_VM_SEED:-2} --count $${RT_VM_SUBSET_GEN:-80} --timeout 120
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \

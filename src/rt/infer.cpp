@@ -2,8 +2,8 @@
 
 #include "rt/infer_types.h"
 
+#include "rt/infer_builtins.h"
 #include "rt/literal.h"
-#include "rt/native.h"
 
 #include <cmath>
 #include <deque>
@@ -223,18 +223,18 @@ private:
     TyRef call(const Node& n) {
         const Node& callee = ast_.at(n.a);
         const NodeId* args = ast_.list(n);
-        if (callee.kind == NodeKind::Member) {  // length() / size() (other methods are refused)
-            expr(callee.a);
-            for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
-            return kinds_ty(kKindInt);
+        if (callee.kind == NodeKind::Member) {  // length()/size() and CP14 methods (infer_builtins.cpp)
+            const TyRef recv = expr(callee.a);
+            std::vector<TyRef> values(n.count);
+            for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
+            return method_result(ast_, n, recv, values);
         }
         const int f = function_index(callee);
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
         if (f < 0) {
-            NativeInfo native{};
-            if (callee.kind == NodeKind::Ident && lookup_native(ast_.text(callee), native)) return kinds_ty(kKindNull);
-            return any_ty();
+            // print, a CP14 free built-in, or something the compiler refuses
+            return callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
         }
         const auto fn_index = static_cast<std::size_t>(f);
         auto& params = params_[fn_index];

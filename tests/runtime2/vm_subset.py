@@ -167,7 +167,8 @@ UNSUPPORTED = [
     ("reserved-binding", "title := 1\nprint(title)\n", "binding-name-reserved"),
     ("reserved-param", "fn(f(name)) { return name }\nprint(f(1))\n", "param-name-reserved"),
     # Methods and natives.
-    ("method", 'x := "a,b"\nprint(x.split(","))\n', "method:split"),
+    # CP14 wiring: split is a bound built-in; replace_once is batch C (CP16).
+    ("method", 'x := "a,b"\nprint(x.replace_once("a", "b"))\n', "method:replace_once"),
     ("native", "print(stringify(1))\n", "callable:stringify"),
     ("alias-argument", 'fn(f(p)) { p.push(9) }\no := {"k": [1]}\nf(o.k)\n', "alias-argument"),
     # Statically known errors (review round 2: refused, no longer replayed).

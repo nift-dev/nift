@@ -14,6 +14,9 @@
 namespace nift::rt {
 
 enum class NativeId : std::uint16_t { Print };
+// CallNative operand b: a NativeId below kFirstBuiltin, a CP14 built-in
+// (natives::BuiltinId = b - kFirstBuiltin, rt/builtin_bind.h) from there on.
+inline constexpr std::uint16_t kFirstBuiltin = 1;
 
 struct NativeInfo {
     NativeId id;

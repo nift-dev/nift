@@ -10,7 +10,8 @@ control.f vm
 fallback_args.f fallback unresolved-name
 fallback_await.f fallback fn-flags
 fallback_bare_expression.f fallback expression-statement
-fallback_builtin.f fallback method:split
+# CP14 wiring: split() is a bound built-in; the unit is still refused, now for print() of its array result.
+fallback_builtin.f fallback type:print
 fallback_const.f fallback declare-const
 fallback_escape.f fallback string-literal
 fallback_fn_after.f fallback fn-after-statement

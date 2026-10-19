@@ -13,6 +13,7 @@
 // once, errors reported where they occur; D-009#1/#5).
 #include "rt/ast.h"
 #include "rt/codegen.h"
+#include "rt/natives/builtin.h"
 #include "rt/infer.h"
 #include "rt/resolver.h"
 #include "rt/text_type.h"
@@ -86,6 +87,10 @@ private:
     bool unary(const Node& node, std::uint16_t dst);
     bool call(const Node& node, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);
+    // CP14: a pure built-in over a fresh window (receiver: kNoNode for a free
+    // function); W1, W2/W4 refusals.
+    bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst);
+    bool unobservable_argument(NodeId id);
     bool array_literal(const Node& node, std::uint16_t dst);
     bool object_literal(const Node& node, std::uint16_t dst);
     bool member(const Node& node, std::uint16_t dst);

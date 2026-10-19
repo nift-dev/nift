@@ -273,6 +273,52 @@ class Supported:
             return self.var(scope, "o")
         return self.typed(scope, k, d)
 
+    def builtin(self, scope, k, d):
+        """CP14 wiring (W7): a call of a bound built-in on a local receiver
+        (string, array of numbers, object {n, x, s}) that cannot fail, or a
+        free built-in. Later arguments of a fallible built-in are literals or
+        locals (W2); results are never receivers (postfix-receiver)."""
+        s, a, o = self.var(scope, "s"), self.var(scope, "a"), self.var(scope, "o")
+        i = self.var(scope, "i") or self.r.choice(ILIT)
+        lit = self.r.choice([x for x in SLIT if x not in ('""',)])  # replace() refuses ""
+        opts = []
+        if k == "i":
+            opts += [f"max({self.ie(scope, d + 1)}, {i})", f"min({i}, {self.r.choice(ILIT)})"]
+            if s:
+                opts += [f"{s}.index_of({lit})", f"{s}.last_index_of({lit})"]
+            if a:
+                opts += [f"{a}.first()", f"{a}.last()", f"{a}.max()", f"{a}.min()", f"{a}.indexOf({i})"]
+            if o:
+                opts += [f'{o}.get("n", 0)']  # without a default: int | null
+        elif k == "s":
+            opts += [f"type({self.ie(scope, d + 1)})", f"html_escape({self.se(scope, d + 1)})",
+                     f"url_encode({self.se(scope, d + 1)})"]
+            if s:
+                opts += [f"{s}.trim()", f"{s}.to_upper()", f"{s}.to_lower()", f"{s}.replace({lit}, \"-\")",
+                         f"{s}.substr(1)", f"{s}.substr(0, 2)", f"{s}.to_string()"]
+            if a:
+                opts += [f'{a}.join(",")', f"{a}.stringify()"]
+            if o:
+                opts += [f"{o}.stringify()", f'{o}.get("s", "d")']
+        elif k == "b":
+            opts += [f"is_int({self.ie(scope, d + 1)})", f"is_string({self.se(scope, d + 1)})"]
+            if s:
+                opts += [f"{s}.contains({lit})", f"{s}.starts_with({lit})", f"{s}.ends_with({lit})", f"{s}.empty()"]
+            if a:
+                opts += [f"{a}.contains({i})", f"{a}.empty()"]
+            if o:
+                opts += [f'{o}.has("n")', f'{o}.has("q")', f"{o}.empty()"]
+        elif k == "a":
+            # never empty: the generator indexes and aggregates arrays
+            opts += [f"range({self.r.randint(1, 3)})", f"range(1, {self.r.randint(2, 4)})"]
+            if a:
+                opts += [f"{a}.slice(0, 2)", f"{a}.unique()", f"{a}.take(1)"]
+        if not opts:
+            return None
+        x = self.r.choice(opts)
+        self.features["builtin:" + re.sub(r"^[A-Za-z0-9_]*\.|\(.*$", "", x)] += 1
+        return x
+
     def ie(self, scope, d):
         r = self.r.random()
         v = self.var(scope, "i")
@@ -280,6 +326,10 @@ class Supported:
             return v if v and self.r.random() < 0.6 else self.r.choice(ILIT)
         if r < 0.45:
             c = self.call(scope, "i", d)
+            if c:
+                return c
+        if r < 0.52:
+            c = self.builtin(scope, "i", d)
             if c:
                 return c
         if r < 0.65:
@@ -337,6 +387,10 @@ class Supported:
             c = self.call(scope, "s", d)
             if c:
                 return c
+        if r < 0.55:
+            c = self.builtin(scope, "s", d)
+            if c:
+                return c
         if r < 0.75:
             right = self.ch(self.r.choice(SLIT), self.par(self.ie(scope, d + 1)), "true", "null")
             return f"{self.r.choice(SLIT) if self.r.random() < 0.3 else self.par(self.se(scope, d + 1))} + {right}"
@@ -366,6 +420,10 @@ class Supported:
             c = self.call(scope, "b", d)
             if c:
                 return c
+        if r < 0.84:
+            c = self.builtin(scope, "b", d)
+            if c:
+                return c
         return f"({self.be(scope, d + 1, True)})"
 
     def comparison(self, scope, d):
@@ -390,6 +448,10 @@ class Supported:
         r = self.r.random()
         if r < 0.25:
             c = self.call(scope, "a", d)
+            if c:
+                return c
+        if r < 0.35:
+            c = self.builtin(scope, "a", d)
             if c:
                 return c
         return "[" + ", ".join(self.ie(scope, d + 2) for _ in range(self.r.randint(1, 3))) + "]"
@@ -708,7 +770,8 @@ INJECT = [
     ("lambda", "", "zf := (y) => y\nprint(1)", "any", "expression:Lambda"),
     ("bare-expression", "", "zx := 1\nzx", "any", "expression-statement"),
     ("native", "", "print(stringify(1))", "any", "callable:stringify"),
-    ("method", "", 'zs := "a,b"\nprint(zs.split(","))', "any", "method:split"),
+    # CP14 wiring: split is a bound built-in; replace_once is batch C (CP16).
+    ("method", "", 'zs := "a,b"\nprint(zs.replace_once("a", "b"))', "any", "method:replace_once"),
     ("zero-decimal", "", "print(0.0)", "any", "number-literal"),
     ("big-integer", "", "print(9007199254740993)", "any", "number-literal"),
     ("escape", "", 'print("a\\tb")', "any", "string-literal"),

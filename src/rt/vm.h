@@ -99,6 +99,7 @@ private:
     bool call_slow(const Proto* callee, std::size_t callee_base, Fault& fault);
     bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
+    bool builtin(const Instr& in, Value* R, Fault& fault);  // CP14 built-ins (rt/natives)
     void flush_if_needed(std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);

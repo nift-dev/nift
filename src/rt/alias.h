@@ -12,7 +12,7 @@ namespace nift::rt {
 
 // Fills plan.escaping: parameter k of function f escapes when the body of f
 // (any nested block) uses the parameter's name as a method-call receiver
-// other than `.length()`/`.size()`, as the object of an index assignment, as
+// other than `.length()`/`.size()` and the read-only CP14 built-in methods, as the object of an index assignment, as
 // the target of `=`, a compound assignment or `++`/`--`, or as a bare-name
 // argument to a parameter of a user function that escapes (fixpoint).
 // Conservative: a block-local shadowing binding of the same name counts too.

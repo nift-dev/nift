@@ -359,7 +359,7 @@ bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
             return true;
         }
     }
-    return raise(fault, StopReason::Internal, "unknown native");
+    return builtin(in, R, fault);  // CP14 built-ins (vm_builtin.cpp); reports an unknown id
 }
 
 bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault) {

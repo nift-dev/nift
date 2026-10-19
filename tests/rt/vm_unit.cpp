@@ -92,7 +92,7 @@ void check_fallbacks() {
         {"print(\"a\\tb\")\n", "string-literal"},
         {"print(9007199254740993)\n", "number-literal"},
         {"fn(min(a, b)) { return 0 }\nprint(min(1, 2))\n", "fn-name-reserved"},
-        {"x := \"a\"\nprint(x.split(\",\"))\n", "method:split"},
+        {"x := \"a\"\nprint(x.replace_once(\"a\", \"b\"))\n", "method:replace_once"},  // CP14: split is bound
         {"print(args)\n", "unresolved-name"},
         {"a := [1]\nprint(a [0])\n", "opaque:legacy-runtime-error"},
         {"a := [1,]\n", "opaque:legacy-runtime-error"},

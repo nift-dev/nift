@@ -1,5 +1,7 @@
 #include "rt/alias.h"
 
+#include "rt/builtin_bind.h"
+
 // rt-lint: cold-file compile-time analysis, once per unit
 
 namespace nift::rt {
@@ -18,8 +20,10 @@ struct Analysis {
     }
 
     bool pure_method(const Node& member) const {
+        // length()/size() and the CP14 built-in methods only read their
+        // receiver (W5); every other method may mutate it.
         const std::string_view m = ast.text(ast.at(member.b));
-        return m == "length" || m == "size";  // rt-lint: allow-string-compare compile time
+        return m == "length" || m == "size" || pure_method_name(m);  // rt-lint: allow-string-compare compile time
     }
 
     // Does the subtree `id` use `name` in an escaping position?
