@@ -1,11 +1,15 @@
 # CP13 prevalidation rules, each decided against legacy (rules_test.py).
+# Integration (feature-site-dx in the base): an unterminated quote or `[` that
+# reaches the end of its block is a translator error in legacy and in the CP10
+# splitter (earliest unterminated opener wins), so those rows are now
+# `reject translator fails` (were R1/R2 with legacy silent).
 # verdict	rule (reject) or - (accept)	legacy: fails|silent|runtime-error|ok	context	statement
 # context: top = between print("a") and print("b"); dead = inside if(0 == 1) {...};
 # after-return = after `return 0` in a called function; fn = inside a function that
 # IS called; uncalled = inside a function that is never called (legacy never
 # translates/evaluates it: these are the D-022 #3 "before anything runs" cases).
 reject	R2-unclosed	fails	top	x := (1 + 2
-reject	R2-unclosed	silent	top	x := [1, 2
+reject	translator	fails	top	x := [1, 2
 reject	R2-unclosed	fails	top	x := {"a": 1
 reject	R2-unclosed	fails	top	print((1)
 reject	R2-unclosed	fails	top	print(f(1)
@@ -38,8 +42,8 @@ reject	R5-missing-left-operand	fails	top	print(== 1)
 reject	R5-missing-left-operand	fails	top	x := && 1
 reject	R5-missing-left-operand	fails	top	x := || 1
 reject	R5-missing-left-operand	fails	top	x := ?? 1
-reject	R1-unterminated-string	silent	top	print("abc)
-reject	R1-unterminated-string	silent	top	x := 'abc
+reject	translator	fails	top	print("abc)
+reject	translator	fails	top	x := 'abc
 reject	R2-unclosed	fails	fn	x := (1 + 2
 reject	R3-empty-element	fails	fn	x := [1, 2,]
 reject	R2-unclosed	ok	uncalled	x := (1 + 2

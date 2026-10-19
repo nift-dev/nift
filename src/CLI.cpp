@@ -1612,15 +1612,21 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     // Runtime 2.0 CP13 (D-022 #3): the whole unit is syntax-validated before
     // engine selection, so a unit routed to legacy cannot bypass it. On
     // failure nothing has run: no output, no effects. NIFT_PREVALIDATE=only
-    // validates and exits (0 valid, 65 invalid) without running (gate tool).
-    {
+    // validates and exits (0 valid, 65 invalid) without running (gate tool);
+    // NIFT_PREVALIDATE=off skips validation (test observation of the engines'
+    // own behaviour only, e.g. rules_test.py's legacy column; never a mode).
+    const char* prevalidate_mode = std::getenv("NIFT_PREVALIDATE");
+    if (!(prevalidate_mode && std::string(prevalidate_mode) == "off")) {
         const auto verdict = nift::rt::prevalidate(source);
-        const char* only = std::getenv("NIFT_PREVALIDATE");
-        const bool validate_only = only && std::string(only) == "only";
+        const bool validate_only = prevalidate_mode && std::string(prevalidate_mode) == "only";
         if (!verdict.ok) {
             const auto where = nift::rt::locate(source, verdict.offset);
+            // The gate's check mode also needs the code and the rule (as
+            // `rt-parse-dump prevalidate` prints them); a normal run prints
+            // the diagnostic only.
             console::error(source_path.generic_string() + ':' + std::to_string(where.line) + ':' +
-                           std::to_string(where.column) + ": " + verdict.message);
+                           std::to_string(where.column) + ": " + verdict.message +
+                           (validate_only ? std::string(" [") + verdict.code + "] " + verdict.rule : std::string()));
             return validate_only ? 65 : 1;
         }
         if (validate_only) return 0;

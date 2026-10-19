@@ -534,7 +534,9 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     // loaded, before any of its statements runs (one grammar: the CP10
     // parser). The error is the module's own position through the import
     // frame, exactly as a failing module statement is reported.
-    if(const auto verdict=nift::rt::prevalidate(*src.content);!verdict.ok){
+    // NIFT_PREVALIDATE=off (test observation only) skips it, as for scripts.
+    const char* prevalidate_mode=std::getenv("NIFT_PREVALIDATE");
+    if(const auto verdict=(prevalidate_mode&&std::string(prevalidate_mode)=="off")?nift::rt::Prevalidation{}:nift::rt::prevalidate(*src.content);!verdict.ok){
         const std::string& text=*src.content;
         const auto where=nift::rt::locate(text,verdict.offset);
         nift::detail::DiagnosticOrigin origin;origin.source=path;origin.line=where.line;origin.column=where.column;

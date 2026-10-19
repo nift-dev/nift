@@ -112,8 +112,14 @@ def validate(nift, path, mode, work, tool):
         p = subprocess.run([nift, name], cwd=cwd, env=env, capture_output=True, timeout=20, stdin=subprocess.DEVNULL)
         if p.returncode == 0:
             return 'accept', '', '', 0
-        m = re.search(rb':(\d+):\d+: (.*)', p.stderr)
-        return 'reject', 'cli', p.stderr.decode(errors='replace').strip()[-120:], int(m.group(1)) if m else 0
+        # NIFT_PREVALIDATE=only prints `<file>:<l>:<c>: <message> [<code>] <rule>`
+        # (integration: the CLI wiring reports the rule like the tool does).
+        err = p.stderr.decode(errors='replace').strip()
+        m = re.search(r':(\d+):\d+: (.*) \[([a-z_.]+)\] (\S+)$', err)
+        if m:
+            return 'reject', m.group(4), f'{m.group(2)} [{m.group(3)}]', int(m.group(1))
+        m = re.search(r':(\d+):\d+: (.*)', err)
+        return 'reject', 'cli', err[-120:], int(m.group(1)) if m else 0
     stats = os.path.join(work, 'stats.jsonl')
     if os.path.exists(stats):
         os.remove(stats)
@@ -138,7 +144,8 @@ def legacy_observation(nift, path, line, work):
     try:
         shutil.copytree(os.path.dirname(path), os.path.join(d, 'c'), dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns('*.stdout', '*.stderr', '*.exit'))
-        env = dict(PATH=os.environ['PATH'], HOME=d, TMPDIR=d, LANG='C', LC_ALL='C')
+        # The engine's own behaviour, not the CLI's prevalidation (observation only).
+        env = dict(PATH=os.environ['PATH'], HOME=d, TMPDIR=d, LANG='C', LC_ALL='C', NIFT_PREVALIDATE='off')
         p = subprocess.run([nift, os.path.basename(path)], cwd=os.path.join(d, 'c'), env=env,
                            capture_output=True, timeout=20, stdin=subprocess.DEVNULL)
         m = re.search(rb':(\d+):\d+: ', p.stderr)

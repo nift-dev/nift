@@ -472,6 +472,62 @@ of them, on `tests/rt/legacy-cases/c1_return_multiline.f` and on
 
 ---
 
+## Integration (speculative, branch `spec-integration`, base CP12 `6c144bb`)
+
+Integrated after the CP14 wiring by the single integration owner; never
+merged before CP12 certifies. Applied: the four CP13 commits (`eaaccba`,
+`50cde7a`, `b9eacae`, `9504311`, cherry-picked cleanly; the Makefile merged
+automatically), the codes patch and the CLI wiring patch from scratch (both
+applied cleanly), plus:
+
+* **Import hook** (design (f), new code): `Parser::execute_import_file`
+  prevalidates the module text right after reading it, before any of it runs;
+  the error is the module's position through the import frame (`import: ` /
+  `@import: ` prefix kept), code `syntax.*`. `changes/syn_import_module_syntax`
+  passes `--expect new`.
+* **`NIFT_PREVALIDATE=off`** (observation only): skips validation in the CLI and
+  the import hook so `rules_test.py` and the gate can record the *engine's*
+  own behaviour (their "legacy" column); before, they ran the same binary,
+  which now validates first. `NIFT_PREVALIDATE=only` also prints `[code] rule`
+  so the gate's `check` mode cites the rule (it reported every rejection as
+  `cli`, i.e. unreviewed).
+* **site-dx reconciliation.** feature-site-dx (in the base) makes a statement
+  whose scan reaches the end of its block inside a quote or an unclosed `[`
+  a translator error, in legacy and in the CP10 splitter (the opener of the
+  earliest unterminated literal is reported). Such units are now parse errors
+  before the R1/R2 checks run, i.e. rule `translator` with site-dx's message;
+  legacy fails loudly instead of dropping the rest of the file. The rules rows
+  `x := [1, 2`, `print("abc)`, `x := 'abc` (top level) are reclassified
+  accordingly (`reject translator fails`). `sites/tpl_unknown_directive` is
+  reclassified `site-dx` (site-dx's `unknown directive @inptu` warning; golden
+  untouched).
+* **Build recovery** (in the base) is unaffected: prevalidation covers script
+  entry points and imports; page builds keep their error flow (`@script`
+  bodies and `$[...]` keep legacy timing until CP24, as designed).
+* **Runner verdicts** (`run.sh`): decisions this binary implements on both
+  engines (D-022 #3, D-025) are SUPERSEDED in the baseline with or without
+  `--vm` and in `changes --expect old`; VM-only decisions (D-018c, D-001#4,
+  D-009#1) are VM-ONLY in `changes --expect new` without `--vm`. With the VM
+  off every changes case is checked against exactly one expectation (guards
+  against both). `test-runtime2-diagnostics` also runs `--expect new`.
+* `changes/ret_multiline_comment.new.stderr` regenerated: with D-022 #3 wired
+  the unit is rejected before it runs at the offending token (3:8,
+  "expression cannot be empty", no `return:` frame), the convention of
+  `syn_malformed_in_uncalled_function`; the earlier `.new` came from a binary
+  with D-025 but without the wiring.
+* VM corpus: `fallback_parse_error.f`, `fallback_trailing_comma.f` are now
+  `prevalidated` (rejected before engine selection, no VM statistics, output
+  byte-identical to the goldens); `vm_parity.py` accepts that outcome only
+  with no statistics.
+
+Not integrated (no prepared work; open): `eval` expression prevalidation
+(needs an expression entry point and old-vs-new tests), JSON diagnostics mode
+(T9), the VM diagnostic record (T2), `throw`/`error()` (T3) and try/catch
+(T4, needs the phase B resolver). Consequently `changes --expect new --vm`
+still fails on the 6 VM-only cases whose units fall back (`statement:Try`
+×2, `statement:StructDecl`, `free-name`, `opaque:irregular-legacy-parse`,
+`context:assignment-error`), as before integration.
+
 ## (e) Work breakdown
 
 | Task | Content | Owned files | Depends on | State |

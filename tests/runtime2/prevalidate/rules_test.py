@@ -60,7 +60,10 @@ def main():
                     problems.append('position not on the statement line: ' + out)
             if a.legacy:
                 p = subprocess.run([a.legacy, 'p.f'], cwd=d, capture_output=True, text=True, timeout=20,
-                                   env=dict(PATH=os.environ['PATH'], HOME=d, LANG='C'))
+                                   env=dict(PATH=os.environ['PATH'], HOME=d, LANG='C',
+                                            # the engine's own behaviour, not the CLI's
+                                            # prevalidation (CP13 wiring): observation only
+                                            NIFT_PREVALIDATE='off'))
                 ran_b = p.stdout.rstrip('\n').endswith('b')
                 on_line = f'p.f:{stmt_line}:' in p.stderr
                 ok = {'fails': p.returncode != 0 and on_line, 'silent': p.returncode == 0 and not ran_b,

@@ -175,6 +175,12 @@ def corpus(args, work):
         if not want:
             print(f"FAIL corpus {name}: no EXPECT entry (outcome {got})")
             failures += 1
+        elif want[0] == "prevalidated":
+            # CP13 (D-022 #3): rejected by prevalidation before engine
+            # selection, so no VM statistics; the output must still be legacy's.
+            if st is not None:
+                print(f"FAIL corpus {name}: expected prevalidated (no engine selected), got {got}")
+                failures += 1
         elif st is None or st["outcome"] != want[0] or not st["reason"].startswith(want[1]):
             print(f"FAIL corpus {name}: expected {want[0]} {want[1]}, got {got}")
             failures += 1

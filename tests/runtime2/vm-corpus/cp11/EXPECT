@@ -1,5 +1,5 @@
 # CP11 VM corpus: expected NIFT_VM=1 outcome per script (tests/runtime2/vm_parity.py).
-# <script> <vm|vm-error|fallback> [reason or message prefix]. Every script must also match legacy byte
+# <script> <vm|vm-error|fallback|prevalidated> [reason or message prefix] (prevalidated: CP13 D-022 #3, rejected before engine selection, no VM statistics). Every script must also match legacy byte
 # for byte. CP12: the former `replayed` outcomes (replay_*.f, review_r1/r5) are now `vm` or `vm-error`
 # (the VM reproduces legacy's result or error itself) or a static `fallback` (refused before execution).
 # CP12 D-018: one meaning in every context; differences only through the named policies of
@@ -21,12 +21,13 @@ fallback_index_assign_call.f fallback index-target
 fallback_interpolation.f fallback interpolation
 fallback_lambda.f fallback expression:Lambda
 fallback_large_literal.f fallback number-literal
-fallback_parse_error.f fallback parse-error
+# CP13 integration (D-022 #3): syntax errors are rejected before engine selection (same output).
+fallback_parse_error.f prevalidated
 fallback_postfix_space.f fallback opaque:legacy-runtime-error
 fallback_shadow_native.f fallback fn-name-reserved
 fallback_shebang_mid.f fallback shebang-statement
 fallback_struct.f fallback statement:StructDecl
-fallback_trailing_comma.f fallback opaque:legacy-runtime-error
+fallback_trailing_comma.f prevalidated
 fallback_try.f fallback statement:Try
 functions.f vm 
 kernels.f vm 
