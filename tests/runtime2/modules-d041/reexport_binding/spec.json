@@ -1,0 +1,14 @@
+{
+ "about": "D-046 #2: a re-export is the same location as the original export; reaching it directly and through a re-exporting module rebinds it rather than colliding.",
+ "legacy": "differs: legacy initialises c twice and fails with a collision on n (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "c runs\n1\n1\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

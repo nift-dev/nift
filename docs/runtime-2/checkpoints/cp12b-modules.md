@@ -1,8 +1,10 @@
 # CP12 phase B — modules: legacy semantics (probed) and the VM design
 
 Status: semantics probed; **decided by D-041** (initialise once per execution
-context, shared instance with an explicit lifecycle, exports copied under
-D-040). VM side in progress: module graph and loader (`src/rt/module_graph.*`,
+context, shared instance with an explicit lifecycle) and **D-046** (exports
+are bindings — shared access to the module's storage location, as nift.dev
+documents and legacy does; D-041 #4's copy rule is reversed; module
+functions resolve free names lexically, D-038). VM side in progress: module graph and loader (`src/rt/module_graph.*`,
 `src/rt/module_loader.*`, below); the D-041 fixtures
 (`tests/runtime2/modules-d041`, below). The legacy side waits for
 feature-host-deps to integrate (coordinator, 2026-10-20). Probes:
@@ -22,7 +24,7 @@ rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
 | Caching | **none**: every `import` executes the module again in a fresh environment; a diamond runs the shared module twice (`c runs` twice) | `diamond`, `repeated` |
 | Execution | the module runs immediately, at the import statement, in isolated scopes (no access to the importer's bindings); its output appears in program order | `side_effect_order`, `module_free_unbound` |
 | Exports | `export(name)` lists a binding, function or struct of the module's top level; after the module finished, exactly the listed names are installed in the importer: variables into the importer's **current innermost scope** (block-scoped: gone after the block), functions and structs into the importer's **global** function/struct tables; an importer re-exports names it imported (`export(cf)` in `b`) | `diamond`, `not_reexported`, `in_block`, `struct_export` |
-| Values | an exported variable is a **live alias** of the module's binding: the importer's writes (`n += 10`, `xs.push(9)`) change the module's state and the module's functions' later writes are seen by the importer (L50; D-041 #4 makes it a copy). The `export_copy` probe does not distinguish (correction of the earlier "copied" reading, found while writing the D-041 fixtures) | `export_copy`, `modules-d041/stateful_*` |
+| Values | `export(name)` exports the **binding**: the importer's name is the module's storage location, so the importer's writes (`n += 10`, `xs.push(9)`) change the module's state and the module's functions' later writes are seen by the importer — as nift.dev documents ("exports the actual binding, not a value snapshot") and as decided by D-046 #2 (the earlier "copied" reading here was wrong; the `export_copy` probe does not distinguish) | `export_copy`, `modules-d041/stateful_*_binding` |
 | Module lexical environment | exported functions resolve the module's own top-level bindings and private functions through the module environment as it is **at the end of the module** (a binding declared after `export` is visible). A name the module does not bind is looked up in the **caller's top-level bindings** (a caller global `zz := 5` is seen) but not in the caller's function locals (an error even if the calling function has it). So modules are **not** fully lexically scoped (correction, D-045 review below; the earlier reading missed the caller-global case); nift.dev documents "named fn declarations resolve free names in the calling scope" | `module_private`, `module_private_late`, `module_vs_caller_local`, `module_free_unbound`; D-045 review |
 | Collisions | importing a name that already exists in the importer (binding in any active scope, function, struct) is an error, `export collides with existing binding: <name>`, after the module ran (its side effects happened); this makes a repeated import of the same module an error | `export_collision`, `repeated`, `same_file_two_spellings`, `in_function` (second call) |
 | Import in a function | runs at each call; the exports go to the global tables, so the second call collides | `in_function` |
@@ -34,7 +36,7 @@ Quirks for the register (not fixed here): exports land in the innermost
 scope for variables but the global tables for functions (L44); every import
 re-runs the module and repeated imports collide (L45, resolved by D-041); the
 `import: ` prefix repeats per level (L46); exported variables are live
-aliases (L50, resolved by D-041 #4).
+bindings (L50: documented and decided, D-046 #2 — not an inconsistency).
 
 ## VM design (proposed; owner decision 2)
 
@@ -58,10 +60,11 @@ aliases (L50, resolved by D-041 #4).
   the cycle error; one that `failed` reports the same failure without running
   it again. Compilation caching never changes initialisation.
   *Superseded draft:* initialise per import (legacy's re-run).
-* **Exports** become stores at the import site: functions bound statically
+* **Exports** become bindings at the import site: functions bound statically
   (the importer's function table gets the module's protos, closed over the
-  instance's module environment); variables copied (D-040) into the
-  importer's current scope. Binding the same declaration again (a repeated
+  instance's module environment); variables bound in the importer's current
+  scope **to the module's storage location** (D-046 #2; values assigned into
+  the location follow D-040). Binding the same declaration again (a repeated
   import, two spellings, a re-export of it) is a rebind, not an error; a
   clash with a *different* binding is refused statically (`import-collision`:
   legacy fails after running the module).
@@ -215,7 +218,7 @@ from an engine**; run by `tests/runtime2/modules_d041.py --nift <binary>`.
 `--legacy-today` checks that the fixtures marked `agrees` pass on today's
 legacy and those marked `differs` (with the register entry) still fail, so
 the specification stays honest until legacy implements initialise-once.
-Today: legacy-today PASS (16 fixtures: 6 agree, 10 differ as recorded).
+Today: legacy-today PASS (19 fixtures: 8 agree, 11 differ as recorded).
 
 | Fixture | D-041 expectation | Today's legacy |
 | --- | --- | --- |
@@ -227,8 +230,11 @@ Today: legacy-today PASS (16 fixtures: 6 agree, 10 differ as recorded).
 | `nested_chain` | relative paths per importer; names reach main only through re-export | agrees |
 | `nested_shared` | direct and indirect imports share one instance | separate (L45) |
 | `circular`, `self_cycle` | explicit cycle error, nothing runs twice | agrees |
-| `stateful_export_copy` | exported `n` is a copy: `0`, `10`, module counter continues `3` | live alias `2`, `12`, `13` (L50) |
-| `stateful_array_copy` | exported array is a copy (`[1]`, module `[1,2]`, importer `[1,9]`) | shared (L50) |
+| `stateful_export_binding` | exported `n` is the module's location: `2`, `12`, then the module's counter continues `13` (D-046 #2) | agrees |
+| `stateful_array_binding` | exported array is the module's location (`[1,2]`, `[1,2,9]`, `[1,2,9]`) | agrees |
+| `repeated_binding` | a repeated import keeps the same locations: state before it survives (`1`, `1`, `7`) | runs again, collision (L45) |
+| `reexport_binding` | a re-export is the original location: reaching `n` directly and through `b` rebinds (`1`, `1`) | runs `c` twice, collision |
+| `module_fn_lexical` | a module function does not see a caller-only name (`zz`): error (D-046 #4, D-038) | prints `5` (caller's global) |
 | `failed_init` | a failed module is not run again; the second import reports the same failure | runs again |
 | `page_isolation` (build) | pages `a`, `b` each get a fresh instance (`1 2`); within page `c` one instance (`x1 y2`); imported modules in each page's dependencies | page `c`: `x1 y1` |
 | `doc_math` | nift.dev's import example (a lambda closing over a module binding) | agrees |
@@ -261,9 +267,16 @@ Syntax the graph and the fixtures use, all documented: script-land
 fixture. Unsupported forms are refused before execution by the graph
 (`import-dynamic`, `import-nested`, …), never reinterpreted. Two
 documentation examples are now fixtures (`doc_math`, `doc_try_import`); the
-page's counter example (`count`/`increment`) waits for decision M1.
+page's counter example (`count`/`increment`) is what `stateful_export_binding`
+pins (D-046 #2).
 
-Discrepancies for an owner decision:
+Discrepancies, **decided by D-046** (owner, 2026-10-20): M1 — exports are
+bindings (D-041 #4 reversed; fixtures flipped to `stateful_*_binding`, plus
+`repeated_binding`, `reexport_binding`); M2 — lexical scoping kept, a
+deliberate compatibility change (`module_fn_lexical`; documentation text
+below, not published); M3 — a legacy parser defect, to be accepted in both
+engines (assigned elsewhere); M4 — imports inside `try` lifted later as a
+coverage item. The table as reviewed:
 
 | # | nift.dev | Legacy | Runtime 2.0 / decisions | Fixtures |
 | --- | --- | --- | --- | --- |
@@ -274,4 +287,39 @@ Discrepancies for an owner decision:
 
 Not a discrepancy: the probes and fixtures name modules `*.nft`, the
 documentation `*.f`; the extension is not syntax (legacy reads any file).
+
+### Prepared nift.dev change (M2, D-046 #4) — not published
+
+`docs/scripting-imports.html`, the paragraph after the first example.
+Current text:
+
+> The imported script cannot implicitly read bindings from its caller.
+> export(name) exports the actual binding, not a value snapshot, so exported
+> closures retain private state correctly. Closures capture script locals (use
+> a lambda such as double := x => x * factor); named fn declarations resolve
+> free names in the calling scope, matching ordinary template @fn semantics.
+
+Proposed text:
+
+> The imported script cannot read bindings from its caller. `export(name)`
+> exports the actual binding, not a value snapshot: the importer and the
+> module share the binding's storage, so writes on either side are seen on
+> the other, and importing the module again in the same run gives the same
+> bindings. Functions and lambdas defined in a module resolve free names where
+> they are defined — the module's own bindings and private helpers, which
+> stay reachable after export — never in the calling scope: a name bound only
+> by the caller is an error inside the module.
+
+Reproducer of the behaviour that changes (legacy prints `5`; after the
+change it is an error naming `zz`) — fixture `module_fn_lexical`:
+
+```
+// m.nft
+fn(f()) { return zz }
+export(f)
+// main.f
+zz := 5
+import("m.nft")
+print(f())
+```
 

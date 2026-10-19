@@ -167,8 +167,9 @@ void check_d041_fixtures() {
     } expect[] = {
         {"repeated", "ok"}, {"repeated_two_spellings", "ok"}, {"export_clash", "import-collision"},
         {"diamond", "ok"}, {"diamond_stateful", "ok"}, {"nested_chain", "ok"}, {"nested_shared", "ok"},
-        {"circular", "import-cycle"}, {"self_cycle", "import-cycle"}, {"stateful_export_copy", "ok"},
-        {"stateful_array_copy", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
+        {"circular", "import-cycle"}, {"self_cycle", "import-cycle"}, {"stateful_export_binding", "ok"},
+        {"stateful_array_binding", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
+        {"repeated_binding", "ok"}, {"reexport_binding", "ok"}, {"module_fn_lexical", "ok"},
         {"doc_math", "ok"}, {"doc_try_import", "import-nested"},
     };
     for (const auto& e : expect) {

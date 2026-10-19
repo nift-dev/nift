@@ -1,0 +1,14 @@
+{
+ "about": "D-046 #2: an exported array binding is the module's location; pushes on either side are shared.",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "2\n[1,2]\n[1,2,9]\n[1,2,9]\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "about": "D-046 #2 (nift.dev: \"export(name) exports the actual binding, not a value snapshot\"): the importer's name is the module's storage location; writes on either side are seen on the other.",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n1\n2\n2\n12\n13\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+print("m runs")
+n := 0
+fn(inc()) { n += 1
+return n }
+export(n)
+export(inc)

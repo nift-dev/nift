@@ -1,0 +1,14 @@
+{
+ "about": "D-046 #2: a repeated import within a context keeps the same exported binding locations (no fresh instance, no reset): state written before the second import is still there, and stays shared.",
+ "legacy": "differs: legacy runs the module again and fails with a collision (L45)",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "m runs\n1\n1\n7\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

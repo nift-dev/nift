@@ -1,0 +1,14 @@
+{
+ "about": "D-046 #4 (D-038): a module function resolves free names through its definition environment only; a name bound only in the caller (here a caller global) is unbound for it. Its own private module bindings stay reachable (doc_math).",
+ "legacy": "differs: legacy finds the caller's top-level binding and prints 5 (nift.dev: \"calling scope\")",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "",
+   "exit": 1,
+   "stderr_contains": "zz"
+  }
+ ]
+}
