@@ -279,3 +279,25 @@ wrong for one target**:
   per-instance SSH host key installed by cloud-init and pinned before first
   contact. Both are verified only when a fresh instance passes with no manual
   steps.
+
+## CP13 phase A certified on Linode @53bc509a (2026-10-20); fresh-instance provisioning verified
+
+Candidate: `runtime-2` 25bee4bb + certify-harness fix (2 commits) + CP13 phase A
+through 1d533533, rebased with no source change (the only non-docs difference
+from 1d533533 is the harness). Fresh g6-dedicated-2 instance, ap-southeast;
+deleted after evidence retrieval (confirmed by API); campaign spend about
+US$0.68.
+
+- **Result:** FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, FLAKY 0, PASS 170;
+  SKIPPED-ENVIRONMENTAL 3 (`test-v43-language`, `test-unreadable-source`,
+  `test-dependency-status`: fail only as root, each passes as `tester`).
+- **Harness fix exercised:** `test-v43-language` now reaches the unprivileged run
+  and passes there (the masking case from @0b879df); its certification guard
+  self-test (14 cases) ran as part of certify.
+- **Provisioning verified with no manual steps:** SSH host key pinned at creation
+  matched (StrictHostKeyChecking=yes); preflight passed all 16 requirements
+  (Go 1.27.2 from the proxy toolchain zip, .NET SDK 10.0.402, Bun 1.4.2, Node 22,
+  …); `test-go-binding` passed in 27.5 s and `test-csharp-binding` in 7.8 s in the
+  main run. The Go/.NET environment issue recorded above is closed.
+- Evidence: `.claude-linode-runs/cp13a2/out.tgz` on the owner's machine
+  (certify log, per-target logs, preflight, environment).
