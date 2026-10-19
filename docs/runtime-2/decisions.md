@@ -918,3 +918,34 @@ Also decided (owner, same day):
   `runtime.reference_cycle` and tests for direct and indirect cycles, without a
   full graph traversal on ordinary assignments; the implementation's cost is
   measured and reported.
+
+## D-044 — DeepSeek-first implementation; filesystem functions (owner, 2026-10-20)
+
+1. **Division of labour.** No new Claude implementation subagents by default;
+   existing agents (CP12B, CP16, CP17, L7, host-deps, CP15 integration) finish
+   their current checkpoints. New implementation work goes to DeepSeek with a
+   handover giving the exact base SHA, decisions, owned files, acceptance tests
+   and prohibited areas; DeepSeek works autonomously (own worktrees and
+   Linodes under D-043, no pushing). Claude owns architecture, acceptance
+   contracts, file ownership, review of finished deliverables, adversarial
+   review where needed, Linode certification and integration. Certification
+   gates are unchanged. Opus review/repair cost per DeepSeek assignment is
+   tracked; delegation is adjusted if the cost exceeds the benefit.
+   First assignment (ASCII case conversion, patches 1b61324/5e14453) delivered;
+   next candidate: a bounded CP15B slice once CP15A integrates.
+2. **Filesystem scripting functions keep their global names** (`cp()`, `rm()`,
+   `mkdir()`, `touch()`, …); D-042's call-syntax/shell-word distinction is
+   sufficient once dispatch is deterministic. No `native.*` or abbreviations.
+   Pending: a narrow feasibility question on `native::cp(...)` as an explicit
+   qualified name (owner preference over `native.cp`), lower priority than VM
+   migration.
+3. **Filesystem defects to fix** (language cleanup / filesystem), with expected
+   semantics specified first and regressions that fail on the old code:
+   `rm()` on a directory (semantics to be specified, not inherited from GNU),
+   `cp()` with an unmatched glob (clear error per a documented glob contract),
+   `rm()` of a missing file (report failure), `touch()` on an existing file
+   (update mtime), user functions named like built-ins (L6). Consequential
+   compatibility choices go to the owner. Fast native implementations and
+   multi-source forms are preserved.
+4. **Process ownership:** agents terminate only processes they own, by verified
+   PID/process group, never by command-name matching.
