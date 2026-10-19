@@ -289,6 +289,7 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/r
 	python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
 		--count $${RT_VM_SUBSET_GEN:-500}
 	python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_former_replay.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} \
 		--sample $${RT_VM_FORMER:-600}

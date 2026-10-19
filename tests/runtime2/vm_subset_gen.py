@@ -206,6 +206,19 @@ class Supported:
         self.in_arg = 0  # inside the arguments of a user call
         self.features = collections.Counter()
         self.bt = {}  # binding name -> legacy binding type (kind letter)
+        # NARROWED (deliberate, coordinator ruling 2026-10-19; not an input
+        # change to hide a failure): a double binding whose declaring text is
+        # double only through another binding (`v := (w) - 2`, `v := w` with w
+        # double) is never the target of `=` or a compound assignment in
+        # loop-reachable code (loop bodies; functions, which may be called
+        # from loops). CP12's compiler proves "always double" only for texts
+        # with a double literal, so it refuses that shape
+        # (context:assignment-type / context:assignment-error). The refused
+        # programs are pinned in tests/runtime2/vm-known-refused/ (they must
+        # stay refused until the inference widens; then this narrowing and
+        # those fixtures are removed). Counted as feature
+        # `narrowed:double-via-binding-assign`.
+        self.d_via_binding = set()
 
     def name(self, prefix):
         self.n += 1
@@ -502,6 +515,8 @@ class Supported:
             # context:assignment-error). x + 0.5 - 0.5 == x for these values.
             x = f"{self.par(x)} + 0.5 - 0.5"
         scope.append((v, k, True))
+        if k == "d" and text_type(x, {}) != "d":
+            self.d_via_binding.add(v)  # double only through a binding (see NARROWED)
         tt = text_type(x, self.bt)
         self.bt[v] = k if tt == "n" else tt
         if loop_names is not None:
@@ -548,6 +563,13 @@ class Supported:
         mutable = [(n, k) for n, k, m in scope if m]
         if r < 0.16 or not scope:
             return self.decl(scope, loop_names)
+        if r < 0.36 and mutable and (loop or self.in_fn):
+            # NARROWED (see __init__): no assignment to a double bound only
+            # through a binding, in loop-reachable code.
+            allowed = [(n, k) for n, k in mutable if n not in self.d_via_binding]
+            if len(allowed) != len(mutable):
+                self.features["narrowed:double-via-binding-assign"] += 1
+            mutable = allowed
         if r < 0.27 and mutable:
             n, k = self.r.choice(mutable)
             if k in ("a", "o"):
@@ -974,6 +996,10 @@ def suite_supported(args, work, out):
     print(f"supported-subset generator: {args.count} programs (seed {args.seed}); entirely on the VM {vm_n} "
           f"({100.0 * vm_n / max(1, args.count):.1f} %, required 100 %); outcomes {dict(tally)}; "
           f"{len(failures)} failure(s)")
+    builtin_calls = sum(v for k, v in features.items() if k.startswith("builtin:"))
+    print(f"supported-subset generator: built-in calls {builtin_calls} "
+          f"({len([k for k in features if k.startswith('builtin:')])} distinct); narrowed shapes: "
+          f"double-via-binding-assign {features.get('narrowed:double-via-binding-assign', 0)}")
     missing = [f for f in REQUIRED_FEATURES if not features.get(f)]
     if args.count >= 200 and missing:
         print(f"FAIL supported-subset generator: features never generated: {missing}")

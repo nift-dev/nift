@@ -1,0 +1,15 @@
+# Programs inside the documented supported subset that CP12's compiler still
+# refuses (a CP12 kind-inference gap, coordinator ruling 2026-10-19, D-027:
+# non-blocking, the unit runs on legacy). tests/runtime2/vm_known_refused.py
+# asserts each is STILL refused with this reason and that NIFT_VM=1 output
+# equals legacy's. When the inference widens ("widen kind inference:
+# parenthesised double operands in assignment", backlog in
+# docs/runtime-2/checkpoints/cp14-builtins-design.md), this test fails: then
+# move the programs to the supported suites and remove the generator's
+# NARROWED shape in tests/runtime2/vm_subset_gen.py.
+#
+# <script> <expected fallback reason>
+double_via_binding_compound.f context:assignment-error
+double_via_paren_assign.f context:assignment-type
+subset_gen_seed1_132.f context:assignment-type
+subset_gen_seed2_143.f context:assignment-error

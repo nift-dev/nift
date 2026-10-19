@@ -420,6 +420,35 @@ built-in coverage is carried by `vm_builtins.py` and the supported generator
 (built-in calls in ~every program, 100 % on the VM apart from the two CP12
 cases above). No corpus program falls back with a `builtin*` reason.
 
+### Generator narrowing and the known-refused list (coordinator ruling, 2026-10-19)
+
+The two supported-generator refusals are a CP12 kind-inference gap (D-027:
+non-blocking, the unit runs on legacy; CP12 is frozen, so inference is not
+changed here). Minimal shapes (delta-reduced from the generated programs):
+
+* A, `context:assignment-error`: `w := 2.5` … `w = w * 1.5` (top level);
+  in a loop `v := w` then `v += 1`.
+* B, `context:assignment-type`: `w := 0.25 + 42` (top level); in a loop
+  `v := (w) - 2` then `v = v * 1.5`.
+
+In both, `v` is always double at run time (legacy agrees: 3.5, 60.375), but
+the compiler proves "always double" only for declaring texts with a double
+literal. **Deliberate narrowing of the subset spec, not an input change to
+hide a failure:** `vm_subset_gen.py` no longer generates `=` or a compound
+assignment, in loop-reachable code (loop bodies, functions), whose target is
+a double binding declared from a text that is double only through another
+binding (`NARROWED` in the generator; counted as feature
+`narrowed:double-via-binding-assign`: 6 statements in 500 programs at
+seed 1, 3 at seed 2). The narrowing is slightly broader than the compiler's
+refusal (shape B inside one function, or A without the reassignment of `w`,
+compile). Evidence kept: `tests/runtime2/vm-known-refused/` (both minimal
+shapes and both generated programs) and `vm_known_refused.py` (in
+`test-rt-vm`) assert they are still refused with their reasons; when the
+inference widens that test fails and the narrowing must be removed.
+
+**Backlog:** widen kind inference: parenthesised double operands in
+assignment (always-double through a binding reference, shapes A and B).
+
 ## Instruction guards and allocation scaling (measured)
 
 Owner addition (round 2). `tests/rt/builtins_bench.cpp` runs 25
