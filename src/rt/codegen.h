@@ -47,6 +47,9 @@ public:
     // closes the gaps, re-targeting jumps).
     // Run once, after the last emit.
     void drop_unread_types();
+    // A type register read from elsewhere (main's global bindings, read by
+    // functions through GetGlobal, CP12b): drop_unread_types keeps it.
+    void keep_type(std::uint16_t reg) { kept_types_.push_back(reg); }
 
     std::unique_ptr<Proto> finish();
     const std::string& error() const { return error_; }
@@ -57,6 +60,7 @@ private:
     std::uint32_t offset_ = 0;
     std::uint8_t flags_ = 0;
     std::string error_;
+    std::vector<std::uint16_t> kept_types_;
 };
 
 } // namespace nift::rt

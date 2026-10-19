@@ -25,6 +25,7 @@
 // is reachable). A function no call reaches has empty parameter kinds: its
 // operations never execute and impose nothing.
 #include "rt/ast.h"
+#include "rt/globals.h"
 #include "rt/resolver.h"
 
 #include <cstddef>
@@ -64,6 +65,10 @@ struct UnitKinds {
 
 // `max_walks` bounds the worklist (0: 64 walks per unit + 1024); beyond it
 // the result is not converged.
-UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks = 0);
+// `globals` (CP12b, rt/globals.h): a function's free name that resolves to a
+// top-level binding reads that binding's kinds, and its writes widen them for
+// every unit (one shared slot); nullptr: free names are unknown, as before.
+UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks = 0,
+                           const GlobalPlan* globals = nullptr);
 
 } // namespace nift::rt

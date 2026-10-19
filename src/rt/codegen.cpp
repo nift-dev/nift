@@ -102,6 +102,7 @@ void mark_register(std::vector<bool>& read, std::uint16_t operand) {
 void FunctionBuilder::drop_unread_types() {
     auto& code = proto_->code;
     std::vector<bool> read(proto_->nregs + 1u, false);
+    for (std::uint16_t reg : kept_types_) mark_register(read, reg);
     for (const Instr& in : code) {
         switch (in.op) {
             case OpCode::CheckType: mark_register(read, in.b); break;

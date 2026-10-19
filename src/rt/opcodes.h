@@ -61,6 +61,8 @@ namespace nift::rt {
     X(GetMember)  /* R[a] = R[b].(atom c)                                       */                    \
     X(Push)       /* R[a].push(RK[b])                                           */                    \
     X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
+    X(GetGlobal)  /* R[a] = G[b]: main's register b (a global, CP12b)           */                    \
+    X(SetGlobal)  /* G[a] = R[b]                                                */                    \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */
 

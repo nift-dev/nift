@@ -1,14 +1,13 @@
 #include "rt/infer.h"
 
+#include "rt/infer_globals.h"
 #include "rt/infer_types.h"
-
 #include "rt/infer_builtins.h"
 #include "rt/literal.h"
 
 #include <cmath>
 #include <deque>
 #include <set>
-#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -19,12 +18,12 @@
 namespace nift::rt {
 
 namespace {
-
 using namespace infer_detail;
 
 class Inference {
 public:
-    Inference(const Ast& ast, NodeId root, const UnitPlan& plan) : ast_(ast), root_(root), plan_(plan) {
+    Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals)
+        : ast_(ast), root_(root), plan_(plan), globals_(globals) {
         result_.kinds.assign(ast.size(), static_cast<std::uint8_t>(kKindAll | kKindUnknown));
         const std::size_t n = plan.functions.size();
         params_.resize(n);
@@ -74,19 +73,18 @@ private:
         into = std::move(next);
         return true;
     }
-    void merge_local(TyRef& into, const TyRef& value) { self_changed_ = merge(into, value) || self_changed_; }
+    void merge_local(TyRef& into, const TyRef& value) {
+        if (!merge(into, value)) return;
+        self_changed_ = true;  // a global's slot is shared by every unit using it (CP12b):
+        for (std::size_t u = 0; globals_.shared(vars_, &into) && u <= plan_.functions.size(); ++u) enqueue(u);
+    }
     void merge_return(const TyRef& value) {  // the callers read the return
         if (current_ >= 0 && merge(returns_[static_cast<std::size_t>(current_)], value))
             for (std::size_t caller : callers_[static_cast<std::size_t>(current_)]) enqueue(caller);
     }
 
     void declare(std::string_view name, NodeId at, const TyRef& value) {
-        if (persist_index_.empty()) persist_index_.assign(ast_.size(), static_cast<std::size_t>(-1));
-        std::size_t& slot = persist_index_[at];
-        if (slot == static_cast<std::size_t>(-1)) {
-            slot = vars_.size();
-            vars_.push_back(empty_ty());
-        }
+        const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
         merge_local(vars_[slot], value);
         scopes_.back().emplace_back(name, slot);
     }
@@ -95,7 +93,9 @@ private:
         for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope)
             for (auto entry = scope->rbegin(); entry != scope->rend(); ++entry)
                 if (entry->first == name) return &vars_[entry->second];
-        return nullptr;
+        // A function's free name resolved to a top-level binding (rt/globals.h).
+        const std::size_t slot = globals_.find(current_, name, persist_index_, vars_, ast_.size());
+        return slot == GlobalSlots::kNone ? nullptr : &vars_[slot];
     }
 
     // Constant-folded literal arithmetic (doubles; only the kind is used).
@@ -375,6 +375,7 @@ private:
     const Ast& ast_;
     NodeId root_;
     const UnitPlan& plan_;
+    GlobalSlots globals_;
     UnitKinds result_;
     std::vector<std::vector<TyRef>> params_;
     std::vector<TyRef> returns_;
@@ -391,8 +392,9 @@ private:
 
 } // namespace
 
-UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks) {
-    return Inference(ast, root, plan).run(max_walks);
+UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks,
+                           const GlobalPlan* globals) {
+    return Inference(ast, root, plan, globals).run(max_walks);
 }
 
 } // namespace nift::rt
