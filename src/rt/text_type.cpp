@@ -105,6 +105,9 @@ TextType infer(std::string_view source) {
     std::size_t root = 0;
     while (root < t.size() && (is_alnum(t[root]) || t[root] == '_')) ++root;
     if (root == 0 || root != t.size()) return known(-1);  // a member/index path is untyped (no structs here)
+    // A root that starts with a digit (`1e` from `-1e-400` split at its `-`s)
+    // names no binding or field: legacy's scope lookup misses, type -1.
+    if (t[0] >= '0' && t[0] <= '9') return known(-1);
     TextType binding;
     binding.kind = TextType::Kind::Binding;
     binding.binding = t;

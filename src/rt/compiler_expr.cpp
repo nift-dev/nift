@@ -280,29 +280,26 @@ bool UnitCompiler::array_literal(const Node& node, std::uint16_t dst) {
     return true;
 }
 
-// A literal made only of constants (numbers, strings without interpolation,
-// true/false/null, negated numbers, arrays and objects of those).
-bool UnitCompiler::constant_tree(const Node& n) const {
-    switch (n.kind) {
-        case NodeKind::Number: case NodeKind::True: case NodeKind::False: case NodeKind::Null: return true;
-        case NodeKind::String: return n.count == 0;
-        case NodeKind::Unary: return n.op == Op::Neg && ast_.at(n.a).kind == NodeKind::Number;
-        case NodeKind::Array: {
-            const NodeId* items = ast_.list(n);
-            for (std::uint32_t k = 0; k < n.count; ++k)
-                if (!constant_tree(ast_.at(items[k]))) return false;
+// A JSON number spelling of an integral negative zero (`-0`, `-0e5`; not
+// `-0.0`), outside strings. Legacy keeps it as -0 when it reads the literal
+// as JSON, but in loop code its prepared parser, when it accepts the literal
+// (no string-valued member, every number in range), reads it as Nift: 0.
+// The CP12 #11 class; refused there (context:negative-zero).
+static bool integral_negative_zero(std::string_view json) {
+    bool quoted = false;
+    for (std::size_t k = 0; k < json.size(); ++k) {
+        const char c = json[k];
+        if (quoted) {
+            if (c == '\\') ++k;
+            else if (c == '"') quoted = false;
+        } else if (c == '"') {
+            quoted = true;
+        } else if (c == '-' && k + 1 < json.size() && json[k + 1] == '0' &&
+                   (k + 2 >= json.size() || (json[k + 2] != '.' && (json[k + 2] < '0' || json[k + 2] > '9')))) {
             return true;
         }
-        case NodeKind::Object: {
-            const NodeId* props = ast_.list(n);
-            for (std::uint32_t k = 0; k < n.count; ++k) {
-                const Node& prop = ast_.at(props[k]);
-                if (prop.a == kNoNode || prop.b == kNoNode || !constant_tree(ast_.at(prop.b))) return false;
-            }
-            return true;
-        }
-        default: return false;
     }
+    return false;
 }
 
 bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
@@ -310,21 +307,22 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
     // JSON with its strict JSON reader (exact number spellings, JSON escapes)
     // and evaluates any other as a Nift literal. The literal's text is parsed
     // here, at compile time, with the same reader (natives::json_parse): JSON
-    // -> that constant value. A literal of constants only that is not JSON
-    // (legacy's fallback evaluator accepts some of those) is refused; a
-    // literal with expressions is never JSON and compiles as before.
+    // -> that constant value. Not JSON -> compiled below as a Nift literal,
+    // which is legacy's fallback; the CP10/CP11 guards (opaque statements,
+    // number-literal, string-literal, ...) refuse what they refused before.
     {
         Value parsed;
         std::string error;
         const natives::Context context;
         if (natives::json_parse(context, text(node), parsed, error) == natives::Status::Ok) {
+            if (loop_reachable() && integral_negative_zero(text(node)) && legacy_prepared_parse_accepts(text(node)))
+                return fail(node, "context:negative-zero");
             std::uint16_t k = 0;
             if (!fb_->constant(parsed, k)) return builder_ok();
             fb_->set_offset(node.begin);
             fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(k & ~kConstantBit));
             return true;
         }
-        if (constant_tree(node)) return fail(node, "json-literal");
     }
     if (!no_trailing_comma(node)) return false;
     const std::uint16_t mark = fb_->top();
