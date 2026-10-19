@@ -487,8 +487,9 @@ Owner rule: CP17 owns handle identity, reference counts, context ownership and
 the authoritative lifecycle state (`Active → Terminating → Completed | Failed |
 Lost`); CP16 owns OS process operations and their outcomes. Exactly one place
 decides "cleanup completed / failed / Lost": **CP17's table**, from facts CP16
-reports once. Interface against CP17 `runtime-2-cp17-dev` @`3cba670` (D-035:
-`CompletionTicket`, `begin_termination`, `LifeState`, `TerminationCause`):
+reports once. Interface against CP17 `runtime-2-cp17-dev` @`245f290` (D-035,
+D-039, review fixes R1–R14: `CompletionTicket`, `begin_termination`,
+`TerminationStart`, `LifeState`, `TerminationCause`):
 
 **1. Host-side seam (CP16, no CP17 types in `src/rt/host/`).**
 
@@ -497,9 +498,11 @@ reports once. Interface against CP17 `runtime-2-cp17-dev` @`3cba670` (D-035:
 // without holding the group's lock (the table has its own).
 struct LifecycleSink {
     virtual ~LifecycleSink() = default;
-    // First time termination starts, whatever starts it (deadline expiry on
-    // the host loop, cancel(), natural exit of every stage, cleanup hook).
-    virtual void terminating(TerminationCause cause) = 0;   // Deadline | Cancel | Exited | Close | Abandoned | ContextEnd
+    // CP16 itself starts termination while the handle stays open: deadline
+    // expiry on the host loop, cancel(), or the natural exit of every stage.
+    // Only these three causes (CP17 returns InvalidCause for any other);
+    // close, abandonment and context end reach CP16 through the cleanup hook.
+    virtual void terminating(TerminationCause cause) = 0;   // Exited | Deadline | Cancel
     // Exactly once, when the group has settled (stages reaped or handed off,
     // leftover members handled): the OS facts, not a lifecycle verdict.
     virtual void settled(const OsOutcome& facts) = 0;
@@ -515,8 +518,15 @@ void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
 
 **2. Binding (the swap commit; CP16 code that sees both sides).**
 * `terminating(cause)` → `table.begin_termination(handle, Process, cause,
-  ticket)`; the first call while `Active` gets the ticket (kept by the
-  binding), later calls get none — termination happens once.
+  ticket, &info)`. `info.started` is true exactly when a ticket was issued
+  (the first call while `Active`): the binding keeps it and CP16 terminates
+  and reports through it. Later calls, and calls after cleanup began, get no
+  ticket — termination happens once. For a **detached** handle no ticket is
+  issued and the lifecycle does not change; `info.detached_request` is true
+  and CP16 may send the cancel *request* (§11.10: SIGTERM to the detached
+  session, escalation driven by the host loop), with nothing supervised and
+  nothing reported. The binding never passes `Close`, `Abandoned`,
+  `ContextEnd` or `Shutdown` here (`InvalidCause`).
 * Cleanup hook (`CleanupEvent&`): if `event.ticket` is non-null (the handle
   was still `Active`: close, last reference, context end), move it into the
   binding, start the OS sequence (`cancel`/`begin_terminate`) and return
@@ -528,13 +538,28 @@ void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
   `stage_unconfirmed` → `lost("process.lost", detail)` (termination could not
   be confirmed); `members_survived` (alive after SIGKILL + bound, known to be
   running) → `failure("process.cleanup_failed", detail)`.
+* **Every script-visible process handle is created counted**
+  (`CreateOptions{counted = true}`): `interactive` handles, so abandonment is
+  detected by reference count (D-035), and `detached` handles, because only
+  counted handles can be detached (R14: an uncounted handle gets
+  `NotCounted`). A `run(..., {"mode": "detached"})` launch creates the counted
+  handle in the current context and immediately calls `detach_as()`; on any
+  refusal the process is cancelled at once (never left running unowned).
 * Detached processes: detach is a CP17 ownership step; the hook does nothing to
   the process and completes at once (bookkeeping only); `context_in_build()`
   (@fbdca07) feeds `RunRequestContext::in_build` so detach in a build is
   refused before launching.
+* **Transfer is not used for processes** (§11.2: ownership never moves except
+  by detach). Since R10, a refused `transfer()` reclaims the resource by
+  default (`TransferPolicy::ReclaimOnRefusal`, D-035): it would run the
+  process hook with `ContextEnd` and terminate the process. If a later host
+  path ever needs to move a process resource, it must decide that consequence
+  explicitly (pass `KeepOnRefusal` to keep it with the source context, whose
+  end is then the fallback) — never rely on the default by accident.
 * Blocking `run()` calls have no script-visible handle; when a call returns
   with background members still in its group (C1), the binding registers an
-  uncounted Process resource for the call's context, so the context end runs
+  **uncounted** Process resource for the call's context (it is never detached
+  or dropped by the script, so R14 does not apply), and the context end runs
   the same hook (the residue is cleaned up and settled through a ticket like
   any other).
 
@@ -551,7 +576,7 @@ void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
 
 **4. D-035 items in the swap.** Reference-counted abandonment: started
 (`interactive`) and `detached` handles are created with
-`CreateOptions{counted = true}`; the VM's boxed `HandleRef` drop is the
+`CreateOptions{counted = true}` (also required for detach, R14); the VM's boxed `HandleRef` drop is the
 `Abandoned` path tested here. Use after close: every process native maps
 CP17's `Closed` status to `runtime.handle_closed`; CP16's
 `process.stdin_closed` stays the error for `write()` after `close_stdin()` on a
