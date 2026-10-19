@@ -637,3 +637,20 @@ must be removed or justified when build recovery integrates.
   and non-ASCII separated (a fast ASCII path is fine; Unicode semantics are not
   traded for speed); allocations per field in `split()`; allocations per object
   literal. Each optimisation gets its own correctness and performance gates.
+
+## D-033 — Remote Linux certification; handle identity vs ownership (owner, 2026-10-19)
+- **Remote certification.** After the CP14 local-versus-remote comparison shows
+  equivalent or stronger coverage (every target's classification compared;
+  environment differences recorded), a dedicated temporary Linode becomes the
+  normal Linux certification platform. Full duplicate local certification is not
+  required per checkpoint unless there is a specific reason; local focused tests
+  remain for development, with periodic cross-checks of environment-sensitive
+  suites (timestamps, scheduling, permissions). Remote Linux certification never
+  replaces macOS/Windows CI.
+- **Handles (CP17).** Resource identity is separate from ownership: references
+  may share a resource, but there is exactly one owner and one cleanup policy;
+  no double or premature cleanup; transfer is explicit. CP16's temporary handle
+  adapter is replaced completely by CP17's interface (no competing ownership
+  mechanism).
+- **Pacing.** CP19 stays on hold until the current integration queue clears; no
+  new architectural workstreams for now.
