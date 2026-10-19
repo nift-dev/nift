@@ -301,3 +301,28 @@ US$0.68.
   main run. The Go/.NET environment issue recorded above is closed.
 - Evidence: `.claude-linode-runs/cp13a2/out.tgz` on the owner's machine
   (certify log, per-target logs, preflight, environment).
+
+## Open defects from the independent memory review (2026-10-20)
+
+Raised by DeepSeek's code review; reproduced by a bounded investigation on a
+Linode worker (`memcheck` job, tip 1105409d; follow-up `memcheck2` running).
+
+- **C1 — abort on memory exhaustion (VM).** `destroy_heap_object` grows a
+  `std::vector` worklist inside noexcept destruction; under `ulimit -v` the VM
+  aborts (SIGABRT, "terminate called after throwing … std::bad_alloc") at 7 of 11
+  limits (10 of 12 with the heap budget raised), including during teardown after
+  a correct "memory budget exceeded". Legacy fails cleanly (exit 1) at every
+  point. **Blocks integration of value-layer changes until fixed and verified**
+  (allocation-free cleanup, original error preserved, cause-and-effect evidence,
+  deep nesting, ASan/UBSan, `ulimit -v` matrix).
+- **C3 — heap-budget bypass in `join()`/`replace()` (VM natives).** Results are
+  built without a budget check: under a 64 MiB budget ~1 GB was allocated, ending
+  in bad_alloc (exit 70) instead of `limit.exceeded`. **Resource-budget blocker**:
+  check and reserve before allocating, overflow-checked size arithmetic.
+- **C2 — atom table outside the heap budget:** under investigation.
+- Related: L7 step 2.1 proposes shrinking the per-object accounting counter from
+  1 GiB to 512 MiB; integration blocked until no silent saturation at either limit
+  is shown (original range preferred).
+
+Owner: the L7 agent (single owner of the VM value layer), with C1/C3 commits and
+evidence kept separately attributable from L7's own changes.
