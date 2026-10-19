@@ -200,11 +200,16 @@ UNSUPPORTED = [
                                   "while (i < 1) { print(g(7)); i += 1 }\n", "prepared-decl-type"),
     ("prepared-fn-ternary-return", 'fn(g(x)) { print("g")\nreturn x }\nfn(f(p)) { return (true ? p : 0) }\n'
                                    "c := 0\nwhile (c < 1) { c += 1\nf(g(1)) }\n", "prepared-fn-unprepared"),
-    ("prepared-fn-chained-compare", "fn(f(p)) { if (p < 2 == true) { print(1) }\nreturn 0 }\nc := 0\n"
-                                    "while (c < 1) { c += 1\nf(1) }\n", "prepared-fn-unprepared"),
-    ("prepared-fn-bare-return", "fn(f(p)) { if (p > 0) { return }\nreturn 1 }\nc := 0\n"
-                                "while (c < 1) { c += 1\nprint(f(1)) }\n", "prepared-fn-unprepared"),
-    ("prepared-fn-paren-coalesce", "fn(f(p)) { return (p ?? 0) }\nc := 0\nwhile (f(c) < 1) { c += 1 }\n",
+    # Stage 4 (records20k): with literal or name-read arguments these calls are
+    # admitted (vm_records_coverage.py); an argument with an effect stays refused.
+    ("prepared-fn-chained-compare", 'fn(g(x)) { print("g")\nreturn x }\n'
+                                    "fn(f(p)) { if (p < 2 == true) { print(1) }\nreturn 0 }\nc := 0\n"
+                                    "while (c < 1) { c += 1\nf(g(1)) }\n", "prepared-fn-unprepared"),
+    ("prepared-fn-bare-return", 'fn(g(x)) { print("g")\nreturn x }\n'
+                                "fn(f(p)) { if (p > 0) { return }\nreturn 1 }\nc := 0\n"
+                                "while (c < 1) { c += 1\nprint(f(g(1))) }\n", "prepared-fn-unprepared"),
+    ("prepared-fn-paren-coalesce", 'fn(g(x)) { print("g")\nreturn x }\n'
+                                   "fn(f(p)) { return (p ?? 0) }\nc := 0\nwhile (f(g(c)) < 1) { c += 1 }\n",
      "prepared-fn-unprepared"),
     ("string-arg-name", 'fn(f(s)) {\ns = "7"\nreturn 0\n}\nq := null\nprint(f("q"))\n', "string-arg-type"),
     ("string-arg-number", 'fn(f(n)) {\nn = "x"\nreturn n\n}\nprint(f("2.5"))\n', "string-arg-type"),

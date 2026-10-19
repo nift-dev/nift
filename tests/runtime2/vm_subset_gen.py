@@ -902,10 +902,12 @@ INJECT = [
      "any", "prepared-decl-type"),
     ("prepared-decl-loop", "", "zi := 0\nwhile (zi < 1) { zi += 1\nzx := 2.5\nzy := zx\nprint(zy) }", "any",
      "prepared-decl-type"),
-    ("prepared-fn-ternary", "fn(zg(p)) { return (p > 0 ? 1 : 2) }", "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(1)) }",
-     "any", "prepared-fn-unprepared"),
-    ("prepared-fn-bare-return", "fn(zg(p)) { if (p > 0) { return }\nreturn 1 }",
-     "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(1)) }", "any", "prepared-fn-unprepared"),
+    # Stage 4 (records20k): admitted with literal or name-read arguments; an
+    # argument with an effect (zh prints) stays refused.
+    ("prepared-fn-ternary", 'fn(zh(x)) { print("h")\nreturn x }\nfn(zg(p)) { return (p > 0 ? 1 : 2) }',
+     "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(zh(1))) }", "any", "prepared-fn-unprepared"),
+    ("prepared-fn-bare-return", 'fn(zh(x)) { print("h")\nreturn x }\nfn(zg(p)) { if (p > 0) { return }\nreturn 1 }',
+     "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(zh(1))) }", "any", "prepared-fn-unprepared"),
     ("bang-precedence", "", "zx := 2\nprint(!zx + 1)", "any", "opaque:irregular-legacy-parse"),
     ("postfix-space", "", "za := [1]\nprint(za [0])", "any", "opaque:legacy-runtime-error"),
 ]

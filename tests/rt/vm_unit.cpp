@@ -139,13 +139,17 @@ void check_fallbacks() {
         {"fn(f(a)) { b := a * 2\nreturn b }\ni := 0\nwhile(i < 1) { print(f(1)); i += 1 }\n", "prepared-decl-type"},
         {"fn(g(a)) { b := a\nreturn b }\nfn(f(a)) { return g(a) }\ni := 0\nwhile(f(i) < 1) { i += 1 }\n",
          "prepared-decl-type"},
-        // M2: a loop-called function legacy cannot prepare (arguments evaluated twice).
-        {"fn(f(p)) { return (true ? p : 0) }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n", "prepared-fn-unprepared"},
-        {"fn(f(p)) { if (p < 2 == true) { print(1) }\nreturn 0 }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n",
+        // M2: a loop-called function legacy cannot prepare (arguments evaluated
+        // twice); stage 4 admits literal and name-read arguments, so these use
+        // an argument with an effect.
+        {"fn(g(x)) { print(x)\nreturn x }\nfn(f(p)) { return (true ? p : 0) }\ni := 0\nwhile(i < 1) { f(g(1)); i += 1 }\n",
          "prepared-fn-unprepared"},
-        {"fn(f(p)) { if (p > 1) { return }\nreturn 0 }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n",
+        {"fn(g(x)) { print(x)\nreturn x }\nfn(f(p)) { if (p < 2 == true) { print(1) }\nreturn 0 }\ni := 0\n"
+         "while(i < 1) { f(g(1)); i += 1 }\n", "prepared-fn-unprepared"},
+        {"fn(g(x)) { print(x)\nreturn x }\nfn(f(p)) { if (p > 1) { return }\nreturn 0 }\ni := 0\n"
+         "while(i < 1) { f(g(1)); i += 1 }\n", "prepared-fn-unprepared"},
+        {"fn(g(x)) { print(x)\nreturn x }\nfn(f(p)) { return (p ?? 1) }\ni := 0\nwhile(i < 1) { f(g(1)); i += 1 }\n",
          "prepared-fn-unprepared"},
-        {"fn(f(p)) { return (p ?? 1) }\ni := 0\nwhile(i < 1) { f(1); i += 1 }\n", "prepared-fn-unprepared"},
         // M3: string literal arguments typed from their text.
         {"fn(f(s)) { return 0 }\nq := null\nprint(f(\"q\"))\n", "string-arg-type"},
         {"fn(f(n)) { return n }\nprint(f(\"2.5\"))\n", "string-arg-type"},
