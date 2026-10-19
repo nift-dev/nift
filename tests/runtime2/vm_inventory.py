@@ -20,7 +20,8 @@ CASES = [
     ("compiles", "x := 1\nprint(x)\n", set()),
     ("two-methods", 's := "abc"\nprint(s.foo())\nprint(s.bar())\n', {"method:foo", "method:bar"}),
     ("chained", 's := " a "\nprint(s.trim().to_upper())\n',
-     {"postfix-receiver", "method:to_upper", "method:trim"}),
+     {"method:to_upper", "method:trim"}),  # CP12b: the chain itself is admitted
+    ("chained-member", 'fn(f()) { return {"k": 1} }\nprint(f().k)\n', {"postfix-receiver:member"}),
     ("lambda-argument", "xs := [1, 2]\ny := xs.map((v) => v + 1)\nprint(y.join(\",\"))\n",
      {"method:map", "expression:Lambda", "method:join"}),
     ("for-and-try", "for (i : [1, 2]) {\n  print(i.zap())\n}\ntry {\n  print(1)\n  nothere()\n} catch (e) {\n"

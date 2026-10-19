@@ -44,6 +44,8 @@ private:
     void replace_in_parent(NodeId statement, const std::vector<NodeId>& replacement);
     void hoist_functions();
     bool unchain(std::uint32_t offset);
+    NodeId statement_of(NodeId id) const;
+    void become(NodeId target, NodeId source);
     void spill_arguments(NodeId statement, NodeId call);
     void add_declared_names(NodeId statement);
     void add_name(std::string_view name) { names_.emplace(name); }

@@ -193,8 +193,7 @@ VmResult Vm::run(std::string& output) {
 #endif
     OP(LoadK) { R[pc->a] = K[pc->b]; NEXT(); }
     OP(LoadI) { R[pc->a] = Value::integer(jump_offset(pc->b)); NEXT(); }
-    OP(LoadNull) { R[pc->a] = Value(); NEXT(); }
-    OP(LoadBool) { R[pc->a] = Value::boolean(pc->b != 0); NEXT(); }
+    OP(LoadNull) { R[pc->a] = Value(); NEXT(); } OP(LoadBool) { R[pc->a] = Value::boolean(pc->b != 0); NEXT(); }
     OP(Move) { R[pc->a] = R[pc->b]; NEXT(); }
     ARITH(Add, __builtin_add_overflow, )
     ARITH(Sub, __builtin_sub_overflow, )
@@ -291,12 +290,12 @@ VmResult Vm::run(std::string& output) {
     }
     OP(Halt) { goto done; }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
-    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(GetGlobal)
-    OP(SetGlobal) {
+    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) {
         if (!cold(*pc, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();
         NOTE_LARGE NEXT();
     }
+    OP(GetGlobal) { R[pc->a] = stack_[pc->b]; NEXT(); } OP(SetGlobal) { stack_[pc->a] = R[pc->b]; NEXT(); }
 #if !NIFT_RT_COMPUTED_GOTO
     default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
@@ -377,10 +376,11 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
             for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);
             break;
         case OpCode::NewObject: out = make_object(); break;
-        case OpCode::ObjectSet: object_set(R[in.a], Atom{in.b}, RK(in.c)); return true;
-        // CP12b globals: main's frame is the bottom of the register stack.
-        case OpCode::GetGlobal: out = stack_[in.b]; break;
-        case OpCode::SetGlobal: stack_[in.a] = R[in.b]; return true;
+        case OpCode::ObjectSet: {
+            Value value = RK(in.c);
+            object_set(R[in.a], Atom{in.b}, std::move(value));
+            return true;
+        }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
         case OpCode::SetIndex: return set_index(note, R[in.a], RK(in.b), RK(in.c), fault);
         case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
