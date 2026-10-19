@@ -166,6 +166,9 @@ def checkpoint(reason, lists, ctx=frozenset()):
         return "CP12b", "enums"
     if reason in ("statement:Import", "statement:Export"):
         return "CP12b", "modules/imports"
+    if reason in ("unresolved-name", "free-name:undeclared", "assign-free-name:undeclared") and \
+            "statement:Import" in ctx:
+        return "CP12b", "modules/imports (imported binding)"
     if head in ("free-name", "assign-free-name"):
         return "CP12b", "globals" + ("" if name in ("", "global") else " (refused: %s)" % name)
     if reason == "unresolved-name:legacy-binding":

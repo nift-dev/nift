@@ -1,0 +1,1008 @@
+== shared: 789 scripts; compile on the VM 102 (12.9 %); refused 687; incomplete inventories {'parse-error': 1}; with consequential reasons 483; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {1: 153, 2: 156, 3: 66, 4: 312}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+     155 /  321  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+     227 /  227  sole    2  fn-after-statement                       CP12b | resolver: function declarations
+      19 /  209  sole    0  unresolved-name                          CP12b | GETDYN/dynamic lookup (top-level name not declared)
+       0 /  188  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+     173 /  173  sole    2  method:stringify                         CP14 | built-ins
+     142 /  142  sole    2  statement:For                            unassigned | for loops
+     141 /  141  sole   11  statement:Import                         CP12b | modules/imports
+       4 /  122  sole    2  expression-statement                     CP24 | template-only construct
+     114 /  114  sole    1  fn-flags                                 CP22/CP24 | async / @fn / struct methods
+      57 /  110  sole    1  interpolation                            VM subset | expression/statement subset (interpolation)
+     109 /  109  sole    9  expression:Lambda                        unassigned | first-class functions / lambdas
+      98 /   98  sole    0  callable:is_dir                          CP16 | host ops
+      97 /   97  sole    0  callable:thread                          CP16 | host ops
+       0 /   93  sole    0  assign-target                            VM subset | expression/statement subset (assign-target)
+      93 /   93  sole    0  method:contains                          CP14 | built-ins
+      92 /   92  sole    1  method:split                             CP14 | built-ins
+      91 /   91  sole    0  method:join                              CP14 | built-ins
+      91 /   91  sole    0  fn-as-value                              unassigned | first-class functions / lambdas
+      33 /   90  sole    3  string-literal                           VM subset | expression/statement subset (string-literal)
+      88 /   88  sole    0  method:to_upper                          CP14 | built-ins
+      85 /   85  sole    1  statement:Try                            CP13 | errors / try-catch
+      85 /   85  sole    9  statement:StructDecl                     CP12b | structs
+       8 /   79  sole    3  prepared-decl-type                       VM subset (D-018/kinds) | compiler precision
+      79 /   79  sole    0  expression:Await                         CP22 | async / await
+      77 /   77  sole    0  method:starts_with                       CP14 | built-ins
+      53 /   71  sole    0  call-binding                             unassigned | first-class functions / lambdas
+      71 /   71  sole    2  callable:getenv                          CP16 | host ops
+       0 /   69  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+       5 /   60  sole    1  type:length                              VM subset (D-018/kinds) | compiler precision
+      52 /   57  sole    2  static-error:member-assign               CP13 | errors / try-catch
+      57 /   57  sole    0  method:open                              CP16 | host ops
+      55 /   55  sole    2  callable:open                            CP16 | host ops
+      55 /   55  sole    0  callable:exists                          CP16 | host ops
+      55 /   55  sole    0  callable:file                            CP16 | host ops
+      54 /   54  sole    3  callable:ls                              CP16 | host ops
+      54 /   54  sole    0  method:close                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      54 /   54  sole    0  method:write                             CP16 | host ops
+      54 /   54  sole    0  method:save                              CP16 | host ops
+      54 /   54  sole    1  free-name:dynamic-caller                 CP12b | globals (refused: dynamic-caller)
+      54 /   54  sole    2  statement:Throw                          CP13 | errors / try-catch
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +  11 -> 113 (14.3 %)  statement:Import
+    +  11 -> 124 (15.7 %)  statement:Export
+    +  23 -> 147 (18.6 %)  fn-flags
+    +  11 -> 158 (20.0 %)  statement:StructDecl
+    +  10 -> 168 (21.3 %)  expression:Lambda
+    +   9 -> 177 (22.4 %)  fn-after-statement
+    +   9 -> 186 (23.6 %)  method:sort_by
+    +   9 -> 195 (24.7 %)  method:map
+    +   8 -> 203 (25.7 %)  callable:inject
+    +  10 -> 213 (27.0 %)  statement:For
+    +  10 -> 223 (28.3 %)  method:stringify
+    +   9 -> 232 (29.4 %)  fn-name-reserved
+    +   7 -> 239 (30.3 %)  statement:Try
+    +   7 -> 246 (31.2 %)  expression:Await
+    +   7 -> 253 (32.1 %)  statement:Throw
+    +   7 -> 260 (33.0 %)  opaque:legacy-runtime-error
+    +   6 -> 266 (33.7 %)  interpolation
+    +   6 -> 272 (34.5 %)  unresolved-name
+    +   5 -> 277 (35.1 %)  string-literal
+    +   5 -> 282 (35.7 %)  number-literal
+  scripts blocked per checkpoint group (any reason):
+     355  VM subset (D-018/kinds) | compiler precision
+     321  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     270  CP14 | built-ins
+     227  CP12b | resolver: function declarations
+     219  CP16 | host ops
+     185  CP12b | modules/imports
+     181  unassigned | first-class functions / lambdas
+     142  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+     142  unassigned | for loops
+     140  CP13 | errors / try-catch
+     128  CP24 | template-only construct
+     124  CP12b | unknown callable (dynamic or module function)
+     114  CP22/CP24 | async / @fn / struct methods
+     110  VM subset | expression/statement subset (interpolation)
+      98  CP12b | modules/imports (imported function)
+      97  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      93  VM subset | expression/statement subset (assign-target)
+      90  VM subset | expression/statement subset (string-literal)
+      86  CP12b | structs
+      79  CP22 | async / await
+      67  CP12b | modules/imports (imported binding)
+      66  CP12b | structs (method of a user struct)
+      63  unassigned | method not in CP14/CP15
+      54  CP12b | globals (refused: dynamic-caller)
+      51  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      36  CP12b | globals
+      30  language-cleanup | names legacy reserves (L6, D-009#3)
+      30  CP24 | template functions
+      28  VM subset | expression/statement subset (compound-target)
+      21  CP16/CP24 | legacy script/template bindings (args, env, page...)
+      12  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      11  VM subset | expression/statement subset (index-assign-target)
+      10  VM subset | expression/statement subset (text-type-name)
+       8  VM subset | expression/statement subset (number-literal)
+       8  CP12b | globals (refused: unanalysed)
+       8  CP15 | built-ins
+       5  VM subset | expression/statement subset (declare-const)
+       4  VM subset | expression/statement subset (postfix-spelling)
+       4  VM subset | expression/statement subset (index-target)
+       4  CP19 | shell
+       3  CP12b | globals (refused: undeclared)
+       3  VM subset | expression/statement subset (spread)
+       3  language-cleanup | D-014 / statement quirks
+       3  VM subset | expression/statement subset (string-arg-type)
+       2  VM subset | expression/statement subset (fn-param)
+       1  VM subset | expression/statement subset (jump-outside-loop)
+       1  VM subset | expression/statement subset (declare-pattern)
+       1  language-cleanup | irregular legacy parse
+       1  CP12b | globals (refused: not-one-top-level-binding)
+       1  VM subset | expression/statement subset (expression:IncDec)
+       1  VM subset | expression/statement subset (prefix-not-precedence)
+       1  none | parse error (legacy rejects too)
+       1  VM subset | expression/statement subset (incdec-target)
+  refused scripts whose certain reasons all map to one group: {'CP12b': 77, 'unassigned': 45, 'VM subset (D-018/kinds)': 28, 'VM subset': 21, 'language-cleanup': 17, 'CP13': 15, 'CP16': 12, 'CP24': 12, 'CP14': 5, 'CP19': 3, 'CP22/CP24': 1, 'CP16/CP24': 1}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+     266  sole    5  CP14 | built-ins
+     227  sole    2  CP12b | resolver: function declarations
+     218  sole   12  CP16 | host ops
+     185  sole   22  CP12b | modules/imports
+     179  sole   10  unassigned | first-class functions / lambdas
+     155  sole    0  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     142  sole    2  unassigned | for loops
+     135  sole   15  CP13 | errors / try-catch
+     114  sole    1  CP22/CP24 | async / @fn / struct methods
+      94  sole    7  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      94  sole    0  CP12b | modules/imports (imported function)
+      86  sole   10  CP12b | structs
+      79  sole    0  CP22 | async / await
+      74  sole   28  VM subset (D-018/kinds) | compiler precision
+      66  sole    0  CP12b | structs (method of a user struct)
+      63  sole    1  unassigned | method not in CP14/CP15
+      57  sole    1  VM subset | expression/statement subset (interpolation)
+      54  sole    1  CP12b | globals (refused: dynamic-caller)
+      51  sole    0  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      33  sole    3  VM subset | expression/statement subset (string-literal)
+      30  sole    6  CP24 | template functions
+      29  sole    7  language-cleanup | names legacy reserves (L6, D-009#3)
+      23  sole    2  CP12b | globals
+      16  sole    0  CP12b | modules/imports (imported binding)
+      12  sole    7  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      10  sole    6  CP24 | template-only construct
+       8  sole    5  VM subset | expression/statement subset (number-literal)
+       7  sole    0  CP15 | built-ins
+       7  sole    1  CP16/CP24 | legacy script/template bindings (args, env, page...)
+       6  sole    3  CP12b | unknown callable (dynamic or module function)
+  greedy climb over features:
+    +  28 -> 130 (16.5 %)  VM subset (D-018/kinds) | compiler precision
+    +  22 -> 152 (19.3 %)  CP12b | modules/imports
+    +  23 -> 175 (22.2 %)  CP22/CP24 | async / @fn / struct methods
+    +  21 -> 196 (24.8 %)  CP13 | errors / try-catch
+    +  18 -> 214 (27.1 %)  CP12b | modules/imports (imported function)
+    +  16 -> 230 (29.2 %)  CP16 | host ops
+    +  18 -> 248 (31.4 %)  unassigned | first-class functions / lambdas
+    +  18 -> 266 (33.7 %)  unassigned | lambda-taking collection methods (not in CP14/CP15)
+    +  24 -> 290 (36.8 %)  unassigned | method not in CP14/CP15
+    +  21 -> 311 (39.4 %)  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+    +  31 -> 342 (43.3 %)  CP14 | built-ins
+    +  27 -> 369 (46.8 %)  CP12b | resolver: function declarations
+    +  22 -> 391 (49.6 %)  VM subset | chained postfix on a call result (a.b().c(), f().k)
+    +  31 -> 422 (53.5 %)  unassigned | for loops
+    +  35 -> 457 (57.9 %)  CP22 | async / await
+    +  31 -> 488 (61.9 %)  VM subset | expression/statement subset (interpolation)
+    +  33 -> 521 (66.0 %)  CP12b | globals (refused: dynamic-caller)
+    +  29 -> 550 (69.7 %)  CP24 | template functions
+    +  23 -> 573 (72.6 %)  VM subset | expression/statement subset (string-literal)
+    +  21 -> 594 (75.3 %)  language-cleanup | names legacy reserves (L6, D-009#3)
+    +  19 -> 613 (77.7 %)  CP12b | structs
+    +  56 -> 669 (84.8 %)  CP12b | structs (method of a user struct)
+    +  19 -> 688 (87.2 %)  CP12b | globals
+    +  16 -> 704 (89.2 %)  CP12b | modules/imports (imported binding)
+    +  10 -> 714 (90.5 %)  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +  77 -> 179 (22.7 %)
+    CP13                         + 103 -> 205 (26.0 %)
+    CP14                         + 113 -> 215 (27.2 %)
+    CP15                         + 115 -> 217 (27.5 %)
+    CP16                         + 145 -> 247 (31.3 %)
+    CP16/CP24                    + 148 -> 250 (31.7 %)
+    CP22                         + 151 -> 253 (32.1 %)
+    CP22/CP24                    + 198 -> 300 (38.0 %)
+    CP24                         + 217 -> 319 (40.4 %)
+    CP19                         + 220 -> 322 (40.8 %)
+    language-cleanup             + 244 -> 346 (43.9 %)
+    VM subset                    + 307 -> 409 (51.8 %)
+    VM subset (D-018/kinds)      + 343 -> 445 (56.4 %)
+    unassigned                   + 686 -> 788 (99.9 %)
+    limits                       + 686 -> 788 (99.9 %)
+    none                         + 686 -> 788 (99.9 %)
+== shared-curated: 589 scripts; compile on the VM 102 (17.3 %); refused 487; incomplete inventories {'parse-error': 1}; with consequential reasons 296; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {1: 153, 2: 155, 3: 62, 4: 117}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+      28 /  153  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+      80 /   80  sole   11  statement:Import                         CP12b | modules/imports
+       4 /   64  sole    2  expression-statement                     CP24 | template-only construct
+      18 /   62  sole    0  unresolved-name                          CP12b | GETDYN/dynamic lookup (top-level name not declared)
+       0 /   61  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+       5 /   60  sole    1  type:length                              VM subset (D-018/kinds) | compiler precision
+      58 /   58  sole    9  expression:Lambda                        unassigned | first-class functions / lambdas
+      58 /   58  sole    1  fn-flags                                 CP22/CP24 | async / @fn / struct methods
+       8 /   54  sole    3  prepared-decl-type                       VM subset (D-018/kinds) | compiler precision
+      53 /   53  sole    9  statement:Export                         CP12b | modules/imports
+      48 /   48  sole    2  fn-after-statement                       CP12b | resolver: function declarations
+      39 /   39  sole    0  callable:thread                          CP16 | host ops
+       0 /   38  sole    0  assign-target                            VM subset | expression/statement subset (assign-target)
+      36 /   36  sole    9  statement:StructDecl                     CP12b | structs
+      33 /   33  sole    0  method:join                              CP14 | built-ins
+      33 /   33  sole    0  fn-as-value                              unassigned | first-class functions / lambdas
+      27 /   27  sole    2  aliasing                                 VM subset (D-018/kinds) | compiler precision
+       1 /   27  sole    0  compound-target                          VM subset | expression/statement subset (compound-target)
+       6 /   25  sole    0  type:index                               VM subset (D-018/kinds) | compiler precision
+      24 /   24  sole    0  method:push                              unassigned | method not in CP14/CP15
+      24 /   24  sole    5  callable:inject                          CP24 | template functions
+      23 /   23  sole    0  expression:Await                         CP22 | async / await
+      21 /   21  sole    2  statement:For                            unassigned | for loops
+      21 /   21  sole    0  method:sort_by                           unassigned | lambda-taking collection methods (not in CP14/CP15)
+      20 /   20  sole    0  method:set                               unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+       2 /   20  sole    0  call-binding                             unassigned | first-class functions / lambdas
+       0 /   20  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+      19 /   19  sole    2  method:stringify                         CP14 | built-ins
+      19 /   19  sole    1  statement:Try                            CP13 | errors / try-catch
+      18 /   18  sole    0  callable:map                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+       2 /   17  sole    1  type:compound-assignment                 VM subset (D-018/kinds) | compiler precision
+       7 /   17  sole    1  unresolved-name:legacy-binding           CP16/CP24 | legacy script/template bindings (args, env, page...)
+      16 /   16  sole    0  method:contains                          CP14 | built-ins
+       8 /   16  sole    2  context:assignment-error                 VM subset (D-018/kinds) | compiler precision
+      14 /   16  sole    0  type:push                                VM subset (D-018/kinds) | compiler precision
+       2 /   14  sole    1  type:+                                   VM subset (D-018/kinds) | compiler precision
+       8 /   14  sole    2  type:print                               VM subset (D-018/kinds) | compiler precision
+      14 /   14  sole    2  method:to_string                         CP14 | built-ins
+      13 /   13  sole    0  method:map                               unassigned | lambda-taking collection methods (not in CP14/CP15)
+      12 /   12  sole    0  callable:set                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +  11 -> 113 (19.2 %)  statement:Import
+    +  11 -> 124 (21.1 %)  statement:Export
+    +  23 -> 147 (25.0 %)  fn-flags
+    +  11 -> 158 (26.8 %)  statement:StructDecl
+    +  10 -> 168 (28.5 %)  expression:Lambda
+    +   9 -> 177 (30.1 %)  fn-after-statement
+    +   9 -> 186 (31.6 %)  method:sort_by
+    +   9 -> 195 (33.1 %)  method:map
+    +   8 -> 203 (34.5 %)  callable:inject
+    +   9 -> 212 (36.0 %)  statement:For
+    +   9 -> 221 (37.5 %)  method:stringify
+    +   9 -> 230 (39.0 %)  fn-name-reserved
+    +   7 -> 237 (40.2 %)  expression:Await
+    +   7 -> 244 (41.4 %)  statement:Try
+    +   7 -> 251 (42.6 %)  opaque:legacy-runtime-error
+    +   6 -> 257 (43.6 %)  unresolved-name
+    +   5 -> 262 (44.5 %)  statement:Throw
+    +   5 -> 267 (45.3 %)  number-literal
+    +   5 -> 272 (46.2 %)  declare-const
+    +   5 -> 277 (47.0 %)  static-error:redeclared
+  scripts blocked per checkpoint group (any reason):
+     193  VM subset (D-018/kinds) | compiler precision
+     153  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     124  CP12b | modules/imports
+      94  CP14 | built-ins
+      93  CP16 | host ops
+      90  unassigned | first-class functions / lambdas
+      70  CP24 | template-only construct
+      63  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      60  CP12b | unknown callable (dynamic or module function)
+      58  CP22/CP24 | async / @fn / struct methods
+      57  unassigned | method not in CP14/CP15
+      48  CP12b | resolver: function declarations
+      43  CP13 | errors / try-catch
+      42  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+      38  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      38  VM subset | expression/statement subset (assign-target)
+      37  CP12b | modules/imports (imported function)
+      37  CP12b | structs
+      30  CP24 | template functions
+      27  VM subset | expression/statement subset (compound-target)
+      23  CP22 | async / await
+      21  unassigned | for loops
+      20  CP12b | modules/imports (imported binding)
+      18  language-cleanup | names legacy reserves (L6, D-009#3)
+      17  CP12b | structs (method of a user struct)
+      17  CP16/CP24 | legacy script/template bindings (args, env, page...)
+      16  CP12b | globals
+      12  VM subset | expression/statement subset (string-literal)
+      12  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      11  VM subset | expression/statement subset (index-assign-target)
+       8  CP12b | globals (refused: unanalysed)
+       8  CP15 | built-ins
+       8  VM subset | expression/statement subset (text-type-name)
+       6  VM subset | expression/statement subset (number-literal)
+       5  VM subset | expression/statement subset (declare-const)
+       5  VM subset | expression/statement subset (interpolation)
+       4  VM subset | expression/statement subset (postfix-spelling)
+       4  VM subset | expression/statement subset (index-target)
+       4  CP19 | shell
+       3  CP12b | globals (refused: undeclared)
+       3  VM subset | expression/statement subset (spread)
+       3  language-cleanup | D-014 / statement quirks
+       3  VM subset | expression/statement subset (string-arg-type)
+       2  CP12b | globals (refused: dynamic-caller)
+       2  VM subset | expression/statement subset (fn-param)
+       1  VM subset | expression/statement subset (jump-outside-loop)
+       1  VM subset | expression/statement subset (declare-pattern)
+       1  language-cleanup | irregular legacy parse
+       1  CP12b | globals (refused: not-one-top-level-binding)
+       1  VM subset | expression/statement subset (expression:IncDec)
+       1  VM subset | expression/statement subset (prefix-not-precedence)
+       1  none | parse error (legacy rejects too)
+       1  VM subset | expression/statement subset (incdec-target)
+  refused scripts whose certain reasons all map to one group: {'CP12b': 77, 'unassigned': 45, 'VM subset (D-018/kinds)': 28, 'VM subset': 21, 'language-cleanup': 17, 'CP13': 15, 'CP16': 12, 'CP24': 12, 'CP14': 5, 'CP19': 3, 'CP22/CP24': 1, 'CP16/CP24': 1}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+     124  sole   22  CP12b | modules/imports
+      92  sole   12  CP16 | host ops
+      90  sole    5  CP14 | built-ins
+      88  sole   10  unassigned | first-class functions / lambdas
+      66  sole   28  VM subset (D-018/kinds) | compiler precision
+      60  sole    7  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      58  sole    1  CP22/CP24 | async / @fn / struct methods
+      57  sole    1  unassigned | method not in CP14/CP15
+      48  sole    2  CP12b | resolver: function declarations
+      38  sole    0  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      38  sole   15  CP13 | errors / try-catch
+      37  sole   10  CP12b | structs
+      33  sole    0  CP12b | modules/imports (imported function)
+      30  sole    6  CP24 | template functions
+      28  sole    0  VM subset | chained postfix on a call result (a.b().c(), f().k)
+      23  sole    0  CP22 | async / await
+      21  sole    2  unassigned | for loops
+      17  sole    7  language-cleanup | names legacy reserves (L6, D-009#3)
+      17  sole    0  CP12b | structs (method of a user struct)
+      16  sole    0  CP12b | modules/imports (imported binding)
+      12  sole    7  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      11  sole    2  CP12b | globals
+      10  sole    3  VM subset | expression/statement subset (string-literal)
+      10  sole    6  CP24 | template-only construct
+       7  sole    0  CP15 | built-ins
+       7  sole    1  CP16/CP24 | legacy script/template bindings (args, env, page...)
+       6  sole    3  CP12b | unknown callable (dynamic or module function)
+       6  sole    5  VM subset | expression/statement subset (number-literal)
+       5  sole    5  VM subset | expression/statement subset (declare-const)
+       5  sole    1  VM subset | expression/statement subset (interpolation)
+  greedy climb over features:
+    +  28 -> 130 (22.1 %)  VM subset (D-018/kinds) | compiler precision
+    +  22 -> 152 (25.8 %)  CP12b | modules/imports
+    +  23 -> 175 (29.7 %)  CP22/CP24 | async / @fn / struct methods
+    +  21 -> 196 (33.3 %)  CP13 | errors / try-catch
+    +  18 -> 214 (36.3 %)  CP12b | modules/imports (imported function)
+    +  16 -> 230 (39.0 %)  CP16 | host ops
+    +  18 -> 248 (42.1 %)  unassigned | first-class functions / lambdas
+    +  18 -> 266 (45.2 %)  unassigned | lambda-taking collection methods (not in CP14/CP15)
+    +  24 -> 290 (49.2 %)  unassigned | method not in CP14/CP15
+    +  21 -> 311 (52.8 %)  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+    +  31 -> 342 (58.1 %)  CP14 | built-ins
+    +  21 -> 363 (61.6 %)  CP12b | resolver: function declarations
+    +  18 -> 381 (64.7 %)  CP12b | structs
+    +  18 -> 399 (67.7 %)  CP24 | template functions
+    +  18 -> 417 (70.8 %)  CP22 | async / await
+    +  15 -> 432 (73.3 %)  VM subset | chained postfix on a call result (a.b().c(), f().k)
+    +  16 -> 448 (76.1 %)  unassigned | for loops
+    +  15 -> 463 (78.6 %)  CP12b | modules/imports (imported binding)
+    +  13 -> 476 (80.8 %)  language-cleanup | names legacy reserves (L6, D-009#3)
+    +  10 -> 486 (82.5 %)  CP12b | structs (method of a user struct)
+    +  10 -> 496 (84.2 %)  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+    +   9 -> 505 (85.7 %)  CP24 | template-only construct
+    +   7 -> 512 (86.9 %)  CP12b | globals
+    +   7 -> 519 (88.1 %)  VM subset | expression/statement subset (string-literal)
+    +   7 -> 526 (89.3 %)  CP15 | built-ins
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +  77 -> 179 (30.4 %)
+    CP13                         + 103 -> 205 (34.8 %)
+    CP14                         + 110 -> 212 (36.0 %)
+    CP15                         + 112 -> 214 (36.3 %)
+    CP16                         + 139 -> 241 (40.9 %)
+    CP16/CP24                    + 142 -> 244 (41.4 %)
+    CP22                         + 145 -> 247 (41.9 %)
+    CP22/CP24                    + 188 -> 290 (49.2 %)
+    CP24                         + 207 -> 309 (52.5 %)
+    CP19                         + 210 -> 312 (53.0 %)
+    language-cleanup             + 232 -> 334 (56.7 %)
+    VM subset                    + 271 -> 373 (63.3 %)
+    VM subset (D-018/kinds)      + 307 -> 409 (69.4 %)
+    unassigned                   + 486 -> 588 (99.8 %)
+    limits                       + 486 -> 588 (99.8 %)
+    none                         + 486 -> 588 (99.8 %)
+== shared-rtdiff-gen: 200 scripts; compile on the VM 0 (0.0 %); refused 200; incomplete inventories {}; with consequential reasons 187; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {2: 1, 3: 4, 4: 195}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+     179 /  179  sole    0  fn-after-statement                       CP12b | resolver: function declarations
+     127 /  168  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+     154 /  154  sole    0  method:stringify                         CP14 | built-ins
+       1 /  147  sole    0  unresolved-name                          CP12b | GETDYN/dynamic lookup (top-level name not declared)
+       0 /  127  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+     121 /  121  sole    0  statement:For                            unassigned | for loops
+      52 /  105  sole    0  interpolation                            VM subset | expression/statement subset (interpolation)
+      95 /   95  sole    0  callable:is_dir                          CP16 | host ops
+      89 /   89  sole    0  method:split                             CP14 | built-ins
+      88 /   88  sole    0  method:to_upper                          CP14 | built-ins
+      23 /   78  sole    0  string-literal                           VM subset | expression/statement subset (string-literal)
+      77 /   77  sole    0  method:starts_with                       CP14 | built-ins
+      77 /   77  sole    0  method:contains                          CP14 | built-ins
+      66 /   66  sole    0  statement:Try                            CP13 | errors / try-catch
+      63 /   63  sole    0  callable:getenv                          CP16 | host ops
+      61 /   61  sole    0  statement:Import                         CP12b | modules/imports
+       0 /   58  sole    0  expression-statement                     CP24 | template-only construct
+      58 /   58  sole    0  method:join                              CP14 | built-ins
+      58 /   58  sole    0  callable:thread                          CP16 | host ops
+      58 /   58  sole    0  fn-as-value                              unassigned | first-class functions / lambdas
+      56 /   56  sole    0  fn-flags                                 CP22/CP24 | async / @fn / struct methods
+      56 /   56  sole    0  expression:Await                         CP22 | async / await
+       0 /   55  sole    0  assign-target                            VM subset | expression/statement subset (assign-target)
+      52 /   52  sole    0  free-name:dynamic-caller                 CP12b | globals (refused: dynamic-caller)
+      51 /   51  sole    0  call-binding                             unassigned | first-class functions / lambdas
+      51 /   51  sole    0  expression:Lambda                        unassigned | first-class functions / lambdas
+       0 /   49  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+      49 /   49  sole    0  static-error:member-assign               CP13 | errors / try-catch
+      49 /   49  sole    0  method:total                             unassigned | method not in CP14/CP15
+      49 /   49  sole    0  statement:StructDecl                     CP12b | structs
+      48 /   48  sole    0  callable:open                            CP16 | host ops
+      48 /   48  sole    0  callable:ls                              CP16 | host ops
+      48 /   48  sole    0  callable:exists                          CP16 | host ops
+      48 /   48  sole    0  method:close                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      48 /   48  sole    0  callable:is_file                         CP16 | host ops
+      48 /   48  sole    0  method:write                             CP16 | host ops
+      48 /   48  sole    0  method:open                              CP16 | host ops
+      48 /   48  sole    0  callable:file                            CP16 | host ops
+      48 /   48  sole    0  method:save                              CP16 | host ops
+       0 /   48  sole    0  type:>                                   VM subset (D-018/kinds) | compiler precision
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +   0 -> 0 (0.0 %)  fn-after-statement
+    +   1 -> 1 (0.5 %)  statement:For
+    +   1 -> 2 (1.0 %)  method:stringify
+    +   1 -> 3 (1.5 %)  interpolation
+    +   1 -> 4 (2.0 %)  statement:Try
+    +   1 -> 5 (2.5 %)  callable:getenv
+    +   1 -> 6 (3.0 %)  free-name:dynamic-caller
+    +   1 -> 7 (3.5 %)  statement:Throw
+    +   2 -> 9 (4.5 %)  free-name:global
+    +   1 -> 10 (5.0 %)  string-literal
+    +   1 -> 11 (5.5 %)  method:sort
+    +   1 -> 12 (6.0 %)  binding-name-reserved
+    +   0 -> 12 (6.0 %)  postfix-receiver
+    +   2 -> 14 (7.0 %)  method:split
+    +   1 -> 15 (7.5 %)  method:substr
+    +   1 -> 16 (8.0 %)  method:replace
+    +   0 -> 16 (8.0 %)  callable:is_dir
+    +   0 -> 16 (8.0 %)  method:to_upper
+    +   0 -> 16 (8.0 %)  method:contains
+    +  10 -> 26 (13.0 %)  method:starts_with
+  scripts blocked per checkpoint group (any reason):
+     179  CP12b | resolver: function declarations
+     176  CP14 | built-ins
+     168  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     162  VM subset (D-018/kinds) | compiler precision
+     126  CP16 | host ops
+     121  unassigned | for loops
+     105  VM subset | expression/statement subset (interpolation)
+     100  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+      97  CP13 | errors / try-catch
+      91  unassigned | first-class functions / lambdas
+      78  VM subset | expression/statement subset (string-literal)
+      64  CP12b | unknown callable (dynamic or module function)
+      61  CP12b | modules/imports
+      61  CP12b | modules/imports (imported function)
+      58  CP24 | template-only construct
+      56  CP22/CP24 | async / @fn / struct methods
+      56  CP22 | async / await
+      55  VM subset | expression/statement subset (assign-target)
+      52  CP12b | globals (refused: dynamic-caller)
+      49  CP12b | structs (method of a user struct)
+      49  CP12b | structs
+      47  CP12b | modules/imports (imported binding)
+      34  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      20  CP12b | globals
+      13  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      12  language-cleanup | names legacy reserves (L6, D-009#3)
+       6  unassigned | method not in CP14/CP15
+       4  CP16/CP24 | legacy script/template bindings (args, env, page...)
+       2  VM subset | expression/statement subset (text-type-name)
+       2  VM subset | expression/statement subset (number-literal)
+       1  VM subset | expression/statement subset (compound-target)
+  refused scripts whose certain reasons all map to one group: {}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+     179  sole    0  CP12b | resolver: function declarations
+     176  sole    0  CP14 | built-ins
+     127  sole    0  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     126  sole    0  CP16 | host ops
+     121  sole    0  unassigned | for loops
+      97  sole    0  CP13 | errors / try-catch
+      91  sole    0  unassigned | first-class functions / lambdas
+      61  sole    0  CP12b | modules/imports (imported function)
+      61  sole    0  CP12b | modules/imports
+      56  sole    0  CP22 | async / await
+      56  sole    0  CP22/CP24 | async / @fn / struct methods
+      52  sole    0  CP12b | globals (refused: dynamic-caller)
+      52  sole    0  VM subset | expression/statement subset (interpolation)
+      49  sole    0  CP12b | structs (method of a user struct)
+      49  sole    0  CP12b | structs
+      34  sole    0  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      23  sole    0  VM subset | expression/statement subset (string-literal)
+      13  sole    0  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      12  sole    0  language-cleanup | names legacy reserves (L6, D-009#3)
+      12  sole    0  CP12b | globals
+       8  sole    0  VM subset (D-018/kinds) | compiler precision
+       6  sole    0  unassigned | method not in CP14/CP15
+       2  sole    0  VM subset | expression/statement subset (number-literal)
+       1  sole    0  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+  greedy climb over features:
+    +   0 -> 0 (0.0 %)  CP12b | resolver: function declarations
+    +   1 -> 1 (0.5 %)  unassigned | for loops
+    +   1 -> 2 (1.0 %)  CP14 | built-ins
+    +   1 -> 3 (1.5 %)  VM subset | chained postfix on a call result (a.b().c(), f().k)
+    +   4 -> 7 (3.5 %)  CP12b | globals (refused: dynamic-caller)
+    +   4 -> 11 (5.5 %)  unassigned | first-class functions / lambdas
+    +  14 -> 25 (12.5 %)  CP16 | host ops
+    +   6 -> 31 (15.5 %)  CP13 | errors / try-catch
+    +   8 -> 39 (19.5 %)  VM subset | expression/statement subset (interpolation)
+    +  12 -> 51 (25.5 %)  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+    +   7 -> 58 (29.0 %)  VM subset | expression/statement subset (string-literal)
+    +   7 -> 65 (32.5 %)  CP12b | globals
+    +   4 -> 69 (34.5 %)  unassigned | lambda-taking collection methods (not in CP14/CP15)
+    +   3 -> 72 (36.0 %)  language-cleanup | names legacy reserves (L6, D-009#3)
+    +   0 -> 72 (36.0 %)  CP12b | modules/imports
+    +  34 -> 106 (53.0 %)  CP12b | modules/imports (imported function)
+    +   2 -> 108 (54.0 %)  VM subset | expression/statement subset (number-literal)
+    +   0 -> 108 (54.0 %)  CP22 | async / await
+    +  37 -> 145 (72.5 %)  CP22/CP24 | async / @fn / struct methods
+    +   0 -> 145 (72.5 %)  CP12b | structs
+    +  47 -> 192 (96.0 %)  CP12b | structs (method of a user struct)
+    +   1 -> 193 (96.5 %)  VM subset (D-018/kinds) | compiler precision
+    +   6 -> 199 (99.5 %)  unassigned | method not in CP14/CP15
+    +   1 -> 200 (100.0 %)  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +   0 -> 0 (0.0 %)
+    CP13                         +   0 -> 0 (0.0 %)
+    CP14                         +   3 -> 3 (1.5 %)
+    CP15                         +   3 -> 3 (1.5 %)
+    CP16                         +   6 -> 6 (3.0 %)
+    CP16/CP24                    +   6 -> 6 (3.0 %)
+    CP22                         +   6 -> 6 (3.0 %)
+    CP22/CP24                    +  10 -> 10 (5.0 %)
+    CP24                         +  10 -> 10 (5.0 %)
+    CP19                         +  10 -> 10 (5.0 %)
+    language-cleanup             +  12 -> 12 (6.0 %)
+    VM subset                    +  36 -> 36 (18.0 %)
+    VM subset (D-018/kinds)      +  36 -> 36 (18.0 %)
+    unassigned                   + 200 -> 200 (100.0 %)
+    limits                       + 200 -> 200 (100.0 %)
+    none                         + 200 -> 200 (100.0 %)
+== projects: 86 scripts; compile on the VM 0 (0.0 %); refused 86; incomplete inventories {}; with consequential reasons 69; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {1: 7, 2: 20, 3: 17, 4: 42}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+      27 /   42  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+      29 /   29  sole    0  statement:Export                         CP12b | modules/imports
+      27 /   27  sole    0  method:stringify                         CP14 | built-ins
+      12 /   27  sole    0  prepared-decl-type                       VM subset (D-018/kinds) | compiler precision
+      26 /   26  sole    0  statement:StructDecl                     CP12b | structs
+       0 /   23  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+      18 /   18  sole    0  aliasing                                 VM subset (D-018/kinds) | compiler precision
+      18 /   18  sole    0  statement:For                            unassigned | for loops
+       0 /   16  sole    0  compound-target                          VM subset | expression/statement subset (compound-target)
+       0 /   15  sole    0  type:print                               VM subset (D-018/kinds) | compiler precision
+       1 /   14  sole    0  type:compound-assignment                 VM subset (D-018/kinds) | compiler precision
+       5 /   14  sole    0  expression-statement                     CP24 | template-only construct
+      13 /   13  sole    0  statement:Import                         CP12b | modules/imports
+       1 /   12  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+      11 /   11  sole    0  method:split                             CP14 | built-ins
+       0 /   11  sole    0  prefix-not-precedence                    VM subset | expression/statement subset (prefix-not-precedence)
+      11 /   11  sole    0  callable:bytes                           CP15 | built-ins
+      10 /   10  sole    0  method:to_int                            CP14 | built-ins
+      10 /   10  sole    0  callable:read                            CP16 | host ops
+       1 /   10  sole    0  path-in-call-argument                    VM subset (D-018/kinds) | compiler precision
+      10 /   10  sole    7  param-name-reserved                      language-cleanup | names legacy reserves (L6, D-009#3)
+      10 /   10  sole    0  method:decode                            CP15 | built-ins
+       1 /    9  sole    0  type:<                                   VM subset (D-018/kinds) | compiler precision
+       9 /    9  sole    0  string-literal                           VM subset | expression/statement subset (string-literal)
+       2 /    8  sole    0  binding-name-reserved                    language-cleanup | names legacy reserves (L6, D-009#3)
+       8 /    8  sole    0  fn-flags                                 CP22/CP24 | async / @fn / struct methods
+       8 /    8  sole    0  statement:Throw                          CP13 | errors / try-catch
+       8 /    8  sole    0  opaque:legacy-runtime-error              language-cleanup | legacy run-time error construct (legacy-runtime-error)
+       7 /    7  sole    0  expression:Await                         CP22 | async / await
+       7 /    7  sole    0  fn-after-statement                       CP12b | resolver: function declarations
+       7 /    7  sole    0  callable:getenv                          CP16 | host ops
+       0 /    6  sole    0  type:length                              VM subset (D-018/kinds) | compiler precision
+       0 /    6  sole    0  prepared-fn-unprepared                   VM subset (D-018/kinds) | compiler precision
+       6 /    6  sole    0  method:join                              CP14 | built-ins
+       0 /    6  sole    0  callable:tiny                            CP12b | unknown callable (dynamic or module function)
+       6 /    6  sole    0  method:cwd                               unassigned | method not in CP14/CP15
+       6 /    6  sole    0  method:run                               CP16 | host ops
+       6 /    6  sole    0  callable:cmd                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+       6 /    6  sole    0  method:parse                             unassigned | method not in CP14/CP15
+       5 /    5  sole    0  fn-name-reserved                         language-cleanup | names legacy reserves (L6, D-009#3)
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +   7 -> 7 (8.1 %)  param-name-reserved
+    +   3 -> 10 (11.6 %)  statement:Export
+    +  14 -> 24 (27.9 %)  statement:StructDecl
+    +   2 -> 26 (30.2 %)  callable:map
+    +   1 -> 27 (31.4 %)  prepared-decl-type
+    +   3 -> 30 (34.9 %)  opaque:legacy-runtime-error
+    +   2 -> 32 (37.2 %)  opaque:template-text
+    +   1 -> 33 (38.4 %)  statement:Import
+    +   0 -> 33 (38.4 %)  method:stringify
+    +   1 -> 34 (39.5 %)  postfix-receiver
+    +   3 -> 37 (43.0 %)  aliasing
+    +   3 -> 40 (46.5 %)  method:to_int
+    +   2 -> 42 (48.8 %)  statement:For
+    +   1 -> 43 (50.0 %)  callable:ls
+    +   0 -> 43 (50.0 %)  callable:bytes
+    +   3 -> 46 (53.5 %)  method:decode
+    +   0 -> 46 (53.5 %)  method:split
+    +   4 -> 50 (58.1 %)  callable:read
+    +   1 -> 51 (59.3 %)  fn-name-reserved
+    +   3 -> 54 (62.8 %)  callable:make_dir
+  scripts blocked per checkpoint group (any reason):
+      46  VM subset (D-018/kinds) | compiler precision
+      42  VM subset | chained postfix on a call result (a.b().c(), f().k)
+      41  CP12b | modules/imports
+      33  CP12b | unknown callable (dynamic or module function)
+      30  CP14 | built-ins
+      26  CP16 | host ops
+      26  CP12b | structs
+      22  language-cleanup | names legacy reserves (L6, D-009#3)
+      20  unassigned | method not in CP14/CP15
+      18  unassigned | for loops
+      16  VM subset | expression/statement subset (compound-target)
+      16  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      16  CP24 | template-only construct
+      13  CP15 | built-ins
+      11  VM subset | expression/statement subset (prefix-not-precedence)
+       9  VM subset | expression/statement subset (string-literal)
+       9  CP13 | errors / try-catch
+       8  CP22/CP24 | async / @fn / struct methods
+       8  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+       7  CP22 | async / await
+       7  CP12b | resolver: function declarations
+       5  VM subset | expression/statement subset (assign-target)
+       5  CP12b | globals (refused: unanalysed)
+       5  CP16/CP24 | legacy script/template bindings (args, env, page...)
+       4  VM subset | expression/statement subset (index-assign-target)
+       4  CP12b | modules/imports (imported binding)
+       3  VM subset | expression/statement subset (index-target)
+       3  VM subset | expression/statement subset (string-arg-type)
+       2  unassigned | first-class functions / lambdas
+       2  CP12b | globals
+       1  CP12b | globals (refused: undeclared)
+       1  VM subset | expression/statement subset (text-type-name)
+       1  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+       1  VM subset | expression/statement subset (number-literal)
+       1  CP12b | modules/imports (imported function)
+       1  CP24 | template functions
+       1  language-cleanup | irregular legacy parse
+  refused scripts whose certain reasons all map to one group: {'CP12b': 14, 'language-cleanup': 7}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+      41  sole    0  CP12b | modules/imports
+      30  sole    0  CP14 | built-ins
+      27  sole    0  VM subset | chained postfix on a call result (a.b().c(), f().k)
+      26  sole    0  CP16 | host ops
+      26  sole    0  CP12b | structs
+      25  sole    0  VM subset (D-018/kinds) | compiler precision
+      20  sole    0  unassigned | method not in CP14/CP15
+      18  sole    0  unassigned | for loops
+      17  sole    7  language-cleanup | names legacy reserves (L6, D-009#3)
+      16  sole    0  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      13  sole    0  CP15 | built-ins
+       9  sole    0  VM subset | expression/statement subset (string-literal)
+       9  sole    0  CP13 | errors / try-catch
+       8  sole    0  CP22/CP24 | async / @fn / struct methods
+       8  sole    0  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+       7  sole    0  CP22 | async / await
+       7  sole    0  CP12b | resolver: function declarations
+       7  sole    0  CP24 | template-only construct
+       3  sole    0  VM subset | expression/statement subset (string-arg-type)
+       2  sole    0  unassigned | first-class functions / lambdas
+       2  sole    0  CP12b | globals
+       1  sole    0  CP12b | globals (refused: undeclared)
+       1  sole    0  VM subset | expression/statement subset (number-literal)
+       1  sole    0  CP24 | template functions
+       1  sole    0  language-cleanup | irregular legacy parse
+  greedy climb over features:
+    +   7 -> 7 (8.1 %)  language-cleanup | names legacy reserves (L6, D-009#3)
+    +   3 -> 10 (11.6 %)  CP12b | modules/imports
+    +  14 -> 24 (27.9 %)  CP12b | structs
+    +   2 -> 26 (30.2 %)  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+    +   1 -> 27 (31.4 %)  CP16 | host ops
+    +   2 -> 29 (33.7 %)  unassigned | method not in CP14/CP15
+    +   2 -> 31 (36.0 %)  CP13 | errors / try-catch
+    +   4 -> 35 (40.7 %)  VM subset | chained postfix on a call result (a.b().c(), f().k)
+    +   5 -> 40 (46.5 %)  CP15 | built-ins
+    +   4 -> 44 (51.2 %)  CP14 | built-ins
+    +   9 -> 53 (61.6 %)  VM subset (D-018/kinds) | compiler precision
+    +   6 -> 59 (68.6 %)  unassigned | for loops
+    +   4 -> 63 (73.3 %)  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+    +   4 -> 67 (77.9 %)  VM subset | expression/statement subset (string-literal)
+    +   2 -> 69 (80.2 %)  CP24 | template-only construct
+    +   2 -> 71 (82.6 %)  CP12b | resolver: function declarations
+    +   1 -> 72 (83.7 %)  CP22/CP24 | async / @fn / struct methods
+    +   7 -> 79 (91.9 %)  CP22 | async / await
+    +   1 -> 80 (93.0 %)  VM subset | expression/statement subset (string-arg-type)
+    +   1 -> 81 (94.2 %)  CP12b | globals
+    +   1 -> 82 (95.3 %)  unassigned | first-class functions / lambdas
+    +   1 -> 83 (96.5 %)  CP12b | globals (refused: undeclared)
+    +   1 -> 84 (97.7 %)  CP24 | template functions
+    +   1 -> 85 (98.8 %)  VM subset | expression/statement subset (number-literal)
+    +   1 -> 86 (100.0 %)  language-cleanup | irregular legacy parse
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +  14 -> 14 (16.3 %)
+    CP13                         +  14 -> 14 (16.3 %)
+    CP14                         +  14 -> 14 (16.3 %)
+    CP15                         +  14 -> 14 (16.3 %)
+    CP16                         +  16 -> 16 (18.6 %)
+    CP16/CP24                    +  16 -> 16 (18.6 %)
+    CP22                         +  16 -> 16 (18.6 %)
+    CP22/CP24                    +  16 -> 16 (18.6 %)
+    CP24                         +  17 -> 17 (19.8 %)
+    CP19                         +  17 -> 17 (19.8 %)
+    language-cleanup             +  28 -> 28 (32.6 %)
+    VM subset                    +  34 -> 34 (39.5 %)
+    VM subset (D-018/kinds)      +  47 -> 47 (54.7 %)
+    unassigned                   +  86 -> 86 (100.0 %)
+    limits                       +  86 -> 86 (100.0 %)
+    none                         +  86 -> 86 (100.0 %)
+== generator: 300 scripts; compile on the VM 72 (24.0 %); refused 228; incomplete inventories {}; with consequential reasons 140; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {1: 97, 2: 29, 3: 18, 4: 84}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+     192 /  192  sole   80  opaque:irregular-legacy-parse            language-cleanup | irregular legacy parse
+       0 /   91  sole    0  compound-target                          VM subset | expression/statement subset (compound-target)
+      64 /   88  sole    1  type:compound-assignment                 VM subset (D-018/kinds) | compiler precision
+      73 /   86  sole    2  type:<                                   VM subset (D-018/kinds) | compiler precision
+      45 /   84  sole    1  type:+                                   VM subset (D-018/kinds) | compiler precision
+      56 /   81  sole    2  type:-                                   VM subset (D-018/kinds) | compiler precision
+      62 /   69  sole    0  prepared-fn-unprepared                   VM subset (D-018/kinds) | compiler precision
+       2 /   68  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+      36 /   60  sole    2  type:*                                   VM subset (D-018/kinds) | compiler precision
+      38 /   57  sole    3  type:%                                   VM subset (D-018/kinds) | compiler precision
+      43 /   54  sole    2  prepared-decl-type                       VM subset (D-018/kinds) | compiler precision
+      17 /   42  sole    0  type:>                                   VM subset (D-018/kinds) | compiler precision
+      24 /   42  sole    0  type:<=                                  VM subset (D-018/kinds) | compiler precision
+       0 /   42  sole    0  assign-target                            VM subset | expression/statement subset (assign-target)
+      20 /   41  sole    0  type:>=                                  VM subset (D-018/kinds) | compiler precision
+      30 /   39  sole    0  context:assignment-error                 VM subset (D-018/kinds) | compiler precision
+       0 /   30  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+       0 /   22  sole    0  incdec-target                            VM subset | expression/statement subset (incdec-target)
+      10 /   21  sole    0  type:increment                           VM subset (D-018/kinds) | compiler precision
+       0 /   11  sole    0  free-name:unanalysed                     CP12b | globals (refused: unanalysed)
+       5 /    9  sole    2  static-error:arity                       CP13 | errors / try-catch
+       5 /    8  sole    0  type:index                               VM subset (D-018/kinds) | compiler precision
+       6 /    7  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+       5 /    6  sole    2  type:unary                               VM subset (D-018/kinds) | compiler precision
+       4 /    5  sole    0  type:/                                   VM subset (D-018/kinds) | compiler precision
+       0 /    5  sole    0  type:length                              VM subset (D-018/kinds) | compiler precision
+       0 /    4  sole    0  assign-free-name:unanalysed              CP12b | globals (refused: unanalysed)
+       1 /    4  sole    0  aliasing                                 VM subset (D-018/kinds) | compiler precision
+       2 /    3  sole    0  context:assignment-type                  VM subset (D-018/kinds) | compiler precision
+       3 /    3  sole    0  context:string-append-type               VM subset (D-018/kinds) | compiler precision
+       2 /    2  sole    0  context:negative-zero                    VM subset (D-018/kinds) | compiler precision
+       1 /    2  sole    0  type:print                               VM subset (D-018/kinds) | compiler precision
+       0 /    1  sole    0  unresolved-name                          CP12b | GETDYN/dynamic lookup (top-level name not declared)
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +  80 -> 152 (50.7 %)  opaque:irregular-legacy-parse
+    +  11 -> 163 (54.3 %)  type:-
+    +   7 -> 170 (56.7 %)  prepared-decl-type
+    +   5 -> 175 (58.3 %)  prepared-fn-unprepared
+    +   6 -> 181 (60.3 %)  type:*
+    +   5 -> 186 (62.0 %)  type:+
+    +   6 -> 192 (64.0 %)  type:%
+    +   8 -> 200 (66.7 %)  type:<
+    +  19 -> 219 (73.0 %)  type:compound-assignment
+    +  19 -> 238 (79.3 %)  context:assignment-error
+    +   6 -> 244 (81.3 %)  type:>=
+    +   7 -> 251 (83.7 %)  type:<=
+    +  10 -> 261 (87.0 %)  type:>
+    +   8 -> 269 (89.7 %)  type:increment
+    +   5 -> 274 (91.3 %)  static-error:arity
+    +   4 -> 278 (92.7 %)  type:unary
+    +   4 -> 282 (94.0 %)  type:/
+    +   3 -> 285 (95.0 %)  context:string-append-type
+    +   2 -> 287 (95.7 %)  type:member
+    +   5 -> 292 (97.3 %)  type:index
+  scripts blocked per checkpoint group (any reason):
+     192  language-cleanup | irregular legacy parse
+     161  VM subset (D-018/kinds) | compiler precision
+      91  VM subset | expression/statement subset (compound-target)
+      42  VM subset | expression/statement subset (assign-target)
+      30  VM subset | chained postfix on a call result (a.b().c(), f().k)
+      22  VM subset | expression/statement subset (incdec-target)
+      13  CP12b | globals (refused: unanalysed)
+       9  CP13 | errors / try-catch
+       1  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+  refused scripts whose certain reasons all map to one group: {'language-cleanup': 80, 'VM subset (D-018/kinds)': 34, 'CP13': 2}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+     192  sole   80  language-cleanup | irregular legacy parse
+     144  sole   34  VM subset (D-018/kinds) | compiler precision
+       5  sole    2  CP13 | errors / try-catch
+  greedy climb over features:
+    +  80 -> 152 (50.7 %)  language-cleanup | irregular legacy parse
+    + 143 -> 295 (98.3 %)  VM subset (D-018/kinds) | compiler precision
+    +   5 -> 300 (100.0 %)  CP13 | errors / try-catch
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +   0 -> 72 (24.0 %)
+    CP13                         +   2 -> 74 (24.7 %)
+    CP14                         +   2 -> 74 (24.7 %)
+    CP15                         +   2 -> 74 (24.7 %)
+    CP16                         +   2 -> 74 (24.7 %)
+    CP16/CP24                    +   2 -> 74 (24.7 %)
+    CP22                         +   2 -> 74 (24.7 %)
+    CP22/CP24                    +   2 -> 74 (24.7 %)
+    CP24                         +   2 -> 74 (24.7 %)
+    CP19                         +   2 -> 74 (24.7 %)
+    language-cleanup             +  84 -> 156 (52.0 %)
+    VM subset                    +  84 -> 156 (52.0 %)
+    VM subset (D-018/kinds)      + 228 -> 300 (100.0 %)
+    unassigned                   + 228 -> 300 (100.0 %)
+    limits                       + 228 -> 300 (100.0 %)
+    none                         + 228 -> 300 (100.0 %)
+== shared+projects: 875 scripts; compile on the VM 102 (11.7 %); refused 773; incomplete inventories {'parse-error': 1}; with consequential reasons 552; first-reason mismatches 0
+  distinct certain reasons per refused script (4 = 4+): {1: 160, 2: 176, 3: 83, 4: 354}
+  reasons by scripts blocked (certain / any; sole blocker; checkpoint):
+     182 /  363  sole    0  postfix-receiver                         VM subset | chained postfix on a call result (a.b().c(), f().k)
+     234 /  234  sole    2  fn-after-statement                       CP12b | resolver: function declarations
+      19 /  214  sole    0  unresolved-name                          CP12b | GETDYN/dynamic lookup (top-level name not declared)
+       0 /  211  sole    0  prepared-unpreparable                    VM subset (D-018/kinds) | compiler precision
+     200 /  200  sole    2  method:stringify                         CP14 | built-ins
+     160 /  160  sole    2  statement:For                            unassigned | for loops
+     154 /  154  sole   11  statement:Import                         CP12b | modules/imports
+       9 /  136  sole    2  expression-statement                     CP24 | template-only construct
+     122 /  122  sole    1  fn-flags                                 CP22/CP24 | async / @fn / struct methods
+     111 /  111  sole    9  statement:StructDecl                     CP12b | structs
+      57 /  110  sole    1  interpolation                            VM subset | expression/statement subset (interpolation)
+     110 /  110  sole    9  expression:Lambda                        unassigned | first-class functions / lambdas
+      20 /  106  sole    3  prepared-decl-type                       VM subset (D-018/kinds) | compiler precision
+     103 /  103  sole    1  method:split                             CP14 | built-ins
+     100 /  100  sole    0  callable:thread                          CP16 | host ops
+      42 /   99  sole    3  string-literal                           VM subset | expression/statement subset (string-literal)
+       0 /   98  sole    0  assign-target                            VM subset | expression/statement subset (assign-target)
+      98 /   98  sole    0  callable:is_dir                          CP16 | host ops
+      97 /   97  sole    0  method:join                              CP14 | built-ins
+      95 /   95  sole    0  method:contains                          CP14 | built-ins
+      92 /   92  sole    0  fn-as-value                              unassigned | first-class functions / lambdas
+      88 /   88  sole    0  method:to_upper                          CP14 | built-ins
+      86 /   86  sole    1  statement:Try                            CP13 | errors / try-catch
+      86 /   86  sole    0  expression:Await                         CP22 | async / await
+      82 /   82  sole    9  statement:Export                         CP12b | modules/imports
+       1 /   81  sole    0  type:member                              VM subset (D-018/kinds) | compiler precision
+      79 /   79  sole    0  method:starts_with                       CP14 | built-ins
+      78 /   78  sole    2  callable:getenv                          CP16 | host ops
+      53 /   72  sole    0  call-binding                             unassigned | first-class functions / lambdas
+       5 /   66  sole    1  type:length                              VM subset (D-018/kinds) | compiler precision
+      62 /   62  sole    2  statement:Throw                          CP13 | errors / try-catch
+      60 /   60  sole    0  method:open                              CP16 | host ops
+      58 /   58  sole    0  method:close                             unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      58 /   58  sole    0  callable:file                            CP16 | host ops
+      52 /   57  sole    2  static-error:member-assign               CP13 | errors / try-catch
+      57 /   57  sole    0  method:write                             CP16 | host ops
+      56 /   56  sole    0  callable:exists                          CP16 | host ops
+      56 /   56  sole    0  method:save                              CP16 | host ops
+       0 /   56  sole    0  type:>                                   VM subset (D-018/kinds) | compiler precision
+      55 /   55  sole    2  callable:open                            CP16 | host ops
+  greedy climb (features added, scripts unlocked, cumulative on the VM):
+    +  11 -> 113 (12.9 %)  statement:Import
+    +  11 -> 124 (14.2 %)  statement:Export
+    +  24 -> 148 (16.9 %)  statement:StructDecl
+    +  24 -> 172 (19.7 %)  fn-flags
+    +  10 -> 182 (20.8 %)  expression:Lambda
+    +  10 -> 192 (21.9 %)  param-name-reserved
+    +   9 -> 201 (23.0 %)  fn-after-statement
+    +   9 -> 210 (24.0 %)  method:sort_by
+    +   9 -> 219 (25.0 %)  method:map
+    +   8 -> 227 (25.9 %)  callable:inject
+    +  10 -> 237 (27.1 %)  statement:For
+    +  13 -> 250 (28.6 %)  expression:Await
+    +  10 -> 260 (29.7 %)  method:stringify
+    +   9 -> 269 (30.7 %)  fn-name-reserved
+    +   8 -> 277 (31.7 %)  opaque:legacy-runtime-error
+    +   7 -> 284 (32.5 %)  statement:Try
+    +   7 -> 291 (33.3 %)  statement:Throw
+    +   6 -> 297 (33.9 %)  interpolation
+    +   6 -> 303 (34.6 %)  prepared-decl-type
+    +   6 -> 309 (35.3 %)  unresolved-name
+  scripts blocked per checkpoint group (any reason):
+     401  VM subset (D-018/kinds) | compiler precision
+     363  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     300  CP14 | built-ins
+     245  CP16 | host ops
+     234  CP12b | resolver: function declarations
+     226  CP12b | modules/imports
+     183  unassigned | first-class functions / lambdas
+     160  unassigned | for loops
+     157  CP12b | unknown callable (dynamic or module function)
+     149  CP13 | errors / try-catch
+     144  CP24 | template-only construct
+     143  CP12b | GETDYN/dynamic lookup (top-level name not declared)
+     122  CP22/CP24 | async / @fn / struct methods
+     113  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+     112  CP12b | structs
+     110  VM subset | expression/statement subset (interpolation)
+      99  VM subset | expression/statement subset (string-literal)
+      99  CP12b | modules/imports (imported function)
+      98  VM subset | expression/statement subset (assign-target)
+      86  CP22 | async / await
+      83  unassigned | method not in CP14/CP15
+      71  CP12b | modules/imports (imported binding)
+      66  CP12b | structs (method of a user struct)
+      54  CP12b | globals (refused: dynamic-caller)
+      52  language-cleanup | names legacy reserves (L6, D-009#3)
+      51  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      44  VM subset | expression/statement subset (compound-target)
+      38  CP12b | globals
+      31  CP24 | template functions
+      26  CP16/CP24 | legacy script/template bindings (args, env, page...)
+      21  CP15 | built-ins
+      20  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      15  VM subset | expression/statement subset (index-assign-target)
+      13  CP12b | globals (refused: unanalysed)
+      12  VM subset | expression/statement subset (prefix-not-precedence)
+      11  VM subset | expression/statement subset (text-type-name)
+       9  VM subset | expression/statement subset (number-literal)
+       7  VM subset | expression/statement subset (index-target)
+       6  VM subset | expression/statement subset (string-arg-type)
+       5  VM subset | expression/statement subset (declare-const)
+       4  VM subset | expression/statement subset (postfix-spelling)
+       4  CP12b | globals (refused: undeclared)
+       4  CP19 | shell
+       3  VM subset | expression/statement subset (spread)
+       3  language-cleanup | D-014 / statement quirks
+       2  language-cleanup | irregular legacy parse
+       2  VM subset | expression/statement subset (fn-param)
+       1  VM subset | expression/statement subset (jump-outside-loop)
+       1  VM subset | expression/statement subset (declare-pattern)
+       1  CP12b | globals (refused: not-one-top-level-binding)
+       1  VM subset | expression/statement subset (expression:IncDec)
+       1  none | parse error (legacy rejects too)
+       1  VM subset | expression/statement subset (incdec-target)
+  refused scripts whose certain reasons all map to one group: {'CP12b': 91, 'unassigned': 45, 'VM subset (D-018/kinds)': 28, 'language-cleanup': 24, 'VM subset': 21, 'CP13': 15, 'CP16': 12, 'CP24': 12, 'CP14': 5, 'CP19': 3, 'CP22/CP24': 1, 'CP16/CP24': 1}
+  features (checkpoint | scope): scripts blocked (certain), sole blocker:
+     296  sole    5  CP14 | built-ins
+     244  sole   12  CP16 | host ops
+     234  sole    2  CP12b | resolver: function declarations
+     226  sole   22  CP12b | modules/imports
+     182  sole    0  VM subset | chained postfix on a call result (a.b().c(), f().k)
+     181  sole   10  unassigned | first-class functions / lambdas
+     160  sole    2  unassigned | for loops
+     144  sole   15  CP13 | errors / try-catch
+     122  sole    1  CP22/CP24 | async / @fn / struct methods
+     112  sole   10  CP12b | structs
+     110  sole    7  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+      99  sole   28  VM subset (D-018/kinds) | compiler precision
+      94  sole    0  CP12b | modules/imports (imported function)
+      86  sole    0  CP22 | async / await
+      83  sole    1  unassigned | method not in CP14/CP15
+      66  sole    0  CP12b | structs (method of a user struct)
+      57  sole    1  VM subset | expression/statement subset (interpolation)
+      54  sole    1  CP12b | globals (refused: dynamic-caller)
+      51  sole    0  unassigned | lambda-taking collection methods (not in CP14/CP15)
+      46  sole   14  language-cleanup | names legacy reserves (L6, D-009#3)
+      42  sole    3  VM subset | expression/statement subset (string-literal)
+      31  sole    6  CP24 | template functions
+      25  sole    2  CP12b | globals
+      20  sole    7  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+      20  sole    0  CP15 | built-ins
+      17  sole    6  CP24 | template-only construct
+      16  sole    0  CP12b | modules/imports (imported binding)
+       9  sole    5  VM subset | expression/statement subset (number-literal)
+       7  sole    1  CP16/CP24 | legacy script/template bindings (args, env, page...)
+       6  sole    3  CP12b | unknown callable (dynamic or module function)
+  greedy climb over features:
+    +  28 -> 130 (14.9 %)  VM subset (D-018/kinds) | compiler precision
+    +  22 -> 152 (17.4 %)  CP12b | modules/imports
+    +  26 -> 178 (20.3 %)  CP12b | structs
+    +  24 -> 202 (23.1 %)  CP22/CP24 | async / @fn / struct methods
+    +  22 -> 224 (25.6 %)  CP13 | errors / try-catch
+    +  18 -> 242 (27.7 %)  CP16 | host ops
+    +  19 -> 261 (29.8 %)  CP12b | modules/imports (imported function)
+    +  18 -> 279 (31.9 %)  unassigned | first-class functions / lambdas
+    +  20 -> 299 (34.2 %)  CP14 | built-ins
+    +  24 -> 323 (36.9 %)  CP12b | resolver: function declarations
+    +  24 -> 347 (39.7 %)  unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)
+    +  35 -> 382 (43.7 %)  unassigned | method not in CP14/CP15
+    +  32 -> 414 (47.3 %)  VM subset | chained postfix on a call result (a.b().c(), f().k)
+    +  34 -> 448 (51.2 %)  unassigned | for loops
+    +  42 -> 490 (56.0 %)  CP22 | async / await
+    +  32 -> 522 (59.7 %)  unassigned | lambda-taking collection methods (not in CP14/CP15)
+    +  31 -> 553 (63.2 %)  VM subset | expression/statement subset (interpolation)
+    +  35 -> 588 (67.2 %)  CP12b | structs (method of a user struct)
+    +  47 -> 635 (72.6 %)  CP12b | globals (refused: dynamic-caller)
+    +  38 -> 673 (76.9 %)  language-cleanup | names legacy reserves (L6, D-009#3)
+    +  30 -> 703 (80.3 %)  VM subset | expression/statement subset (string-literal)
+    +  31 -> 734 (83.9 %)  CP24 | template functions
+    +  19 -> 753 (86.1 %)  CP12b | globals
+    +  16 -> 769 (87.9 %)  CP12b | modules/imports (imported binding)
+    +  15 -> 784 (89.6 %)  language-cleanup | legacy run-time error construct (legacy-runtime-error)
+  whole checkpoints, cumulative (refused scripts unlocked; on the VM):
+    CP12b                        +  91 -> 193 (22.1 %)
+    CP13                         + 117 -> 219 (25.0 %)
+    CP14                         + 127 -> 229 (26.2 %)
+    CP15                         + 129 -> 231 (26.4 %)
+    CP16                         + 161 -> 263 (30.1 %)
+    CP16/CP24                    + 164 -> 266 (30.4 %)
+    CP22                         + 167 -> 269 (30.7 %)
+    CP22/CP24                    + 214 -> 316 (36.1 %)
+    CP24                         + 234 -> 336 (38.4 %)
+    CP19                         + 237 -> 339 (38.7 %)
+    language-cleanup             + 272 -> 374 (42.7 %)
+    VM subset                    + 341 -> 443 (50.6 %)
+    VM subset (D-018/kinds)      + 390 -> 492 (56.2 %)
+    unassigned                   + 772 -> 874 (99.9 %)
+    limits                       + 772 -> 874 (99.9 %)
+    none                         + 772 -> 874 (99.9 %)

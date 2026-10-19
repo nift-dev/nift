@@ -1,0 +1,6138 @@
+{
+ "generator": {
+  "blocked_by": {
+   "aliasing": 1,
+   "context:assignment-error": 30,
+   "context:assignment-type": 2,
+   "context:negative-zero": 2,
+   "context:string-append-type": 3,
+   "opaque:irregular-legacy-parse": 192,
+   "prepared-decl-type": 43,
+   "prepared-fn-unprepared": 62,
+   "prepared-unpreparable": 2,
+   "static-error:arity": 5,
+   "type:%": 38,
+   "type:*": 36,
+   "type:+": 45,
+   "type:-": 56,
+   "type:/": 4,
+   "type:<": 73,
+   "type:<=": 24,
+   "type:>": 17,
+   "type:>=": 20,
+   "type:compound-assignment": 64,
+   "type:increment": 10,
+   "type:index": 5,
+   "type:member": 6,
+   "type:print": 1,
+   "type:unary": 5
+  },
+  "blocked_by_any": {
+   "aliasing": 4,
+   "assign-free-name:unanalysed": 4,
+   "assign-target": 42,
+   "compound-target": 91,
+   "context:assignment-error": 39,
+   "context:assignment-type": 3,
+   "context:negative-zero": 2,
+   "context:string-append-type": 3,
+   "free-name:unanalysed": 11,
+   "incdec-target": 22,
+   "opaque:irregular-legacy-parse": 192,
+   "postfix-receiver": 30,
+   "prepared-decl-type": 54,
+   "prepared-fn-unprepared": 69,
+   "prepared-unpreparable": 68,
+   "static-error:arity": 9,
+   "type:%": 57,
+   "type:*": 60,
+   "type:+": 84,
+   "type:-": 81,
+   "type:/": 5,
+   "type:<": 86,
+   "type:<=": 42,
+   "type:>": 42,
+   "type:>=": 41,
+   "type:compound-assignment": 88,
+   "type:increment": 21,
+   "type:index": 8,
+   "type:length": 5,
+   "type:member": 7,
+   "type:print": 2,
+   "type:unary": 6,
+   "unresolved-name": 1
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 1,
+   "CP12b | globals (refused: unanalysed)": 13,
+   "CP13 | errors / try-catch": 9,
+   "VM subset (D-018/kinds) | compiler precision": 161,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 30,
+   "VM subset | expression/statement subset (assign-target)": 42,
+   "VM subset | expression/statement subset (compound-target)": 91,
+   "VM subset | expression/statement subset (incdec-target)": 22,
+   "language-cleanup | irregular legacy parse": 192
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    0
+   ],
+   [
+    "CP13",
+    2
+   ],
+   [
+    "CP14",
+    2
+   ],
+   [
+    "CP15",
+    2
+   ],
+   [
+    "CP16",
+    2
+   ],
+   [
+    "CP16/CP24",
+    2
+   ],
+   [
+    "CP22",
+    2
+   ],
+   [
+    "CP22/CP24",
+    2
+   ],
+   [
+    "CP24",
+    2
+   ],
+   [
+    "CP19",
+    2
+   ],
+   [
+    "language-cleanup",
+    84
+   ],
+   [
+    "VM subset",
+    84
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    228
+   ],
+   [
+    "unassigned",
+    228
+   ],
+   [
+    "limits",
+    228
+   ],
+   [
+    "none",
+    228
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "opaque:irregular-legacy-parse"
+    ],
+    80,
+    152
+   ],
+   [
+    [
+     "type:-"
+    ],
+    11,
+    163
+   ],
+   [
+    [
+     "prepared-decl-type"
+    ],
+    7,
+    170
+   ],
+   [
+    [
+     "prepared-fn-unprepared"
+    ],
+    5,
+    175
+   ],
+   [
+    [
+     "type:*"
+    ],
+    6,
+    181
+   ],
+   [
+    [
+     "type:+"
+    ],
+    5,
+    186
+   ],
+   [
+    [
+     "type:%"
+    ],
+    6,
+    192
+   ],
+   [
+    [
+     "type:<"
+    ],
+    8,
+    200
+   ],
+   [
+    [
+     "type:compound-assignment"
+    ],
+    19,
+    219
+   ],
+   [
+    [
+     "context:assignment-error"
+    ],
+    19,
+    238
+   ],
+   [
+    [
+     "type:>="
+    ],
+    6,
+    244
+   ],
+   [
+    [
+     "type:<="
+    ],
+    7,
+    251
+   ],
+   [
+    [
+     "type:>"
+    ],
+    10,
+    261
+   ],
+   [
+    [
+     "type:increment"
+    ],
+    8,
+    269
+   ],
+   [
+    [
+     "static-error:arity"
+    ],
+    5,
+    274
+   ],
+   [
+    [
+     "type:unary"
+    ],
+    4,
+    278
+   ],
+   [
+    [
+     "type:/"
+    ],
+    4,
+    282
+   ],
+   [
+    [
+     "context:string-append-type"
+    ],
+    3,
+    285
+   ],
+   [
+    [
+     "type:member"
+    ],
+    2,
+    287
+   ],
+   [
+    [
+     "type:index"
+    ],
+    5,
+    292
+   ]
+  ],
+  "compiled": 72,
+  "distinct": {
+   "1": 97,
+   "2": 29,
+   "3": 18,
+   "4": 84
+  },
+  "feature_blocked": {
+   "CP13 | errors / try-catch": 5,
+   "VM subset (D-018/kinds) | compiler precision": 144,
+   "language-cleanup | irregular legacy parse": 192
+  },
+  "feature_climb": [
+   [
+    [
+     "language-cleanup | irregular legacy parse"
+    ],
+    80,
+    152
+   ],
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    143,
+    295
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    5,
+    300
+   ]
+  ],
+  "feature_sole": {
+   "CP13 | errors / try-catch": 2,
+   "VM subset (D-018/kinds) | compiler precision": 34,
+   "language-cleanup | irregular legacy parse": 80
+  },
+  "first_mismatch": [],
+  "first_reason": {
+   "context:negative-zero": 1,
+   "opaque:irregular-legacy-parse": 192,
+   "prepared-decl-type": 7,
+   "prepared-fn-unprepared": 7,
+   "static-error:arity": 2,
+   "type:%": 4,
+   "type:*": 4,
+   "type:+": 1,
+   "type:-": 3,
+   "type:<": 4,
+   "type:compound-assignment": 1,
+   "type:unary": 2
+  },
+  "incomplete": {},
+  "only_checkpoint": {
+   "CP13": 2,
+   "VM subset (D-018/kinds)": 34,
+   "language-cleanup": 80
+  },
+  "refused": 228,
+  "scripts": 300,
+  "sole": {
+   "opaque:irregular-legacy-parse": 80,
+   "prepared-decl-type": 2,
+   "static-error:arity": 2,
+   "type:%": 3,
+   "type:*": 2,
+   "type:+": 1,
+   "type:-": 2,
+   "type:<": 2,
+   "type:compound-assignment": 1,
+   "type:unary": 2
+  },
+  "with_consequential": 140
+ },
+ "projects": {
+  "blocked_by": {
+   "aliasing": 18,
+   "assign-free-name:global": 2,
+   "binding-name-reserved": 2,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bytes": 11,
+   "callable:cmd": 6,
+   "callable:copy": 1,
+   "callable:error": 1,
+   "callable:exists": 1,
+   "callable:ffi_buffer": 1,
+   "callable:ffi_bytes": 1,
+   "callable:ffi_call": 1,
+   "callable:ffi_open": 1,
+   "callable:file": 3,
+   "callable:getenv": 7,
+   "callable:ifstream": 1,
+   "callable:ls": 1,
+   "callable:make_dir": 4,
+   "callable:map": 4,
+   "callable:move": 1,
+   "callable:mutex": 3,
+   "callable:open_bytes": 1,
+   "callable:os": 1,
+   "callable:read": 10,
+   "callable:remove": 1,
+   "callable:run": 3,
+   "callable:sleep": 3,
+   "callable:thread": 3,
+   "callable:type": 1,
+   "callable:which": 1,
+   "context:assignment-error": 1,
+   "expression-statement": 5,
+   "expression:Await": 7,
+   "expression:Lambda": 1,
+   "fn-after-statement": 7,
+   "fn-as-value": 1,
+   "fn-flags": 8,
+   "fn-name-reserved": 5,
+   "free-name:undeclared": 1,
+   "method:black": 1,
+   "method:blue": 1,
+   "method:bold": 1,
+   "method:bytes": 1,
+   "method:chars": 1,
+   "method:close": 4,
+   "method:compare": 1,
+   "method:contains": 2,
+   "method:cwd": 6,
+   "method:cyan": 1,
+   "method:decode": 10,
+   "method:dim": 1,
+   "method:encode": 3,
+   "method:ends_with": 1,
+   "method:eq": 1,
+   "method:fetch_add": 1,
+   "method:get": 2,
+   "method:green": 1,
+   "method:gt": 1,
+   "method:gte": 1,
+   "method:html": 1,
+   "method:input": 2,
+   "method:integer": 1,
+   "method:italic": 1,
+   "method:join": 6,
+   "method:keys": 4,
+   "method:lines": 1,
+   "method:load": 1,
+   "method:lock": 3,
+   "method:lt": 1,
+   "method:lte": 1,
+   "method:magenta": 1,
+   "method:open": 3,
+   "method:options": 1,
+   "method:ordinal": 1,
+   "method:parse": 6,
+   "method:parse_bytes": 1,
+   "method:parse_document": 1,
+   "method:plural": 1,
+   "method:prepare": 1,
+   "method:push": 3,
+   "method:read": 2,
+   "method:read_all_bytes": 1,
+   "method:red": 1,
+   "method:remove": 1,
+   "method:replace": 1,
+   "method:reset": 1,
+   "method:run": 6,
+   "method:satisfies": 1,
+   "method:save": 2,
+   "method:set": 2,
+   "method:sgr": 2,
+   "method:split": 11,
+   "method:starts_with": 2,
+   "method:store": 1,
+   "method:stringify": 27,
+   "method:stringify_document": 1,
+   "method:substr": 1,
+   "method:to_int": 10,
+   "method:to_string": 4,
+   "method:trim": 1,
+   "method:underline": 1,
+   "method:unified": 1,
+   "method:unlock": 3,
+   "method:valid": 1,
+   "method:valid_range": 1,
+   "method:validate_spec": 1,
+   "method:white": 1,
+   "method:words": 1,
+   "method:wrap": 2,
+   "method:write": 3,
+   "method:write_document": 1,
+   "method:yellow": 1,
+   "number-literal": 1,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 8,
+   "opaque:template-text": 2,
+   "param-name-reserved": 10,
+   "path-in-call-argument": 1,
+   "postfix-receiver": 27,
+   "prepared-decl-type": 12,
+   "statement:Export": 29,
+   "statement:For": 18,
+   "statement:Import": 13,
+   "statement:StructDecl": 26,
+   "statement:Throw": 8,
+   "statement:Try": 1,
+   "string-arg-type": 3,
+   "string-literal": 9,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:member": 1
+  },
+  "blocked_by_any": {
+   "aliasing": 18,
+   "assign-free-name:global": 2,
+   "assign-free-name:unanalysed": 1,
+   "assign-target": 5,
+   "binding-name-reserved": 8,
+   "call-binding": 1,
+   "callable:ansi": 1,
+   "callable:assert": 1,
+   "callable:async_job": 1,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bad": 1,
+   "callable:bytes": 11,
+   "callable:cli": 1,
+   "callable:cmd": 6,
+   "callable:copy": 1,
+   "callable:csv": 1,
+   "callable:curl": 1,
+   "callable:diff": 1,
+   "callable:dotenv": 1,
+   "callable:duration": 1,
+   "callable:error": 1,
+   "callable:exists": 1,
+   "callable:ffi_buffer": 1,
+   "callable:ffi_bytes": 1,
+   "callable:ffi_call": 1,
+   "callable:ffi_open": 1,
+   "callable:file": 3,
+   "callable:fuzzy": 1,
+   "callable:getenv": 7,
+   "callable:good": 1,
+   "callable:held_job": 1,
+   "callable:http": 1,
+   "callable:humanize": 1,
+   "callable:id": 1,
+   "callable:ifstream": 1,
+   "callable:ignore": 1,
+   "callable:jq": 1,
+   "callable:ls": 1,
+   "callable:magick": 1,
+   "callable:make_dir": 4,
+   "callable:map": 4,
+   "callable:mdx": 2,
+   "callable:move": 1,
+   "callable:mutex": 3,
+   "callable:mysql": 1,
+   "callable:nested_one": 1,
+   "callable:open_bytes": 1,
+   "callable:os": 1,
+   "callable:pandoc": 1,
+   "callable:postgres": 1,
+   "callable:read": 10,
+   "callable:redis": 1,
+   "callable:remove": 1,
+   "callable:run": 3,
+   "callable:semver": 1,
+   "callable:sleep": 3,
+   "callable:socket": 1,
+   "callable:sqlite": 1,
+   "callable:thread": 3,
+   "callable:tiny": 6,
+   "callable:type": 1,
+   "callable:url": 1,
+   "callable:vips": 1,
+   "callable:which": 1,
+   "callable:write": 4,
+   "compound-target": 16,
+   "context:assignment-error": 3,
+   "expression-statement": 14,
+   "expression:Await": 7,
+   "expression:Lambda": 1,
+   "fn-after-statement": 7,
+   "fn-as-value": 1,
+   "fn-flags": 8,
+   "fn-name-reserved": 5,
+   "free-name:unanalysed": 5,
+   "free-name:undeclared": 1,
+   "index-assign-target": 4,
+   "index-target": 3,
+   "method:black": 1,
+   "method:blue": 1,
+   "method:bold": 1,
+   "method:bytes": 1,
+   "method:chars": 1,
+   "method:close": 4,
+   "method:compare": 1,
+   "method:contains": 2,
+   "method:cwd": 6,
+   "method:cyan": 1,
+   "method:decode": 10,
+   "method:dim": 1,
+   "method:encode": 3,
+   "method:ends_with": 1,
+   "method:eq": 1,
+   "method:fetch_add": 1,
+   "method:get": 2,
+   "method:green": 1,
+   "method:gt": 1,
+   "method:gte": 1,
+   "method:html": 1,
+   "method:input": 2,
+   "method:integer": 1,
+   "method:italic": 1,
+   "method:join": 6,
+   "method:keys": 4,
+   "method:lines": 1,
+   "method:load": 1,
+   "method:lock": 3,
+   "method:lt": 1,
+   "method:lte": 1,
+   "method:magenta": 1,
+   "method:open": 3,
+   "method:options": 1,
+   "method:ordinal": 1,
+   "method:parse": 6,
+   "method:parse_bytes": 1,
+   "method:parse_document": 1,
+   "method:plural": 1,
+   "method:prepare": 1,
+   "method:push": 3,
+   "method:read": 2,
+   "method:read_all_bytes": 1,
+   "method:red": 1,
+   "method:remove": 1,
+   "method:replace": 1,
+   "method:reset": 1,
+   "method:run": 6,
+   "method:satisfies": 1,
+   "method:save": 2,
+   "method:set": 2,
+   "method:sgr": 2,
+   "method:split": 11,
+   "method:starts_with": 2,
+   "method:store": 1,
+   "method:stringify": 27,
+   "method:stringify_document": 1,
+   "method:substr": 1,
+   "method:to_int": 10,
+   "method:to_string": 4,
+   "method:trim": 1,
+   "method:underline": 1,
+   "method:unified": 1,
+   "method:unlock": 3,
+   "method:valid": 1,
+   "method:valid_range": 1,
+   "method:validate_spec": 1,
+   "method:white": 1,
+   "method:words": 1,
+   "method:wrap": 2,
+   "method:write": 3,
+   "method:write_document": 1,
+   "method:yellow": 1,
+   "number-literal": 1,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 8,
+   "opaque:template-text": 2,
+   "param-name-reserved": 10,
+   "path-in-call-argument": 10,
+   "postfix-receiver": 42,
+   "prefix-not-precedence": 11,
+   "prepared-decl-type": 27,
+   "prepared-fn-unprepared": 6,
+   "prepared-unpreparable": 23,
+   "statement:Export": 29,
+   "statement:For": 18,
+   "statement:Import": 13,
+   "statement:StructDecl": 26,
+   "statement:Throw": 8,
+   "statement:Try": 1,
+   "string-arg-type": 3,
+   "string-literal": 9,
+   "text-type-name": 1,
+   "type:%": 2,
+   "type:*": 3,
+   "type:+": 5,
+   "type:-": 5,
+   "type:<": 9,
+   "type:>": 4,
+   "type:>=": 2,
+   "type:compound-assignment": 14,
+   "type:element-assignment": 2,
+   "type:index": 4,
+   "type:length": 6,
+   "type:member": 12,
+   "type:print": 15,
+   "type:push": 2,
+   "type:unary": 1,
+   "unresolved-name": 5,
+   "unresolved-name:legacy-binding": 5
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 1,
+   "CP12b | globals": 2,
+   "CP12b | globals (refused: unanalysed)": 5,
+   "CP12b | globals (refused: undeclared)": 1,
+   "CP12b | modules/imports": 41,
+   "CP12b | modules/imports (imported binding)": 4,
+   "CP12b | modules/imports (imported function)": 1,
+   "CP12b | resolver: function declarations": 7,
+   "CP12b | structs": 26,
+   "CP12b | unknown callable (dynamic or module function)": 33,
+   "CP13 | errors / try-catch": 9,
+   "CP14 | built-ins": 30,
+   "CP15 | built-ins": 13,
+   "CP16 | host ops": 26,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 5,
+   "CP22 | async / await": 7,
+   "CP22/CP24 | async / @fn / struct methods": 8,
+   "CP24 | template functions": 1,
+   "CP24 | template-only construct": 16,
+   "VM subset (D-018/kinds) | compiler precision": 46,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 42,
+   "VM subset | expression/statement subset (assign-target)": 5,
+   "VM subset | expression/statement subset (compound-target)": 16,
+   "VM subset | expression/statement subset (index-assign-target)": 4,
+   "VM subset | expression/statement subset (index-target)": 3,
+   "VM subset | expression/statement subset (number-literal)": 1,
+   "VM subset | expression/statement subset (prefix-not-precedence)": 11,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 9,
+   "VM subset | expression/statement subset (text-type-name)": 1,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 8,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 22,
+   "unassigned | first-class functions / lambdas": 2,
+   "unassigned | for loops": 18,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 16,
+   "unassigned | method not in CP14/CP15": 20
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    14
+   ],
+   [
+    "CP13",
+    14
+   ],
+   [
+    "CP14",
+    14
+   ],
+   [
+    "CP15",
+    14
+   ],
+   [
+    "CP16",
+    16
+   ],
+   [
+    "CP16/CP24",
+    16
+   ],
+   [
+    "CP22",
+    16
+   ],
+   [
+    "CP22/CP24",
+    16
+   ],
+   [
+    "CP24",
+    17
+   ],
+   [
+    "CP19",
+    17
+   ],
+   [
+    "language-cleanup",
+    28
+   ],
+   [
+    "VM subset",
+    34
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    47
+   ],
+   [
+    "unassigned",
+    86
+   ],
+   [
+    "limits",
+    86
+   ],
+   [
+    "none",
+    86
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "param-name-reserved"
+    ],
+    7,
+    7
+   ],
+   [
+    [
+     "statement:Export"
+    ],
+    3,
+    10
+   ],
+   [
+    [
+     "statement:StructDecl"
+    ],
+    14,
+    24
+   ],
+   [
+    [
+     "callable:map"
+    ],
+    2,
+    26
+   ],
+   [
+    [
+     "prepared-decl-type"
+    ],
+    1,
+    27
+   ],
+   [
+    [
+     "opaque:legacy-runtime-error"
+    ],
+    3,
+    30
+   ],
+   [
+    [
+     "opaque:template-text"
+    ],
+    2,
+    32
+   ],
+   [
+    [
+     "statement:Import"
+    ],
+    1,
+    33
+   ],
+   [
+    [
+     "method:stringify"
+    ],
+    0,
+    33
+   ],
+   [
+    [
+     "postfix-receiver"
+    ],
+    1,
+    34
+   ],
+   [
+    [
+     "aliasing"
+    ],
+    3,
+    37
+   ],
+   [
+    [
+     "method:to_int"
+    ],
+    3,
+    40
+   ],
+   [
+    [
+     "statement:For"
+    ],
+    2,
+    42
+   ],
+   [
+    [
+     "callable:ls"
+    ],
+    1,
+    43
+   ],
+   [
+    [
+     "callable:bytes"
+    ],
+    0,
+    43
+   ],
+   [
+    [
+     "method:decode"
+    ],
+    3,
+    46
+   ],
+   [
+    [
+     "method:split"
+    ],
+    0,
+    46
+   ],
+   [
+    [
+     "callable:read"
+    ],
+    4,
+    50
+   ],
+   [
+    [
+     "fn-name-reserved"
+    ],
+    1,
+    51
+   ],
+   [
+    [
+     "callable:make_dir"
+    ],
+    3,
+    54
+   ]
+  ],
+  "compiled": 0,
+  "distinct": {
+   "1": 7,
+   "2": 20,
+   "3": 17,
+   "4": 42
+  },
+  "feature_blocked": {
+   "CP12b | globals": 2,
+   "CP12b | globals (refused: undeclared)": 1,
+   "CP12b | modules/imports": 41,
+   "CP12b | resolver: function declarations": 7,
+   "CP12b | structs": 26,
+   "CP13 | errors / try-catch": 9,
+   "CP14 | built-ins": 30,
+   "CP15 | built-ins": 13,
+   "CP16 | host ops": 26,
+   "CP22 | async / await": 7,
+   "CP22/CP24 | async / @fn / struct methods": 8,
+   "CP24 | template functions": 1,
+   "CP24 | template-only construct": 7,
+   "VM subset (D-018/kinds) | compiler precision": 25,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 27,
+   "VM subset | expression/statement subset (number-literal)": 1,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 9,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 8,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 17,
+   "unassigned | first-class functions / lambdas": 2,
+   "unassigned | for loops": 18,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 16,
+   "unassigned | method not in CP14/CP15": 20
+  },
+  "feature_climb": [
+   [
+    [
+     "language-cleanup | names legacy reserves (L6, D-009#3)"
+    ],
+    7,
+    7
+   ],
+   [
+    [
+     "CP12b | modules/imports"
+    ],
+    3,
+    10
+   ],
+   [
+    [
+     "CP12b | structs"
+    ],
+    14,
+    24
+   ],
+   [
+    [
+     "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)"
+    ],
+    2,
+    26
+   ],
+   [
+    [
+     "CP16 | host ops"
+    ],
+    1,
+    27
+   ],
+   [
+    [
+     "unassigned | method not in CP14/CP15"
+    ],
+    2,
+    29
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    2,
+    31
+   ],
+   [
+    [
+     "VM subset | chained postfix on a call result (a.b().c(), f().k)"
+    ],
+    4,
+    35
+   ],
+   [
+    [
+     "CP15 | built-ins"
+    ],
+    5,
+    40
+   ],
+   [
+    [
+     "CP14 | built-ins"
+    ],
+    4,
+    44
+   ],
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    9,
+    53
+   ],
+   [
+    [
+     "unassigned | for loops"
+    ],
+    6,
+    59
+   ],
+   [
+    [
+     "language-cleanup | legacy run-time error construct (legacy-runtime-error)"
+    ],
+    4,
+    63
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-literal)"
+    ],
+    4,
+    67
+   ],
+   [
+    [
+     "CP24 | template-only construct"
+    ],
+    2,
+    69
+   ],
+   [
+    [
+     "CP12b | resolver: function declarations"
+    ],
+    2,
+    71
+   ],
+   [
+    [
+     "CP22/CP24 | async / @fn / struct methods"
+    ],
+    1,
+    72
+   ],
+   [
+    [
+     "CP22 | async / await"
+    ],
+    7,
+    79
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-arg-type)"
+    ],
+    1,
+    80
+   ],
+   [
+    [
+     "CP12b | globals"
+    ],
+    1,
+    81
+   ],
+   [
+    [
+     "unassigned | first-class functions / lambdas"
+    ],
+    1,
+    82
+   ],
+   [
+    [
+     "CP12b | globals (refused: undeclared)"
+    ],
+    1,
+    83
+   ],
+   [
+    [
+     "CP24 | template functions"
+    ],
+    1,
+    84
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (number-literal)"
+    ],
+    1,
+    85
+   ],
+   [
+    [
+     "language-cleanup | irregular legacy parse"
+    ],
+    1,
+    86
+   ]
+  ],
+  "feature_sole": {
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 7
+  },
+  "first_mismatch": [],
+  "first_reason": {
+   "callable:file": 1,
+   "callable:getenv": 1,
+   "callable:map": 3,
+   "callable:mutex": 1,
+   "callable:os": 1,
+   "callable:read": 4,
+   "callable:run": 2,
+   "fn-after-statement": 3,
+   "fn-flags": 7,
+   "fn-name-reserved": 5,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 8,
+   "opaque:template-text": 2,
+   "param-name-reserved": 10,
+   "postfix-receiver": 17,
+   "prepared-decl-type": 1,
+   "statement:Import": 5,
+   "statement:StructDecl": 14
+  },
+  "incomplete": {},
+  "only_checkpoint": {
+   "CP12b": 14,
+   "language-cleanup": 7
+  },
+  "refused": 86,
+  "scripts": 86,
+  "sole": {
+   "param-name-reserved": 7
+  },
+  "with_consequential": 69
+ },
+ "shared": {
+  "blocked_by": {
+   "alias-argument": 1,
+   "aliasing": 34,
+   "assign-free-name": 2,
+   "assign-free-name:global": 2,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 16,
+   "call-binding": 53,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:answer": 3,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bare_value": 1,
+   "callable:build": 2,
+   "callable:bytes": 3,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 1,
+   "callable:child_value": 1,
+   "callable:clean_module_target": 1,
+   "callable:cmd": 4,
+   "callable:copy": 2,
+   "callable:cp": 2,
+   "callable:deepcopy": 2,
+   "callable:direct": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 3,
+   "callable:exists": 55,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_call": 4,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 4,
+   "callable:file": 55,
+   "callable:getenv": 71,
+   "callable:hardware_concurrency": 1,
+   "callable:helper": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 98,
+   "callable:is_file": 51,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:ls": 54,
+   "callable:made": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:map": 18,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:minify": 4,
+   "callable:mkdir": 3,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 6,
+   "callable:mv": 2,
+   "callable:nope": 3,
+   "callable:open": 55,
+   "callable:open_bytes": 2,
+   "callable:os": 2,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:prepared_indirect": 1,
+   "callable:project_root": 1,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 1,
+   "callable:recur": 1,
+   "callable:rm": 22,
+   "callable:run": 4,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 3,
+   "callable:sha256_file": 4,
+   "callable:sleep": 1,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 97,
+   "callable:throw": 1,
+   "callable:timer": 10,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 1,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 8,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:win_value": 1,
+   "callable:worker_job": 2,
+   "compound-target": 1,
+   "context:assignment-error": 8,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 4,
+   "expression:Await": 79,
+   "expression:IncDec": 1,
+   "expression:Lambda": 109,
+   "fn-after-statement": 227,
+   "fn-as-value": 91,
+   "fn-flags": 114,
+   "fn-name-reserved": 10,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 54,
+   "free-name:global": 19,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:undeclared": 2,
+   "index-assign-target": 2,
+   "index-target": 4,
+   "interpolation": 57,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:clear": 2,
+   "method:close": 54,
+   "method:command": 1,
+   "method:compound": 1,
+   "method:contains": 93,
+   "method:count": 1,
+   "method:decode": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 2,
+   "method:eq": 1,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 8,
+   "method:group_by": 2,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:invoke_bound": 1,
+   "method:join": 91,
+   "method:keys": 1,
+   "method:load": 2,
+   "method:lock": 5,
+   "method:locked": 1,
+   "method:m": 2,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 57,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:pop": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 31,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 4,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:replace": 20,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 5,
+   "method:same_handle": 1,
+   "method:save": 54,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 20,
+   "method:sort": 14,
+   "method:sort_by": 21,
+   "method:split": 92,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:starts_with": 77,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:stringify": 173,
+   "method:substr": 22,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_string": 14,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:transaction": 1,
+   "method:trim": 1,
+   "method:try_lock": 1,
+   "method:unlock": 4,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:write": 54,
+   "number-literal": 8,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 3,
+   "parse-error": 1,
+   "path-in-call-argument": 2,
+   "postfix-receiver": 155,
+   "postfix-spelling": 4,
+   "prepared-decl-type": 8,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 53,
+   "statement:For": 142,
+   "statement:Import": 141,
+   "statement:StructDecl": 85,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 54,
+   "statement:Try": 85,
+   "static-error:arity": 5,
+   "static-error:member-assign": 52,
+   "static-error:redeclared": 5,
+   "string-arg-type": 3,
+   "string-literal": 33,
+   "type:*": 1,
+   "type:+": 2,
+   "type:<": 1,
+   "type:compound-assignment": 2,
+   "type:increment": 1,
+   "type:index": 6,
+   "type:length": 5,
+   "type:print": 8,
+   "type:push": 14,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 19,
+   "unresolved-name:legacy-binding": 7
+  },
+  "blocked_by_any": {
+   "alias-argument": 1,
+   "aliasing": 34,
+   "assign-free-name": 16,
+   "assign-free-name:global": 2,
+   "assign-free-name:unanalysed": 2,
+   "assign-free-name:undeclared": 1,
+   "assign-target": 93,
+   "binding-name-reserved": 18,
+   "call-binding": 71,
+   "callable:P": 3,
+   "callable:Point": 1,
+   "callable:S1": 8,
+   "callable:S10": 2,
+   "callable:S11": 2,
+   "callable:S12": 3,
+   "callable:S14": 3,
+   "callable:S15": 2,
+   "callable:S16": 1,
+   "callable:S2": 4,
+   "callable:S20": 1,
+   "callable:S3": 5,
+   "callable:S4": 6,
+   "callable:S5": 2,
+   "callable:S6": 5,
+   "callable:S7": 5,
+   "callable:S8": 5,
+   "callable:S9": 2,
+   "callable:_leading": 1,
+   "callable:add": 2,
+   "callable:add_async": 1,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:af1": 11,
+   "callable:af10": 4,
+   "callable:af11": 3,
+   "callable:af12": 4,
+   "callable:af13": 3,
+   "callable:af14": 2,
+   "callable:af15": 2,
+   "callable:af16": 2,
+   "callable:af17": 1,
+   "callable:af19": 1,
+   "callable:af2": 1,
+   "callable:af21": 1,
+   "callable:af22": 1,
+   "callable:af3": 5,
+   "callable:af4": 4,
+   "callable:af5": 5,
+   "callable:af6": 5,
+   "callable:af7": 5,
+   "callable:af8": 2,
+   "callable:af9": 3,
+   "callable:answer": 3,
+   "callable:api": 4,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bad": 2,
+   "callable:bare": 2,
+   "callable:bare_value": 1,
+   "callable:box": 2,
+   "callable:build": 2,
+   "callable:bytes": 3,
+   "callable:callable": 1,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 2,
+   "callable:child_value": 1,
+   "callable:clean_loading_async_wrapper": 1,
+   "callable:clean_module_target": 1,
+   "callable:cmd": 4,
+   "callable:copy": 2,
+   "callable:counter": 1,
+   "callable:cp": 2,
+   "callable:deepcopy": 2,
+   "callable:direct": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 5,
+   "callable:exists": 55,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_call": 4,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 4,
+   "callable:file": 55,
+   "callable:future": 1,
+   "callable:getenv": 71,
+   "callable:global_order": 1,
+   "callable:hardware_concurrency": 1,
+   "callable:helper": 1,
+   "callable:holder": 1,
+   "callable:id": 2,
+   "callable:ignore_async": 3,
+   "callable:inc_async": 1,
+   "callable:init_async_job": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 98,
+   "callable:is_file": 51,
+   "callable:is_null": 1,
+   "callable:later": 1,
+   "callable:legacy_eq": 1,
+   "callable:len": 2,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:loader": 1,
+   "callable:loading_imported_timer_async_wrapper": 1,
+   "callable:local_order": 1,
+   "callable:ls": 54,
+   "callable:made": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:make_timer": 1,
+   "callable:map": 18,
+   "callable:measure": 1,
+   "callable:method_api": 1,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:min": 3,
+   "callable:minify": 4,
+   "callable:mk": 1,
+   "callable:mkdir": 3,
+   "callable:mko": 1,
+   "callable:module_point": 1,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 6,
+   "callable:mv": 2,
+   "callable:named": 1,
+   "callable:nope": 3,
+   "callable:open": 55,
+   "callable:open_bytes": 2,
+   "callable:os": 2,
+   "callable:outer": 2,
+   "callable:p": 1,
+   "callable:pack": 2,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:point": 1,
+   "callable:prepared_count": 1,
+   "callable:prepared_eq": 1,
+   "callable:prepared_indirect": 1,
+   "callable:private_async": 1,
+   "callable:probe": 1,
+   "callable:project_root": 1,
+   "callable:pt": 2,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 1,
+   "callable:recur": 2,
+   "callable:rm": 22,
+   "callable:run": 5,
+   "callable:s": 1,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 4,
+   "callable:sha256_file": 5,
+   "callable:sleep": 1,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 97,
+   "callable:throw": 2,
+   "callable:timer": 10,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 2,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 9,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:vault": 12,
+   "callable:vips_lib": 1,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:win_value": 1,
+   "callable:work": 1,
+   "callable:worker_job": 2,
+   "compound-target": 28,
+   "context:assignment-error": 16,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 122,
+   "expression:Await": 79,
+   "expression:IncDec": 1,
+   "expression:Lambda": 109,
+   "fn-after-statement": 227,
+   "fn-as-value": 91,
+   "fn-flags": 114,
+   "fn-name-reserved": 10,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 54,
+   "free-name:global": 19,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:unanalysed": 8,
+   "free-name:undeclared": 2,
+   "incdec-target": 1,
+   "index-assign-target": 11,
+   "index-target": 4,
+   "interpolation": 110,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:clear": 2,
+   "method:close": 54,
+   "method:command": 1,
+   "method:compound": 1,
+   "method:contains": 93,
+   "method:count": 1,
+   "method:decode": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 2,
+   "method:eq": 1,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 8,
+   "method:group_by": 2,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:invoke_bound": 1,
+   "method:join": 91,
+   "method:keys": 1,
+   "method:load": 2,
+   "method:lock": 5,
+   "method:locked": 1,
+   "method:m": 2,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 57,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:pop": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 31,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 4,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:replace": 20,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 5,
+   "method:same_handle": 1,
+   "method:save": 54,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 20,
+   "method:sort": 14,
+   "method:sort_by": 21,
+   "method:split": 92,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:starts_with": 77,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:stringify": 173,
+   "method:substr": 22,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_string": 14,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:transaction": 1,
+   "method:trim": 1,
+   "method:try_lock": 1,
+   "method:unlock": 4,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:write": 54,
+   "number-literal": 8,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 3,
+   "parse-error": 1,
+   "path-in-call-argument": 2,
+   "postfix-receiver": 321,
+   "postfix-spelling": 4,
+   "prefix-not-precedence": 1,
+   "prepared-decl-type": 79,
+   "prepared-fn-unprepared": 2,
+   "prepared-unpreparable": 188,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 53,
+   "statement:For": 142,
+   "statement:Import": 141,
+   "statement:StructDecl": 85,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 54,
+   "statement:Try": 85,
+   "static-error:arity": 7,
+   "static-error:member-assign": 57,
+   "static-error:redeclared": 5,
+   "string-arg-type": 3,
+   "string-literal": 90,
+   "text-type-name": 10,
+   "type:*": 3,
+   "type:+": 21,
+   "type:-": 7,
+   "type:/": 1,
+   "type:<": 2,
+   "type:>": 52,
+   "type:>=": 2,
+   "type:compound-assignment": 17,
+   "type:increment": 1,
+   "type:index": 25,
+   "type:length": 60,
+   "type:member": 69,
+   "type:print": 14,
+   "type:push": 16,
+   "type:script-return": 1,
+   "type:unary": 3,
+   "unresolved-name": 209,
+   "unresolved-name:legacy-binding": 21
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 142,
+   "CP12b | globals": 36,
+   "CP12b | globals (refused: dynamic-caller)": 54,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: unanalysed)": 8,
+   "CP12b | globals (refused: undeclared)": 3,
+   "CP12b | modules/imports": 185,
+   "CP12b | modules/imports (imported binding)": 67,
+   "CP12b | modules/imports (imported function)": 98,
+   "CP12b | resolver: function declarations": 227,
+   "CP12b | structs": 86,
+   "CP12b | structs (method of a user struct)": 66,
+   "CP12b | unknown callable (dynamic or module function)": 124,
+   "CP13 | errors / try-catch": 140,
+   "CP14 | built-ins": 270,
+   "CP15 | built-ins": 8,
+   "CP16 | host ops": 219,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 21,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 79,
+   "CP22/CP24 | async / @fn / struct methods": 114,
+   "CP24 | template functions": 30,
+   "CP24 | template-only construct": 128,
+   "VM subset (D-018/kinds) | compiler precision": 355,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 321,
+   "VM subset | expression/statement subset (assign-target)": 93,
+   "VM subset | expression/statement subset (compound-target)": 28,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (incdec-target)": 1,
+   "VM subset | expression/statement subset (index-assign-target)": 11,
+   "VM subset | expression/statement subset (index-target)": 4,
+   "VM subset | expression/statement subset (interpolation)": 110,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 8,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (prefix-not-precedence)": 1,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 90,
+   "VM subset | expression/statement subset (text-type-name)": 10,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 12,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 30,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 181,
+   "unassigned | for loops": 142,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 51,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 97,
+   "unassigned | method not in CP14/CP15": 63
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    77
+   ],
+   [
+    "CP13",
+    103
+   ],
+   [
+    "CP14",
+    113
+   ],
+   [
+    "CP15",
+    115
+   ],
+   [
+    "CP16",
+    145
+   ],
+   [
+    "CP16/CP24",
+    148
+   ],
+   [
+    "CP22",
+    151
+   ],
+   [
+    "CP22/CP24",
+    198
+   ],
+   [
+    "CP24",
+    217
+   ],
+   [
+    "CP19",
+    220
+   ],
+   [
+    "language-cleanup",
+    244
+   ],
+   [
+    "VM subset",
+    307
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    343
+   ],
+   [
+    "unassigned",
+    686
+   ],
+   [
+    "limits",
+    686
+   ],
+   [
+    "none",
+    686
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "statement:Import"
+    ],
+    11,
+    113
+   ],
+   [
+    [
+     "statement:Export"
+    ],
+    11,
+    124
+   ],
+   [
+    [
+     "fn-flags"
+    ],
+    23,
+    147
+   ],
+   [
+    [
+     "statement:StructDecl"
+    ],
+    11,
+    158
+   ],
+   [
+    [
+     "expression:Lambda"
+    ],
+    10,
+    168
+   ],
+   [
+    [
+     "fn-after-statement"
+    ],
+    9,
+    177
+   ],
+   [
+    [
+     "method:sort_by"
+    ],
+    9,
+    186
+   ],
+   [
+    [
+     "method:map"
+    ],
+    9,
+    195
+   ],
+   [
+    [
+     "callable:inject"
+    ],
+    8,
+    203
+   ],
+   [
+    [
+     "statement:For"
+    ],
+    10,
+    213
+   ],
+   [
+    [
+     "method:stringify"
+    ],
+    10,
+    223
+   ],
+   [
+    [
+     "fn-name-reserved"
+    ],
+    9,
+    232
+   ],
+   [
+    [
+     "statement:Try"
+    ],
+    7,
+    239
+   ],
+   [
+    [
+     "expression:Await"
+    ],
+    7,
+    246
+   ],
+   [
+    [
+     "statement:Throw"
+    ],
+    7,
+    253
+   ],
+   [
+    [
+     "opaque:legacy-runtime-error"
+    ],
+    7,
+    260
+   ],
+   [
+    [
+     "interpolation"
+    ],
+    6,
+    266
+   ],
+   [
+    [
+     "unresolved-name"
+    ],
+    6,
+    272
+   ],
+   [
+    [
+     "string-literal"
+    ],
+    5,
+    277
+   ],
+   [
+    [
+     "number-literal"
+    ],
+    5,
+    282
+   ]
+  ],
+  "compiled": 102,
+  "distinct": {
+   "1": 153,
+   "2": 156,
+   "3": 66,
+   "4": 312
+  },
+  "feature_blocked": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 3,
+   "CP12b | globals": 23,
+   "CP12b | globals (refused: dynamic-caller)": 54,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: undeclared)": 3,
+   "CP12b | modules/imports": 185,
+   "CP12b | modules/imports (imported binding)": 16,
+   "CP12b | modules/imports (imported function)": 94,
+   "CP12b | resolver: function declarations": 227,
+   "CP12b | structs": 86,
+   "CP12b | structs (method of a user struct)": 66,
+   "CP12b | unknown callable (dynamic or module function)": 6,
+   "CP13 | errors / try-catch": 135,
+   "CP14 | built-ins": 266,
+   "CP15 | built-ins": 7,
+   "CP16 | host ops": 218,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 7,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 79,
+   "CP22/CP24 | async / @fn / struct methods": 114,
+   "CP24 | template functions": 30,
+   "CP24 | template-only construct": 10,
+   "VM subset (D-018/kinds) | compiler precision": 74,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 155,
+   "VM subset | expression/statement subset (compound-target)": 1,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (index-assign-target)": 2,
+   "VM subset | expression/statement subset (index-target)": 4,
+   "VM subset | expression/statement subset (interpolation)": 57,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 8,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 33,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 12,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 29,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 179,
+   "unassigned | for loops": 142,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 51,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 94,
+   "unassigned | method not in CP14/CP15": 63
+  },
+  "feature_climb": [
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    28,
+    130
+   ],
+   [
+    [
+     "CP12b | modules/imports"
+    ],
+    22,
+    152
+   ],
+   [
+    [
+     "CP22/CP24 | async / @fn / struct methods"
+    ],
+    23,
+    175
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    21,
+    196
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported function)"
+    ],
+    18,
+    214
+   ],
+   [
+    [
+     "CP16 | host ops"
+    ],
+    16,
+    230
+   ],
+   [
+    [
+     "unassigned | first-class functions / lambdas"
+    ],
+    18,
+    248
+   ],
+   [
+    [
+     "unassigned | lambda-taking collection methods (not in CP14/CP15)"
+    ],
+    18,
+    266
+   ],
+   [
+    [
+     "unassigned | method not in CP14/CP15"
+    ],
+    24,
+    290
+   ],
+   [
+    [
+     "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)"
+    ],
+    21,
+    311
+   ],
+   [
+    [
+     "CP14 | built-ins"
+    ],
+    31,
+    342
+   ],
+   [
+    [
+     "CP12b | resolver: function declarations"
+    ],
+    27,
+    369
+   ],
+   [
+    [
+     "VM subset | chained postfix on a call result (a.b().c(), f().k)"
+    ],
+    22,
+    391
+   ],
+   [
+    [
+     "unassigned | for loops"
+    ],
+    31,
+    422
+   ],
+   [
+    [
+     "CP22 | async / await"
+    ],
+    35,
+    457
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (interpolation)"
+    ],
+    31,
+    488
+   ],
+   [
+    [
+     "CP12b | globals (refused: dynamic-caller)"
+    ],
+    33,
+    521
+   ],
+   [
+    [
+     "CP24 | template functions"
+    ],
+    29,
+    550
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-literal)"
+    ],
+    23,
+    573
+   ],
+   [
+    [
+     "language-cleanup | names legacy reserves (L6, D-009#3)"
+    ],
+    21,
+    594
+   ],
+   [
+    [
+     "CP12b | structs"
+    ],
+    19,
+    613
+   ],
+   [
+    [
+     "CP12b | structs (method of a user struct)"
+    ],
+    56,
+    669
+   ],
+   [
+    [
+     "CP12b | globals"
+    ],
+    19,
+    688
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported binding)"
+    ],
+    16,
+    704
+   ],
+   [
+    [
+     "language-cleanup | legacy run-time error construct (legacy-runtime-error)"
+    ],
+    10,
+    714
+   ]
+  ],
+  "feature_sole": {
+   "CP12b | globals": 2,
+   "CP12b | globals (refused: dynamic-caller)": 1,
+   "CP12b | globals (refused: undeclared)": 2,
+   "CP12b | modules/imports": 22,
+   "CP12b | resolver: function declarations": 2,
+   "CP12b | structs": 10,
+   "CP12b | unknown callable (dynamic or module function)": 3,
+   "CP13 | errors / try-catch": 15,
+   "CP14 | built-ins": 5,
+   "CP16 | host ops": 12,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 1,
+   "CP19 | shell": 3,
+   "CP22/CP24 | async / @fn / struct methods": 1,
+   "CP24 | template functions": 6,
+   "CP24 | template-only construct": 6,
+   "VM subset (D-018/kinds) | compiler precision": 28,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (index-target)": 2,
+   "VM subset | expression/statement subset (interpolation)": 1,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 5,
+   "VM subset | expression/statement subset (string-arg-type)": 2,
+   "VM subset | expression/statement subset (string-literal)": 3,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 7,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 7,
+   "unassigned | first-class functions / lambdas": 10,
+   "unassigned | for loops": 2,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 7,
+   "unassigned | method not in CP14/CP15": 1
+  },
+  "first_mismatch": [],
+  "first_reason": {
+   "alias-argument": 1,
+   "aliasing": 19,
+   "assign-free-name": 3,
+   "binding-name-reserved": 3,
+   "call-binding": 1,
+   "callable:cat": 2,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:ffi_callback": 1,
+   "callable:ffi_open": 3,
+   "callable:file": 4,
+   "callable:getenv": 5,
+   "callable:inject": 24,
+   "callable:ls": 3,
+   "callable:map": 16,
+   "callable:minify": 2,
+   "callable:mutex": 5,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:platform": 1,
+   "callable:project_root": 1,
+   "callable:read": 1,
+   "callable:run": 4,
+   "callable:set": 6,
+   "callable:sha256": 2,
+   "callable:thread": 12,
+   "callable:timer": 3,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 3,
+   "expression:Lambda": 14,
+   "fn-after-statement": 214,
+   "fn-flags": 56,
+   "fn-name-reserved": 8,
+   "fn-param": 1,
+   "free-name": 3,
+   "index-target": 3,
+   "interpolation": 3,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:map": 9,
+   "method:nope": 1,
+   "method:sort": 2,
+   "method:sort_by": 9,
+   "method:split": 1,
+   "method:stringify": 8,
+   "method:to_string": 2,
+   "method:to_upper": 1,
+   "number-literal": 5,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 1,
+   "parse-error": 1,
+   "path-in-call-argument": 1,
+   "postfix-receiver": 12,
+   "prepared-decl-type": 8,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 10,
+   "statement:For": 7,
+   "statement:Import": 53,
+   "statement:StructDecl": 25,
+   "statement:Throw": 2,
+   "statement:Try": 17,
+   "static-error:arity": 4,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 3,
+   "type:push": 10,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 4
+  },
+  "incomplete": {
+   "parse-error": 1
+  },
+  "only_checkpoint": {
+   "CP12b": 77,
+   "CP13": 15,
+   "CP14": 5,
+   "CP16": 12,
+   "CP16/CP24": 1,
+   "CP19": 3,
+   "CP22/CP24": 1,
+   "CP24": 12,
+   "VM subset": 21,
+   "VM subset (D-018/kinds)": 28,
+   "language-cleanup": 17,
+   "unassigned": 45
+  },
+  "refused": 687,
+  "scripts": 789,
+  "sole": {
+   "aliasing": 2,
+   "assign-free-name": 1,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 2,
+   "callable:cat": 1,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:getenv": 2,
+   "callable:inject": 5,
+   "callable:ls": 3,
+   "callable:minify": 1,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:read": 1,
+   "callable:run": 1,
+   "callable:timer": 1,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "expression-statement": 2,
+   "expression:Lambda": 9,
+   "fn-after-statement": 2,
+   "fn-flags": 1,
+   "fn-name-reserved": 5,
+   "free-name:dynamic-caller": 1,
+   "free-name:global": 1,
+   "free-name:undeclared": 1,
+   "index-target": 2,
+   "interpolation": 1,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:nope": 1,
+   "method:split": 1,
+   "method:stringify": 2,
+   "method:to_string": 2,
+   "number-literal": 5,
+   "opaque:legacy-runtime-error": 7,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 1,
+   "prepared-decl-type": 3,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 9,
+   "statement:For": 2,
+   "statement:Import": 11,
+   "statement:StructDecl": 9,
+   "statement:Throw": 2,
+   "statement:Try": 1,
+   "static-error:arity": 3,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 2,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name:legacy-binding": 1
+  },
+  "with_consequential": 483
+ },
+ "shared+projects": {
+  "blocked_by": {
+   "alias-argument": 1,
+   "aliasing": 52,
+   "assign-free-name": 2,
+   "assign-free-name:global": 4,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 18,
+   "call-binding": 53,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:answer": 3,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:atomic<bool>": 2,
+   "callable:atomic<int>": 2,
+   "callable:bare_value": 1,
+   "callable:build": 2,
+   "callable:bytes": 14,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 1,
+   "callable:child_value": 1,
+   "callable:clean_module_target": 1,
+   "callable:cmd": 10,
+   "callable:copy": 3,
+   "callable:cp": 2,
+   "callable:deepcopy": 2,
+   "callable:direct": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 4,
+   "callable:exists": 56,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_buffer": 1,
+   "callable:ffi_bytes": 1,
+   "callable:ffi_call": 5,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 5,
+   "callable:file": 58,
+   "callable:getenv": 78,
+   "callable:hardware_concurrency": 1,
+   "callable:helper": 1,
+   "callable:ifstream": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 98,
+   "callable:is_file": 51,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:ls": 55,
+   "callable:made": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:make_dir": 4,
+   "callable:map": 22,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:minify": 4,
+   "callable:mkdir": 3,
+   "callable:move": 1,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 9,
+   "callable:mv": 2,
+   "callable:nope": 3,
+   "callable:open": 55,
+   "callable:open_bytes": 3,
+   "callable:os": 3,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:prepared_indirect": 1,
+   "callable:project_root": 1,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 11,
+   "callable:recur": 1,
+   "callable:remove": 1,
+   "callable:rm": 22,
+   "callable:run": 7,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 3,
+   "callable:sha256_file": 4,
+   "callable:sleep": 4,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 100,
+   "callable:throw": 1,
+   "callable:timer": 10,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 1,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 9,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:which": 1,
+   "callable:win_value": 1,
+   "callable:worker_job": 2,
+   "compound-target": 1,
+   "context:assignment-error": 9,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 9,
+   "expression:Await": 86,
+   "expression:IncDec": 1,
+   "expression:Lambda": 110,
+   "fn-after-statement": 234,
+   "fn-as-value": 92,
+   "fn-flags": 122,
+   "fn-name-reserved": 15,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 54,
+   "free-name:global": 19,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:undeclared": 3,
+   "index-assign-target": 2,
+   "index-target": 4,
+   "interpolation": 57,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:black": 1,
+   "method:blue": 1,
+   "method:bold": 1,
+   "method:bytes": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:chars": 1,
+   "method:clear": 2,
+   "method:close": 58,
+   "method:command": 1,
+   "method:compare": 1,
+   "method:compound": 1,
+   "method:contains": 95,
+   "method:count": 1,
+   "method:cwd": 6,
+   "method:cyan": 1,
+   "method:decode": 11,
+   "method:dim": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 5,
+   "method:ends_with": 1,
+   "method:eq": 2,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:fetch_add": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 10,
+   "method:green": 1,
+   "method:group_by": 2,
+   "method:gt": 1,
+   "method:gte": 1,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:html": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:input": 2,
+   "method:integer": 1,
+   "method:invoke_bound": 1,
+   "method:italic": 1,
+   "method:join": 97,
+   "method:keys": 5,
+   "method:lines": 1,
+   "method:load": 3,
+   "method:lock": 8,
+   "method:locked": 1,
+   "method:lt": 1,
+   "method:lte": 1,
+   "method:m": 2,
+   "method:magenta": 1,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 60,
+   "method:options": 1,
+   "method:ordinal": 1,
+   "method:parse": 6,
+   "method:parse_bytes": 1,
+   "method:parse_document": 1,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:plural": 1,
+   "method:pop": 1,
+   "method:prepare": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 34,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 6,
+   "method:read_all_bytes": 1,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:red": 1,
+   "method:remove": 1,
+   "method:replace": 21,
+   "method:reset": 1,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 11,
+   "method:same_handle": 1,
+   "method:satisfies": 1,
+   "method:save": 56,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 22,
+   "method:sgr": 2,
+   "method:sort": 14,
+   "method:sort_by": 21,
+   "method:split": 103,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:starts_with": 79,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:store": 1,
+   "method:stringify": 200,
+   "method:stringify_document": 1,
+   "method:substr": 23,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_int": 10,
+   "method:to_string": 18,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:transaction": 1,
+   "method:trim": 2,
+   "method:try_lock": 1,
+   "method:underline": 1,
+   "method:unified": 1,
+   "method:unlock": 7,
+   "method:valid": 1,
+   "method:valid_range": 1,
+   "method:validate_spec": 1,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:white": 1,
+   "method:words": 1,
+   "method:wrap": 2,
+   "method:write": 57,
+   "method:write_document": 1,
+   "method:yellow": 1,
+   "number-literal": 9,
+   "opaque:irregular-legacy-parse": 2,
+   "opaque:legacy-runtime-error": 20,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 8,
+   "param-name-reserved": 13,
+   "parse-error": 1,
+   "path-in-call-argument": 3,
+   "postfix-receiver": 182,
+   "postfix-spelling": 4,
+   "prepared-decl-type": 20,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 82,
+   "statement:For": 160,
+   "statement:Import": 154,
+   "statement:StructDecl": 111,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 62,
+   "statement:Try": 86,
+   "static-error:arity": 5,
+   "static-error:member-assign": 52,
+   "static-error:redeclared": 5,
+   "string-arg-type": 6,
+   "string-literal": 42,
+   "type:*": 1,
+   "type:+": 2,
+   "type:<": 2,
+   "type:compound-assignment": 3,
+   "type:increment": 1,
+   "type:index": 6,
+   "type:length": 5,
+   "type:member": 1,
+   "type:print": 8,
+   "type:push": 14,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 19,
+   "unresolved-name:legacy-binding": 7
+  },
+  "blocked_by_any": {
+   "alias-argument": 1,
+   "aliasing": 52,
+   "assign-free-name": 16,
+   "assign-free-name:global": 4,
+   "assign-free-name:unanalysed": 3,
+   "assign-free-name:undeclared": 1,
+   "assign-target": 98,
+   "binding-name-reserved": 26,
+   "call-binding": 72,
+   "callable:P": 3,
+   "callable:Point": 1,
+   "callable:S1": 8,
+   "callable:S10": 2,
+   "callable:S11": 2,
+   "callable:S12": 3,
+   "callable:S14": 3,
+   "callable:S15": 2,
+   "callable:S16": 1,
+   "callable:S2": 4,
+   "callable:S20": 1,
+   "callable:S3": 5,
+   "callable:S4": 6,
+   "callable:S5": 2,
+   "callable:S6": 5,
+   "callable:S7": 5,
+   "callable:S8": 5,
+   "callable:S9": 2,
+   "callable:_leading": 1,
+   "callable:add": 2,
+   "callable:add_async": 1,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:af1": 11,
+   "callable:af10": 4,
+   "callable:af11": 3,
+   "callable:af12": 4,
+   "callable:af13": 3,
+   "callable:af14": 2,
+   "callable:af15": 2,
+   "callable:af16": 2,
+   "callable:af17": 1,
+   "callable:af19": 1,
+   "callable:af2": 1,
+   "callable:af21": 1,
+   "callable:af22": 1,
+   "callable:af3": 5,
+   "callable:af4": 4,
+   "callable:af5": 5,
+   "callable:af6": 5,
+   "callable:af7": 5,
+   "callable:af8": 2,
+   "callable:af9": 3,
+   "callable:ansi": 1,
+   "callable:answer": 3,
+   "callable:api": 4,
+   "callable:assert": 1,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:async_job": 1,
+   "callable:atomic<bool>": 2,
+   "callable:atomic<int>": 2,
+   "callable:bad": 3,
+   "callable:bare": 2,
+   "callable:bare_value": 1,
+   "callable:box": 2,
+   "callable:build": 2,
+   "callable:bytes": 14,
+   "callable:callable": 1,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 2,
+   "callable:child_value": 1,
+   "callable:clean_loading_async_wrapper": 1,
+   "callable:clean_module_target": 1,
+   "callable:cli": 1,
+   "callable:cmd": 10,
+   "callable:copy": 3,
+   "callable:counter": 1,
+   "callable:cp": 2,
+   "callable:csv": 1,
+   "callable:curl": 1,
+   "callable:deepcopy": 2,
+   "callable:diff": 1,
+   "callable:direct": 1,
+   "callable:dotenv": 1,
+   "callable:duration": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 6,
+   "callable:exists": 56,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_buffer": 1,
+   "callable:ffi_bytes": 1,
+   "callable:ffi_call": 5,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 5,
+   "callable:file": 58,
+   "callable:future": 1,
+   "callable:fuzzy": 1,
+   "callable:getenv": 78,
+   "callable:global_order": 1,
+   "callable:good": 1,
+   "callable:hardware_concurrency": 1,
+   "callable:held_job": 1,
+   "callable:helper": 1,
+   "callable:holder": 1,
+   "callable:http": 1,
+   "callable:humanize": 1,
+   "callable:id": 3,
+   "callable:ifstream": 1,
+   "callable:ignore": 1,
+   "callable:ignore_async": 3,
+   "callable:inc_async": 1,
+   "callable:init_async_job": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 98,
+   "callable:is_file": 51,
+   "callable:is_null": 1,
+   "callable:jq": 1,
+   "callable:later": 1,
+   "callable:legacy_eq": 1,
+   "callable:len": 2,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:loader": 1,
+   "callable:loading_imported_timer_async_wrapper": 1,
+   "callable:local_order": 1,
+   "callable:ls": 55,
+   "callable:made": 1,
+   "callable:magick": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:make_dir": 4,
+   "callable:make_timer": 1,
+   "callable:map": 22,
+   "callable:mdx": 2,
+   "callable:measure": 1,
+   "callable:method_api": 1,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:min": 3,
+   "callable:minify": 4,
+   "callable:mk": 1,
+   "callable:mkdir": 3,
+   "callable:mko": 1,
+   "callable:module_point": 1,
+   "callable:move": 1,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 9,
+   "callable:mv": 2,
+   "callable:mysql": 1,
+   "callable:named": 1,
+   "callable:nested_one": 1,
+   "callable:nope": 3,
+   "callable:open": 55,
+   "callable:open_bytes": 3,
+   "callable:os": 3,
+   "callable:outer": 2,
+   "callable:p": 1,
+   "callable:pack": 2,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:pandoc": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:point": 1,
+   "callable:postgres": 1,
+   "callable:prepared_count": 1,
+   "callable:prepared_eq": 1,
+   "callable:prepared_indirect": 1,
+   "callable:private_async": 1,
+   "callable:probe": 1,
+   "callable:project_root": 1,
+   "callable:pt": 2,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 11,
+   "callable:recur": 2,
+   "callable:redis": 1,
+   "callable:remove": 1,
+   "callable:rm": 22,
+   "callable:run": 8,
+   "callable:s": 1,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:semver": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 4,
+   "callable:sha256_file": 5,
+   "callable:sleep": 4,
+   "callable:socket": 1,
+   "callable:sqlite": 1,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 100,
+   "callable:throw": 2,
+   "callable:timer": 10,
+   "callable:tiny": 6,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 2,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 10,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:url": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:vault": 12,
+   "callable:vips": 1,
+   "callable:vips_lib": 1,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:which": 1,
+   "callable:win_value": 1,
+   "callable:work": 1,
+   "callable:worker_job": 2,
+   "callable:write": 4,
+   "compound-target": 44,
+   "context:assignment-error": 19,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 136,
+   "expression:Await": 86,
+   "expression:IncDec": 1,
+   "expression:Lambda": 110,
+   "fn-after-statement": 234,
+   "fn-as-value": 92,
+   "fn-flags": 122,
+   "fn-name-reserved": 15,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 54,
+   "free-name:global": 19,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:unanalysed": 13,
+   "free-name:undeclared": 3,
+   "incdec-target": 1,
+   "index-assign-target": 15,
+   "index-target": 7,
+   "interpolation": 110,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:black": 1,
+   "method:blue": 1,
+   "method:bold": 1,
+   "method:bytes": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:chars": 1,
+   "method:clear": 2,
+   "method:close": 58,
+   "method:command": 1,
+   "method:compare": 1,
+   "method:compound": 1,
+   "method:contains": 95,
+   "method:count": 1,
+   "method:cwd": 6,
+   "method:cyan": 1,
+   "method:decode": 11,
+   "method:dim": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 5,
+   "method:ends_with": 1,
+   "method:eq": 2,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:fetch_add": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 10,
+   "method:green": 1,
+   "method:group_by": 2,
+   "method:gt": 1,
+   "method:gte": 1,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:html": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:input": 2,
+   "method:integer": 1,
+   "method:invoke_bound": 1,
+   "method:italic": 1,
+   "method:join": 97,
+   "method:keys": 5,
+   "method:lines": 1,
+   "method:load": 3,
+   "method:lock": 8,
+   "method:locked": 1,
+   "method:lt": 1,
+   "method:lte": 1,
+   "method:m": 2,
+   "method:magenta": 1,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 60,
+   "method:options": 1,
+   "method:ordinal": 1,
+   "method:parse": 6,
+   "method:parse_bytes": 1,
+   "method:parse_document": 1,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:plural": 1,
+   "method:pop": 1,
+   "method:prepare": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 34,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 6,
+   "method:read_all_bytes": 1,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:red": 1,
+   "method:remove": 1,
+   "method:replace": 21,
+   "method:reset": 1,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 11,
+   "method:same_handle": 1,
+   "method:satisfies": 1,
+   "method:save": 56,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 22,
+   "method:sgr": 2,
+   "method:sort": 14,
+   "method:sort_by": 21,
+   "method:split": 103,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:starts_with": 79,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:store": 1,
+   "method:stringify": 200,
+   "method:stringify_document": 1,
+   "method:substr": 23,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_int": 10,
+   "method:to_string": 18,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:transaction": 1,
+   "method:trim": 2,
+   "method:try_lock": 1,
+   "method:underline": 1,
+   "method:unified": 1,
+   "method:unlock": 7,
+   "method:valid": 1,
+   "method:valid_range": 1,
+   "method:validate_spec": 1,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:white": 1,
+   "method:words": 1,
+   "method:wrap": 2,
+   "method:write": 57,
+   "method:write_document": 1,
+   "method:yellow": 1,
+   "number-literal": 9,
+   "opaque:irregular-legacy-parse": 2,
+   "opaque:legacy-runtime-error": 20,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 8,
+   "param-name-reserved": 13,
+   "parse-error": 1,
+   "path-in-call-argument": 12,
+   "postfix-receiver": 363,
+   "postfix-spelling": 4,
+   "prefix-not-precedence": 12,
+   "prepared-decl-type": 106,
+   "prepared-fn-unprepared": 8,
+   "prepared-unpreparable": 211,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 82,
+   "statement:For": 160,
+   "statement:Import": 154,
+   "statement:StructDecl": 111,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 62,
+   "statement:Try": 86,
+   "static-error:arity": 7,
+   "static-error:member-assign": 57,
+   "static-error:redeclared": 5,
+   "string-arg-type": 6,
+   "string-literal": 99,
+   "text-type-name": 11,
+   "type:%": 2,
+   "type:*": 6,
+   "type:+": 26,
+   "type:-": 12,
+   "type:/": 1,
+   "type:<": 11,
+   "type:>": 56,
+   "type:>=": 4,
+   "type:compound-assignment": 31,
+   "type:element-assignment": 2,
+   "type:increment": 1,
+   "type:index": 29,
+   "type:length": 66,
+   "type:member": 81,
+   "type:print": 29,
+   "type:push": 18,
+   "type:script-return": 1,
+   "type:unary": 4,
+   "unresolved-name": 214,
+   "unresolved-name:legacy-binding": 26
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 143,
+   "CP12b | globals": 38,
+   "CP12b | globals (refused: dynamic-caller)": 54,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: unanalysed)": 13,
+   "CP12b | globals (refused: undeclared)": 4,
+   "CP12b | modules/imports": 226,
+   "CP12b | modules/imports (imported binding)": 71,
+   "CP12b | modules/imports (imported function)": 99,
+   "CP12b | resolver: function declarations": 234,
+   "CP12b | structs": 112,
+   "CP12b | structs (method of a user struct)": 66,
+   "CP12b | unknown callable (dynamic or module function)": 157,
+   "CP13 | errors / try-catch": 149,
+   "CP14 | built-ins": 300,
+   "CP15 | built-ins": 21,
+   "CP16 | host ops": 245,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 26,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 86,
+   "CP22/CP24 | async / @fn / struct methods": 122,
+   "CP24 | template functions": 31,
+   "CP24 | template-only construct": 144,
+   "VM subset (D-018/kinds) | compiler precision": 401,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 363,
+   "VM subset | expression/statement subset (assign-target)": 98,
+   "VM subset | expression/statement subset (compound-target)": 44,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (incdec-target)": 1,
+   "VM subset | expression/statement subset (index-assign-target)": 15,
+   "VM subset | expression/statement subset (index-target)": 7,
+   "VM subset | expression/statement subset (interpolation)": 110,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 9,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (prefix-not-precedence)": 12,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 6,
+   "VM subset | expression/statement subset (string-literal)": 99,
+   "VM subset | expression/statement subset (text-type-name)": 11,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 2,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 20,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 52,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 183,
+   "unassigned | for loops": 160,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 51,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 113,
+   "unassigned | method not in CP14/CP15": 83
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    91
+   ],
+   [
+    "CP13",
+    117
+   ],
+   [
+    "CP14",
+    127
+   ],
+   [
+    "CP15",
+    129
+   ],
+   [
+    "CP16",
+    161
+   ],
+   [
+    "CP16/CP24",
+    164
+   ],
+   [
+    "CP22",
+    167
+   ],
+   [
+    "CP22/CP24",
+    214
+   ],
+   [
+    "CP24",
+    234
+   ],
+   [
+    "CP19",
+    237
+   ],
+   [
+    "language-cleanup",
+    272
+   ],
+   [
+    "VM subset",
+    341
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    390
+   ],
+   [
+    "unassigned",
+    772
+   ],
+   [
+    "limits",
+    772
+   ],
+   [
+    "none",
+    772
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "statement:Import"
+    ],
+    11,
+    113
+   ],
+   [
+    [
+     "statement:Export"
+    ],
+    11,
+    124
+   ],
+   [
+    [
+     "statement:StructDecl"
+    ],
+    24,
+    148
+   ],
+   [
+    [
+     "fn-flags"
+    ],
+    24,
+    172
+   ],
+   [
+    [
+     "expression:Lambda"
+    ],
+    10,
+    182
+   ],
+   [
+    [
+     "param-name-reserved"
+    ],
+    10,
+    192
+   ],
+   [
+    [
+     "fn-after-statement"
+    ],
+    9,
+    201
+   ],
+   [
+    [
+     "method:sort_by"
+    ],
+    9,
+    210
+   ],
+   [
+    [
+     "method:map"
+    ],
+    9,
+    219
+   ],
+   [
+    [
+     "callable:inject"
+    ],
+    8,
+    227
+   ],
+   [
+    [
+     "statement:For"
+    ],
+    10,
+    237
+   ],
+   [
+    [
+     "expression:Await"
+    ],
+    13,
+    250
+   ],
+   [
+    [
+     "method:stringify"
+    ],
+    10,
+    260
+   ],
+   [
+    [
+     "fn-name-reserved"
+    ],
+    9,
+    269
+   ],
+   [
+    [
+     "opaque:legacy-runtime-error"
+    ],
+    8,
+    277
+   ],
+   [
+    [
+     "statement:Try"
+    ],
+    7,
+    284
+   ],
+   [
+    [
+     "statement:Throw"
+    ],
+    7,
+    291
+   ],
+   [
+    [
+     "interpolation"
+    ],
+    6,
+    297
+   ],
+   [
+    [
+     "prepared-decl-type"
+    ],
+    6,
+    303
+   ],
+   [
+    [
+     "unresolved-name"
+    ],
+    6,
+    309
+   ]
+  ],
+  "compiled": 102,
+  "distinct": {
+   "1": 160,
+   "2": 176,
+   "3": 83,
+   "4": 354
+  },
+  "feature_blocked": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 3,
+   "CP12b | globals": 25,
+   "CP12b | globals (refused: dynamic-caller)": 54,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: undeclared)": 4,
+   "CP12b | modules/imports": 226,
+   "CP12b | modules/imports (imported binding)": 16,
+   "CP12b | modules/imports (imported function)": 94,
+   "CP12b | resolver: function declarations": 234,
+   "CP12b | structs": 112,
+   "CP12b | structs (method of a user struct)": 66,
+   "CP12b | unknown callable (dynamic or module function)": 6,
+   "CP13 | errors / try-catch": 144,
+   "CP14 | built-ins": 296,
+   "CP15 | built-ins": 20,
+   "CP16 | host ops": 244,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 7,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 86,
+   "CP22/CP24 | async / @fn / struct methods": 122,
+   "CP24 | template functions": 31,
+   "CP24 | template-only construct": 17,
+   "VM subset (D-018/kinds) | compiler precision": 99,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 182,
+   "VM subset | expression/statement subset (compound-target)": 1,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (index-assign-target)": 2,
+   "VM subset | expression/statement subset (index-target)": 4,
+   "VM subset | expression/statement subset (interpolation)": 57,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 9,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 6,
+   "VM subset | expression/statement subset (string-literal)": 42,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 2,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 20,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 46,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 181,
+   "unassigned | for loops": 160,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 51,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 110,
+   "unassigned | method not in CP14/CP15": 83
+  },
+  "feature_climb": [
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    28,
+    130
+   ],
+   [
+    [
+     "CP12b | modules/imports"
+    ],
+    22,
+    152
+   ],
+   [
+    [
+     "CP12b | structs"
+    ],
+    26,
+    178
+   ],
+   [
+    [
+     "CP22/CP24 | async / @fn / struct methods"
+    ],
+    24,
+    202
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    22,
+    224
+   ],
+   [
+    [
+     "CP16 | host ops"
+    ],
+    18,
+    242
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported function)"
+    ],
+    19,
+    261
+   ],
+   [
+    [
+     "unassigned | first-class functions / lambdas"
+    ],
+    18,
+    279
+   ],
+   [
+    [
+     "CP14 | built-ins"
+    ],
+    20,
+    299
+   ],
+   [
+    [
+     "CP12b | resolver: function declarations"
+    ],
+    24,
+    323
+   ],
+   [
+    [
+     "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)"
+    ],
+    24,
+    347
+   ],
+   [
+    [
+     "unassigned | method not in CP14/CP15"
+    ],
+    35,
+    382
+   ],
+   [
+    [
+     "VM subset | chained postfix on a call result (a.b().c(), f().k)"
+    ],
+    32,
+    414
+   ],
+   [
+    [
+     "unassigned | for loops"
+    ],
+    34,
+    448
+   ],
+   [
+    [
+     "CP22 | async / await"
+    ],
+    42,
+    490
+   ],
+   [
+    [
+     "unassigned | lambda-taking collection methods (not in CP14/CP15)"
+    ],
+    32,
+    522
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (interpolation)"
+    ],
+    31,
+    553
+   ],
+   [
+    [
+     "CP12b | structs (method of a user struct)"
+    ],
+    35,
+    588
+   ],
+   [
+    [
+     "CP12b | globals (refused: dynamic-caller)"
+    ],
+    47,
+    635
+   ],
+   [
+    [
+     "language-cleanup | names legacy reserves (L6, D-009#3)"
+    ],
+    38,
+    673
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-literal)"
+    ],
+    30,
+    703
+   ],
+   [
+    [
+     "CP24 | template functions"
+    ],
+    31,
+    734
+   ],
+   [
+    [
+     "CP12b | globals"
+    ],
+    19,
+    753
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported binding)"
+    ],
+    16,
+    769
+   ],
+   [
+    [
+     "language-cleanup | legacy run-time error construct (legacy-runtime-error)"
+    ],
+    15,
+    784
+   ]
+  ],
+  "feature_sole": {
+   "CP12b | globals": 2,
+   "CP12b | globals (refused: dynamic-caller)": 1,
+   "CP12b | globals (refused: undeclared)": 2,
+   "CP12b | modules/imports": 22,
+   "CP12b | resolver: function declarations": 2,
+   "CP12b | structs": 10,
+   "CP12b | unknown callable (dynamic or module function)": 3,
+   "CP13 | errors / try-catch": 15,
+   "CP14 | built-ins": 5,
+   "CP16 | host ops": 12,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 1,
+   "CP19 | shell": 3,
+   "CP22/CP24 | async / @fn / struct methods": 1,
+   "CP24 | template functions": 6,
+   "CP24 | template-only construct": 6,
+   "VM subset (D-018/kinds) | compiler precision": 28,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (index-target)": 2,
+   "VM subset | expression/statement subset (interpolation)": 1,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 5,
+   "VM subset | expression/statement subset (string-arg-type)": 2,
+   "VM subset | expression/statement subset (string-literal)": 3,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 7,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 14,
+   "unassigned | first-class functions / lambdas": 10,
+   "unassigned | for loops": 2,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 7,
+   "unassigned | method not in CP14/CP15": 1
+  },
+  "first_mismatch": [],
+  "first_reason": {
+   "alias-argument": 1,
+   "aliasing": 19,
+   "assign-free-name": 3,
+   "binding-name-reserved": 3,
+   "call-binding": 1,
+   "callable:cat": 2,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:ffi_callback": 1,
+   "callable:ffi_open": 3,
+   "callable:file": 5,
+   "callable:getenv": 6,
+   "callable:inject": 24,
+   "callable:ls": 3,
+   "callable:map": 19,
+   "callable:minify": 2,
+   "callable:mutex": 6,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:os": 1,
+   "callable:platform": 1,
+   "callable:project_root": 1,
+   "callable:read": 5,
+   "callable:run": 6,
+   "callable:set": 6,
+   "callable:sha256": 2,
+   "callable:thread": 12,
+   "callable:timer": 3,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 3,
+   "expression:Lambda": 14,
+   "fn-after-statement": 217,
+   "fn-flags": 63,
+   "fn-name-reserved": 13,
+   "fn-param": 1,
+   "free-name": 3,
+   "index-target": 3,
+   "interpolation": 3,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:map": 9,
+   "method:nope": 1,
+   "method:sort": 2,
+   "method:sort_by": 9,
+   "method:split": 1,
+   "method:stringify": 8,
+   "method:to_string": 2,
+   "method:to_upper": 1,
+   "number-literal": 5,
+   "opaque:irregular-legacy-parse": 2,
+   "opaque:legacy-runtime-error": 20,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 8,
+   "param-name-reserved": 11,
+   "parse-error": 1,
+   "path-in-call-argument": 1,
+   "postfix-receiver": 29,
+   "prepared-decl-type": 9,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 10,
+   "statement:For": 7,
+   "statement:Import": 58,
+   "statement:StructDecl": 39,
+   "statement:Throw": 2,
+   "statement:Try": 17,
+   "static-error:arity": 4,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 3,
+   "type:push": 10,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 4
+  },
+  "incomplete": {
+   "parse-error": 1
+  },
+  "only_checkpoint": {
+   "CP12b": 91,
+   "CP13": 15,
+   "CP14": 5,
+   "CP16": 12,
+   "CP16/CP24": 1,
+   "CP19": 3,
+   "CP22/CP24": 1,
+   "CP24": 12,
+   "VM subset": 21,
+   "VM subset (D-018/kinds)": 28,
+   "language-cleanup": 24,
+   "unassigned": 45
+  },
+  "refused": 773,
+  "scripts": 875,
+  "sole": {
+   "aliasing": 2,
+   "assign-free-name": 1,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 2,
+   "callable:cat": 1,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:getenv": 2,
+   "callable:inject": 5,
+   "callable:ls": 3,
+   "callable:minify": 1,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:read": 1,
+   "callable:run": 1,
+   "callable:timer": 1,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "expression-statement": 2,
+   "expression:Lambda": 9,
+   "fn-after-statement": 2,
+   "fn-flags": 1,
+   "fn-name-reserved": 5,
+   "free-name:dynamic-caller": 1,
+   "free-name:global": 1,
+   "free-name:undeclared": 1,
+   "index-target": 2,
+   "interpolation": 1,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:nope": 1,
+   "method:split": 1,
+   "method:stringify": 2,
+   "method:to_string": 2,
+   "number-literal": 5,
+   "opaque:legacy-runtime-error": 7,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 1,
+   "param-name-reserved": 7,
+   "prepared-decl-type": 3,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 9,
+   "statement:For": 2,
+   "statement:Import": 11,
+   "statement:StructDecl": 9,
+   "statement:Throw": 2,
+   "statement:Try": 1,
+   "static-error:arity": 3,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 2,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name:legacy-binding": 1
+  },
+  "with_consequential": 552
+ },
+ "shared-curated": {
+  "blocked_by": {
+   "alias-argument": 1,
+   "aliasing": 27,
+   "assign-free-name": 2,
+   "assign-free-name:global": 2,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 4,
+   "call-binding": 2,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:answer": 3,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bare_value": 1,
+   "callable:build": 2,
+   "callable:bytes": 3,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 1,
+   "callable:child_value": 1,
+   "callable:clean_module_target": 1,
+   "callable:cmd": 4,
+   "callable:copy": 2,
+   "callable:cp": 2,
+   "callable:deepcopy": 2,
+   "callable:direct": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 3,
+   "callable:exists": 7,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_call": 4,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 4,
+   "callable:file": 7,
+   "callable:getenv": 8,
+   "callable:hardware_concurrency": 1,
+   "callable:helper": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 3,
+   "callable:is_file": 3,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:ls": 6,
+   "callable:made": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:map": 18,
+   "callable:minify": 4,
+   "callable:mkdir": 3,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 6,
+   "callable:mv": 2,
+   "callable:nope": 3,
+   "callable:open": 7,
+   "callable:open_bytes": 2,
+   "callable:os": 2,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:prepared_indirect": 1,
+   "callable:project_root": 1,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 1,
+   "callable:recur": 1,
+   "callable:rm": 2,
+   "callable:run": 4,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 3,
+   "callable:sha256_file": 4,
+   "callable:sleep": 1,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 39,
+   "callable:throw": 1,
+   "callable:timer": 10,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 1,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 8,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:win_value": 1,
+   "callable:worker_job": 2,
+   "compound-target": 1,
+   "context:assignment-error": 8,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 4,
+   "expression:Await": 23,
+   "expression:IncDec": 1,
+   "expression:Lambda": 58,
+   "fn-after-statement": 48,
+   "fn-as-value": 33,
+   "fn-flags": 58,
+   "fn-name-reserved": 10,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 2,
+   "free-name:global": 7,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:undeclared": 2,
+   "index-assign-target": 2,
+   "index-target": 4,
+   "interpolation": 5,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:clear": 2,
+   "method:close": 6,
+   "method:command": 1,
+   "method:compound": 1,
+   "method:contains": 16,
+   "method:count": 1,
+   "method:decode": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 2,
+   "method:eq": 1,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 8,
+   "method:group_by": 2,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:invoke_bound": 1,
+   "method:join": 33,
+   "method:keys": 1,
+   "method:load": 2,
+   "method:lock": 5,
+   "method:locked": 1,
+   "method:m": 2,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 9,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:pop": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 24,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 4,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 5,
+   "method:same_handle": 1,
+   "method:save": 6,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 20,
+   "method:sort": 1,
+   "method:sort_by": 21,
+   "method:split": 3,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:stringify": 19,
+   "method:substr": 1,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_string": 14,
+   "method:transaction": 1,
+   "method:trim": 1,
+   "method:try_lock": 1,
+   "method:unlock": 4,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:write": 6,
+   "number-literal": 6,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 3,
+   "parse-error": 1,
+   "path-in-call-argument": 2,
+   "postfix-receiver": 28,
+   "postfix-spelling": 4,
+   "prepared-decl-type": 8,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 53,
+   "statement:For": 21,
+   "statement:Import": 80,
+   "statement:StructDecl": 36,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 10,
+   "statement:Try": 19,
+   "static-error:arity": 5,
+   "static-error:member-assign": 3,
+   "static-error:redeclared": 5,
+   "string-arg-type": 3,
+   "string-literal": 10,
+   "type:+": 2,
+   "type:<": 1,
+   "type:compound-assignment": 2,
+   "type:increment": 1,
+   "type:index": 6,
+   "type:length": 5,
+   "type:print": 8,
+   "type:push": 14,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 18,
+   "unresolved-name:legacy-binding": 7
+  },
+  "blocked_by_any": {
+   "alias-argument": 1,
+   "aliasing": 27,
+   "assign-free-name": 7,
+   "assign-free-name:global": 2,
+   "assign-free-name:unanalysed": 2,
+   "assign-free-name:undeclared": 1,
+   "assign-target": 38,
+   "binding-name-reserved": 6,
+   "call-binding": 20,
+   "callable:P": 3,
+   "callable:Point": 1,
+   "callable:_leading": 1,
+   "callable:add": 2,
+   "callable:add_async": 1,
+   "callable:add_f64": 1,
+   "callable:add_i64": 1,
+   "callable:answer": 3,
+   "callable:api": 4,
+   "callable:async_a": 1,
+   "callable:async_b": 1,
+   "callable:atomic<bool>": 1,
+   "callable:atomic<int>": 1,
+   "callable:bad": 2,
+   "callable:bare": 2,
+   "callable:bare_value": 1,
+   "callable:box": 2,
+   "callable:build": 2,
+   "callable:bytes": 3,
+   "callable:callable": 1,
+   "callable:callable_collision": 1,
+   "callable:cat": 5,
+   "callable:catch": 2,
+   "callable:child_value": 1,
+   "callable:clean_loading_async_wrapper": 1,
+   "callable:clean_module_target": 1,
+   "callable:cmd": 4,
+   "callable:copy": 2,
+   "callable:counter": 1,
+   "callable:cp": 2,
+   "callable:deepcopy": 2,
+   "callable:direct": 1,
+   "callable:dynamic_value": 1,
+   "callable:env": 2,
+   "callable:epoch": 6,
+   "callable:err": 2,
+   "callable:error": 5,
+   "callable:exists": 7,
+   "callable:exit": 1,
+   "callable:exported_async": 1,
+   "callable:exported_future_timer": 1,
+   "callable:exported_thread_timer": 1,
+   "callable:ffi_call": 4,
+   "callable:ffi_callback": 1,
+   "callable:ffi_close": 1,
+   "callable:ffi_open": 4,
+   "callable:file": 7,
+   "callable:future": 1,
+   "callable:getenv": 8,
+   "callable:global_order": 1,
+   "callable:hardware_concurrency": 1,
+   "callable:helper": 1,
+   "callable:holder": 1,
+   "callable:id": 2,
+   "callable:ignore_async": 3,
+   "callable:inc_async": 1,
+   "callable:init_async_job": 1,
+   "callable:inject": 24,
+   "callable:inner_value": 1,
+   "callable:is_dir": 3,
+   "callable:is_file": 3,
+   "callable:is_null": 1,
+   "callable:later": 1,
+   "callable:legacy_eq": 1,
+   "callable:len": 2,
+   "callable:load_function": 2,
+   "callable:load_lambda": 1,
+   "callable:load_runtime_child": 1,
+   "callable:loader": 1,
+   "callable:loading_imported_timer_async_wrapper": 1,
+   "callable:local_order": 1,
+   "callable:ls": 6,
+   "callable:made": 1,
+   "callable:make_a": 1,
+   "callable:make_b": 1,
+   "callable:make_timer": 1,
+   "callable:map": 18,
+   "callable:measure": 1,
+   "callable:method_api": 1,
+   "callable:min": 3,
+   "callable:minify": 4,
+   "callable:mk": 1,
+   "callable:mkdir": 3,
+   "callable:mko": 1,
+   "callable:module_point": 1,
+   "callable:mutate": 2,
+   "callable:mutate_async": 1,
+   "callable:mutex": 6,
+   "callable:mv": 2,
+   "callable:named": 1,
+   "callable:nope": 3,
+   "callable:open": 7,
+   "callable:open_bytes": 2,
+   "callable:os": 2,
+   "callable:outer": 2,
+   "callable:p": 1,
+   "callable:pack": 2,
+   "callable:package_double": 1,
+   "callable:package_value": 2,
+   "callable:pair_sum": 1,
+   "callable:parent_counter": 1,
+   "callable:platform": 2,
+   "callable:point": 1,
+   "callable:prepared_count": 1,
+   "callable:prepared_eq": 1,
+   "callable:prepared_indirect": 1,
+   "callable:private_async": 1,
+   "callable:probe": 1,
+   "callable:project_root": 1,
+   "callable:pt": 2,
+   "callable:public_add": 1,
+   "callable:pwd": 2,
+   "callable:range": 1,
+   "callable:read": 1,
+   "callable:recur": 2,
+   "callable:rm": 2,
+   "callable:run": 5,
+   "callable:s": 1,
+   "callable:same": 1,
+   "callable:same_name": 1,
+   "callable:scale_helper": 1,
+   "callable:set": 12,
+   "callable:setenv": 1,
+   "callable:sha256": 4,
+   "callable:sha256_file": 5,
+   "callable:sleep": 1,
+   "callable:stack": 1,
+   "callable:start_private_async": 1,
+   "callable:stat": 2,
+   "callable:state": 2,
+   "callable:stateful": 1,
+   "callable:status": 1,
+   "callable:symlink_escape": 1,
+   "callable:thread": 39,
+   "callable:throw": 2,
+   "callable:timer": 10,
+   "callable:touch": 1,
+   "callable:track": 1,
+   "callable:tracked": 2,
+   "callable:traversal_escape": 1,
+   "callable:try": 2,
+   "callable:twice": 1,
+   "callable:two": 1,
+   "callable:type": 9,
+   "callable:undefined_fn": 1,
+   "callable:undefined_thing": 1,
+   "callable:untrack": 1,
+   "callable:use_own": 1,
+   "callable:val": 1,
+   "callable:value": 2,
+   "callable:vault": 12,
+   "callable:vips_lib": 1,
+   "callable:warn": 1,
+   "callable:wave_owner": 1,
+   "callable:win_value": 1,
+   "callable:work": 1,
+   "callable:worker_job": 2,
+   "compound-target": 27,
+   "context:assignment-error": 16,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 64,
+   "expression:Await": 23,
+   "expression:IncDec": 1,
+   "expression:Lambda": 58,
+   "fn-after-statement": 48,
+   "fn-as-value": 33,
+   "fn-flags": 58,
+   "fn-name-reserved": 10,
+   "fn-param": 2,
+   "free-name:dynamic-caller": 2,
+   "free-name:global": 7,
+   "free-name:not-one-top-level-binding": 1,
+   "free-name:unanalysed": 8,
+   "free-name:undeclared": 2,
+   "incdec-target": 1,
+   "index-assign-target": 11,
+   "index-target": 4,
+   "interpolation": 5,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:add": 12,
+   "method:array_value": 1,
+   "method:available": 1,
+   "method:await": 1,
+   "method:bare": 1,
+   "method:call": 2,
+   "method:call_helper": 1,
+   "method:call_pick": 1,
+   "method:call_sibling": 1,
+   "method:call_step": 1,
+   "method:catch": 1,
+   "method:clear": 2,
+   "method:close": 6,
+   "method:command": 1,
+   "method:compound": 1,
+   "method:contains": 16,
+   "method:count": 1,
+   "method:decode": 1,
+   "method:done": 2,
+   "method:elapsed": 4,
+   "method:empty": 1,
+   "method:encode": 2,
+   "method:eq": 1,
+   "method:error": 1,
+   "method:exec": 2,
+   "method:explicit": 1,
+   "method:filter": 1,
+   "method:fixed": 1,
+   "method:get": 8,
+   "method:group_by": 2,
+   "method:handle_path": 1,
+   "method:has": 1,
+   "method:helper": 2,
+   "method:hidden": 1,
+   "method:inc": 2,
+   "method:increment": 1,
+   "method:index_compound": 1,
+   "method:index_compound_prepared": 1,
+   "method:index_direct": 1,
+   "method:index_direct_prepared": 1,
+   "method:index_dynamic": 1,
+   "method:index_postfix": 1,
+   "method:invoke_bound": 1,
+   "method:join": 33,
+   "method:keys": 1,
+   "method:load": 2,
+   "method:lock": 5,
+   "method:locked": 1,
+   "method:m": 2,
+   "method:map": 13,
+   "method:member": 1,
+   "method:module_handle_path": 1,
+   "method:module_value": 1,
+   "method:nope": 1,
+   "method:omit": 1,
+   "method:open": 9,
+   "method:pause": 1,
+   "method:paused": 1,
+   "method:pick": 1,
+   "method:pipe": 1,
+   "method:pop": 1,
+   "method:private_call": 1,
+   "method:private_value": 1,
+   "method:public_helper": 1,
+   "method:push": 24,
+   "method:q": 1,
+   "method:query": 2,
+   "method:read": 4,
+   "method:read_other": 1,
+   "method:receiver_compound": 1,
+   "method:receiver_compound_prepared": 1,
+   "method:receiver_direct": 1,
+   "method:receiver_direct_prepared": 1,
+   "method:resize": 1,
+   "method:resume": 1,
+   "method:run": 5,
+   "method:same_handle": 1,
+   "method:save": 6,
+   "method:secret": 1,
+   "method:self": 1,
+   "method:set": 20,
+   "method:sort": 1,
+   "method:sort_by": 21,
+   "method:split": 3,
+   "method:start": 2,
+   "method:start_private_async": 1,
+   "method:status": 2,
+   "method:stop": 1,
+   "method:stringify": 19,
+   "method:substr": 1,
+   "method:sum": 1,
+   "method:throw": 1,
+   "method:to_global": 1,
+   "method:to_string": 14,
+   "method:transaction": 1,
+   "method:trim": 1,
+   "method:try_lock": 1,
+   "method:unlock": 4,
+   "method:values": 1,
+   "method:variadic": 1,
+   "method:write": 6,
+   "number-literal": 6,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 3,
+   "parse-error": 1,
+   "path-in-call-argument": 2,
+   "postfix-receiver": 153,
+   "postfix-spelling": 4,
+   "prefix-not-precedence": 1,
+   "prepared-decl-type": 54,
+   "prepared-fn-unprepared": 2,
+   "prepared-unpreparable": 61,
+   "shebang-statement": 2,
+   "spread": 3,
+   "statement:Command": 4,
+   "statement:Export": 53,
+   "statement:For": 21,
+   "statement:Import": 80,
+   "statement:StructDecl": 36,
+   "statement:TemplateStmt": 4,
+   "statement:Throw": 10,
+   "statement:Try": 19,
+   "static-error:arity": 7,
+   "static-error:member-assign": 8,
+   "static-error:redeclared": 5,
+   "string-arg-type": 3,
+   "string-literal": 12,
+   "text-type-name": 8,
+   "type:*": 2,
+   "type:+": 14,
+   "type:-": 6,
+   "type:<": 2,
+   "type:>": 4,
+   "type:>=": 2,
+   "type:compound-assignment": 17,
+   "type:increment": 1,
+   "type:index": 25,
+   "type:length": 60,
+   "type:member": 20,
+   "type:print": 14,
+   "type:push": 16,
+   "type:script-return": 1,
+   "type:unary": 3,
+   "unresolved-name": 62,
+   "unresolved-name:legacy-binding": 17
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 42,
+   "CP12b | globals": 16,
+   "CP12b | globals (refused: dynamic-caller)": 2,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: unanalysed)": 8,
+   "CP12b | globals (refused: undeclared)": 3,
+   "CP12b | modules/imports": 124,
+   "CP12b | modules/imports (imported binding)": 20,
+   "CP12b | modules/imports (imported function)": 37,
+   "CP12b | resolver: function declarations": 48,
+   "CP12b | structs": 37,
+   "CP12b | structs (method of a user struct)": 17,
+   "CP12b | unknown callable (dynamic or module function)": 60,
+   "CP13 | errors / try-catch": 43,
+   "CP14 | built-ins": 94,
+   "CP15 | built-ins": 8,
+   "CP16 | host ops": 93,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 17,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 23,
+   "CP22/CP24 | async / @fn / struct methods": 58,
+   "CP24 | template functions": 30,
+   "CP24 | template-only construct": 70,
+   "VM subset (D-018/kinds) | compiler precision": 193,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 153,
+   "VM subset | expression/statement subset (assign-target)": 38,
+   "VM subset | expression/statement subset (compound-target)": 27,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (incdec-target)": 1,
+   "VM subset | expression/statement subset (index-assign-target)": 11,
+   "VM subset | expression/statement subset (index-target)": 4,
+   "VM subset | expression/statement subset (interpolation)": 5,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 6,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (prefix-not-precedence)": 1,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 12,
+   "VM subset | expression/statement subset (text-type-name)": 8,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 12,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 18,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 90,
+   "unassigned | for loops": 21,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 38,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 63,
+   "unassigned | method not in CP14/CP15": 57
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    77
+   ],
+   [
+    "CP13",
+    103
+   ],
+   [
+    "CP14",
+    110
+   ],
+   [
+    "CP15",
+    112
+   ],
+   [
+    "CP16",
+    139
+   ],
+   [
+    "CP16/CP24",
+    142
+   ],
+   [
+    "CP22",
+    145
+   ],
+   [
+    "CP22/CP24",
+    188
+   ],
+   [
+    "CP24",
+    207
+   ],
+   [
+    "CP19",
+    210
+   ],
+   [
+    "language-cleanup",
+    232
+   ],
+   [
+    "VM subset",
+    271
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    307
+   ],
+   [
+    "unassigned",
+    486
+   ],
+   [
+    "limits",
+    486
+   ],
+   [
+    "none",
+    486
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "statement:Import"
+    ],
+    11,
+    113
+   ],
+   [
+    [
+     "statement:Export"
+    ],
+    11,
+    124
+   ],
+   [
+    [
+     "fn-flags"
+    ],
+    23,
+    147
+   ],
+   [
+    [
+     "statement:StructDecl"
+    ],
+    11,
+    158
+   ],
+   [
+    [
+     "expression:Lambda"
+    ],
+    10,
+    168
+   ],
+   [
+    [
+     "fn-after-statement"
+    ],
+    9,
+    177
+   ],
+   [
+    [
+     "method:sort_by"
+    ],
+    9,
+    186
+   ],
+   [
+    [
+     "method:map"
+    ],
+    9,
+    195
+   ],
+   [
+    [
+     "callable:inject"
+    ],
+    8,
+    203
+   ],
+   [
+    [
+     "statement:For"
+    ],
+    9,
+    212
+   ],
+   [
+    [
+     "method:stringify"
+    ],
+    9,
+    221
+   ],
+   [
+    [
+     "fn-name-reserved"
+    ],
+    9,
+    230
+   ],
+   [
+    [
+     "expression:Await"
+    ],
+    7,
+    237
+   ],
+   [
+    [
+     "statement:Try"
+    ],
+    7,
+    244
+   ],
+   [
+    [
+     "opaque:legacy-runtime-error"
+    ],
+    7,
+    251
+   ],
+   [
+    [
+     "unresolved-name"
+    ],
+    6,
+    257
+   ],
+   [
+    [
+     "statement:Throw"
+    ],
+    5,
+    262
+   ],
+   [
+    [
+     "number-literal"
+    ],
+    5,
+    267
+   ],
+   [
+    [
+     "declare-const"
+    ],
+    5,
+    272
+   ],
+   [
+    [
+     "static-error:redeclared"
+    ],
+    5,
+    277
+   ]
+  ],
+  "compiled": 102,
+  "distinct": {
+   "1": 153,
+   "2": 155,
+   "3": 62,
+   "4": 117
+  },
+  "feature_blocked": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 2,
+   "CP12b | globals": 11,
+   "CP12b | globals (refused: dynamic-caller)": 2,
+   "CP12b | globals (refused: not-one-top-level-binding)": 1,
+   "CP12b | globals (refused: undeclared)": 3,
+   "CP12b | modules/imports": 124,
+   "CP12b | modules/imports (imported binding)": 16,
+   "CP12b | modules/imports (imported function)": 33,
+   "CP12b | resolver: function declarations": 48,
+   "CP12b | structs": 37,
+   "CP12b | structs (method of a user struct)": 17,
+   "CP12b | unknown callable (dynamic or module function)": 6,
+   "CP13 | errors / try-catch": 38,
+   "CP14 | built-ins": 90,
+   "CP15 | built-ins": 7,
+   "CP16 | host ops": 92,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 7,
+   "CP19 | shell": 4,
+   "CP22 | async / await": 23,
+   "CP22/CP24 | async / @fn / struct methods": 58,
+   "CP24 | template functions": 30,
+   "CP24 | template-only construct": 10,
+   "VM subset (D-018/kinds) | compiler precision": 66,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 28,
+   "VM subset | expression/statement subset (compound-target)": 1,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (declare-pattern)": 1,
+   "VM subset | expression/statement subset (expression:IncDec)": 1,
+   "VM subset | expression/statement subset (fn-param)": 2,
+   "VM subset | expression/statement subset (index-assign-target)": 2,
+   "VM subset | expression/statement subset (index-target)": 4,
+   "VM subset | expression/statement subset (interpolation)": 5,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 6,
+   "VM subset | expression/statement subset (postfix-spelling)": 4,
+   "VM subset | expression/statement subset (spread)": 3,
+   "VM subset | expression/statement subset (string-arg-type)": 3,
+   "VM subset | expression/statement subset (string-literal)": 10,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | irregular legacy parse": 1,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 12,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 17,
+   "none | parse error (legacy rejects too)": 1,
+   "unassigned | first-class functions / lambdas": 88,
+   "unassigned | for loops": 21,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 38,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 60,
+   "unassigned | method not in CP14/CP15": 57
+  },
+  "feature_climb": [
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    28,
+    130
+   ],
+   [
+    [
+     "CP12b | modules/imports"
+    ],
+    22,
+    152
+   ],
+   [
+    [
+     "CP22/CP24 | async / @fn / struct methods"
+    ],
+    23,
+    175
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    21,
+    196
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported function)"
+    ],
+    18,
+    214
+   ],
+   [
+    [
+     "CP16 | host ops"
+    ],
+    16,
+    230
+   ],
+   [
+    [
+     "unassigned | first-class functions / lambdas"
+    ],
+    18,
+    248
+   ],
+   [
+    [
+     "unassigned | lambda-taking collection methods (not in CP14/CP15)"
+    ],
+    18,
+    266
+   ],
+   [
+    [
+     "unassigned | method not in CP14/CP15"
+    ],
+    24,
+    290
+   ],
+   [
+    [
+     "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)"
+    ],
+    21,
+    311
+   ],
+   [
+    [
+     "CP14 | built-ins"
+    ],
+    31,
+    342
+   ],
+   [
+    [
+     "CP12b | resolver: function declarations"
+    ],
+    21,
+    363
+   ],
+   [
+    [
+     "CP12b | structs"
+    ],
+    18,
+    381
+   ],
+   [
+    [
+     "CP24 | template functions"
+    ],
+    18,
+    399
+   ],
+   [
+    [
+     "CP22 | async / await"
+    ],
+    18,
+    417
+   ],
+   [
+    [
+     "VM subset | chained postfix on a call result (a.b().c(), f().k)"
+    ],
+    15,
+    432
+   ],
+   [
+    [
+     "unassigned | for loops"
+    ],
+    16,
+    448
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported binding)"
+    ],
+    15,
+    463
+   ],
+   [
+    [
+     "language-cleanup | names legacy reserves (L6, D-009#3)"
+    ],
+    13,
+    476
+   ],
+   [
+    [
+     "CP12b | structs (method of a user struct)"
+    ],
+    10,
+    486
+   ],
+   [
+    [
+     "language-cleanup | legacy run-time error construct (legacy-runtime-error)"
+    ],
+    10,
+    496
+   ],
+   [
+    [
+     "CP24 | template-only construct"
+    ],
+    9,
+    505
+   ],
+   [
+    [
+     "CP12b | globals"
+    ],
+    7,
+    512
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-literal)"
+    ],
+    7,
+    519
+   ],
+   [
+    [
+     "CP15 | built-ins"
+    ],
+    7,
+    526
+   ]
+  ],
+  "feature_sole": {
+   "CP12b | globals": 2,
+   "CP12b | globals (refused: dynamic-caller)": 1,
+   "CP12b | globals (refused: undeclared)": 2,
+   "CP12b | modules/imports": 22,
+   "CP12b | resolver: function declarations": 2,
+   "CP12b | structs": 10,
+   "CP12b | unknown callable (dynamic or module function)": 3,
+   "CP13 | errors / try-catch": 15,
+   "CP14 | built-ins": 5,
+   "CP16 | host ops": 12,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 1,
+   "CP19 | shell": 3,
+   "CP22/CP24 | async / @fn / struct methods": 1,
+   "CP24 | template functions": 6,
+   "CP24 | template-only construct": 6,
+   "VM subset (D-018/kinds) | compiler precision": 28,
+   "VM subset | expression/statement subset (declare-const)": 5,
+   "VM subset | expression/statement subset (index-target)": 2,
+   "VM subset | expression/statement subset (interpolation)": 1,
+   "VM subset | expression/statement subset (jump-outside-loop)": 1,
+   "VM subset | expression/statement subset (number-literal)": 5,
+   "VM subset | expression/statement subset (string-arg-type)": 2,
+   "VM subset | expression/statement subset (string-literal)": 3,
+   "language-cleanup | D-014 / statement quirks": 3,
+   "language-cleanup | legacy run-time error construct (legacy-runtime-error)": 7,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 7,
+   "unassigned | first-class functions / lambdas": 10,
+   "unassigned | for loops": 2,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 7,
+   "unassigned | method not in CP14/CP15": 1
+  },
+  "first_mismatch": [],
+  "first_reason": {
+   "alias-argument": 1,
+   "aliasing": 19,
+   "assign-free-name": 3,
+   "binding-name-reserved": 3,
+   "call-binding": 1,
+   "callable:cat": 2,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:ffi_callback": 1,
+   "callable:ffi_open": 3,
+   "callable:file": 3,
+   "callable:getenv": 5,
+   "callable:inject": 24,
+   "callable:ls": 3,
+   "callable:map": 16,
+   "callable:minify": 2,
+   "callable:mutex": 5,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:platform": 1,
+   "callable:project_root": 1,
+   "callable:read": 1,
+   "callable:run": 4,
+   "callable:set": 6,
+   "callable:sha256": 2,
+   "callable:thread": 10,
+   "callable:timer": 3,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "declare-pattern": 1,
+   "expression-statement": 3,
+   "expression:Lambda": 14,
+   "fn-after-statement": 44,
+   "fn-flags": 46,
+   "fn-name-reserved": 8,
+   "fn-param": 1,
+   "free-name": 3,
+   "index-target": 3,
+   "interpolation": 3,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:map": 9,
+   "method:nope": 1,
+   "method:sort": 1,
+   "method:sort_by": 9,
+   "method:split": 1,
+   "method:stringify": 3,
+   "method:to_string": 2,
+   "number-literal": 5,
+   "opaque:irregular-legacy-parse": 1,
+   "opaque:legacy-runtime-error": 12,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 6,
+   "param-name-reserved": 1,
+   "parse-error": 1,
+   "path-in-call-argument": 1,
+   "postfix-receiver": 11,
+   "prepared-decl-type": 8,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 10,
+   "statement:For": 2,
+   "statement:Import": 50,
+   "statement:StructDecl": 24,
+   "statement:Throw": 2,
+   "statement:Try": 17,
+   "static-error:arity": 4,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 3,
+   "type:push": 10,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name": 4
+  },
+  "incomplete": {
+   "parse-error": 1
+  },
+  "only_checkpoint": {
+   "CP12b": 77,
+   "CP13": 15,
+   "CP14": 5,
+   "CP16": 12,
+   "CP16/CP24": 1,
+   "CP19": 3,
+   "CP22/CP24": 1,
+   "CP24": 12,
+   "VM subset": 21,
+   "VM subset (D-018/kinds)": 28,
+   "language-cleanup": 17,
+   "unassigned": 45
+  },
+  "refused": 487,
+  "scripts": 589,
+  "sole": {
+   "aliasing": 2,
+   "assign-free-name": 1,
+   "assign-free-name:undeclared": 1,
+   "binding-name-reserved": 2,
+   "callable:cat": 1,
+   "callable:err": 1,
+   "callable:error": 1,
+   "callable:exit": 1,
+   "callable:getenv": 2,
+   "callable:inject": 5,
+   "callable:ls": 3,
+   "callable:minify": 1,
+   "callable:nope": 2,
+   "callable:open": 2,
+   "callable:read": 1,
+   "callable:run": 1,
+   "callable:timer": 1,
+   "callable:warn": 1,
+   "context:assignment-error": 2,
+   "context:assignment-type": 1,
+   "declare-const": 5,
+   "expression-statement": 2,
+   "expression:Lambda": 9,
+   "fn-after-statement": 2,
+   "fn-flags": 1,
+   "fn-name-reserved": 5,
+   "free-name:dynamic-caller": 1,
+   "free-name:global": 1,
+   "free-name:undeclared": 1,
+   "index-target": 2,
+   "interpolation": 1,
+   "jump-not-last": 1,
+   "jump-outside-loop": 1,
+   "method:nope": 1,
+   "method:split": 1,
+   "method:stringify": 2,
+   "method:to_string": 2,
+   "number-literal": 5,
+   "opaque:legacy-runtime-error": 7,
+   "opaque:struct-body": 1,
+   "opaque:template-text": 1,
+   "prepared-decl-type": 3,
+   "prepared-fn-unprepared": 1,
+   "shebang-statement": 2,
+   "statement:Command": 3,
+   "statement:Export": 9,
+   "statement:For": 2,
+   "statement:Import": 11,
+   "statement:StructDecl": 9,
+   "statement:Throw": 2,
+   "statement:Try": 1,
+   "static-error:arity": 3,
+   "static-error:member-assign": 2,
+   "static-error:redeclared": 5,
+   "string-arg-type": 2,
+   "string-literal": 3,
+   "type:+": 1,
+   "type:<": 1,
+   "type:compound-assignment": 1,
+   "type:increment": 1,
+   "type:length": 1,
+   "type:print": 2,
+   "type:script-return": 1,
+   "type:unary": 1,
+   "unresolved-name:legacy-binding": 1
+  },
+  "with_consequential": 296
+ },
+ "shared-rtdiff-gen": {
+  "blocked_by": {
+   "aliasing": 7,
+   "binding-name-reserved": 12,
+   "call-binding": 51,
+   "callable:exists": 48,
+   "callable:file": 48,
+   "callable:getenv": 63,
+   "callable:is_dir": 95,
+   "callable:is_file": 48,
+   "callable:ls": 48,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:open": 48,
+   "callable:rm": 20,
+   "callable:thread": 58,
+   "expression:Await": 56,
+   "expression:Lambda": 51,
+   "fn-after-statement": 179,
+   "fn-as-value": 58,
+   "fn-flags": 56,
+   "free-name:dynamic-caller": 52,
+   "free-name:global": 12,
+   "interpolation": 52,
+   "method:close": 48,
+   "method:contains": 77,
+   "method:join": 58,
+   "method:open": 48,
+   "method:push": 7,
+   "method:replace": 20,
+   "method:save": 48,
+   "method:sort": 13,
+   "method:split": 89,
+   "method:starts_with": 77,
+   "method:stringify": 154,
+   "method:substr": 21,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:write": 48,
+   "number-literal": 2,
+   "postfix-receiver": 127,
+   "statement:For": 121,
+   "statement:Import": 61,
+   "statement:StructDecl": 49,
+   "statement:Throw": 44,
+   "statement:Try": 66,
+   "static-error:member-assign": 49,
+   "string-literal": 23,
+   "type:*": 1,
+   "unresolved-name": 1
+  },
+  "blocked_by_any": {
+   "aliasing": 7,
+   "assign-free-name": 9,
+   "assign-target": 55,
+   "binding-name-reserved": 12,
+   "call-binding": 51,
+   "callable:S1": 8,
+   "callable:S10": 2,
+   "callable:S11": 2,
+   "callable:S12": 3,
+   "callable:S14": 3,
+   "callable:S15": 2,
+   "callable:S16": 1,
+   "callable:S2": 4,
+   "callable:S20": 1,
+   "callable:S3": 5,
+   "callable:S4": 6,
+   "callable:S5": 2,
+   "callable:S6": 5,
+   "callable:S7": 5,
+   "callable:S8": 5,
+   "callable:S9": 2,
+   "callable:af1": 11,
+   "callable:af10": 4,
+   "callable:af11": 3,
+   "callable:af12": 4,
+   "callable:af13": 3,
+   "callable:af14": 2,
+   "callable:af15": 2,
+   "callable:af16": 2,
+   "callable:af17": 1,
+   "callable:af19": 1,
+   "callable:af2": 1,
+   "callable:af21": 1,
+   "callable:af22": 1,
+   "callable:af3": 5,
+   "callable:af4": 4,
+   "callable:af5": 5,
+   "callable:af6": 5,
+   "callable:af7": 5,
+   "callable:af8": 2,
+   "callable:af9": 3,
+   "callable:exists": 48,
+   "callable:file": 48,
+   "callable:getenv": 63,
+   "callable:is_dir": 95,
+   "callable:is_file": 48,
+   "callable:ls": 48,
+   "callable:mf10": 7,
+   "callable:mf11": 4,
+   "callable:mf12": 4,
+   "callable:mf13": 2,
+   "callable:mf14": 4,
+   "callable:mf15": 2,
+   "callable:mf16": 1,
+   "callable:mf17": 1,
+   "callable:mf18": 1,
+   "callable:mf19": 1,
+   "callable:mf2": 5,
+   "callable:mf20": 1,
+   "callable:mf23": 1,
+   "callable:mf3": 6,
+   "callable:mf4": 6,
+   "callable:mf5": 8,
+   "callable:mf6": 3,
+   "callable:mf7": 4,
+   "callable:mf8": 4,
+   "callable:mf9": 5,
+   "callable:open": 48,
+   "callable:rm": 20,
+   "callable:thread": 58,
+   "compound-target": 1,
+   "expression-statement": 58,
+   "expression:Await": 56,
+   "expression:Lambda": 51,
+   "fn-after-statement": 179,
+   "fn-as-value": 58,
+   "fn-flags": 56,
+   "free-name:dynamic-caller": 52,
+   "free-name:global": 12,
+   "interpolation": 105,
+   "method:close": 48,
+   "method:contains": 77,
+   "method:join": 58,
+   "method:open": 48,
+   "method:push": 7,
+   "method:replace": 20,
+   "method:save": 48,
+   "method:sort": 13,
+   "method:split": 89,
+   "method:starts_with": 77,
+   "method:stringify": 154,
+   "method:substr": 21,
+   "method:to_upper": 88,
+   "method:total": 49,
+   "method:write": 48,
+   "number-literal": 2,
+   "postfix-receiver": 168,
+   "prepared-decl-type": 25,
+   "prepared-unpreparable": 127,
+   "statement:For": 121,
+   "statement:Import": 61,
+   "statement:StructDecl": 49,
+   "statement:Throw": 44,
+   "statement:Try": 66,
+   "static-error:member-assign": 49,
+   "string-literal": 78,
+   "text-type-name": 2,
+   "type:*": 1,
+   "type:+": 7,
+   "type:-": 1,
+   "type:/": 1,
+   "type:>": 48,
+   "type:member": 49,
+   "unresolved-name": 147,
+   "unresolved-name:legacy-binding": 4
+  },
+  "by_checkpoint": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 100,
+   "CP12b | globals": 20,
+   "CP12b | globals (refused: dynamic-caller)": 52,
+   "CP12b | modules/imports": 61,
+   "CP12b | modules/imports (imported binding)": 47,
+   "CP12b | modules/imports (imported function)": 61,
+   "CP12b | resolver: function declarations": 179,
+   "CP12b | structs": 49,
+   "CP12b | structs (method of a user struct)": 49,
+   "CP12b | unknown callable (dynamic or module function)": 64,
+   "CP13 | errors / try-catch": 97,
+   "CP14 | built-ins": 176,
+   "CP16 | host ops": 126,
+   "CP16/CP24 | legacy script/template bindings (args, env, page...)": 4,
+   "CP22 | async / await": 56,
+   "CP22/CP24 | async / @fn / struct methods": 56,
+   "CP24 | template-only construct": 58,
+   "VM subset (D-018/kinds) | compiler precision": 162,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 168,
+   "VM subset | expression/statement subset (assign-target)": 55,
+   "VM subset | expression/statement subset (compound-target)": 1,
+   "VM subset | expression/statement subset (interpolation)": 105,
+   "VM subset | expression/statement subset (number-literal)": 2,
+   "VM subset | expression/statement subset (string-literal)": 78,
+   "VM subset | expression/statement subset (text-type-name)": 2,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 12,
+   "unassigned | first-class functions / lambdas": 91,
+   "unassigned | for loops": 121,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 13,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 34,
+   "unassigned | method not in CP14/CP15": 6
+  },
+  "checkpoint_climb": [
+   [
+    "CP12b",
+    0
+   ],
+   [
+    "CP13",
+    0
+   ],
+   [
+    "CP14",
+    3
+   ],
+   [
+    "CP15",
+    3
+   ],
+   [
+    "CP16",
+    6
+   ],
+   [
+    "CP16/CP24",
+    6
+   ],
+   [
+    "CP22",
+    6
+   ],
+   [
+    "CP22/CP24",
+    10
+   ],
+   [
+    "CP24",
+    10
+   ],
+   [
+    "CP19",
+    10
+   ],
+   [
+    "language-cleanup",
+    12
+   ],
+   [
+    "VM subset",
+    36
+   ],
+   [
+    "VM subset (D-018/kinds)",
+    36
+   ],
+   [
+    "unassigned",
+    200
+   ],
+   [
+    "limits",
+    200
+   ],
+   [
+    "none",
+    200
+   ]
+  ],
+  "climb": [
+   [
+    [
+     "fn-after-statement"
+    ],
+    0,
+    0
+   ],
+   [
+    [
+     "statement:For"
+    ],
+    1,
+    1
+   ],
+   [
+    [
+     "method:stringify"
+    ],
+    1,
+    2
+   ],
+   [
+    [
+     "interpolation"
+    ],
+    1,
+    3
+   ],
+   [
+    [
+     "statement:Try"
+    ],
+    1,
+    4
+   ],
+   [
+    [
+     "callable:getenv"
+    ],
+    1,
+    5
+   ],
+   [
+    [
+     "free-name:dynamic-caller"
+    ],
+    1,
+    6
+   ],
+   [
+    [
+     "statement:Throw"
+    ],
+    1,
+    7
+   ],
+   [
+    [
+     "free-name:global"
+    ],
+    2,
+    9
+   ],
+   [
+    [
+     "string-literal"
+    ],
+    1,
+    10
+   ],
+   [
+    [
+     "method:sort"
+    ],
+    1,
+    11
+   ],
+   [
+    [
+     "binding-name-reserved"
+    ],
+    1,
+    12
+   ],
+   [
+    [
+     "postfix-receiver"
+    ],
+    0,
+    12
+   ],
+   [
+    [
+     "method:split"
+    ],
+    2,
+    14
+   ],
+   [
+    [
+     "method:substr"
+    ],
+    1,
+    15
+   ],
+   [
+    [
+     "method:replace"
+    ],
+    1,
+    16
+   ],
+   [
+    [
+     "callable:is_dir"
+    ],
+    0,
+    16
+   ],
+   [
+    [
+     "method:to_upper"
+    ],
+    0,
+    16
+   ],
+   [
+    [
+     "method:contains"
+    ],
+    0,
+    16
+   ],
+   [
+    [
+     "method:starts_with"
+    ],
+    10,
+    26
+   ]
+  ],
+  "compiled": 0,
+  "distinct": {
+   "2": 1,
+   "3": 4,
+   "4": 195
+  },
+  "feature_blocked": {
+   "CP12b | GETDYN/dynamic lookup (top-level name not declared)": 1,
+   "CP12b | globals": 12,
+   "CP12b | globals (refused: dynamic-caller)": 52,
+   "CP12b | modules/imports": 61,
+   "CP12b | modules/imports (imported function)": 61,
+   "CP12b | resolver: function declarations": 179,
+   "CP12b | structs": 49,
+   "CP12b | structs (method of a user struct)": 49,
+   "CP13 | errors / try-catch": 97,
+   "CP14 | built-ins": 176,
+   "CP16 | host ops": 126,
+   "CP22 | async / await": 56,
+   "CP22/CP24 | async / @fn / struct methods": 56,
+   "VM subset (D-018/kinds) | compiler precision": 8,
+   "VM subset | chained postfix on a call result (a.b().c(), f().k)": 127,
+   "VM subset | expression/statement subset (interpolation)": 52,
+   "VM subset | expression/statement subset (number-literal)": 2,
+   "VM subset | expression/statement subset (string-literal)": 23,
+   "language-cleanup | names legacy reserves (L6, D-009#3)": 12,
+   "unassigned | first-class functions / lambdas": 91,
+   "unassigned | for loops": 121,
+   "unassigned | lambda-taking collection methods (not in CP14/CP15)": 13,
+   "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)": 34,
+   "unassigned | method not in CP14/CP15": 6
+  },
+  "feature_climb": [
+   [
+    [
+     "CP12b | resolver: function declarations"
+    ],
+    0,
+    0
+   ],
+   [
+    [
+     "unassigned | for loops"
+    ],
+    1,
+    1
+   ],
+   [
+    [
+     "CP14 | built-ins"
+    ],
+    1,
+    2
+   ],
+   [
+    [
+     "VM subset | chained postfix on a call result (a.b().c(), f().k)"
+    ],
+    1,
+    3
+   ],
+   [
+    [
+     "CP12b | globals (refused: dynamic-caller)"
+    ],
+    4,
+    7
+   ],
+   [
+    [
+     "unassigned | first-class functions / lambdas"
+    ],
+    4,
+    11
+   ],
+   [
+    [
+     "CP16 | host ops"
+    ],
+    14,
+    25
+   ],
+   [
+    [
+     "CP13 | errors / try-catch"
+    ],
+    6,
+    31
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (interpolation)"
+    ],
+    8,
+    39
+   ],
+   [
+    [
+     "unassigned | legacy built-in not scheduled (map/set/mutex/ffi/cmd...)"
+    ],
+    12,
+    51
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (string-literal)"
+    ],
+    7,
+    58
+   ],
+   [
+    [
+     "CP12b | globals"
+    ],
+    7,
+    65
+   ],
+   [
+    [
+     "unassigned | lambda-taking collection methods (not in CP14/CP15)"
+    ],
+    4,
+    69
+   ],
+   [
+    [
+     "language-cleanup | names legacy reserves (L6, D-009#3)"
+    ],
+    3,
+    72
+   ],
+   [
+    [
+     "CP12b | modules/imports"
+    ],
+    0,
+    72
+   ],
+   [
+    [
+     "CP12b | modules/imports (imported function)"
+    ],
+    34,
+    106
+   ],
+   [
+    [
+     "VM subset | expression/statement subset (number-literal)"
+    ],
+    2,
+    108
+   ],
+   [
+    [
+     "CP22 | async / await"
+    ],
+    0,
+    108
+   ],
+   [
+    [
+     "CP22/CP24 | async / @fn / struct methods"
+    ],
+    37,
+    145
+   ],
+   [
+    [
+     "CP12b | structs"
+    ],
+    0,
+    145
+   ],
+   [
+    [
+     "CP12b | structs (method of a user struct)"
+    ],
+    47,
+    192
+   ],
+   [
+    [
+     "VM subset (D-018/kinds) | compiler precision"
+    ],
+    1,
+    193
+   ],
+   [
+    [
+     "unassigned | method not in CP14/CP15"
+    ],
+    6,
+    199
+   ],
+   [
+    [
+     "CP12b | GETDYN/dynamic lookup (top-level name not declared)"
+    ],
+    1,
+    200
+   ]
+  ],
+  "feature_sole": {},
+  "first_mismatch": [],
+  "first_reason": {
+   "callable:file": 1,
+   "callable:thread": 2,
+   "fn-after-statement": 170,
+   "fn-flags": 10,
+   "method:sort": 1,
+   "method:stringify": 5,
+   "method:to_upper": 1,
+   "postfix-receiver": 1,
+   "statement:For": 5,
+   "statement:Import": 3,
+   "statement:StructDecl": 1
+  },
+  "incomplete": {},
+  "only_checkpoint": {},
+  "refused": 200,
+  "scripts": 200,
+  "sole": {},
+  "with_consequential": 187
+ }
+}
