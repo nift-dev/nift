@@ -815,3 +815,39 @@ large nested values, mutation after copy, and repeated assignment.
 
 Process: isolated from CP13/CP15 compiler integration; normal independent
 review and certification; CP25's zero-fallback requirement unchanged.
+
+## D-041 — Module initialisation and contexts (owner, 2026-10-20; refines D-037)
+
+Evidence: `checkpoints/cp12b-modules.md` (branch `runtime-2-cp12b-dev`,
+eb073516): static import-graph expansion over the corpora, 86 project units and
+38 project checkouts (~2,100 files with imports) found no executed program that
+initialises a module twice; double imports occur only in documentation. (Static
+analysis, not every conditional import path executed.)
+
+1. **Initialise once per execution context** (option A). Importers share the
+   module instance; compilation, initialisation and state ownership are separate.
+   The instance has an explicit lifecycle (uninitialised, initialising,
+   initialised, failed) leaving room for CP22–CP23: concurrent imports observe
+   the completed instance or the same failure, never a second initialisation;
+   circular imports follow the documented contract.
+2. **Both engines together** (D-018): independent fixtures first, then
+   initialise-once in legacy and VM, differential and migration suites, one
+   integration. A temporary VM refusal (`import-reinitialised`) is allowed only
+   if the engines must land separately, with a recorded removal condition; it is
+   never part of the module design.
+3. **Context boundaries:** script run, page render, build hook, each
+   auto-rebuild pass and each isolate get their own instances; a page render
+   never inherits mutable module state from another page or the build. The
+   compiled-module cache is immutable and shareable, keyed by canonical path,
+   content hash, compiler version **and every compilation setting that affects
+   meaning** (language modes, target configuration, feature flags). Imports
+   during a page render contribute to that page's dependency record.
+4. **Exports follow D-040:** ordinary exported values are copied (copy-on-write)
+   and are not live mutable bindings; exported functions keep access to their
+   module's lexical private state; CP17 handles keep shared identity. The
+   specification states this explicitly.
+
+Verification: independently specified tests for repeated, diamond, circular,
+nested and stateful imports, page-render isolation and rebuilds, in both
+engines; corpus and real-package gates preserved. No further module-design round
+unless implementation evidence raises a genuinely open question.
