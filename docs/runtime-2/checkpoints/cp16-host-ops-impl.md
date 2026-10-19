@@ -74,8 +74,9 @@ output). Only one version is active per process; v1 stays the parity channel.
 
 ### 1.3 `run()` options (D-030 alternative A)
 
-Keys: `mode` (`capture` | `stream` | `interactive` | `detached`), `timeout_ms`,
-`kill_after_ms` (non-negative integers ≤ 2^53−1). Parsed from a VM-independent
+Keys: `mode` (`capture` | `pipe` | `stream` | `interactive` | `detached`),
+`timeout_ms`, `kill_after_ms` (non-negative integers ≤ 2^53−1), `stdin`
+(D-034, §6.2). Parsed from a VM-independent
 `OptionObject`; the VM wiring converts the object later.
 
 * Unknown keys are fatal **first** (before any other check), with a spelling
@@ -149,17 +150,31 @@ are finished asynchronously by the reaper.
 | Reading `NIFT_READ_LIMIT` | `capture_limit` is a parameter; the setting is parsed by host-deps' `ReadLimit.h` (not integrated) |
 | Windows `ProcessGroup` | no Windows toolchain here; job-object helpers written, untested; every entry point reports `process.unsupported` |
 | Detached pipelines | not needed by alternative A (`run()` is one command); refused loudly |
-| Deadline enforcement for an idle interactive handle | a deadline is enforced whenever the handle is used (`read*`, `write`, `wait`, `cancel`) and at context end; enforcing it while the script does something else needs CP22's event loop or a thread-safe group (question for the owner) |
 | `auto_superseded_pass`, `build_*` lifetime tests, `terminal_foreground_handoff` (pty), `exit_sigint`, macOS/Windows rows | need the build engine/CLI wiring, a pty harness, or other platforms |
 | Linking `src/rt/host` into `nift` | nothing calls it yet; added when the first native uses it |
+| Checking `shutting_down()` before a build or page render | the build engine is not wired to the Host layer yet; the flag is exported for it (§6.4) |
+
+**CP22 items (recorded, D-034 item 6).**
+* **PDEATHSIG is per thread on Linux.** `PR_SET_PDEATHSIG(SIGKILL)` fires when
+  the *thread* that forked the stage exits, not when Nift exits. Harmless
+  while every launch happens on the VM thread (W18 refuses threads), but once
+  CP22 lets workers launch processes, a worker that ends before its child would
+  kill that child. CP22 must launch from a long-lived thread (for example the
+  host loop) or drop PDEATHSIG for worker launches.
+* **The host loop is CP22's scheduler candidate.** It is a generic one-thread
+  loop (monotonic timers + one-shot fd watches, sleeping in `poll()` until the
+  next event). CP22 can host its scheduler on it or replace it behind the same
+  three calls (`loop_at`, `loop_when_readable`, `loop_cancel`); the process
+  model does not depend on anything else.
 
 ## 3. Tests (run 2026-10-19, Linux 6.18, GCC 13.3, 2-vCPU shared host)
 
 | Run | Result |
 |---|---|
-| `host-layer-unit` (`make test-rt-host`, first half) | 377 checks, 0 failures |
-| `host-process-unit` contained (`run_contained.sh`: `ulimit -f` 1 GiB, `ulimit -v` 4 GiB, `timeout 600`, own session, tagged-process cleanup) | 1085 checks, 0 failures, three consecutive runs |
-| `make test-rt-host-sanitize` (ASan+UBSan, `detect_leaks=1`, `halt_on_error=1`; no `ulimit -v` under ASan) | layer 377/0, process 1085/0 |
+| `host-layer-unit` (`make test-rt-host`, first half) | 497 checks, 0 failures |
+| `host-process-unit` contained (`run_contained.sh`: `ulimit -f` 1 GiB, `ulimit -v` 4 GiB, `timeout 600`, own session, tagged-process cleanup) | 1238 checks, 0 failures; 16 consecutive clean runs after the last fixes (one earlier run failed once in `leftovers_c1_and_holders` and was not reproduced in 28 runs; a diagnostic print stays in that test) |
+| `make test-rt-host-sanitize` (ASan+UBSan, `detect_leaks=1`, `halt_on_error=1`; no `ulimit -v` under ASan) | layer 497/0, process 1238/0 |
+| `make test-rt-host-tsan` (ThreadSanitizer, `halt_on_error=1`) | process 1238/0, no reports |
 | CP17 swap trial (scratch merge of `runtime-2-cp17-dev` @`11e98d2`, ASan+UBSan) | `host_cp17_binding` 27 checks, 0 failures |
 
 The two unit binaries were compiled directly at `nice -n 19` (about 30 s
@@ -193,6 +208,12 @@ through `/proc/self/fd`):
 | `sigterm_to_nift_c2` | `exit_sigterm` (C2) | SIGTERM to a Nift process blocked in `run()` with a SIGTERM-ignoring child: child killed, detached process alive, Nift dies of SIGTERM within grace + bound |
 | `sigkill_pdeathsig_linux` | `exit_sigkill_linux` | direct stage dies when Nift is SIGKILLed |
 | `escapees_subreaper` | `escape_setsid_linux` | holder in another session does not hang PipeCapture; escapee reparented to Nift, untouched by group cleanup, removed by the orphan sweep; detached process spared and later reaped |
+| `pipe_mode_suite` | D-034 pipe | 16 MiB stdout + 16 MiB stderr at once; descendant holding the pipe terminated, prompt return; launch failure / exit 4 / timeout / limit as distinct states; capture still a seekable file, pipe a pipe; cancel from another thread while the owner is blocked in `wait()`; context-end cleanup |
+| `stdin_suite` | D-034 stdin | empty text; shell syntax arrives literally; 8 MiB in while 8 MiB comes out (pipe and capture); early exit (`head -c 10`, `exit 3`) keeps the result, incomplete delivery, no error; `null`; deadline and cancellation while feeding; `{"file"}` |
+| `deadline_suite` | D-034 deadlines | idle handle, child ignoring SIGTERM: finished with nobody calling it (SIGKILL after the grace); four concurrent idle deadlines expire in order; expiry while the owner is blocked in `read_line()`; expiry recorded though the child exits during the grace; nothing left armed afterwards |
+| `deadline_races` | D-034 race safety | 30 rounds of deadline + own exit + cross-thread `cancel()` + context cleanup at once |
+| `shutdown_refuses_launches` | §6.4 | no new launch while shutting down (`host.shutting_down`); HostCall refusals are in the layer test |
+| `cleanup_failures_reported` | §6.5 | unkillable process (test hook): error-ended context → no warning, failure reported; normal end → warning + failure; error-ended context with a killable process → silent |
 
 Not run (deferred, §2): `auto_superseded_pass`, `build_page_unwaited`,
 `build_hook_bg`, `exit_sigint`, `terminal_foreground_handoff`,
@@ -237,36 +258,118 @@ binding test into `tests/rt/`. The swap is not committed here because CP17's
 code is not on `runtime-2` yet (committing it would make this branch carry
 CP17's uncertified history).
 
-Small asks for CP17 (convenience, not blockers): a read-only
-`context_kind(ContextId)` / `in_build_family(ContextId)` query, so a native
-can check detach-in-build before launching without CP16 tracking context
-kinds separately.
+CP17 added `HandleTable::context_in_build()` (@fbdca07) on request; the swap
+sets `RunRequestContext::in_build` from it, so detach-in-build is refused
+before anything is launched. D-034 item 7: the swap stays uncommitted until
+CP17 is integrated. The swap test was updated for `ContextCleanup::wait()`
+now returning the list of cleanup failures.
 
-## 5. Open questions for the owner
+## 5. Owner answers (D-034) and where they are implemented
 
-1. **`mode: "capture"` vs the default.** Slice 1 maps an explicit
-   `"capture"` to the legacy default (FileCapture), so `{"mode": "capture"}`
-   never changes behaviour. D-011's pipe capture (descendants holding the
-   pipe are terminated) has no option name yet. Keep it Host-internal
-   (benchmarks), or expose it (e.g. a later `"capture": "pipe"`)?
-2. **`stdin` option.** Alternative A mentions `"stdin": …` but D-030 did not
-   fix its values; slice 1 rejects `stdin` as an unknown key (adding it later
-   is compatible). Values to adopt: `"inherit"`, `"null"`, a file, given text?
-3. **Deadlines on idle handles.** A started (interactive) process's deadline
-   is enforced whenever the handle is used and at context end, not while the
-   script is busy elsewhere. Accept until CP22's event loop, or enforce from
-   the reaper thread now (needs a thread-safe `ProcessGroup`)?
-4. **Warnings on error-ended contexts.** Implemented as §11.3 says (no
-   warning when the context failed). D-030's refinement only says the warning
-   fires when a running process is terminated; confirm the error case stays
-   silent.
-5. **C2 after the cleanup.** Blocking waits park once SIGINT/SIGTERM arrived
-   (so the script cannot finish with its own exit status while cleanup runs);
-   non-blocking script code keeps running until the watcher re-raises the
-   signal (≤ grace + bound). Acceptable?
-6. **`test-rt-host` in `make test`.** Not added to the aggregate yet (the
-   process tests take ~10 s and use python3, gzip, setsid). Add it now or at
-   VM wiring?
-7. **PDEATHSIG and threads.** Linux delivers it when the *thread* that forked
-   exits; harmless while launches happen on the VM thread (W18 refuses
-   threads), but it must be revisited with CP22.
+| # | Question | D-034 answer | Implemented in |
+|---|---|---|---|
+| 1 | capture vs pipe | `mode: "pipe"` opt-in; `"capture"` unchanged | §6.1 |
+| 2 | `stdin` values | `"inherit"`, `"null"`, `{"file"}`, `{"text"}` | §6.2 |
+| 3 | idle-handle deadlines | enforced now, from the reaper/host loop | §6.3 |
+| 4 | error-ended contexts | no routine warning; genuine failures still reported | §6.5 |
+| 5 | SIGTERM window | accepted, bounded, documented | §6.4 |
+| 6 | `test-rt-host` in `make test` | yes | `Makefile` (`test: test-rt-host`) |
+| 7 | PDEATHSIG | CP22 item | §2 |
+| 8 | CP17 swap | not yet; use `context_in_build()` (@fbdca07) | §4 |
+
+## 6. D-034 implementation
+
+### 6.1 Modes: capture, pipe, stream, interactive, detached
+
+| | `capture` (default) | `pipe` | `stream` | `interactive` | `detached` |
+|---|---|---|---|---|---|
+| child's stdout/stderr | anonymous regular files (seekable) | pipes | Nift's own stdout/stderr (after flushing Nift's buffers) | pipes | `/dev/null` |
+| what `run()` returns | result with `stdout`/`stderr` | same | result, `stdout`/`stderr` empty | `Process` handle | `Process` handle (pid record) |
+| completion | every stage reaped | every stage reaped; then leftovers holding the pipe are terminated | every stage reaped | `wait()` | never waited |
+| background descendants | not waited for; terminated when the context ends (C1) | terminated as soon as the stages are reaped (they would keep the pipe open) | as capture | as pipe, once cancelled or waited | not managed |
+| output bound | `NIFT_READ_LIMIT` per stream, checked on a 20 ms tick while running and on read-back | checked on every read | none (nothing is retained; writing to Nift's stdout gives backpressure) | per-stream buffer with backpressure; `wait()` drains up to the read limit | — |
+| best for | today's programs; tools that seek or stat their stdout; compatibility | large or fast output, stdout and stderr together, prompt return | build tools whose progress the user should see | dialogue with a process | servers in standalone scripts (refused in builds) |
+| costs | two temporary files per call; output written to disk first | a child that keeps background helpers alive loses them; children see a pipe, not a file | output cannot be inspected | the script must read, or `wait()` | Nift cannot capture its output or wait for it |
+
+Outcomes are distinct in every blocking mode: `launch_failed` (with `launched:
+false`, 127/126, `error`), `exited` with the exit code, `timed_out`,
+`cancelled`, `limit_exceeded` (`capture_limit_exceeded` names the stream;
+output released, never truncated) and `lost`. Results of calls without the new
+options keep today's fields; the new ones (`state`, `timed_out`, `cancelled`,
+`signal`, `stdin_*`) are for results of calls that use them (§11.10).
+
+### 6.2 stdin
+
+| Form | Behaviour |
+|---|---|
+| omitted, `"inherit"` | today's behaviour: the child inherits Nift's stdin (terminal foreground handoff for blocking calls, §11.8) |
+| `"null"` | `/dev/null` |
+| `{"text": s}` | a string, written through a pipe by the same event loop that drains stdout/stderr (no deadlock for any size). Never through a shell: the bytes arrive literally. Bytes are refused (`stdin.text must be a string, not bytes`); binary stdin is a later byte form or a stream handle |
+| `{"file": p}` | read by the Host through `HostCall` (op `read`, so trace v1/v2 and dependency recording in builds), with **normal OS path semantics** (`link/../x` is what the OS opens; the canonical path is what `--fs-root` checks and what is recorded), bounded by the read limit (`limit.exceeded` naming `NIFT_READ_LIMIT`, never truncated); then fed exactly like `{"text"}`, so the child receives the bytes that were recorded. Missing file or a directory: `io.open_failed` (catchable). Detached processes open the file themselves (they are never connected to Nift) |
+
+Delivery: an early exit or a closed stdin is not an error. The result keeps the
+process outcome, with `stdin_complete: false` and how much was written. Only a
+genuine write failure (any errno other than EPIPE) is reported, in
+`stdin_error`. Cancellation and deadlines close stdin first (§11.4 step 1).
+Mode rules: `stdin` is refused with `interactive` (the process reads what
+`write()` sends) and `"inherit"`/`{"text"}` with `detached`.
+
+One stdin mechanism: CP19/CP20 `< file` redirections and `cmd().stdin(path)`
+keep `SpawnStage::stdin_path` (the child opens the file, as today); the option
+forms use the same `StdinMode` slot.
+
+### 6.3 Deadlines
+
+* Monotonic clock (`steady_clock`); the deadline is fixed at launch.
+* **A deadline marks when cancellation starts**, not when everything is gone:
+  SIGTERM to the whole pipeline at the deadline, SIGKILL after the grace period
+  (`kill_after`, default 2,000 ms), then a bounded wait (5,000 ms) before
+  `lost`. Cleanup can therefore finish up to about grace (+ bound) after the
+  deadline.
+* The expiry is recorded (`timed_out`, state `timed_out`) even when the process
+  exits by itself during the grace period.
+* Enforced whether or not the handle is used: when a call returns and the group
+  is not finished, it arms a host-loop timer for its next step (deadline,
+  SIGKILL, bound) and one-shot pidfd watches (so an exit is reaped at once).
+  The loop thread sleeps in `poll()` until the nearest timer or watch — no
+  periodic polling. Abandoned and explicitly released handles are adopted by
+  the reaper and finished by the same timers.
+* Race safety: every group operation holds the group's lock; the event loop
+  releases it only while in `poll()`. A timer that finds the group busy retries
+  once after 5 ms (the holder re-arms when it lets go). Tested: 30 rounds of
+  deadline, own exit, `cancel()` from another thread and context cleanup at the
+  same moment — every group settles, no zombie, no survivor.
+
+### 6.4 SIGINT/SIGTERM: shutting down (bounded window)
+
+From the moment the signal arrives (`install_signal_cleanup()`):
+1. Nift is **shutting down**: `ProcessGroup::start` refuses new launches
+   (`host.shutting_down`, fatal); `HostCall::begin()` refuses every externally
+   visible op (writes, copies, moves, removals, spawns). Reads stay possible so
+   running code can reach its shutdown path. The build engine is to check
+   `runtime::shutting_down()` before starting a build or a page render (wired
+   with the build engine).
+2. A watcher thread sends SIGTERM to every managed group, waits up to the grace
+   period, sends SIGKILL, waits up to the bound; detached processes are not
+   touched.
+3. Then Nift ends with the same signal (exit status 130/143 in a shell). If
+   the program reaches its end first, an atexit handler waits for step 2
+   (bounded) and re-raises, so the status is signal-derived either way.
+
+Window: running (non-blocked) script code may continue for at most grace +
+bound (2 s + 5 s by default) after the signal. This is a **normal-shutdown
+guarantee only**: SIGKILL or a crash of Nift runs none of it (Linux PDEATHSIG
+still kills direct stages; everything else is the §11.9 table). There is no
+general interruption mechanism for script code.
+
+### 6.5 Contexts that end on an error
+
+The routine warning (`was still running when <context> ended; terminated`) is
+suppressed; the context's own error stays the primary diagnostic. Genuine
+cleanup failures are still reported, separately, through the failure sink
+(stderr by default), after the error:
+`error: cleanup: process 'x' (pid N) could not be terminated (still running
+after SIGKILL); left to the reaper` (or `... within N ms ...` when a group did
+not settle in time). The same report appears for normal context ends and for
+abandoned handles finished by the reaper. Tested with SIGKILL suppressed by a
+test-only hook (`-DNIFT_HOST_TEST_HOOKS`; not compiled into anything else).
