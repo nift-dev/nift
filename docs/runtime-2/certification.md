@@ -252,3 +252,30 @@ remotely for CP14 as well. `cert.sh` now installs Go from the
 `proxy.golang.org` toolchain zip and .NET from channel 10.0, with a loud warning
 if either is missing. The issue counts as resolved only after a fresh instance
 passes both binding targets with no manual steps.
+
+## CP13 phase A remote run @0b879df (2026-10-20): not certified
+
+Linode g6-dedicated-2, ap-southeast; instance deleted after evidence retrieval
+(confirmed by API); spend to date about US$0.52. Summary line: FAIL 0,
+BASELINE-FAILURE 1, SKIPPED-ENVIRONMENTAL 2, FLAKY 2, PASS 168. **That summary is
+wrong for one target**:
+
+- `test-v43-language` was classified BASELINE-FAILURE. As root it fails at a
+  root-only step (`v43_cp112_filevalue_wall_smoke.sh`), and so does the v4.12.0
+  baseline. The unprivileged run got further and failed on a real regression:
+  `print(null?["x"])` → "unknown value or malformed expression" (expected
+  `null`); the runtime-2 binary prints `null`. The CP13 prevalidator does not
+  know optional indexing. The local certify of fb9112d had the same masking.
+- Harness fix (branch `certify-baseline-fix`, 2dcce918, to be certified with the
+  next CP13 run): the baseline runs as the same user as the candidate log it is
+  compared with, and BASELINE-FAILURE requires the same failing step; otherwise
+  FAIL. Regression check added to `certification_guard.sh`.
+- `test-go-binding` and `test-csharp-binding` show FLAKY only because the
+  toolchains were installed by hand during the run; their re-runs alone passed
+  (Go: `ok nift.dev/embed/v4/cmd/embed-harness`; C#: 29 passed, 0 failed) on the
+  unchanged candidate. Not counted as a fresh-instance provisioning fix.
+- Remote provisioning now has a mandatory preflight (exact toolchain versions;
+  certify does not start if any is missing; `GOTOOLCHAIN=local`) and a
+  per-instance SSH host key installed by cloud-init and pinned before first
+  contact. Both are verified only when a fresh instance passes with no manual
+  steps.
