@@ -7,6 +7,8 @@
 #include "PackageTransaction.h"
 #include "Console.h"
 #include "FileSystem.h"
+#include "rt/parser.h"
+#include "rt/prevalidate.h"
 
 #include <nift/context.h>
 
@@ -527,6 +529,24 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     if(cycle){error="script import cycle through "+path.generic_string();return false;}
     auto src = host_.read_shared_source(path);if(nift::trace::enabled())trace_host("read-source",path,src.status==nift::HostStatus::Error?"error":src.content?"ok":"missing"); if(src.status==nift::HostStatus::Error||!src.content){const std::string message=src.error.empty()?"script is not readable: "+path.generic_string():src.error+": "+path.generic_string();if(src.status==nift::HostStatus::Error)fail_fatal(nift::detail::DiagnosticCode::HostProviderError,message,error);else{fail_recoverable(package_provenance?nift::detail::DiagnosticCode::PackageImportSourceUnreadable:nift::detail::DiagnosticCode::IoImportSourceUnreadable,message,error);}if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
     package_reader.reset();
+
+    // Runtime 2.0 CP13 (D-022 #3, R1): a module is syntax-validated when it is
+    // loaded, before any of its statements runs (one grammar: the CP10
+    // parser). The error is the module's own position through the import
+    // frame, exactly as a failing module statement is reported.
+    if(const auto verdict=nift::rt::prevalidate(*src.content);!verdict.ok){
+        const std::string& text=*src.content;
+        const auto where=nift::rt::locate(text,verdict.offset);
+        nift::detail::DiagnosticOrigin origin;origin.source=path;origin.line=where.line;origin.column=where.column;
+        std::size_t line_begin=std::min<std::size_t>(verdict.offset,text.size());while(line_begin>0&&text[line_begin-1]!='\n')--line_begin;
+        const std::size_t line_end=text.find('\n',line_begin);
+        origin.source_line=text.substr(line_begin,line_end==std::string::npos?std::string::npos:line_end-line_begin);
+        const bool statement_error=std::string(verdict.code)=="syntax.invalid_statement";
+        auto diagnostic=nift::detail::make_diagnostic(statement_error?nift::detail::DiagnosticCode::NativeTranslationError:nift::detail::DiagnosticCode::NativeSyntaxError,verdict.message,std::move(origin));
+        diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});
+        error=verdict.message;active_diagnostic_=std::move(diagnostic);
+        return false;
+    }
 
     const auto module_identity_checkpoint=next_module_identity_;
     const auto lambda_identity_checkpoint=next_lambda_instance_id_;

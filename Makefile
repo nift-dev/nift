@@ -1381,6 +1381,7 @@ test-runtime2-vm-corpus: $(TARGET)
 test-runtime2-diagnostics: $(TARGET)
 	bash tests/runtime2/diagnostics/run.sh --binary "$(CURDIR)/$(TARGET)"
 	bash tests/runtime2/diagnostics/run.sh --binary "$(CURDIR)/$(TARGET)" --suite changes --expect old
+	bash tests/runtime2/diagnostics/run.sh --binary "$(CURDIR)/$(TARGET)" --suite changes --expect new
 	python3 tests/runtime2/diagnostics/codes_check.py
 	python3 tests/runtime2/diagnostics/json_check.py
 

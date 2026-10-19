@@ -13,7 +13,7 @@ int main() {
     using nift::detail::WorkerCompletion;
 
     const auto syntax = nift::detail::diagnostic_code_info(DiagnosticCode::NativeSyntaxError);
-    assert(syntax.text == "native.syntax_error");
+    assert(syntax.text == "syntax.malformed_expression");
     assert(syntax.disposition == DiagnosticDisposition::Fatal);
 
     const auto io = nift::detail::diagnostic_code_info(DiagnosticCode::IoReadFailed);
@@ -34,9 +34,10 @@ int main() {
         registry_fingerprint ^= static_cast<unsigned>(info.disposition);
         registry_fingerprint *= 1099511628211ULL;
     }
-    // Filesystem metadata inspection added io.metadata_failed in e0390f4.
-    assert(static_cast<int>(DiagnosticCode::Count) == 62);
-    assert(registry_fingerprint == 12329584139511440984ULL);
+    // Filesystem metadata inspection added io.metadata_failed in e0390f4;
+    // CP13 (D-025) renamed the language codes and added seven runtime.* codes.
+    assert(static_cast<int>(DiagnosticCode::Count) == 69);
+    assert(registry_fingerprint == 17050003444344975066ULL);
     assert(registered_codes.count("io.metadata_failed") == 1);
     assert(nift::detail::diagnostic_code_info(DiagnosticCode::IoMetadataFailed).disposition ==
            DiagnosticDisposition::Recoverable);

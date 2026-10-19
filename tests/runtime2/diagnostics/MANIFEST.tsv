@@ -87,4 +87,4 @@ tpl_script_throw	parity	S13
 tpl_script_try_catch	parity	S13	v4.12 differs (D-002 filesystem freedom): .v412 goldens
 tpl_if_error	parity	S13	
 tpl_input_missing	parity	S13	
-tpl_unknown_directive	parity	S13	unknown @directive passes through (documented for CSS @media); typo warning is a site-dx candidate
+tpl_unknown_directive	site-dx	S13	unknown @directive passes through (documented for CSS @media); feature-site-dx (integrated, runtime-2 @8957559) now also warns "unknown directive @inptu published literally (did you mean @input?)" on stderr; output and exit unchanged; reclassified at integration (spec-integration)

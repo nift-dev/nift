@@ -28,6 +28,8 @@
 // heavy headers so libstdc++'s <filesystem>/<locale> are parsed before any
 // windows.h macros are visible (mingw locale/gthread fragility).
 #include "Console.h"
+#include "rt/parser.h"
+#include "rt/prevalidate.h"
 #include "rt/script_runner.h"
 
 #include <algorithm>
@@ -1607,6 +1609,22 @@ static int run_script_shell_loop(Parser& parser, bool load_rc);
 static int run_script_source(const std::string& source, const fs::path& source_path,
                              const std::string& cmd, const std::vector<std::string>& script_args,
                              const fs::path& host_root, bool interactive_after = false, const std::string& target = "native") {
+    // Runtime 2.0 CP13 (D-022 #3): the whole unit is syntax-validated before
+    // engine selection, so a unit routed to legacy cannot bypass it. On
+    // failure nothing has run: no output, no effects. NIFT_PREVALIDATE=only
+    // validates and exits (0 valid, 65 invalid) without running (gate tool).
+    {
+        const auto verdict = nift::rt::prevalidate(source);
+        const char* only = std::getenv("NIFT_PREVALIDATE");
+        const bool validate_only = only && std::string(only) == "only";
+        if (!verdict.ok) {
+            const auto where = nift::rt::locate(source, verdict.offset);
+            console::error(source_path.generic_string() + ':' + std::to_string(where.line) + ':' +
+                           std::to_string(where.column) + ": " + verdict.message);
+            return validate_only ? 65 : 1;
+        }
+        if (validate_only) return 0;
+    }
     // Runtime 2.0 CP11: opt-in VM (NIFT_VM=1); returns false to run legacy unchanged.
     if (!interactive_after && target == "native") {
         int vm_exit = 0;

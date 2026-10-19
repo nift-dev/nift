@@ -9,7 +9,16 @@
 
 namespace nift::detail {
 
+// Identity (DiagnosticCode), severity and catchability are separate
+// properties (D-022). `DiagnosticDisposition` is only the *default*
+// catchability a raise through fail_recoverable/fail_fatal gets; whether a
+// particular raise was catchable is recorded on the Diagnostic itself
+// (`catchable`). Adding or renaming a code never changes what a program can
+// catch. Codes describe what went wrong, not which component detected it
+// (D-025; taxonomy in docs/runtime-2/checkpoints/cp13-diagnostics-design.md).
 enum class DiagnosticDisposition { Fatal, Recoverable };
+
+enum class DiagnosticSeverity { Error, Warning, Note };
 
 enum class DiagnosticCode {
     NativeSyntaxError,
@@ -74,6 +83,16 @@ enum class DiagnosticCode {
     PackageImportSourceUnreadable,
     FfiLibraryLoadFailed,
     FfiSymbolNotFound,
+    // CP13 (D-022 #2, D-025): specific language run-time codes, replacing
+    // internal.legacy_failure for ordinary run-time errors. Appended; all
+    // default to Fatal, exactly as these errors are today.
+    RuntimeUndefinedCallable,
+    RuntimeTypeError,
+    RuntimeIndexOutOfBounds,
+    RuntimeMemberNotFound,
+    RuntimeArityError,
+    RuntimeIntegerOverflow,
+    RuntimeDivisionByZero,
     Count,
 };
 
@@ -87,21 +106,21 @@ inline DiagnosticCodeInfo diagnostic_code_info(DiagnosticCode code) {
     switch (code) {
 #define NIFT_DIAGNOSTIC_CASE(name, text, disposition) \
         case DiagnosticCode::name: return {text, D::disposition}
-        NIFT_DIAGNOSTIC_CASE(NativeSyntaxError, "native.syntax_error", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeTranslationError, "native.translation_error", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeNameError, "native.name_error", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeInvalidArgument, "native.invalid_argument", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeInvalidOperation, "native.invalid_operation", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeInvalidControl, "native.invalid_control", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeMutationDenied, "native.mutation_denied", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeArithmeticError, "native.arithmetic_error", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeLimitExceeded, "native.limit_exceeded", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeInvalidHandle, "native.invalid_handle", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeResourceLifecycle, "native.resource_lifecycle", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeResourceOwnerMismatch, "native.resource_owner_mismatch", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeResourceTransferDenied, "native.resource_transfer_denied", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeUnsupportedValue, "native.unsupported_value", Fatal);
-        NIFT_DIAGNOSTIC_CASE(NativeSystemServiceFailed, "native.system_service_failed", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeSyntaxError, "syntax.malformed_expression", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeTranslationError, "syntax.invalid_statement", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeNameError, "runtime.undefined_name", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeInvalidArgument, "runtime.invalid_argument", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeInvalidOperation, "runtime.invalid_operation", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeInvalidControl, "runtime.invalid_control", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeMutationDenied, "runtime.mutation_denied", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeArithmeticError, "runtime.arithmetic_error", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeLimitExceeded, "limit.exceeded", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeInvalidHandle, "runtime.invalid_handle", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeResourceLifecycle, "runtime.resource_lifecycle", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeResourceOwnerMismatch, "runtime.resource_owner_mismatch", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeResourceTransferDenied, "runtime.resource_transfer_denied", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeUnsupportedValue, "runtime.unsupported_value", Fatal);
+        NIFT_DIAGNOSTIC_CASE(NativeSystemServiceFailed, "host.service_failed", Fatal);
         NIFT_DIAGNOSTIC_CASE(PolicyRestrictedOperation, "policy.restricted_operation", Fatal);
         NIFT_DIAGNOSTIC_CASE(PolicyAuthorityDenied, "policy.authority_denied", Fatal);
         NIFT_DIAGNOSTIC_CASE(PolicyPathEscape, "policy.path_escape", Fatal);
@@ -123,7 +142,7 @@ inline DiagnosticCodeInfo diagnostic_code_info(DiagnosticCode code) {
         NIFT_DIAGNOSTIC_CASE(InternalInvariantViolation, "internal.invariant_violation", Fatal);
         NIFT_DIAGNOSTIC_CASE(InternalImportLifecycle, "internal.import_lifecycle", Fatal);
         NIFT_DIAGNOSTIC_CASE(InternalIdentityExhausted, "internal.identity_exhausted", Fatal);
-        NIFT_DIAGNOSTIC_CASE(InternalResourceExhausted, "internal.resource_exhausted", Fatal);
+        NIFT_DIAGNOSTIC_CASE(InternalResourceExhausted, "limit.resource_exhausted", Fatal);
         NIFT_DIAGNOSTIC_CASE(InternalLegacyFailure, "internal.legacy_failure", Fatal);
         NIFT_DIAGNOSTIC_CASE(UserRaised, "user.raised", Recoverable);
         NIFT_DIAGNOSTIC_CASE(IoOpenFailed, "io.open_failed", Recoverable);
@@ -149,6 +168,13 @@ inline DiagnosticCodeInfo diagnostic_code_info(DiagnosticCode code) {
         NIFT_DIAGNOSTIC_CASE(PackageImportSourceUnreadable, "package.import_source_unreadable", Recoverable);
         NIFT_DIAGNOSTIC_CASE(FfiLibraryLoadFailed, "ffi.library_load_failed", Recoverable);
         NIFT_DIAGNOSTIC_CASE(FfiSymbolNotFound, "ffi.symbol_not_found", Recoverable);
+        NIFT_DIAGNOSTIC_CASE(RuntimeUndefinedCallable, "runtime.undefined_callable", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeTypeError, "runtime.type_error", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeIndexOutOfBounds, "runtime.index_out_of_bounds", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeMemberNotFound, "runtime.member_not_found", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeArityError, "runtime.arity_error", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeIntegerOverflow, "runtime.integer_overflow", Fatal);
+        NIFT_DIAGNOSTIC_CASE(RuntimeDivisionByZero, "runtime.division_by_zero", Fatal);
         case DiagnosticCode::Count: break;
 #undef NIFT_DIAGNOSTIC_CASE
     }
@@ -185,6 +211,11 @@ struct DiagnosticFrame {
 
 struct Diagnostic {
     DiagnosticCode code = DiagnosticCode::InternalLegacyFailure;
+    DiagnosticSeverity severity = DiagnosticSeverity::Error;
+    // Whether this raise could be caught by `try` (fail_recoverable -> true,
+    // fail_fatal / Parser::fail -> false; the VM's catch rule). Never derived
+    // from `code` alone.
+    bool catchable = false;
     std::string message;
     DiagnosticOrigin origin;
     std::vector<DiagnosticFrame> frames;
@@ -192,7 +223,9 @@ struct Diagnostic {
 
 inline Diagnostic make_diagnostic(DiagnosticCode code, std::string message,
                                   DiagnosticOrigin origin = {}) {
-    return {code, std::move(message), std::move(origin), {}};
+    return {code, DiagnosticSeverity::Error,
+            diagnostic_code_info(code).disposition == DiagnosticDisposition::Recoverable,
+            std::move(message), std::move(origin), {}};
 }
 
 inline std::string project_diagnostic(const Diagnostic& diagnostic) {

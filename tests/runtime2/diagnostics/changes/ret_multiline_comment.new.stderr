@@ -1,1 +1,1 @@
-error: $ROOT/ret_multiline_comment.f:2:3: return: expression cannot be empty
+error: $ROOT/ret_multiline_comment.f:3:8: expression cannot be empty

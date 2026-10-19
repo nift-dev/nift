@@ -444,7 +444,7 @@
     "ok": false,
     "stdout": "",
     "message": "function while requires a block",
-    "code": "native.translation_error",
+    "code": "syntax.invalid_statement",
     "disposition": "fatal",
     "frames": []
   },

@@ -41,9 +41,20 @@
 # old) is EXPECTED-CHANGE (legacy is being changed by feature-site-dx); with --vm, a difference on an
 # `approved:*` case is SUPERSEDED (checked by the changes suite instead);
 # every other difference is a FAIL.
+# Decisions in BOTH_ENGINES are implemented on both engines by this binary
+# (D-022 #3 prevalidation before engine selection, D-025 in both front ends):
+# their baseline cases are SUPERSEDED with or without --vm, and in the
+# changes suite `--expect old` reports them SUPERSEDED (they are checked by
+# `--expect new`). The other decisions (D-018c, D-001#4, D-009#1) are VM-only:
+# `--expect new` without --vm reports them VM-ONLY (legacy keeps the old
+# behaviour by design; `--expect old` checks it). With the VM off every
+# changes case is thus checked against exactly one expectation (guards, which
+# have no .new files, against both).
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
+BOTH_ENGINES="D-022#3 D-025"
+both_engines() { local d="${1#approved:}"; [[ " $BOTH_ENGINES " == *" $d "* ]]; }
 SUITE=baseline; EXPECT=""; VM=0; REGEN=""; LIST=0; FILTER=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -134,7 +145,9 @@ print(r["outcome"]+(":"+r["reason"] if r["outcome"]=="fallback" else ""))' "$W/s
   local cls; cls="$(class_of "$name")"
   if [ "$bad" = 0 ]; then pass=$((pass+1)); echo "PASS $name$outcome"; return; fi
   if [ "$cls" = site-dx ] && { [ "$SUITE" = baseline ] || [ "$EXPECT" = old ]; }; then changed=$((changed+1)); echo "EXPECTED-CHANGE $name ($cls;$diffs)$outcome"; return; fi
-  if [ "$SUITE" = baseline ] && [ "$VM" = 1 ] && [[ "$cls" == approved:* ]]; then superseded=$((superseded+1)); echo "SUPERSEDED $name ($cls;$diffs)$outcome"; return; fi
+  if [ "$SUITE" = baseline ] && [[ "$cls" == approved:* ]] && { [ "$VM" = 1 ] || both_engines "$cls"; }; then superseded=$((superseded+1)); echo "SUPERSEDED $name ($cls;$diffs)$outcome"; return; fi
+  if [ "$SUITE" = changes ] && [ "$EXPECT" = old ] && both_engines "$cls" && ls "$base".new.* >/dev/null 2>&1; then superseded=$((superseded+1)); echo "SUPERSEDED $name ($cls;$diffs; implemented on both engines, checked by --expect new)"; return; fi
+  if [ "$SUITE" = changes ] && [ "$EXPECT" = new ] && [ "$VM" = 0 ] && ! both_engines "$cls" && ls "$base".new.* >/dev/null 2>&1; then superseded=$((superseded+1)); echo "VM-ONLY $name ($cls;$diffs; legacy keeps the old behaviour, checked by --expect old)"; return; fi
   fail=$((fail+1)); echo "FAIL $name ($cls;$diffs)$outcome"
   for k in out:stdout err:stderr exit:exit; do
     g="$(golden_for "$base" "${k##*:}")"
