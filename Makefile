@@ -543,17 +543,33 @@ test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
 
 # CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()
-# options. Not linked into nift until the VM wiring.
+# options, process model. Not linked into nift until the VM wiring. Process
+# tests run contained (D-031: ulimit -f/-v, timeout, own session, cleanup).
 RT_HOST_SOURCES := $(sort $(wildcard src/rt/host/*.cpp))
-RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) src/HostTrace.h tests/rt/rt_test.h
+RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) src/HostTrace.h src/ProcessPOSIX.h src/ProcessEnvironment.h tests/rt/rt_test.h
 RT_HOST_LAYER_UNIT := $(TEST_DIR)/rt/host-layer-unit$(EXEEXT)
+RT_HOST_PROCESS_UNIT := $(TEST_DIR)/rt/host-process-unit$(EXEEXT)
 $(RT_HOST_LAYER_UNIT): tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$@"
+$(RT_HOST_PROCESS_UNIT): tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 
-.PHONY: test-rt-host
-test-rt-host: $(RT_HOST_LAYER_UNIT)
+.PHONY: test-rt-host test-rt-host-sanitize
+test-rt-host: $(RT_HOST_LAYER_UNIT) $(RT_HOST_PROCESS_UNIT)
 	"$(RT_HOST_LAYER_UNIT)"
+	tests/runtime2/cp16/run_contained.sh "$(RT_HOST_PROCESS_UNIT)"
+
+# ASan+UBSan on both Host-layer unit tests (no ulimit -v: the sanitizers
+# reserve large shadow mappings; file size, time and cleanup still apply).
+test-rt-host-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-layer-unit"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/host-layer-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-process-unit"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		tests/runtime2/cp16/run_contained.sh --sanitized "$(TEST_DIR)/rt-san/host-process-unit"
 
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)
