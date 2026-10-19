@@ -598,3 +598,24 @@ must be removed or justified when build recovery integrates.
   general generators' acceptance and refusal rates by reason; any narrowing of
   the supported-subset spec is explicit, kept as must-stay-refused fixtures, and
   reported.
+
+## D-031 — Build-output ownership; dangerous-I/O test containment (owner, 2026-10-19)
+- **Ownership, not directories.** During a website build, script writes are
+  refused into `.nift/` metadata and onto outputs owned by another page or
+  declared build task; writes to the current page's own outputs, to unowned
+  destinations (including unowned files in `public/`) and outside the project
+  (OS permissions, optional `--fs-root`) are allowed. Destinations are resolved
+  with filesystem semantics (symlinks, `..`, alternative spellings) close to the
+  write; the remaining check/write race is documented. Overwritten pages are not
+  auto-rebuilt (no compatibility machinery). Old/new tests prove the previous
+  cross-page corruption and its refusal.
+- **Cross-filesystem moves** fall back to copy-then-delete with explicit partial
+  failure: a failed copy leaves the original intact; a failed delete after copy
+  is reported as an error, never success.
+- **Later (not now):** explicitly declared additional outputs per page/task, so
+  ownership covers JSON exports, images and similar generated files.
+- **Standing rule: dangerous I/O tests are contained.** Any test or probe that
+  could produce unbounded data, memory, disk use or processes runs under hard
+  limits (`ulimit -f`, `ulimit -v`, `timeout`, child cleanup), even when the
+  implementation is supposed to enforce them, so one probe cannot disrupt other
+  agents or invalidate certification work.
