@@ -319,7 +319,20 @@ Linode worker (`memcheck` job, tip 1105409d; follow-up `memcheck2` running).
   built without a budget check: under a 64 MiB budget ~1 GB was allocated, ending
   in bad_alloc (exit 70) instead of `limit.exceeded`. **Resource-budget blocker**:
   check and reserve before allocating, overflow-checked size arithmetic.
-- **C2 — atom table outside the heap budget:** under investigation.
+- **C2 — atom table outside the heap budget (confirmed).** Runtime interning
+  (`from_entries` keys) is never counted or trimmed: 3M distinct keys under a
+  16 MiB budget reached 511 MB RSS without the budget firing. Medium now (one-shot
+  CLI runs), high once VM contexts are long-lived. Count interned bytes (L7 2.1);
+  table lifetime/trimming → CP23 or the first long-lived-VM checkpoint.
+
+Final verification (memcheck2, 7fab21a6): **C1 cause and effect** — 18 of 24
+`ulimit -v`/budget points SIGABRT on the unchanged binary, 0 of 24 with only
+`value.cpp` swapped for the hybrid worklist (all exit 70 cleanly); value suites
+and vm_unit pass with the fix; push −1.5 %. **C3** also covers latent
+`stringify`/`flatten` amplification once aliasing is allowed; `print` peaks at
+1.54× (one output-buffer copy). The L7 side table (cd56fc1f) closes per-object
+saturation under-counting but not C3; it adds one allocation inside `noexcept`
+(`heap_retally`), to be fixed with C1.
 - Related: L7 step 2.1 proposes shrinking the per-object accounting counter from
   1 GiB to 512 MiB; integration blocked until no silent saturation at either limit
   is shown (original range preferred).
