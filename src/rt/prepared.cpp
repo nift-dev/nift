@@ -46,6 +46,8 @@ public:
     PreparedRefusal run() {
         mark_prepared_functions();
         result_.loop_called = marked_;
+        mark_unpreparable_functions();
+        check_unpreparable_calls();
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
             check_regions(ast_.at(plan_.functions[f]).b, marked_[f]);
         if (!result_.refused) top_level([this](NodeId id) { check_regions(id, false); return !result_.refused; });
@@ -169,7 +171,7 @@ private:
     void check_regions(NodeId body, bool prepared_function) {
         if (prepared_function) {
             walk(ast_, body,
-                 [this](NodeId, const Node& n) { return check_declaration(n, nullptr) && check_preparable(n); });
+                 [this](NodeId, const Node& n) { return check_declaration(n, nullptr); });
             return;
         }
         outermost_loops(body, [this](const Node& n) {
@@ -250,23 +252,68 @@ private:
         return legacy_prepared_parse_accepts(expr);
     }
 
-    bool check_preparable(const Node& n) {
+    // Can legacy's prepared evaluator prepare this statement of a function
+    // body (a bare `return`, or an `if`/`while` condition or `return`
+    // expression its parser rejects, cannot be prepared)?
+    bool preparable(const Node& n) const {
         std::string_view text;
         switch (n.kind) {
-            case NodeKind::Return:
-                if ((n.flags & kFlagBare) || n.a == kNoNode || !return_preparable(n))
-                    return refuse(n, "prepared-fn-unprepared");
-                return true;
-            case NodeKind::If:
-                if (!header_text(n, 2, text) || !legacy_prepared_parse_accepts(text))
-                    return refuse(n, "prepared-fn-unprepared");
-                return true;
-            case NodeKind::While:
-                if (!header_text(n, 5, text) || !legacy_prepared_parse_accepts(text))
-                    return refuse(n, "prepared-fn-unprepared");
-                return true;
+            case NodeKind::Return: return !(n.flags & kFlagBare) && n.a != kNoNode && return_preparable(n);
+            case NodeKind::If: return header_text(n, 2, text) && legacy_prepared_parse_accepts(text);
+            case NodeKind::While: return header_text(n, 5, text) && legacy_prepared_parse_accepts(text);
             default: return true;
         }
+    }
+
+    // Functions whose body legacy cannot prepare (P2/P3).
+    void mark_unpreparable_functions() {
+        unpreparable_.assign(plan_.functions.size(), false);
+        for (std::size_t f = 0; f < plan_.functions.size(); ++f)
+            unpreparable_[f] = !walk(ast_, ast_.at(plan_.functions[f]).b,
+                                     [this](NodeId, const Node& n) { return preparable(n); });
+    }
+
+    // An argument whose second evaluation cannot be observed: a literal or a
+    // name read (a local binding; anything else the compiler refuses).
+    bool unobservable(NodeId id) const {
+        const Node& n = ast_.at(id);
+        switch (n.kind) {
+            case NodeKind::Ident: return !plan_.index.count(ast_.text(n));
+            case NodeKind::Number: case NodeKind::True: case NodeKind::False: case NodeKind::Null: return true;
+            case NodeKind::String: return n.count == 0;
+            case NodeKind::Unary: return n.op == Op::Neg && ast_.at(n.a).kind == NodeKind::Number;
+            default: return false;
+        }
+    }
+
+    // records20k coverage (stage 4): when legacy cannot prepare a function
+    // called from prepared code, it evaluates the arguments, abandons the
+    // preparation and evaluates the call's text again on its textual
+    // (canonical) path: the body runs once, canonically (the VM's meaning),
+    // and only the second evaluation of the arguments differs (M2). Such a
+    // call is admitted when every argument is a literal or a name read
+    // (evaluating it twice cannot be observed); otherwise it is refused
+    // (prepared-fn-unprepared). Prepared code: loop conditions and bodies
+    // anywhere, and the bodies of functions called from them (marked_).
+    bool check_call_sites(NodeId id) {
+        return walk(ast_, id, [this](NodeId, const Node& n) {
+            const int f = callee_index(n);
+            if (f < 0 || !unpreparable_[static_cast<std::size_t>(f)]) return true;
+            const NodeId* args = ast_.list(n);
+            for (std::uint32_t k = 0; k < n.count; ++k)
+                if (!unobservable(args[k])) return refuse(ast_.at(args[k]), "prepared-fn-unprepared");
+            return true;
+        });
+    }
+
+    void check_unpreparable_calls() {
+        for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
+            if (marked_[f]) check_call_sites(ast_.at(plan_.functions[f]).b);
+        if (result_.refused) return;
+        walk(ast_, root_, [this](NodeId, const Node& n) {
+            if (n.kind != NodeKind::While) return true;
+            return check_call_sites(n.a) && check_call_sites(n.b);
+        });
     }
 
     // Legacy's bind_call_param types a quoted argument from its unquoted text.
@@ -312,6 +359,7 @@ private:
     std::vector<std::unordered_set<std::string_view>> function_names_;
     std::vector<std::vector<std::size_t>> callers_;
     std::vector<bool> marked_;
+    std::vector<bool> unpreparable_;  // per function: legacy cannot prepare its body
     bool changed_ = false;
     PreparedRefusal result_;
 };

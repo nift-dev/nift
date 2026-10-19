@@ -235,8 +235,11 @@ bool UnitCompiler::expression_statement(const Node& node) {
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) return fail(node, "static-error:push-arity");
             const NodeId arg = ast_.list(expr)[0];
-            if (!kinds_within(callee.a, kKindArray, receiver, "type:push") ||
-                !kinds_within(arg, kKindScalar, ast_.at(arg), "aliasing"))
+            // records20k coverage (stage 4): legacy pushes an aggregate taken
+            // from a place as a location reference (refused: no_alias); a
+            // fresh value (call result, literal, operator result) is a value
+            // in both engines.
+            if (!kinds_within(callee.a, kKindArray, receiver, "type:push") || !no_alias(arg, ast_.at(arg)))
                 return false;
             if (!expr_any(arg, value)) return false;
             fb_->set_offset(expr.begin);
