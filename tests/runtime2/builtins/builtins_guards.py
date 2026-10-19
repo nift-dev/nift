@@ -69,7 +69,7 @@ def exponent(a, b, n1, n2):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bench")
-    parser.add_argument("--sizes", default="1,100,10000,100000")
+    parser.add_argument("--sizes", default="1,100,1000,10000,100000")
     parser.add_argument("--write")
     parser.add_argument("--check")
     parser.add_argument("--markdown", action="store_true")
@@ -80,25 +80,29 @@ def main():
         for n in sizes:
             for name, values in measure(os.path.abspath(args.bench), n, workdir).items():
                 data.setdefault(name, {})[n] = values
-    n1, n2 = sizes[-2], sizes[-1]
     rows = {}
     for name, per in data.items():
+        # Workloads with a size limit (O(n^2) ones) use their two largest sizes.
+        have = [n for n in sizes if n in per]
+        n1, n2 = have[-2], have[-1]
         rows[name] = {
-            "ir": {str(n): round(per[n]["ir"], 1) for n in sizes},
-            "allocs": {str(n): round(per[n]["allocs"], 3) for n in sizes},
-            "heap": {str(n): round(per[n]["heap"], 1) for n in sizes},
+            "ir": {str(n): round(per[n]["ir"], 1) for n in have},
+            "allocs": {str(n): round(per[n]["allocs"], 3) for n in have},
+            "heap": {str(n): round(per[n]["heap"], 1) for n in have},
             "exponent": round(exponent(per[n1]["ir"], per[n2]["ir"], n1, n2), 3),
             "alloc_exponent": round(exponent(per[n1]["allocs"] or 1, per[n2]["allocs"] or 1, n1, n2), 3),
+            "exponent_sizes": [n1, n2],
         }
     if args.markdown:
         head = " | ".join("Ir/call n=%d" % n for n in sizes)
-        print("| workload | %s | exp. | allocs/call n=%d / n=%d | alloc exp. |" % (head, n1, n2))
+        print("| workload | %s | exp. (sizes) | allocs/call at those sizes | alloc exp. |" % head)
         print("|---|" + "---:|" * (len(sizes) + 3))
         for name in sorted(rows):
             r = rows[name]
-            print("| %s | %s | %.2f | %s / %s | %.2f |" % (
-                name, " | ".join("{:,.0f}".format(r["ir"][str(n)]) for n in sizes), r["exponent"],
-                r["allocs"][str(n1)], r["allocs"][str(n2)], r["alloc_exponent"]))
+            a, b = r["exponent_sizes"]
+            print("| %s | %s | %.2f (%d→%d) | %s / %s | %.2f |" % (
+                name, " | ".join("{:,.0f}".format(r["ir"][str(n)]) if str(n) in r["ir"] else "—" for n in sizes),
+                r["exponent"], a, b, r["allocs"][str(a)], r["allocs"][str(b)], r["alloc_exponent"]))
     else:
         print(json.dumps(rows, indent=1))
     if args.write:

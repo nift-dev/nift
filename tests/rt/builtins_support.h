@@ -87,9 +87,16 @@ inline std::string literal(const Value& v) {
     switch (v.kind()) {
         case Kind::Null: return "null";
         case Kind::Bool: return v.as_bool() ? "true" : "false";
-        case Kind::Int: return std::to_string(v.as_int());
+        case Kind::Int:
+            // -2^63 is not a Nift integer literal (unary minus of 2^63); legacy's
+            // JSON object literal holds it exactly.
+            if (v.as_int() == INT64_MIN) return "{\"v\": -9223372036854775808}.v";
+            return std::to_string(v.as_int());
         case Kind::Double: return nift::RuntimeValue(v.as_double()).dump(0);
-        case Kind::Decimal: return std::string(nift::rt::decimal_spelling(v));
+        case Kind::Decimal:
+            // An exact spelling survives only through legacy's JSON object
+            // literal path (a bare literal like 0.0 or 1e-400 is re-read).
+            return "{\"v\": " + std::string(nift::rt::decimal_spelling(v)) + "}.v";
         case Kind::Bytes: {
             std::string out = "bytes([";
             bool first = true;

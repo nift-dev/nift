@@ -6,6 +6,8 @@
 
 #include "rt/compare.h"
 #include "rt/decimal.h"
+#include "rt/error.h"
+#include "rt/heap.h"
 #include "rt/natives/bytes_methods.h"
 #include "rt/natives/format_methods.h"
 #include "rt/natives/json_methods.h"
@@ -360,6 +362,10 @@ void batch_b() {
     CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({0xff}), s("utf-8")}), "decode: invalid UTF-8"));
     CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({0xc0, 0x80}), s("utf-8")}), "decode: invalid UTF-8"));
     CHECK(err(call(BuiltinId::BytesDecode, {make_bytes({}), s("latin1")}), "decode: encoding must be exactly 'utf-8'"));
+    // Empty bytes (data() may be null): decode and sha256 (UBSan, review round 1).
+    CHECK(ok(call(BuiltinId::BytesDecode, {make_bytes({}), s("utf-8")}), "string | [\"\"]"));
+    CHECK(ok(call(BuiltinId::FnSha256, {make_bytes({})}),
+             "string | [\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"]"));
     CHECK(ok(call(BuiltinId::FnSha256, {s("abc")}),
              "string | [\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"]"));
     CHECK(ok(call(BuiltinId::FnSha256, {make_bytes({97, 98, 99})}),
@@ -394,6 +400,31 @@ void batch_b() {
     CHECK(copied.status == Status::Ok && equal(copied.out, nested));
     array_push(array_mut(copied.out)[0], i(9));  // mutating the copy leaves the original (COW)
     CHECK(shown(nested) == "ok array | [[[1],{\"k\":2}]]");
+    // Review D1: functions and Error values are copied as they are.
+    const Value fn = Value::adopt(new FunctionObject());
+    Result fcopy = call(BuiltinId::FnCopy, {fn});
+    CHECK(fcopy.status == Status::Ok && fcopy.out.heap() == fn.heap());
+    const Value raised = make_user_error("boom");
+    Result ecopy = call(BuiltinId::FnDeepcopy, {arr({raised, fn})});
+    CHECK(ecopy.status == Status::Ok);
+    // Review D2: a struct or handle anywhere in the value is a compiler defect.
+    const Value point = Value::adopt(new StructObject(atom("Point")));
+    CHECK(call(BuiltinId::FnCopy, {point}).status == Status::Internal);
+    CHECK(call(BuiltinId::FnCopy, {arr({i(1), obj({{"p", point}})})}).status == Status::Internal);
+    CHECK(call(BuiltinId::FnDeepcopy, {obj({{"h", Value::handle(HandleKind::File, 1, 0)}})}).status ==
+          Status::Internal);
+    // Review R2: validate stops beyond 512 nested levels (Limit), at exactly 512 it validates.
+    auto nest = [](int depth) {
+        Value v = arr({});
+        for (int k = 0; k < depth; ++k) v = arr({v});
+        return v;
+    };
+    const Value any_schema = make_object();
+    CHECK(call(BuiltinId::FnValidate, {any_schema, nest(512)}).status == Status::Ok);
+    Result deep = call(BuiltinId::FnValidate, {any_schema, nest(513)});
+    CHECK(deep.status == Status::Limit && deep.error == "validate: value nesting exceeds 512 levels");
+    CHECK(call(BuiltinId::FnValidate, {any_schema, nest(200000)}).status == Status::Limit);  // legacy crashes
+    CHECK(recoverable_code(BuiltinId::FnValidate) == "schema.rejected" && recoverable_code(BuiltinId::FnCopy).empty());
 }
 
 // Receivers are never changed, `out` may alias the receiver's register, and

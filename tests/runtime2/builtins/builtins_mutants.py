@@ -78,6 +78,9 @@ MUTANTS = [
      "    if (!jsonschema::validate(instance, schema, message)) {", "    if (false) {"),
     ("M22 round half to even", "number_methods.cpp",
      "double nearest(double d) { return std::round(d); }", "double nearest(double d) { return std::nearbyint(d); }"),
+    ("M23 validate rejection is fatal, not catchable", "json_methods.cpp",
+     "        return Status::Recoverable;  // legacy: catchable Error, code schema.rejected",
+     "        return Status::Error;"),
 ]
 
 

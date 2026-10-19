@@ -19,9 +19,12 @@ inline constexpr std::string_view kSchemaRejectedCode = "schema.rejected";
 // Strict JSON (RFC 8259; duplicate object keys rejected; nesting <= 512) into
 // a Value: numbers that need their exact spelling (more than 15 integer
 // digits, zero with a fraction or sign, exponent magnitude >= 300) become
-// Decimals, others Doubles. `error` is the parser's message (callers add
-// their own prefix, as legacy does). Not a script built-in: used by the
-// compiler for structured literals and by CP16's inject/@json/read_val.
+// Decimals, others Doubles. `error` is the parser's message. Not a script
+// built-in. Callers: CP16's inject/@json/read_val (which add legacy's
+// "inject: " etc. prefix) and the compiler for `{...}` literals, which runs
+// it at compile time: a literal that does not parse as JSON is refused before
+// execution (legacy then falls back to its Nift literal evaluator; wiring rule
+// W9), so a json_parse error never surfaces at run time for a literal.
 Status json_parse(const Context& context, std::string_view text, Value& out, std::string& error);
 
 Status fn_validate(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

@@ -70,6 +70,10 @@ const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name) {
     return nullptr;
 }
 
+std::string_view recoverable_code(BuiltinId id) {
+    return id == BuiltinId::FnValidate ? kSchemaRejectedCode : std::string_view();
+}
+
 Status call_builtin(const BuiltinSpec& spec, const Context& context, const Value* args, std::uint32_t argc,
                     Value& out, std::string& error) {
     return spec.fn(context, args, argc, out, error);

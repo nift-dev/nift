@@ -51,10 +51,28 @@ std::string random_text(std::size_t max_pieces = 8) {
     return out;
 }
 
+Value parsed(const char* text);
+
+// Review R4: exact Decimals (built by json_parse from spellings legacy keeps
+// exactly, and bound in the program through a JSON object literal so legacy
+// holds the same StrNumber), the int64 extremes, and halves (round).
+const char* const kDecimalSpellings[] = {"-0", "0.0", "-0.0", "0.00", "12345678901234567890", "-12345678901234567890",
+                                         "9007199254740993", "18446744073709551615", "1e-400", "-1e-400", "1e300",
+                                         "-2.5e300", "100000000000000000000.5", "-9223372036854775809"};
+const double kHalves[] = {0.5, 1.5, 2.5, -0.5, -1.5, -2.5};
+
 Value random_number() {
-    switch (pick(6)) {
+    switch (pick(9)) {
         case 0: return Value::number(kDoubles[pick(sizeof kDoubles / sizeof kDoubles[0])]);
         case 1: return Value::integer(9007199254740993 + static_cast<std::int64_t>(pick(3)));
+        case 2: return Value::number(kHalves[pick(sizeof kHalves / sizeof kHalves[0])]);
+        case 3: {
+            const Value d = parsed(kDecimalSpellings[pick(sizeof kDecimalSpellings / sizeof kDecimalSpellings[0])]);
+            return d;
+        }
+        case 4:
+            if (chance(50)) return Value::integer(chance(50) ? INT64_MIN : INT64_MAX);
+            return Value::integer(chance(50) ? INT64_MIN + 1 : INT64_MAX - 1);
         default: return Value::integer(static_cast<std::int64_t>(pick(26)) - 5);
     }
 }
@@ -292,9 +310,33 @@ std::string random_json(int depth, bool top) {
     return out + space() + (array ? "]" : "}");
 }
 
+// Review R4: invalid JSON object literals (balanced, so a broken case cannot
+// swallow the rest of a program; each still runs alone). json_parse must
+// reject them; the compiler then refuses the unit (W9), so they are not
+// compared but legacy's outcome class is tallied.
+std::string corrupt_json(std::string text) {
+    const std::size_t open = text.find('{');
+    switch (pick(7)) {
+        case 0: return text.insert(open + 1, "\"z\": 01, ");                       // leading zero
+        case 1: return text.insert(open + 1, "\"z\": \"\\ud800\", ");          // lone surrogate
+        case 2: return text.insert(open + 1, "\"z\": \"\xff\", ");              // invalid UTF-8
+        case 3: return text.insert(open + 1, "\"z\": 1, \"\\u007a\": 2, ");  // duplicate after unescaping
+        case 4: return text.insert(open + 1, "\"z\": [1,], ");                     // trailing comma
+        case 5: return text.insert(open + 1, "\"z\": 1e400, ");                    // not finite
+        default: {                                                             // depth beyond 512
+            std::string deep;
+            for (int k = 0; k < 513; ++k) deep += "{\"d\":";
+            deep += "1";
+            for (int k = 0; k < 513; ++k) deep += "}";
+            return text.insert(open + 1, "\"z\": " + deep + ", ");
+        }
+    }
+}
+
 struct Case {
     BuiltinId id;  // BuiltinId::Count: a json_parse case (`json`)
     std::string json;
+    bool isolated = false;  // run in a program of its own (corrupted JSON)
     std::vector<Value> args;
     std::string expected;  // the native's outcome
     std::string legacy;    // the legacy outcome
@@ -331,7 +373,12 @@ std::string native_outcome(const Case& c) {
         return "ok bytes | " + nift::crypto::sha256_hex(nift::crypto::sha256_bytes(data.data(), data.size()));
     }
     if (status == Status::Ok) return builtins_test::shown(out);
-    if (status == Status::Error || status == Status::Recoverable) return "error " + error;
+    if (status == Status::Error) return "error " + error;
+    // Review R4: a recoverable error is legacy's catchable Error; the program
+    // wraps validate in try/catch, so legacy shows "caught <code> | <message>".
+    if (status == Status::Recoverable)
+        return "caught " + std::string(recoverable_code(c.id)) + " | " + error;
+    if (status == Status::Limit) return "limit " + error;
     return "native-status " + std::to_string(static_cast<int>(status)) + " " + error;
 }
 
@@ -350,6 +397,13 @@ std::string program_lines(const Case& c, std::size_t n) {
     call += std::string(spec.name) + "(";
     for (std::size_t k = first; k < c.args.size(); ++k) call += (k > first ? ", c" : "c") + std::to_string(n) + "_" + std::to_string(k);
     call += ")";
+    if (c.id == BuiltinId::FnValidate) {
+        // try/catch tells a catchable (recoverable) error from a fatal one.
+        p << "try {\n  r" << n << " := " << call << "\n  print(type(r" << n << "))\n  print([r" << n
+          << "].stringify())\n} catch(e" << n << ") {\n  print(\"caught \" + e" << n << ".code)\n  print(e" << n
+          << ".message)\n}\n";
+        return p.str();
+    }
     p << "r" << n << " := " << call << "\nprint(type(r" << n << "))\n";
     // Bytes cannot be stringified: their SHA-256 identifies the content.
     if (c.expected.rfind("ok bytes", 0) == 0) p << "print(sha256(r" << n << "))\n";
@@ -396,7 +450,7 @@ std::size_t run_batch(const std::string& nift, const std::string& dir, std::vect
     while (k < lines.size() && n < to) {
         if (lines[k] != "@" + std::to_string(n)) break;
         if (k + 2 >= lines.size() || lines[k + 1].rfind('@', 0) == 0) break;
-        cases[n].legacy = "ok " + lines[k + 1] + " | " + lines[k + 2];
+        cases[n].legacy = (lines[k + 1].rfind("caught ", 0) == 0 ? "" : "ok ") + lines[k + 1] + " | " + lines[k + 2];
         if (cases[n].expected.rfind("ok bytes", 0) == 0 && lines[k + 1] == "bytes") cases[n].legacy = "ok bytes | " + lines[k + 2];
         k += 3;
         ++n;
@@ -425,18 +479,26 @@ int main(int argc, char** argv) {
     std::vector<Case> cases;
     for (std::size_t n = 0; n < count; ++n) {
         // One case in eight is a json_parse case (CP15).
-        Case c{n % 8 == 7 ? BuiltinId::Count : static_cast<BuiltinId>((n - n / 8) % builtin_count()), {}, {}, {}, {}};
-        if (c.id == BuiltinId::Count) c.json = random_json(0, true);
+        Case c{n % 8 == 7 ? BuiltinId::Count : static_cast<BuiltinId>((n - n / 8) % builtin_count()), {}, false, {}, {}, {}};
+        if (c.id == BuiltinId::Count) {
+            c.json = random_json(0, true);
+            if (chance(30)) { c.json = corrupt_json(c.json); c.isolated = true; }
+        }
         else c.args = arguments(c.id);
         c.expected = native_outcome(c);
         cases.push_back(static_cast<Case&&>(c));
     }
     constexpr std::size_t kBatch = 150;
     std::size_t runs = 0;
-    for (std::size_t at = 0; at < cases.size(); ++runs) at = run_batch(nift, dir, cases, at, std::min(at + kBatch, cases.size()));
+    for (std::size_t at = 0; at < cases.size(); ++runs) {
+        std::size_t to = at + 1;
+        if (!cases[at].isolated)
+            while (to < cases.size() && to < at + kBatch && !cases[to].isolated) ++to;
+        at = run_batch(nift, dir, cases, at, to);
+    }
 
     std::map<std::string, std::pair<std::size_t, std::size_t>> per;  // name -> (cases, errors)
-    std::size_t errors = 0, refused_cases = 0;
+    std::size_t errors = 0, refused_cases = 0, invalid_legacy_ok = 0, invalid_legacy_error = 0;
     const char* show = std::getenv("BUILTINS_DIFF_SHOW");  // print the first N cases (both outcomes)
     const std::size_t shown_cases = show ? std::strtoull(show, nullptr, 10) : 0;
     for (std::size_t n = 0; n < cases.size(); ++n) {
@@ -448,6 +510,13 @@ int main(int argc, char** argv) {
                                                  : kPrefix[static_cast<int>(builtin_spec(c.id).receiver)] +
                                                        std::string(builtin_spec(c.id).name)];
         if (refused(c)) { ++refused_cases; continue; }
+        if (c.id == BuiltinId::Count && c.expected.rfind("json-error ", 0) == 0) {
+            // W9: refused at compile time. Legacy falls back to its Nift literal
+            // evaluator: tally whether that fails or succeeds.
+            ++(c.legacy.rfind("ok ", 0) == 0 ? invalid_legacy_ok : invalid_legacy_error);
+            CHECK(c.expected.size() > 11);  // a parser message
+            continue;
+        }
         ++row.first;
         if (c.legacy.rfind("error", 0) == 0) { ++row.second; ++errors; }
         CHECK(c.expected == c.legacy);
@@ -458,6 +527,8 @@ int main(int argc, char** argv) {
     }
     std::printf("builtins-diff: seed %llu, %zu cases (%zu compared, %zu legacy errors, %zu refused by rule W1) in %zu "
                 "legacy runs\n", seed, cases.size(), cases.size() - refused_cases, errors, refused_cases, runs);
+    std::printf("  invalid JSON literals (refused by W9): %zu; legacy fallback errors %zu, legacy fallback "
+                "succeeds %zu\n", invalid_legacy_ok + invalid_legacy_error, invalid_legacy_error, invalid_legacy_ok);
     for (const auto& row : per) std::printf("  %-20s %4zu cases, %4zu errors\n", row.first.c_str(), row.second.first, row.second.second);
     if (std::system(("rm -rf '" + std::string(dir) + "'").c_str()) != 0) std::fprintf(stderr, "cleanup failed\n");
     return rt_test::finish("builtins-diff");

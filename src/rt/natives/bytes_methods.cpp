@@ -150,7 +150,10 @@ Status bytes_decode(const Context&, const Value* args, std::uint32_t argc, Value
     if (!data) return internal(error, "decode receiver");
     if (argc != 2) return fail(error, "decode: expected encoding");
     if (!utf8_name(args[1])) return fail(error, "decode: encoding must be exactly 'utf-8'");
-    const std::string_view text(reinterpret_cast<const char*>(data->data()), data->size());
+    // An empty vector's data() may be null: never pass (null, 0) on (CP09
+    // make_string memcpy's its argument; UBSan rejects a null source).
+    static const char kEmpty[] = "";
+    const std::string_view text(data->empty() ? kEmpty : reinterpret_cast<const char*>(data->data()), data->size());
     if (!strict_utf8(text)) return fail(error, "decode: invalid UTF-8");
     out = make_string(text);
     return Status::Ok;
@@ -161,7 +164,8 @@ Status fn_sha256(const Context&, const Value* args, std::uint32_t argc, Value& o
     nift::crypto::Sha256Digest digest;
     if (args[0].is(Kind::Bytes)) {
         const auto& data = bytes_of(args[0]);
-        digest = nift::crypto::sha256_bytes(data.data(), data.size());
+        static const std::uint8_t kNone = 0;
+        digest = nift::crypto::sha256_bytes(data.empty() ? &kNone : data.data(), data.size());
     } else if (args[0].is(Kind::String)) {
         const std::string_view text = string_view_of(args[0]);
         digest = nift::crypto::sha256_bytes(text.data(), text.size());

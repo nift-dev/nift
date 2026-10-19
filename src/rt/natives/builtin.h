@@ -19,8 +19,11 @@
 //     Status::Recoverable (CP15) is a program error legacy raises as a
 //     *catchable* Error value (e.g. `validate` rejecting an instance:
 //     code "schema.rejected"); `error` holds the message and
-//     recoverable_code(id) names the code. Until CP13's try/catch the VM treats it as
-//     Error (uncaught legacy behaviour is identical).
+//     recoverable_code(id) names the code. Until CP13's try/catch the VM treats
+//     it as Error (uncaught legacy behaviour is identical).
+//     Status::Limit (CP15 review R2) is a fatal, uncatchable resource-limit
+//     error, code "limit.exceeded" (D-022/D-025), e.g. a value nested deeper
+//     than 512 levels given to validate.
 //   * Every heap object a native creates goes through the CP09 constructors
 //     (make_string, make_array, array_push, object_set), so the live-heap total
 //     stays exact (heap_account.h).
@@ -33,7 +36,7 @@
 
 namespace nift::rt::natives {
 
-enum class Status : std::uint8_t { Ok, Error, Internal, Memory, Recoverable };
+enum class Status : std::uint8_t { Ok, Error, Internal, Memory, Recoverable, Limit };
 
 // Per-call context. heap_limit = 0 disables the budget check (unit tests).
 struct Context {
@@ -109,6 +112,10 @@ std::size_t builtin_count();
 // Compile-time lookup by receiver and name; nullptr if CP14 has no native for
 // it (the compiler then refuses the unit, as today).
 const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name);
+// The error code of a Status::Recoverable result of `id` ("schema.rejected"
+// for validate); empty for built-ins that never return Recoverable.
+std::string_view recoverable_code(BuiltinId id);
+
 // Calls the native. Each native checks its own arity and reports legacy's
 // per-function message ("split: expected one delimiter", "<m>: expected no
 // arguments", ...); min_args/max_args are for the compiler.

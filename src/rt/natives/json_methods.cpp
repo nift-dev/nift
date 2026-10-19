@@ -10,6 +10,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 namespace nift::rt::natives {
 
@@ -50,7 +51,16 @@ constexpr std::int64_t kExact = std::int64_t(1) << 53;
 
 // Legacy runtime_to_json for plain values. Int beyond 2^53 is legacy's exact
 // StrNumber; bytes are "bytes values are not JSON serializable".
-bool to_document(const Value& v, json::Document& doc, std::string& error, bool& bad_kind) {
+// Nesting cap, as the parser's (review R2): legacy recurses without a bound
+// and crashes on very deep values; here deeper values stop with Status::Limit.
+constexpr int kMaxDocumentDepth = 512;
+
+bool to_document(const Value& v, json::Document& doc, std::string& error, bool& bad_kind, bool& limit, int depth) {
+    if (depth > kMaxDocumentDepth) {
+        limit = true;
+        error = "value nesting exceeds 512 levels";
+        return false;
+    }
     switch (v.kind()) {
         case Kind::Null: doc = json::Document(nullptr); return true;
         case Kind::Bool: doc = json::Document(v.as_bool()); return true;
@@ -73,7 +83,7 @@ bool to_document(const Value& v, json::Document& doc, std::string& error, bool& 
             doc.array.reserve(array_size(v));
             for (const Value& item : array_items(v)) {
                 doc.array.emplace_back();
-                if (!to_document(item, doc.array.back(), error, bad_kind)) return false;
+                if (!to_document(item, doc.array.back(), error, bad_kind, limit, depth + 1)) return false;
             }
             return true;
         case Kind::Object:
@@ -81,7 +91,8 @@ bool to_document(const Value& v, json::Document& doc, std::string& error, bool& 
             doc.object.reserve(object_size(v));
             for (const auto& entry : object_entries(v)) {
                 doc.object.emplace_back(std::string(atom_text(entry.first)), json::Document());
-                if (!to_document(entry.second, doc.object.back().second, error, bad_kind)) return false;
+                json::Document& member = doc.object.back().second;
+                if (!to_document(entry.second, member, error, bad_kind, limit, depth + 1)) return false;
             }
             return true;
         default: bad_kind = true; error = "json argument kind"; return false;
@@ -102,11 +113,12 @@ Status json_parse(const Context& context, std::string_view text, Value& out, std
 Status fn_validate(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return fail(error, "validate: expected schema and value");
     json::Document schema, instance;
-    bool bad_kind = false;
+    bool bad_kind = false, limit = false;
     std::string conversion;
-    if (!to_document(args[0], schema, conversion, bad_kind) || !to_document(args[1], instance, conversion, bad_kind)) {
+    if (!to_document(args[0], schema, conversion, bad_kind, limit, 0) ||
+        !to_document(args[1], instance, conversion, bad_kind, limit, 0)) {
         error = "validate: " + conversion;
-        return bad_kind ? Status::Internal : Status::Error;
+        return bad_kind ? Status::Internal : limit ? Status::Limit : Status::Error;
     }
     std::string message;
     if (!jsonschema::schema_valid(schema, message)) return fail(error, "validate: " + message);
@@ -125,12 +137,26 @@ Status fn_validate(const Context&, const Value* args, std::uint32_t argc, Value&
 // CP12 phase B / CP17.
 Status fn_copy(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 1) return fail(error, "copy: expected one value");
-    switch (args[0].kind()) {
-        case Kind::Function: case Kind::Struct: case Kind::Handle: case Kind::Error:
-            error = "copy argument kind";
+    // Functions and Error values are immutable or identity values: legacy
+    // copies them as they are (review D1). A struct or handle anywhere in the
+    // value would have to be re-created (legacy clones structs): CP17. The
+    // compiler admits copy only for provably plain arguments (wiring rule
+    // W11), so finding one here is a compiler defect, reported loudly (D2).
+    std::vector<const Value*> work{&args[0]};
+    while (!work.empty()) {
+        const Value* v = work.back();
+        work.pop_back();
+        if (v->is(Kind::Struct) || v->is(Kind::Handle)) {
+            error = "copy of a struct or handle (CP17)";
             return Status::Internal;
-        default: out = args[0]; return Status::Ok;
+        }
+        if (v->is(Kind::Array))
+            for (const Value& item : array_items(*v)) work.push_back(&item);
+        else if (v->is(Kind::Object))
+            for (const auto& entry : object_entries(*v)) work.push_back(&entry.second);
     }
+    out = args[0];
+    return Status::Ok;
 }
 
 } // namespace nift::rt::natives

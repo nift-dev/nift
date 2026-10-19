@@ -56,6 +56,7 @@ struct Workload {
     // run n calls on n different inputs).
     std::function<std::vector<std::vector<Value>>(std::size_t n)> inputs;
     NativeFn direct = nullptr;  // a native API that is not a table entry (json_parse)
+    std::size_t max_n = 0;      // skipped above this size (0: no limit)
 };
 
 Status json_parse_native(const Context& context, const Value* args, std::uint32_t, Value& out, std::string& error) {
@@ -161,6 +162,13 @@ std::vector<Workload> workloads() {
              Value doc;
              json_parse(Context{}, json_records(n), doc, e);
              return one({schema, doc}); }},
+        // Review note: uniqueItems compares every pair (O(n^2), inherited from
+        // the legacy validator); guarded at small sizes so it cannot get worse.
+        {"fn.validate.unique", BuiltinId::FnValidate, [](std::size_t n) {
+             Value schema;
+             std::string e;
+             json_parse(Context{}, R"({"type": "array", "uniqueItems": true})", schema, e);
+             return one({schema, int_array(n)}); }, nullptr, 1000},
         {"fn.sha256", BuiltinId::FnSha256, [](std::size_t n) { return one({text_of(n)}); }},
         {"fn.bytes", BuiltinId::FnBytes, [](std::size_t n) {
              Value a = make_array(n);
@@ -192,6 +200,7 @@ int main(int argc, char** argv) {
     const Context context;
     for (const Workload& w : workloads()) {
         if (filter && !std::strstr(w.name, filter)) continue;
+        if (w.max_n && n > w.max_n) continue;
         auto calls = w.inputs(n);
         std::vector<Value> results(calls.size());
         std::string error;
