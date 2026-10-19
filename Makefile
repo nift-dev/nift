@@ -354,14 +354,21 @@ $(RT_VM_GLOBALS): tests/rt/vm_globals_unit.cpp $(RT_VM_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_globals_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# CP12 phase B: the module graph and loader (D-041; rt/module_graph.h).
+RT_VM_MODULES := $(TEST_DIR)/rt/vm-modules-unit$(EXEEXT)
+$(RT_VM_MODULES): tests/rt/vm_modules_unit.cpp $(RT_VM_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_modules_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_run.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
-test-rt-vm: $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+test-rt-vm: $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	"$(RT_VM_UNIT)"
 	"$(RT_VM_GLOBALS)"
+	"$(RT_VM_MODULES)"
 	"$(RT_VM_PREPARED)"
 	python3 tools/rt-lint.py src/rt
 	python3 tools/rt-vm/legacy_names.py --check
@@ -385,6 +392,7 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARG
 	python3 tests/runtime2/vm_chain.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs
+	python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -394,6 +402,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_globals_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-globals-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-globals-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_modules_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-modules-unit"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-modules-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-prepared-parse"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-prepared-parse" 20000
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \

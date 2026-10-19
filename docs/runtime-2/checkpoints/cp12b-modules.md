@@ -230,8 +230,14 @@ Today: legacy-today PASS (14 fixtures: 4 agree, 10 differ as recorded).
 | `page_isolation` (build) | pages `a`, `b` each get a fresh instance (`1 2`); within page `c` one instance (`x1 y2`); imported modules in each page's dependencies | page `c`: `x1 y1` |
 | `rebuild` (build) | editing `m.nft` rebuilds `a`, `b`, `c` with fresh instances; editing `y.nft` rebuilds only `c`; no change rebuilds nothing | page `c` differs |
 
-Interpretations to confirm (no design round requested; flagged in case the
-owner reads D-041 differently): a sequential re-import after a failed
-initialisation reports the same failure (D-041 #1 states it for concurrent
-imports); a repeated import rebinds rather than collides (option A as
-proposed and adopted).
+Interpretations of D-041 (recorded; accepted by the coordinator as
+consistent with D-041, reported to the owner):
+
+* **Repeated import rebinds.** Importing a module again (same importer, another
+  spelling, or through a re-export) binds the same exports of the same
+  instance again; it is not a collision (option A as proposed and adopted).
+  Fixtures `repeated`, `repeated_two_spellings`.
+* **A failed initialisation is final in its context.** A sequential re-import
+  after a failed initialisation reports the same failure without running the
+  module again (D-041 #1 states it for concurrent imports). Fixture
+  `failed_init`.
