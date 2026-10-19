@@ -78,7 +78,17 @@ struct VmResult {
     std::vector<std::uint64_t> derived_lines;
     bool evidence_truncated = false;
     std::uint64_t output_lines = 0;  // newlines printed by the program
+    std::string code;        // the stop's diagnostic code when it has a specific one (Fault::code)
+    bool catchable = false;  // legacy raises it as a catchable Error (no try/catch on the VM yet)
 };
+
+// The stop's reason, message, code and catchability.
+inline void fault_into(VmResult& result, const Fault& fault) {
+    result.reason = fault.reason;
+    result.message = fault.message;
+    result.code = fault.code;
+    result.catchable = fault.catchable;
+}
 
 class Vm {
 public:

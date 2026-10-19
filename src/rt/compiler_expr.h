@@ -93,6 +93,7 @@ private:
     bool unobservable_argument(NodeId id);
     bool array_literal(const Node& node, std::uint16_t dst);
     bool object_literal(const Node& node, std::uint16_t dst);
+    bool constant_tree(const Node& node) const;  // CP15 W9: a literal of constants only
     bool member(const Node& node, std::uint16_t dst);
     bool index(const Node& node, std::uint16_t dst);
     bool local_register(const Node& node, std::uint16_t& reg);

@@ -20,8 +20,15 @@ namespace nift::rt {
 
 static_assert(natives::kNull == kKindNull && natives::kBool == kKindBool && natives::kInt == kKindInt &&
                   natives::kFrac == kKindFrac && natives::kString == kKindString &&
-                  natives::kArray == kKindArray && natives::kObject == kKindObject && natives::kAny == kKindAll,
+                  natives::kArray == kKindArray && natives::kObject == kKindObject &&
+                  (natives::kAny & 0x7f) == kKindAll,
               "CP14 KindSet and CP12 kind bits must agree");
+// CP15 W8: bytes have a KindSet bit (0x80) CP12's 8-bit kind set does not
+// (its 0x80 is Unknown). CP12's inference is not widened here (frozen in
+// certification): every built-in that produces or takes bytes is refused
+// (`builtin-bytes:<name>`), and no inferred kind set is ever Bytes.
+static_assert(natives::kBytes == 0x80 && natives::kBytes == kKindUnknown,
+              "the bytes bit is the bit CP12 uses for Unknown: never pass a KindSet with it to CP12");
 static_assert(static_cast<std::size_t>(natives::BuiltinId::Count) + kFirstBuiltin <= 0x10000,
               "built-in ids fit the CallNative operand");
 
@@ -49,5 +56,13 @@ bool pure_method_name(std::string_view name);
 
 // stringify / prettify / highlight (W6: presentation chains are refused).
 bool presentation_builtin(const natives::BuiltinSpec& spec);
+
+// CP15 W8: a built-in that produces bytes or is a method of bytes (refused,
+// `builtin-bytes:<name>`, until CP12's kind set has a bytes bit).
+bool bytes_builtin(const natives::BuiltinSpec& spec);
+// CP15 W10/W11: `validate`, `copy`, `deepcopy` take only provably plain
+// arguments (no Unknown kinds; the VM has no struct/handle values) and no
+// quoted-literal argument for `validate` (J-Q2).
+bool plain_arguments_only(const natives::BuiltinSpec& spec);
 
 } // namespace nift::rt

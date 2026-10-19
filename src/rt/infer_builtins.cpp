@@ -31,6 +31,8 @@ TyRef builtin_result(const Ast& ast_, const natives::BuiltinSpec& spec, const Ty
                      const std::vector<TyRef>& values, const Node& n) {
     using natives::BuiltinId;
     const NodeId* args = ast_.list(n);
+    // CP15 W8: bytes results have no CP12 kind bit; the compiler refuses them.
+    if (bytes_builtin(spec)) return any_ty();
     const auto elements = [](const TyRef& t) { return element_of(t, nullptr, false); };
     const auto members = [](const TyRef& t) { return element_of(t, nullptr, true); };
     switch (spec.rule) {
@@ -55,7 +57,10 @@ TyRef builtin_result(const Ast& ast_, const natives::BuiltinSpec& spec, const Ty
             t->items.clear();
             return t;
         }
-        case natives::ResultRule::Selected: {  // free min / max
+        case natives::ResultRule::Selected: {  // free min / max; CP15 validate, copy, deepcopy
+            if (spec.id == BuiltinId::FnValidate) return values.size() == 2 ? values[1] : any_ty();
+            if (spec.id == BuiltinId::FnCopy || spec.id == BuiltinId::FnDeepcopy)
+                return values.size() == 1 ? values[0] : any_ty();
             TyRef out = empty_ty();
             if (values.size() == 1 && (values[0]->kinds & ~kKindUnknown) == kKindArray && !values[0]->any)
                 return elements(values[0]);

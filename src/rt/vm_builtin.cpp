@@ -24,6 +24,18 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {
         case natives::Status::Ok: break;
         case natives::Status::Error: return raise(fault, StopReason::Error, std::move(message));
+        case natives::Status::Recoverable:
+            // CP15: legacy raises a catchable Error (validate: schema.rejected).
+            // No try/catch on the VM yet (CP13 T4): uncaught, it is the same
+            // program error as legacy's, reported with its code.
+            fault.code = std::string(natives::recoverable_code(spec.id));
+            fault.catchable = true;
+            return raise(fault, StopReason::Error, std::move(message));
+        case natives::Status::Limit:
+            // CP15 review R2: a fatal, uncatchable resource limit.
+            fault.code = "limit.exceeded";
+            fault.catchable = false;
+            return raise(fault, StopReason::Error, std::move(message));
         case natives::Status::Internal:
             // A receiver or argument kind the compiler promised away.
             return raise(fault, StopReason::Internal,

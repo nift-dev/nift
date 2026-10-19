@@ -196,7 +196,9 @@ test-runtime-value: $(RUNTIME_VALUE_TEST)
 
 # Runtime 2.0 CP09 value model (src/rt): unit, randomised differential/property
 # tests against the legacy RuntimeValue, lint, sanitizer build and benchmarks.
-RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp)
+# CP15: the natives also link the vendored SHA-256 and the JSON Schema validator
+# (neither uses RuntimeValue).
+RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp) src/Sha256.cpp src/JsonSchema.cpp
 RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.inc) tests/rt/rt_test.h tests/rt/legacy_oracle.h
 RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
 RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)

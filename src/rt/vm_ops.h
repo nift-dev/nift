@@ -34,6 +34,13 @@ struct Fault {
     // ... and one of its operands was large (the result may be a small number
     // or a boolean that still differs from legacy's double arithmetic).
     bool large_operand = false;
+    // CP15 (codes from the CP13 taxonomy): the diagnostic code of an Error
+    // stop when the raise has a specific one ("schema.rejected" for a
+    // validate rejection, "limit.exceeded" for a resource limit), and whether
+    // legacy raises it as a catchable Error. Empty: no specific code yet
+    // (the VM diagnostic record, CP13 T2, assigns the rest).
+    std::string code;
+    bool catchable = false;
 };
 
 inline constexpr std::int64_t kSafeInteger = std::int64_t(1) << 53;

@@ -53,4 +53,16 @@ bool pure_method_name(std::string_view name) { return first_method(name) != null
 
 bool presentation_builtin(const BuiltinSpec& spec) { return spec.receiver == Receiver::Any; }
 
+bool bytes_builtin(const BuiltinSpec& spec) {
+    // `Selected` results (validate, copy, deepcopy) are their arguments'
+    // kinds, which never include bytes; only fixed results can be bytes.
+    return (spec.rule == natives::ResultRule::Fixed && (spec.result & natives::kBytes) != 0) ||
+           spec.receiver == Receiver::Bytes;
+}
+
+bool plain_arguments_only(const BuiltinSpec& spec) {
+    using natives::BuiltinId;
+    return spec.id == BuiltinId::FnValidate || spec.id == BuiltinId::FnCopy || spec.id == BuiltinId::FnDeepcopy;
+}
+
 } // namespace nift::rt

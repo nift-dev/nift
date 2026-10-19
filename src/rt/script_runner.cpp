@@ -39,6 +39,8 @@ struct Stats {
     std::vector<std::uint64_t> large_lines, derived_lines;
     bool evidence_truncated = false;
     std::string path;
+    std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
+    bool catchable = false;  // vm-error: legacy raises it as a catchable Error
 };
 
 std::string json_escape(const std::string& text) {
@@ -62,7 +64,8 @@ void report(const Stats& s) {
          << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
          << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
          << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
-         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false");
+         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false")
+         << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false");
     const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
         line << ",\"" << name << "\":[";
         for (std::size_t k = 0; k < values.size(); ++k) line << (k ? "," : "") << values[k];
@@ -249,6 +252,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         // A program error, in legacy's format, at the failing expression.
         stats.outcome = "vm-error";
         stats.reason = result.message;
+        stats.code = result.code;
+        stats.catchable = result.catchable;
         report(stats);
         error_line(source_path, stats, result.message);
         exit_code = 1;

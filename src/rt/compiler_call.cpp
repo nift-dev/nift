@@ -112,6 +112,20 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
 bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
                                 std::uint16_t dst) {
     const NodeId* args = ast_.list(node);
+    // CP15 W8: no bytes kind in CP12's inference; bytes built-ins are refused.
+    if (bytes_builtin(spec)) return fail(node, "builtin-bytes:" + std::string(spec.name));
+    if (plain_arguments_only(spec))
+        for (std::uint32_t k = 0; k < node.count; ++k) {
+            const Node& arg = ast_.at(args[k]);
+            // CP15 W10 (J-Q2): legacy strips the quotes of a string-literal
+            // validate argument at top level (and not in loop code).
+            if (spec.id == natives::BuiltinId::FnValidate && arg.kind == NodeKind::String)
+                return fail(arg, "builtin-literal-arg:validate");
+            // CP15 W11: provably plain values only (until CP17's structs).
+            const std::uint8_t k_arg = kinds(args[k]);
+            if ((k_arg & kKindUnknown) && !unknown_defers(k_arg))
+                return fail(arg, "builtin-plain-arg:" + std::string(spec.name));
+        }
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));

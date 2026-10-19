@@ -4,6 +4,7 @@
 #include "rt/atom.h"
 #include "rt/literal.h"
 #include "rt/native.h"
+#include "rt/natives/json_methods.h"
 #include "rt/prepared_parse.h"
 
 namespace nift::rt::detail {
@@ -279,7 +280,52 @@ bool UnitCompiler::array_literal(const Node& node, std::uint16_t dst) {
     return true;
 }
 
+// A literal made only of constants (numbers, strings without interpolation,
+// true/false/null, negated numbers, arrays and objects of those).
+bool UnitCompiler::constant_tree(const Node& n) const {
+    switch (n.kind) {
+        case NodeKind::Number: case NodeKind::True: case NodeKind::False: case NodeKind::Null: return true;
+        case NodeKind::String: return n.count == 0;
+        case NodeKind::Unary: return n.op == Op::Neg && ast_.at(n.a).kind == NodeKind::Number;
+        case NodeKind::Array: {
+            const NodeId* items = ast_.list(n);
+            for (std::uint32_t k = 0; k < n.count; ++k)
+                if (!constant_tree(ast_.at(items[k]))) return false;
+            return true;
+        }
+        case NodeKind::Object: {
+            const NodeId* props = ast_.list(n);
+            for (std::uint32_t k = 0; k < n.count; ++k) {
+                const Node& prop = ast_.at(props[k]);
+                if (prop.a == kNoNode || prop.b == kNoNode || !constant_tree(ast_.at(prop.b))) return false;
+            }
+            return true;
+        }
+        default: return false;
+    }
+}
+
 bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
+    // CP15 W9 (J-Q1, review R3): legacy reads a `{...}` literal whose text is
+    // JSON with its strict JSON reader (exact number spellings, JSON escapes)
+    // and evaluates any other as a Nift literal. The literal's text is parsed
+    // here, at compile time, with the same reader (natives::json_parse): JSON
+    // -> that constant value. A literal of constants only that is not JSON
+    // (legacy's fallback evaluator accepts some of those) is refused; a
+    // literal with expressions is never JSON and compiles as before.
+    {
+        Value parsed;
+        std::string error;
+        const natives::Context context;
+        if (natives::json_parse(context, text(node), parsed, error) == natives::Status::Ok) {
+            std::uint16_t k = 0;
+            if (!fb_->constant(parsed, k)) return builder_ok();
+            fb_->set_offset(node.begin);
+            fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(k & ~kConstantBit));
+            return true;
+        }
+        if (constant_tree(node)) return fail(node, "json-literal");
+    }
     if (!no_trailing_comma(node)) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;

@@ -341,8 +341,7 @@ void Vm::note_large(const Instr* pc, Fault& fault) {
 }
 
 void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const {
-    result.reason = fault.reason;
-    result.message = fault.message;
+    fault_into(result, fault);
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
     MUTATE_ERROR_OFFSET(result.offset)
     result.error_in_loop_path = in_loop_path(pc);

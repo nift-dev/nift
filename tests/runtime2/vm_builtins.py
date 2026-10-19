@@ -120,6 +120,27 @@ SUPPORTED = {
         'total := 0\nnums := range(1, 5)\nj := 0\nwhile (j < nums.length()) { total += nums[j]; j += 1 }\nprint(total)\n'
         'print(ws.length() + ps.length())\n'
     ),
+    # CP15 (batch B): numbers, sha256 of strings, validate/copy/deepcopy on
+    # plain values, `{...}` literals read as JSON (W9: JSON escapes, -0 and
+    # exact big integers are JSON's, not the Nift literal evaluator's).
+    "f15-numbers": (
+        "x := -2.5\nprint(x.abs())\nprint(x.floor())\nprint(x.ceil())\nprint(x.round())\n"
+        "y := 2.5\nprint(y.round())\nz := 7\nprint(z.to_int())\nw := 3.0\nprint(w.to_int())\n"
+        "neg := 0 - 7\nprint(neg.abs())\nfr := 0.1 * 3\nprint(fr.round())\n"
+    ),
+    "f15-sha-validate-copy": (
+        'print(sha256("abc"))\nprint(sha256(""))\n'
+        'schema := {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}\n'
+        'rec := {"id": 7, "tags": ["a"]}\nok := validate(schema, rec)\nprint(ok.stringify())\n'
+        "arr := [1, [2]]\nc := copy(arr)\nc.push(3)\nprint(arr.stringify())\nprint(c.stringify())\nc2 := copy(rec)\nprint(c2.stringify())\n"
+        'd := deepcopy(rec)\nprint(d.stringify())\nn := 5\nm := copy(n)\nprint(m)\n'
+    ),
+    "f15-json-literals": (
+        'je := {"s": "caf\\u00e9"}\nprint(je.s)\nj := {"z": -0, "big": 12345678901234567890123, "f": 0.10, "e": 1e300}\n'
+        "print(j.stringify())\nprint(j.z)\nprint(j.big)\nprint(j.f)\nprint(j.e)\n"
+        'nested := {"a": [1, {"b": null}], "t": true}\nprint(nested.stringify())\nprint(nested.t)\n'
+        "i := 3\nmixed := {\"k\": i, \"l\": [i, 2]}\nprint(mixed.stringify())\n"
+    ),
 }
 
 # Legacy error messages of bound natives, at top level.
@@ -146,6 +167,12 @@ ERRORS = [
     # `return: ` prefix, the VM at the failing expression (approved D-018c);
     # checked by the policy-classified harnesses (vm_parity, vm_d018), not here.
     ("object-length-top", 'o := {"a": 1}\nprint(o.length())\n'),
+    # CP15: N1 errors, sha256 argument kinds, validate rejection (legacy's
+    # catchable Error, uncaught here: same output; code schema.rejected).
+    ("num-to-int-fraction", "x := 2.5\nprint(x.to_int())\n"),
+    ("sha256-kind", "print(sha256(1))\n"),
+    ("validate-rejected", 'schema := {"type": "string"}\nv := 5\nr := validate(schema, v)\nprint(r)\n'),
+    ("validate-bad-schema", 'schema := {"type": 5}\nv := 5\nr := validate(schema, v)\nprint(r)\n'),
 ]
 
 UNSUPPORTED = [
@@ -177,7 +204,14 @@ UNSUPPORTED = [
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n", "method:pop"),
     ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n", "method:sort"),
     # Batch B (CP15) and C (CP16) names.
-    ("cp15-abs", "x := -2\nprint(x.abs())\n", "method:abs"),
+    # CP15 W8: bytes have no CP12 kind bit; W9: a literal of constants that
+    # is not JSON; W10: a quoted-literal validate argument (J-Q2).
+    ("w8-bytes", "b := bytes([1, 2])\nprint(1)\n", "builtin-bytes:bytes"),
+    ("w8-encode", 's := "a"\nb := s.encode("utf-8")\nprint(1)\n', "builtin-bytes:encode"),
+    ("w9-not-json-dot", 'o := {"a": .5}\nprint(o.a)\n', "json-literal"),
+    ("w10-validate-literal", 'schema := {"type": "string"}\nr := validate(schema, "x")\nprint(r)\n',
+     "builtin-literal-arg:validate"),
+    ("n-q2-abs-arity", "x := -2\nprint(x.abs(1))\n", "builtin-arity:abs"),
     ("cp16-replace-once", 's := "aa"\nprint(s.replace_once("a", "b"))\n', "method:replace_once"),
     ("cp17-collection", "s := stack()\nprint(1)\n", "callable:stack"),
 ]
@@ -238,6 +272,28 @@ def check(nift, work, kind, name, source, reason, timeout):
 # Natives whose result outgrows their inputs check the VM's heap budget while
 # building (Status::Memory): under a lowered budget the run stops as an
 # internal failure (exit 70, never a legacy run), as every VM memory stop.
+# CP15 review R2 (deliberate change from legacy, which recurses without a
+# bound): a value nested deeper than 512 levels given to validate stops with
+# the fatal limit.exceeded error (exit 1), on the VM only (legacy is not the
+# oracle for this case).
+LIMIT = ('fn(deep(n)) {\n  if (n == 0) { return [1] }\n  return [deep(n - 1)]\n}\nv := deep(600)\nschema := {"type": "array"}\n'
+         'r := validate(schema, v)\nprint(r.size())\n')
+
+
+def limit_check(nift, work, timeout):
+    d = tempfile.mkdtemp(dir=work)
+    try:
+        with open(os.path.join(d, "p.f"), "w") as f:
+            f.write(LIMIT)
+        (out, err, rc), st = run(nift, d, "require", timeout)
+        if rc != 1 or b"validate: value nesting exceeds 512 levels" not in err or not st or \
+                st.get("outcome") != "vm-error" or st.get("code") != "limit.exceeded" or st.get("catchable"):
+            return [f"validate-limit: expected exit 1, limit.exceeded (not catchable), got {rc} {err[-160:]!r} {st}"]
+        return []
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 BUDGET = [
     ("range", "r := range(5000000)\nprint(r.size())\n", 20_000_000),
     ("split-empty", 's := "ab"\ni := 0\nwhile (i < 22) { s += s; i += 1 }\nc := s.split("")\nprint(c.size())\n',
@@ -286,6 +342,7 @@ def main():
         with cf.ThreadPoolExecutor(a.jobs) as pool:
             failures = [f for f in pool.map(lambda it: check(nift, work, *it, a.timeout), todo) if f]
         failures += budget_checks(nift, work, a.timeout)
+        failures += limit_check(nift, work, a.timeout)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for f in failures:

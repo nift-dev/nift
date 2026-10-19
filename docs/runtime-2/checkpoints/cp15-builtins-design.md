@@ -172,6 +172,30 @@ The CP14 workloads' guards are unchanged (re-checked: 0 failures).
 * `json_parse` is called by the compiler (structured literals) and by CP16
   Host ops (`inject`, `@json`, `read_val`).
 
+## Wiring (integration, branch `spec-integration`)
+
+On `runtime-2` @`bd1c8a9` (CP12 certified) after the CP14 wiring and CP13,
+by the single integration owner. Rules applied:
+
+| Rule | Implementation |
+| --- | --- |
+| W8 bytes | **Refused, not widened**: CP12's kind set is frozen (its 0x80 is Unknown). Every built-in with a fixed bytes result or a bytes receiver (`bytes()`, `encode`, bytes `length size empty slice decode`) is refused before execution, `builtin-bytes:<name>`; `static_assert`s pin the bit layouts. `sha256` of a string binds (bytes values cannot exist on the VM). Widening = a 16-bit kind set in CP12's inference (backlog). |
+| W9 `{...}` literals | `UnitCompiler::object_literal` runs `natives::json_parse` on the literal's source text at compile time: JSON → that value as a constant (`LoadK`; copy-on-write on first mutation); a literal of constants only (numbers, strings without interpolation, `true/false/null`, negated numbers, nested literals of those) that is not JSON → refused, `json-literal`; a literal with expressions (never JSON) compiles as before. |
+| W10 | a string-literal argument of `validate` → `builtin-literal-arg:validate`. |
+| W11 | `validate`, `copy`, `deepcopy`: an argument whose kinds include Unknown → `builtin-plain-arg:<name>` (the VM has no struct, handle or function values, so known kinds are plain). |
+| N-Q2, B-Q2, J-Q3 | W1 arity refusals (`builtin-arity:<name>`). |
+| `Status::Recoverable` | an Error stop with legacy's message and `code` `schema.rejected`, `catchable` true (VM statistics `code`/`catchable`); no try/catch on the VM yet (CP13 T4), so uncaught exactly as legacy. |
+| `Status::Limit` | a fatal Error stop (exit 1), `code` `limit.exceeded`, not catchable. |
+| Inference | `validate` → its value argument's type, `copy`/`deepcopy` → the argument's type; bytes results Unknown (refused). |
+| Link | `src/Sha256.cpp`, `src/JsonSchema.cpp` join `RT_VALUE_SOURCES` (the rt test binaries); `nift` already links them. |
+
+Tests: `tests/runtime2/vm_builtins.py` gains the CP15 bodies (numbers,
+`sha256`/`validate`/`copy`/`deepcopy`, JSON literals with JSON-only
+spellings, mixed literals) in the five contexts, error programs (N1, `sha256`
+kinds, a rejected and a malformed `validate`), refusals (W8 ×2, W9, W10,
+N-Q2) and the VM-only `Limit` check (600-deep value: exit 1,
+`limit.exceeded`, not catchable; legacy is not the oracle there, review R2).
+
 ## Commits
 
 Local, on `runtime-2-cp15-dev` (base `c3b0046`): natives; tests, probe,
