@@ -30,7 +30,14 @@ std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest 
         call->set_spawn(stage.argv(), stage.cwd, absolute_cwd(stage.cwd));
         calls.push_back(std::move(call));
     }
-    for (auto& call : calls) call->begin();  // all v1 lines before the first launch (legacy order)
+    for (auto& call : calls) {  // all v1 lines before the first launch (legacy order)
+        if (call->begin() != HostStatus::Ok) {
+            status = call->status();
+            error = call->error();
+            for (auto& other : calls) if (!other->finished()) other->fail(status, error);
+            return nullptr;
+        }
+    }
     auto group = ProcessGroup::start(std::move(request), status, error);
     if (!group) {
         for (auto& call : calls) call->fail(status, error);

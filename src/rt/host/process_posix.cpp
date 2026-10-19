@@ -298,6 +298,16 @@ struct ProcessGroup::State {
     Phase left_phase = Phase::None;
     Clock::time_point left_at;
     std::vector<long> left_members;
+    bool leftover_failed = false;
+    // stdin delivery accounting (ProcessResult::stdin_*)
+    std::uint64_t stdin_total = 0;
+    std::uint64_t stdin_written = 0;
+    bool stdin_incomplete = false;
+    std::string stdin_error;
+    // Concurrency and the host loop.
+    mutable std::mutex mu;
+    std::weak_ptr<ProcessGroup> self;
+    std::vector<runtime::TaskId> loop_tasks;
     ProcessResult result;
 
     bool all_reaped() const {
@@ -315,6 +325,15 @@ namespace {
 
 using State = ProcessGroup::State;
 
+bool kill_suppressed_for_test() {
+#ifdef NIFT_HOST_TEST_HOOKS
+    return runtime::test_hooks().suppress_sigkill.load();
+#else
+    return false;
+#endif
+}
+void rearm(State& s);
+
 bool group_has_members(const State& s) {
     if (s.pgid <= 0) return false;
 #ifdef __linux__
@@ -329,7 +348,7 @@ void send_signal(State& s, int sig) {
     if (s.scope == CancelScope::Child) {
         if (s.child_stage < s.st.size()) {
             const auto& stage = s.st[s.child_stage];
-            if (stage.pid > 0 && !stage.reaped) ::kill(stage.pid, sig);  // unreaped: the pid cannot have been reused
+            if (stage.pid > 0 && !stage.reaped && !(sig == SIGKILL && kill_suppressed_for_test())) ::kill(stage.pid, sig);  // unreaped: no pid reuse
         }
         return;
     }
@@ -338,11 +357,13 @@ void send_signal(State& s, int sig) {
     // members (Linux: same session).
     std::vector<long> tree;
     if (s.scope == CancelScope::Tree) tree = runtime::proc_descendants(s.unreaped_pids());
+    if (sig == SIGKILL && kill_suppressed_for_test()) return;
     if (s.pgid > 0 && (!s.all_reaped() || group_has_members(s))) ::kill(-s.pgid, sig);
     for (long pid : tree) ::kill(static_cast<pid_t>(pid), sig);
 }
 
 void close_stdin_end(State& s) {
+    if (s.in_pos < s.in_pending.size()) s.stdin_incomplete = true;  // undelivered input: not an error by itself
     close_fd(s.in_fd);
     s.in_pending.clear();
     s.in_pos = 0;
@@ -448,11 +469,19 @@ void write_stdin(State& s) {
         const std::size_t left = s.in_pending.size() - s.in_pos;
         const ssize_t n = write_no_sigpipe(s.in_fd, s.in_pending.data() + s.in_pos, std::min(left, kChunk));
         if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) return;
-            close_stdin_end(s);  // EPIPE: the reader is gone
+            const int error = errno;
+            if (error == EAGAIN || error == EWOULDBLOCK) return;
+            // EPIPE: the reader exited or closed stdin early -- the result is
+            // kept, delivery is just incomplete. Anything else is a genuine
+            // delivery failure and is reported.
+            if (error != EPIPE)
+                s.stdin_error = s.req.builtin + ": stdin: write failed after " + std::to_string(s.stdin_written) + " of " +
+                                std::to_string(s.stdin_total) + " bytes: " + std::strerror(error);
+            close_stdin_end(s);
             return;
         }
         s.in_pos += static_cast<std::size_t>(n);
+        s.stdin_written += static_cast<std::uint64_t>(n);
     }
     if (s.in_pos >= s.in_pending.size()) {
         s.in_pending.clear();
@@ -538,10 +567,21 @@ void finish(State& s, const void* key) {
             r.error = last.error;
             r.state = GroupState::LaunchFailed;
         } else if (s.lost) r.state = GroupState::Lost;
-        else if (s.timed_out) r.state = GroupState::TimedOut;
-        else if (s.cancelled) r.state = GroupState::Cancelled;
-        else r.state = GroupState::Exited;
+        else {
+            // The first cause wins: a deadline that expired stays recorded
+            // even if the process then exits by itself during the grace period.
+            switch (s.reason) {
+                case CancelReason::Deadline: r.state = GroupState::TimedOut; break;
+                case CancelReason::Limit: r.state = GroupState::LimitExceeded; break;
+                case CancelReason::Explicit: case CancelReason::Cleanup: case CancelReason::Abandoned: r.state = GroupState::Cancelled; break;
+                default: r.state = s.limit_hit ? GroupState::LimitExceeded : GroupState::Exited; break;
+            }
+        }
     }
+    r.stdin_total = s.stdin_total;
+    r.stdin_written = s.stdin_written;
+    r.stdin_complete = !s.stdin_incomplete && s.stdin_written == s.stdin_total;
+    r.stdin_error = s.stdin_error;
     if (s.limit_hit) {
         s.out = Buffer();
         s.err = Buffer();
@@ -586,13 +626,18 @@ bool step(State& s, const void* key) {
         s.phase = State::Phase::Done;
     }
     if (!s.all_reaped()) return false;
+    if (s.in_fd >= 0) { write_stdin(s); close_stdin_end(s); }  // nobody left to read it
     // Every stage reaped. Pipe modes: read what is there now; if a pipe is
     // still open, a leftover member (or an escapee) holds it.
     if (s.out_fd >= 0) drain(s, s.out_fd, s.out, true);
     if (s.err_fd >= 0) drain(s, s.err_fd, s.err, false);
     if (s.out_fd >= 0 || s.err_fd >= 0) {
-        const bool interactive_unread = s.req.mode == OutputMode::Interactive && !s.waiting;
-        if (interactive_unread) return false;  // the script may still read; wait()/cleanup finishes it
+        // An idle interactive handle whose pipes a descendant still holds may
+        // still produce output the script reads later: keep it open. Once a
+        // cancellation (deadline, cancel, cleanup) is under way, finish:
+        // unread output moves to result.out and stays readable.
+        const bool interactive_unread = s.req.mode == OutputMode::Interactive && !s.waiting && s.phase == State::Phase::None;
+        if (interactive_unread) return false;
         const bool members = group_has_members(s);
         if (!s.leftover_started) {
             s.leftover_started = true;
@@ -624,6 +669,8 @@ ProcessGroup::ProcessGroup(std::unique_ptr<State> state) : s_(std::move(state)) 
 ProcessGroup::~ProcessGroup() {
     if (!s_) return;
     State& s = *s_;
+    for (auto id : s.loop_tasks) runtime::loop_cancel(id);
+    s.loop_tasks.clear();
     if (!s.finished && !s.detached) {
         // Never leak: a group destroyed while running is killed and reaped
         // (bounded). Normal paths finish groups through wait()/cleanup hooks.
@@ -662,6 +709,10 @@ const char* output_mode_name(OutputMode mode) {
 }
 
 std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& status, HostError& error) {
+    return start_impl(std::move(req), status, error, true);
+}
+
+std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostStatus& status, HostError& error, bool arm) {
     status = HostStatus::Ok;
     status = validate(req, error);
     if (status != HostStatus::Ok) return nullptr;
@@ -674,6 +725,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& 
     s.kill_after = s.req.kill_after;
     s.st.resize(s.req.stages.size());
     std::shared_ptr<ProcessGroup> group(new ProcessGroup(std::move(state)));
+    s.self = group;
     const void* key = group.get();
     const auto& stages = s.req.stages;
     const OutputMode mode = s.req.mode;
@@ -718,6 +770,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& 
             set_nonblocking(s.in_fd);
             if (mode != OutputMode::Interactive) {
                 s.in_pending = s.req.stdin_text;
+                s.stdin_total = s.req.stdin_text.size();
                 s.close_stdin_when_drained = true;
             }
         }
@@ -924,14 +977,17 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& 
         runtime::index_remove(key);
         return group;
     }
-    if (s.req.timeout) s.deadline = Clock::now() + *s.req.timeout;
+    if (s.req.timeout) s.deadline = Clock::now() + *s.req.timeout;  // monotonic
+    std::lock_guard<std::mutex> lock(s.mu);
     if (s.in_fd >= 0 && !s.in_pending.empty()) write_stdin(s);
     else if (s.in_fd >= 0 && s.close_stdin_when_drained) close_fd(s.in_fd);
+    if (arm) rearm(s);
     return group;
 }
 
 ProcessResult ProcessGroup::run(SpawnRequest request, HostStatus& status, HostError& error) {
-    auto group = start(std::move(request), status, error);
+    // Blocking: wait() drives the group to the end itself; no host-loop arming.
+    auto group = start_impl(std::move(request), status, error, false);
     if (!group) return ProcessResult();
     return group->wait();
 }
@@ -943,6 +999,10 @@ namespace {
 // true when settled (nothing left to do).
 bool leftover_step(State& s) {
     if (!s.cleanup_requested || s.left_phase == State::Phase::Done) return true;
+    if (s.lost) {  // a stage already survived SIGKILL: reported as Lost, nothing more to try
+        s.left_phase = State::Phase::Done;
+        return true;
+    }
     const auto now = Clock::now();
     const bool members = s.pgid > 0 && group_has_members(s);
     if (s.left_phase == State::Phase::None) {
@@ -958,21 +1018,45 @@ bool leftover_step(State& s) {
     if (!members) {
         s.left_phase = State::Phase::Done;
     } else if (s.left_phase == State::Phase::Term && now >= s.left_at + s.req.kill_after) {
-        ::kill(-s.pgid, SIGKILL);
+        if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL);
         s.left_phase = State::Phase::Kill;
         s.left_at = now;
     } else if (s.left_phase == State::Phase::Kill && now >= s.left_at + s.req.post_kill_wait) {
         s.left_phase = State::Phase::Done;
+        s.leftover_failed = true;  // still members after SIGKILL + bound
     }
     if (s.left_phase != State::Phase::Done) return false;
     for (long pid : s.left_members) runtime::reaper_add_pid(pid);  // ours only under the subreaper
     s.left_members.clear();
     return true;
 }
-} // namespace
 
-namespace {
-bool run_loop(State& s, const void* key, std::optional<Clock::time_point> until, const std::function<bool()>& stop) {
+// Detached groups: only an explicit cancel request has anything to drive.
+bool detached_step(State& s) {
+    if (s.phase == State::Phase::None || s.phase == State::Phase::Done) return true;
+    const auto now = Clock::now();
+    if (!group_has_members(s)) { s.phase = State::Phase::Done; return true; }
+    if (s.phase == State::Phase::Term && now >= s.phase_at + s.kill_after) {
+        if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL);
+        s.phase = State::Phase::Kill;
+        s.phase_at = now;
+    } else if (s.phase == State::Phase::Kill && now >= s.phase_at + s.req.post_kill_wait) {
+        s.phase = State::Phase::Done;
+        return true;
+    }
+    return false;
+}
+
+bool group_settled(const State& s) {
+    if (s.detached) return s.phase == State::Phase::None || s.phase == State::Phase::Done;
+    return s.finished && (!s.cleanup_requested || s.left_phase == State::Phase::Done);
+}
+
+// The event loop. The group lock is held except while sleeping in poll(),
+// so other threads (cancel, the host loop's timers, context cleanup) can act
+// on the group meanwhile; every state change happens under the lock.
+bool run_loop(State& s, const void* key, std::unique_lock<std::mutex>& lk, std::optional<Clock::time_point> until,
+              const std::function<bool()>& stop) {
     for (;;) {
         if (step(s, key)) return true;
         if (stop && stop()) return false;
@@ -998,55 +1082,121 @@ bool run_loop(State& s, const void* key, std::optional<Clock::time_point> until,
             timeout_ms = left <= 0 ? 0 : static_cast<int>(std::min<long long>(left + 1, 1 << 30));
         }
         if (fds.empty() && timeout_ms < 0) timeout_ms = 10;  // defensive: never sleep forever with nothing to watch
+        lk.unlock();
         const int ready = ::poll(fds.empty() ? nullptr : fds.data(), static_cast<nfds_t>(fds.size()), timeout_ms);
+        lk.lock();
+        // Descriptors may have been closed by another thread meanwhile: use
+        // the current ones; a stale readiness result only costs one pass.
         if (ready > 0) {
             if (s.out_fd >= 0) drain(s, s.out_fd, s.out, true);
             if (s.err_fd >= 0) drain(s, s.err_fd, s.err, false);
             if (s.in_fd >= 0) write_stdin(s);
         }
-        if (until && Clock::now() >= *until) {
-            const bool done = step(s, key);
-            return done;
-        }
+        if (until && Clock::now() >= *until) return step(s, key);
     }
 }
+
+// Arms the host loop for an unattended group: a timer for the next deadline /
+// escalation / leftover step, and pidfd watches so an exit is reaped at once.
+// Called with the group lock held at the end of every public operation.
+void rearm(State& s) {
+    for (auto id : s.loop_tasks) runtime::loop_cancel(id);
+    s.loop_tasks.clear();
+    if (group_settled(s)) { runtime::notify_settled(); return; }
+    const auto now = Clock::now();
+    Clock::time_point wake = Clock::time_point::max();
+    if (s.detached) {
+        if (s.phase == State::Phase::Term) wake = s.phase_at + s.kill_after;
+        if (s.phase == State::Phase::Kill) wake = s.phase_at + s.req.post_kill_wait;
+        wake = std::min(wake, now + Millis(20));  // membership has no descriptor to watch
+    } else if (!s.finished) {
+        if (s.deadline && s.phase == State::Phase::None && !s.all_reaped()) wake = std::min(wake, *s.deadline);
+        if (s.phase == State::Phase::Term) wake = std::min(wake, s.phase_at + s.kill_after);
+        if (s.phase == State::Phase::Kill) wake = std::min(wake, s.phase_at + s.req.post_kill_wait);
+        if (s.req.mode == OutputMode::FileCapture) wake = std::min(wake, now + Millis(20));  // capture-size check
+        if (s.leftover_started || (s.all_reaped() && (s.waiting || s.phase != State::Phase::None))) wake = std::min(wake, now + Millis(10));
+        if (!s.pidfds_ok && !s.all_reaped()) wake = std::min(wake, now + Millis(50));
+        for (const auto& stage : s.st) {
+            if (stage.pidfd < 0 || stage.reaped) continue;
+            const int dup = ::fcntl(stage.pidfd, F_DUPFD_CLOEXEC, 3);
+            if (dup < 0) continue;
+            std::weak_ptr<ProcessGroup> w = s.self;
+            s.loop_tasks.push_back(runtime::loop_when_readable(dup, [w] { if (auto g = w.lock()) g->timer_tick(); }));
+        }
+    } else {
+        if (s.left_phase == State::Phase::Term) wake = s.left_at + s.req.kill_after;
+        if (s.left_phase == State::Phase::Kill) wake = s.left_at + s.req.post_kill_wait;
+        wake = std::min(wake, now + Millis(20));  // membership has no descriptor to watch
+    }
+    if (wake != Clock::time_point::max()) {
+        std::weak_ptr<ProcessGroup> w = s.self;
+        s.loop_tasks.push_back(runtime::loop_at(wake, [w] { if (auto g = w.lock()) g->timer_tick(); }));
+    }
+}
+
+// Lock for a public operation; re-arms the host loop when it is released.
+struct OpLock {
+    State& s;
+    std::unique_lock<std::mutex> lk;
+    explicit OpLock(State& state) : s(state), lk(state.mu) {}
+    ~OpLock() { if (lk.owns_lock()) rearm(s); }
+};
 } // namespace
+
+void ProcessGroup::timer_tick() {
+    State& s = *s_;
+    auto keep = s.self.lock();  // the reaper may release the last reference below
+    std::unique_lock<std::mutex> lk(s.mu, std::try_to_lock);
+    if (!lk.owns_lock()) {
+        // Busy: the holder is between poll() calls and re-arms when it lets
+        // go; retry shortly in case that happened just before this fired.
+        std::weak_ptr<ProcessGroup> w = s.self;
+        runtime::loop_at(Clock::now() + Millis(5), [w] { if (auto g = w.lock()) g->timer_tick(); });
+        return;
+    }
+    if (s.detached) detached_step(s);
+    else {
+        if (!s.finished) run_loop(s, this, lk, Clock::now(), nullptr);
+        if (s.finished) leftover_step(s);
+    }
+    const bool done = group_settled(s);
+    const bool failed = s.lost || s.leftover_failed;
+    rearm(s);
+    lk.unlock();
+    if (done && runtime::reaper_release(this) && failed)
+        runtime::report_cleanup_failure("error: cleanup: process '" + argv0() + "' (pid " + std::to_string(pid()) +
+                                        ") could not be terminated (still running after SIGKILL); left to the reaper");
+}
 
 bool ProcessGroup::pump(std::optional<Clock::time_point> until) {
     State& s = *s_;
-    if (s.detached) {
-        // Only a cancel request has anything to drive.
-        if (s.phase == State::Phase::None || s.phase == State::Phase::Done) return true;
-        const auto now = Clock::now();
-        if (!group_has_members(s)) { s.phase = State::Phase::Done; return true; }
-        if (s.phase == State::Phase::Term && now >= s.phase_at + s.kill_after) { ::kill(-s.pgid, SIGKILL); s.phase = State::Phase::Kill; s.phase_at = now; }
-        else if (s.phase == State::Phase::Kill && now >= s.phase_at + s.req.post_kill_wait) { s.phase = State::Phase::Done; return true; }
-        (void)until;
-        return false;
-    }
-    if (!s.finished && !run_loop(s, this, until, nullptr)) return false;
-    return leftover_step(s);
+    OpLock op(s);
+    if (s.detached) return detached_step(s);
+    if (!s.finished && !run_loop(s, this, op.lk, until, nullptr)) return false;
+    leftover_step(s);
+    return group_settled(s);
 }
 
 const ProcessResult& ProcessGroup::wait() {
     State& s = *s_;
+    OpLock op(s);
     if (!s.finished && !s.detached) {
         s.waiting = true;
-        run_loop(s, this, std::nullopt, nullptr);
-        if (runtime::termination_requested()) runtime::park_for_termination();  // C2: Nift ends with the signal
+        run_loop(s, this, op.lk, std::nullopt, nullptr);
     }
     return s.result;
 }
 
 bool ProcessGroup::cancel(CancelScope scope, CancelReason reason, std::optional<Millis> kill_after) {
     State& s = *s_;
+    OpLock op(s);
     const Millis grace = kill_after ? *kill_after : s.req.kill_after;
     if (s.detached) {
         if (s.result.state != GroupState::Detached || s.pgid <= 0 || !group_has_members(s)) return false;
         if (s.phase != State::Phase::None) return true;
         s.kill_after = grace;
         s.phase_at = Clock::now();
-        if (grace.count() <= 0) { ::kill(-s.pgid, SIGKILL); s.phase = State::Phase::Kill; }
+        if (grace.count() <= 0) { if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL); s.phase = State::Phase::Kill; }
         else { ::kill(-s.pgid, SIGTERM); s.phase = State::Phase::Term; }
         return true;
     }
@@ -1059,23 +1209,25 @@ bool ProcessGroup::cancel(CancelScope scope, CancelReason reason, std::optional<
         for (std::size_t i = 0; i < s.st.size(); ++i) if (s.st[i].pid > 0 && !s.st[i].reaped) { child = i; break; }
         if (child == s.st.size()) return false;
     }
-    const bool anything = !s.all_reaped();
-    if (!anything) return false;
+    if (s.all_reaped()) return false;
     begin_cancel(s, scope, reason, grace, child);
     return true;
 }
 
 HostStatus ProcessGroup::write(std::string_view bytes, HostError& error) {
     State& s = *s_;
+    OpLock op(s);
     if (s.in_fd < 0 || s.stdin_closed || s.finished)
         return make_error(error, "process.stdin_closed", s.req.builtin + ": write: the process's stdin is closed");
     s.in_pending.append(bytes.data(), bytes.size());
-    run_loop(s, this, Clock::now(), nullptr);
+    s.stdin_total += bytes.size();
+    run_loop(s, this, op.lk, Clock::now(), nullptr);
     return HostStatus::Ok;
 }
 
 HostStatus ProcessGroup::close_stdin(HostError& error) {
     State& s = *s_;
+    OpLock op(s);
     if (s.stdin_closed || s.in_fd < 0) {
         if (s.req.mode != OutputMode::Interactive)
             return make_error(error, "process.stdin_closed", s.req.builtin + ": close_stdin: the process has no stdin pipe");
@@ -1091,9 +1243,10 @@ HostStatus ProcessGroup::close_stdin(HostError& error) {
 
 std::optional<std::string> ProcessGroup::read_line() {
     State& s = *s_;
+    OpLock op(s);
     auto has_line = [&] { return s.out.data.find('\n', s.out.pos) != std::string::npos; };
     if (!s.finished && !has_line() && s.out_fd >= 0)
-        run_loop(s, this, std::nullopt, [&] { return has_line() || s.out_fd < 0; });
+        run_loop(s, this, op.lk, std::nullopt, [&] { return has_line() || s.out_fd < 0; });
     if (s.finished) {
         // After finish the unread output lives in result.out.
         std::string& rest = s.result.out;
@@ -1119,8 +1272,9 @@ std::optional<std::string> ProcessGroup::read_line() {
 
 std::optional<std::string> ProcessGroup::read(std::size_t max) {
     State& s = *s_;
+    OpLock op(s);
     if (!s.finished && s.out.retained() == 0 && s.out_fd >= 0)
-        run_loop(s, this, std::nullopt, [&] { return s.out.retained() > 0 || s.out_fd < 0; });
+        run_loop(s, this, op.lk, std::nullopt, [&] { return s.out.retained() > 0 || s.out_fd < 0; });
     if (s.finished) {
         std::string& rest = s.result.out;
         if (rest.empty()) return std::nullopt;
@@ -1135,27 +1289,36 @@ std::optional<std::string> ProcessGroup::read(std::size_t max) {
     return chunk;
 }
 
-bool ProcessGroup::finished() const { return s_->finished; }
+bool ProcessGroup::finished() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
+    return s_->finished;
+}
 
 bool ProcessGroup::running() {
     State& s = *s_;
+    OpLock op(s);
     if (s.detached) return s.result.state == GroupState::Detached && group_has_members(s);
     if (s.finished) return false;
     reap_some(s, this);
     return !s.all_reaped();
 }
 
-bool ProcessGroup::detached() const { return s_->detached; }
+bool ProcessGroup::detached() const { return s_->detached; }  // fixed at start
 GroupState ProcessGroup::state() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
     if (s_->finished) return s_->result.state;
     return GroupState::Running;
 }
-long ProcessGroup::pid() const { return s_->st.empty() ? -1 : static_cast<long>(s_->st.front().pid); }
-long ProcessGroup::pgid() const { return static_cast<long>(s_->pgid); }
+long ProcessGroup::pid() const { return s_->st.empty() ? -1 : static_cast<long>(s_->st.front().pid); }  // fixed at start
+long ProcessGroup::pgid() const { return static_cast<long>(s_->pgid); }                                    // fixed at start
 std::string ProcessGroup::argv0() const { return s_->req.stages.empty() ? std::string() : s_->req.stages.front().program; }
 const SpawnRequest& ProcessGroup::request() const { return s_->req; }
-const ProcessResult& ProcessGroup::result() const { return s_->result; }
+const ProcessResult& ProcessGroup::result() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
+    return s_->result;
+}
 std::vector<StageResult> ProcessGroup::stages() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
     if (s_->finished) return s_->result.stages;
     std::vector<StageResult> out;
     for (const auto& stage : s_->st) out.push_back(stage.result);
@@ -1165,6 +1328,7 @@ bool ProcessGroup::has_live_members() const { return group_has_members(*s_); }
 
 ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason reason) {
     State& s = *s_;
+    OpLock op(s);
     TerminateOutcome outcome;
     if (s.detached) return outcome;  // explicitly detached: never touched by managed cleanup
     s.cleanup_requested = true;
@@ -1175,7 +1339,7 @@ ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason reason
             outcome.live_stage_terminated = true;
             begin_cancel(s, runtime::subreaper_enabled() ? CancelScope::Tree : CancelScope::Pipeline, reason, s.req.kill_after);
         }
-        run_loop(s, this, Clock::now(), nullptr);  // one non-blocking step
+        run_loop(s, this, op.lk, Clock::now(), nullptr);  // one non-blocking step
     }
     if (s.finished && s.left_phase == State::Phase::None && s.pgid > 0 && group_has_members(s)) {
         outcome.leftovers_terminated = true;
@@ -1188,6 +1352,16 @@ ProcessGroup::TerminateOutcome ProcessGroup::terminate(CancelReason reason) {
     TerminateOutcome outcome = begin_terminate(reason);
     while (!pump(Clock::now() + Millis(10))) {}
     return outcome;
+}
+
+bool ProcessGroup::settled() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
+    return group_settled(*s_);
+}
+
+bool ProcessGroup::cleanup_failed() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
+    return s_->lost || s_->leftover_failed;
 }
 
 std::string signal_name(int signo) {

@@ -83,7 +83,7 @@ int main() {
         ContextCleanup end("script", false);
         auto report = table.close_context(script);
         CHECK(report.status == HandleStatus::Ok && report.failures.empty() && report.cleaned == 3);
-        CHECK(end.wait() == 0);
+        CHECK(end.wait().empty());
     }
     const auto ms = std::chrono::duration_cast<milliseconds>(std::chrono::steady_clock::now() - t0).count();
     CHECK(ms >= 450 && ms < 1500);

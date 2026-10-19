@@ -40,6 +40,7 @@ constexpr ErrorCodeInfo kCodes[] = {
     {"limit.exceeded", HostStatus::Limit, false},
     // host services
     {"host.service_failed", HostStatus::Fatal, false},
+    {"host.shutting_down", HostStatus::Fatal, false},
     // invariant breaks (exit 70, never guessed)
     {"internal.host_call", HostStatus::Internal, false},
     {"internal.handle", HostStatus::Internal, false},

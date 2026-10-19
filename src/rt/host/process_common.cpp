@@ -1,4 +1,5 @@
 #include "rt/host/process.h"
+#include "rt/host/process_runtime.h"
 
 namespace nift::rt::host {
 
@@ -22,6 +23,7 @@ const char* group_state_name(GroupState state) {
         case GroupState::LaunchFailed: return "launch_failed";
         case GroupState::Cancelled: return "cancelled";
         case GroupState::TimedOut: return "timed_out";
+        case GroupState::LimitExceeded: return "limit_exceeded";
         case GroupState::Lost: return "lost";
         case GroupState::Detached: return "detached";
     }
@@ -30,6 +32,8 @@ const char* group_state_name(GroupState state) {
 
 HostStatus ProcessGroup::validate(const SpawnRequest& req, HostError& error) {
     const std::string& b = req.builtin;
+    if (runtime::shutting_down())
+        return make_error(error, "host.shutting_down", b + ": Nift is shutting down (signal received); no new process is started");
     if (req.stages.empty()) return make_error(error, "runtime.invalid_argument", b + ": empty pipeline");
     if (req.mode == OutputMode::Detached) {
         if (req.in_build)

@@ -8,8 +8,10 @@ namespace fs = std::filesystem;
 
 std::string Resolved::trace_path() const { return path.generic_string(); }
 
-HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out, HostError& error) {
+HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out, HostError& error,
+                        PathSemantics semantics) {
     out.spelled = std::string(raw);
+    out.open_path.clear();
     std::string expanded(raw);
     if (policy.standalone && !expanded.empty() && expanded[0] == '~' &&
         (expanded.size() == 1 || expanded[1] == '/' || expanded[1] == '\\')) {
@@ -27,7 +29,14 @@ HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::str
         const fs::path base = policy.base.empty() ? fs::current_path() : policy.base;
         path = base / path;
     }
-    out.path = fs::absolute(path).lexically_normal();
+    if (semantics == PathSemantics::Os) {
+        out.open_path = fs::absolute(path);
+        std::error_code ec;
+        fs::path canonical = fs::weakly_canonical(out.open_path, ec);
+        out.path = ec ? out.open_path : canonical;
+    } else {
+        out.path = fs::absolute(path).lexically_normal();
+    }
     if (policy.allow) {
         std::string reason;
         if (!policy.allow(out.path, reason))

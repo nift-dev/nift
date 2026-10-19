@@ -1,5 +1,7 @@
 #include "rt/host/host_call.h"
 
+#include "rt/host/process_runtime.h"
+
 namespace nift::rt::host {
 
 HostCall::HostCall(const HostCallEnv& env, HostOp op, std::string_view builtin)
@@ -15,11 +17,11 @@ HostCall::~HostCall() {
     emit_v2("error", e.code);
 }
 
-HostStatus HostCall::resolve(std::string_view raw) {
+HostStatus HostCall::resolve(std::string_view raw, PathSemantics semantics) {
     static const PathPolicy default_policy;
     const PathPolicy& policy = env_.paths ? *env_.paths : default_policy;
     HostError e;
-    const HostStatus s = resolve_path(policy, raw, builtin_, target_, e);
+    const HostStatus s = resolve_path(policy, raw, builtin_, target_, e, semantics);
     if (s != HostStatus::Ok) {
         target_.path = std::filesystem::path(std::string(raw));
         resolved_ = true;
@@ -51,11 +53,18 @@ std::string HostCall::trace_arg() const {
     return std::string();
 }
 
-void HostCall::begin() {
-    if (begun_) return;
+HostStatus HostCall::begin() {
+    if (begun_) return finished_ ? status_ : HostStatus::Ok;
     begun_ = true;
+    if ((op_is_write(op_) || op_ == HostOp::Spawn) && runtime::shutting_down()) {
+        refused_ = true;
+        HostError e;
+        make_error(e, "host.shutting_down", builtin_ + ": Nift is shutting down (signal received); nothing new is written or started");
+        return fail(HostStatus::Fatal, e);
+    }
     const auto& info = op_info(op_);
     if (env_.trace && info.v1_point == TracePoint::Pre) env_.trace->emit_v1(info.v1_name, trace_arg(), pre_res_);
+    return HostStatus::Ok;
 }
 
 void HostCall::emit_v2(const std::string& res, const std::string& err) {

@@ -17,7 +17,9 @@
 //    context ends (§11.9 row 3).
 #include "rt/host/process.h"
 
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -29,12 +31,49 @@ using WarningSink = std::function<void(const std::string&)>;
 void set_warning_sink(WarningSink sink);  // empty: stderr
 void warn(const std::string& line);
 
-// ---- reaper ----
+// ---- cleanup failures (reported separately from routine warnings) ----
+// "error: cleanup: process 'x' (pid N) could not be terminated ..." -- printed
+// even when the context ended on an error (that error stays the primary
+// diagnostic; this is a second, distinct report).
+void set_failure_sink(WarningSink sink);  // empty: stderr
+void report_cleanup_failure(const std::string& line);
+
+// ---- host loop (timers and one-shot fd watches) ----
+// One lazily started thread that sleeps in poll() until the nearest timer or
+// a watched descriptor becomes readable -- no periodic polling. Callbacks run
+// on the loop thread without the loop's lock held. Generic on purpose: CP22's
+// scheduler can take this over (or host it) without changing its users.
+using TaskId = std::uint64_t;
+TaskId loop_at(Clock::time_point when, std::function<void()> fn);  // one-shot timer (monotonic clock)
+TaskId loop_when_readable(int fd, std::function<void()> fn);      // one-shot; the loop owns `fd` and closes it
+void loop_cancel(TaskId id);                                       // no-op for fired/unknown ids
+std::size_t loop_pending();
+
+// ---- reaper (built on the host loop) ----
+// Pids nobody waits for any more (Lost stages, detached processes adopted
+// under the subreaper, orphans) are reaped when their pidfd becomes readable
+// (fallback without pidfd: a 100 ms timer per pid). Adopted groups (abandoned
+// or explicitly released handles) are kept alive and driven to completion by
+// their own timers.
 void reaper_add_pid(long pid);
-void reaper_adopt(ProcessGroupPtr group);  // the reaper pumps it to completion
+void reaper_adopt(ProcessGroupPtr group);
+// Called by a group once settled; true if it was adopted (the reaper then
+// reports a genuine cleanup failure itself: nobody else will see it).
+bool reaper_release(const ProcessGroup* group);
+// Settle notifications: a counter bumped whenever a group settles, so a
+// context end can sleep until something changes instead of polling.
+std::uint64_t settle_generation();
+void notify_settled();
+void wait_settle_change(std::uint64_t seen, Clock::time_point until);
 std::size_t reaper_pending();
 // Test support: waits (bounded) until the reaper has nothing left; returns true if idle.
 bool reaper_wait_idle(Millis bound);
+
+// ---- test hooks (only with -DNIFT_HOST_TEST_HOOKS; never user-controllable) ----
+#ifdef NIFT_HOST_TEST_HOOKS
+struct TestHooks { std::atomic<bool> suppress_sigkill{false}; };
+TestHooks& test_hooks();
+#endif
 
 // ---- termination index (not ownership) ----
 struct IndexedGroup { long pgid = -1; std::vector<long> stage_pids; bool detached = false; };
@@ -53,12 +92,20 @@ struct SignalCleanupOptions {
 };
 bool install_signal_cleanup(SignalCleanupOptions options = SignalCleanupOptions());
 void uninstall_signal_cleanup();
-// True once SIGINT/SIGTERM arrived with the handler installed. Blocking
-// waits that complete afterwards park instead of returning, so the script
-// cannot carry on (or exit with its own status) while the watcher cleans up
-// and then ends Nift with the signal.
+// True once SIGINT/SIGTERM arrived with the handler installed: Nift is
+// shutting down. From then on no new managed process is launched
+// (`host.shutting_down`) and HostCall refuses every externally visible op
+// (writes, spawns); the build engine checks the same flag before starting a
+// build or a page render (wiring later). Running code may continue to its
+// shutdown path while the watcher terminates the managed children (SIGTERM,
+// grace, SIGKILL, bounded wait); then Nift ends with the signal. If the
+// program exits first, an atexit handler waits for the watcher (bounded) and
+// re-raises, so the exit status is always signal-derived. This is a bounded
+// normal-shutdown guarantee only: SIGKILL or a crash runs none of it.
 bool termination_requested();
-[[noreturn]] void park_for_termination();
+bool shutting_down();
+void request_shutdown_for_test(int signo);  // marks shutting down without a signal (tests)
+void clear_shutdown_for_test();
 // Runs the C2 sequence synchronously (also used by the watcher thread).
 // Returns the number of groups that still had live members.
 std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait);

@@ -7,10 +7,17 @@
 #include "rt/host/host_op.h"
 #include "rt/host/host_trace.h"
 #include "rt/host/path.h"
+#include "rt/host/process.h"
+#include "rt/host/process_runtime.h"
 #include "rt/host/run_options.h"
+#include "rt/host/run_request.h"
 #include "rt_test.h"
 
+#include <csignal>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <stdlib.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -388,13 +395,14 @@ void test_run_options() {
     CHECK(parse_err(obj({{"Mode", OptionValue::of_string("stream")}})) == "run: unknown option 'Mode' (did you mean 'mode'?)");
     CHECK(parse_err(obj({{"kill-after-ms", OptionValue::of_int(1)}})) == "run: unknown option 'kill-after-ms' (did you mean 'kill_after_ms'?)");
     CHECK(parse_err(obj({{"timeuot_ms", OptionValue::of_int(1)}})) == "run: unknown option 'timeuot_ms' (did you mean 'timeout_ms'?)");
-    CHECK(parse_err(obj({{"bogus", OptionValue::of_int(1)}})) == "run: unknown option 'bogus' (options: mode, timeout_ms, kill_after_ms)");
-    CHECK(parse_err(obj({{"stdin", OptionValue::of_string("null")}})) == "run: unknown option 'stdin' (options: mode, timeout_ms, kill_after_ms)");
+    CHECK(parse_err(obj({{"bogus", OptionValue::of_int(1)}})) == "run: unknown option 'bogus' (options: mode, timeout_ms, kill_after_ms, stdin)");
+    CHECK(parse_err(obj({{"stdn", OptionValue::of_string("null")}})) == "run: unknown option 'stdn' (did you mean 'stdin'?)");
     // an unknown key is reported even when another option is also invalid
     CHECK(parse_err(obj({{"mode", OptionValue::of_int(1)}, {"tmeout_ms", OptionValue::of_int(1)}})).find("unknown option 'tmeout_ms'") != std::string::npos);
     // value errors
-    CHECK(parse_err(obj({{"mode", OptionValue::of_string("streem")}})) == "run: mode must be one of capture, stream, interactive, detached (did you mean 'stream'?)");
-    CHECK(parse_err(obj({{"mode", OptionValue::of_string("background")}})) == "run: mode must be one of capture, stream, interactive, detached");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("streem")}})) == "run: mode must be one of capture, pipe, stream, interactive, detached (did you mean 'stream'?)");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("background")}})) == "run: mode must be one of capture, pipe, stream, interactive, detached");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("pipes")}})) == "run: mode must be one of capture, pipe, stream, interactive, detached (did you mean 'pipe'?)");
     CHECK(parse_err(obj({{"mode", OptionValue::of_int(1)}})) == "run: mode must be a string, not number");
     CHECK(parse_err(obj({{"mode", OptionValue::other("array")}})) == "run: mode must be a string, not array");
     CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_int(-1)}})) == "run: timeout_ms must be a non-negative integer");
@@ -410,6 +418,12 @@ void test_run_options() {
     CHECK(parse_err(obj({{"kill_after_ms", OptionValue::of_int(5)}})) == "run: kill_after_ms needs timeout_ms in mode capture (nothing else can cancel a blocking run)");
     CHECK(parse_err(obj({{"mode", OptionValue::of_string("stream")}, {"kill_after_ms", OptionValue::of_int(5)}})).find("in mode stream") != std::string::npos);
     CHECK(parse_err(obj({{"mode", OptionValue::of_string("detached")}, {"kill_after_ms", OptionValue::of_int(5)}})) == "OK");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("pipe")}, {"kill_after_ms", OptionValue::of_int(5)}})).find("in mode pipe") != std::string::npos);
+    // mode pipe (D-034): explicit opt-in; capture keeps file capture
+    CHECK(parse_run_options(obj({{"mode", OptionValue::of_string("pipe")}}), "run", o, e) == HostStatus::Ok && o.mode == RunMode::Pipe && !o.returns_handle());
+    CHECK(output_mode_for(RunMode::Pipe) == OutputMode::PipeCapture);
+    CHECK(output_mode_for(RunMode::Capture) == OutputMode::FileCapture);
+    CHECK(output_mode_for(RunMode::Interactive) == OutputMode::Interactive);
     CHECK(parse_err(obj({{"mode", OptionValue::of_string("interactive")}, {"timeout_ms", OptionValue::of_int(5)}})) == "OK");
     // context check
     RunOptions det;
@@ -424,6 +438,155 @@ void test_run_options() {
     CHECK(edit_distance("mode", "") == 4);
     CHECK(suggest_option("md", run_option_keys()).empty());  // too short to guess
     CHECK(suggest_option("timeout", run_option_keys()).empty() || suggest_option("timeout", run_option_keys()) == "timeout_ms");
+}
+
+std::string stdin_err(const OptionValue& v, std::string mode = "") {
+    OptionObject o = {{"stdin", v}};
+    if (!mode.empty()) o.push_back({"mode", OptionValue::of_string(mode)});
+    return parse_err(o);
+}
+
+void test_stdin_option() {
+    RunOptions o;
+    HostError e;
+    CHECK(parse_run_options({}, "run", o, e) == HostStatus::Ok && !o.stdin_source.given && o.stdin_source.kind == StdinOption::Kind::Inherit);
+    auto parsed = [&](const OptionValue& v) {
+        RunOptions r;
+        HostError err;
+        CHECK(parse_run_options(OptionObject{{"stdin", v}}, "run", r, err) == HostStatus::Ok);
+        return r.stdin_source;
+    };
+    CHECK(parsed(OptionValue::of_string("inherit")).kind == StdinOption::Kind::Inherit);
+    CHECK(parsed(OptionValue::of_string("null")).kind == StdinOption::Kind::Null);
+    auto f = parsed(OptionValue::object({{"file", OptionValue::of_string("in/data.txt")}}));
+    CHECK(f.kind == StdinOption::Kind::File && f.value == "in/data.txt" && f.given);
+    auto t = parsed(OptionValue::object({{"text", OptionValue::of_string("a\nb\n")}}));
+    CHECK(t.kind == StdinOption::Kind::Text && t.value == "a\nb\n");
+    auto empty = parsed(OptionValue::object({{"text", OptionValue::of_string("")}}));
+    CHECK(empty.kind == StdinOption::Kind::Text && empty.value.empty());
+    // malformed forms: clear, fatal, with suggestions
+    const std::string forms = "\"inherit\", \"null\", {\"file\": path} or {\"text\": string}";
+    CHECK(stdin_err(OptionValue::of_string("nul")) == "run: stdin must be " + forms + " (did you mean \"null\"?)");
+    CHECK(stdin_err(OptionValue::of_string("Inherit")) == "run: stdin must be " + forms + " (did you mean \"inherit\"?)");
+    CHECK(stdin_err(OptionValue::of_string("input.txt")) ==
+          "run: stdin must be " + forms + " (a path is given as {\"file\": \"input.txt\"}, text as {\"text\": ...})");
+    CHECK(stdin_err(OptionValue::of_int(0)) == "run: stdin must be " + forms + ", not number");
+    CHECK(stdin_err(OptionValue::other("array")) == "run: stdin must be " + forms + ", not array");
+    CHECK(stdin_err(OptionValue::object({})) == "run: stdin object must have exactly one key, \"file\" or \"text\" (got 0)");
+    CHECK(stdin_err(OptionValue::object({{"file", OptionValue::of_string("a")}, {"text", OptionValue::of_string("b")}})) ==
+          "run: stdin object must have exactly one key, \"file\" or \"text\" (got 2)");
+    CHECK(stdin_err(OptionValue::object({{"fiel", OptionValue::of_string("a")}})) == "run: unknown stdin form 'fiel' (did you mean 'file'?)");
+    CHECK(stdin_err(OptionValue::object({{"path", OptionValue::of_string("a")}})) == "run: unknown stdin form 'path' (forms: {\"file\": path}, {\"text\": string})");
+    CHECK(stdin_err(OptionValue::object({{"text", OptionValue::other("bytes")}})) ==
+          "run: stdin.text must be a string, not bytes (binary stdin is not supported yet; text is never reinterpreted from bytes)");
+    CHECK(stdin_err(OptionValue::object({{"text", OptionValue::of_int(3)}})) == "run: stdin.text must be a string, not number");
+    CHECK(stdin_err(OptionValue::object({{"file", OptionValue()}})) == "run: stdin.file must be a string, not null");
+    CHECK(stdin_err(OptionValue::object({{"file", OptionValue::of_string("")}})) == "run: stdin.file must not be empty");
+    // combinations
+    CHECK(stdin_err(OptionValue::of_string("null"), "interactive") == "run: stdin is not allowed in mode interactive (the process reads what write() sends)");
+    CHECK(stdin_err(OptionValue::of_string("inherit"), "detached") == "run: stdin \"inherit\" is not allowed for a detached process (use \"null\" or {\"file\": path})");
+    CHECK(stdin_err(OptionValue::object({{"text", OptionValue::of_string("x")}}), "detached").find("{\"text\": ...} is not allowed for a detached process") != std::string::npos);
+    CHECK(stdin_err(OptionValue::of_string("null"), "detached") == "OK");
+    CHECK(stdin_err(OptionValue::object({{"file", OptionValue::of_string("f")}}), "detached") == "OK");
+    CHECK(stdin_err(OptionValue::object({{"text", OptionValue::of_string("x")}}), "pipe") == "OK");
+    CHECK(stdin_err(OptionValue::of_string("null"), "stream") == "OK");
+    CHECK(parse_err(obj({{"stdin", OptionValue::of_string("null")}, {"stdin", OptionValue::of_string("null")}})) == "run: option 'stdin' given twice");
+}
+
+void test_stdin_file_and_request() {
+    char dir[] = "/tmp/cp16-stdin-XXXXXX";
+    CHECK(::mkdtemp(dir) != nullptr);
+    const std::string d = dir;
+    std::filesystem::create_directories(d + "/real/sub");
+    { std::ofstream f(d + "/real/data.txt", std::ios::binary); f << "hello\n"; }
+    { std::ofstream f(d + "/big.txt", std::ios::binary); f << std::string(5000, 'x'); }
+    std::filesystem::create_directory_symlink(d + "/real/sub", d + "/link");
+    SpySink sink;
+    SpyObserver observer;
+    TraceChannel channel(TraceChannel::V1, &sink);
+    PathPolicy policy;
+    policy.standalone = true;
+    policy.base = d;
+    HostCallEnv env{&channel, &observer, &policy};
+    RunRequestContext ctx;
+    ctx.read_limit = 4096;
+    std::string bytes;
+    HostError e;
+    // normal OS semantics: link/../data.txt is real/data.txt (lexically it would be <dir>/data.txt, which does not exist)
+    CHECK(read_stdin_file(env, "link/../data.txt", ctx, bytes, e) == HostStatus::Ok && bytes == "hello\n");
+    const std::string canon = std::filesystem::weakly_canonical(d + "/real/data.txt").generic_string();
+    CHECK(observer.calls.size() == 1 && observer.calls[0] == "read " + canon + " 6");  // dependency recorded
+    CHECK(sink.lines.size() == 1 && sink.lines[0] == "{\"ctx\":\"script\",\"op\":\"read\",\"arg\":\"" + canon + "\",\"res\":\"6\"}\n");
+    observer.calls.clear();
+    // missing / directory: catchable io.open_failed, nothing recorded
+    CHECK(read_stdin_file(env, "nope.txt", ctx, bytes, e) == HostStatus::Recoverable && e.code == "io.open_failed" && catchable(e.code));
+    CHECK(e.message == "run: cannot open stdin file nope.txt");
+    CHECK(read_stdin_file(env, "real", ctx, bytes, e) == HostStatus::Recoverable && e.message == "run: cannot open stdin file real: it is a directory");
+    // read limit: loud, never truncated
+    CHECK(read_stdin_file(env, "big.txt", ctx, bytes, e) == HostStatus::Limit && e.code == "limit.exceeded" && bytes.empty());
+    CHECK(e.message == "run: stdin file big.txt exceeds the read limit of 4096 bytes (NIFT_READ_LIMIT)");
+    CHECK(observer.calls.empty());
+    // --fs-root policy (checked on the canonical path)
+    PathPolicy rooted = policy;
+    rooted.allow = [&](const std::filesystem::path& p, std::string& reason) {
+        if (p.generic_string().rfind(std::filesystem::weakly_canonical(d + "/real/sub").generic_string(), 0) == 0) return true;
+        reason = "path is outside --fs-root";
+        return false;
+    };
+    HostCallEnv renv{&channel, &observer, &rooted};
+    CHECK(read_stdin_file(renv, "link/../data.txt", ctx, bytes, e) == HostStatus::Fatal && e.message == "run: path is outside --fs-root");
+    // request building
+    RunOptions opts;
+    SpawnRequest req;
+    CHECK(parse_run_options(OptionObject{{"mode", OptionValue::of_string("pipe")}, {"timeout_ms", OptionValue::of_int(50)},
+                                         {"stdin", OptionValue::object({{"file", OptionValue::of_string("real/data.txt")}})}},
+                            "run", opts, e) == HostStatus::Ok);
+    CHECK(build_spawn_request(env, opts, {"cat", "-"}, ctx, req, e) == HostStatus::Ok);
+    CHECK(req.mode == OutputMode::PipeCapture && req.stdin_mode == StdinMode::Text && req.stdin_text == "hello\n");
+    CHECK(req.timeout && req.timeout->count() == 50 && req.kill_after == kDefaultKillAfter && req.capture_limit == 4096);
+    CHECK(req.stages.size() == 1 && req.stages[0].program == "cat" && req.stages[0].args == std::vector<std::string>{"-"});
+    RunOptions plain;
+    CHECK(build_spawn_request(env, plain, {"true"}, ctx, req, e) == HostStatus::Ok && req.mode == OutputMode::FileCapture && req.stdin_mode == StdinMode::Inherit);
+    RunOptions det;
+    det.mode = RunMode::Detached;
+    RunRequestContext bctx = ctx;
+    bctx.in_build = true;
+    CHECK(build_spawn_request(env, det, {"sleep", "1"}, bctx, req, e) == HostStatus::Fatal && e.code == "process.detach_in_build");
+    std::filesystem::remove_all(d);
+}
+
+void test_shutdown_refusals() {
+    SpySink sink;
+    TraceChannel channel(TraceChannel::V2, &sink);
+    PathPolicy policy = script_policy();
+    HostCallEnv env{&channel, nullptr, &policy};
+    runtime::request_shutdown_for_test(SIGTERM);
+    {
+        HostCall call(env, HostOp::Save, "save");
+        call.resolve("x");
+        CHECK(call.begin() == HostStatus::Fatal && call.error().code == "host.shutting_down" && call.finished());
+    }
+    {
+        HostCall call(env, HostOp::Spawn, "run");
+        call.set_arg("true");
+        CHECK(call.begin() == HostStatus::Fatal);
+    }
+    {
+        HostCall call(env, HostOp::Read, "open");  // reads stay possible: the shutdown path may need them
+        call.resolve("x");
+        CHECK(call.begin() == HostStatus::Ok);
+        call.succeed("1");
+    }
+    SpawnRequest r;
+    SpawnStage st;
+    st.program = "true";
+    r.stages.push_back(st);
+    HostError e;
+    CHECK(ProcessGroup::validate(r, e) == HostStatus::Fatal && e.code == "host.shutting_down");
+    runtime::clear_shutdown_for_test();
+    CHECK(ProcessGroup::validate(r, e) == HostStatus::Ok);
+    CHECK(sink.lines.size() == 3 && sink.lines[0].find("\"err\":\"host.shutting_down\"") != std::string::npos);
+    CHECK(!catchable("host.shutting_down"));
 }
 
 void test_adapter() {
@@ -471,6 +634,9 @@ int main() {
     test_recording_table();
     test_paths();
     test_run_options();
+    test_stdin_option();
+    test_stdin_file_and_request();
+    test_shutdown_refusals();
     test_adapter();
     return rt_test::finish("host-layer-unit");
 }

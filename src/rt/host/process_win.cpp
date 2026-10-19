@@ -94,6 +94,9 @@ const char* output_mode_name(OutputMode mode) {
     return "?";
 }
 
+std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostStatus& status, HostError& error, bool) {
+    return start(std::move(req), status, error);
+}
 std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& status, HostError& error) {
     status = validate(req, error);
     if (status != HostStatus::Ok) return nullptr;
@@ -124,6 +127,9 @@ std::vector<StageResult> ProcessGroup::stages() const { return s_->result.stages
 ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason) { return TerminateOutcome(); }
 ProcessGroup::TerminateOutcome ProcessGroup::terminate(CancelReason) { return TerminateOutcome(); }
 bool ProcessGroup::has_live_members() const { return false; }
+bool ProcessGroup::cleanup_failed() const { return false; }
+bool ProcessGroup::settled() const { return true; }
+void ProcessGroup::timer_tick() {}
 std::string signal_name(int signo) { return "SIG" + std::to_string(signo); }
 
 } // namespace nift::rt::host

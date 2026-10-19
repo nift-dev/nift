@@ -14,6 +14,7 @@
 #include "rt/host/process_call.h"
 #include "rt/host/process_cleanup.h"
 #include "rt/host/process_runtime.h"
+#include "rt/host/run_request.h"
 #include "rt_test.h"
 
 #include <cerrno>
@@ -409,7 +410,7 @@ void cancellation() {
     std::this_thread::sleep_for(milliseconds(200));
     CHECK(g->running());
     CHECK(g->cancel());
-    CHECK(g->cancel());  // idempotent while running
+    g->cancel();  // idempotent: no second sequence (false once the host loop reaped every stage)
     const auto& r = g->wait();
     CHECK(r.cancelled && !r.timed_out && r.state == GroupState::Cancelled);
     CHECK(r.stages.size() == 3);
@@ -490,14 +491,18 @@ void leftovers_c1_and_holders() {
     const auto t0 = Clock::now();
     const auto& r = g->wait();
     CHECK(r.out == "started\n" && ms_since(t0) < 2000);
-    CHECK(tagged(tag).size() == 1);  // the sleep survives the call (§11.3 row 1)
+    {
+        const auto left = tagged(tag);
+        if (left.size() != 1) for (long p : left) { runtime::ProcInfo i; runtime::proc_read(p, i); std::printf("left %ld state %c ppid %ld pgrp %ld\n", p, i.state, i.ppid, i.pgrp); }
+        CHECK(left.size() == 1);  // the sleep survives the call (§11.3 row 1)
+    }
     std::vector<std::string> warnings;
     runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
     CleanupReport report;
     {
         ContextCleanup end("script", false);
         report = process_cleanup(g, ProcessRelease::ContextEnd);
-        CHECK(end.wait() == 0);
+        CHECK(end.wait().empty());
     }
     // (queued or already settled: a plain `sleep` dies of SIGTERM at once)
     CHECK(report.leftovers_terminated && !report.live_stage_terminated && !report.warned && !report.handed_to_reaper);
@@ -574,7 +579,7 @@ void adapter_lifecycle() {
         ContextCleanup end("script", false);
         table.close_context(ctx);
         CHECK(ms_since(t0) < 300);  // the hooks only start the sequence
-        CHECK(end.wait() == 0);
+        CHECK(end.wait().empty());
     }
     const double ms = ms_since(t0);
     CHECK(ms >= 450 && ms < 1500);  // one grace period for all three groups
@@ -779,39 +784,285 @@ void sigkill_pdeathsig_linux() {
 }
 
 void escapees_subreaper() {
-    const std::string tag = new_tag(), dtag = new_tag();
+    const std::string ptag = new_tag(), tag = new_tag(), dtag = new_tag();
     if (!runtime::enable_subreaper()) { std::printf("escapees_subreaper: SKIPPED (no PR_SET_CHILD_SUBREAPER)\n"); return; }
     CHECK(runtime::subreaper_enabled());
-    // a pipe holder in another session does not hang a pipe-mode call
+    // a pipe holder in another session does not hang a pipe-mode call (it may
+    // also be terminated as a leftover if it had not left the group yet)
     const auto t0 = Clock::now();
-    auto r = run_ok(req({"sh", "-c", "setsid sleep 30 & echo x"}, OutputMode::PipeCapture, tag));
+    auto r = run_ok(req({"sh", "-c", "setsid sleep 30 & echo x"}, OutputMode::PipeCapture, ptag));
     CHECK(r.out == "x\n" && ms_since(t0) < 3000);
     // an escapee of a FileCapture run (setsid, its parent exits) is reparented to Nift
     auto g = start_ok(req({"sh", "-c", "setsid sleep 30 </dev/null >/dev/null 2>&1 &"}, OutputMode::FileCapture, tag));
     g->wait();
-    CHECK(wait_until([&] { return tagged(tag).size() == 2; }, milliseconds(2000)));
-    for (long pid : tagged(tag)) {
+    CHECK(wait_until([&] {
+        auto pids = tagged(tag);
+        if (pids.size() != 1) return false;
         runtime::ProcInfo info;
-        CHECK(runtime::proc_read(pid, info) && info.ppid == ::getpid());
-    }
+        return runtime::proc_read(pids[0], info) && info.ppid == ::getpid() && info.session == pids[0];
+    }, milliseconds(2000)));
     // group cleanup cannot reach it (it left the group) ...
     {
         ContextCleanup end("script", false);
         process_cleanup(g, ProcessRelease::ContextEnd);
     }
-    CHECK(tagged(tag).size() == 2);
+    CHECK(tagged(tag).size() == 1);
     // ... the root-context orphan sweep does; a detached process is spared
     auto det = start_ok(req({"sleep", "30"}, OutputMode::Detached, dtag));
     CHECK(wait_until([&] { return tagged(dtag).size() == 1; }, milliseconds(2000)));
     const std::size_t swept = runtime::sweep_orphans(milliseconds(300), milliseconds(2000));
-    CHECK(swept == 2);
+    CHECK(swept >= 1 && swept <= 2);
     CHECK(none_tagged(tag));
+    CHECK(none_tagged(ptag));
     CHECK(tagged(dtag).size() == 1);
     det->cancel(CancelScope::Pipeline, CancelReason::Explicit, milliseconds(300));
     runtime::reaper_adopt(det);
     CHECK(none_tagged(dtag));
     CHECK(runtime::reaper_wait_idle(milliseconds(5000)));  // the detached pid was reaped (ours under the subreaper)
     CHECK(zombie_children() == 0);
+}
+
+// ---- D-034 ----
+ProcessResult run_opts(OptionObject opts, std::vector<std::string> argv, const std::string& tag, std::uint64_t limit = 1u << 30) {
+    RunOptions o;
+    HostError e;
+    CHECK(parse_run_options(opts, "run", o, e) == HostStatus::Ok);
+    RunRequestContext ctx;
+    ctx.read_limit = limit;
+    SpawnRequest r;
+    HostCallEnv env;
+    CHECK(build_spawn_request(env, o, argv, ctx, r, e) == HostStatus::Ok);
+    r.stages[0].env.push_back({"NIFT_TEST_PROC_TAG", tag});
+    if (!o.kill_after) r.kill_after = milliseconds(300);  // keep the suite fast; the 2,000 ms default has its own test
+    return run_ok(r);
+}
+
+OptionValue text(std::string t) { return OptionValue::object({{"text", OptionValue::of_string(std::move(t))}}); }
+
+void pipe_mode_suite() {
+    const std::string tag = new_tag();
+    const OptionValue pipe = OptionValue::of_string("pipe");
+    // large stdout and large stderr at the same time
+    const char* both = "python3 -c \"import os\na=b'a'*65536; b=b'b'*65536\nfor i in range(256):\n  os.write(1,a); os.write(2,b)\n\"";
+    auto r = run_opts({{"mode", pipe}}, {"sh", "-c", both}, tag);
+    CHECK(r.state == GroupState::Exited && r.out.size() == 16u << 20 && r.err.size() == 16u << 20);
+    // a descendant holding the pipe: managed cleanup, prompt return
+    auto t0 = Clock::now();
+    r = run_opts({{"mode", pipe}}, {"sh", "-c", "(sleep 30 &); echo x"}, tag);
+    CHECK(r.out == "x\n" && r.state == GroupState::Exited && ms_since(t0) < 2000);
+    CHECK(none_tagged(tag));
+    // distinct outcomes: launch failure, nonzero exit, timeout, limit
+    r = run_opts({{"mode", pipe}}, {"missing-cp16"}, tag);
+    CHECK(r.state == GroupState::LaunchFailed && !r.launched && r.exit_code == 127);
+    r = run_opts({{"mode", pipe}}, {"sh", "-c", "exit 4"}, tag);
+    CHECK(r.state == GroupState::Exited && r.launched && r.exit_code == 4);
+    r = run_opts({{"mode", pipe}, {"timeout_ms", OptionValue::of_int(200)}}, {"sleep", "30"}, tag);
+    CHECK(r.state == GroupState::TimedOut && r.timed_out && !r.cancelled);
+    r = run_opts({{"mode", pipe}}, {"sh", "-c", "head -c 3000000 /dev/zero; sleep 30"}, tag, 1u << 20);
+    CHECK(r.state == GroupState::LimitExceeded && r.capture_limit_exceeded == "stdout" && !r.timed_out && !r.cancelled);
+    // capture keeps file capture: seekable stdout
+    r = run_opts({{"mode", OptionValue::of_string("capture")}}, {"sh", "-c", "test -f /dev/stdout && echo file"}, tag);
+    CHECK(r.out == "file\n");
+    r = run_opts({{"mode", pipe}}, {"sh", "-c", "test -p /dev/stdout && echo pipe"}, tag);
+    CHECK(r.out == "pipe\n");
+    // cancellation from another thread while the owner is blocked in wait()
+    auto req0 = req({"sh", "-c", "echo started; sleep 30"}, OutputMode::PipeCapture, tag);
+    auto g = start_ok(req0);
+    std::thread canceller([&] { std::this_thread::sleep_for(milliseconds(200)); g->cancel(); });
+    t0 = Clock::now();
+    const auto& rc = g->wait();
+    canceller.join();
+    CHECK(rc.state == GroupState::Cancelled && rc.cancelled && rc.out == "started\n" && ms_since(t0) < 2000);
+    // cleanup at context end (pipe mode handle still running)
+    std::vector<std::string> warnings;
+    runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
+    g = start_ok(req({"sleep", "30"}, OutputMode::PipeCapture, tag));
+    {
+        ContextCleanup end("script", false);
+        process_cleanup(g, ProcessRelease::ContextEnd);
+        CHECK(end.wait().empty());
+    }
+    CHECK(warnings.size() == 1 && g->finished() && g->result().state == GroupState::Cancelled);
+    runtime::set_warning_sink(nullptr);
+    CHECK(none_tagged(tag));
+}
+
+void stdin_suite() {
+    const std::string tag = new_tag();
+    const OptionValue pipe = OptionValue::of_string("pipe");
+    // empty input
+    auto r = run_opts({{"mode", pipe}, {"stdin", text("")}}, {"wc", "-c"}, tag);
+    CHECK(std::strtol(r.out.c_str(), nullptr, 10) == 0 && r.stdin_complete && r.stdin_total == 0 && r.stdin_error.empty());
+    // never a shell: shell syntax arrives literally
+    r = run_opts({{"mode", pipe}, {"stdin", text("$(echo hi) `id` ; | *\n")}}, {"cat"}, tag);
+    CHECK(r.out == "$(echo hi) `id` ; | *\n");
+    // large input fed while large output is drained (cat echoes 8 MiB back): no deadlock
+    std::string big(8u << 20, 'q');
+    for (std::size_t i = 0; i < big.size(); i += 4096) big[i] = '\n';
+    for (const char* mode : {"pipe", "capture"}) {
+        r = run_opts({{"mode", OptionValue::of_string(mode)}, {"stdin", text(big)}, {"timeout_ms", OptionValue::of_int(60000)}}, {"cat"}, tag);
+        CHECK(!r.timed_out && r.out == big && r.stdin_complete && r.stdin_written == big.size());
+    }
+    // early exit: the process result is kept; delivery is incomplete, not an error
+    r = run_opts({{"mode", pipe}, {"stdin", text(big)}}, {"head", "-c", "10"}, tag);
+    CHECK(r.state == GroupState::Exited && r.exit_code == 0 && r.out.size() == 10);
+    CHECK(!r.stdin_complete && r.stdin_written < big.size() && r.stdin_error.empty());
+    r = run_opts({{"mode", pipe}, {"stdin", text(big)}}, {"sh", "-c", "exit 3"}, tag);
+    CHECK(r.exit_code == 3 && !r.stdin_complete && r.stdin_error.empty());
+    // stdin "null" and inherit (default) unchanged
+    r = run_opts({{"mode", pipe}, {"stdin", OptionValue::of_string("null")}}, {"wc", "-c"}, tag);
+    CHECK(std::strtol(r.out.c_str(), nullptr, 10) == 0);
+    // deadline while feeding a child that never reads
+    auto t0 = Clock::now();
+    r = run_opts({{"mode", pipe}, {"stdin", text(big)}, {"timeout_ms", OptionValue::of_int(200)}}, {"sleep", "30"}, tag);
+    CHECK(r.state == GroupState::TimedOut && !r.stdin_complete && r.stdin_error.empty() && ms_since(t0) < 2000);
+    // cancellation while feeding
+    auto fr = req({"sleep", "30"}, OutputMode::PipeCapture, tag);
+    fr.stdin_mode = StdinMode::Text;
+    fr.stdin_text = big;
+    auto g = start_ok(fr);
+    std::this_thread::sleep_for(milliseconds(100));
+    CHECK(g->cancel());
+    const auto& rc = g->wait();
+    CHECK(rc.state == GroupState::Cancelled && !rc.stdin_complete && rc.stdin_error.empty());
+    // {"file": path}
+    char path[] = "/tmp/cp16-stdin-file-XXXXXX";
+    const int fd = ::mkstemp(path);
+    CHECK(::write(fd, "from file\n", 10) == 10);
+    ::close(fd);
+    r = run_opts({{"mode", pipe}, {"stdin", OptionValue::object({{"file", OptionValue::of_string(path)}})}}, {"cat"}, tag);
+    CHECK(r.out == "from file\n" && r.stdin_complete);
+    std::remove(path);
+    CHECK(none_tagged(tag));
+    CHECK(zombie_children() == 0);
+}
+
+void deadline_suite() {
+    const std::string tag = new_tag();
+    // idle handle whose child ignores SIGTERM: enforced with nobody using the handle
+    auto r0 = req({"sh", "-c", "trap '' TERM; while :; do sleep 0.05; done"}, OutputMode::Interactive, tag);
+    r0.timeout = milliseconds(200);
+    r0.kill_after = milliseconds(300);
+    auto t0 = Clock::now();
+    auto idle = start_ok(r0);
+    CHECK(wait_until([&] { return idle->finished(); }, milliseconds(3000)));  // no call that pumps it
+    const double ms = ms_since(t0);
+    if (!(ms >= 450 && ms < 2000)) std::printf("idle deadline: %.0f ms\n", ms);
+    CHECK(ms >= 450 && ms < 2000);
+    CHECK(idle->result().state == GroupState::TimedOut && idle->result().stages[0].signal == SIGKILL);
+    CHECK(none_tagged(tag, milliseconds(200)));
+    CHECK(zombie_children() == 0);
+    // several concurrent deadlines on idle handles
+    std::vector<ProcessGroupPtr> gs;
+    for (int ms_i : {100, 250, 1200, 1300}) {
+        auto r = req({"sleep", "30"}, OutputMode::Interactive, tag);
+        r.timeout = milliseconds(ms_i);
+        gs.push_back(start_ok(r));
+    }
+    std::this_thread::sleep_for(milliseconds(700));
+    CHECK(gs[0]->finished() && gs[1]->finished() && !gs[2]->finished() && !gs[3]->finished());
+    CHECK(wait_until([&] { return gs[2]->finished() && gs[3]->finished(); }, milliseconds(3000)));
+    for (auto& g : gs) CHECK(g->result().state == GroupState::TimedOut && g->result().stages[0].signal == SIGTERM);
+    // expiry while the owner is blocked reading
+    auto br = req({"sleep", "30"}, OutputMode::Interactive, tag);
+    br.timeout = milliseconds(200);
+    auto g = start_ok(br);
+    t0 = Clock::now();
+    CHECK(!g->read_line());
+    CHECK(ms_since(t0) < 2000 && g->wait().timed_out);
+    // the expiry is recorded even if the child then exits by itself during the grace period
+    auto ex = req({"sh", "-c", "trap 'exit 0' TERM; while :; do sleep 0.05; done"}, OutputMode::Interactive, tag);
+    ex.timeout = milliseconds(150);
+    g = start_ok(ex);
+    const auto& rr = g->wait();
+    CHECK(rr.state == GroupState::TimedOut && rr.timed_out && rr.exit_code == 0 && rr.stages[0].state == StageState::Exited);
+    // the host loop has nothing left armed once every group settled
+    CHECK(wait_until([] { return runtime::loop_pending() == 0; }, milliseconds(1000)));
+    CHECK(none_tagged(tag));
+}
+
+void deadline_races() {
+    const std::string tag = new_tag();
+    std::vector<std::string> warnings;
+    runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
+    int ok = 0;
+    for (int i = 0; i < 30; ++i) {
+        // deadline, own exit, explicit cancel and context cleanup all at about the same time
+        auto r = req({"sh", "-c", i % 2 ? "sleep 0.03" : "sleep 30"}, OutputMode::Interactive, tag);
+        r.timeout = milliseconds(30);
+        r.kill_after = milliseconds(100);
+        auto g = start_ok(r);
+        std::this_thread::sleep_for(std::chrono::microseconds(25000 + (i % 7) * 1000));
+        std::thread a([&] { g->cancel(); });
+        {
+            ContextCleanup end("script", false);
+            process_cleanup(g, ProcessRelease::ContextEnd);
+            end.wait();
+        }
+        a.join();
+        if (g->finished() && g->settled()) ++ok;
+    }
+    CHECK(ok == 30);
+    CHECK(wait_until([] { return zombie_children() == 0; }, milliseconds(1000)));
+    CHECK(none_tagged(tag));
+    runtime::set_warning_sink(nullptr);
+}
+
+void shutdown_refuses_launches() {
+    runtime::request_shutdown_for_test(SIGTERM);
+    HostStatus st;
+    HostError e;
+    CHECK(!ProcessGroup::start(req({"true"}, OutputMode::PipeCapture, new_tag()), st, e) && e.code == "host.shutting_down");
+    CHECK(e.message == "run: Nift is shutting down (signal received); no new process is started");
+    runtime::clear_shutdown_for_test();
+}
+
+void cleanup_failures_reported() {
+    // A process that cannot be terminated (SIGKILL suppressed by the test
+    // hook): the routine warning follows the context's outcome, the genuine
+    // failure is reported separately in both cases.
+    const std::string tag = new_tag();
+    std::vector<std::string> warnings, failures;
+    runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
+    runtime::set_failure_sink([&](const std::string& f) { failures.push_back(f); });
+    runtime::test_hooks().suppress_sigkill = true;
+    for (bool failed : {true, false}) {
+        warnings.clear();
+        failures.clear();
+        auto r = req({"sh", "-c", "trap '' TERM; while :; do sleep 0.05; done"}, OutputMode::Interactive, tag);
+        r.kill_after = milliseconds(150);
+        r.post_kill_wait = milliseconds(200);
+        auto g = start_ok(r);
+        std::this_thread::sleep_for(milliseconds(150));  // let sh install its trap first
+        std::vector<std::string> reported;
+        {
+            ContextCleanup end(failed ? "page 'about'" : "script", failed);
+            process_cleanup(g, ProcessRelease::ContextEnd);
+            reported = end.wait();
+        }
+        CHECK(warnings.size() == (failed ? 0u : 1u));
+        CHECK(reported.size() == 1 && failures == reported);
+        if (!reported.empty())
+            CHECK(reported[0] == "error: cleanup: process 'sh' (pid " + std::to_string(g->pid()) +
+                                 ") could not be terminated (still running after SIGKILL); left to the reaper");
+        CHECK(g->result().state == GroupState::Lost && g->cleanup_failed());
+        kill_tagged(tag);
+    }
+    // an error-ended context whose processes terminate normally: silent
+    runtime::test_hooks().suppress_sigkill = false;
+    warnings.clear();
+    failures.clear();
+    auto g = start_ok(req({"sleep", "30"}, OutputMode::Interactive, tag));
+    {
+        ContextCleanup end("page 'about'", true);
+        process_cleanup(g, ProcessRelease::ContextEnd);
+        CHECK(end.wait().empty());
+    }
+    CHECK(warnings.empty() && failures.empty() && g->result().state == GroupState::Cancelled);
+    runtime::set_warning_sink(nullptr);
+    runtime::set_failure_sink(nullptr);
+    CHECK(runtime::reaper_wait_idle(milliseconds(3000)));
+    CHECK(none_tagged(tag));
 }
 
 } // namespace
@@ -839,6 +1090,12 @@ int main(int argc, char** argv) {
         {"detached_rules", detached_rules},
         {"low_fd_limit", low_fd_limit},
         {"trace_spawn", trace_spawn},
+        {"pipe_mode_suite", pipe_mode_suite},
+        {"stdin_suite", stdin_suite},
+        {"deadline_suite", deadline_suite},
+        {"deadline_races", deadline_races},
+        {"shutdown_refuses_launches", shutdown_refuses_launches},
+        {"cleanup_failures_reported", cleanup_failures_reported},
         {"sigterm_to_nift_c2", sigterm_to_nift_c2},
         {"sigkill_pdeathsig_linux", sigkill_pdeathsig_linux},
         {"escapees_subreaper", escapees_subreaper},  // last: enables the subreaper for the rest of the process

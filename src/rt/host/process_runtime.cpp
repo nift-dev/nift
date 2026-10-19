@@ -14,6 +14,8 @@
 #include <csignal>
 #include <cstring>
 #include <dirent.h>
+#include <poll.h>
+#include <sys/syscall.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -119,6 +121,173 @@ std::vector<long> proc_group_members(long pgid, long session) {
     return out;
 }
 
+// ---------------------------------------------------------------- failures
+namespace {
+WarningSink& failure_sink() { static WarningSink s; return s; }
+} // namespace
+
+void set_failure_sink(WarningSink sink) {
+    std::lock_guard<std::mutex> lock(warn_mutex());
+    failure_sink() = std::move(sink);
+}
+
+void report_cleanup_failure(const std::string& line) {
+    WarningSink sink;
+    {
+        std::lock_guard<std::mutex> lock(warn_mutex());
+        sink = failure_sink();
+    }
+    if (sink) { sink(line); return; }
+    std::fflush(stdout);
+    std::fprintf(stderr, "%s\n", line.c_str());
+    std::fflush(stderr);
+}
+
+#ifdef NIFT_HOST_TEST_HOOKS
+TestHooks& test_hooks() { static TestHooks h; return h; }
+#endif
+
+// ---------------------------------------------------------------- host loop
+#ifndef _WIN32
+namespace {
+struct LoopState {
+    std::mutex mutex;
+    std::multimap<Clock::time_point, TaskId> timers;
+    struct Task { std::function<void()> fn; int fd = -1; Clock::time_point when; bool timer = false; };
+    std::map<TaskId, Task> tasks;
+    TaskId next = 1;
+    int wake[2] = {-1, -1};
+    bool started = false;
+};
+LoopState& loop() { static LoopState* s = new LoopState; return *s; }  // never destroyed: the thread outlives statics
+
+void loop_wake(LoopState& l) {
+    if (l.wake[1] < 0) return;
+    const char byte = 1;
+    ssize_t ignored = ::write(l.wake[1], &byte, 1);  // non-blocking; a full pipe already means "wake up"
+    (void)ignored;
+}
+
+void loop_thread() {
+    auto& l = loop();
+    for (;;) {
+        std::vector<pollfd> fds;
+        std::vector<TaskId> fd_tasks;
+        int timeout_ms = -1;
+        {
+            std::lock_guard<std::mutex> lock(l.mutex);
+            fds.push_back({l.wake[0], POLLIN, 0});
+            for (const auto& kv : l.tasks)
+                if (!kv.second.timer) { fds.push_back({kv.second.fd, POLLIN, 0}); fd_tasks.push_back(kv.first); }
+            if (!l.timers.empty()) {
+                const auto left = std::chrono::duration_cast<Millis>(l.timers.begin()->first - Clock::now()).count();
+                timeout_ms = left <= 0 ? 0 : static_cast<int>(std::min<long long>(left + 1, 1 << 30));
+            }
+        }
+        const int ready = ::poll(fds.data(), static_cast<nfds_t>(fds.size()), timeout_ms);
+        std::vector<std::function<void()>> due;
+        {
+            std::lock_guard<std::mutex> lock(l.mutex);
+            if (ready > 0 && (fds[0].revents & POLLIN)) {
+                char buf[64];
+                while (::read(l.wake[0], buf, sizeof buf) > 0) {}
+            }
+            if (ready > 0) {
+                for (std::size_t i = 1; i < fds.size(); ++i) {
+                    if (!fds[i].revents) continue;
+                    auto it = l.tasks.find(fd_tasks[i - 1]);
+                    if (it == l.tasks.end()) continue;  // cancelled meanwhile
+                    due.push_back(std::move(it->second.fn));
+                    ::close(it->second.fd);
+                    l.tasks.erase(it);
+                }
+            }
+            const auto now = Clock::now();
+            while (!l.timers.empty() && l.timers.begin()->first <= now) {
+                const TaskId id = l.timers.begin()->second;
+                l.timers.erase(l.timers.begin());
+                auto it = l.tasks.find(id);
+                if (it == l.tasks.end()) continue;
+                due.push_back(std::move(it->second.fn));
+                l.tasks.erase(it);
+            }
+        }
+        for (auto& fn : due) if (fn) fn();
+    }
+}
+
+void loop_start_locked(LoopState& l) {
+    if (l.started) return;
+    int fds[2];
+    if (::pipe(fds) != 0) return;
+    for (int fd : fds) {
+        ::fcntl(fd, F_SETFD, FD_CLOEXEC);
+        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL) | O_NONBLOCK);
+    }
+    l.wake[0] = fds[0];
+    l.wake[1] = fds[1];
+    l.started = true;
+    std::thread(loop_thread).detach();
+}
+} // namespace
+
+TaskId loop_at(Clock::time_point when, std::function<void()> fn) {
+    auto& l = loop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    loop_start_locked(l);
+    const TaskId id = l.next++;
+    LoopState::Task task;
+    task.fn = std::move(fn);
+    task.when = when;
+    task.timer = true;
+    l.tasks.emplace(id, std::move(task));
+    const bool earliest = l.timers.empty() || when < l.timers.begin()->first;
+    l.timers.emplace(when, id);
+    if (earliest) loop_wake(l);
+    return id;
+}
+
+TaskId loop_when_readable(int fd, std::function<void()> fn) {
+    auto& l = loop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    loop_start_locked(l);
+    const TaskId id = l.next++;
+    LoopState::Task task;
+    task.fn = std::move(fn);
+    task.fd = fd;
+    l.tasks.emplace(id, std::move(task));
+    loop_wake(l);
+    return id;
+}
+
+void loop_cancel(TaskId id) {
+    if (!id) return;
+    auto& l = loop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    auto it = l.tasks.find(id);
+    if (it == l.tasks.end()) return;
+    if (it->second.timer) {
+        auto range = l.timers.equal_range(it->second.when);
+        for (auto t = range.first; t != range.second; ++t) if (t->second == id) { l.timers.erase(t); break; }
+    } else {
+        ::close(it->second.fd);
+        loop_wake(l);  // drop the fd from the current poll set
+    }
+    l.tasks.erase(it);
+}
+
+std::size_t loop_pending() {
+    auto& l = loop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    return l.tasks.size();
+}
+#else
+TaskId loop_at(Clock::time_point, std::function<void()>) { return 0; }
+TaskId loop_when_readable(int, std::function<void()>) { return 0; }
+void loop_cancel(TaskId) {}
+std::size_t loop_pending() { return 0; }
+#endif
+
 // ---------------------------------------------------------------- reaper
 namespace {
 struct ReaperState {
@@ -126,68 +295,110 @@ struct ReaperState {
     std::condition_variable idle;
     std::set<long> pids;
     std::vector<ProcessGroupPtr> groups;
-    bool running = false;
 };
-ReaperState& reaper() { static ReaperState* s = new ReaperState; return *s; }  // never destroyed: the thread may outlive statics
+ReaperState& reaper() { static ReaperState* s = new ReaperState; return *s; }
 
-void reaper_loop() {
+void reaper_done_pid(long pid) {
     auto& r = reaper();
-    for (;;) {
-        std::vector<ProcessGroupPtr> groups;
-        std::vector<long> pids;
-        {
-            std::lock_guard<std::mutex> lock(r.mutex);
-            if (r.pids.empty() && r.groups.empty()) {
-                r.running = false;
-                r.idle.notify_all();
-                return;
-            }
-            groups = r.groups;
-            pids.assign(r.pids.begin(), r.pids.end());
-        }
-        std::vector<ProcessGroupPtr> done_groups;
-        for (auto& g : groups)
-            if (g->pump(Clock::now())) done_groups.push_back(g);
-        std::vector<long> done_pids;
+    std::lock_guard<std::mutex> lock(r.mutex);
+    r.pids.erase(pid);
+    if (r.pids.empty() && r.groups.empty()) r.idle.notify_all();
+}
+
 #ifndef _WIN32
-        for (long pid : pids) {
-            int status = 0;
-            const pid_t got = ::waitpid(static_cast<pid_t>(pid), &status, WNOHANG);
-            if (got == static_cast<pid_t>(pid) || (got < 0 && errno == ECHILD)) done_pids.push_back(pid);
-        }
+int open_pidfd_for(long pid) {
+#if defined(__linux__) && defined(SYS_pidfd_open)
+    const long fd = ::syscall(SYS_pidfd_open, static_cast<pid_t>(pid), 0);
+    return fd < 0 ? -1 : static_cast<int>(fd);
 #else
-        done_pids = pids;
+    (void)pid;
+    return -1;
 #endif
-        {
-            std::lock_guard<std::mutex> lock(r.mutex);
-            for (long pid : done_pids) r.pids.erase(pid);
-            for (auto& g : done_groups) r.groups.erase(std::remove(r.groups.begin(), r.groups.end(), g), r.groups.end());
-        }
-        std::this_thread::sleep_for(Millis(20));
+}
+
+// Reaps `pid` if it is our child and has exited; true when nothing is left to wait for.
+bool try_reap(long pid) {
+    int status = 0;
+    pid_t got;
+    do { got = ::waitpid(static_cast<pid_t>(pid), &status, WNOHANG); } while (got < 0 && errno == EINTR);
+    if (got == static_cast<pid_t>(pid) || (got < 0 && errno == ECHILD)) return true;
+    // Not our child (no subreaper) and still alive: nothing to reap, nothing to wait for.
+    if (got == 0) return false;
+    return true;
+}
+
+void watch_pid(long pid) {
+    const int fd = open_pidfd_for(pid);
+    if (fd >= 0) {
+        loop_when_readable(fd, [pid] {
+            if (try_reap(pid)) reaper_done_pid(pid);
+            else watch_pid(pid);  // spurious: re-arm
+        });
+    } else {
+        // No pidfd (old kernel, or the pid is already gone): one timer, not a busy loop.
+        if (try_reap(pid)) { reaper_done_pid(pid); return; }
+        loop_at(Clock::now() + Millis(100), [pid] { watch_pid(pid); });
     }
 }
-
-void reaper_kick_locked(ReaperState& r) {
-    if (r.running) return;
-    r.running = true;
-    std::thread(reaper_loop).detach();
-}
+#endif
 } // namespace
 
 void reaper_add_pid(long pid) {
     if (pid <= 0) return;
     auto& r = reaper();
-    std::lock_guard<std::mutex> lock(r.mutex);
-    r.pids.insert(pid);
-    reaper_kick_locked(r);
+    {
+        std::lock_guard<std::mutex> lock(r.mutex);
+        if (!r.pids.insert(pid).second) return;
+    }
+#ifndef _WIN32
+    watch_pid(pid);
+#else
+    reaper_done_pid(pid);
+#endif
 }
 
 void reaper_adopt(ProcessGroupPtr group) {
     if (!group) return;
-    auto& r = reaper();
-    std::lock_guard<std::mutex> lock(r.mutex);
-    r.groups.push_back(std::move(group));
-    reaper_kick_locked(r);
+    {
+        auto& r = reaper();
+        std::lock_guard<std::mutex> lock(r.mutex);
+        if (std::find(r.groups.begin(), r.groups.end(), group) != r.groups.end()) return;
+        r.groups.push_back(group);
+    }
+    group->timer_tick();  // drives it now; its timers keep driving it until settled
+}
+
+bool reaper_release(const ProcessGroup* group) {
+    ProcessGroupPtr keep;  // destroyed after the lock is released
+    {
+        auto& r = reaper();
+        std::lock_guard<std::mutex> lock(r.mutex);
+        for (auto it = r.groups.begin(); it != r.groups.end(); ++it)
+            if (it->get() == group) { keep = std::move(*it); r.groups.erase(it); break; }
+        if (r.pids.empty() && r.groups.empty()) r.idle.notify_all();
+    }
+    return keep != nullptr;
+}
+
+namespace {
+std::mutex& settle_mutex() { static std::mutex m; return m; }
+std::condition_variable& settle_cv() { static std::condition_variable c; return c; }
+std::atomic<std::uint64_t> g_settle{0};
+} // namespace
+
+std::uint64_t settle_generation() { return g_settle.load(); }
+
+void notify_settled() {
+    {
+        std::lock_guard<std::mutex> lock(settle_mutex());
+        ++g_settle;
+    }
+    settle_cv().notify_all();
+}
+
+void wait_settle_change(std::uint64_t seen, Clock::time_point until) {
+    std::unique_lock<std::mutex> lock(settle_mutex());
+    settle_cv().wait_until(lock, until, [&] { return g_settle.load() != seen; });
 }
 
 std::size_t reaper_pending() {
@@ -199,7 +410,7 @@ std::size_t reaper_pending() {
 bool reaper_wait_idle(Millis bound) {
     auto& r = reaper();
     std::unique_lock<std::mutex> lock(r.mutex);
-    return r.idle.wait_for(lock, bound, [&] { return !r.running && r.pids.empty() && r.groups.empty(); });
+    return r.idle.wait_for(lock, bound, [&] { return r.pids.empty() && r.groups.empty(); });
 }
 
 // ---------------------------------------------------------------- termination index
@@ -268,13 +479,18 @@ std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait) {
 namespace {
 int g_signal_pipe[2] = {-1, -1};
 std::atomic<bool> g_terminating{false};
+std::atomic<int> g_signal{0};
 std::atomic<bool> g_installed{false};
+std::mutex g_done_mutex;
+std::condition_variable g_done_cv;
+bool g_cleanup_done = false;
 struct sigaction g_old_int, g_old_term;
 SignalCleanupOptions& signal_options() { static auto* o = new SignalCleanupOptions; return *o; }
 
 extern "C" void nift_host_signal_handler(int signo) {
     const int saved = errno;
     g_terminating.store(true);
+    g_signal.store(signo);
     const unsigned char byte = static_cast<unsigned char>(signo);
     if (g_signal_pipe[1] >= 0) { ssize_t ignored = ::write(g_signal_pipe[1], &byte, 1); (void)ignored; }
     errno = saved;
@@ -289,7 +505,12 @@ void watcher_loop(int read_fd) {
         const int signo = byte;
         const auto options = signal_options();
         terminate_all_indexed(options.kill_after, options.post_kill_wait);
-        if (options.on_done) { g_terminating = false; options.on_done(signo); continue; }
+        {
+            std::lock_guard<std::mutex> lock(g_done_mutex);
+            g_cleanup_done = true;
+        }
+        g_done_cv.notify_all();
+        if (options.on_done) { options.on_done(signo); continue; }
         struct sigaction dfl{};
         dfl.sa_handler = SIG_DFL;
         sigemptyset(&dfl.sa_mask);
@@ -304,11 +525,31 @@ void watcher_loop(int read_fd) {
 }
 } // namespace
 
-bool termination_requested() { return g_terminating.load(); }
-
-void park_for_termination() {
-    for (;;) std::this_thread::sleep_for(Millis(1000));
+// atexit: the program reached its end while the watcher was still cleaning
+// up after SIGINT/SIGTERM. Wait for it (bounded) and end with the signal.
+extern "C" void nift_host_exit_handler() {
+    if (!g_terminating.load() || !g_installed.load()) return;
+    const auto options = signal_options();
+    if (options.on_done) return;
+    std::unique_lock<std::mutex> lock(g_done_mutex);
+    g_done_cv.wait_for(lock, options.kill_after + options.post_kill_wait + Millis(1000), [] { return g_cleanup_done; });
+    lock.unlock();
+    const int signo = g_signal.load() ? g_signal.load() : SIGTERM;
+    struct sigaction dfl{};
+    dfl.sa_handler = SIG_DFL;
+    sigemptyset(&dfl.sa_mask);
+    ::sigaction(signo, &dfl, nullptr);
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, signo);
+    ::pthread_sigmask(SIG_UNBLOCK, &set, nullptr);
+    ::raise(signo);
 }
+
+bool termination_requested() { return g_terminating.load(); }
+bool shutting_down() { return g_terminating.load(); }
+void request_shutdown_for_test(int signo) { g_signal = signo; g_terminating = true; }
+void clear_shutdown_for_test() { g_terminating = false; g_signal = 0; }
 
 bool install_signal_cleanup(SignalCleanupOptions options) {
     if (g_installed.exchange(true)) { signal_options() = std::move(options); return true; }
@@ -320,6 +561,8 @@ bool install_signal_cleanup(SignalCleanupOptions options) {
     g_signal_pipe[0] = fds[0];
     g_signal_pipe[1] = fds[1];
     std::thread(watcher_loop, fds[0]).detach();
+    static bool registered = false;
+    if (!registered) { registered = true; std::atexit(nift_host_exit_handler); }
     struct sigaction sa{};
     sa.sa_handler = nift_host_signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -402,7 +645,9 @@ std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::f
 #else  // _WIN32: the C2 equivalent (console control handler) and job objects live in process_win.cpp.
 std::size_t terminate_all_indexed(Millis, Millis) { return 0; }
 bool termination_requested() { return false; }
-void park_for_termination() { for (;;) std::this_thread::sleep_for(Millis(1000)); }
+bool shutting_down() { return false; }
+void request_shutdown_for_test(int) {}
+void clear_shutdown_for_test() {}
 bool install_signal_cleanup(SignalCleanupOptions) { return false; }
 void uninstall_signal_cleanup() {}
 bool enable_subreaper() { return false; }

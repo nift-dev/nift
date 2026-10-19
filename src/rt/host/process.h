@@ -92,7 +92,7 @@ struct StageResult {
     long pid = -1;
 };
 
-enum class GroupState : std::uint8_t { Running, Exited, LaunchFailed, Cancelled, TimedOut, Lost, Detached };
+enum class GroupState : std::uint8_t { Running, Exited, LaunchFailed, Cancelled, TimedOut, LimitExceeded, Lost, Detached };
 const char* group_state_name(GroupState state);
 
 struct ProcessResult {
@@ -110,6 +110,14 @@ struct ProcessResult {
     int signal = 0;                       // the last stage's terminating signal, if any
     std::string capture_limit_exceeded;   // "stdout" / "stderr" when the capture limit was reached
     std::string limit_message;            // "<builtin>: captured stdout of <prog> exceeds the read limit of N bytes (NIFT_READ_LIMIT)"
+    // stdin delivery (StdinMode::Text and Interactive writes). An early exit
+    // or a closed stdin is not an error: `stdin_complete` is false and the
+    // process result is kept. `stdin_error` is set only for a genuine
+    // delivery failure (a write error other than EPIPE).
+    std::uint64_t stdin_total = 0;
+    std::uint64_t stdin_written = 0;
+    bool stdin_complete = true;
+    std::string stdin_error;
     long pid = -1;                        // first stage
 };
 
@@ -118,6 +126,13 @@ std::string signal_name(int signo);  // "SIGTERM", ..., "SIG<n>"
 enum class CancelScope : std::uint8_t { Child, Pipeline, Tree };
 enum class CancelReason : std::uint8_t { None, Explicit, Deadline, Limit, Cleanup, Abandoned, Leftover };
 
+// Thread safety: every public member locks the group; the event loop drops
+// the lock while it sleeps in poll(), so cancel() from another thread, the
+// host loop's deadline timers and context cleanup never wait for a blocked
+// read or wait() to finish. Deadlines are enforced even when nobody uses the
+// handle: a group that is not finished when a call returns arms a host-loop
+// timer for its next deadline or escalation step (and pidfd watches so exits
+// are reaped promptly).
 class ProcessGroup {
 public:
     struct State;
@@ -168,6 +183,9 @@ public:
     const SpawnRequest& request() const;
     const ProcessResult& result() const;  // valid once finished()
     std::vector<StageResult> stages() const;  // current per-stage view (launch outcome known right after start)
+    // Host-loop entry point (timers, pidfd watches, reaper adoption): one
+    // non-blocking step if the group is not busy; re-arms itself.
+    void timer_tick();
 
     // Cleanup support (process_cleanup.h). begin_terminate() starts the §11.4
     // sequence for live stages (scope Tree under the Linux subreaper,
@@ -178,6 +196,11 @@ public:
     struct TerminateOutcome { bool live_stage_terminated = false; bool leftovers_terminated = false; };
     TerminateOutcome begin_terminate(CancelReason reason);
     TerminateOutcome terminate(CancelReason reason);
+    // A genuine cleanup failure: a stage or a leftover member still alive
+    // after SIGKILL and the bounded wait (handed to the reaper).
+    bool cleanup_failed() const;
+    // Finished, and any requested leftover cleanup done (detached: no cancel in flight).
+    bool settled() const;
     // True when the group (or, for a detached group, its session) still has a
     // live (non-zombie) member. Linux checks /proc and requires Nift's session
     // for managed groups (guards against pgid reuse); elsewhere kill(-pgid, 0).
@@ -185,6 +208,7 @@ public:
 
 private:
     explicit ProcessGroup(std::unique_ptr<State> state);
+    static std::shared_ptr<ProcessGroup> start_impl(SpawnRequest request, HostStatus& status, HostError& error, bool arm);
     std::unique_ptr<State> s_;
 };
 

@@ -8,7 +8,7 @@
 //
 //   HostCall call(env, HostOp::Read, "open");
 //   if (call.resolve(raw) != HostStatus::Ok) return call.status();   // already traced/reported
-//   call.begin();                                                    // v1 Pre point
+//   if (call.begin() != HostStatus::Ok) return call.status();       // v1 Pre point
 //   std::string data; HostError e;
 //   if (!read_it(call.target().path, data, e)) return call.fail(HostStatus::Recoverable, e);
 //   call.succeed(std::to_string(data.size()), obs);                 // v1 PostOk point, v2, record
@@ -46,7 +46,7 @@ public:
     // Path ops: resolve once; trace, the op and recording all use the result.
     // A refusal by the path policy finishes the call (v2 line, no v1 line:
     // legacy validates before tracing).
-    HostStatus resolve(std::string_view raw);
+    HostStatus resolve(std::string_view raw, PathSemantics semantics = PathSemantics::Lexical);
     const Resolved& target() const { return target_; }
     // Non-path ops: the trace `arg` (variable name, program, ...).
     void set_arg(std::string arg) { arg_ = std::move(arg); has_arg_ = true; }
@@ -56,7 +56,10 @@ public:
     // v1 result text for ops whose Pre line carries one (open: the mode; spawn: cwd).
     void set_pre_result(std::string res) { pre_res_ = std::move(res); }
 
-    void begin();
+    // Writes the v1 line for Pre ops. While Nift is shutting down (SIGINT/
+    // SIGTERM received) an externally visible op (writes, spawns) is refused
+    // here with `host.shutting_down` and the call is finished.
+    HostStatus begin();
     HostStatus succeed(std::string res = std::string(), const Observation& obs = Observation());
     HostStatus fail(HostStatus status, const HostError& error, std::string v1_res = "error");
 

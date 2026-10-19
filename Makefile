@@ -554,12 +554,21 @@ $(RT_HOST_LAYER_UNIT): tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 $(RT_HOST_PROCESS_UNIT): tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$@"
+	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS $(CXXFLAGS) tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 
-.PHONY: test-rt-host test-rt-host-sanitize
+.PHONY: test-rt-host test-rt-host-sanitize test-rt-host-tsan
 test-rt-host: $(RT_HOST_LAYER_UNIT) $(RT_HOST_PROCESS_UNIT)
 	"$(RT_HOST_LAYER_UNIT)"
 	tests/runtime2/cp16/run_contained.sh "$(RT_HOST_PROCESS_UNIT)"
+# Contained and fast (~20 s); part of `make test` (D-034).
+test: test-rt-host
+
+# ThreadSanitizer on the process tests (groups are shared with the host loop thread).
+test-rt-host-tsan:
+	mkdir -p "$(TEST_DIR)/rt-tsan"
+	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread \
+		tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-tsan/host-process-unit"
+	env TSAN_OPTIONS=halt_on_error=1 tests/runtime2/cp16/run_contained.sh --sanitized "$(TEST_DIR)/rt-tsan/host-process-unit"
 
 # ASan+UBSan on both Host-layer unit tests (no ulimit -v: the sanitizers
 # reserve large shadow mappings; file size, time and cleanup still apply).
@@ -567,7 +576,7 @@ test-rt-host-sanitize:
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-layer-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/host-layer-unit"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-process-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-process-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		tests/runtime2/cp16/run_contained.sh --sanitized "$(TEST_DIR)/rt-san/host-process-unit"
 

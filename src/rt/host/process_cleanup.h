@@ -58,9 +58,11 @@ public:
     const std::string& label() const { return label_; }
     bool failed() const { return failed_; }
     void add(ProcessGroupPtr group);
-    // Returns the number of groups that had to be handed to the reaper
-    // because they were not settled by the deadline (Lost stages).
-    std::size_t wait();
+    // Sleeps until every group settled (or grace + bound passed). Returns the
+    // genuine cleanup failures (not terminated / still alive after SIGKILL),
+    // which are also reported through runtime::report_cleanup_failure --
+    // separately from routine warnings and also for error-ended contexts.
+    std::vector<std::string> wait();
 
 private:
     std::string label_;

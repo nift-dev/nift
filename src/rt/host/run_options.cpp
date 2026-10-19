@@ -8,6 +8,7 @@ namespace nift::rt::host {
 const char* run_mode_name(RunMode mode) {
     switch (mode) {
         case RunMode::Capture: return "capture";
+        case RunMode::Pipe: return "pipe";
         case RunMode::Stream: return "stream";
         case RunMode::Interactive: return "interactive";
         case RunMode::Detached: return "detached";
@@ -16,7 +17,7 @@ const char* run_mode_name(RunMode mode) {
 }
 
 const std::vector<std::string>& run_option_keys() {
-    static const std::vector<std::string> keys = {"mode", "timeout_ms", "kill_after_ms"};
+    static const std::vector<std::string> keys = {"mode", "timeout_ms", "kill_after_ms", "stdin"};
     return keys;
 }
 
@@ -66,6 +67,7 @@ static std::string describe(const OptionValue& v) {
         case OptionValue::Type::Bool: return "bool";
         case OptionValue::Type::Int: case OptionValue::Type::Number: return "number";
         case OptionValue::Type::String: return "string";
+        case OptionValue::Type::Object: return "object";
         case OptionValue::Type::Other: return v.type_name.empty() ? std::string("value") : v.type_name;
     }
     return "value";
@@ -84,12 +86,55 @@ static bool milliseconds(const OptionValue& v, std::chrono::milliseconds& out) {
     return true;
 }
 
+static const char* kStdinForms = "\"inherit\", \"null\", {\"file\": path} or {\"text\": string}";
+
+HostStatus parse_stdin(const OptionValue& value, const std::string& b, StdinOption& out, HostError& error) {
+    auto bad = [&](std::string message) { return make_error(error, "runtime.invalid_argument", b + ": " + message); };
+    out = StdinOption();
+    out.given = true;
+    if (value.type == OptionValue::Type::String) {
+        if (value.text == "inherit") { out.kind = StdinOption::Kind::Inherit; return HostStatus::Ok; }
+        if (value.text == "null") { out.kind = StdinOption::Kind::Null; return HostStatus::Ok; }
+        static const std::vector<std::string> words = {"inherit", "null"};
+        const std::string suggestion = suggest_option(value.text, words);
+        std::string message = std::string("stdin must be ") + kStdinForms;
+        if (!suggestion.empty()) message += " (did you mean \"" + suggestion + "\"?)";
+        else message += " (a path is given as {\"file\": \"" + value.text + "\"}, text as {\"text\": ...})";
+        return bad(message);
+    }
+    if (value.type != OptionValue::Type::Object)
+        return bad(std::string("stdin must be ") + kStdinForms + ", not " + describe(value));
+    if (value.keys.size() != 1)
+        return bad(std::string("stdin object must have exactly one key, \"file\" or \"text\" (got ") + std::to_string(value.keys.size()) + ")");
+    const std::string& key = value.keys[0];
+    const OptionValue& v = value.values[0];
+    static const std::vector<std::string> forms = {"file", "text"};
+    if (key != "file" && key != "text") {
+        const std::string suggestion = suggest_option(key, forms);
+        std::string message = "unknown stdin form '" + key + "'";
+        message += suggestion.empty() ? std::string(" (forms: {\"file\": path}, {\"text\": string})") : " (did you mean '" + suggestion + "'?)";
+        return bad(message);
+    }
+    if (v.type != OptionValue::Type::String) {
+        std::string message = "stdin." + key + " must be a string, not " + describe(v);
+        if (key == "text" && v.type == OptionValue::Type::Other && v.type_name == "bytes")
+            message += " (binary stdin is not supported yet; text is never reinterpreted from bytes)";
+        return bad(message);
+    }
+    if (key == "file") {
+        if (v.text.empty()) return bad("stdin.file must not be empty");
+        out.kind = StdinOption::Kind::File;
+    } else out.kind = StdinOption::Kind::Text;
+    out.value = v.text;
+    return HostStatus::Ok;
+}
+
 HostStatus parse_run_options(const OptionObject& object, std::string_view builtin, RunOptions& out, HostError& error) {
     const std::string b(builtin);
     auto bad = [&](std::string message) { return make_error(error, "runtime.invalid_argument", b + ": " + message); };
     RunOptions options;
     options.present = true;
-    bool seen_mode = false, seen_timeout = false, seen_kill = false;
+    bool seen_mode = false, seen_timeout = false, seen_kill = false, seen_stdin = false;
     // Unknown keys first, in object order: a typo must never be reported as
     // a missing/incompatible option instead (the user's actual mistake).
     for (const auto& [key, value] : object) {
@@ -98,7 +143,7 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
         if (std::find(keys.begin(), keys.end(), key) != keys.end()) continue;
         const std::string suggestion = suggest_option(key, keys);
         if (!suggestion.empty()) return bad("unknown option '" + key + "' (did you mean '" + suggestion + "'?)");
-        return bad("unknown option '" + key + "' (options: mode, timeout_ms, kill_after_ms)");
+        return bad("unknown option '" + key + "' (options: mode, timeout_ms, kill_after_ms, stdin)");
     }
     for (const auto& [key, value] : object) {
         if (key == "mode") {
@@ -106,13 +151,14 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
             seen_mode = true;
             if (value.type != OptionValue::Type::String) return bad("mode must be a string, not " + describe(value));
             if (value.text == "capture") options.mode = RunMode::Capture;
+            else if (value.text == "pipe") options.mode = RunMode::Pipe;
             else if (value.text == "stream") options.mode = RunMode::Stream;
             else if (value.text == "interactive") options.mode = RunMode::Interactive;
             else if (value.text == "detached") options.mode = RunMode::Detached;
             else {
-                static const std::vector<std::string> modes = {"capture", "stream", "interactive", "detached"};
+                static const std::vector<std::string> modes = {"capture", "pipe", "stream", "interactive", "detached"};
                 const std::string suggestion = suggest_option(value.text, modes);
-                std::string message = "mode must be one of capture, stream, interactive, detached";
+                std::string message = "mode must be one of capture, pipe, stream, interactive, detached";
                 if (!suggestion.empty()) message += " (did you mean '" + suggestion + "'?)";
                 return bad(message);
             }
@@ -122,6 +168,11 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
             std::chrono::milliseconds ms{0};
             if (!milliseconds(value, ms)) return bad("timeout_ms must be a non-negative integer");
             options.timeout = ms;
+        } else if (key == "stdin") {
+            if (seen_stdin) return bad("option 'stdin' given twice");
+            seen_stdin = true;
+            HostStatus st = parse_stdin(value, b, options.stdin_source, error);
+            if (st != HostStatus::Ok) return st;
         } else if (key == "kill_after_ms") {
             if (seen_kill) return bad("option 'kill_after_ms' given twice");
             seen_kill = true;
@@ -133,8 +184,14 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
     // Incompatible combinations (design §11.7, §12.2).
     if (options.mode == RunMode::Detached && options.timeout)
         return bad("deadline is not allowed for a detached process");
+    const auto& in = options.stdin_source;
+    if (in.given && options.mode == RunMode::Interactive)
+        return bad("stdin is not allowed in mode interactive (the process reads what write() sends)");
+    if (in.given && options.mode == RunMode::Detached && (in.kind == StdinOption::Kind::Inherit || in.kind == StdinOption::Kind::Text))
+        return bad(std::string("stdin ") + (in.kind == StdinOption::Kind::Inherit ? "\"inherit\"" : "{\"text\": ...}") +
+                   " is not allowed for a detached process (use \"null\" or {\"file\": path})");
     if (options.kill_after && !options.timeout &&
-        (options.mode == RunMode::Capture || options.mode == RunMode::Stream))
+        (options.mode == RunMode::Capture || options.mode == RunMode::Pipe || options.mode == RunMode::Stream))
         return bad(std::string("kill_after_ms needs timeout_ms in mode ") + run_mode_name(options.mode) +
                    " (nothing else can cancel a blocking run)");
     out = options;
