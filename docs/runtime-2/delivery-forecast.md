@@ -1,6 +1,6 @@
 # Runtime 2.0 delivery forecast (living)
 
-_Last updated: 2026-10-19 18:35 AEDT. Updated when milestones land or blockers
+_Last updated: 2026-10-19 18:40 AEDT. Updated when milestones land or blockers
 emerge, not continuously. Authoritative per-checkpoint evidence stays in
 `progress.md`; this file tracks state, dependencies, estimates and the forecast._
 
@@ -19,10 +19,18 @@ Linux certification moves to a dedicated Linode once validated (D-033).
 - VM coverage (shared corpora): **101 / 786 (12.8 %)**, measured at CP12 phase A.
   Refusal-reason inventory with sole-blocker and multi-reason counts: in progress
   (`checkpoints/cp12b-coverage-inventory.md`, pending).
-- Forecast (2026-10-19): CP13–CP18 plus a large share of CP12 phase B within the
-  next weekly allowance is plausible; the whole roadmap (CP00–CP27) within it is
-  unlikely (~10–15 %); realistic for the whole roadmap: **3–5 weeks**.
-  Implementation complete ≠ cross-platform-certified release.
+- **Target (owner, 2026-10-19): complete the Runtime 2.0 implementation within
+  seven days, with the following week as contingency.** A stretch target, not
+  permission to weaken correctness or certification. Workstreams overlap (agents
+  in parallel, Linode certification), so checkpoint estimates are not additive.
+  My earlier 3–5 week figure assumed largely sequential checkpoints and is
+  superseded; the forecast is revised from observed throughput (checkpoints
+  integrated per day, certification queue time, refusal-reason reductions).
+  Implementation complete ≠ certified legacy retirement ≠ cross-platform-certified
+  release.
+- Phase B prioritisation (owner): rank features by scripts unlocked (alone and in
+  combination) **and** estimated effort, respecting dependencies; weight real
+  package and website usage above synthetic corpora.
 
 ## Checkpoints
 
@@ -64,9 +72,14 @@ Linux certification moves to a dedicated Linode once validated (D-033).
 | string performance (D-032) | | | | | | after CP14 integrates |
 | mtime checkpoint | | | | | | equal-tick rebuilds on multigrain kernels |
 
-## Schedule (fastest credible; no gates weakened)
+## Schedule (seven-day stretch; no gates weakened)
 
-| When | Target |
+Owner's ranges: CP13–CP15 integrated 1–2 days; CP12B substantially complete 2–4;
+CP16–CP18 3–5; CP19–CP21 3–6; CP22–CP23 3–7; CP24 2–4; CP25 2–5 after its
+prerequisites.
+
+
+| When | Target (owner's estimates, overlapping) |
 |---|---|
 | 2026-10-19 (before the allowance reset) | CP14 certified + integrated; remote certification validated; host-deps verified; CP13 ready to certify; CP12B inventory |
 | Days 1–2 | CP13, CP15 integrated; records20k 100 % on the VM (first end-to-end benchmark); CP12B features landing; CP17 integrated |
