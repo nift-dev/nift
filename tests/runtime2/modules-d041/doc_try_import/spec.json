@@ -1,0 +1,14 @@
+{
+ "about": "nift.dev scripting-imports: a missing import is a recoverable failure that try/catch handles. The page's trailing `// io.import_source_unreadable` comment is left out: legacy rejects trailing `//` comments after a statement (D-045 discrepancy, cp12b-modules.md).",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "io.import_source_unreadable\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}

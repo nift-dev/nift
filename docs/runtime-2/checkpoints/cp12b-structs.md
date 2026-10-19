@@ -45,3 +45,22 @@ semantics and construction; this extends it.
 * Construction evaluates field initialisers at construction time in the
   declaring scope (the probe shows they see the bindings current at the
   `Name()` call — with L25, top-level bindings are the lexical scope).
+
+## D-045 review: nift.dev `docs/structs.html` vs legacy and the draft
+
+The page's examples use the template form `@struct(name) { … }`; script land
+drops the `@` (`docs/scripting.html`), so `struct (Name) { … }` is the
+documented script form. The page's counter example run in legacy prints
+`5`, then `5` / `6` after `copy(a)` — as documented.
+
+| # | nift.dev | Legacy | Decision / draft | Status |
+| --- | --- | --- | --- | --- |
+| S1 | instances have **reference semantics**; binding or passing copies the reference; `copy()` makes an independent instance; examples rely on it ("shared traversal state", recursive fragment state) | references (probe `reference`) — agrees with the page | **D-040: value semantics, including structs** — contradicts the page and its examples | owner decision: D-040 vs the documented reference semantics (the examples would need `copy`-free rewrites or a handle type) |
+| S2 | fields and methods are **implicitly visible inside methods**; parameters and locals shadow them; `this.x` names the receiver | agrees (`this.value = value` works; `step()` calls a private method implicitly) | the draft mentioned only `this`; implicit members added to the draft's scope rules | draft corrected below |
+| S3 | "struct definitions and method execution follow normal lexical scoping … through their definition/call context" (ambiguous) | dynamic: a method sees a caller's local (`method_free_caller`) | D-038: lexical; caller-dependent lookups refused | record: the page's wording should name one rule |
+| S4 | at most one constructor (method named like the struct) | agrees | draft agrees | — |
+
+Draft correction (S2): inside a method, a free name resolves to a parameter
+or local first, then to the receiver's fields and methods (private ones
+included), then lexically (D-038); `this` names the receiver explicitly.
+

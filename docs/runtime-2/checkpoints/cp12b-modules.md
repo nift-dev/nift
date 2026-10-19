@@ -23,7 +23,7 @@ rt-diff workspace), run by `tests/runtime2/semantics_modules.py --nift
 | Execution | the module runs immediately, at the import statement, in isolated scopes (no access to the importer's bindings); its output appears in program order | `side_effect_order`, `module_free_unbound` |
 | Exports | `export(name)` lists a binding, function or struct of the module's top level; after the module finished, exactly the listed names are installed in the importer: variables into the importer's **current innermost scope** (block-scoped: gone after the block), functions and structs into the importer's **global** function/struct tables; an importer re-exports names it imported (`export(cf)` in `b`) | `diamond`, `not_reexported`, `in_block`, `struct_export` |
 | Values | an exported variable is a **live alias** of the module's binding: the importer's writes (`n += 10`, `xs.push(9)`) change the module's state and the module's functions' later writes are seen by the importer (L50; D-041 #4 makes it a copy). The `export_copy` probe does not distinguish (correction of the earlier "copied" reading, found while writing the D-041 fixtures) | `export_copy`, `modules-d041/stateful_*` |
-| Module lexical environment | exported functions resolve the module's own top-level bindings and private functions through the module environment as it is **at the end of the module** (a binding declared after `export` is visible); never through the caller (a caller's local of the same name is not seen; an unbound name is an error even if the caller has it) — modules are **lexically scoped** already | `module_private`, `module_private_late`, `module_vs_caller_local`, `module_free_unbound` |
+| Module lexical environment | exported functions resolve the module's own top-level bindings and private functions through the module environment as it is **at the end of the module** (a binding declared after `export` is visible). A name the module does not bind is looked up in the **caller's top-level bindings** (a caller global `zz := 5` is seen) but not in the caller's function locals (an error even if the calling function has it). So modules are **not** fully lexically scoped (correction, D-045 review below; the earlier reading missed the caller-global case); nift.dev documents "named fn declarations resolve free names in the calling scope" | `module_private`, `module_private_late`, `module_vs_caller_local`, `module_free_unbound`; D-045 review |
 | Collisions | importing a name that already exists in the importer (binding in any active scope, function, struct) is an error, `export collides with existing binding: <name>`, after the module ran (its side effects happened); this makes a repeated import of the same module an error | `export_collision`, `repeated`, `same_file_two_spellings`, `in_function` (second call) |
 | Import in a function | runs at each call; the exports go to the global tables, so the second call collides | `in_function` |
 | Errors | missing file: `script is not readable: <abs path>` at the import statement (recoverable diagnostic `io.import_source_unreadable`); cycle: `script import cycle through <abs path>` reported inside the innermost module with one `import: ` prefix per active import; an error inside a module is reported at the module's position with an `import: ` prefix per level; `export(x)` naming nothing: `export names no existing binding: x` at the export; `return <value>` in a module: `return with a value is not allowed in import` at the import (bare `return` ends the module normally); missing package: `package is not installed: <name>` | `missing`, `cycle`, `self_cycle`, `module_error`, `export_missing`, `module_return`, `module_bare_return`, `package_missing` |
@@ -188,7 +188,10 @@ entry path, options)`, run before anything executes:
   `export-duplicate`, `export-nested`, `export-struct` (structs: B4),
   `module-return`, `import-limit`.
 
-Unit tests: `tests/rt/vm_modules_unit.cpp` plans every legacy probe
+Unit tests (hermetic: every graph is planned from a copy in a fresh
+temporary root; absent targets are checked absent first; the loader's
+not-found regression covers a missing file, a directory, a dangling symlink,
+a FIFO and an unreadable file): `tests/rt/vm_modules_unit.cpp` plans every legacy probe
 (`semantics-modules`, 25) under both policies, the D-041 script fixtures,
 resolution details (relative chains, two spellings, absent files, project
 root) and rebinding.
@@ -212,7 +215,7 @@ from an engine**; run by `tests/runtime2/modules_d041.py --nift <binary>`.
 `--legacy-today` checks that the fixtures marked `agrees` pass on today's
 legacy and those marked `differs` (with the register entry) still fail, so
 the specification stays honest until legacy implements initialise-once.
-Today: legacy-today PASS (14 fixtures: 4 agree, 10 differ as recorded).
+Today: legacy-today PASS (16 fixtures: 6 agree, 10 differ as recorded).
 
 | Fixture | D-041 expectation | Today's legacy |
 | --- | --- | --- |
@@ -228,6 +231,8 @@ Today: legacy-today PASS (14 fixtures: 4 agree, 10 differ as recorded).
 | `stateful_array_copy` | exported array is a copy (`[1]`, module `[1,2]`, importer `[1,9]`) | shared (L50) |
 | `failed_init` | a failed module is not run again; the second import reports the same failure | runs again |
 | `page_isolation` (build) | pages `a`, `b` each get a fresh instance (`1 2`); within page `c` one instance (`x1 y2`); imported modules in each page's dependencies | page `c`: `x1 y1` |
+| `doc_math` | nift.dev's import example (a lambda closing over a module binding) | agrees |
+| `doc_try_import` | nift.dev's recoverable missing import under `try` (`io.import_source_unreadable`) | agrees (without the page's trailing `//` comment, D-045 M3) |
 | `rebuild` (build) | editing `m.nft` rebuilds `a`, `b`, `c` with fresh instances; editing `y.nft` rebuilds only `c`; no change rebuilds nothing | page `c` differs |
 
 Interpretations of D-041 (recorded; accepted by the coordinator as
@@ -241,3 +246,32 @@ consistent with D-041, reported to the owner):
   after a failed initialisation reports the same failure without running the
   module again (D-041 #1 states it for concurrent imports). Fixture
   `failed_init`.
+
+## D-045 review: syntax and documentation (nift.dev, legacy, VM)
+
+Checked during normal review against nift.dev `docs/scripting-imports.html`
+and `docs/structs.html` (the live pages are byte-identical to
+`labs-src/nift-site` @7400024) and legacy (runtime-2 binaries).
+
+Syntax the graph and the fixtures use, all documented: script-land
+`import("path")` and template `@import("path")` (script land also accepts
+`@import`), `export(name)`, `fn(name(args)) { … }`, `try { … } catch(err)
+{ … }`, `throw error("…")`, `err.code` / `err.message`, `+=`, `.push(…)`,
+`.stringify()`, `$[…]` in pages; lambdas only in the documentation-example
+fixture. Unsupported forms are refused before execution by the graph
+(`import-dynamic`, `import-nested`, …), never reinterpreted. Two
+documentation examples are now fixtures (`doc_math`, `doc_try_import`); the
+page's counter example (`count`/`increment`) waits for decision M1.
+
+Discrepancies for an owner decision:
+
+| # | nift.dev | Legacy | Runtime 2.0 / decisions | Fixtures |
+| --- | --- | --- | --- | --- |
+| M1 | "`export(name)` exports the actual binding, not a value snapshot, so exported closures retain private state" (counter example: `count` reads 2 after two `increment()`) | live alias, both directions (L50) — agrees with the page | **D-041 #4: exported values are copies** — contradicts the page and legacy. D-041 was decided on this document's earlier, wrong "copied" reading | `stateful_export_copy`, `stateful_array_copy` encode D-041; change them if the owner keeps the documented binding semantics |
+| M2 | "named fn declarations resolve free names in the calling scope, matching template `@fn`" | caller's **top-level** bindings are seen, the calling function's locals are not (`return: unknown value … zz`) — matches the page only partly | D-038 (lexical; caller-dependent lookups refused, `free-name:dynamic-caller`) | the module probes; a module function reading a caller global would be refused by the VM |
+| M3 | script examples end statements with trailing `// …` comments (66 lines on 12 pages, e.g. `print(err.code)   // io.import_source_unreadable` on the imports page) | **rejected**: the statement runs, then `expression cannot be empty` (exit 1); a whole-line `//` comment works | the CP10 parser matches legacy (Opaque, legacy-runtime-error) | `doc_try_import` leaves the comment out; not module-specific (reported to the coordinator) |
+| M4 | a missing import inside `try` is a recoverable failure | agrees | the VM graph refuses imports inside `try` (`import-nested`) before execution — a coverage gap, not a semantic change; to lift with the lifecycle work | `doc_try_import`, `failed_init` |
+
+Not a discrepancy: the probes and fixtures name modules `*.nft`, the
+documentation `*.f`; the extension is not syntax (legacy reads any file).
+

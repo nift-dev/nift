@@ -169,6 +169,7 @@ void check_d041_fixtures() {
         {"diamond", "ok"}, {"diamond_stateful", "ok"}, {"nested_chain", "ok"}, {"nested_shared", "ok"},
         {"circular", "import-cycle"}, {"self_cycle", "import-cycle"}, {"stateful_export_copy", "ok"},
         {"stateful_array_copy", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
+        {"doc_math", "ok"}, {"doc_try_import", "import-nested"},
     };
     for (const auto& e : expect) {
         const Planned p = plan(root.copy(kD041 / e.fixture / "p", e.fixture), InitPolicy::OncePerContext);

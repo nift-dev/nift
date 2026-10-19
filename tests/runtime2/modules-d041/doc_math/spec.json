@@ -1,0 +1,14 @@
+{
+ "about": "nift.dev scripting-imports: a lambda closing over a module binding, exported and called (the page's template example, as a script).",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "42\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}
