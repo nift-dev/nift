@@ -27,6 +27,7 @@
 #include <functional>
 #include <string>
 #include <sys/resource.h>
+#include <set>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <thread>
@@ -55,37 +56,67 @@ std::string new_tag() {
 // set up): such a read is retried until it is stable, so a test process is
 // never missed (a missed process would turn an orphan check into a false pass;
 // stress evidence in cp16-host-ops-impl.md §7).
-std::string read_environ(long pid) {
+// Diagnostics of the last tagged() scan: every pid readdir returned, and why
+// a pid was skipped or how its environ read went (printed on failure).
+struct ScanNote { long pid; std::string what; };
+std::set<long> g_scan_seen;
+std::vector<ScanNote> g_scan_notes;
+
+std::string read_environ(long pid, std::string* note) {
     const std::string path = "/proc/" + std::to_string(pid) + "/environ";
     std::string env;
-    for (int attempt = 0; attempt < 200; ++attempt) {
+    int empties = 0, open_failures = 0, last_errno = 0;
+    for (int attempt = 0; attempt < 20; ++attempt) {  // <= ~10 ms: the exec window is far shorter
         env.clear();
         const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
-        if (fd < 0) return env;  // gone
-        char buf[4096];
-        ssize_t n;
-        while ((n = ::read(fd, buf, sizeof buf)) > 0) env.append(buf, static_cast<std::size_t>(n));
-        ::close(fd);
-        if (!env.empty()) return env;
+        if (fd >= 0) {
+            char buf[4096];
+            ssize_t n;
+            while ((n = ::read(fd, buf, sizeof buf)) > 0) env.append(buf, static_cast<std::size_t>(n));
+            if (n < 0) last_errno = errno;
+            ::close(fd);
+            if (!env.empty()) break;
+            ++empties;
+        } else {
+            last_errno = errno;
+            ++open_failures;
+        }
+        // Empty or unopenable while the process still exists (inside execve():
+        // the new address space is installed before its environment area is
+        // set up, and opening can race the switch too): look again.
         runtime::ProcInfo info;
-        if (!runtime::proc_read(pid, info) || info.state == 'Z' || info.state == 'X') return env;
-        std::this_thread::sleep_for(std::chrono::microseconds(500));  // mid-exec (or a truly empty environment): look again
+        if (!runtime::proc_read(pid, info) || info.state == 'Z' || info.state == 'X') break;
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
+    if (note && (empties || open_failures))
+        *note = "environ retries: empty " + std::to_string(empties) + ", open failed " + std::to_string(open_failures) +
+                ", errno " + std::to_string(last_errno) + ", final " + std::to_string(env.size()) + " bytes";
     return env;
 }
 
 std::vector<long> tagged(const std::string& tag) {
     std::vector<long> out;
     const std::string needle = "NIFT_TEST_PROC_TAG=" + tag;
+    g_scan_seen.clear();
+    g_scan_notes.clear();
     DIR* dir = ::opendir("/proc");
     if (!dir) return out;
     while (dirent* e = ::readdir(dir)) {
         if (e->d_name[0] < '1' || e->d_name[0] > '9') continue;
         const long pid = std::strtol(e->d_name, nullptr, 10);
+        g_scan_seen.insert(pid);
         runtime::ProcInfo info;
-        if (!runtime::proc_read(pid, info) || info.state == 'Z') continue;
+        bool have = false;
+        for (int attempt = 0; attempt < 3 && !have; ++attempt) {  // stat can race the exec switch as well
+            have = runtime::proc_read(pid, info);
+            if (!have && ::access(("/proc/" + std::to_string(pid)).c_str(), F_OK) != 0) break;  // really gone
+        }
+        if (!have) { g_scan_notes.push_back({pid, "stat unreadable"}); continue; }
+        if (info.state == 'Z') continue;
         if (pid == 2 || info.ppid == 2) continue;  // kernel threads have no environment
-        const std::string env = read_environ(pid);
+        std::string note;
+        const std::string env = read_environ(pid, &note);
+        if (!note.empty()) g_scan_notes.push_back({pid, note});
         std::size_t start = 0;
         while (start < env.size()) {
             const std::size_t end = env.find('\0', start);
@@ -124,7 +155,27 @@ int zombie_children() {
     return n;
 }
 
+// "No zombies while Nift lives": immediate without the subreaper; with it,
+// adopted orphans are reaped asynchronously by the host loop (SIGCHLD), so
+// the guarantee is "reaped within a bound" -- 1 s here.
+bool no_zombies() { return wait_until([] { return zombie_children() == 0; }, milliseconds(1000)); }
+
+int fd_count_raw();
+// Descriptors of this process minus those the host loop owns (pidfd watches
+// for processes of earlier tests come and go asynchronously); re-measured
+// until stable, so a real leak (persistent) is still caught.
 int fd_count() {
+    int last = -1;
+    for (int i = 0; i < 50; ++i) {
+        const int now = fd_count_raw() - static_cast<int>(runtime::loop_fd_count());
+        if (now == last) return now;
+        last = now;
+        std::this_thread::sleep_for(milliseconds(5));
+    }
+    return last;
+}
+
+int fd_count_raw() {
     int n = 0;
     DIR* dir = ::opendir("/proc/self/fd");
     if (!dir) return -1;
@@ -286,7 +337,7 @@ void own_blocking_reaped() {
         auto r = run_ok(req({"true"}, mode, tag));
         if (!(r.launched && r.exit_code == 0)) { CHECK(false); break; }
     }
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
     CHECK(fd_count() == fds_before);
     CHECK(none_tagged(tag, milliseconds(500)));
 }
@@ -400,7 +451,7 @@ void deadlines() {
     r = run_ok(req({"sh", "-c", "sleep 0.3; echo ok"}, OutputMode::PipeCapture, tag));
     CHECK(!r.timed_out && r.out == "ok\n");
     CHECK(none_tagged(tag));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
 }
 
 void default_grace_2000ms() {
@@ -456,7 +507,7 @@ void cancellation() {
     CHECK(g->cancel(CancelScope::Tree));
     g->wait();
     CHECK(none_tagged(tag));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
 }
 
 void exit_cancel_race() {
@@ -470,7 +521,7 @@ void exit_cancel_race() {
         if (r.state == GroupState::Exited || r.state == GroupState::Cancelled) ++done;
     }
     CHECK(done == 200);
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
     CHECK(none_tagged(tag, milliseconds(500)));
 }
 
@@ -526,6 +577,7 @@ void leftovers_c1_and_holders() {
             std::printf("left count %zu; sh: state %s exit %d signal %d; pgid %ld\n", left.size(), stage_state_name(r.stages[0].state),
                         r.exit_code, r.stages[0].signal, g->pgid());
             for (long p : left) { runtime::ProcInfo i; runtime::proc_read(p, i); std::printf("left %ld state %c ppid %ld pgrp %ld\n", p, i.state, i.ppid, i.pgrp); }
+            for (const auto& n : g_scan_notes) std::printf("  scan note: pid %ld: %s\n", n.pid, n.what.c_str());
             dump_events(t_start);
             for (long m : runtime::proc_group_members(g->pgid(), -1)) {
                 runtime::ProcInfo i;
@@ -542,6 +594,7 @@ void leftovers_c1_and_holders() {
                 for (auto& ch : cmd) if (ch == '\0') ch = ' ';
                 std::printf("  member %ld state %c ppid %ld cmdline [%s] environ %zu bytes\n", m, i.state, i.ppid, cmd.c_str(),
                             slurp("/proc/" + std::to_string(m) + "/environ").size());
+                std::printf("  member %ld %s by the failing scan\n", m, g_scan_seen.count(m) ? "was listed" : "was NOT listed");
             }
             std::this_thread::sleep_for(milliseconds(50));
             std::printf("  rescan after 50 ms: %zu tagged\n", tagged(tag).size());
@@ -702,7 +755,19 @@ void detached_rules() {
     auto g = start_ok(m);
     CHECK(g && !g->result().launched && g->result().exit_code == 127 && g->result().error == "executable not found: definitely-missing-cp16");
     CHECK(none_tagged(tag, milliseconds(300)));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
+}
+
+// RLIMIT_NOFILE bounds descriptor *numbers*: the smallest limit that leaves
+// exactly `free_slots` unused numbers below it.
+rlim_t limit_with_free_slots(int free_slots) {
+    std::set<int> open_fds;
+    DIR* dir = ::opendir("/proc/self/fd");
+    while (dirent* e = dir ? ::readdir(dir) : nullptr) if (e->d_name[0] != '.') open_fds.insert(std::atoi(e->d_name));
+    if (dir) { open_fds.erase(::dirfd(dir)); ::closedir(dir); }
+    int limit = 0, free_below = 0;
+    while (free_below < free_slots) { if (!open_fds.count(limit)) ++free_below; ++limit; }
+    return static_cast<rlim_t>(limit);
 }
 
 void low_fd_limit() {
@@ -711,7 +776,7 @@ void low_fd_limit() {
     ::getrlimit(RLIMIT_NOFILE, &old);
     const int base = fd_count();
     struct rlimit low = old;
-    low.rlim_cur = static_cast<rlim_t>(base + 3);  // room for one pipe, not for a capture pair + report pipe
+    low.rlim_cur = limit_with_free_slots(3);  // room for one pipe, not for a capture pair + report pipe
     ::setrlimit(RLIMIT_NOFILE, &low);
     auto r = run_ok(req({"true"}, OutputMode::PipeCapture, tag));
     ::setrlimit(RLIMIT_NOFILE, &old);
@@ -719,7 +784,7 @@ void low_fd_limit() {
     CHECK(r.error == "cannot create pipe: Too many open files");
     CHECK(fd_count() == base);
     // a limit that fits: 300 launches, no descriptor leak
-    low.rlim_cur = static_cast<rlim_t>(base + 12);
+    low.rlim_cur = limit_with_free_slots(12);
     ::setrlimit(RLIMIT_NOFILE, &low);
     bool all = true;
     for (int i = 0; i < 300; ++i) {
@@ -729,7 +794,7 @@ void low_fd_limit() {
     ::setrlimit(RLIMIT_NOFILE, &old);
     CHECK(all);
     CHECK(fd_count() == base);
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
 }
 
 struct SpySink : TraceSink {
@@ -871,7 +936,7 @@ void escapees_subreaper() {
     runtime::reaper_adopt(det);
     CHECK(none_tagged(dtag));
     CHECK(runtime::reaper_wait_idle(milliseconds(5000)));  // the detached pid was reaped (ours under the subreaper)
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
 }
 
 // Regression (stress finding 2): under the subreaper, an adopted orphan that
@@ -897,7 +962,7 @@ void subreaper_reaps_orphans() {
         runtime::ProcInfo info;
         return !runtime::proc_read(orphan, info);  // gone from /proc = reaped (a zombie would still be listed)
     }, milliseconds(1000)));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
     // a foreign child (same session, Nift's own group): left for its owner
     const pid_t foreign = ::fork();
     if (foreign == 0) ::_exit(7);
@@ -1018,7 +1083,7 @@ void stdin_suite() {
     CHECK(r.out == "from file\n" && r.stdin_complete);
     std::remove(path);
     CHECK(none_tagged(tag));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
 }
 
 void deadline_suite() {
@@ -1035,7 +1100,7 @@ void deadline_suite() {
     CHECK(ms >= 450 && ms < 2000);
     CHECK(idle->result().state == GroupState::TimedOut && idle->result().stages[0].signal == SIGKILL);
     CHECK(none_tagged(tag, milliseconds(200)));
-    CHECK(zombie_children() == 0);
+    CHECK(no_zombies());
     // several concurrent deadlines on idle handles
     std::vector<ProcessGroupPtr> gs;
     for (int ms_i : {100, 250, 1200, 1300}) {

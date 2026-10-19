@@ -308,11 +308,20 @@ std::size_t loop_pending() {
     std::lock_guard<std::mutex> lock(l.mutex);
     return l.tasks.size();
 }
+
+std::size_t loop_fd_count() {
+    auto& l = loop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    std::size_t n = l.started ? 2 : 0;
+    for (const auto& kv : l.tasks) if (!kv.second.timer) ++n;
+    return n;
+}
 #else
 TaskId loop_at(Clock::time_point, std::function<void()>) { return 0; }
 TaskId loop_when_readable(int, std::function<void()>) { return 0; }
 void loop_cancel(TaskId) {}
 std::size_t loop_pending() { return 0; }
+std::size_t loop_fd_count() { return 0; }
 #endif
 
 // ---------------------------------------------------------------- reaper

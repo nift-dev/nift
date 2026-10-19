@@ -49,6 +49,7 @@ TaskId loop_at(Clock::time_point when, std::function<void()> fn);  // one-shot t
 TaskId loop_when_readable(int fd, std::function<void()> fn);      // one-shot; the loop owns `fd` and closes it
 void loop_cancel(TaskId id);                                       // no-op for fired/unknown ids
 std::size_t loop_pending();
+std::size_t loop_fd_count();  // descriptors the loop owns (wake pipe + fd watches), for leak checks
 
 // ---- reaper (built on the host loop) ----
 // Pids nobody waits for any more (Lost stages, detached processes adopted

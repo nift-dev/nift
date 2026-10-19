@@ -968,9 +968,11 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     }
     if (detached) {
         auto& stage = s.st.front();
-        if (stage.pid > 0 && !stage.exec_failed) {
-            runtime::note_detached_session(s.pgid);
-            runtime::reaper_add_pid(stage.pid);  // our child only under the subreaper; ECHILD otherwise
+        if (stage.pid > 0) {
+            // Ours to reap only under the subreaper (ECHILD otherwise) -- also
+            // when its exec failed: it exits at once, reparented to Nift.
+            if (!stage.exec_failed) runtime::note_detached_session(s.pgid);
+            runtime::reaper_add_pid(stage.pid);
         }
         stage.reaped = true;  // never waited by Nift
         s.result.state = stage.exec_failed || stage.pid <= 0 ? GroupState::LaunchFailed : GroupState::Detached;
