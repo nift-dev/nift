@@ -36,6 +36,7 @@ struct FakeProcess {
 struct Reaper {
     std::mutex mu;
     std::vector<std::pair<std::string, bool>> seen;  // (context label, context ending on error) per hook call
+    std::atomic<int> detached_with_ticket{0};         // D-039: must stay 0 (no supervision of detached resources)
     std::vector<std::pair<std::shared_ptr<FakeProcess>, CompletionTicket>> queue;
     void schedule(std::shared_ptr<FakeProcess> p, CompletionTicket t) {
         p->terminate_calls++;  // "SIGTERM sent"
@@ -63,6 +64,7 @@ KindSpec process_kind(Reaper& reaper) {
     spec.cleanup = [&reaper](CleanupEvent& e) {
         auto p = std::static_pointer_cast<FakeProcess>(e.resource);
         { std::lock_guard<std::mutex> lock(reaper.mu); reaper.seen.emplace_back(e.context_label, e.context_error); }
+        if (e.owner == kDetached && e.ticket) ++reaper.detached_with_ticket;
         if (!e.ticket) return CleanupOutcome::pending();           // termination already started: bookkeeping only
         if (e.owner == kDetached) return CleanupOutcome::completed();  // detached: survives, bookkeeping released
         if (!p->alive) return CleanupOutcome::completed();          // exited and reaped: nothing to terminate

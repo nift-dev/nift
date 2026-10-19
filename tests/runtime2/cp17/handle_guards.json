@@ -5,9 +5,10 @@
     22000
   ],
   "ir_per_iteration": {
-    "cycle": 2091.0,
+    "cycle": 2080.0,
     "resolve": 251.0,
-    "counted": 2165.0,
-    "context": 8443.2
+    "counted": 2154.0,
+    "context": 8494.2,
+    "context_label": 8926.2
   }
 }

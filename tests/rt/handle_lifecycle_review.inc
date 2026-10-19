@@ -260,6 +260,13 @@ void r14_detached_bookkeeping() {
     f.t.drop(counted);
     st = f.t.stats();
     CHECK(st.detached == 0 && st.live == 1 && st.records == 1 && st.pending_obligations == 0);
+    CHECK(f.reaper.detached_with_ticket == 0);  // the detached hook got no ticket: nothing supervised
+    // Another detached last reference: again no ticket, nothing pending.
+    Value d2;
+    f.spawn(d2);
+    CHECK(f.t.detach_as(d2, P, f.script) == HandleStatus::Ok);
+    f.t.drop(d2);
+    CHECK(f.reaper.detached_with_ticket == 0 && f.t.stats().pending_obligations == 0);
 }
 
 // R10: a refused transfer reclaims by default (D-035); into a build is allowed.
@@ -283,7 +290,9 @@ void r10_transfer_policy() {
     settle.join();
 }
 
-// close_context waits for a hook another thread started for its handle.
+// close_context waits for a hook another thread started for its handle, even
+// when that cleanup carries no obligation (the resource had already settled:
+// only the in-flight count keeps the context alive).
 void close_waits_for_inflight_hook_unit() {
     std::atomic<bool> in_hook{false}, allow{false}, hook_done{false}, closed{false};
     bool done_before_close = false;
@@ -301,8 +310,12 @@ void close_waits_for_inflight_hook_unit() {
     t.open_context(ContextKind::Script, kDetached, c);
     Value h;
     t.create(c, HandleKind::Timer, std::make_shared<Plain>(), h);
+    CompletionTicket exited;
+    CHECK(t.begin_termination(h, HandleKind::Timer, TerminationCause::Exited, exited) == HandleStatus::Ok);
+    CHECK(exited.complete(CleanupOutcome::completed()));  // settled: closing it creates no obligation
     std::thread releaser([&] { t.release(h, HandleKind::Timer, c); });
     while (!in_hook.load()) std::this_thread::yield();
+    CHECK(t.stats().pending_obligations == 0);
     std::thread closer([&] { t.close_context(c); done_before_close = hook_done.load(); closed = true; });
     std::this_thread::sleep_for(std::chrono::milliseconds(60));
     CHECK(!closed.load());
