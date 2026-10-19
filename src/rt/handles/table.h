@@ -50,6 +50,12 @@ public:
     // each context's handles newest first, one hook call per handle with
     // reason ContextEnd; failing hooks never stop the cleanup of the rest.
     CloseReport close_context(ContextId id);
+    // Whether `id` is a build-family context (Build, BuildHook, PageRender,
+    // AutoRebuild, or nested in one), where detach() is DetachForbidden and
+    // transfer() out of the build is TransferForbidden. Lets a native refuse
+    // a detached launch before starting anything. Works on open and closing
+    // contexts; ContextClosed / UnknownContext otherwise.
+    HandleStatus context_in_build(ContextId id, bool& in_build) const;
 
     // Creates a live handle owned by `owner` (an open context).
     HandleStatus create(ContextId owner, HandleKind kind, std::shared_ptr<void> resource, Value& out,

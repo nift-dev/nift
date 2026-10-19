@@ -31,6 +31,25 @@ void ownership_and_access() {
     t.create(page, HandleKind::Process, res(4), hp);
     t.create(page_child, HandleKind::Process, res(5), hpc);
     const HandleKind P = HandleKind::Process;
+    // Build-family query (refuse a detached launch before starting anything).
+    bool in_build = true;
+    CHECK(t.context_in_build(script, in_build) == HandleStatus::Ok && !in_build);
+    CHECK(t.context_in_build(child, in_build) == HandleStatus::Ok && !in_build);
+    for (const ContextId c : {build, page, page_child}) {
+        in_build = false;
+        CHECK(t.context_in_build(c, in_build) == HandleStatus::Ok && in_build);
+    }
+    ContextId hook_ctx, rebuild;
+    t.open_context(ContextKind::BuildHook, kDetached, hook_ctx);
+    t.open_context(ContextKind::AutoRebuild, kDetached, rebuild);
+    CHECK(t.context_in_build(hook_ctx, in_build) == HandleStatus::Ok && in_build);
+    CHECK(t.context_in_build(rebuild, in_build) == HandleStatus::Ok && in_build);
+    t.close_context(hook_ctx);
+    in_build = false;
+    CHECK(t.context_in_build(hook_ctx, in_build) == HandleStatus::ContextClosed && !in_build);
+    CHECK(t.context_in_build(424242, in_build) == HandleStatus::UnknownContext);
+    CHECK(t.context_in_build(kDetached, in_build) == HandleStatus::UnknownContext);
+    t.close_context(rebuild);
     // Access: the owner and contexts nested in it; never siblings or parents.
     CHECK(serial_of(t, h, P, script) == 1 && serial_of(t, h, P, child) == 1);
     CHECK(serial_of(t, hc, P, script) == -1 && serial_of(t, hc, P, sibling) == -1);

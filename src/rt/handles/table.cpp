@@ -46,6 +46,14 @@ HandleStatus HandleTable::open_context(ContextKind kind, ContextId parent, Conte
     return contexts_.open(kind, parent, out);
 }
 
+HandleStatus HandleTable::context_in_build(ContextId id, bool& in_build) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    HandleStatus status;
+    const ExecContext* c = contexts_.find(id, status);
+    if (c) in_build = c->build_family;
+    return status;
+}
+
 HandleStatus HandleTable::create(ContextId owner, HandleKind kind, std::shared_ptr<void> resource, Value& out,
                                  CreateOptions options) {
     std::unique_lock<std::mutex> lock(mu_);

@@ -32,6 +32,9 @@ public:
     // The open or closing context `id`, or null (status says why).
     ExecContext* find(ContextId id, HandleStatus& status);
     ExecContext* find(ContextId id) { HandleStatus ignored; return find(id, ignored); }
+    const ExecContext* find(ContextId id, HandleStatus& status) const {
+        return const_cast<ContextTree*>(this)->find(id, status);
+    }
     // Ok when `accessor` is `owner` or nested in it, or the handle is
     // detached, or the accessor is kAnyAccessor. Otherwise NotOwned.
     HandleStatus may_access(ContextId accessor, ContextId owner) const;
