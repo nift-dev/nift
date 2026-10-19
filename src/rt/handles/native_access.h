@@ -41,9 +41,12 @@ HandleStatus native_handle_arg(const HandleAccess& access, std::string_view buil
     return status;
 }
 
-// close(h): idempotent (closing a closed handle is Ok).
+// close(h): idempotent (closing a closed handle is Ok). CleanupFailed when the
+// resource settled Failed, Lost or CleanupIncomplete synchronously: `error`
+// then carries the failure's own code and message, `failure` (optional) the
+// details; class Error (D-035: exit 1). It is also in the context's report.
 HandleStatus native_handle_close(const HandleAccess& access, std::string_view builtin, const Value& arg,
-                                 HandleKind kind, std::string& error);
+                                 HandleKind kind, std::string& error, CleanupFailure* failure = nullptr);
 // detach(h): refused inside builds with the kind's code.
 HandleStatus native_handle_detach(const HandleAccess& access, std::string_view builtin, const Value& arg,
                                   HandleKind kind, std::string& error);

@@ -80,7 +80,7 @@ void transfers(int rounds) {
         CHECK(f.t.create(dst, P, std::make_shared<FakeProcess>(), g) == HandleStatus::ContextClosed);
         ContextId child;
         CHECK(f.t.open_context(ContextKind::Script, dst, child) == HandleStatus::ContextClosed);
-        CHECK(f.t.transfer(h, P, src, dst) == HandleStatus::ContextClosed);
+        CHECK(f.t.transfer(h, P, src, dst, TransferPolicy::KeepOnRefusal) == HandleStatus::ContextClosed);
         ContextId owner = 0;
         CHECK(f.t.owner_of(h, P, owner) == HandleStatus::Ok && owner == src && p->terminate_calls == 0);
         CHECK(f.t.transfer(h, P, src, dst, TransferPolicy::ReclaimOnRefusal) == HandleStatus::ContextClosed);
@@ -312,7 +312,7 @@ void close_and_detach_d039() {
     }
     {   // (b) failure to establish detachment is a reportable operation failure
         Value h;
-        f.spawn(h, 0, false);
+        f.spawn(h);
         deadline(f.t, h, f.reaper, TerminationCause::Deadline);  // termination already started
         CHECK(f.t.detach_as(h, P, f.script) == HandleStatus::DetachFailed);
         CHECK(native_handle_detach(HandleAccess{&f.t, f.script}, "detach", h, P, error) == HandleStatus::DetachFailed);
@@ -326,7 +326,7 @@ void close_and_detach_d039() {
         f.spawn(g, 0, false);
         ContextId other;
         f.t.open_context(ContextKind::Script, kDetached, other);
-        CHECK(f.t.detach_as(g, P, other) == HandleStatus::NotOwned);
+        CHECK(f.t.detach_as(g, P, other) == HandleStatus::DetachFailed);  // not the owner: reportable
         f.t.close(g, P, f.script);
         CHECK(f.t.detach_as(g, P, f.script) == HandleStatus::Closed);
         f.reaper.settle_all(CleanupOutcome::completed());
@@ -339,7 +339,7 @@ void close_and_detach_d039() {
         CompletionTicket ticket;
         TerminationStart info;
         CHECK(f.t.begin_termination(h, P, TerminationCause::Cancel, ticket, &info) == HandleStatus::Ok);
-        CHECK(info.started && !ticket);  // CP16 may send the request; no outcome is tracked
+        CHECK(!info.started && info.detached_request && !ticket);  // a request; no outcome is tracked
         LifeState state;
         TerminationCause cause;
         CHECK(f.t.lifecycle(h, P, state, cause) == HandleStatus::Ok && state == LifeState::Active);

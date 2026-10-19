@@ -62,20 +62,25 @@ HandleStatus ContextTree::cancel(ContextId id) {
     return HandleStatus::Ok;
 }
 
-void ContextTree::collect(ContextId id, std::vector<ContextId>& order) {
+void ContextTree::collect(ContextId id, std::uint64_t closer, std::vector<ContextId>& order,
+                          std::vector<ContextId>& elsewhere) {
     ExecContext& c = contexts_[id];
     c.state = ContextState::Closing;
+    c.closer = closer;
     // Iterate a copy: children are only erased by erase(), never during this walk.
     const std::vector<ContextId> children = c.children;
     for (auto it = children.rbegin(); it != children.rend(); ++it) {
-        if (contexts_.count(*it)) collect(*it, order);
+        const auto child = contexts_.find(*it);
+        if (child == contexts_.end()) continue;
+        if (child->second.state == ContextState::Closing) elsewhere.push_back(*it);  // another close owns it
+        else collect(*it, closer, order, elsewhere);
     }
     order.push_back(id);
 }
 
-std::vector<ContextId> ContextTree::begin_close(ContextId id) {
+std::vector<ContextId> ContextTree::begin_close(ContextId id, std::uint64_t closer, std::vector<ContextId>& elsewhere) {
     std::vector<ContextId> order;
-    collect(id, order);
+    collect(id, closer, order, elsewhere);
     return order;
 }
 

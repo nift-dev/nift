@@ -35,24 +35,46 @@ void HandleTable::close_one(ContextId id, CloseReport& report, std::unique_lock<
     idle_.notify_all();
 }
 
-CloseReport HandleTable::close_context(ContextId id, bool on_error) {
-    CloseReport report;
-    std::unique_lock<std::mutex> lock(mu_);
-    ExecContext* c = contexts_.find(id, report.status);
-    if (!c) return report;
-    if (c->state == ContextState::Closing) { report.status = HandleStatus::ContextClosed; return report; }
-    report.label = c->label;
-    report.on_error = on_error;
-    const std::vector<ContextId> order = contexts_.begin_close(id);
+void HandleTable::close_subtree(ContextId id, bool on_error, CloseReport& report,
+                                std::unique_lock<std::mutex>& lock) {
+    std::vector<ContextId> elsewhere;
+    const std::vector<ContextId> order = contexts_.begin_close(id, next_closer_++, elsewhere);
     for (const ContextId each : order) {
         if (ExecContext* e = contexts_.find(each)) e->ending_on_error = e->ending_on_error || on_error;
     }
+    // Descendants another close already owns end there (and are reported
+    // there); ours end after them, descendants first.
+    report.descendants_closed_elsewhere += elsewhere.size();
+    idle_.wait(lock, [&] {
+        for (const ContextId e : elsewhere) {
+            if (contexts_.find(e)) return false;
+        }
+        return true;
+    });
     for (const ContextId each : order) close_one(each, report, lock);
+}
+
+CloseReport HandleTable::close_context(ContextId id, bool on_error) {
+    CloseReport report;
+    if (in_own_hook()) { report.status = HandleStatus::ReentrantClose; return report; }
+    std::unique_lock<std::mutex> lock(mu_);
+    ExecContext* c = contexts_.find(id, report.status);
+    if (!c) return report;
+    report.label = c->label;
+    report.on_error = on_error;
+    if (c->state == ContextState::Closing) {  // another close owns it: wait until it is gone
+        idle_.wait(lock, [&] { return contexts_.find(id) == nullptr; });
+        report.status = HandleStatus::ContextClosed;
+        report.closed_elsewhere = true;
+        return report;
+    }
+    close_subtree(id, on_error, report, lock);
     return report;
 }
 
 CloseReport HandleTable::shutdown() {
     CloseReport report;
+    if (in_own_hook()) { report.status = HandleStatus::ReentrantClose; return report; }
     std::unique_lock<std::mutex> lock(mu_);
     // Repeats until nothing is left: a hook may open contexts or create handles.
     for (;;) {
@@ -63,7 +85,7 @@ CloseReport HandleTable::shutdown() {
             if (c && c->state != ContextState::Closing) newest = *it;
         }
         if (newest != kDetached) {
-            for (const ContextId each : contexts_.begin_close(newest)) close_one(each, report, lock);
+            close_subtree(newest, false, report, lock);
             continue;
         }
         if (!roots.empty()) { idle_.wait(lock); continue; }  // closes running on other threads
@@ -88,10 +110,14 @@ HandleStatus HandleTable::detach(const Value& handle, HandleKind kind, ContextId
     if (expected_owner == kDetached || store_.slot(index).owner != expected_owner) return HandleStatus::NotOwned;
     ExecContext* c = contexts_.find(expected_owner, status);
     if (!c) return status;
-    if (!accepts_handles(*c)) return HandleStatus::ContextClosed;
+    if (!accepts_handles(*c)) return HandleStatus::DetachFailed;  // the context is ending or cancelling
     if (c->build_family) return HandleStatus::DetachForbidden;
+    if (!store_.slot(index).counted) return HandleStatus::NotCounted;  // its bookkeeping could never end
     LifeRecord& r = *records_.find(store_.slot(index).record);
-    if (r.state != LifeState::Active) return HandleStatus::DetachFailed;  // termination already started
+    // Decided by what started termination, never by timing: a resource that
+    // only exited (reported or not, reaped or not) detaches; one Nift is
+    // terminating, or terminated, cannot be promised a lifetime.
+    if (r.cause != TerminationCause::None && r.cause != TerminationCause::Exited) return HandleStatus::DetachFailed;
     store_.move(index, c->handles, detached_, kDetached);
     r.owner = kDetached;
     return HandleStatus::Ok;
@@ -106,14 +132,14 @@ HandleStatus HandleTable::detach_as(const Value& handle, HandleKind kind, Contex
         if (status != HandleStatus::Ok) return status;
         owner = store_.slot(index).owner;
         if (owner == kDetached) return HandleStatus::Ok;  // already detached: nothing to give up
-        status = contexts_.may_access(accessor, owner);
-        if (status != HandleStatus::Ok) return status;
+        if (contexts_.may_access(accessor, owner) != HandleStatus::Ok) return HandleStatus::DetachFailed;
         // A build-family accessor may not detach even an ancestor's handle.
         const ExecContext* a = accessor == kAnyAccessor ? nullptr : contexts_.find(accessor);
         if (a && a->build_family) return HandleStatus::DetachForbidden;
     }
-    // Ownership is re-checked under the lock: a concurrent change makes this NotOwned.
-    return detach(handle, kind, owner);
+    // Ownership is re-checked under the lock: a concurrent change fails the detach.
+    const HandleStatus status = detach(handle, kind, owner);
+    return status == HandleStatus::NotOwned ? HandleStatus::DetachFailed : status;
 }
 
 HandleStatus HandleTable::transfer(const Value& handle, HandleKind kind, ContextId expected_owner,

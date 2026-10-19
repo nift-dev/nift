@@ -265,7 +265,8 @@ test-rt-value-sanitize:
 RT_HANDLE_SOURCES := src/rt/handle.cpp $(sort $(wildcard src/rt/handles/*.cpp)) src/rt/value.cpp src/rt/string.cpp \
 	src/rt/heap_account.cpp
 RT_HANDLE_DEPS := $(RT_HANDLE_SOURCES) src/rt/handle.h $(wildcard src/rt/handles/*.h) src/rt/value.h \
-	tests/rt/rt_test.h tests/rt/handle_test_support.h tests/rt/handle_lifecycle_unit_more.inc
+	tests/rt/rt_test.h tests/rt/handle_test_support.h tests/rt/handle_lifecycle_unit_more.inc \
+	tests/rt/handle_lifecycle_review.inc
 RT_HANDLE_UNIT_SOURCES := tests/rt/handle_table_unit.cpp tests/rt/handle_table_ownership.cpp
 RT_HANDLE_UNIT := $(TEST_DIR)/rt/handle-unit$(EXEEXT)
 RT_HANDLE_STRESS := $(TEST_DIR)/rt/handle-stress$(EXEEXT)

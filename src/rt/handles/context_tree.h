@@ -24,6 +24,7 @@ struct ExecContext {
     ContextState state = ContextState::Open;
     bool build_family = false;         // a build context or nested in one: no detach
     bool ending_on_error = false;      // set by close_context(id, true) for the closing subtree
+    std::uint64_t closer = 0;          // the close_context call that owns ending this context
     std::string label;                 // diagnostics: "page 'index'", "build", ...
     std::vector<ContextId> children;   // in open order
     OwnerList handles;                 // owned handles in creation order
@@ -45,10 +46,13 @@ public:
     // Ok when `accessor` is `owner` or nested in it, or the handle is
     // detached, or the accessor is kAnyAccessor. Otherwise NotOwned.
     HandleStatus may_access(ContextId accessor, ContextId owner) const;
-    // Marks `id` and every open descendant Closing and returns the order in
-    // which they are cleaned: descendants before ancestors, later-opened
-    // siblings first (reverse of open order, like destructors).
-    std::vector<ContextId> begin_close(ContextId id);
+    // Marks `id` and every descendant not already being closed Closing, owned
+    // by `closer`, and returns the order in which they are cleaned:
+    // descendants before ancestors, later-opened siblings first (reverse of
+    // open order, like destructors). Descendants another close already owns
+    // are not taken over: they are listed in `elsewhere` (that close reports
+    // them; this one waits until they are gone).
+    std::vector<ContextId> begin_close(ContextId id, std::uint64_t closer, std::vector<ContextId>& elsewhere);
     // Marks `id` and every open descendant Cancelling. ContextClosed when
     // `id` is already closing.
     HandleStatus cancel(ContextId id);
@@ -60,7 +64,8 @@ public:
     static bool is_build_kind(ContextKind kind) { return kind != ContextKind::Script; }
 
 private:
-    void collect(ContextId id, std::vector<ContextId>& order);
+    void collect(ContextId id, std::uint64_t closer, std::vector<ContextId>& order,
+                 std::vector<ContextId>& elsewhere);
 
     std::unordered_map<ContextId, ExecContext> contexts_;
     std::vector<ContextId> roots_;   // in open order

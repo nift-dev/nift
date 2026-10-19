@@ -64,9 +64,7 @@ LifeState settled_state(CleanupOutcome::Result result) {
     }
 }
 
-namespace {
-
-const char* default_code(LifeState state) {
+const char* default_failure_code(LifeState state) {
     switch (state) {
         case LifeState::Failed: return "internal.handle_cleanup_failed";
         case LifeState::CleanupIncomplete: return "internal.handle_cleanup_incomplete";
@@ -74,7 +72,7 @@ const char* default_code(LifeState state) {
     }
 }
 
-const char* default_message(LifeState state) {
+const char* default_failure_message(LifeState state) {
     switch (state) {
         case LifeState::Failed: return "still alive after forced termination";
         case LifeState::CleanupIncomplete: return "ended, but cleanup could not be completed";
@@ -82,7 +80,11 @@ const char* default_message(LifeState state) {
     }
 }
 
-} // namespace
+CleanupFailure make_failure(const LifeRecord& base, LifeState state, CleanupOutcome&& outcome) {
+    return CleanupFailure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {},
+                          outcome.code.empty() ? default_failure_code(state) : std::move(outcome.code),
+                          outcome.message.empty() ? default_failure_message(state) : std::move(outcome.message)};
+}
 
 bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed) {
     failed = false;
@@ -90,9 +92,7 @@ bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, Cleanu
     record.state = settled_state(outcome.result);
     if (record.state == LifeState::Completed) return true;
     failed = true;
-    failure = CleanupFailure{record.handle, record.kind, record.owner, record.reason, record.cause, record.state, {},
-                             outcome.code.empty() ? default_code(record.state) : std::move(outcome.code),
-                             outcome.message.empty() ? default_message(record.state) : std::move(outcome.message)};
+    failure = make_failure(record, record.state, std::move(outcome));
     return true;
 }
 

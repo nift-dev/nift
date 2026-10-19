@@ -37,7 +37,10 @@
 namespace nift::rt::handles {
 
 struct TerminationStart {
-    bool started = false;                        // true: the caller got the ticket and must terminate
+    bool started = false;                        // true exactly when a ticket was issued: the caller
+                                                 // terminates and reports through it
+    bool detached_request = false;               // detached resource: CP16 may send the request;
+                                                 // no ticket, nothing is supervised (D-039)
     LifeState state = LifeState::Active;         // lifecycle before the call
     TerminationCause cause = TerminationCause::None;  // what had started termination, if anything
 };
@@ -68,6 +71,10 @@ public:
     // reason ContextEnd; then waits until every obligation of these contexts
     // has settled (CP16 bounds that wait). The report lists every Failed/Lost
     // settle of their resources; it is final.
+    // Every caller waits until the context is gone. If another close already
+    // owns it: status ContextClosed, closed_elsewhere, and its failures are in
+    // that close's report. Called from inside a cleanup hook of this table:
+    // ReentrantClose (it would wait for the hook itself).
     // `on_error`: the context is ending on an error (fatal error, failed page
     // or hook); its descendants end with it on the same error. Hooks see it in
     // CleanupEvent::context_error; the report carries it.
@@ -106,26 +113,33 @@ public:
     HandleStatus release(const Value& handle, HandleKind kind, ContextId expected_owner,
                          CleanupFailure* failure = nullptr);
     // detach (host, strict): the named owner gives the resource up; nothing
-    // cleans it at context end; shutdown() releases its bookkeeping. A
-    // resource already terminating cannot be detached (DetachFailed, D-039).
+    // cleans it at context end; its bookkeeping goes with its last counted
+    // reference (or shutdown()). Only counted handles can be detached
+    // (NotCounted), so no bookkeeping outlives the script's references.
+    // DetachFailed (D-039, reportable) when the context is ending or
+    // cancelling, or Nift already started terminating the resource (a
+    // deadline, a cancel, a close); a resource that only exited or settled
+    // after exiting detaches trivially.
     HandleStatus detach(const Value& handle, HandleKind kind, ContextId expected_owner);
-    // detach_as (script-facing): the caller must be the owner or nested in it;
-    // detaching a detached handle is Ok.
+    // detach_as (script-facing): the caller must be the owner or nested in it
+    // (DetachFailed otherwise); detaching a detached handle is Ok.
     HandleStatus detach_as(const Value& handle, HandleKind kind, ContextId accessor);
     // transfer (host-internal only, D-035; never exposed to natives): moves
     // ownership to another open context in one step. Out of the build family,
     // or adoption of a detached resource: TransferForbidden. A destination
     // that has ended or is cancelling: ContextClosed / UnknownContext, and
-    // with ReclaimOnRefusal the resource is cleaned up at once.
+    // (default, D-035) the resource is cleaned up at once. Moving into the
+    // build family is allowed (the build then owns its cleanup).
     HandleStatus transfer(const Value& handle, HandleKind kind, ContextId expected_owner, ContextId new_owner,
-                          TransferPolicy policy = TransferPolicy::KeepOnRefusal);
+                          TransferPolicy policy = TransferPolicy::ReclaimOnRefusal);
 
     // CP16 reports that a live resource is terminating for `cause` (Deadline,
     // Cancel, Exited) while its handle stays open. The first call while the
     // lifecycle is Active gets the ticket (info.started); later calls, and
     // calls after cleanup began, do not: termination happens exactly once.
-    // A detached resource: info.started is true (CP16 may send the request)
-    // but no ticket is issued and the lifecycle is unchanged (D-039).
+    // A detached resource: no ticket, info.started false, info.detached_request
+    // true (CP16 may send the request); the lifecycle is unchanged (D-039).
+    // Any cause but Exited, Deadline or Cancel is InvalidCause.
     HandleStatus begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
                                    CompletionTicket& ticket, TerminationStart* info = nullptr);
 
@@ -137,7 +151,8 @@ public:
 
     // Closes every context still open (roots newest first), then releases
     // every detached handle (reason Shutdown), then waits for every
-    // outstanding obligation. Idempotent.
+    // outstanding obligation. Idempotent. From inside a cleanup hook of this
+    // table: status ReentrantClose, nothing done.
     CloseReport shutdown();
 
     TableStats stats() const;
@@ -156,7 +171,7 @@ private:
         LifeState state;
         TerminationCause cause;
         bool ticket;
-        std::string label;     // the owner's label
+        const std::string* label;  // the owner's label (stable while the hook is in flight)
         bool context_error;    // the owner is ending on an error
     };
 
@@ -173,6 +188,8 @@ private:
     void finish_locked(ContextId owner);
     HandleStatus close_locked(std::uint32_t index, std::unique_lock<std::mutex>& lock, CleanupFailure* failure);
     void close_one(ContextId id, CloseReport& report, std::unique_lock<std::mutex>& lock);
+    void close_subtree(ContextId id, bool on_error, CloseReport& report, std::unique_lock<std::mutex>& lock);
+    bool in_own_hook() const;  // this thread is running a cleanup hook of this table
     // Settles a lifecycle (CompletionTicket::complete). Exactly once.
     bool settle(std::uint64_t record, CleanupOutcome&& outcome);
 
@@ -186,7 +203,7 @@ private:
     OwnerList detached_;
     std::size_t detached_in_flight_ = 0, detached_obligations_ = 0, obligations_ = 0;
     std::vector<CleanupFailure> detached_failures_;
-    std::uint64_t created_ = 0, cleaned_ = 0, settled_ = 0;
+    std::uint64_t created_ = 0, cleaned_ = 0, settled_ = 0, next_closer_ = 1;
 };
 
 } // namespace nift::rt::handles

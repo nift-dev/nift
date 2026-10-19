@@ -40,12 +40,18 @@ enum class HandleStatus : std::uint8_t {
     KindRegistered,     // the kind is already registered
     NullResource,       // create() with a null resource
     DetachForbidden,    // detach inside a build context (D-030)
-    DetachFailed,       // detachment could not be established (D-039): the resource
-                        // is already terminating, so its promised lifetime cannot hold
+    DetachFailed,       // detachment could not be established (D-039): Nift already
+                        // started terminating the resource, the context is ending or
+                        // cancelling, or the caller does not own it (a reportable
+                        // operation failure, never Internal)
     TransferForbidden,  // a transfer that would move a resource out of build ownership
     LimitExceeded,      // the table's capacity (NIFT_HANDLE_LIMIT) is reached (D-020/D-028: loud)
     InvalidSetting,     // NIFT_HANDLE_LIMIT has an invalid value (reported, never replaced)
-    CleanupFailed,      // the kind's cleanup hook failed; the slot is reclaimed anyway
+    CleanupFailed,      // close/release: the resource settled Failed, Lost or
+                        // CleanupIncomplete synchronously; the CleanupFailure carries
+                        // the specific code (D-035: exit 1); the slot is reclaimed anyway
+    InvalidCause,       // begin_termination with a cause that is not Exited/Deadline/Cancel
+    ReentrantClose,     // close_context/shutdown from inside a cleanup hook of this table
 };
 
 // How a failure surfaces (D-035): Recoverable = a catchable program error

@@ -34,10 +34,22 @@ void describe_handle_failure(HandleStatus status, std::string_view builtin, Hand
 }
 
 HandleStatus native_handle_close(const HandleAccess& access, std::string_view builtin, const Value& arg,
-                                 HandleKind kind, std::string& error) {
-    const HandleStatus status = access.table ? access.table->close(arg, kind, access.context)
+                                 HandleKind kind, std::string& error, CleanupFailure* failure) {
+    CleanupFailure local;
+    CleanupFailure& f = failure ? *failure : local;
+    const HandleStatus status = access.table ? access.table->close(arg, kind, access.context, &f)
                                              : HandleStatus::UnknownContext;
-    if (status != HandleStatus::Ok) describe_handle_failure(status, builtin, kind, arg, access.table, error);
+    if (status == HandleStatus::CleanupFailed) {
+        // The failure's own code and text (never "alive" unless it is Failed).
+        error.assign(builtin);
+        error += ": " + f.message + " (";
+        const KindSpec* spec = access.table->kind_spec(kind);
+        error += spec && !spec->name.empty() ? spec->name : "kind " + std::to_string(static_cast<unsigned>(kind));
+        error += " handle " + std::to_string(static_cast<std::uint32_t>(arg.handle_id())) + "/" +
+                 std::to_string(arg.handle_generation()) + ", " + f.code + ")";
+    } else if (status != HandleStatus::Ok) {
+        describe_handle_failure(status, builtin, kind, arg, access.table, error);
+    }
     return status;
 }
 

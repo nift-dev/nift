@@ -7,6 +7,19 @@ namespace nift::rt::handles {
 
 namespace {
 
+const std::string kNoLabel;
+
+// Tables whose cleanup hook this thread is running (innermost last): close
+// and shutdown from inside a hook would wait for that hook (deadlock).
+thread_local std::vector<const void*> t_hook_tables;
+
+struct HookScope {
+    explicit HookScope(const void* table) { t_hook_tables.push_back(table); }
+    ~HookScope() { t_hook_tables.pop_back(); }
+    HookScope(const HookScope&) = delete;
+    HookScope& operator=(const HookScope&) = delete;
+};
+
 std::uint32_t next_table_tag() {
     static std::atomic<std::uint32_t> next{1};
     std::uint32_t tag = next.fetch_add(1, std::memory_order_relaxed);
@@ -20,6 +33,13 @@ HandleTable::HandleTable(TableOptions options)
     : store_(next_table_tag(), options.capacity), invalid_setting_(std::move(options.invalid_setting)) {}
 
 HandleTable::~HandleTable() { shutdown(); }
+
+bool HandleTable::in_own_hook() const {
+    for (const void* t : t_hook_tables) {
+        if (t == this) return true;
+    }
+    return false;
+}
 
 HandleStatus HandleTable::register_kind(HandleKind kind, KindSpec spec) {
     if (kind == HandleKind::None) return HandleStatus::UnknownKind;
@@ -82,16 +102,20 @@ HandleStatus HandleTable::resolve(const Value& handle, HandleKind kind, ContextI
 
 HandleStatus HandleTable::resolve_checked(const Value& handle, HandleKind kind, ContextId accessor,
                                           const void* type_tag, std::shared_ptr<void>& out) const {
-    std::lock_guard<std::mutex> lock(mu_);
-    std::uint32_t index = 0;
-    HandleStatus status = store_.classify(handle, kind, index);
-    if (status != HandleStatus::Ok) return status;
-    const Slot& s = store_.slot(index);
-    status = contexts_.may_access(accessor, s.owner);
-    if (status != HandleStatus::Ok) return status;
-    const KindSpec& spec = kinds_[static_cast<std::uint8_t>(kind)].spec;
-    if (type_tag && spec.type_tag != type_tag) return HandleStatus::TypeMismatch;
-    out = s.resource;
+    std::shared_ptr<void> result;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        std::uint32_t index = 0;
+        HandleStatus status = store_.classify(handle, kind, index);
+        if (status != HandleStatus::Ok) return status;
+        const Slot& s = store_.slot(index);
+        status = contexts_.may_access(accessor, s.owner);
+        if (status != HandleStatus::Ok) return status;
+        const KindSpec& spec = kinds_[static_cast<std::uint8_t>(kind)].spec;
+        if (type_tag && spec.type_tag != type_tag) return HandleStatus::TypeMismatch;
+        result = s.resource;
+    }
+    out.swap(result);  // the caller's previous value dies here, outside the lock
     return HandleStatus::Ok;
 }
 
@@ -136,13 +160,13 @@ HandleTable::Started HandleTable::begin_cleanup_locked(std::uint32_t index, Rele
     const ContextId owner = store_.slot(index).owner;
     const std::uint64_t id = store_.slot(index).record;
     Started started{store_.take(index, *list_of(owner)), reason, LifeState::Active, TerminationCause::None, false,
-                    {}, false};
+                    &kNoLabel, false};
     if (owner == kDetached) {
         ++detached_in_flight_;
     } else {
         ExecContext& c = *contexts_.find(owner);
         ++c.in_flight;
-        started.label = c.label;
+        started.label = &c.label;  // stable: the context is not erased while this cleanup is in flight
         started.context_error = reason == ReleaseReason::ContextEnd && c.ending_on_error;
     }
     LifeRecord& r = *records_.find(id);
@@ -150,9 +174,18 @@ HandleTable::Started HandleTable::begin_cleanup_locked(std::uint32_t index, Rele
     started.cause = r.cause;
     r.slot_live = false;
     r.reason = reason;
-    if (owner == kDetached) {   // D-039: only Nift's bookkeeping ends; no ticket, no obligation
-        records_.erase(id);
-        ++settled_;
+    if (owner == kDetached) {   // D-039: only Nift's bookkeeping ends; no new ticket
+        if (r.ticket_issued && !is_settled(r.state)) {
+            // Detached after it exited: CP16 still holds the reaping ticket.
+            // The record stays until that report arrives (its id must not be
+            // reused under a live ticket); shutdown() waits for it.
+            r.obligation = true;
+            ++detached_obligations_;
+            ++obligations_;
+        } else {
+            if (!is_settled(r.state)) ++settled_;
+            records_.erase(id);
+        }
         return started;
     }
     if (r.state == LifeState::Active) {   // this cleanup starts termination and holds the ticket
@@ -184,9 +217,10 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
     lock.unlock();
     CleanupOutcome outcome = CleanupOutcome::completed();
     CleanupEvent event{t.kind, t.handle, t.owner, started.reason, t.resource, started.state, started.cause,
-                       started.label, started.context_error, started.ticket ? &ticket : nullptr};
+                       *started.label, started.context_error, started.ticket ? &ticket : nullptr};
     bool threw = false;
     if (spec.cleanup) {
+        HookScope scope(this);
         try {
             outcome = spec.cleanup(event);
         } catch (const std::exception& e) {
@@ -198,19 +232,30 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
         }
     }
     bool failed = false;
+    LifeRecord base;  // identity fields for failures reported from here
+    base.handle = t.handle;
+    base.kind = t.kind;
+    base.owner = t.owner;
+    base.reason = started.reason;
+    base.cause = started.ticket ? cause_of(started.reason) : started.cause;
     if (ticket && (threw || outcome.result != CleanupOutcome::Result::Pending)) {
         const LifeState state = settled_state(outcome.result);
         failed = state != LifeState::Completed;
-        if (failed && failure) {
-            *failure = CleanupFailure{t.handle, t.kind, t.owner, started.reason, cause_of(started.reason), state,
-                                      started.label, outcome.code, outcome.message};
+        if (failed && failure) {  // the caller's copy, with the same defaults as the report
+            *failure = make_failure(base, state, CleanupOutcome(outcome));
+            failure->context_label = *started.label;
         }
         ticket.complete(std::move(outcome));
-    } else if (!started.ticket && threw) {  // a bookkeeping-only hook threw: still loud
+    } else if (threw || (t.owner == kDetached && outcome.result != CleanupOutcome::Result::Completed &&
+                         outcome.result != CleanupOutcome::Result::Pending)) {
+        // Known and otherwise unreported: a hook that threw after taking the
+        // ticket or while releasing bookkeeping, or a failure a detached
+        // resource's hook knows about (D-039: detached_failures, no exit effect).
+        CleanupFailure f = make_failure(base, threw ? LifeState::Lost : settled_state(outcome.result),
+                                        std::move(outcome));
+        f.context_label = *started.label;
         lock.lock();
-        failures_of(t.owner).push_back(CleanupFailure{t.handle, t.kind, t.owner, started.reason, started.cause,
-                                                      LifeState::Lost, started.label, outcome.code,
-                                                      outcome.message});
+        failures_of(t.owner).push_back(std::move(f));
         lock.unlock();
     }
     // A ticket the hook left behind with pending() settles here as unresolved.
@@ -297,6 +342,9 @@ bool HandleTable::settle(std::uint64_t id, CleanupOutcome&& outcome) {
 
 HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
                                             CompletionTicket& ticket, TerminationStart* info) {
+    if (cause != TerminationCause::Exited && cause != TerminationCause::Deadline && cause != TerminationCause::Cancel) {
+        return HandleStatus::InvalidCause;  // the other causes belong to the table's own events
+    }
     CompletionTicket issued;
     TerminationStart start;
     {
@@ -308,7 +356,7 @@ HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind
         start.state = r.state;
         start.cause = r.cause;
         if (store_.slot(index).owner == kDetached) {  // D-039: a request only; no ticket, nothing supervised
-            start.started = true;
+            start.detached_request = true;
         } else if (r.state == LifeState::Active) {
             r.state = LifeState::Terminating;
             r.cause = cause;

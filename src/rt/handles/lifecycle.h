@@ -28,6 +28,11 @@ bool is_settled(LifeState state);
 TerminationCause cause_of(ReleaseReason reason);
 // The settled state an outcome reports (Pending as a final report: Lost).
 LifeState settled_state(CleanupOutcome::Result result);
+// Default code and message for a failed settled state (Failed, Lost, CleanupIncomplete).
+const char* default_failure_code(LifeState state);
+const char* default_failure_message(LifeState state);
+// The CleanupFailure for an outcome, with the defaults applied.
+CleanupFailure make_failure(const LifeRecord& base, LifeState state, CleanupOutcome&& outcome);
 
 // A pool of records; ids are pool index + 1 (0 = none). Reusing an id is safe:
 // a record is erased only after it settled and its slot was given up, and the

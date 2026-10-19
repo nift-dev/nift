@@ -42,7 +42,7 @@ void status_codes() {
     CHECK(handle_error_class(HandleStatus::Ok) == HandleErrorClass::None);
     // Every status has a distinct, non-empty code.
     std::map<std::string, int> seen;
-    for (int s = 1; s <= static_cast<int>(HandleStatus::CleanupFailed); ++s) {
+    for (int s = 1; s <= static_cast<int>(HandleStatus::ReentrantClose); ++s) {
         const std::string code = handle_status_code(static_cast<HandleStatus>(s));
         CHECK(!code.empty() && ++seen[code] == 1);
     }

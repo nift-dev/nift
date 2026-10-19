@@ -19,7 +19,7 @@ import sys
 import tempfile
 
 TOLERANCE = 1.10
-MODES = ["cycle", "resolve", "counted", "context"]
+MODES = ["cycle", "resolve", "counted", "context", "context_label"]
 N1, N2 = 2000, 22000
 
 
@@ -57,6 +57,9 @@ def main():
         with open(args.check) as handle:
             guards = json.load(handle)["ir_per_iteration"]
         for mode, value in results.items():
+            if mode not in guards:
+                print("NEW  %-8s %.1f (no guard recorded yet)" % (mode, value))
+                continue
             limit = guards[mode] * TOLERANCE
             status = "PASS" if value <= limit else "FAIL"
             failed = failed or status == "FAIL"

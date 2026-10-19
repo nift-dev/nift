@@ -23,7 +23,9 @@ const char* handle_status_code(HandleStatus status) {
         case HandleStatus::TransferForbidden: return "runtime.transfer_out_of_build";
         case HandleStatus::LimitExceeded: return "limit.exceeded";
         case HandleStatus::InvalidSetting: return "runtime.invalid_argument";
-        case HandleStatus::CleanupFailed: return "internal.handle_cleanup_failed";
+        case HandleStatus::CleanupFailed: return "runtime.cleanup_failed";
+        case HandleStatus::InvalidCause: return "internal.handle_invalid_cause";
+        case HandleStatus::ReentrantClose: return "internal.handle_reentrant_close";
     }
     return "internal.handle_unknown_status";
 }
@@ -45,11 +47,13 @@ const char* handle_status_text(HandleStatus status) {
         case HandleStatus::KindRegistered: return "handle kind is already registered";
         case HandleStatus::NullResource: return "null handle resource";
         case HandleStatus::DetachForbidden: return "detaching is not allowed inside a build";
-        case HandleStatus::DetachFailed: return "detachment could not be established (already terminating)";
+        case HandleStatus::DetachFailed: return "detachment could not be established";
         case HandleStatus::TransferForbidden: return "transfer would move a resource out of the build";
         case HandleStatus::LimitExceeded: return "handle limit exceeded";
         case HandleStatus::InvalidSetting: return "invalid handle limit setting";
-        case HandleStatus::CleanupFailed: return "handle cleanup failed";
+        case HandleStatus::CleanupFailed: return "cleanup failed";
+        case HandleStatus::InvalidCause: return "invalid termination cause";
+        case HandleStatus::ReentrantClose: return "context close from inside a cleanup hook";
     }
     return "unknown handle status";
 }
@@ -61,7 +65,8 @@ HandleErrorClass handle_error_class(HandleStatus status) {
         case HandleStatus::LimitExceeded: return HandleErrorClass::Limit;
         case HandleStatus::InvalidSetting:
         case HandleStatus::DetachForbidden:
-        case HandleStatus::DetachFailed: return HandleErrorClass::Error;
+        case HandleStatus::DetachFailed:
+        case HandleStatus::CleanupFailed: return HandleErrorClass::Error;
         default: return HandleErrorClass::Internal;
     }
 }

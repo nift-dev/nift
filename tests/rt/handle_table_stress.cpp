@@ -25,6 +25,7 @@ using namespace nift::rt::handles;
 namespace {
 
 std::atomic<long> g_alive{0}, g_twice{0}, g_wrong{0}, g_cleaned{0}, g_settle_twice{0};
+std::atomic<long> g_failures_produced{0};  // Failed/Lost/CleanupIncomplete outcomes reported to the table
 
 struct Res {
     long serial;
@@ -48,8 +49,11 @@ struct Reaper {
         { std::lock_guard<std::mutex> lock(mu); work.swap(queue); }
         for (auto& [r, t] : work) {
             if (r->settled.fetch_add(1) != 0) ++g_settle_twice;
-            t.complete(r->serial % 13 == 0 ? CleanupOutcome::lost("test.lost", "unconfirmed")
-                                           : CleanupOutcome::completed());
+            const bool lost = r->serial % 13 == 0;
+            if (t.complete(lost ? CleanupOutcome::lost("test.lost", "unconfirmed") : CleanupOutcome::completed()) &&
+                lost) {
+                ++g_failures_produced;
+            }
         }
     }
 };
@@ -68,7 +72,10 @@ KindSpec counting_kind() {
             return CleanupOutcome::pending();
         }
         if (r->settled.fetch_add(1) != 0) ++g_settle_twice;
-        if (r->serial % 17 == 0) return CleanupOutcome::failure("test.fail", "failing hook");
+        if (r->serial % 17 == 0) {
+            ++g_failures_produced;
+            return CleanupOutcome::failure("test.fail", "failing hook");
+        }
         return CleanupOutcome::success();
     };
     return spec;
@@ -200,6 +207,7 @@ void context_manager(HandleTable& t, Board& board, std::atomic<bool>& stop, long
 
 void random_stress(int seconds_ms, std::uint32_t capacity) {
     long refused_alive = 0, closed_failures = 0;
+    g_failures_produced = 0;
     {
         TableOptions options;
         options.capacity = capacity;
@@ -231,6 +239,10 @@ void random_stress(int seconds_ms, std::uint32_t capacity) {
                     static_cast<unsigned long long>(after.created), static_cast<unsigned long long>(after.cleaned),
                     before.slots, capacity, before.live, closed_failures, r.failures.size());
         CHECK(before.slots <= capacity);
+        // Every failure reported to the table appears in exactly one report.
+        const long reported = closed_failures + static_cast<long>(r.failures.size() + r.detached_failures.size());
+        CHECK(reported == g_failures_produced.load());
+        CHECK(r.detached_failures.empty());  // detached hooks here never report failures
         refused_alive = g_alive.load();  // board entries hold only Values: no resources
     }
     CHECK(g_twice == 0 && g_wrong == 0 && g_settle_twice == 0);

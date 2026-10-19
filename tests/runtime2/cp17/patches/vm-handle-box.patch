@@ -114,9 +114,9 @@ index 00000000..fe0d8077
 +
 +namespace nift::rt::handles {
 +
-+// Adopts one table reference to `handle` (the creator's reference from a
-+// counted create(), or one from retain()) into a new boxed Value. Plain
-+// handles (uncounted kinds) are returned unchanged.
++// Boxes `handle`, adopting one table reference (the creator's reference from
++// a counted create(), or one from retain()). Box counted handles only; a
++// non-handle or an already boxed value is returned unchanged.
 +Value box_counted_handle(HandleTable& table, const Value& handle);
 +// A boxed value for another isolate: retains a new table reference (refcounts
 +// of heap values are per isolate; boxes never cross isolates).

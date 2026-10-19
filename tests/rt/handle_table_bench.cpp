@@ -5,12 +5,14 @@
 //        resolve = resolve of one of 64 live handles
 //        counted = create(counted) + retain + drop + drop (abandoned)
 //        context = open_context + create 4 + close_context
+//        context_label = the same with a realistic 53-character context label
 #include "rt/handles/table.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace nift::rt;
@@ -55,10 +57,12 @@ int main(int argc, char** argv) {
             t.drop(h);
             sink += t.drop(h) == HandleStatus::Ok;
         }
-    } else if (std::strcmp(mode, "context") == 0) {
+    } else if (std::strcmp(mode, "context") == 0 || std::strcmp(mode, "context_label") == 0) {
+        const bool labelled = std::strcmp(mode, "context_label") == 0;
+        const std::string label = "page 'content/posts/2026/10/an-ordinary-page-name.md'";  // 53 characters
         for (long i = 0; i < n; ++i) {
             ContextId k;
-            t.open_context(ContextKind::PageRender, c, k);
+            t.open_context(ContextKind::PageRender, c, k, labelled ? label : std::string());
             for (int j = 0; j < 4; ++j) { Value h; t.create(k, HandleKind::File, resource, h); }
             sink += static_cast<long>(t.close_context(k).cleaned);
         }

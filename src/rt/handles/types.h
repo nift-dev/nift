@@ -74,7 +74,7 @@ struct CleanupEvent {
     // The owning context's label ("page 'index'", "build", "script x.f"; empty
     // when detached) and whether that context is ending on an error (D-035:
     // one source of truth for CP16's warnings; false unless reason is ContextEnd).
-    const std::string& context_label;
+    const std::string& context_label;         // valid for the duration of the hook call
     bool context_error;
     // Detached resources (owner == kDetached): never a ticket; the hook only
     // releases bookkeeping, its result is ignored and the table records
@@ -157,6 +157,12 @@ struct CloseReport {
     bool on_error = false;                    // it ended on an error (close_context(id, true))
     std::size_t cleaned = 0;                  // handles whose cleanup this close started
     std::size_t contexts = 0;                 // contexts ended (the context and its descendants)
+    // The context was already being closed by another close_context call
+    // (status ContextClosed): this call returned only after it was gone, and
+    // its failures are in that call's report. For a parent close: the number of
+    // descendants another close owned (their failures are in that report).
+    bool closed_elsewhere = false;
+    std::size_t descendants_closed_elsewhere = 0;
     std::vector<CleanupFailure> failures;     // in settle order (D-035: every unresolved obligation
                                               // was resolved before this report was produced)
     // shutdown() only: failures Nift actually knows about for detached
@@ -177,10 +183,11 @@ struct CreateOptions {
     bool counted = false;
 };
 
-// What transfer() does when the destination cannot take the resource.
+// What transfer() does when the destination has ended or is cancelling.
+// D-035: a refused transfer reclaims the resource (the default).
 enum class TransferPolicy : std::uint8_t {
-    KeepOnRefusal,     // the source keeps it (its context end is the fallback)
     ReclaimOnRefusal,  // the resource is cleaned up now (reason ContextEnd)
+    KeepOnRefusal,     // the source keeps it (its context end is the fallback)
 };
 
 inline constexpr const char* kHandleLimitSetting = "NIFT_HANDLE_LIMIT";

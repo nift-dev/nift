@@ -133,6 +133,18 @@ keeps no per-thread record of its own.
   final result with cleanup unresolved (D-035). CP16 bounds that wait (grace,
   forced termination, 5 s post-kill bound → `Lost`). Reference drops never
   wait; only context end does.
+* **Who reports a context's failures (review R1):** exactly one
+  `close_context` call owns ending each context: the first one to reach it.
+  A parent close does not take over a descendant another close is already
+  ending; it waits until that descendant is gone, counts it in
+  `descendants_closed_elsewhere`, and leaves its failures to that close's
+  report. A second `close_context` on a context another close owns waits until
+  it is gone and returns `ContextClosed` with `closed_elsewhere = true`. Every
+  caller therefore returns only after the context's hooks and obligations
+  finished, and each failure appears in exactly one report.
+* **Re-entrancy (R3):** `close_context` and `shutdown` called from inside a
+  cleanup hook of the same table return `ReentrantClose`
+  (`internal.handle_reentrant_close`) instead of waiting for the hook itself.
 * **Shutdown** (`shutdown()`, also the destructor): closes every open root
   (newest first), releases detached handles' bookkeeping (reason `Shutdown`),
   waits for every obligation. Idempotent. Hook state and tickets must not
@@ -191,9 +203,12 @@ first event wins, whoever it is:
 | refused transfer with reclaim | `transfer(..., ReclaimOnRefusal)` → hook, reason `ContextEnd` | closed |
 | table shutdown (detached) | `shutdown()` → hook, reason `Shutdown` | closed |
 
-`begin_termination` returns the ticket (`info.started`) only while the
-lifecycle is `Active`; later calls report the current state and cause and
-get no ticket, so no resource is terminated twice.
+`begin_termination` accepts only `Exited`, `Deadline` and `Cancel`
+(`InvalidCause` otherwise: the other causes belong to the table's own events).
+`info.started` means exactly "a ticket was issued": only while the lifecycle is
+`Active`. Later calls report the current state and cause and get no ticket,
+so no resource is terminated twice. For a detached handle no ticket is ever
+issued; `info.detached_request` tells CP16 it may send the cancel request.
 
 **What a hook receives** (`CleanupEvent`): kind, the (already closed) handle,
 owner, release reason, the owner's label and whether it is ending on an error, the resource (`shared_ptr`; the reaper may keep a copy:
@@ -207,15 +222,21 @@ cleanup began, the `cause` that started termination (if any), and `ticket`:
   dropped the last reference.
 * `ticket == nullptr` (a deadline or cancel already started termination, or
   the resource already settled): the existing ticket decides; the hook only
-  releases bookkeeping and its return value is ignored (an exception is still
-  reported as a failure).
+  releases bookkeeping and its return value is ignored. An exception from a
+  hook is always reported (`Lost`, `internal.handle_cleanup_threw`), also when
+  it was thrown after the hook took the ticket (R9).
 * Detached resources (D-039): the hook sees `owner == kDetached` and **no
   ticket**; it only releases Nift's bookkeeping and does not touch the process
-  (it survives its last reference). Its result is ignored and the table records
-  `Completed` at once: no record, ticket or obligation is kept for a detached
-  resource, and nothing waits for it. `begin_termination` on a detached handle
-  (a script's cancel) returns `info.started` with no ticket and leaves the
-  lifecycle unchanged: a request, not supervision.
+  (it survives its last reference). The table records `Completed` at once: no
+  record, ticket or obligation is kept for a detached resource and nothing
+  waits for it, except one case: a resource detached after it exited whose
+  reaping ticket CP16 still holds keeps its record until that report arrives
+  (record ids must not be reused under a live ticket); `shutdown()` waits for
+  it. A failure the hook reports for a detached resource (it knows it), or an
+  exception, goes to `shutdown()`'s `detached_failures` (R6), which never
+  change the exit status. `begin_termination` on a detached handle (a script's
+  cancel) issues no ticket and leaves the lifecycle unchanged: a request, not
+  supervision.
 
 **How async completion is reported:** `CompletionTicket::complete(outcome)`
 from any thread, exactly once (`true` if it settled the lifecycle; a second
@@ -251,16 +272,19 @@ as in the table above; CP16 passes specific ones (`process.kill_failed`,
 | `Foreign` | `internal.handle_foreign` | Internal | issued by another table |
 | `Forged` | `internal.handle_forged` | Internal | never issued |
 | `TypeMismatch` | `internal.handle_type_mismatch` | Internal | `resolve_as<T>` with the wrong `T` |
-| `NotOwned` | `internal.handle_not_owned` | Internal | caller may not access / is not the required owner |
+| `NotOwned` | `internal.handle_not_owned` | Internal | caller may not access / is not the required owner (host-facing; script detach reports `DetachFailed`) |
 | `NotCounted` | `internal.handle_not_counted` | Internal | retain/drop on an uncounted handle |
 | `ContextClosed` / `UnknownContext` | `internal.handle_context_closed` / `internal.handle_unknown_context` | Internal | context ended, ending or cancelling / never issued |
 | `UnknownKind` / `KindRegistered` / `NullResource` | `internal.handle_unknown_kind` / `..._kind_registered` / `..._null_resource` | Internal | registration and create errors |
 | `DetachForbidden` | per kind: `process.detach_in_build`, else `runtime.detach_in_build` | Error | detach inside a build (D-030) |
-| `DetachFailed` | `runtime.detach_failed` | Error | detachment could not be established: the resource is already terminating, so the promised lifetime cannot hold (D-039). CP16 reports its own failures to set the lifetime up (setsid, job breakaway) as operation failures and does not call `detach` |
+| `DetachFailed` | `runtime.detach_failed` | Error | detachment could not be established (D-039): Nift already started terminating the resource (deadline, cancel, close; decided by the termination cause, never by timing), the owning context is ending or cancelling, or the caller does not own it. A resource that only exited (reported, reaped or not) detaches trivially (R5). CP16 reports its own failures to set the lifetime up (setsid, job breakaway) as operation failures and does not call `detach` |
+| `NotCounted` on detach | `internal.handle_not_counted` | Internal | only counted handles can be detached, so a detached handle's bookkeeping always ends with its last reference (R14); CP16 creates detachable kinds counted |
 | `TransferForbidden` | `runtime.transfer_out_of_build` | Internal (host-facing only) | transfer out of the build family, or adoption of a detached resource |
 | `LimitExceeded` | `limit.exceeded` | Limit | `run: handle limit exceeded (N handles, NIFT_HANDLE_LIMIT)` |
 | `InvalidSetting` | `runtime.invalid_argument` | Error | `NIFT_HANDLE_LIMIT='x' (expected a handle count from 1 to 4294967295, optionally with K or M)` |
-| `CleanupFailed` | the failure's own code | Internal | `close`/`release` whose hook settled Failed/Lost synchronously (also in the close report) |
+| `CleanupFailed` | `runtime.cleanup_failed`; natives report the failure's own code and text | Error (exit 1, D-035) | `close`/`release` whose resource settled Failed, Lost or CleanupIncomplete synchronously; the `CleanupFailure` (same defaults as the report) is also in the close report (R4) |
+| `InvalidCause` | `internal.handle_invalid_cause` | Internal | `begin_termination` with a cause other than Exited/Deadline/Cancel |
+| `ReentrantClose` | `internal.handle_reentrant_close` | Internal | `close_context`/`shutdown` from inside a cleanup hook of the same table |
 
 Forged, cross-table and wrong-kind handles stay fatal `internal.*`: the
 compiler admits handle values only where they cannot be forged (W13).
@@ -286,11 +310,14 @@ it is `limit.exceeded` naming the setting; the refused resource is destroyed
 and `detach` and nothing in `native_access.h` reaches `transfer` (checked by
 `make test-rt-handles`). It is one locked step, so there is no window in which
 no context is responsible. It requires the named current owner, an open or
-cancelling source, and an **open** destination in the same build family.
-A destination that has ended or is cancelling refuses the transfer
-(`ContextClosed`/`UnknownContext`); with `ReclaimOnRefusal` the resource is
-cleaned up at once (reason `ContextEnd`), with `KeepOnRefusal` it stays with
-the source, whose end is the fallback. Returning a handle from an async
+cancelling source and an **open** destination. A resource never leaves the
+build family (out of it: `TransferForbidden`); moving a script's resource
+*into* a build is allowed, because the build then owns its cleanup, which is
+stricter, not looser (R10). A destination that has ended or is cancelling
+refuses the transfer (`ContextClosed`/`UnknownContext`) and, by default
+(`ReclaimOnRefusal`, D-035's wording), the resource is cleaned up at once
+(reason `ContextEnd`); `KeepOnRefusal` leaves it with the source, whose end is
+the fallback. Returning a handle from an async
 worker: the host transfers it to the parent before closing the worker
 context, so the worker's end never releases it. `detach` stays separate.
 
@@ -310,8 +337,9 @@ the fallback for anything still referenced (including cycles).
   and marks itself boxed in byte 12; `is_heap()`, `handle_id()` and
   destruction (`delete_object` calls the callback, which `drop`s) learn about
   it; `heap_account` counts the box.
-* `rt/handles/handle_box.{h,cpp}`: `box_counted_handle(table, h)` adopts the
-  creator's reference; `share_into_isolate(table, boxed)` retains a new table
+* `rt/handles/handle_box.{h,cpp}`: `box_counted_handle(table, h)` boxes a
+  counted handle, adopting the creator's reference (a non-handle or an
+  already boxed value is returned unchanged; R12); `share_into_isolate(table, boxed)` retains a new table
   reference for another isolate (heap refcounts are per isolate);
   `Value::handle_identity()` gives the plain handle for table calls.
 * Equality and hashing of boxed and plain handles agree (same identity).
@@ -324,11 +352,18 @@ the fallback for anything still referenced (including cycles).
   contexts and by every worker thread of those contexts. Contexts are not
   thread-affine.
 * Every operation is linearizable under one mutex. Hooks run without it, may
-  call back into the table, must not block and must not close the context
-  that owns the handle being cleaned.
+  call back into the table (resolve, create, close, drop, transfer), must not
+  block, and may not call `close_context` or `shutdown` of the same table
+  (`ReentrantClose`, detected per thread).
+* The owner's label reaches hooks by reference (valid during the hook call:
+  the context cannot end while the hook is in flight); it is copied only into
+  a `CleanupFailure` (R8).
 * `CompletionTicket::complete` may be called from any thread (the reaper).
 * `resolve` returns a `shared_ptr` copy: a resource stays alive while a native
-  uses it even if another thread ends it meanwhile.
+  uses it even if another thread ends it meanwhile. The caller's previous
+  `out` value is destroyed after the lock is released, so a resource whose
+  destructor drops a `HandleRef` cannot deadlock (R2). No other caller value is
+  destroyed under the lock.
 * `close_context` returns only after every hook for its handles has finished
   (including ones other threads started) and every obligation has settled.
 * Kind registration is write-once.
@@ -347,7 +382,9 @@ bool in_build; table.context_in_build(script, in_build);   // refuse a detached 
 Value h; table.create(script, HandleKind::Process, group, h, CreateOptions{/*counted*/ true});
 CompletionTicket t; TerminationStart info;                 // deadline / cancel / natural exit
 table.begin_termination(h, HandleKind::Process, TerminationCause::Deadline, t, &info);
-if (info.started) reaper.cancel(group, std::move(t));       // reaper later: t.complete(completed() | failure() | lost())
+if (info.started) reaper.cancel(group, std::move(t));       // a ticket was issued: we terminate, then report
+else if (info.detached_request) send_cancel_request(group); // detached: a request; nothing is tracked
+// reaper later: t.complete(completed() | alive_after_kill() | lost() | cleanup_incomplete())
 CloseReport r = table.close_context(script, failed);       // waits for obligations; r.final_exit_status(status)
 ```
 
@@ -402,9 +439,10 @@ mapping: Recoverable → catchable error with the code, Internal →
 | `tests/rt/handle_table_unit.cpp` | status codes (all distinct) and classes, CP09 `check()`, registration, identity layout, forgery matrix (string, int, null, kind, foreign tag, unknown slot, generation 0 / future / max, rewritten kind byte), closed after release and after reuse by another kind, generation wrap and retirement, churn reclamation (200,000 steps, capacity 64), capacity limit |
 | `tests/rt/handle_table_ownership.cpp` | access rules, identity vs ownership, detach/transfer as single steps, build-family bans, `context_in_build`, close ordering across a build with pages and a hook (LIFO; an older handle resolvable inside a newer one's hook), failing hooks (failure / `std::exception` / non-exception) all reported with the rest still cleaned, explicit-release failure in the close report, idempotent `close`, closed and unknown contexts, destructor shutdown, counted references, native interface |
 | `tests/rt/handle_lifecycle_unit.cpp` (+ `_more.inc`) | D-035 with a fake process kind and a test-driven reaper: aliasing; last-reference release (non-blocking, closed at once, obligation until settled); `close_context` waiting for obligations; deadline and cancel before/after release (one termination; timeout stays a resource outcome); 300 threaded races of deadline/cancel vs last drop vs `close()`; detached process surviving its last reference, detach refused in builds; context-end fallback with live references; success, alive-after-kill failure, earlier error and signal status primary, `Lost` text, asynchronous failure after drop, deadline failure while open, unresolved tickets (hook and reaper), exactly-once tickets; 200 settle-vs-close races; `handle_closed` identity (explicit close, idempotence, automatic cleanup, registry reuse, cancel race, wrong kind, forged); transfers (worker result, cancelled and ended destinations with keep/reclaim, stale handle, 200 races against the source's end); `NIFT_HANDLE_LIMIT` parsing, message and invalid value; D-039: a second `close()` through an alias (and through `native_handle_close`) after the first, every alias then `handle_closed`; detach refused while terminating (`runtime.detach_failed`, ownership unchanged), by a non-owner and on a closed handle; a detached cancel is a request with no ticket and nothing retained; context labels and the on-error flag in hooks and reports (a build ending on an error with a Lost page process and a build process alive after SIGKILL); every settled state (Completed, Failed, Lost, CleanupIncomplete) settled while the handle is open and after close: state, default code and message ("alive" only for Failed, "confirm" only for Lost), exit rule, `handle_closed` afterwards; CP16's exited-but-unreaped report |
-| `tests/rt/handle_table_stress.cpp` | 4 workers + a context manager + an asynchronous reaper over one table: random create (counted and not), resolve (always the identified resource), release, retain/drop, detach, deadlines (`begin_termination`), transfer while contexts open and close; a capacity-48 run hitting the limit; `release`/`drop`/`close_context` race on one counted handle; `close_context` blocked on another thread's hook. Every resource is cleaned once and settled once; nothing outlives shutdown |
-| `tests/rt/handle_table_bench.cpp` + `tests/runtime2/cp17/handle_guards.py` | callgrind instruction guards (+10 %) |
-| `tests/runtime2/cp17/handle_mutants.py` | 35 mutants (including one per state mapping and four for D-039), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
+| `tests/rt/handle_table_stress.cpp` | 4 workers + a context manager + an asynchronous reaper over one table: random create (counted and not), resolve (always the identified resource), release, retain/drop, detach, deadlines (`begin_termination`), transfer while contexts open and close; a capacity-48 run hitting the limit; `release`/`drop`/`close_context` race on one counted handle; `close_context` blocked on another thread's hook. Every resource is cleaned once and settled once; nothing outlives shutdown; every failure reported to the table appears in exactly one report (asserted) |
+| `tests/rt/handle_table_bench.cpp` + `tests/runtime2/cp17/handle_guards.py` | callgrind instruction guards (+10 %), including `context_label` (a realistic 53-character page label; R8) |
+| `tests/rt/handle_lifecycle_review.inc` (in the lifecycle suite) | the adversarial review's findings as deterministic tests: R1 a second close waits for the owning close's hooks and reports `closed_elsewhere`, and 100 rounds of child-close vs parent-close always report the child's failure in the child's report only; R2 `resolve` into an `out` holding the last reference of a resource that drops a `HandleRef`; R3 `close_context`/`shutdown` from a hook → `ReentrantClose`; R4 synchronous Failed / Failed-with-defaults / CleanupIncomplete / Lost through `close()` and `native_handle_close` (own code, own text, class Error, report); R5 detach after exit (reaped and still reaping), after a deadline, in a cancelling context; R7 every invalid cause, `started` vs `detached_request`; R9 throw after taking the ticket; R14 uncounted detach refused, last counted reference frees all bookkeeping; R10 default reclaim and transfer into a build; `close_context` waiting for another thread's in-flight hook (also in the mutant harness) |
+| `tests/runtime2/cp17/handle_mutants.py` | 46 mutants (one per state mapping, D-039, and the review findings), each removing one rule; the unit or lifecycle suite must fail (a hang counts) |
 | `tests/runtime2/cp17/no_handle_strings.py` | gate: no `\x1fnift` handle string in code under `src/rt`; self-test |
 | `patches/vm-handle-box.patch` (`tests/rt/handle_box_unit.cpp`) | boxed handles: refcounted aliases, equality/hash with plain handles, cross-isolate share, last box schedules cleanup |
 

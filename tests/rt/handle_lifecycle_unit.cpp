@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -368,6 +369,7 @@ void settle_close_races(int rounds) {
 }
 
 #include "handle_lifecycle_unit_more.inc"
+#include "handle_lifecycle_review.inc"
 
 } // namespace
 
@@ -386,5 +388,6 @@ int main() {
     context_label_and_error();
     settled_states();
     close_and_detach_d039();
+    review_findings();
     return rt_test::finish("rt handle lifecycle unit");
 }

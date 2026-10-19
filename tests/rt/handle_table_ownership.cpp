@@ -25,7 +25,7 @@ void ownership_and_access() {
     t.open_context(ContextKind::PageRender, build, page);
     t.open_context(ContextKind::Script, page, page_child);  // a script nested in a build is build-family
     Value h, hc, hb, hp, hpc;
-    t.create(script, HandleKind::Process, res(1), h);
+    t.create(script, HandleKind::Process, res(1), h, CreateOptions{true});  // detachable: counted
     t.create(child, HandleKind::Process, res(2), hc);
     t.create(build, HandleKind::Process, res(3), hb);
     t.create(page, HandleKind::Process, res(4), hp);
@@ -94,7 +94,7 @@ void ownership_and_access() {
     // sibling cleans hc exactly once; the detached handle survives both.
     CloseReport r = t.close_context(child);
     CHECK(r.cleaned == 0 && log.cleaned[2] == 0);
-    CHECK(t.transfer(hb, P, build, child) == HandleStatus::ContextClosed);
+    CHECK(t.transfer(hb, P, build, child, TransferPolicy::KeepOnRefusal) == HandleStatus::ContextClosed);
     r = t.close_context(sibling);
     CHECK(r.cleaned == 1 && log.cleaned[2] == 1);
     r = t.close_context(page);  // page_child goes with it; hp was moved to the build
@@ -204,7 +204,7 @@ void contexts_and_cleanup() {
         ContextId ds;
         d.open_context(ContextKind::Script, kDetached, ds);
         d.create(ds, HandleKind::File, res(30), v);
-        d.create(ds, HandleKind::File, res(31), v);
+        d.create(ds, HandleKind::File, res(31), v, CreateOptions{true});
         d.detach(v, HandleKind::File, ds);
     }
     CHECK(tail_log.events.size() == 2 && tail_log.events[0] == "30:context-end" && tail_log.events[1] == "31:shutdown");
@@ -258,13 +258,12 @@ void counted_references() {
     keep.reset();
     keep2.reset();
     CHECK(log.cleaned[4] == 1);
-    // D-039: a detached handle's hook only releases bookkeeping; its reported
-    // result is ignored (Nift does not supervise the resource). Only what Nift
-    // actually knows (here: a hook that threw) reaches shutdown(), separately,
-    // and never changes the exit status.
+    // D-039: a detached handle's hook only releases bookkeeping (no ticket).
+    // What Nift actually knows (a failure the hook reports, a hook that threw)
+    // reaches shutdown() in detached_failures and never changes the exit status.
     ContextId s2;
     t.open_context(ContextKind::Script, kDetached, s2);
-    t.create(s2, P, res(9004), failing, CreateOptions{true});   // its hook reports a failure: ignored
+    t.create(s2, P, res(9004), failing, CreateOptions{true});   // its hook reports a known failure
     t.detach(failing, P, s2);
     t.drop(failing);
     Value throwing;
@@ -274,10 +273,13 @@ void counted_references() {
     TableStats st = t.stats();
     CHECK(st.records == 0 && st.pending_obligations == 0 && st.detached == 0);  // nothing kept for a report
     r = t.shutdown();
-    CHECK(r.failures.empty() && r.detached_failures.size() == 1 && r.final_exit_status(0) == 0);
-    if (r.detached_failures.size() == 1) {
+    CHECK(r.failures.empty() && r.detached_failures.size() == 2 && r.final_exit_status(0) == 0);
+    if (r.detached_failures.size() == 2) {
         CHECK(r.detached_failures[0].owner == kDetached && r.detached_failures[0].reason == ReleaseReason::Abandoned &&
-              r.detached_failures[0].code == "internal.handle_cleanup_threw");
+              r.detached_failures[0].code == "process.kill_failed" &&
+              r.detached_failures[0].state == LifeState::CleanupIncomplete);
+        CHECK(r.detached_failures[1].code == "internal.handle_cleanup_threw" &&
+              r.detached_failures[1].state == LifeState::Lost);
     }
     for (const auto& [serial, n] : log.cleaned) CHECK(n == 1);
 }
