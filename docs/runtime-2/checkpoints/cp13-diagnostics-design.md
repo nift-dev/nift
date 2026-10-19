@@ -472,7 +472,20 @@ of them, on `tests/rt/legacy-cases/c1_return_multiline.f` and on
 
 ---
 
-## Integration (speculative, branch `spec-integration`, base CP12 `6c144bb`)
+## Integration = CP13 phase A (branch `spec-integration`; certified base `runtime-2` `4b2fc909`)
+
+**Scope label.** CP13's roadmap scope is "errors, try/catch, diagnostics
+parity". This integration is **CP13 phase A**: syntax prevalidation on both
+engines (CLI and import hook), multi-line return values (D-025), the
+`syntax.*`/`runtime.*`/`limit.*`/`host.*` code taxonomy, and the
+feature-site-dx reconciliation. **CP13 phase B is open**: the VM diagnostic
+record (T2), `throw`/`error()` (T3) and try/catch (T4) on the VM, JSON
+diagnostics mode (T9), and `eval` prevalidation. Where phase B touches files
+the integration owner holds, it follows CP15 and the records20k work.
+
+(History: first integrated speculatively on CP12's tip `6c144bb`, then
+rebased onto `bd1c8a9` and `4b2fc909`; the section below keeps its original
+wording.)
 
 Integrated after the CP14 wiring by the single integration owner; never
 merged before CP12 certifies. Applied: the four CP13 commits (`eaaccba`,
