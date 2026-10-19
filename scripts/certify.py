@@ -251,6 +251,23 @@ def audit(planned, timeout, out_path):
     return out
 
 
+_STEP = re.compile(r"(?:tests|scripts|tools)/[\w./-]+")
+
+
+def failure_signature(text):
+    """The step a target failed at: the last test/script path mentioned before
+    make's final error line, or None if it cannot be identified. Used so that
+    BASELINE-FAILURE is only claimed when the baseline fails at the same step
+    (a baseline failure at an earlier step must not mask a later regression)."""
+    lines = text.splitlines()
+    end = max((i for i, l in enumerate(lines) if l.startswith("make: ***")), default=len(lines))
+    for line in reversed(lines[:end]):
+        m = _STEP.findall(line)
+        if m:
+            return m[-1]
+    return None
+
+
 def ensure_baseline(path, jobs):
     if not (path / "Makefile").exists():
         return False
@@ -336,6 +353,7 @@ def main():
     user_copy = None
     baseline = Path(a.baseline) if a.baseline else None
     baseline_ready = None
+    baseline_user_copy = None
     for t, r in sorted(results.items()):
         if r["rc"] == 0:
             r["status"], r["reason"] = "PASS", ""
@@ -356,6 +374,11 @@ def main():
         if unverified:
             r["status"], r["reason"] = "UNVERIFIED", "; ".join(unverified)
             continue
+        # The candidate's furthest-reaching failure: as root, unless the
+        # unprivileged run was made (it gets past root-only steps and may fail
+        # later, e.g. CP13 @0b879df: root failed at a root-only smoke, the
+        # unprivileged run failed later on a real regression).
+        cand_log, base_user = logdir / f"{t}.log", None
         if os.geteuid() == 0 and user:
             if user_copy is None:
                 user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
@@ -364,14 +387,32 @@ def main():
             if urc == 0:
                 r["status"], r["reason"] = "SKIPPED-ENVIRONMENTAL", f"fails only as root; passes as unprivileged user '{user}'"
                 continue
+            cand_log, base_user = logdir / f"{t}.unprivileged.log", user
         if baseline:
             if baseline_ready is None:
                 baseline_ready = ensure_baseline(baseline, a.jobs)
             if baseline_ready:
-                brc, _ = run_target(baseline, t, logdir / f"{t}.baseline.log", a.timeout)
-                btext = (logdir / f"{t}.baseline.log").read_text(errors="replace")
+                # Compare like with like: the baseline runs as the same user as
+                # the candidate log it is compared with.
+                base_dir = baseline
+                if base_user:
+                    if baseline_user_copy is None:
+                        baseline_user_copy = Path(pwd.getpwnam(base_user).pw_dir) / "nift-certify-baseline-copy"
+                        prepare_copy(baseline, baseline_user_copy, base_user)
+                    base_dir = baseline_user_copy
+                blog = logdir / f"{t}.baseline.log"
+                brc, _ = run_target(base_dir, t, blog, a.timeout, user=base_user)
+                btext = blog.read_text(errors="replace")
                 if brc != 0 and "No rule to make target" not in btext:
-                    r["status"], r["reason"] = "BASELINE-FAILURE", f"also fails on the v4.12.0 baseline ({baseline})"
+                    csig = failure_signature(cand_log.read_text(errors="replace"))
+                    bsig = failure_signature(btext)
+                    if csig is not None and csig == bsig:
+                        r["status"], r["reason"] = "BASELINE-FAILURE", (
+                            f"also fails on the v4.12.0 baseline ({baseline}) at the same step: {csig}")
+                        continue
+                    r["status"], r["reason"] = "FAIL", (
+                        f"baseline also fails, but at a different or unidentified step "
+                        f"(candidate: {csig}; baseline: {bsig}); see {cand_log.relative_to(ROOT)}")
                     continue
         r["status"], r["reason"] = "FAIL", f"see .build/certify/{t}.log"
 

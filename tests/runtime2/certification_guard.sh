@@ -62,3 +62,27 @@ print(f'PASS certification guard: certify-targets reaches {len(required)} requir
       f'{len(ci_scripts) - len([s for s in ci_scripts if s in CI_ONLY])} directly-run CI scripts covered, '
       f'{len([s for s in ci_scripts if s in CI_ONLY])} CI-only: ' + ', '.join(f'{k} ({v})' for k, v in CI_ONLY.items() if k in ci_scripts))
 PY
+
+# BASELINE-FAILURE must only be claimed when the baseline fails at the same step
+# (CP13 phase A @0b879df: a root-only failure on both trees masked a later
+# regression that only the unprivileged run reached).
+python3 - <<'PY'
+import sys
+sys.path.insert(0, 'scripts')
+import certify
+sig = certify.failure_signature
+root = 'NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nboom\nmake: *** [Makefile:1136: test-v43-language] Error 1\n'
+unpriv = ('NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nPASS\n'
+          'NIFT_BIN=x tests/v43_final_language_smoke.sh\nerror: t.nift:1:36: bad\n'
+          'make: *** [Makefile:1160: test-v43-language] Error 1\n')
+checks = [
+    (sig(root), 'tests/v43_cp112_filevalue_wall_smoke.sh'),
+    (sig(unpriv), 'tests/v43_final_language_smoke.sh'),
+    (sig('no step here\nmake: *** [x] Error 2\n'), None),
+    (sig(root) == sig(unpriv), False),
+]
+bad = [(got, want) for got, want in checks if got != want]
+if bad:
+    print('FAIL certify failure_signature:', bad); sys.exit(1)
+print(f'PASS certify failure_signature ({len(checks)} checks)')
+PY
