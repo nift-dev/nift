@@ -32,14 +32,20 @@ const char* kind_name(Kind kind);
 // a HeapObject can be destroyed without the owning Value.
 struct HeapObject {
     std::uint32_t refcount = 1;
-    Kind kind;
+    // Low 4 bits: the Kind (all kinds fit). Bit 7: the D-040 identity summary
+    // ("may contain a callable or handle", rt/heap.h). Bits 4-6 are unused.
+    std::uint8_t tag;
     // Live-heap accounting (rt/heap_account.h): the footprint last counted
-    // for this object, in 64-byte granules (24 bits, saturating); 0 = not
-    // counted. Uses the header's padding: HeapObject stays 8 bytes.
+    // for this object, in 64-byte granules (24 bits; objects of 1 GiB or more
+    // are counted exactly in a side table); 0 = not counted. Uses the
+    // header's padding: HeapObject stays 8 bytes.
     std::uint8_t counted[3] = {0, 0, 0};
-    explicit HeapObject(Kind k) : kind(k) {}
+    static constexpr std::uint8_t kKindMask = 0x0F;
+    explicit HeapObject(Kind k) : tag(static_cast<std::uint8_t>(k)) {}
+    Kind kind() const noexcept { return static_cast<Kind>(tag & kKindMask); }
 };
 static_assert(sizeof(HeapObject) == 8, "HeapObject header must stay 8 bytes");
+static_assert(static_cast<unsigned>(Kind::Error) <= HeapObject::kKindMask, "every Kind must fit the tag's low bits");
 void destroy_heap_object(HeapObject* object);
 
 // Handle kinds are typed tags, never strings (decision 5). Values carry
@@ -80,7 +86,7 @@ public:
     }
     // Takes ownership of one reference to `object` (kind taken from the object).
     static Value adopt(HeapObject* object) noexcept {
-        Value v; v.set_kind(object->kind); v.set_pointer(object); return v;
+        Value v; v.set_kind(object->kind()); v.set_pointer(object); return v;
     }
     static Value handle(HandleKind kind, std::uint64_t id, std::uint32_t generation) noexcept {
         Value v; v.set_kind(Kind::Handle); v.bytes_[14] = static_cast<unsigned char>(kind);
@@ -111,7 +117,7 @@ public:
     // Replaces this heap value's object with `adopted` (which must have the
     // same kind), releasing the previous reference. Used by copy-on-write.
     void replace_heap(HeapObject* adopted) noexcept {
-        release(); set_kind(adopted->kind); set_pointer(adopted);
+        release(); set_kind(adopted->kind()); set_pointer(adopted);
     }
 
     const unsigned char* raw() const noexcept { return bytes_; }

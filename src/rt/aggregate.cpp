@@ -35,9 +35,9 @@ template <class T> void relocate(std::vector<T>& items) {
 }
 
 void relocate_storage(HeapObject* object) {
-    if (object->kind == Kind::Array) relocate(static_cast<ArrayObject*>(object)->items);
-    if (object->kind == Kind::Struct) relocate(static_cast<StructObject*>(object)->fields);
-    if (object->kind == Kind::Object) {
+    if (object->kind() == Kind::Array) relocate(static_cast<ArrayObject*>(object)->items);
+    if (object->kind() == Kind::Struct) relocate(static_cast<StructObject*>(object)->fields);
+    if (object->kind() == Kind::Object) {
         auto* o = static_cast<ObjectObject*>(object);
         relocate(o->entries);
         relocate(o->index);

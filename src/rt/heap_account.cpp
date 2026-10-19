@@ -2,14 +2,30 @@
 
 #include "rt/heap.h"
 
+#include <unordered_map>
+
 namespace nift::rt {
 
 namespace {
 
 thread_local std::size_t live_bytes = 0;
 
-// 23 bits: bit 7 of counted[2] is the identity summary (rt/heap.h).
-constexpr std::size_t kMaxGranules = (std::size_t(1) << 23) - 1;
+// Objects whose footprint reaches the granule field's maximum are counted
+// exactly here instead (keyed by object): the header records only the
+// sentinel kMaxGranules, so the live total, and with it the VM's heap budget,
+// always sees the real size however large one object is or however many
+// saturate (memory investigation concern 3: budgets must not be bypassed by
+// large values). Only objects of 1 GiB or more ever enter this table.
+thread_local std::unordered_map<const HeapObject*, std::size_t>* saturated = nullptr;
+
+std::unordered_map<const HeapObject*, std::size_t>& saturated_table() {
+    // Never freed: lives as long as the thread (no destruction-order issues).
+    if (!saturated) saturated = new std::unordered_map<const HeapObject*, std::size_t>();
+    return *saturated;
+}
+
+// 24 bits (1 GiB); larger objects are counted exactly in `saturated`.
+constexpr std::size_t kMaxGranules = (std::size_t(1) << 24) - 1;
 
 // Dynamic storage of a std::string beyond its in-object buffer (libstdc++
 // keeps up to 15 characters inline).
@@ -19,8 +35,12 @@ std::size_t text_storage(const std::string& text) {
 
 template <class T> std::size_t vector_storage(const std::vector<T>& items) { return items.capacity() * sizeof(T); }
 
+// Inlined into heap_retally (hot: every push and object insert).
+#if defined(__GNUC__)
+__attribute__((always_inline)) inline
+#endif
 std::size_t raw_footprint(const HeapObject* object) {
-    switch (object->kind) {
+    switch (object->kind()) {
         case Kind::String: return sizeof(StringObject) + text_storage(static_cast<const StringObject*>(object)->text);
         case Kind::Decimal:
             return sizeof(DecimalObject) + text_storage(static_cast<const DecimalObject*>(object)->spelling);
@@ -52,33 +72,71 @@ std::size_t granules_of(std::size_t bytes) {
 
 std::size_t recorded(const HeapObject* object) {
     return std::size_t(object->counted[0]) | (std::size_t(object->counted[1]) << 8) |
-           (std::size_t(object->counted[2] & ~kMayHoldIdentity) << 16);
+           (std::size_t(object->counted[2]) << 16);
 }
 
 void record(HeapObject* object, std::size_t granules) {
     object->counted[0] = static_cast<std::uint8_t>(granules);
     object->counted[1] = static_cast<std::uint8_t>(granules >> 8);
-    const unsigned summary = object->counted[2] & kMayHoldIdentity;
-    object->counted[2] = static_cast<std::uint8_t>(((granules >> 16) & 0x7Fu) | summary);
+    object->counted[2] = static_cast<std::uint8_t>(granules >> 16);
+}
+
+std::size_t exact_bytes(std::size_t raw) { return ((raw + kHeapGranule - 1) / kHeapGranule) * kHeapGranule; }
+
+// The bytes currently counted for `object` (exact for saturated objects).
+std::size_t counted_bytes(const HeapObject* object) {
+    const std::size_t granules = recorded(object);
+    if (granules != kMaxGranules) return granules * kHeapGranule;
+    const auto& table = saturated_table();
+    const auto it = table.find(object);
+    return it == table.end() ? granules * kHeapGranule : it->second;
 }
 
 } // namespace
 
 std::size_t live_heap_bytes() noexcept { return live_bytes; }
 
-std::size_t heap_footprint(const HeapObject* object) noexcept {
-    return granules_of(raw_footprint(object)) * kHeapGranule;
+std::size_t heap_saturated_objects() noexcept { return saturated ? saturated->size() : 0; }
+
+std::size_t heap_footprint(const HeapObject* object) noexcept { return exact_bytes(raw_footprint(object)); }
+
+namespace {
+
+// Objects at or above the field's limit, or leaving it: exact side table.
+// Kept out of line so heap_retally's common path stays a leaf (no frame).
+#if defined(__GNUC__)
+__attribute__((noinline))
+#endif
+void retally_saturated(HeapObject* object, std::size_t raw, std::size_t granules) {
+    const std::size_t before = counted_bytes(object);
+    std::size_t now = granules * kHeapGranule;
+    if (granules == kMaxGranules) {
+        now = exact_bytes(raw);
+        saturated_table()[object] = now;  // may throw bad_alloc: noexcept terminates, as any OOM here would
+    } else {
+        saturated_table().erase(object);
+    }
+    live_bytes += now - before;  // modular: correct for shrinking too
+    record(object, granules);
 }
 
+} // namespace
+
 void heap_retally(HeapObject* object) noexcept {
-    const std::size_t now = granules_of(raw_footprint(object));
+    const std::size_t raw = raw_footprint(object);
+    const std::size_t granules = granules_of(raw);
     const std::size_t before = recorded(object);
-    live_bytes += (now - before) * kHeapGranule;  // modular: correct for shrinking too
-    record(object, now);
+    if (granules == kMaxGranules || before == kMaxGranules) {
+        retally_saturated(object, raw, granules);
+        return;
+    }
+    live_bytes += (granules - before) * kHeapGranule;  // modular: correct for shrinking too
+    record(object, granules);
 }
 
 void heap_untally(HeapObject* object) noexcept {
-    live_bytes -= recorded(object) * kHeapGranule;
+    live_bytes -= counted_bytes(object);
+    if (recorded(object) == kMaxGranules) saturated_table().erase(object);
     record(object, 0);
 }
 

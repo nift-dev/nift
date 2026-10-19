@@ -10,10 +10,12 @@
 // the recorded amount. Because the recorded amount travels with the object,
 // the total can never drift: an object never retallied counts 0 and removes
 // 0. Footprint = the object itself plus the dynamic storage it owns
-// (string/vector capacities), rounded up to 64-byte granules and saturating
-// at 512 MiB per object (23 bits; the header's 24th bit is the D-040 identity
-// summary, rt/heap.h); child values are separate objects counted on their
-// own, so nested values are covered without a scan.
+// (string/vector capacities), rounded up to 64-byte granules. The header holds
+// up to 1 GiB of granules (24 bits); larger objects are counted exactly in a
+// side table, so the total (and the VM heap budget) never under-counts a large
+// value (memory investigation concern 3). Child
+// values are separate objects counted on their own, so nested values are
+// covered without a scan.
 #include "rt/value.h"
 
 #include <cstddef>
@@ -33,5 +35,8 @@ void heap_untally(HeapObject* object) noexcept;
 
 // The footprint heap_retally would record now, in bytes (granule-rounded).
 std::size_t heap_footprint(const HeapObject* object) noexcept;
+
+// Live objects counted in the exact side table (1 GiB or more); tests.
+std::size_t heap_saturated_objects() noexcept;
 
 } // namespace nift::rt

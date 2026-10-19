@@ -247,7 +247,11 @@ $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 $(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK tests/rt/value_cycle_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
-.PHONY: bench-rt-value-cycle
+.PHONY: bench-rt-value-cycle test-rt-heap-saturation
+# Large values count at their real size against the VM heap budget (~1.5 GiB
+# RSS; workers only, not part of `make test`).
+test-rt-heap-saturation: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/heap_saturation.sh
 bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
 	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
 
@@ -485,7 +489,8 @@ bench-rt-vm: $(TARGET) $(RT_VM_RUN)
 
 # Callgrind instruction counts, rt::Value vs legacy RuntimeValue (needs valgrind).
 bench-rt-value: $(RT_VALUE_BENCH)
-	tools/rt-bench.sh "$(RT_VALUE_BENCH)"
+	tools/rt-bench.sh "$(RT_VALUE_BENCH)" | tee "$(TEST_DIR)/rt/value-bench-table.md"
+	python3 tests/rt/value_bench_guard.py "$(TEST_DIR)/rt/value-bench-table.md" tests/rt/value_bench_baseline.json
 
 $(CP17_BYTES_TEST): tests/cp17_bytes.cpp src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p "$(TEST_DIR)"

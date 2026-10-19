@@ -14,11 +14,15 @@
 // 4. the identity summary bit: sound (an aggregate with a callable, a handle
 //    or a marked child below it is marked), precise for API stores of plain
 //    data, conservative for raw array_mut
+// 6. heap accounting: objects at and above the 512 MiB and 1 GiB boundaries,
+//    several large objects, counter arithmetic (concern 3)
+// 7. copy-on-write metadata: the identity summary bit across copies
 // 5. the cycle checker against brute-force reachability on random graphs of
 //    captured cells, closures, handles and payloads; plain stores never walk
 #include "rt/aggregate.h"
 #include "rt/compare.h"
 #include "rt/heap.h"
+#include "rt/heap_account.h"
 #include "rt/string.h"
 #include "rt/value_cycle.h"
 #include "rt_test.h"
@@ -531,6 +535,108 @@ void plain_stores_never_walk() {
     CHECK(cycle_check_stats().checks == walked);
 }
 
+
+// ---- 6. heap accounting of large objects (memory investigation concern 3) ----
+// The header field holds 2^24 - 1 granules (1 GiB - 64 bytes); objects beyond
+// it are counted exactly in a side table. Whatever the size, the live total
+// (which the VM heap budget reads) must equal the sum of the exact footprints.
+// Storage is reserved, not touched; run under ulimit -v (test-rt-value).
+Value big_string(std::size_t capacity) {
+    auto* so = new StringObject(std::string());
+    so->text.reserve(capacity);
+    heap_retally(so);
+    return Value::adopt(so);
+}
+
+void large_accounting() {
+    const std::size_t base = live_heap_bytes();
+    const std::size_t mib = std::size_t(1) << 20, gib = std::size_t(1) << 30;
+    // Single objects at and just above the 512 MiB and 1 GiB boundaries.
+    for (std::size_t bytes : {512 * mib - 64, 512 * mib, 512 * mib + 1, gib - 256, gib - 64, gib, gib + 1, gib + 64,
+                              3 * gib / 2}) {
+        Value v = big_string(bytes);
+        const std::size_t footprint = heap_footprint(v.heap());
+        CHECK(footprint >= bytes && footprint % kHeapGranule == 0);
+        CHECK(live_heap_bytes() - base == footprint);  // exact, also beyond the 1 GiB field
+    }
+    CHECK(live_heap_bytes() == base);
+    // Several large objects at once: the total is their sum, never capped.
+    {
+        Value a = big_string(gib + mib), b = big_string(gib / 4), c = big_string(gib / 4);
+        const std::size_t sum = heap_footprint(a.heap()) + heap_footprint(b.heap()) + heap_footprint(c.heap());
+        CHECK(live_heap_bytes() - base == sum && sum > gib + gib / 2);
+        // Transitions: above -> below the field (leaves the side table), below -> above, above -> above.
+        std::string().swap(a.heap_as<StringObject>()->text);
+        heap_retally(a.heap());
+        CHECK(live_heap_bytes() - base == heap_footprint(a.heap()) + heap_footprint(b.heap()) + heap_footprint(c.heap()));
+        CHECK(heap_saturated_objects() == 0);  // a left the side table
+        b.heap_as<StringObject>()->text.reserve(gib + 2 * mib);
+        heap_retally(b.heap());
+        c.heap_as<StringObject>()->text.reserve(gib + 4 * mib);
+        heap_retally(c.heap());
+        heap_retally(c.heap());  // retally without change: no drift
+        CHECK(live_heap_bytes() - base == heap_footprint(a.heap()) + heap_footprint(b.heap()) + heap_footprint(c.heap()));
+        CHECK(live_heap_bytes() - base > 2 * gib && heap_saturated_objects() == 2);
+    }
+    CHECK(heap_saturated_objects() == 0);
+    CHECK(live_heap_bytes() == base);  // destruction removes the exact amounts (side table included)
+    // Counter arithmetic: shrinking objects subtract (modular difference, never
+    // underflowing the total), untallied objects count 0, re-tally is idempotent.
+    {
+        Value s = big_string(64 * mib);
+        const std::size_t with = live_heap_bytes();
+        std::string().swap(s.heap_as<StringObject>()->text);
+        heap_retally(s.heap());
+        CHECK(live_heap_bytes() < with && live_heap_bytes() - base == heap_footprint(s.heap()));
+        heap_retally(s.heap());
+        CHECK(live_heap_bytes() - base == heap_footprint(s.heap()));
+    }
+    CHECK(live_heap_bytes() == base);
+}
+
+// ---- 7. copy-on-write metadata (identity summary bit) ---------------------------
+// Behaviour chosen: the bit is conservative. It is copied by clones, set by
+// any store that may add a callable or handle, and may stay set after the last
+// one is removed (cleared only when the cycle checker verifies the children);
+// it is never missing while a callable or handle is present.
+void cow_metadata() {
+    Value a = make_array();
+    array_push(a, I(1));
+    Value b = a;  // shared
+    array_push(a, Value::adopt(new FunctionObject()));  // a.push(fn() { return 1 })
+    CHECK(a.heap() != b.heap());
+    CHECK(may_contain_identity(a) && !may_contain_identity(b));  // b keeps its contents and its bit
+    CHECK(array_size(b) == 1 && array_items(b)[0].as_int() == 1 && array_size(a) == 2);
+    // A cycle-producing store involving a is refused and leaves a and b unchanged.
+    TestGraph g;
+    g.cells.assign(1, Value());
+    auto* f = new FunctionObject();
+    Value closure = Value::adopt(f);
+    g.captures[f] = {0};
+    g.cells[0] = a;
+    Value holder = a;
+    array_push(holder, closure);  // holder = a + [closure capturing cell 0]
+    CHECK(would_close_cycle(CycleTarget::captured_cell(&g.cells[0]), holder, g));
+    CHECK(array_size(a) == 2 && array_size(b) == 1 && !may_contain_identity(b));
+    // Removing the last callable or handle: the bit may stay set, never missing.
+    Value c = make_array();
+    array_push(c, Value::handle(HandleKind::File, 1, 1));
+    array_push(c, I(2));
+    array_mut(c).erase(array_mut(c).begin());  // the handle is gone
+    CHECK(may_contain_identity(c));            // conservative: still set
+    CycleGraph none;
+    CHECK(!would_close_cycle(CycleTarget::captured_cell(&g.cells[0]), c, none));
+    CHECK(!may_contain_identity(c));           // verified clean by the checker
+    array_push(c, Value::adopt(new FunctionObject()));
+    CHECK(may_contain_identity(c));            // never missing when one is present
+    Value d = c;
+    array_mut(d).pop_back();
+    CHECK(may_contain_identity(c) && array_size(c) == 2);  // the original keeps its function and bit
+    Value e = c;
+    array_push(e, I(5));  // the clone still holds the function: the bit travels with the clone
+    CHECK(may_contain_identity(e) && e.heap() != c.heap());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -544,6 +650,8 @@ int main(int argc, char** argv) {
     summary_bit(300 * scale);
     cycle_checker(400 * scale);
     plain_stores_never_walk();
+    large_accounting();
+    cow_metadata();
     std::printf("seed %lu scale %ld\n", seed, scale);
     return rt_test::finish("rt value D-040");
 }

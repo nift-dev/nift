@@ -34,7 +34,7 @@ void detach_children(HeapObject* object, std::vector<HeapObject*>& pending) {
     auto take = [&pending](Value& child) {
         if (HeapObject* last = child.release_detached()) pending.push_back(last);
     };
-    switch (object->kind) {
+    switch (object->kind()) {
         case Kind::Array: for (Value& v : static_cast<ArrayObject*>(object)->items) take(v); return;
         case Kind::Object: for (auto& e : static_cast<ObjectObject*>(object)->entries) take(e.second); return;
         case Kind::Function: for (Value& v : static_cast<FunctionObject*>(object)->upvalues) take(v); return;
@@ -46,7 +46,7 @@ void detach_children(HeapObject* object, std::vector<HeapObject*>& pending) {
 
 void delete_object(HeapObject* object) {
     heap_untally(object);
-    switch (object->kind) {
+    switch (object->kind()) {
         case Kind::String: delete static_cast<StringObject*>(object); return;
         case Kind::Decimal: delete static_cast<DecimalObject*>(object); return;
         case Kind::Bytes: delete static_cast<BytesObject*>(object); return;
@@ -72,7 +72,7 @@ bool has_children(Kind kind) {
 // (a COW `a = [a]` loop builds depth in O(1) per step). Leaf kinds and
 // aggregates without dying children allocate no worklist.
 void destroy_heap_object(HeapObject* object) {
-    if (!has_children(object->kind)) { delete_object(object); return; }
+    if (!has_children(object->kind())) { delete_object(object); return; }
     std::vector<HeapObject*> pending;
     detach_children(object, pending);
     delete_object(object);

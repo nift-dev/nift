@@ -31,21 +31,21 @@ struct BytesObject : HeapObject {
     explicit BytesObject(std::vector<std::uint8_t> d) : HeapObject(Kind::Bytes), data(std::move(d)) {}
 };
 
-// Identity summary (D-040 V16, the cycle rule): bit 7 of the header's third
-// `counted` byte (accounting uses the low 23 bits) means "this aggregate may
-// contain a callable or a handle, directly or through a child with the bit".
-// It is conservative: set whenever a store might add identity-bearing content
-// (array_mut hands out raw storage, so it sets it too) and cleared only by
-// the cycle checker after it has verified the direct children (rt/value_cycle.h).
-// Plain data therefore never needs a walk: an aggregate whose bit is clear
-// holds no callable or handle anywhere below it.
+// Identity summary (D-040 V16, the cycle rule): bit 7 of the header's tag
+// byte (the Kind uses the low 4 bits) means "this aggregate may contain a
+// callable or a handle, directly or through a child with the bit". It is
+// conservative: set whenever a store might add identity-bearing content
+// (array_mut hands out raw storage, so it sets it too), copied by
+// copy-on-write clones, and cleared only by the cycle checker after it has
+// verified the direct children (rt/value_cycle.h). Removing the last callable
+// or handle from a container leaves the bit set (conservative, never
+// missing). Plain data therefore never needs a walk: an aggregate whose bit is
+// clear holds no callable or handle anywhere below it.
 inline constexpr std::uint8_t kMayHoldIdentity = 0x80;
-inline bool may_hold_identity(const HeapObject* object) noexcept {
-    return (object->counted[2] & kMayHoldIdentity) != 0;
-}
-inline void mark_may_hold_identity(HeapObject* object) noexcept { object->counted[2] |= kMayHoldIdentity; }
+inline bool may_hold_identity(const HeapObject* object) noexcept { return (object->tag & kMayHoldIdentity) != 0; }
+inline void mark_may_hold_identity(HeapObject* object) noexcept { object->tag |= kMayHoldIdentity; }
 inline void clear_may_hold_identity(HeapObject* object) noexcept {
-    object->counted[2] = static_cast<std::uint8_t>(object->counted[2] & ~kMayHoldIdentity);
+    object->tag = static_cast<std::uint8_t>(object->tag & ~kMayHoldIdentity);
 }
 
 // Copy-on-write aggregates: a Value copy shares the object; mutation through
