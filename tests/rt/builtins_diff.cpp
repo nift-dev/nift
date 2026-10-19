@@ -312,8 +312,10 @@ std::string random_json(int depth, bool top) {
 
 // Review R4: invalid JSON object literals (balanced, so a broken case cannot
 // swallow the rest of a program; each still runs alone). json_parse must
-// reject them; the compiler then refuses the unit (W9), so they are not
-// compared but legacy's outcome class is tallied.
+// reject them; the compiler then compiles the literal as a Nift literal
+// (W9 option A, legacy's fallback; the CP10/CP11 guards apply), which this
+// native-level test cannot evaluate: not compared here, legacy's outcome
+// class is tallied (the VM side is checked by tests/runtime2/vm_builtins.py).
 std::string corrupt_json(std::string text) {
     const std::size_t open = text.find('{');
     switch (pick(7)) {
@@ -511,8 +513,8 @@ int main(int argc, char** argv) {
                                                        std::string(builtin_spec(c.id).name)];
         if (refused(c)) { ++refused_cases; continue; }
         if (c.id == BuiltinId::Count && c.expected.rfind("json-error ", 0) == 0) {
-            // W9: refused at compile time. Legacy falls back to its Nift literal
-            // evaluator: tally whether that fails or succeeds.
+            // W9: not JSON, so the literal is read as Nift (legacy's fallback
+            // evaluator, and the VM's CP14 literal path): tally whether it fails.
             ++(c.legacy.rfind("ok ", 0) == 0 ? invalid_legacy_ok : invalid_legacy_error);
             CHECK(c.expected.size() > 11);  // a parser message
             continue;
@@ -527,7 +529,7 @@ int main(int argc, char** argv) {
     }
     std::printf("builtins-diff: seed %llu, %zu cases (%zu compared, %zu legacy errors, %zu refused by rule W1) in %zu "
                 "legacy runs\n", seed, cases.size(), cases.size() - refused_cases, errors, refused_cases, runs);
-    std::printf("  invalid JSON literals (refused by W9): %zu; legacy fallback errors %zu, legacy fallback "
+    std::printf("  invalid JSON literals (read as Nift, W9): %zu; legacy fallback errors %zu, legacy fallback "
                 "succeeds %zu\n", invalid_legacy_ok + invalid_legacy_error, invalid_legacy_error, invalid_legacy_ok);
     for (const auto& row : per) std::printf("  %-20s %4zu cases, %4zu errors\n", row.first.c_str(), row.second.first, row.second.second);
     if (std::system(("rm -rf '" + std::string(dir) + "'").c_str()) != 0) std::fprintf(stderr, "cleanup failed\n");

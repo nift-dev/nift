@@ -136,12 +136,85 @@ SUPPORTED = {
         'd := deepcopy(rec)\nprint(d.stringify())\nn := 5\nm := copy(n)\nprint(m)\n'
     ),
     "f15-json-literals": (
-        'je := {"s": "caf\\u00e9"}\nprint(je.s)\nj := {"z": -0, "big": 12345678901234567890123, "f": 0.10, "e": 1e300}\n'
+        'j := {"z": -0, "big": 12345678901234567890123, "f": 0.10, "e": 1e300}\n'
         "print(j.stringify())\nprint(j.z)\nprint(j.big)\nprint(j.f)\nprint(j.e)\n"
         'nested := {"a": [1, {"b": null}], "t": true}\nprint(nested.stringify())\nprint(nested.t)\n'
         "i := 3\nmixed := {\"k\": i, \"l\": [i, 2]}\nprint(mixed.stringify())\n"
     ),
+    # CP15 W9 (option A): a `{...}` literal that is JSON is read as JSON
+    # (LoadK); any other is compiled as a Nift literal, legacy's fallback.
+    # Nested at least two levels, in arrays and objects; JSON and fallback
+    # spellings of the same values must print identically (pj/pf); a JSON
+    # object inside a fallback literal is still read as JSON (`-0.0`,
+    # `1e-400` kept; the integral `-0` is in SUPPORTED_TOP, as legacy reads it
+    # as 0 in loop code).
+    "w9-literals": (
+        'o0 := {"a": .5}\nprint(o0.a)\no1 := {"a": 1, "b": .5}\nprint(o1.stringify())\n'
+        'o4 := {"a": {"b": -0.0}, "c": .5}\nprint(o4.stringify())\na6 := [{"b": 1e-400}, .5]\nprint(a6.stringify())\n'
+        "o7 := {\"s\": 'q', \"t\": {\"u\": [1., .5, 'r']}}\nprint(o7.stringify())\nprint(o7.s)\n"
+        'o9 := {"a": {"b": 0.10, "c": [1, {"d": -0.00}]}, "e": .5}\nprint(o9.stringify())\n'
+        'o10 := {"b": -0.0}\nprint(o10.stringify())\nv10 := o10.b\nprint(v10)\nprint("b=" + v10)\n'
+        # `-0` with a string-valued sibling: legacy's prepared parser rejects
+        # the literal, so legacy reads it as JSON in every context (-0 kept).
+        'ns := {"b": -0, "c": "s"}\nprint(ns.stringify())\nprint(ns.b)\n'
+        'nn := {"a": {"b": -0e0, "s": "x"}, "t": "y"}\nprint(nn.stringify())\n'
+        'pj := {"h": 0.5, "k": 2500, "m": 0.25, "n": 1e-7, "p": 0.1, "s": "q", "t": [1, 0.5, "r"], "u": {"v": 1, "w": 0.5}}\n'
+        "pf := {\"h\": .5, \"k\": 2.5E+3, \"m\": 2.5e-1, \"n\": 1e-7, \"p\": 0.1, \"s\": 'q', \"t\": [1., .5, 'r'], "
+        '"u": {"v": 1., "w": .5}}\n'
+        "print(pj.stringify())\nprint(pf.stringify())\nprint(pj.stringify() == pf.stringify())\n"
+        "print(pj.h)\nprint(pf.h)\nprint(pj.k)\nprint(pf.k)\nprint(pj.n)\nprint(pf.n)\n"
+        'dj := {"a": 1e300, "b": 1.5e-7, "c": 1e21, "d": 123456789012.5, "e": 5e-324, "f": 1.7976931348623157e308, '
+        '"g": -2.5e-300, "h": 1e-400, "i": 9007199254740993, "j": 1.50, "k": 0.0}\n'
+        "print(dj.stringify())\nprint(dj.c)\nprint(dj.e)\nprint(dj.i)\n"
+    ),
+    # Sign of zero vs the `-0` spelling (owner, CP15 record "Negative zero"):
+    # the sign of zero is never observable as a number (arithmetic results
+    # print canonically, `x == 0`); a JSON literal's `-0`/`-0.0` keeps its
+    # SPELLING through storage, member/index access, nesting, print,
+    # stringify and concatenation; arithmetic on it gives the canonical form.
+    "negzero-sign": (
+        'o := {"b": -0, "e": -0.0, "s": "x", "c": [-0, {"d": -0, "s": "y"}]}\nprint(o.stringify())\nprint(o.b)\n'
+        'print(o.e)\nprint("s" + o.b)\nprint("s" + o.e)\nprint(o.c.stringify())\nprint(o.c[0])\nprint(o.c[1].d)\n'
+        'v := o.b\nw := o.e\nprint(v + 0)\nprint(v - 0)\nprint(v * 1)\nprint(v * -1)\nprint(w + 0)\nprint(w * 1)\n'
+        'print(v == 0)\nprint(w == 0)\nprint(v < 0)\nprint(v > -1)\n'
+        'q := {"b": 0, "e": 0, "s": "x", "c": [0, {"d": 0, "s": "y"}]}\nprint(o == q)\n'
+        'x := 0.5 - 0.5\nprint(x * -1)\ny := -0.5 * 0\nprint(y)\nprint("s" + y)\na := [y]\nprint(a.stringify())\n'
+        'print(y == 0)\nprint(y + 0)\ni := 0\nprint(i * -1)\njj := {"c": [-0, 1], "s": "x"}\nprint(jj.c.join(","))\n'
+    ),
 }
+
+# Supported at top level only: `-0` read as Nift (a fallback literal or an
+# array element) is integer negation, refused in loop code
+# (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
+SUPPORTED_TOP = [
+    # The one place the two readings meet: JSON except for one fallback
+    # spelling (`.5`). As JSON `-0` stays -0; read as Nift it is 0.
+    ("w9-meet", 'jn := {"a": 0.10, "b": -0, "c": 0.5}\nfb := {"a": 0.10, "b": -0, "c": .5}\n'
+                "print(jn.stringify())\nprint(fb.stringify())\nprint(jn.b)\nprint(fb.b)\n"),
+    ("w9-json-negzero-nested", 'o4 := {"a": {"b": -0}, "c": .5}\nprint(o4.stringify())\na6 := [{"b": -0}, .5]\n'
+                               'print(a6.stringify())\no9 := {"a": {"b": 0.10, "c": [1, {"d": -0e0}]}, "e": .5}\n'
+                               'print(o9.stringify())\n'),
+    ("w9-fallback-array-negzero", 'o5 := {"a": [-0, {"b": -0}], "c": .5}\nprint(o5.stringify())\n'),
+    # Negation (unary minus of a possibly integer operand is refused in loop
+    # code, CP12 #11): `-(-0)` is 0, `-(-0.0)` is 0.0 (legacy flips the
+    # spelling's sign), `-(0.5 - 0.5)` prints 0.
+    ("negzero-negation", 'o := {"b": -0, "e": -0.0, "s": "x"}\nv := o.b\nw := o.e\nprint(-v)\nprint(-w)\n'
+                         'x := 0.5 - 0.5\nprint(-x)\ni := 0\nprint(-i)\nprint(-0 + 0)\nprint(-0 == 0)\n'),
+    ("negzero-nested-sort", 'a := [{"b": 1}, {"b": -0}]\nprint(a.stringify())\no := {"a": {"b": [-0]}}\nprint(o.a.b[0])\n'
+                            'print(o.a.stringify())\n'),
+    # CP12 text typing of `{..., "m": -1e-400}` meets the digit-led root `1e`:
+    # type -1, as legacy (also for a declaration in a function called from a
+    # loop, where the declaration's text type must be known statically).
+    ("texttype-digit-root", 'fn(h()) {\nd3 := {"m": -1e-400, "n": 3}\nprint(d3.stringify())\nreturn 0\n}\n'
+                            'dj := {"a": 1, "m": -1e-400, "s": "x"}\nprint(dj.stringify())\nprint(dj.m)\n'
+                            'i := 0\nwhile (i < 1) { i += 1\nd2 := {"m": -1e-400, "n": 2}\nprint(d2.stringify())\nh() }\n'),
+    # The -0 finding (open defect on runtime-2 since 4b2fc909): every shape.
+    ("negzero-shapes", 'fn(f(v)) { return v.b }\nfn(g()) { return {"b": -0} }\n'
+                       'a := [-0]\nprint(a.stringify())\nx := -0\nprint(x)\n'
+                       'print(f({"b": -0}))\nr := g()\nprint(r.stringify())\n'
+                       'o := {"b": -0}\nv := o.b\nprint(v)\nprint(v + 0)\nprint("s" + v)\n'
+                       'print("o=" + o.stringify())\nprint("b=" + o.b)\nq := {"b": 0}\nprint(o == q)\nprint(o.b == 0)\n'),
+]
 
 # Legacy error messages of bound natives, at top level.
 ERRORS = [
@@ -172,6 +245,10 @@ ERRORS = [
     ("num-to-int-fraction", "x := 2.5\nprint(x.to_int())\n"),
     ("sha256-kind", "print(sha256(1))\n"),
     ("validate-rejected", 'schema := {"type": "string"}\nv := 5\nr := validate(schema, v)\nprint(r)\n'),
+    # Division by any zero is an error, whatever its sign or spelling.
+    ("negzero-div-json", 'o := {"b": -0, "s": "x"}\nprint(1 / o.b)\n'),
+    ("negzero-div-json-double", 'o := {"b": -0.0}\nprint(1 / o.b)\n'),
+    ("negzero-div-arith", "x := -0.5 * 0\nprint(1 / x)\n"),
     ("validate-bad-schema", 'schema := {"type": 5}\nv := 5\nr := validate(schema, v)\nprint(r)\n'),
 ]
 
@@ -208,9 +285,28 @@ UNSUPPORTED = [
     # is not JSON; W10: a quoted-literal validate argument (J-Q2).
     ("w8-bytes", "b := bytes([1, 2])\nprint(1)\n", "builtin-bytes:bytes"),
     ("w8-encode", 's := "a"\nb := s.encode("utf-8")\nprint(1)\n', "builtin-bytes:encode"),
-    ("w9-not-json-dot", 'o := {"a": .5}\nprint(o.a)\n', "json-literal"),
+    # W9 option A: a literal that is not JSON is compiled as a Nift literal,
+    # so the CP10/CP11 guards refuse exactly what they refused before.
+    ("w9-fallback-leading-zero", 'o := {"z": 01, "a": 1}\nprint(o.stringify())\n', "number-literal"),
+    ("w9-fallback-non-finite", 'o := {"z": 1e400, "a": 1}\nprint(o.stringify())\n', "number-literal"),
+    ("w9-fallback-int-range", 'o := {"a": 12345678901234567890123, "b": .5}\nprint(o.stringify())\n', "number-literal"),
+    ("w9-fallback-zero-decimal", 'o := {"a": -0.0, "b": .5}\nprint(o.stringify())\n', "number-literal"),
+    ("w9-fallback-denormal", 'o := {"a": 5e-324, "b": .5}\nprint(o.stringify())\n', "number-literal"),
+    ("w9-fallback-escape", 'o := {"z": "\\xff", "a": 1}\nprint(o.stringify())\n', "opaque:legacy-runtime-error"),
+    # An integral negative zero in a JSON literal: legacy reads it as 0 in
+    # loop code (loop bodies, functions called from loops), -0 elsewhere.
+    ("w9-json-negzero-loop", 'i := 0\nwhile (i < 1) { i += 1\no := {"b": -0}\nprint(o.stringify()) }\n',
+     "context:negative-zero"),
+    ("w9-json-negzero-fnloop", 'fn(h()) { return {"b": {"c": -0e-5}} }\ni := 0\n'
+                               'while (i < 1) { i += 1\nr := h()\nprint(r.stringify()) }\n', "context:negative-zero"),
+    ("w9-fallback-negzero-loop", 'i := 0\nwhile (i < 1) { i += 1\no := {"b": -0, "c": .5}\nprint(o.b) }\n',
+     "context:negative-zero"),
     ("w10-validate-literal", 'schema := {"type": "string"}\nr := validate(schema, "x")\nprint(r)\n',
      "builtin-literal-arg:validate"),
+    # W9 cannot see an escaped string inside a structured literal: the CP10
+    # parser keeps any such statement Opaque (J-Q1: `\u00e9` means different
+    # values in `{...}` and `[...]`), so it runs on legacy before W9 applies.
+    ("w9-escaped-string", 'je := {"s": "caf\\u00e9"}\nprint(je.s)\n', "opaque:legacy-runtime-error"),
     ("n-q2-abs-arity", "x := -2\nprint(x.abs(1))\n", "builtin-arity:abs"),
     ("cp16-replace-once", 's := "aa"\nprint(s.replace_once("a", "b"))\n', "method:replace_once"),
     ("cp17-collection", "s := stack()\nprint(1)\n", "callable:stack"),
@@ -324,6 +420,7 @@ def items():
         for ctx, template in CONTEXTS.items():
             indented = "".join("  " + line + "\n" for line in body.splitlines()) if ctx != "top" else body
             out.append(("supported", f"{body_name}@{ctx}", template.format(body=indented), None))
+    out += [("supported", n, s, None) for n, s in SUPPORTED_TOP]
     out += [("error", n, s, None) for n, s in ERRORS]
     out += [("unsupported", n, s, r) for n, s, r in UNSUPPORTED]
     return out

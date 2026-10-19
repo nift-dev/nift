@@ -161,6 +161,27 @@ def refers_to_binding(text, functions=()):
 ILIT = ["0", "1", "2", "3", "7", "10", "-3", "42", "100"]
 DLIT = ["0.5", "1.25", "-0.75", "2.5", ".5", "3.125", "2.5e-1"]  # non-integral binary fractions
 SLIT = ['"a"', '"bc"', '""', "'q'", '"x y"', '"é"', '"zz"', '"1"']
+# CP15 W9 / -0 finding: spellings whose JSON meaning legacy keeps exactly
+# (`-0`, `0.0`, `1.50`, integers beyond 2^53, exponents of 300 and more,
+# denormals, values below the smallest denormal). Before CP15 every one was
+# either refused (number-literal) or, for `-0`, compiled as the Nift
+# negation `0` (a silent difference from legacy's JSON reading of `{...}`);
+# the pools above held only spellings both readings agree on, so the
+# generator could not reach the difference. They appear only as an extra
+# "v" member of an object literal that is JSON throughout (otherwise legacy
+# reads the literal as Nift, where most of them are refused).
+VLIT = ["-0", "-0e0", "0.0", "-0.0", "1.50", "1E2", "1e300", "-2.5e-300", "1e-400", "-1e-400", "5e-324", "4.9e-324",
+        "2.2250738585072014e-308", "1.7976931348623157e308", "9007199254740993", "12345678901234567890123",
+        "-12345678901234567890123"]
+# In loop code legacy's prepared parser reads an object literal without a
+# string-valued member as Nift (an integral -0 becomes 0; the VM refuses
+# that: context:negative-zero). These literals always have a string member
+# ("s" outside, "u" in the mixed form's inner object, whose nested shape keeps
+# the "s" of the outer), which that parser rejects, so legacy reads the JSON
+# ones as JSON in every context and the VM runs them: drawn in all contexts.
+# A part spelled as JSON: a number of the pools (not `.5`) or a plain
+# double-quoted string (not `'q'`).
+JSON_PART = re.compile(r"-?[0-9][0-9.e-]*|" + r'"[^"$\\]*"')
 CMP = ["<", "<=", ">", ">=", "==", "!="]
 KINDS = ["i", "d", "s", "b", "a", "o"]
 
@@ -196,6 +217,14 @@ class Supported:
 
     def __init__(self, rng):
         self.r = rng
+        # The JSON-only values draw from their own stream, seeded from the
+        # program's without consuming it, so every other choice (and so each
+        # seed's programs apart from the added member) is unchanged.
+        self.rv = random.Random(repr(rng.getstate()[1][:8]))
+        # (literal text, literal text with the added member): applied to the
+        # finished program, so every decision taken on the text (text types,
+        # binding references, retries) sees exactly CP14's text.
+        self.json_members = []
         self.n = 0
         self.fns = []   # (name, [param kinds], return kind)
         self.recs = []  # recursive int functions taking one small int
@@ -476,8 +505,42 @@ class Supported:
             c = self.call(scope, "o", d)
             if c:
                 return c
-        return ('{"n": ' + self.ie(scope, d + 2) + ', "x": ' + self.de(scope, d + 2) + ', "s": ' +
-                self.se(scope, d + 2) + "}")
+        return self.json_values([self.ie(scope, d + 2), self.de(scope, d + 2), self.se(scope, d + 2)])
+
+    def json_values(self, parts):
+        """`{"n": .., "x": .., "s": ..}` exactly as before (no generator
+        narrowing relative to CP14: the parts' text is never changed), and a
+        share with an added "v" member holding JSON-only values (VLIT):
+        flat or nested (arrays and objects) when every part is already
+        spelled as JSON, so the whole literal is JSON; otherwise mixed, an
+        inner JSON object inside a literal legacy reads as Nift (`.5`, `'q'`,
+        expressions), which legacy still reads as JSON."""
+        as_json = all(JSON_PART.fullmatch(p) for p in parts)
+        draw = self.rv.random()
+        if draw < 0.35 and (as_json or draw < 0.2):
+            shape = "mixed" if not as_json else self.rv.choice(["flat", "nested", "mixed"])
+            v = self.rv.choice(VLIT)
+            if shape == "flat":
+                member = v
+            elif shape == "nested":
+                member = ("[" + v + ", {\"w\": " + self.rv.choice(VLIT) + ", \"t\": [" + self.rv.choice(VLIT) +
+                          "]}]")
+            else:
+                member = '{"w": ' + v + ', "u": "x", "t": [' + self.rv.choice(VLIT) + "]}"
+            base = '{"n": ' + parts[0] + ', "x": ' + parts[1] + ', "s": ' + parts[2] + "}"
+            self.json_members.append((base, base[:-1] + ', "v": ' + member + "}"))
+            return base
+        return '{"n": ' + parts[0] + ', "x": ' + parts[1] + ', "s": ' + parts[2] + "}"
+
+    def with_json_members(self, text):
+        """The program text with the recorded "v" members added (a literal
+        of a discarded candidate may find no occurrence: skipped)."""
+        for base, extended in self.json_members:
+            at = text.find(base)
+            if at >= 0:
+                text = text[:at] + extended + text[at + len(base):]
+                self.features["json-only-value"] += 1
+        return text
 
     def cond(self, scope):
         """`if`/`while` conditions: no `?:`, `??` or object literal anywhere
@@ -556,7 +619,7 @@ class Supported:
             return self.ch("true", "false")
         if k == "a":
             return "[" + ", ".join(self.r.choice(ILIT) for _ in range(self.r.randint(1, 3))) + "]"
-        return '{"n": ' + self.r.choice(ILIT) + ', "x": ' + self.r.choice(DLIT) + ', "s": ' + self.r.choice(SLIT) + "}"
+        return self.json_values([self.r.choice(ILIT), self.r.choice(DLIT), self.r.choice(SLIT)])
 
     def stmt(self, scope, depth, loop, ret, loop_names):
         r = self.r.random()
@@ -752,7 +815,7 @@ class Supported:
             elif self.r.random() < 0.05:
                 body.append("return " + self.e([], self.ch("i", "s")))
                 self.features["top-return"] += 1
-        return "\n".join(out + body) + "\n"
+        return self.with_json_members("\n".join(out + body) + "\n")
 
 
 def supported_program(seed, index):
@@ -832,8 +895,19 @@ FN_AFTER = ("fn-after-statement", "print(1)\nfn(zg()) { return 1 }")
 CONTEXTS = ["top", "if", "loop", "fn", "fnloop"]
 
 
-def unsupported_program(seed, index):
-    """(source, expected reason prefix, construct name, context)."""
+# Constructs added after CP14 (CP15 integration): injected in programs added
+# to the suite beyond its count (indices count, count + 1, ...), so the CP14
+# programs (indices below count) are generated exactly as before.
+INJECT_ADDED = [
+    # Not JSON (not finite), so legacy reads the literal as Nift and fails;
+    # the CP14 path refuses the spelling.
+    ("non-finite-literal", "", 'zo := {"a": 1e400}\nprint(zo.stringify())', "any", "number-literal"),
+]
+
+
+def unsupported_program(seed, index, added=None):
+    """(source, expected reason prefix, construct name, context); `added`
+    forces one of INJECT_ADDED (programs beyond the suite's count)."""
     rng = random.Random(seed * 104729 + index)
     g = Supported(rng)
     base = g.program()
@@ -849,10 +923,10 @@ def unsupported_program(seed, index):
     else:
         first = len(lines)
     fns, stmts = lines[:first], lines[first:]
-    if rng.random() < 0.04:
+    if added is None and rng.random() < 0.04:
         name, extra = FN_AFTER
         return base + extra + "\n", "fn-after-statement", name, "top"
-    name, add_fns, add_stmts, where, reason = rng.choice(INJECT)
+    name, add_fns, add_stmts, where, reason = rng.choice(INJECT) if added is None else added
     ctx = "top" if where == "top" else rng.choice(CONTEXTS)
     if add_stmts:
         body = add_stmts
@@ -1049,6 +1123,10 @@ def suite_unsupported(args, work, out):
     for i in range(args.count):
         src, reason, name, ctx = unsupported_program(args.seed, i)
         items.append((i, src, reason, name, ctx))
+    for k in range(max(1, args.count // 40) * len(INJECT_ADDED)):
+        i = args.count + k
+        src, reason, name, ctx = unsupported_program(args.seed, i, INJECT_ADDED[k % len(INJECT_ADDED)])
+        items.append((i, src, reason, name, ctx))
     tally, failures = collections.Counter(), []
     constructs = collections.Counter()
     with cf.ThreadPoolExecutor(args.jobs) as pool:
@@ -1059,10 +1137,11 @@ def suite_unsupported(args, work, out):
             if problem:
                 failures.append((f"unsupported seed {args.seed} index {i} [{label}]", problem, src, legacy, vm))
     report_failures(failures)
-    print(f"unsupported generator: {args.count} programs (seed {args.seed}), {len(constructs)} constructs; "
-          f"refused before execution with the expected reason: {args.count - len(failures)}; "
+    print(f"unsupported generator: {len(items)} programs (seed {args.seed}; {args.count} as in CP14, "
+          f"{len(items) - args.count} with constructs added since), {len(constructs)} constructs; "
+          f"refused before execution with the expected reason: {len(items) - len(failures)}; "
           f"{len(failures)} failure(s)")
-    out["unsupported"] = {"seed": args.seed, "count": args.count, "outcomes": dict(tally),
+    out["unsupported"] = {"seed": args.seed, "count": len(items), "cp14_count": args.count, "outcomes": dict(tally),
                           "constructs": dict(constructs), "failures": len(failures)}
     return len(failures)
 
