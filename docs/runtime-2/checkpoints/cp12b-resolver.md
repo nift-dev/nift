@@ -85,6 +85,86 @@ reason: `free-name:dynamic-caller` (GETDYN proper), `dynamic-shadow`,
 `legacy-binding`. Today the analysis refines the inventory; the compiler
 does not use it yet.
 
+## Chained postfix (coordinator item 1)
+
+Cause of the refusal: `plain_postfix` (compiler_rules.cpp) admitted member,
+index and method links only on name paths (`a`, `a.b`, `a[i]`); CP10 had
+already reduced every chain on other receivers to the shapes legacy
+dispatches (links from a plain name through calls, links on array/object
+literals, known methods elsewhere; everything else Opaque). Legacy evaluates
+those shapes like any receiver, in every context (`vm_chain.py` and the
+chain probes).
+
+Shapes in the inventory (classify-all now records each refused access's
+shape and source line). Of the 153 curated scripts with a chained-postfix
+refusal, 28 have it as a certain reason; the other 125 meet it only behind
+an unsupported inner method (`s.split(",").join("-")`: masking `split`
+leaves `null.join`). Certain sites (curated): receivers — call results 47,
+object literals 10, method-call results 7, array literals 6, string
+literals 2, parenthesised expressions 3; accesses — method 58, member 16,
+index 1.
+
+| # | Cause | Effort | State | Scripts |
+| --- | --- | --- | --- | --- |
+| C1 | index link on a call result or literal (`f()[0]`, `[..][i]`, `{..}["k"]`) | S | **done** (`5521a861`) | part of the 28 |
+| C2 | method link on a call result or literal (`f().length()`, `s.trim().upper()`): the chain is admitted; the method itself still needs its owner (CP14, CP15, CP14B, CP15B, CP16) | S | **done** (`5521a861`) | most of the 153 (as their methods land) |
+| C3 | member read on a call result or literal (`f().k`, `{"a": 1}.a`): legacy's missing-member message depends on receiver shape and context (L41) | M: a receiver-shape note in `member()` (compiler_call.cpp, frozen) and the VM message; or language cleanup unifies the message | refused, `postfix-receiver:member` | 6 curated, 1 project (certain) |
+| C4 | links on other receivers (parenthesised expressions, numbers, booleans) | — | CP10 Opaque (legacy rejects most of them) | 0 certain after C1/C2 |
+
+Measured with the fix (classify-all, same corpora): alone +0 (104 → 104
+curated; every chain also calls a method nobody supports yet, 0 lost);
+with B2 globals 106; with modules 154; modules + B2 156; with modules,
+functions as values and CP13–CP16 **262 curated, 14 projects, 285 shared**
+(without the chain fix the same set gives 252 / 5 / 262: the fix is worth
++10 curated, +9 projects, +23 shared in combination); C3 would add +2
+curated.
+
+Gates for the fix and for H1 below the compiler: see "Tests run (round 2)".
+
+## H1 globals: the parts below the compiler (coordinator item 2)
+
+Done (`c8ffc7ca`): opcodes `GetGlobal`/`SetGlobal` (VM cold path; no hot
+opcode touched), `FunctionBuilder::keep_type`, the inference's shared global
+slot (`infer_unit_kinds(..., globals)`, `infer_globals.*`), unit tests
+`tests/rt/vm_globals_unit.cpp` (23 checks). Waiting for the CP15
+integration (frozen `compiler_expr`, `compiler_call`): emitting the opcodes
+for free names, writes with the binding-type check, `compile_unit` passing
+the plan to the inference, and the D-018 analyses' scope for globals
+(compiler_unit.cpp, compiler_assign.cpp: not frozen, but the hookup goes in
+together). Decision 3 (L25): ordinary globals and module bindings must not
+be compile errors; only caller-dependent lookups stay refused.
+
+## Effort of the greedy-climb features
+
+S = days, resolver/compiler only; M = a week or two, compiler + VM + tests;
+L = a checkpoint-sized piece or a runtime subsystem. Order = the curated
+greedy climb after modules + functions as values + CP13–CP16
+(`cp12b-coverage-inventory.md`, "Residual").
+
+| Feature (owner) | Unlocks (sole / blocked, curated residual) | Effort | Why |
+| --- | --- | --- | --- |
+| `fn[async]` (CP22), `@fn` deferred bodies (CP24) | 34 / 58 | L (async), M (@fn) | async needs the CP22 scheduler; `@fn` is a translated body |
+| callback-taking collection methods (CP14B) | 30 / 38 | M | callables as values (CP12C) first, then natives calling back into the VM |
+| threads, mutexes, atomics (CP22/CP23) | 28 / 44 | L | VM coroutines, isolates |
+| template functions (CP24) | 23 / 30 | M | template compiler hooks |
+| L7 aliasing (language cleanup; records20k: CP14) | 19 / 29 | L | a value/reference rule decision, then COW cells |
+| remaining pure built-ins (CP15B) | 18 / 32 | M | many small natives |
+| structs (CP12b) | 15 / 37 (+ 18 methods) | L | struct table, heap layout, methods, private, identity |
+| literal spellings, interpolation (CP15B) | 15 / 20 | S–M | exact decimals, escapes, `$[…]` in strings |
+| legacy parse/run-time quirks (language cleanup) | 12 / 16 | M | per-quirk decisions (D-014, D-022) |
+| statement and binding forms (CP12C) | 11 / 23 | M | const, destructuring, element targets, spread |
+| L6 reserved names (language cleanup; D-009#3 approved) | 11 / 17 | S | resolver: user names shadow built-ins |
+| D-018 loop-evaluator refusals (language cleanup) | 11 / 15 | M | lift once legacy is no longer the loop oracle |
+| template-only constructs (CP24) | 7 / 10 | L | template compiler |
+| globals (CP12b, H1) | 6 / 9 | S | hook after the rebase |
+| FFI (CP18) | 4 / 5 | L | C ABI 1.4 |
+| `await` (CP22) | 3 / 23 | L | scheduler |
+| shell (CP19) | 3 / 4 | L | command mode |
+| processes (CP16/CP20) | 2 / 4 | M | pipelines |
+| modules (CP12b) | — | L | per `cp12b-modules.md` |
+| chained postfix (CP12b) | — | S | done |
+| functions as values, closures, `for` (CP12C) | — | L | closures, upvalues, iteration protocol |
+
 ## Hooks for the compiler / VM / test files (sequence with the integration owner)
 
 **T1 — B1 test expectations** (commits `649729a2`, `e2bbc555`, marked "needs
