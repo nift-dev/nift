@@ -137,8 +137,8 @@ At `e2bbc555` (B1 + its tests), shared host, every heavy job through
 | `make test-rt-vm` | **PASS**: vm-unit 40,320 checks; prepared-parser port 100,136; rt-lint; legacy names; VM corpus 79 (0 failures); rt-diff 816 entries, **0 differing, 7 approved** (3 D-001#4 + 2 D-018c class, confirmed by VM statistics; 2 exact rules); rt-diff VM outcomes 103 of 789 scripts on the VM (83 vm + 20 vm-error); adversarial 37,449 programs, 0 non-approved differences (69 D-001#4, 99 D-018c); subset suites 50 supported / 66 unsupported; supported generator 500/500 on the VM; unsupported generator 500/500 refused before execution with the expected reason; engine selection, former replay, D-018, context consistency, policy negatives, review reproducers, golden 108, int bounds 2,682: PASS |
 | `make test-rt-vm-mutants` | **PASS**: unmutated passes every suite; 8 of 8 mutants rejected |
 | hot paths (callgrind marginal VM instructions, `vm_compare.py`'s method; baseline = this branch before B1) | flat call 425 → 425, loop 109 → 109, fib 285 → 285 per call (add_local 183, if_branch 244 unchanged) |
-| `make test-rt-vm-sanitize` | see below |
-| `tests/runtime2/vm_inventory.py` | 12 cases, 0 failures |
+| `make test-rt-vm-sanitize` | **clean** (ASan+UBSan, leaks on): vm-unit 40,320; prepared-parser 40,136; parity, adversarial 3,619 (0 non-approved), subset suites, generated suites, engine selection, former replay, D-018, context consistency, review, golden, int bounds: PASS |
+| `tests/runtime2/vm_inventory.py` | 12 cases, 0 failures (also on the sanitized binary); classify-all over the 86 project units on the sanitized binary: 86 complete inventories, no crash |
 
 Generators (seed 1, 500 each), before (runtime-2 tests, baseline binary) →
 after:
