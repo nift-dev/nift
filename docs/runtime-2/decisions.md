@@ -936,9 +936,15 @@ Also decided (owner, same day):
 2. **Filesystem scripting functions keep their global names** (`cp()`, `rm()`,
    `mkdir()`, `touch()`, …); D-042's call-syntax/shell-word distinction is
    sufficient once dispatch is deterministic. No `native.*` or abbreviations.
-   Pending: a narrow feasibility question on `native::cp(...)` as an explicit
-   qualified name (owner preference over `native.cp`), lower priority than VM
-   migration.
+   **`native::` approved (owner, 2026-10-20), scheduled with L6 after
+   CP25-critical work:** `native::<name>(...)` explicitly calls a public Nift
+   built-in, bypassing user-function shadowing; unqualified calls follow lexical
+   resolution (L6); unknown qualified names are a clear diagnostic; `native` is a
+   reserved built-in namespace only (no general namespaces); covers all public
+   built-ins where L6 shadowing applies, never internal C++ functions; both
+   engines; the existing global names stay and the ~735 call sites are not
+   migrated. (`::` is unused today: legacy rejects it as malformed; the VM lexer
+   has no `::` token.)
 3. **Filesystem defects to fix** (language cleanup / filesystem), with expected
    semantics specified first and regressions that fail on the old code:
    `rm()` on a directory (semantics to be specified, not inherited from GNU),
