@@ -356,6 +356,70 @@ with its CP12 dependency:
    F1–F3 built-in, except the documented W-rules. "Per-builtin instruction
    guards": see below.
 
+## Wiring (speculative integration, branch `spec-integration`)
+
+Done on `spec-integration` (local, never pushed), **speculative, base CP12
+`6c144bb`** (CP12 tip under certification: `runtime-2` @`8957559` + the CP12
+commits incl. the CP09 memcpy fix `547614f`). Integrated by the single
+integration owner after CP12 freezes; disposable until CP12 certifies.
+
+| Step | Where | What was done |
+| --- | --- | --- |
+| 1 Dispatch | `native.h` (`kFirstBuiltin = 1`), `vm.cpp` (`Vm::native` default), `vm_builtin.{h,cpp}` (`Vm::builtin`) | `CallNative a=window base, b=kFirstBuiltin+BuiltinId, c=window size` (receiver first). `Ok` → result into `R[a]`, the window's other registers cleared; `Error` → `raise(StopReason::Error, message)` at the call's offset (legacy message, exit 1); `Internal` → `StopReason::Internal` "unexpected operands (compiler defect): built-in <name>" (exit 70); `Memory` → the VM's memory stop (Internal "memory budget exceeded", or the recursion error beyond 64 frames), never a retry: the partial result is already freed, so `memory_exceeded`'s "still within the budget" early return is not used. Off the hot path (CallNative was already a cold opcode). |
+| 2 Methods | `compiler_call.cpp` `method_call`, `builtin_call` | `length()`/`size()` without arguments keep the Length opcode and its CP12 checks (`type:length`, `context:object-length` = Q3). Every other method binds through `builtin_bind.{h,cpp}` (`bind_method`): receiver family from the inferred kinds (W3); the window is a fresh register range, receiver and arguments evaluated once, left to right (D-018). |
+| 3 Free functions | `compiler_call.cpp` `call` | `range min max html_escape attr_escape url_encode type is_*` bind when no user function has the name (a user function, parameter or binding of a reserved name is refused earlier: `fn-name-reserved`, `param-name-reserved`, `binding-name-reserved`, `call-binding`). The CP12 textual-argument evidence rule (prepared parser rejects an argument → the call is textual) applies to them as to user calls. |
+| 4 Inference | `infer.cpp` (`call`), `infer_builtins.{h,cpp}` | Result types from `ResultRule` with CP12's structural types: `split`/`keys` array of string, `values` array of the members, `entries` array of `{key: string, value: members}`, `chunk` array of arrays of the elements, `range` array of int, `pick`/`omit` the receiver's object type, `first last min max` the elements, `slice unique take drop` array of the elements, `get(k[, d])` the member (literal key) or all members ∪ the default or null, `merge`/`merge_deep` the union of both object types, free `min`/`max` the arguments (one array argument: its elements). Arrays/objects whose contents no rule describes (`flatten`, `from_entries`) get an *open* type (container kind, `any`: every kind at every depth below), never "no members". Unbound methods are Unknown (the compiler refuses them); a receiver with empty kinds (never executed) gives the empty type. `static_assert`: the CP14 `KindSet` bits equal CP12's `kKind*`. |
+| 5 Alias analysis | `alias.cpp` | Every CP14 method name is read-only (`pure_method_name`): a parameter used as a built-in receiver does not escape. Results are fresh values (legacy probe: `b := a.first(); b.push(9)` and `c := o.get("k"); c.push(2)` leave `a`/`o` unchanged, both engines). |
+| 6 Refusals | `compiler_call.cpp` | `builtin-arity:<name>` (W1, Q10), `builtin-lazy-args:<name>` (W2: a later argument of a fallible built-in that is not a literal or a local read), `builtin-default:get` (W4), `builtin-receiver:<name>` (W3: mixed/Unknown kinds, or the family lacks the method: `s.keys()`, `a.index_of()` = Q8, `n.to_double()` = Q4), `builtin-presentation-chain` (W6, Q14; currently unreachable because a method call on a call result is refused first as `postfix-receiver`, kept as defence in depth), `method:<name>` for F4/F5 and batch B/C names. |
+| 7 Suites | `tests/runtime2/vm_builtins.py` (in `test-rt-vm` and `test-rt-vm-sanitize`), `vm_subset_gen.py` | Supported: 7 bodies × 5 contexts (top, `if`, loop, function from top, function from loop) covering every bound built-in and the receiver/argument shapes (binding, member path, index, nested built-in arguments), 100 % on the VM, identical to legacy; errors: 19 legacy messages at top level, byte-identical; unsupported: 18 refusals with their reasons, refused before execution; budget: `range`/`split("")` under a lowered heap budget stop with exit 70. The supported-subset generator emits built-in calls (int, string, bool and array results, error-free by construction) in every context. |
+
+Not wired, refused (unchanged reasons): F4 mutating methods other than the
+CP11 `push` statement, F5 callbacks, F7 handles, batch B/C names, method
+calls on call results (`postfix-receiver`: `s.trim().length()`,
+`o.stringify().stringify()`); widening that is a separate step (the CP10
+tree and legacy's textual reading of chains must be shown to agree first).
+
+Interface mismatches met (all resolved in the wiring, natives unchanged):
+
+* The sketch's `call_builtin(..., R[in.a], fault.message)` wrote the result
+  straight into the receiver's register and the message into the fault; the
+  wiring uses a local `out`/message (no aliasing reliance on argument 0 and
+  no partially written fault on `Ok`).
+* `memory_exceeded` returns "ok" when the live heap is back under the limit,
+  which is always the case after a native returned `Memory` (its partial
+  result is freed): it cannot be used as the sketch did; the stop is explicit.
+* CP12's inference returned `int` for every method call and its `Ty` had no
+  "object with unknown members"; the open type uses the existing `any` flag
+  with the container kind instead of a new field.
+* CP12 has `kinds()` widening Unknown and a probe mode (`unknown_defers`):
+  the receiver rule defers in probe mode like every CP12 kind check.
+* `kFirstBuiltin` lives in `native.h` (the sketch put it there too); the
+  binding helpers are a separate cold file so `infer.cpp`/`vm.cpp` stay
+  under rt-lint's 400-line limit.
+
+### Wiring results (2026-10-19, `nice make -j1`, binary of this commit)
+
+| Gate | Result |
+| --- | --- |
+| `make test-rt-builtins` | unit 635 checks / 0 failures; differential seed 20261018, 5,000 cases (4,979 compared, 21 refused by W1) / 0 failures; isolation PASS; rt-lint PASS; context probe PASS (inventory pinned) |
+| `make test-rt-builtins-sanitize` | unit 634, differential 1,994: 0 failures (ASan+UBSan) |
+| `make test-rt-builtins-guards` | 25 workloads, 0 guard failures |
+| `vm_builtins.py` | 35 supported (7 bodies × 5 contexts) on the VM, identical to legacy; 19 error programs byte-identical; 18 refusals; 2 budget stops; 0 failures |
+| `make test-rt-vm` steps | vm-unit, prepared-parser port (100,136), rt-lint, legacy names: PASS; `vm_parity` PASS (rt-diff 815 entries, 0 differing, 7 approved; corpus); adversarial 37,442 programs, 0 non-approved (168 approved); `vm_subset.py` 49 supported / 65 unsupported PASS; unsupported generator 500/500; engine selection, former replay, D-018, context consistency, policy negatives (52/5), review reproducers (87), golden (108), int bounds (2,682): PASS. **Supported generator: seed 1 499/500, seed 2 499/500** — the one refusal in each (`context:assignment-type`, `context:assignment-error`) reproduces on the CP12 binary with every built-in call removed from the program: a pre-existing CP12 compiler-vs-subset-spec gap exposed because the extended generator draws a different random stream (recorded, not hidden by changing inputs). |
+| `make test-rt-vm-mutants` | unmutated passes, 8/8 mutants rejected |
+| callgrind (`vm_compare.py --groups ops,fib`) | flat call 425, fib 285/call (top level and in a loop), loop 109, add_local 183, if_branch 244: unchanged |
+
+Coverage (same harness and seed before/after; "before" = the CP12 binary of
+this base plus feature-serve): shared corpora 104 of 788 distinct scripts on
+the VM (84 `vm` + 20 `vm-error`) before and after, identical outcome
+distribution — every corpus script calling an F1–F3/F6 built-in also uses a
+construct still refused (F4/F5 methods `sort_by` 19, `map` 9, `sort` 2;
+`postfix-receiver` chains 14; imports, structs, lambdas, …). General generator
+(`vm_gen.py`) 72 of 300 before and after: it emits no built-in calls. The
+built-in coverage is carried by `vm_builtins.py` and the supported generator
+(built-in calls in ~every program, 100 % on the VM apart from the two CP12
+cases above). No corpus program falls back with a `builtin*` reason.
+
 ## Instruction guards and allocation scaling (measured)
 
 Owner addition (round 2). `tests/rt/builtins_bench.cpp` runs 25
@@ -452,7 +516,7 @@ random doubles and the special values in the unit test.
 | --- | --- |
 | Inventory and family split, legacy and intended semantics, kind rules, guard targets | this record |
 | ≥ 2 families as pure natives with unit, differential and sanitizer tests | F1, F2, F3, F6 (73 entries) |
-| Wiring into compiler/VM; supported/unsupported suites; batch fallback = 0 | **after CP12 certifies** (plan above) |
+| Wiring into compiler/VM; supported/unsupported suites; batch fallback = 0 | speculative wiring on `spec-integration` (base CP12 `6c144bb`), see "Wiring"; final after CP12 certifies |
 | Per-builtin instruction guards measured and locked | native level: 25 workloads locked (+10 %); VM-level guards (call overhead through `CallNative`) at wiring |
 | D-015 candidates recorded | Q1–Q14; owner decisions pending for Q1, Q2, Q4, Q6–Q9, Q14 |
 
