@@ -1,7 +1,8 @@
 # feature-host-deps — host-operation correctness before CP16 (D-028)
 
-Status: **implemented, not certified**, on branch `feature-host-deps` (from
-`runtime-2` @`59e9fa5`), local commits only. `make certify` is run by the
+Status: **implemented, not certified**, on branch `feature-host-deps`
+(written on `runtime-2` @`59e9fa5`; **rebased onto `runtime-2` @`975dbb1a`**
+on 2026-10-20, see §5b), local commits only. `make certify` is run by the
 owner. Linux only; macOS/Windows pending the next CI milestone (D-004). The
 Windows half of the process-capture bound (`src/Process.cpp`, `#ifdef _WIN32`)
 was written but never compiled here.
@@ -222,12 +223,12 @@ over a file 3× the limit, 64 × `read_bytes(limit/2)` from `/dev/zero`, and
   `<op>: <path or what> exceeds the read limit of <N> bytes (NIFT_READ_LIMIT)`.
 * Nothing is truncated: the only outcomes are the complete value or the error.
 
-Error code: legacy's taxonomy names it `native.limit_exceeded` (fatal);
-CP13's taxonomy renames it `limit.exceeded` with `details.limit`, so after
-CP13 integrates this error is `limit.exceeded` with no change here. There is
-no JSON diagnostics path on this base (`--format=json` is CP13); the
-structured `Diagnostic` (`result_.diagnostic`, embedding API) carries the code
-and message.
+Error code: `limit.exceeded` (fatal). On the original base legacy's
+taxonomy named it `native.limit_exceeded`; CP13 phase A (integrated, present
+on the rebased base) maps `DiagnosticCode::NativeLimitExceeded` to
+`limit.exceeded`, with no change here. `details.limit` and `--format=json`
+are CP13 phase B (open); until then the structured `Diagnostic`
+(`result_.diagnostic`, embedding API) carries the code and message.
 
 Build state: a page that hits the limit is an ordinary failed page (D-020):
 non-zero exit, last-good output kept, no `.unfinished`, the next build after
@@ -421,9 +422,116 @@ Measured peak RSS in the exceeding cases (limit 64 MiB): 11 MiB (rejected
 from `st_size`, capture stopped early) to 70 MiB (endless stdin read to the
 limit) against a baseline VmHWM of 6 MiB, under RLIMIT_AS 114 MiB.
 
-Not run: `make certify` (owner), sanitizer builds of `nift`, the regression
-suite, macOS/Windows, a mutant build of `nift` for R4 (the unit test's
-mutants cover the growth rule).
+Not run in round 1: `make certify` (owner), sanitizer builds of `nift`, the
+regression suite, macOS/Windows, a mutant build of `nift` for R4 (the unit
+test's mutants cover the growth rule). The sanitizer builds and the R4 mutant
+were run after the rebase (§5b).
+
+## 5b. Rebase onto `runtime-2` @`a3dc2846` and re-verification (2026-10-20)
+
+Final base: `runtime-2` @`975dbb1a`. The verification below ran on the
+rebase onto `a3dc2846`; `runtime-2` then advanced by 10 commits that change
+only `docs/runtime-2/{certification,compatibility,decisions,delivery-forecast}.md`,
+and the branch was rebased again without conflict. `src/`, `tests/`,
+`scripts/` and the `Makefile` are byte-identical between the verified tree
+and the final one, so every result below applies to it.
+
+The two branch commits (`6aeca9b`, `67fdd56`) were rebased from `59e9fa5`
+onto `runtime-2` @`a3dc2846` (79 commits: CP12 phase A, CP14 phase A, CP13
+phase A with the prevalidator, `src/rt/parser-sources.txt` and the
+`runtime.*`/`limit.exceeded` codes, D-029–D-041). `runtime-2` itself was not
+touched; the pre-rebase tip is kept as the local branch
+`backup/feature-host-deps-pre-rebase-67fdd56a`.
+
+**Conflicts.** Only `docs/runtime-2/progress.md`, in both commits: upstream
+added the CP12, CP13 and CP14 rows where this branch added its row. Resolved
+by keeping all upstream rows and placing the `feature-host-deps` row after
+them (the round-1 commit's version of the row replaces the first commit's).
+Auto-merged without conflict and checked by reading the result: `Makefile`
+(the `test-runtime2-host-deps` block sits next to upstream's new targets;
+nothing upstream renamed what it uses) and `src/ParserScript.cpp` (upstream's
+D-025 multi-line `return` and the CP13 import prevalidation are in
+`translate_function_program`/`execute_import_file`; the branch's
+`settle_worker_observations` call stays at the end of `run_script`, after
+`finalize_script_resources`, on the only return path that runs a script).
+Semantic checks: the branch adds no `src/*.cpp` and no `src/rt` file, so
+`src/rt/parser-sources.txt` and the binding build lists need no change;
+`native.limit_exceeded` is now reported as `limit.exceeded` by CP13's code
+mapping (§3 text updated), and no test of this branch asserted the old code
+string. Build: `make nift`, 0 warnings.
+
+**Revert-the-fix evidence** (each fix reverted alone in a scratch copy of the
+rebased tree, `nift` rebuilt, the finding's suite run against that binary
+under `ulimit -f 2 GiB`, `ulimit -v 8 GiB`, `timeout`, own session, leftover
+check; the unmutated binary passes every suite: `read_limit.py` 115/115,
+`host_deps.py` 198/198, `build_write_ownership.sh` 28/28,
+`file_copy_move_freedom.sh` 23/23, `fs_freedom.sh` 16/16):
+
+| Finding | Fix reverted | Suite result on the mutant | Failing checks (examples) |
+|---|---|---|---|
+| D1 | `read_line` catch rethrows | `read_limit.py` 113 PASS / 2 FAIL | `read_line on a directory`, `read_line on a EIO (/proc/self/mem)`: uncaught `basic_filebuf::underflow` |
+| D2 | `page_member_sources` returns the content file only | `host_deps.py` 195 / 3 FAIL | `page(x).metadata external front matter edit` in modified, hash, hybrid |
+| D3 | workers never observe (`worker_observing_=false`, both sites) | `host_deps.py` 189 / 9 FAIL | `async function open() edit`, `async function exists() target appears`, `thread() worker ifstream edit`, all modes |
+| D4 | `cp()` and `file().copy()` sources not recorded | `host_deps.py` 192 / 6 FAIL | `cp() source edit`, `file().copy() source edit`, all modes |
+| D5 | no capture check while the child runs | `read_limit.py` 113 / 2 FAIL | `run(sh -c 'yes; touch marker') kills the descendant`, `stderr capture of an endless producer` |
+| D6 | `guard_build_write` always allows | `build_write_ownership.sh` 24 FAIL; `file_copy_move_freedom.sh` 5 FAIL | every "not refused: … another page's output" case; `.nift/tracked.json` overwritten and the next build broken |
+| D7 | `read()` line unbounded | `read_limit.py` 113 / 2 FAIL | `read(): stdin line one byte over is a limit error`, `read(): endless stdin (/dev/zero) stops at the limit` |
+| R4 | growth step reserves 2 × target (capacity up to 2 × limit) | `read_limit.py` 98 / 17 FAIL | every `/dev/zero`, `/dev/full`, endless-FIFO and default-limit case (`std::bad_alloc` under the 1.5 × limit RLIMIT_AS) |
+| R5 | no EXDEV fallback | `file_copy_move_freedom.sh` 1 FAIL; `build_write_ownership.sh` 1 FAIL | `cross-device move`; `cross-device move partial` |
+| F7 (test fix) | `--fs-root` not enforced | fixed `fs_freedom.sh` 1 FAIL; `file_copy_move_freedom.sh` 1 FAIL; the pre-fix `fs_freedom.sh` (from `59e9fa5`) **16/16 PASS** | proves the old check was vacuous and the new one is not |
+| R1–R3 | documentation only (§1 guarantee by mode, §3 per-read limit, F9/F10) | n/a | text present after the rebase |
+
+**Gates on the rebased tree** (binary built from the rebased round-1 commit,
+every step under `ulimit -f`/`-v`, `timeout`, no leftover processes):
+`make test-runtime2-host-deps` pass (364 PASS lines: unit, `host_deps.py`
+198, `file_copy_move_freedom.sh`, `build_write_ownership.sh`,
+`read_limit.py` 115); `test-test-integrity` pass (393 files, 0 findings);
+`test-runtime2-certification-guard` pass; `test-runtime2-diagnostics` pass;
+`test-runtime2-prevalidate-gate` pass (rules, zero-false-rejection gate, 17
+positive programs + 346 operator differential); `test-rt-vm-mutants` pass
+(8/8 rejected, unmutated passes); `test-site-dx` pass (including the watch
+cases); `test-build-recovery` pass (`build_recovery.py` 996 checks;
+randomized 80 steps × 3 modes, 0 problems); `test-runtime2-fs-freedom`,
+`test-runtime2-dynamic-reads`, `test-contracts`, `test-conformance` (9/9)
+pass. Incremental/dependency-record gates: `test-incremental-state-transitions`,
+`test-incremental-modified-immediate`, `test-incremental-new-features`,
+`test-dependency-path-identity` (15), `test-pagination-equivalence` (18
+comparisons), `checkpoint-7-incremental-equivalence`, `test-crash-recovery`,
+`test-randomized-incremental` pass. `make test-dependency-status` as the
+unprivileged user `tester` (tester-owned copy of the tree): pass (contracts
+PASS, CLI status adversarial 30 PASS, 0 SKIP).
+
+**Sanitizers.** `.build/nift-sanitize` (ASan+UBSan, `detect_leaks=1`,
+`halt_on_error=1`, reports logged to files so swallowed stderr cannot hide
+them) and `.build/nift-tsan` were built from the rebased tree.
+`read_limit_unit` under ASan/UBSan: pass. ASan/UBSan `nift`: `host_deps.py`
+198/198, `build_write_ownership.sh` 28/28, `file_copy_move_freedom.sh` 23/23,
+`fs_freedom.sh` 16/16, `read_limit.py` 115/115 with `quarantine_size_mb=0`;
+0 sanitizer reports. With ASan's default quarantine the 20 peak-RSS
+assertions of `read_limit.py` fail (345 MiB against a 271 MiB bound: freed
+growth buffers stay resident in the quarantine) while every functional check
+passes; that is the sanitizer's allocator, not the bound. TSan `nift`:
+`host_deps.py` 198/198 (async/thread worker merging, D3), 0 reports. ASan and
+TSan cannot run under `RLIMIT_AS`, so these runs used scratch copies of the
+suites with only the `ulimit -v`/`RLIMIT_AS` lines removed and
+`hard_rss_limit_mb=3072` as the memory bound; disk limits and timeouts were
+kept and the committed suites are unchanged.
+
+**Dependency record.** The fixes add no parallel mechanism: worker reads,
+copy sources, `page(x)` members and failed reads all go into the existing
+page-info observation record (`dependencies`, snapshots, `absent`, and the
+`unreadable` section of the same record); build-write ownership reads the
+existing tracked-output index and records nothing.
+
+**Still open** (unchanged by the rebase): F1–F12 above; the Windows half of
+the capture bound was not compiled; `make certify`, macOS/Windows and the
+regression suite are not run here. The new fatal/recoverable messages of this
+checkpoint (read limit, build-write refusals, `io.move_failed`) have no cases
+in CP13's diagnostic corpus (`tests/runtime2/diagnostics/`, code table): the
+codes are set in the source, but the corpus does not pin them yet (CP13 phase
+B or a follow-up). The CP16 fixture patch
+(`docs/runtime-2/evidence/feature-host-deps/cp16-fixtures-recaptured.patch`)
+was not re-applied to the current CP16 branch.
 
 ## 6. Note for CP16
 
