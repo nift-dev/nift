@@ -13,6 +13,8 @@
 #include <cerrno>
 #include <csignal>
 #include <cstring>
+#include "ProcessPOSIX.h"  // nift_process_launch_mutex
+
 #include <dirent.h>
 #include <poll.h>
 #include <sys/syscall.h>
@@ -147,9 +149,32 @@ void report_cleanup_failure(const std::string& line) {
 TestHooks& test_hooks() { static TestHooks h; return h; }
 #endif
 
+void test_event(const void* group, const char* what, long a, long b, long c, const char* detail) {
+#ifdef NIFT_HOST_TEST_HOOKS
+    auto& h = test_hooks();
+    if (!h.record.load()) return;
+    std::lock_guard<std::mutex> lock(h.log_mutex);
+    h.log.push_back(EventRecord{Clock::now(), group, what, a, b, c, detail});
+#else
+    (void)group; (void)what; (void)a; (void)b; (void)c; (void)detail;
+#endif
+}
+
+int host_kill(long target, int sig, const char* site, const void* group) {
+    if (sig != 0) test_event(group, "signal", target, sig, 0, site);  // a = target (<0: group), b = signal
+#ifndef _WIN32
+    return ::kill(static_cast<pid_t>(target), sig);
+#else
+    (void)target; (void)sig;
+    return -1;
+#endif
+}
+
 // ---------------------------------------------------------------- host loop
 #ifndef _WIN32
 namespace {
+std::atomic<int> g_loop_wake_fd{-1};
+std::atomic<bool> g_sigchld{false};
 struct LoopState {
     std::mutex mutex;
     std::multimap<Clock::time_point, TaskId> timers;
@@ -213,6 +238,7 @@ void loop_thread() {
             }
         }
         for (auto& fn : due) if (fn) fn();
+        if (g_sigchld.exchange(false)) reap_adopted_orphans();
     }
 }
 
@@ -226,6 +252,7 @@ void loop_start_locked(LoopState& l) {
     }
     l.wake[0] = fds[0];
     l.wake[1] = fds[1];
+    g_loop_wake_fd = fds[1];
     l.started = true;
     std::thread(loop_thread).detach();
 }
@@ -445,6 +472,53 @@ void note_detached_session(long sid) {
     detached_sessions().insert(sid);
 }
 
+namespace {
+std::mutex& managed_mutex() { static std::mutex m; return m; }
+std::set<long>& managed_pgids() { static auto* s = new std::set<long>; return *s; }
+} // namespace
+
+void note_managed_pgid(long pgid) {
+    if (pgid <= 0) return;
+    std::lock_guard<std::mutex> lock(managed_mutex());
+    managed_pgids().insert(pgid);
+}
+
+std::size_t reap_adopted_orphans() {
+#ifdef __linux__
+    // A stage that exits between fork() and its registration in the index
+    // must not be taken for an orphan: launches hold this mutex across both.
+    std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
+    const long self = static_cast<long>(::getpid());
+    const long own_session = static_cast<long>(::getsid(0));
+    std::set<long> stages;
+    for (const auto& g : index_snapshot()) for (long p : g.stage_pids) stages.insert(p);
+    const auto all = proc_scan();
+    std::size_t reaped = 0;
+    std::lock_guard<std::mutex> lock(managed_mutex());
+    auto& known = managed_pgids();
+    for (const auto& p : all) {
+        if (p.ppid != self || p.state != 'Z' || stages.count(p.pid)) continue;
+        const bool ours = known.count(p.pgrp) || p.session != own_session;
+        if (!ours) continue;  // another component's child (legacy run(), job control): theirs to wait for
+        int status = 0;
+        if (::waitpid(static_cast<pid_t>(p.pid), &status, WNOHANG) == static_cast<pid_t>(p.pid)) {
+            ++reaped;
+            test_event(nullptr, "orphan-reap", p.pid, p.pgrp, status);
+        }
+    }
+    // Forget groups that no longer exist, so a reused pgid of other code is never claimed.
+    std::set<long> present;
+    for (const auto& p : all) present.insert(p.pgrp);
+    for (auto it = known.begin(); it != known.end();) {
+        if (!present.count(*it)) it = known.erase(it);
+        else ++it;
+    }
+    return reaped;
+#else
+    return 0;
+#endif
+}
+
 #ifndef _WIN32
 namespace {
 bool group_alive(const IndexedGroup& g) {
@@ -463,14 +537,14 @@ std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait) {
     std::vector<IndexedGroup> groups;
     for (auto& g : index_snapshot())
         if (!g.detached && g.pgid > 0 && group_alive(g)) groups.push_back(g);
-    for (const auto& g : groups) ::kill(-static_cast<pid_t>(g.pgid), SIGTERM);
+    for (const auto& g : groups) host_kill(-g.pgid, SIGTERM, "c2-term", nullptr);
     auto any_alive = [&] {
         for (const auto& g : groups) if (group_alive(g)) return true;
         return false;
     };
     sleep_until_or(Clock::now() + kill_after, [&] { return !any_alive(); });
     for (const auto& g : groups)
-        if (group_alive(g)) ::kill(-static_cast<pid_t>(g.pgid), SIGKILL);
+        if (group_alive(g)) host_kill(-g.pgid, SIGKILL, "c2-kill", nullptr);
     sleep_until_or(Clock::now() + post_kill_wait, [&] { return !any_alive(); });
     return groups.size();
 }
@@ -587,12 +661,42 @@ void uninstall_signal_cleanup() {
 // ---------------------------------------------------------------- subreaper / orphans
 namespace { std::atomic<bool> g_subreaper{false}; }
 
+#ifdef __linux__
+namespace {
+struct sigaction g_old_chld;
+extern "C" void nift_host_sigchld(int signo, siginfo_t* info, void* context) {
+    const int saved = errno;
+    g_sigchld.store(true);
+    const int fd = g_loop_wake_fd.load();
+    if (fd >= 0) { const char byte = 2; ssize_t ignored = ::write(fd, &byte, 1); (void)ignored; }
+    // Chain whatever was installed before (never change other code's SIGCHLD semantics).
+    if (g_old_chld.sa_flags & SA_SIGINFO) { if (g_old_chld.sa_sigaction) g_old_chld.sa_sigaction(signo, info, context); }
+    else if (g_old_chld.sa_handler != SIG_DFL && g_old_chld.sa_handler != SIG_IGN && g_old_chld.sa_handler) g_old_chld.sa_handler(signo);
+    errno = saved;
+}
+} // namespace
+#endif
+
 bool enable_subreaper() {
 #ifdef __linux__
     if (g_subreaper) return true;
-    if (::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) == 0) { g_subreaper = true; return true; }
-#endif
+    if (::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0) return false;
+    g_subreaper = true;
+    // Adopted orphans become our children: reap them when they exit (no
+    // zombies while Nift lives). SIGCHLD only wakes the host loop.
+    loop_at(Clock::now(), [] {});  // make sure the loop (and its wake pipe) exists
+    struct sigaction current {};
+    ::sigaction(SIGCHLD, nullptr, &current);
+    if (!(current.sa_flags & SA_SIGINFO) && current.sa_handler == SIG_IGN) return true;  // children auto-reaped already
+    struct sigaction sa {};
+    sa.sa_sigaction = nift_host_sigchld;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NOCLDSTOP;
+    ::sigaction(SIGCHLD, &sa, &g_old_chld);
+    return true;
+#else
     return false;
+#endif
 }
 bool subreaper_enabled() { return g_subreaper; }
 
@@ -620,7 +724,7 @@ std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::f
     }
     for (long pid : zombies) { int st; ::waitpid(static_cast<pid_t>(pid), &st, WNOHANG); }
     if (orphans.empty()) return 0;
-    for (long pid : orphans) ::kill(static_cast<pid_t>(pid), SIGTERM);
+    for (long pid : orphans) host_kill(pid, SIGTERM, "sweep-term", nullptr);
     std::set<long> left(orphans.begin(), orphans.end());
     auto reap = [&] {
         for (auto it = left.begin(); it != left.end();) {
@@ -632,7 +736,7 @@ std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::f
         return left.empty();
     };
     sleep_until_or(Clock::now() + kill_after, reap);
-    for (long pid : left) ::kill(static_cast<pid_t>(pid), SIGKILL);
+    for (long pid : left) host_kill(pid, SIGKILL, "sweep-kill", nullptr);
     sleep_until_or(Clock::now() + post_kill_wait, reap);
     for (long pid : left) reaper_add_pid(pid);
     return orphans.size();

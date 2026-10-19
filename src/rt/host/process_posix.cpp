@@ -348,7 +348,7 @@ void send_signal(State& s, int sig) {
     if (s.scope == CancelScope::Child) {
         if (s.child_stage < s.st.size()) {
             const auto& stage = s.st[s.child_stage];
-            if (stage.pid > 0 && !stage.reaped && !(sig == SIGKILL && kill_suppressed_for_test())) ::kill(stage.pid, sig);  // unreaped: no pid reuse
+            if (stage.pid > 0 && !stage.reaped && !(sig == SIGKILL && kill_suppressed_for_test())) runtime::host_kill(stage.pid, sig, "child", &s);  // unreaped: no pid reuse
         }
         return;
     }
@@ -358,8 +358,8 @@ void send_signal(State& s, int sig) {
     std::vector<long> tree;
     if (s.scope == CancelScope::Tree) tree = runtime::proc_descendants(s.unreaped_pids());
     if (sig == SIGKILL && kill_suppressed_for_test()) return;
-    if (s.pgid > 0 && (!s.all_reaped() || group_has_members(s))) ::kill(-s.pgid, sig);
-    for (long pid : tree) ::kill(static_cast<pid_t>(pid), sig);
+    if (s.pgid > 0 && (!s.all_reaped() || group_has_members(s))) runtime::host_kill(-s.pgid, sig, "pipeline", &s);
+    for (long pid : tree) runtime::host_kill(pid, sig, "tree", &s);
 }
 
 void close_stdin_end(State& s) {
@@ -381,6 +381,7 @@ void begin_cancel(State& s, CancelScope scope, CancelReason reason, Millis kill_
     if (reason == CancelReason::Cleanup || reason == CancelReason::Abandoned) s.waiting = true;  // unread output is discarded
     if (scope != CancelScope::Child) close_stdin_end(s);  // a child blocked reading stdin sees EOF
     s.phase_at = Clock::now();
+    runtime::test_event(&s, "cancel", s.pgid, static_cast<long>(reason), static_cast<long>(scope));
     if (kill_after.count() <= 0) {
         send_signal(s, SIGKILL);
         s.phase = State::Phase::Kill;
@@ -391,6 +392,7 @@ void begin_cancel(State& s, CancelScope scope, CancelReason reason, Millis kill_
 }
 
 void record_exit(StageRt& stage, int status) {
+    runtime::test_event(nullptr, "reap", stage.pid, status, 0, WIFSIGNALED(status) ? "signaled" : "exited");  // a = pid, b = wait status
     stage.reaped = true;
     if (stage.pidfd >= 0) { ::close(stage.pidfd); stage.pidfd = -1; }
     auto& r = stage.result;
@@ -443,7 +445,7 @@ void drain(State& s, int& fd, Buffer& b, bool is_out) {
         }
         ssize_t n;
         do { n = ::read(fd, chunk, room); } while (n < 0 && errno == EINTR);
-        if (n == 0) { close_fd(fd); return; }
+        if (n == 0) { runtime::test_event(&s, "eof", s.pgid, is_out ? 1 : 2); close_fd(fd); return; }  // b: 1 stdout, 2 stderr
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) return;
             close_fd(fd);  // EIO etc.: treat as EOF
@@ -594,6 +596,7 @@ void finish(State& s, const void* key) {
     s.out = Buffer();
     s.err = Buffer();
     s.finished = true;
+    runtime::test_event(&s, "finish", s.pgid, static_cast<long>(r.state), 0, group_state_name(r.state));
     runtime::index_remove(key);
 }
 
@@ -641,6 +644,7 @@ bool step(State& s, const void* key) {
         const bool members = group_has_members(s);
         if (!s.leftover_started) {
             s.leftover_started = true;
+            runtime::test_event(&s, "pipe-leftover", s.pgid, members ? 1 : 0);
             if (members && s.phase == State::Phase::None)
                 begin_cancel(s, CancelScope::Pipeline, CancelReason::Leftover, s.req.kill_after);
         }
@@ -908,6 +912,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
             if (want_handoff && i == 0) ::tcsetpgrp(STDIN_FILENO, pid);
         }
         auto& stage = s.st[i];
+        runtime::test_event(&s, "spawn", stage_pid, s.pgid, static_cast<long>(i), "");  // a = pid, b = pgid, c = stage
         stage.pid = stage_pid;
         stage.result.pid = stage_pid;
         stage.result.launched = stage_pid > 0;
@@ -936,6 +941,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
         if (link[1] >= 0) ::close(link[1]);
         prev_read = link[0];
         runtime::index_add(key, runtime::IndexedGroup{s.pgid, s.unreaped_pids(), detached});
+        runtime::note_managed_pgid(s.pgid);
     }
     if (prev_read >= 0) ::close(prev_read);
     // The child ends live only in the children now.
@@ -1010,7 +1016,8 @@ bool leftover_step(State& s) {
 #ifdef __linux__
         s.left_members = runtime::proc_group_members(s.pgid, static_cast<long>(::getsid(0)));
 #endif
-        ::kill(-s.pgid, SIGTERM);
+        runtime::test_event(&s, "leftover-start", s.pgid, static_cast<long>(s.left_members.size()));
+        runtime::host_kill(-s.pgid, SIGTERM, "leftover-term", &s);
         s.left_phase = State::Phase::Term;
         s.left_at = now;
         return false;
@@ -1018,7 +1025,7 @@ bool leftover_step(State& s) {
     if (!members) {
         s.left_phase = State::Phase::Done;
     } else if (s.left_phase == State::Phase::Term && now >= s.left_at + s.req.kill_after) {
-        if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL);
+        if (!kill_suppressed_for_test()) runtime::host_kill(-s.pgid, SIGKILL, "leftover-kill", &s);
         s.left_phase = State::Phase::Kill;
         s.left_at = now;
     } else if (s.left_phase == State::Phase::Kill && now >= s.left_at + s.req.post_kill_wait) {
@@ -1037,7 +1044,7 @@ bool detached_step(State& s) {
     const auto now = Clock::now();
     if (!group_has_members(s)) { s.phase = State::Phase::Done; return true; }
     if (s.phase == State::Phase::Term && now >= s.phase_at + s.kill_after) {
-        if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL);
+        if (!kill_suppressed_for_test()) runtime::host_kill(-s.pgid, SIGKILL, "detached-kill", &s);
         s.phase = State::Phase::Kill;
         s.phase_at = now;
     } else if (s.phase == State::Phase::Kill && now >= s.phase_at + s.req.post_kill_wait) {
@@ -1154,6 +1161,7 @@ void ProcessGroup::timer_tick() {
         runtime::loop_at(Clock::now() + Millis(5), [w] { if (auto g = w.lock()) g->timer_tick(); });
         return;
     }
+    runtime::test_event(&s, "tick", s.pgid, s.finished ? 1 : 0, static_cast<long>(s.phase));
     if (s.detached) detached_step(s);
     else {
         if (!s.finished) run_loop(s, this, lk, Clock::now(), nullptr);
@@ -1196,8 +1204,8 @@ bool ProcessGroup::cancel(CancelScope scope, CancelReason reason, std::optional<
         if (s.phase != State::Phase::None) return true;
         s.kill_after = grace;
         s.phase_at = Clock::now();
-        if (grace.count() <= 0) { if (!kill_suppressed_for_test()) ::kill(-s.pgid, SIGKILL); s.phase = State::Phase::Kill; }
-        else { ::kill(-s.pgid, SIGTERM); s.phase = State::Phase::Term; }
+        if (grace.count() <= 0) { if (!kill_suppressed_for_test()) runtime::host_kill(-s.pgid, SIGKILL, "detached-cancel", &s); s.phase = State::Phase::Kill; }
+        else { runtime::host_kill(-s.pgid, SIGTERM, "detached-cancel", &s); s.phase = State::Phase::Term; }
         return true;
     }
     if (s.finished) return false;

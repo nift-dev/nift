@@ -50,6 +50,30 @@ std::string new_tag() {
     return tag;
 }
 
+// Reads /proc/<pid>/environ. A process inside execve() briefly has an empty
+// environ (the new address space is installed before its environment area is
+// set up): such a read is retried until it is stable, so a test process is
+// never missed (a missed process would turn an orphan check into a false pass;
+// stress evidence in cp16-host-ops-impl.md §7).
+std::string read_environ(long pid) {
+    const std::string path = "/proc/" + std::to_string(pid) + "/environ";
+    std::string env;
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        env.clear();
+        const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (fd < 0) return env;  // gone
+        char buf[4096];
+        ssize_t n;
+        while ((n = ::read(fd, buf, sizeof buf)) > 0) env.append(buf, static_cast<std::size_t>(n));
+        ::close(fd);
+        if (!env.empty()) return env;
+        runtime::ProcInfo info;
+        if (!runtime::proc_read(pid, info) || info.state == 'Z' || info.state == 'X') return env;
+        std::this_thread::sleep_for(std::chrono::microseconds(500));  // mid-exec (or a truly empty environment): look again
+    }
+    return env;
+}
+
 std::vector<long> tagged(const std::string& tag) {
     std::vector<long> out;
     const std::string needle = "NIFT_TEST_PROC_TAG=" + tag;
@@ -60,14 +84,8 @@ std::vector<long> tagged(const std::string& tag) {
         const long pid = std::strtol(e->d_name, nullptr, 10);
         runtime::ProcInfo info;
         if (!runtime::proc_read(pid, info) || info.state == 'Z') continue;
-        const std::string path = std::string("/proc/") + e->d_name + "/environ";
-        const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
-        if (fd < 0) continue;
-        std::string env;
-        char buf[4096];
-        ssize_t n;
-        while ((n = ::read(fd, buf, sizeof buf)) > 0) env.append(buf, static_cast<std::size_t>(n));
-        ::close(fd);
+        if (pid == 2 || info.ppid == 2) continue;  // kernel threads have no environment
+        const std::string env = read_environ(pid);
         std::size_t start = 0;
         while (start < env.size()) {
             const std::size_t end = env.find('\0', start);
@@ -483,7 +501,18 @@ void capture_limit_loud() {
     CHECK(none_tagged(tag));
 }
 
+void dump_events(Clock::time_point since) {
+    auto& h = runtime::test_hooks();
+    std::lock_guard<std::mutex> lock(h.log_mutex);
+    for (const auto& e : h.log) {
+        if (e.at < since) continue;
+        std::printf("  +%8.3f ms %-15s group=%p a=%ld b=%ld c=%ld %s\n",
+                    std::chrono::duration<double, std::milli>(e.at - since).count(), e.what, e.group, e.a, e.b, e.c, e.detail);
+    }
+}
+
 void leftovers_c1_and_holders() {
+    const auto t_start = Clock::now() - milliseconds(3000);  // include late events of earlier tests
     const std::string tag = new_tag();
     // FileCapture (legacy): run() returns after the stage; the background
     // descendant stays alive until the context ends, then is terminated silently.
@@ -493,7 +522,30 @@ void leftovers_c1_and_holders() {
     CHECK(r.out == "started\n" && ms_since(t0) < 2000);
     {
         const auto left = tagged(tag);
-        if (left.size() != 1) for (long p : left) { runtime::ProcInfo i; runtime::proc_read(p, i); std::printf("left %ld state %c ppid %ld pgrp %ld\n", p, i.state, i.ppid, i.pgrp); }
+        if (left.size() != 1) {
+            std::printf("left count %zu; sh: state %s exit %d signal %d; pgid %ld\n", left.size(), stage_state_name(r.stages[0].state),
+                        r.exit_code, r.stages[0].signal, g->pgid());
+            for (long p : left) { runtime::ProcInfo i; runtime::proc_read(p, i); std::printf("left %ld state %c ppid %ld pgrp %ld\n", p, i.state, i.ppid, i.pgrp); }
+            dump_events(t_start);
+            for (long m : runtime::proc_group_members(g->pgid(), -1)) {
+                runtime::ProcInfo i;
+                runtime::proc_read(m, i);
+                auto slurp = [](const std::string& path) {
+                    std::string out; char buf[4096]; ssize_t n;
+                    const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+                    if (fd < 0) return std::string("<open failed>");
+                    while ((n = ::read(fd, buf, sizeof buf)) > 0) out.append(buf, static_cast<std::size_t>(n));
+                    ::close(fd);
+                    return out;
+                };
+                std::string cmd = slurp("/proc/" + std::to_string(m) + "/cmdline");
+                for (auto& ch : cmd) if (ch == '\0') ch = ' ';
+                std::printf("  member %ld state %c ppid %ld cmdline [%s] environ %zu bytes\n", m, i.state, i.ppid, cmd.c_str(),
+                            slurp("/proc/" + std::to_string(m) + "/environ").size());
+            }
+            std::this_thread::sleep_for(milliseconds(50));
+            std::printf("  rescan after 50 ms: %zu tagged\n", tagged(tag).size());
+        }
         CHECK(left.size() == 1);  // the sleep survives the call (§11.3 row 1)
     }
     std::vector<std::string> warnings;
@@ -822,6 +874,38 @@ void escapees_subreaper() {
     CHECK(zombie_children() == 0);
 }
 
+// Regression (stress finding 2): under the subreaper, an adopted orphan that
+// exits is reaped at once (SIGCHLD wakes the host loop), while a child of
+// other code in Nift's own session and group is never taken from its owner.
+void subreaper_reaps_orphans() {
+    if (!runtime::enable_subreaper()) { std::printf("subreaper_reaps_orphans: SKIPPED\n"); return; }
+    const std::string tag = new_tag();
+    auto g = start_ok(req({"sh", "-c", "sleep 0.3 &"}, OutputMode::FileCapture, tag));
+    g->wait();
+    long orphan = -1;
+    CHECK(wait_until([&] {
+        auto pids = tagged(tag);
+        if (pids.size() != 1) return false;
+        runtime::ProcInfo info;
+        if (!runtime::proc_read(pids[0], info) || info.ppid != ::getpid()) return false;
+        orphan = pids[0];
+        return true;
+    }, milliseconds(1000)));  // adopted by Nift
+    // no Host call from here on: only the host loop can reap it
+    CHECK(none_tagged(tag, milliseconds(2000)));
+    CHECK(wait_until([&] {
+        runtime::ProcInfo info;
+        return !runtime::proc_read(orphan, info);  // gone from /proc = reaped (a zombie would still be listed)
+    }, milliseconds(1000)));
+    CHECK(zombie_children() == 0);
+    // a foreign child (same session, Nift's own group): left for its owner
+    const pid_t foreign = ::fork();
+    if (foreign == 0) ::_exit(7);
+    std::this_thread::sleep_for(milliseconds(300));  // SIGCHLD has woken the loop by now
+    int status = 0;
+    CHECK(::waitpid(foreign, &status, 0) == foreign && WIFEXITED(status) && WEXITSTATUS(status) == 7);
+}
+
 // ---- D-034 ----
 ProcessResult run_opts(OptionObject opts, std::vector<std::string> argv, const std::string& tag, std::uint64_t limit = 1u << 30) {
     RunOptions o;
@@ -1069,6 +1153,8 @@ void cleanup_failures_reported() {
 
 int main(int argc, char** argv) {
     kSelf = argv[0];
+    runtime::test_hooks().record = true;  // diagnostics: event trace (printed on failure)
+
     if (argc == 4 && std::strcmp(argv[1], "--c2-child") == 0) return c2_child(argv[2], argv[3]);
     if (argc == 3 && std::strcmp(argv[1], "--pdeath-child") == 0) return pdeath_child(argv[2]);
     const std::string only = argc > 1 ? argv[1] : "";
@@ -1098,15 +1184,29 @@ int main(int argc, char** argv) {
         {"cleanup_failures_reported", cleanup_failures_reported},
         {"sigterm_to_nift_c2", sigterm_to_nift_c2},
         {"sigkill_pdeathsig_linux", sigkill_pdeathsig_linux},
-        {"escapees_subreaper", escapees_subreaper},  // last: enables the subreaper for the rest of the process
+        {"escapees_subreaper", escapees_subreaper},  // enables the subreaper for the rest of the process
+        {"subreaper_reaps_orphans", subreaper_reaps_orphans},
     };
+    // Stress: CP16_REPEAT=N runs the selection N times (the signal log is reset per round).
+    const char* repeat_env = std::getenv("CP16_REPEAT");
+    const int rounds = repeat_env ? std::max(1, std::atoi(repeat_env)) : 1;
+    for (int round = 0; round < rounds; ++round) {
+    bool first = true;
     for (const auto& t : tests) {
         if (!only.empty() && only != t.name) continue;
+        if (rounds > 1 && first) {
+            auto& h = runtime::test_hooks();
+            std::lock_guard<std::mutex> lock(h.log_mutex);
+            h.log.clear();
+            std::printf("--- round %d\n", round + 1);
+        }
+        first = false;
         const long before = rt_test::failures();
         const auto t0 = Clock::now();
         t.fn();
         std::printf("%-28s %s (%.0f ms)\n", t.name, rt_test::failures() == before ? "ok" : "FAILED", ms_since(t0));
         std::fflush(stdout);
+    }
     }
     return rt_test::finish("host-process-unit");
 }

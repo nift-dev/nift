@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -71,9 +72,28 @@ bool reaper_wait_idle(Millis bound);
 
 // ---- test hooks (only with -DNIFT_HOST_TEST_HOOKS; never user-controllable) ----
 #ifdef NIFT_HOST_TEST_HOOKS
-struct TestHooks { std::atomic<bool> suppress_sigkill{false}; };
+// Event trace for diagnosing OS-level ordering (monotonic timestamps, pids,
+// pgids, signals sent, pipe EOFs, reaps, state transitions).
+struct EventRecord {
+    Clock::time_point at;
+    const void* group;
+    const char* what;   // spawn, signal, eof, reap, cancel, finish, tick, ...
+    long a, b, c;       // meaning per event (documented at the call sites)
+    const char* detail;
+};
+struct TestHooks {
+    std::atomic<bool> suppress_sigkill{false};
+    std::atomic<bool> record{false};
+    std::mutex log_mutex;
+    std::vector<EventRecord> log;
+};
 TestHooks& test_hooks();
 #endif
+// Records one event in the test build (no-op otherwise).
+void test_event(const void* group, const char* what, long a = 0, long b = 0, long c = 0, const char* detail = "");
+// Every signal the Host layer sends goes through here (target < 0: a process
+// group), so the test build can record it.
+int host_kill(long target, int sig, const char* site, const void* group);
 
 // ---- termination index (not ownership) ----
 struct IndexedGroup { long pgid = -1; std::vector<long> stage_pids; bool detached = false; };
@@ -121,6 +141,15 @@ bool subreaper_enabled();
 std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait,
                           const std::function<bool(long pid)>& foreign = nullptr);
 void note_detached_session(long sid);
+// Every process group the Host layer creates is noted, so adopted orphans
+// can be told apart from children launched by other code.
+void note_managed_pgid(long pgid);
+// Reaps zombie children that are adopted orphans (under the subreaper): a
+// process group Nift created, or a session other than Nift's (escapees,
+// detached sessions). Never an unreaped stage of a live group, never a
+// child of other code in Nift's own session and groups (no waitpid(-1)).
+// Runs on the host loop after SIGCHLD; returns how many were reaped.
+std::size_t reap_adopted_orphans();
 
 // ---- /proc helpers (Linux; empty elsewhere) ----
 struct ProcInfo { long pid = 0; char state = '?'; long ppid = 0; long pgrp = 0; long session = 0; };
