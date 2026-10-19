@@ -18,22 +18,41 @@ TerminationCause cause_of(ReleaseReason reason) {
 }
 
 std::uint64_t LifecycleStore::add(HandleKind kind, const Value& handle, ContextId owner) {
-    const std::uint64_t id = next_++;
-    LifeRecord& r = records_[id];
+    std::uint64_t id;
+    if (!free_.empty()) {
+        id = free_.back();
+        free_.pop_back();
+    } else {
+        records_.emplace_back();
+        id = records_.size();
+    }
+    LifeRecord& r = records_[id - 1];
+    r = LifeRecord();
     r.kind = kind;
     r.handle = handle;
     r.owner = owner;
+    r.in_use = true;
+    ++live_;
     return id;
 }
 
 LifeRecord* LifecycleStore::find(std::uint64_t id) {
-    const auto it = records_.find(id);
-    return it == records_.end() ? nullptr : &it->second;
+    if (id == 0 || id > records_.size() || !records_[id - 1].in_use) return nullptr;
+    return &records_[id - 1];
 }
 
 const LifeRecord* LifecycleStore::find(std::uint64_t id) const {
-    const auto it = records_.find(id);
-    return it == records_.end() ? nullptr : &it->second;
+    if (id == 0 || id > records_.size() || !records_[id - 1].in_use) return nullptr;
+    return &records_[id - 1];
+}
+
+void LifecycleStore::erase(std::uint64_t id) {
+    LifeRecord* r = find(id);
+    if (!r) return;
+    r->in_use = false;
+    r->handle = Value();
+    free_.push_back(id);
+    --live_;
 }
 
 LifeState settled_state(CleanupOutcome::Result result) {

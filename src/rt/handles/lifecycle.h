@@ -7,7 +7,7 @@
 #include "rt/handles/types.h"
 
 #include <cstdint>
-#include <unordered_map>
+#include <vector>
 
 namespace nift::rt::handles {
 
@@ -21,6 +21,7 @@ struct LifeRecord {
     bool slot_live = true;            // the handle is still open
     bool obligation = false;          // closed but not yet settled: the owner must wait for it
     bool ticket_issued = false;
+    bool in_use = false;              // pool bookkeeping
 };
 
 bool is_settled(LifeState state);
@@ -28,21 +29,25 @@ TerminationCause cause_of(ReleaseReason reason);
 // The settled state an outcome reports (Pending as a final report: Lost).
 LifeState settled_state(CleanupOutcome::Result result);
 
+// A pool of records; ids are pool index + 1 (0 = none). Reusing an id is safe:
+// a record is erased only after it settled and its slot was given up, and the
+// single ticket ever issued for it is spent by then (complete() empties it).
 class LifecycleStore {
 public:
     std::uint64_t add(HandleKind kind, const Value& handle, ContextId owner);
     LifeRecord* find(std::uint64_t id);
     const LifeRecord* find(std::uint64_t id) const;
-    void erase(std::uint64_t id) { records_.erase(id); }
-    std::size_t size() const { return records_.size(); }
+    void erase(std::uint64_t id);
+    std::size_t size() const { return live_; }
     // Applies a final outcome to an unsettled record. Returns false when the
     // record is already settled. Fills `failure` (and sets `failed`) for
     // Failed/Lost, with default codes and messages where the reporter gave none.
     static bool settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed);
 
 private:
-    std::unordered_map<std::uint64_t, LifeRecord> records_;
-    std::uint64_t next_ = 1;
+    std::vector<LifeRecord> records_;
+    std::vector<std::uint64_t> free_;
+    std::size_t live_ = 0;
 };
 
 } // namespace nift::rt::handles
