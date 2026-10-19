@@ -15,8 +15,18 @@ bool is_comparison(const Node& n) {
     }
 }
 
+// Receivers a member, index or method link may follow. CP12 phase B adds call
+// results and array/object/string literals: CP10 admits a chain on them only
+// in the shapes legacy dispatches (links from a plain name, links on array
+// and object literals, known methods on other receivers; everything else is
+// Opaque), and legacy evaluates those shapes like any other receiver, in every
+// context (cp12b-resolver.md, "Chained postfix").
 bool is_receiver(NodeKind kind) {
-    return kind == NodeKind::Ident || kind == NodeKind::Member || kind == NodeKind::Index;
+    switch (kind) {
+        case NodeKind::Ident: case NodeKind::Member: case NodeKind::Index:
+        case NodeKind::Call: case NodeKind::Array: case NodeKind::Object: case NodeKind::String: return true;
+        default: return false;
+    }
 }
 
 } // namespace
@@ -31,6 +41,14 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     if (left.end >= src.size() || src[left.end] != expected) return fail(node, "postfix-spelling");
     if (node.kind == NodeKind::Member && ast_.at(node.b).begin != left.end + 1) return fail(node, "postfix-spelling");
     if (node.kind != NodeKind::Call && !is_receiver(left.kind)) return fail(node, "postfix-receiver");
+    // A member read (not a method's callee: no `(` follows) on a call result
+    // or literal: legacy's missing-member message depends on the receiver's
+    // shape and on the context ("JSON value 'f()' has no member 'k'" in
+    // textual code, "value has no member: k" in loop code), so it is not
+    // compiled (language-consistency L41).
+    const bool path = left.kind == NodeKind::Ident || left.kind == NodeKind::Member || left.kind == NodeKind::Index;
+    if (node.kind == NodeKind::Member && !path && (node.end >= src.size() || src[node.end] != '('))
+        return fail(node, "postfix-receiver:member");
     return true;
 }
 
