@@ -356,12 +356,17 @@ with its CP12 dependency:
    F1–F3 built-in, except the documented W-rules. "Per-builtin instruction
    guards": see below.
 
-## Wiring (speculative integration, branch `spec-integration`)
+## Wiring (branch `spec-integration-cp14`)
 
-Done on `spec-integration` (local, never pushed), **speculative, base CP12
-`6c144bb`** (CP12 tip under certification: `runtime-2` @`8957559` + the CP12
-commits incl. the CP09 memcpy fix `547614f`). Integrated by the single
-integration owner after CP12 freezes; disposable until CP12 certifies.
+Done by the single integration owner, first speculatively on CP12's tip
+`6c144bb` while CP12 was in certification (the results below were measured
+there), then rebased onto **`runtime-2` @`bd1c8a9`** (CP12 certified,
+@`ebc2656`; it differs from `6c144bb` only by feature-serve, the CP09
+`inline_text` memcpy fix, two test-harness fixes and docs; CP12's code is
+unchanged). Branch `spec-integration-cp14` (local, never pushed) is the CP14
+unit proposed for certification; CP13, CP15 and the records20k work follow on
+`spec-integration`. The certification-base gate runs are in "Certification
+base runs" below.
 
 | Step | Where | What was done |
 | --- | --- | --- |
@@ -419,6 +424,36 @@ construct still refused (F4/F5 methods `sort_by` 19, `map` 9, `sort` 2;
 built-in coverage is carried by `vm_builtins.py` and the supported generator
 (built-in calls in ~every program, 100 % on the VM apart from the two CP12
 cases above). No corpus program falls back with a `builtin*` reason.
+
+### Certification base runs (`spec-integration-cp14` on `runtime-2` `bd1c8a9`)
+
+2026-10-19, `nice make -j1` through `heavy.sh`, every step under the D-031
+limits (`ulimit -f`, `ulimit -v` except ASan steps, `timeout`, own session):
+
+| Gate | Result |
+| --- | --- |
+| `make test-rt-builtins` | unit, differential (seed 20261018, 5,000), isolation, rt-lint, pinned probe: PASS |
+| `make test-rt-builtins-sanitize` / `-guards` | 634 + 1,994 checks, 0 failures / 25 workloads, 0 guard failures |
+| `make test-rt-vm` (default seed 1) | PASS: rt-diff 0 differing; adversarial 37,449, 0 non-approved; supported generator 500/500 (built-in calls 9,474, 30 distinct; narrowed 6); unsupported 500/500; built-ins, known-refused and every other step PASS |
+| `RT_VM_SEED=2 make test-rt-vm` | PASS: adversarial 37,449, 0 non-approved; supported generator 500/500 (narrowed 3); unsupported 500/500 |
+| `make test-rt-vm-mutants` | unmutated passes, 8/8 mutants rejected |
+| `make test-rt-vm-sanitize` | PASS (ASan+UBSan: unit, parity, adversarial 3,619, subset, generated, built-ins, engine selection, former replay, D-018, context consistency, review, golden, int bounds) |
+| callgrind hot paths | flat call 425, fib 285/call, loop 109, add_local 183, if_branch 244: unchanged |
+
+Generator acceptance and refusal rates (before = CP12's generator and binary
+on this base; after = this unit):
+
+| Generator | Seed | Before | After |
+| --- | ---: | --- | --- |
+| supported subset (500) | 1 | 500 on the VM, 0 refused | 500 on the VM, 0 refused; narrowed shape excluded 6 times |
+| supported subset (500) | 2 | 500 on the VM, 0 refused | 500 on the VM, 0 refused; narrowed shape excluded 3 times |
+| unsupported (500) | 1, 2 | 500/500 refused with the expected reason | 500/500 |
+| general (`vm_gen.py`, 300) | 1 | 72 on the VM (24.0 %); refused: `opaque:irregular-legacy-parse` 192, `prepared-fn-unprepared` 7, `prepared-decl-type` 7, `type:*` 4, `type:%` 4, `type:<` 4, `type:-` 3, `static-error:arity` 2, `type:unary` 2, `context:negative-zero` 1, `type:+` 1, `type:compound-assignment` 1 | identical |
+| general (`vm_gen.py`, 300) | 2 | 68 on the VM (22.7 %); refused: `opaque:irregular-legacy-parse` 187, `prepared-fn-unprepared` 12, `type:-` 9, `type:<` 8, `prepared-decl-type` 7, `type:unary` 3, `context:assignment-type` 1, `type:*` 1, `type:>=` 1, `type:+` 1, `context:string-append-type` 1 | identical |
+
+The general generator emits no built-in calls, so it cannot change; the
+supported generator's "after" programs contain built-in calls (about 19 per
+program) and still run entirely on the VM.
 
 ### Generator narrowing and the known-refused list (coordinator ruling, 2026-10-19)
 
@@ -545,7 +580,7 @@ random doubles and the special values in the unit test.
 | --- | --- |
 | Inventory and family split, legacy and intended semantics, kind rules, guard targets | this record |
 | ≥ 2 families as pure natives with unit, differential and sanitizer tests | F1, F2, F3, F6 (73 entries) |
-| Wiring into compiler/VM; supported/unsupported suites; batch fallback = 0 | speculative wiring on `spec-integration` (base CP12 `6c144bb`), see "Wiring"; final after CP12 certifies |
+| Wiring into compiler/VM; supported/unsupported suites; batch fallback = 0 | wired (branch `spec-integration-cp14` on `runtime-2` `bd1c8a9`), see "Wiring" |
 | Per-builtin instruction guards measured and locked | native level: 25 workloads locked (+10 %); VM-level guards (call overhead through `CallNative`) at wiring |
 | D-015 candidates recorded | Q1–Q14; owner decisions pending for Q1, Q2, Q4, Q6–Q9, Q14 |
 
