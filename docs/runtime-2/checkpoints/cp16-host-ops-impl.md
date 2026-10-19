@@ -373,3 +373,170 @@ after SIGKILL); left to the reaper` (or `... within N ms ...` when a group did
 not settle in time). The same report appears for normal context ends and for
 abandoned handles finished by the reaper. Tested with SIGKILL suppressed by a
 test-only hook (`-DNIFT_HOST_TEST_HOOKS`; not compiled into anything else).
+
+## 7. Investigation: the rare `leftovers_c1_and_holders` failure (closed)
+
+**Symptom.** One failure in about 30 full runs: right after a `FileCapture`
+run of `sh -c "sleep 30 & echo started"`, the test found **0** processes with
+its tag instead of the surviving background `sleep` (C1: it must survive the
+call).
+
+**Instrumentation** (test build only, `-DNIFT_HOST_TEST_HOOKS`): every signal
+the Host layer sends goes through `runtime::host_kill`, and a timestamped
+event trace (`runtime::test_event`, monotonic clock) records spawns (pid,
+pgid), signals (target, signal, call site), pipe EOFs, reaps (pid, wait
+status), cancellations (reason, scope), host-loop ticks and finishes (state).
+On failure the test prints the trace for the last 3 s plus every member of the
+group (`/proc` state, ppid, cmdline, environ size) and rescans 50 ms later.
+`CP16_REPEAT=N` repeats the selection; `stress.sh` runs it under
+`run_contained.sh` (D-031 limits) through `heavy.sh`, with and without two
+CPU burners.
+
+**Reproduced** (before the fix): 2/300 single-test rounds without load, 1/300
+with load, 3/600 in a targeted run. Every captured trace has the same shape:
+
+```
+left count 0; sh: state exited exit 0 signal 0; pgid 30062
+  +3000.382 ms spawn   a=30062 b=30062      (sh: pid 30062, pgid 30062)
+  +3006.260 ms tick
+  +3006.267 ms reap    a=30062 b=0 exited   (sh exited 0)
+  +3006.294 ms finish  b=1 exited
+  member 30063 state S ppid 1 cmdline [sleep 30 ] environ 24056 bytes
+  rescan after 50 ms: 1 tagged
+```
+
+No signal was sent to the group (no `signal` event), `sh` exited normally,
+and the `sleep` was alive, in the group, carrying the tag — the scan missed
+it. **Cause: a test observation race.** The scan ran while the background
+child was inside `execve()`: the new address space is installed before its
+environment area is set up, and `/proc/<pid>/environ` reads empty in that
+window. Not a Host-layer race (no signal, no reap, no state change involved).
+The same race could make `none_tagged()` miss a live process and let an
+orphan check pass falsely.
+
+**Fix (test, strengthened, not weakened).** `read_environ()` re-reads a live,
+non-kernel process whose environ is empty until it is non-empty (bounded,
+0.5 ms steps); no process on this host has a genuinely empty environment.
+Both "exactly one survivor" and "no survivor" checks are now immune to the
+exec window.
+
+**Second finding from the same campaign (Host layer, fixed).** Repeating the
+full suite in one process made every round after the first fail only zombie
+checks (178 failures in 25 rounds without load, 111 in 15 with load). Round 1
+ends by enabling the Linux subreaper; from then on, background descendants
+reparented to Nift stayed zombies until a context end swept them — a breach of
+"never zombies while Nift lives" (§11.9). Fix: when the subreaper is enabled,
+a chained `SIGCHLD` handler wakes the host loop, which reaps zombie children
+that are provably adopted orphans: their process group was created by the Host
+layer, or their session is not Nift's (escapees, detached sessions). Unreaped
+stages of live groups and children of other code in Nift's own session and
+groups (legacy `run()`, job control) are never touched (still no
+`waitpid(-1)`); the scan holds the launch mutex so a stage between `fork()`
+and its registration cannot be mistaken for an orphan; known pgids are
+forgotten once the group is gone. Regression test `subreaper_reaps_orphans`
+(adopted orphan reaped with no further Host call; a foreign `fork()`ed child
+keeps its exit status for its owner) — it fails on a mutant without the
+`SIGCHLD` hookup (orphan left a zombie), passes with the fix.
+
+**Before the fixes** (`stress.sh` through `heavy.sh`, `run_contained.sh` limits):
+
+| Phase | Rounds | Failures |
+|---|---|---|
+| A: `leftovers_c1_and_holders` alone, no load | 300 | 2 (exec window) |
+| B: full suite repeated in one process, no load | 25 | 178 (all zombie checks, rounds 2+) |
+| C: `leftovers_c1_and_holders` alone, 2 CPU burners | 300 | 1 (exec window) |
+| D: full suite repeated, 2 CPU burners | 15 | 111 (all zombie checks, rounds 2+) |
+| targeted, with member diagnostics | 600 | 3 (exec window; traces above) |
+
+**After the fixes — verification status: PENDING.** The same four-phase
+campaign and the ASan/UBSan + TSan runs on the fixed build (commit
+`c3952f5`) are queued in `heavy.sh` behind a priority `make certify`
+(more than 75 minutes at the time of writing); the gate was not bypassed.
+Results land in `/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp16dbg/after.summary` (per-phase logs `after.*.log`) and
+`/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/cp16dbg/san.log`. Evidence available now: the full suite on the fixed build
+(1244 checks, 0 failures, one contained run, no repetition), the orphan
+regression test and its mutant check. Until the campaign reports 0 failures
+in every phase, the flake fix counts as explained but not yet verified under
+stress.
+
+## 8. Lifecycle authority: CP16 reports, CP17 decides (to settle at integration)
+
+Owner rule: CP17 owns handle identity, reference counts, context ownership and
+the authoritative lifecycle state (`Active → Terminating → Completed | Failed |
+Lost`); CP16 owns OS process operations and their outcomes. Exactly one place
+decides "cleanup completed / failed / Lost": **CP17's table**, from facts CP16
+reports once. Interface against CP17 `runtime-2-cp17-dev` @`3cba670` (D-035:
+`CompletionTicket`, `begin_termination`, `LifeState`, `TerminationCause`):
+
+**1. Host-side seam (CP16, no CP17 types in `src/rt/host/`).**
+
+```cpp
+// Set by the binding when the group gets a handle. The process layer calls it
+// without holding the group's lock (the table has its own).
+struct LifecycleSink {
+    virtual ~LifecycleSink() = default;
+    // First time termination starts, whatever starts it (deadline expiry on
+    // the host loop, cancel(), natural exit of every stage, cleanup hook).
+    virtual void terminating(TerminationCause cause) = 0;   // Deadline | Cancel | Exited | Close | Abandoned | ContextEnd
+    // Exactly once, when the group has settled (stages reaped or handed off,
+    // leftover members handled): the OS facts, not a lifecycle verdict.
+    virtual void settled(const OsOutcome& facts) = 0;
+};
+struct OsOutcome {
+    bool all_stages_reaped;          // every stage's exit was observed
+    bool stage_unconfirmed;          // a stage still unreaped after SIGKILL + bound (handed to the reaper)
+    bool members_survived;           // leftover group members still present after SIGKILL + bound
+    std::string detail;              // "process 'x' (pid N) ..." for the report
+};
+void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
+```
+
+**2. Binding (the swap commit; CP16 code that sees both sides).**
+* `terminating(cause)` → `table.begin_termination(handle, Process, cause,
+  ticket)`; the first call while `Active` gets the ticket (kept by the
+  binding), later calls get none — termination happens once.
+* Cleanup hook (`CleanupEvent&`): if `event.ticket` is non-null (the handle
+  was still `Active`: close, last reference, context end), move it into the
+  binding, start the OS sequence (`cancel`/`begin_terminate`) and return
+  `CleanupOutcome::pending()` — never block (D-035). If null (CP16 already
+  started termination and holds the ticket), only release bookkeeping and
+  return `completed()`; the existing ticket decides.
+* `settled(facts)` → `ticket.complete(...)` with this fixed mapping (CP17 may
+  rename the codes): all reaped and nothing survived → `completed()`;
+  `stage_unconfirmed` → `lost("process.lost", detail)` (termination could not
+  be confirmed); `members_survived` (alive after SIGKILL + bound, known to be
+  running) → `failure("process.cleanup_failed", detail)`.
+* Detached processes: detach is a CP17 ownership step; the hook does nothing to
+  the process and completes at once (bookkeeping only); `context_in_build()`
+  (@fbdca07) feeds `RunRequestContext::in_build` so detach in a build is
+  refused before launching.
+* Blocking `run()` calls have no script-visible handle; when a call returns
+  with background members still in its group (C1), the binding registers an
+  uncounted Process resource for the call's context, so the context end runs
+  the same hook (the residue is cleaned up and settled through a ticket like
+  any other).
+
+**3. What moves out of CP16 at the swap (no competing mechanism).**
+
+| CP16 today | After the swap |
+|---|---|
+| `handle_adapter_tmp.*` (stand-in table) | deleted; `handles::HandleTable` |
+| `ProcessGroup::cleanup_failed()`, `GroupState::Lost` used as a verdict | remain OS facts in the result object only; the lifecycle verdict is CP17's `LifeState` |
+| `ContextCleanup::wait()` (one deadline per context end) and its failure list | `close_context()` waits for every obligation (its report is final); CP16 keeps `ContextCleanup` only as the thread-local carrier of the context label and "ended on an error" for the routine warning (CP17's event has neither) |
+| `runtime::report_cleanup_failure` / failure sink | replaced by `CloseReport::failures`, printed by the context-end path after the original error; exit status from `CloseReport::final_exit_status(original)` (D-035: a cleanup failure forces a nonzero exit; an earlier error or 130/143 stays primary) |
+| reaper adoption of abandoned groups | unchanged mechanism (the reaper keeps the group alive and drives it), but completion goes through the moved-out ticket |
+| routine warnings ("still running when … ended", "abandoned while running") | unchanged, CP16's (D-030) |
+
+**4. D-035 items in the swap.** Reference-counted abandonment: started
+(`interactive`) and `detached` handles are created with
+`CreateOptions{counted = true}`; the VM's boxed `HandleRef` drop is the
+`Abandoned` path tested here. Use after close: every process native maps
+CP17's `Closed` status to `runtime.handle_closed`; CP16's
+`process.stdin_closed` stays the error for `write()` after `close_stdin()` on a
+still-open handle. Cleanup failure → nonzero exit: via
+`final_exit_status`, never by CP16 directly.
+
+**5. Open points for integration.** (a) CP17's `CleanupEvent` could carry the
+context's kind/label and whether it ended on an error, which would retire the
+thread-local `ContextCleanup`; (b) whether `members_survived` is `Failed` or
+`Lost` (proposed above: Failed, because the processes are known to be alive).
