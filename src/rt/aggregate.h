@@ -1,5 +1,6 @@
 #pragma once
-// Copy-on-write arrays and insertion-ordered objects (CP09).
+// Copy-on-write aggregates (CP09; D-040): arrays, insertion-ordered objects
+// and struct instances, all with value semantics.
 //
 // Reading never copies. Mutation goes through array_mut/object_mut (or the
 // helpers below), which first make the aggregate unshared: if another Value
@@ -37,8 +38,12 @@ namespace nift::rt {
 
 Value make_array(std::size_t reserve = 0);
 const std::vector<Value>& array_items(const Value& array);
-std::vector<Value>& array_mut(Value& array);  // unshares first
+// Unshares first. Raw storage: the array is conservatively marked as possibly
+// holding identity-bearing values (rt/heap.h); prefer array_set for one slot.
+std::vector<Value>& array_mut(Value& array);
 void array_push(Value& array, Value item);
+// Replaces element `index` (< size); unshares first.
+void array_set(Value& array, std::size_t index, Value item);
 std::size_t array_size(const Value& array);
 
 Value make_object();
@@ -49,7 +54,41 @@ const Value* object_get(const Value& object, Atom key);
 void object_set(Value& object, Atom key, Value value);
 bool object_remove(Value& object, Atom key);
 
-// Makes `value` (Array or Object) uniquely owned; returns true if it cloned.
+// Struct instances (D-040 V9): fields in declaration order (private ones
+// included). struct_add_field is for construction; struct_set replaces an
+// existing field and returns false when the struct has no such field.
+Value make_struct(Atom type_name, std::size_t reserve = 0);
+Atom struct_type(const Value& instance);
+const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
+const Value* struct_get(const Value& instance, Atom field);
+void struct_add_field(Value& instance, Atom field, Value value);
+bool struct_set(Value& instance, Atom field, Value value);
+
+// In-place mutation of nested places (`a[0].push(x)`, `o["k"]["m"] = v`,
+// `s.q.v = 5`): each returns the child slot of an aggregate after making that
+// aggregate unique, so a path is made unique top-down by chaining them and
+// the final write touches no other value. The returned pointer follows the
+// lifetime contract above (any later mutation of the parent invalidates it),
+// and the parent is conservatively marked as possibly holding identity-bearing
+// values, since the caller may store anything into the slot.
+// Null when the index is out of range, the key or field is missing.
+Value* array_slot_mut(Value& array, std::size_t index);
+Value* object_slot_mut(Value& object, Atom key);
+Value* struct_slot_mut(Value& instance, Atom field);
+
+// Makes `value` (Array, Object or Struct) uniquely owned; returns true if it
+// cloned. The clone keeps the identity summary bit.
 bool unshare(Value& value);
+
+// O(1): a callable, a handle, or an aggregate whose identity summary bit is
+// set. False means the value certainly contains no callable or handle, so
+// storing it can never close a cycle (D-040 V16).
+inline bool may_contain_identity(const Value& value) noexcept {
+    switch (value.kind()) {
+        case Kind::Function: case Kind::Handle: return true;
+        case Kind::Array: case Kind::Object: case Kind::Struct: return may_hold_identity(value.heap());
+        default: return false;
+    }
+}
 
 } // namespace nift::rt

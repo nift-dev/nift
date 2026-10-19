@@ -21,6 +21,8 @@ namespace nift::rt {
 class Value;
 Value make_string(std::string_view text);  // rt/string.h; befriended for inline strings
 
+// Order matters: every kind that can carry identity (D-040 V16) sorts at or
+// after Array (rt/aggregate.cpp relies on it for a one-compare fast path).
 enum class Kind : std::uint8_t {
     Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Function, Struct, Handle, Error
 };

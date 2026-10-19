@@ -8,7 +8,8 @@ namespace {
 
 thread_local std::size_t live_bytes = 0;
 
-constexpr std::size_t kMaxGranules = (std::size_t(1) << 24) - 1;
+// 23 bits: bit 7 of counted[2] is the identity summary (rt/heap.h).
+constexpr std::size_t kMaxGranules = (std::size_t(1) << 23) - 1;
 
 // Dynamic storage of a std::string beyond its in-object buffer (libstdc++
 // keeps up to 15 characters inline).
@@ -51,13 +52,14 @@ std::size_t granules_of(std::size_t bytes) {
 
 std::size_t recorded(const HeapObject* object) {
     return std::size_t(object->counted[0]) | (std::size_t(object->counted[1]) << 8) |
-           (std::size_t(object->counted[2]) << 16);
+           (std::size_t(object->counted[2] & ~kMayHoldIdentity) << 16);
 }
 
 void record(HeapObject* object, std::size_t granules) {
     object->counted[0] = static_cast<std::uint8_t>(granules);
     object->counted[1] = static_cast<std::uint8_t>(granules >> 8);
-    object->counted[2] = static_cast<std::uint8_t>(granules >> 16);
+    const unsigned summary = object->counted[2] & kMayHoldIdentity;
+    object->counted[2] = static_cast<std::uint8_t>(((granules >> 16) & 0x7Fu) | summary);
 }
 
 } // namespace

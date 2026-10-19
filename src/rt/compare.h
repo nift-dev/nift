@@ -5,7 +5,9 @@
 //     (1 == 1.0 == "1.00" as a JSON decimal); NaN equals nothing;
 //   * strings and bytes compare bytewise; arrays elementwise; objects as
 //     unordered sets of (key, value) entries; errors structurally;
-//   * functions, structs and handles compare by identity;
+//   * struct instances structurally (D-040 V13): the same struct type and
+//     every field, private fields included, in declaration order;
+//   * functions and handles compare by identity;
 //   * values of different kinds are unequal (`"1" == 1` is false).
 // hash(a) == hash(b) whenever equal(a, b).
 #include "rt/value.h"
@@ -28,5 +30,13 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
 bool compare_relational(const Value& left, const Value& right, int& comparison);
 bool truthy(const Value& value);
 std::uint64_t hash(const Value& value);
+
+// `same(a, b)` (D-040 V18): defined only for identity-bearing values
+// (callables and handles); NotIdentity means at least one operand is an
+// ordinary value, which the caller reports as runtime.type_error ("same:
+// operands must be identity-bearing values"). Never exposes storage sharing.
+enum class Sameness : std::uint8_t { Different, Same, NotIdentity };
+bool identity_bearing(const Value& value) noexcept;
+Sameness same(const Value& left, const Value& right) noexcept;
 
 } // namespace nift::rt

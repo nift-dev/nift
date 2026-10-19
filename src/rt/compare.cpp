@@ -98,8 +98,13 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
         case Kind::Object:
             if (identity && left.heap() == right.heap()) return Shallow::Equal;
             return object_size(left) == object_size(right) ? Shallow::Descend : Shallow::Unequal;
+        case Kind::Struct:
+            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+            return struct_type(left) == struct_type(right) && struct_fields(left).size() == struct_fields(right).size()
+                       ? Shallow::Descend
+                       : Shallow::Unequal;
         case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
-        case Kind::Function: case Kind::Struct: same = left.heap() == right.heap(); break;
+        case Kind::Function: same = left.heap() == right.heap(); break;
         case Kind::Handle:
             same = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                    left.handle_generation() == right.handle_generation();
@@ -140,7 +145,8 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
         EqualFrame& top = open.back();
         const Value& l = *top.left;
         const bool array = l.is(Kind::Array);
-        if (top.next == (array ? array_size(l) : object_size(l))) {
+        const bool instance = l.is(Kind::Struct);
+        if (top.next == (array ? array_size(l) : instance ? struct_fields(l).size() : object_size(l))) {
             open.pop_back();
             continue;
         }
@@ -149,6 +155,11 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
         if (array) {
             a = &array_items(l)[top.next];
             b = &array_items(*top.right)[top.next];
+        } else if (instance) {  // same type: same field order (declaration order)
+            const auto& lf = struct_fields(l)[top.next];
+            const auto& rf = struct_fields(*top.right)[top.next];
+            a = &lf.second;
+            b = lf.first == rf.first ? &rf.second : nullptr;
         } else {
             const auto& entry = object_entries(l)[top.next];
             a = &entry.second;
@@ -227,18 +238,31 @@ struct HashFrame {
     std::uint64_t h;
 };
 
-std::size_t child_count(const Value& v) { return v.is(Kind::Array) ? array_size(v) : object_size(v); }
-
-const Value& child_at(const Value& v, std::size_t i) {
-    return v.is(Kind::Array) ? array_items(v)[i] : object_entries(v)[i].second;
+std::size_t child_count(const Value& v) {
+    if (v.is(Kind::Array)) return array_size(v);
+    return v.is(Kind::Struct) ? struct_fields(v).size() : object_size(v);
 }
 
+const Value& child_at(const Value& v, std::size_t i) {
+    if (v.is(Kind::Array)) return array_items(v)[i];
+    return v.is(Kind::Struct) ? struct_fields(v)[i].second : object_entries(v)[i].second;
+}
+
+// Arrays and structs fold children in order (structs start from the type);
+// objects add one term per entry (order-independent, like equality).
 std::uint64_t combine(const Value& parent, std::size_t i, std::uint64_t h, std::uint64_t child) {
     if (parent.is(Kind::Array)) return mix(h, child);
+    if (parent.is(Kind::Struct)) return mix(mix(h, hash_text(atom_text(struct_fields(parent)[i].first))), child);
     return h + mix(hash_text(atom_text(object_entries(parent)[i].first)), child);
 }
 
-bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Object); }
+bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Object) || v.is(Kind::Struct); }
+
+std::uint64_t seed_of(const Value& v) {
+    if (v.is(Kind::Array)) return 8u;
+    if (v.is(Kind::Struct)) return mix(10u, hash_text(atom_text(struct_type(v))));
+    return 9u;
+}
 
 } // namespace
 
@@ -246,13 +270,13 @@ bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Objec
 // recursive definition.
 std::uint64_t hash(const Value& value) {
     if (!is_aggregate(value)) return leaf_hash(value);
-    std::vector<HashFrame> stack{{&value, 0, value.is(Kind::Array) ? 8u : 9u}};
+    std::vector<HashFrame> stack{{&value, 0, seed_of(value)}};
     for (;;) {
         HashFrame& top = stack.back();
         if (top.next < child_count(*top.value)) {
             const Value& child = child_at(*top.value, top.next);
             if (is_aggregate(child)) {
-                stack.push_back({&child, 0, child.is(Kind::Array) ? 8u : 9u});
+                stack.push_back({&child, 0, seed_of(child)});
                 continue;
             }
             top.h = combine(*top.value, top.next, top.h, leaf_hash(child));
@@ -266,6 +290,19 @@ std::uint64_t hash(const Value& value) {
         parent.h = combine(*parent.value, parent.next, parent.h, done);
         ++parent.next;
     }
+}
+
+bool identity_bearing(const Value& value) noexcept {
+    return value.is(Kind::Function) || value.is(Kind::Handle);
+}
+
+Sameness same(const Value& left, const Value& right) noexcept {
+    if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
+    if (left.kind() != right.kind()) return Sameness::Different;
+    if (left.is(Kind::Function)) return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
+    const bool same_resource = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
+                               left.handle_generation() == right.handle_generation();
+    return same_resource ? Sameness::Same : Sameness::Different;
 }
 
 } // namespace nift::rt

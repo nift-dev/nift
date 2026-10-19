@@ -193,12 +193,12 @@ void functions_and_structs() {
     Value alias = fn;
     Value other = Value::adopt(new FunctionObject());
     CHECK(equal(fn, alias) && !equal(fn, other) && truthy(fn));
-    auto* s = new StructObject(atom("Point"));
-    s->fields.emplace_back(atom("x"), I(1));
-    Value p = Value::adopt(s);
-    Value q = p;  // reference semantics: shared, no COW
-    q.heap_as<StructObject>()->fields[0].second = I(9);
-    CHECK(p.heap_as<StructObject>()->fields[0].second.as_int() == 9 && equal(p, q));
+    Value p = make_struct(atom("Point"));
+    struct_add_field(p, atom("x"), I(1));
+    Value q = p;  // value semantics (D-040 V9): shared until written, then copied
+    CHECK(struct_set(q, atom("x"), I(9)));
+    CHECK(struct_get(p, atom("x"))->as_int() == 1 && struct_get(q, atom("x"))->as_int() == 9 && !equal(p, q));
+    CHECK(struct_set(q, atom("x"), I(1)) && equal(p, q) && hash(p) == hash(q));  // structural equality
 }
 
 } // namespace

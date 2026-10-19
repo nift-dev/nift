@@ -2,6 +2,8 @@
 
 #include "rt/heap_account.h"
 
+#include <cstdlib>
+
 namespace nift::rt {
 
 namespace {
@@ -34,6 +36,7 @@ template <class T> void relocate(std::vector<T>& items) {
 
 void relocate_storage(HeapObject* object) {
     if (object->kind == Kind::Array) relocate(static_cast<ArrayObject*>(object)->items);
+    if (object->kind == Kind::Struct) relocate(static_cast<StructObject*>(object)->fields);
     if (object->kind == Kind::Object) {
         auto* o = static_cast<ObjectObject*>(object);
         relocate(o->entries);
@@ -75,6 +78,36 @@ std::ptrdiff_t find_position(const ObjectObject& object, Atom key) {
     }
 }
 
+// Retain-before-unique (D-040 V16): the stored value is owned by the callee's
+// parameter before the receiver is made unique, so a value stored into
+// itself (`a.push(a)`) is the receiver's previous value and unshare clones
+// the receiver. Checked builds verify that a store never makes an object
+// contain itself directly.
+void check_not_self(const HeapObject* receiver, const Value& stored) {
+#ifdef NIFT_RT_RELOCATE_ON_MUTATION
+    if (stored.is_heap() && stored.heap() == receiver) std::abort();
+#else
+    (void)receiver; (void)stored;
+#endif
+}
+
+// Hot path (every push/set): scalars and strings are decided by one compare,
+// since every kind that can carry identity sorts at or after Kind::Array.
+inline void note_store(HeapObject* receiver, const Value& stored) {
+    if (stored.kind() < Kind::Array) return;
+    if (may_contain_identity(stored)) mark_may_hold_identity(receiver);
+}
+
+void copy_summary(const HeapObject* from, HeapObject* to) {
+    if (may_hold_identity(from)) mark_may_hold_identity(to);
+}
+
+std::ptrdiff_t field_position(const StructObject& s, Atom field) {
+    for (std::size_t i = 0; i < s.fields.size(); ++i)
+        if (s.fields[i].first == field) return static_cast<std::ptrdiff_t>(i);
+    return -1;
+}
+
 ObjectObject& object_mut(Value& object) {
     if (!unshare(object)) relocate_storage(object.heap());
     return *object.heap_as<ObjectObject>();
@@ -84,26 +117,32 @@ ObjectObject& object_mut(Value& object) {
 
 bool unshare(Value& value) {
     if (value.refcount() <= 1) return false;
+    HeapObject* copy = nullptr;
     if (value.is(Kind::Array)) {
-        auto* copy = new ArrayObject();
-        copy->items = value.heap_as<ArrayObject>()->items;
-        relocate_storage(value.heap());  // stale references into the shared original fault too
-        heap_retally(copy);
-        value.replace_heap(copy);
-        return true;
-    }
-    if (value.is(Kind::Object)) {
-        auto* copy = new ObjectObject();
+        auto* a = new ArrayObject();
+        a->items = value.heap_as<ArrayObject>()->items;
+        copy = a;
+    } else if (value.is(Kind::Object)) {
+        auto* o = new ObjectObject();
         const auto* source = value.heap_as<ObjectObject>();
-        copy->entries = source->entries;
-        copy->index = source->index;
-        relocate_storage(value.heap());
-        heap_retally(copy);
-        value.replace_heap(copy);
-        return true;
+        o->entries = source->entries;
+        o->index = source->index;
+        copy = o;
+    } else if (value.is(Kind::Struct)) {
+        const auto* source = value.heap_as<StructObject>();
+        auto* st = new StructObject(source->type_name);
+        st->fields = source->fields;
+        copy = st;
+    } else {
+        return false;
     }
-    return false;
+    copy_summary(value.heap(), copy);
+    relocate_storage(value.heap());  // stale references into the shared original fault too
+    heap_retally(copy);
+    value.replace_heap(copy);
+    return true;
 }
+
 
 Value make_array(std::size_t reserve) {
     auto* array = new ArrayObject();
@@ -116,12 +155,28 @@ const std::vector<Value>& array_items(const Value& array) { return array.heap_as
 
 std::vector<Value>& array_mut(Value& array) {
     if (!unshare(array)) relocate_storage(array.heap());
+    mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
     return array.heap_as<ArrayObject>()->items;
 }
 
 void array_push(Value& array, Value item) {
-    array_mut(array).push_back(static_cast<Value&&>(item));
+    if (!unshare(array)) relocate_storage(array.heap());
+    check_not_self(array.heap(), item);
+    note_store(array.heap(), item);
+    array.heap_as<ArrayObject>()->items.push_back(static_cast<Value&&>(item));
     heap_retally(array.heap());
+}
+
+void array_set(Value& array, std::size_t index, Value item) {
+    if (!unshare(array)) relocate_storage(array.heap());
+    check_not_self(array.heap(), item);
+    note_store(array.heap(), item);
+    array.heap_as<ArrayObject>()->items[index] = static_cast<Value&&>(item);
+}
+
+Value* array_slot_mut(Value& array, std::size_t index) {
+    if (index >= array_size(array)) return nullptr;
+    return &array_mut(array)[index];
 }
 
 std::size_t array_size(const Value& array) { return array_items(array).size(); }
@@ -146,6 +201,8 @@ const Value* object_get(const Value& object, Atom key) {
 
 void object_set(Value& object, Atom key, Value value) {
     ObjectObject& o = object_mut(object);
+    check_not_self(&o, value);
+    note_store(&o, value);
     const std::ptrdiff_t at = find_position(o, key);
     if (at >= 0) { o.entries[static_cast<std::size_t>(at)].second = static_cast<Value&&>(value); return; }
     o.entries.emplace_back(key, static_cast<Value&&>(value));
@@ -168,6 +225,58 @@ bool object_remove(Value& object, Atom key) {
     rebuild_index(o);
     heap_retally(object.heap());
     return true;
+}
+
+Value* object_slot_mut(Value& object, Atom key) {
+    if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
+    ObjectObject& o = object_mut(object);
+    mark_may_hold_identity(&o);
+    return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
+}
+
+Value make_struct(Atom type_name, std::size_t reserve) {
+    auto* instance = new StructObject(type_name);
+    instance->fields.reserve(reserve);
+    heap_retally(instance);
+    return Value::adopt(instance);
+}
+
+Atom struct_type(const Value& instance) { return instance.heap_as<StructObject>()->type_name; }
+
+const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance) {
+    return instance.heap_as<StructObject>()->fields;
+}
+
+const Value* struct_get(const Value& instance, Atom field) {
+    const auto* s = instance.heap_as<StructObject>();
+    const std::ptrdiff_t at = field_position(*s, field);
+    return at < 0 ? nullptr : &s->fields[static_cast<std::size_t>(at)].second;
+}
+
+void struct_add_field(Value& instance, Atom field, Value value) {
+    if (!unshare(instance)) relocate_storage(instance.heap());
+    check_not_self(instance.heap(), value);
+    note_store(instance.heap(), value);
+    instance.heap_as<StructObject>()->fields.emplace_back(field, static_cast<Value&&>(value));
+    heap_retally(instance.heap());
+}
+
+bool struct_set(Value& instance, Atom field, Value value) {
+    if (field_position(*instance.heap_as<StructObject>(), field) < 0) return false;
+    if (!unshare(instance)) relocate_storage(instance.heap());
+    auto* s = instance.heap_as<StructObject>();
+    check_not_self(s, value);
+    note_store(s, value);
+    s->fields[static_cast<std::size_t>(field_position(*s, field))].second = static_cast<Value&&>(value);
+    return true;
+}
+
+Value* struct_slot_mut(Value& instance, Atom field) {
+    if (field_position(*instance.heap_as<StructObject>(), field) < 0) return nullptr;
+    if (!unshare(instance)) relocate_storage(instance.heap());
+    auto* s = instance.heap_as<StructObject>();
+    mark_may_hold_identity(s);
+    return &s->fields[static_cast<std::size_t>(field_position(*s, field))].second;
 }
 
 } // namespace nift::rt

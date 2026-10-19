@@ -206,6 +206,9 @@ RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
 RT_VALUE_REGRESS := $(TEST_DIR)/rt/value-regress$(EXEEXT)
 RT_VALUE_BENCH := $(TEST_DIR)/rt/value-bench$(EXEEXT)
 RT_VALUE_ROUND2 := $(TEST_DIR)/rt/value-round2$(EXEEXT)
+RT_VALUE_D040 := $(TEST_DIR)/rt/value-d040$(EXEEXT)
+RT_VALUE_CYCLE_BENCH := $(TEST_DIR)/rt/value-cycle-bench$(EXEEXT)
+RT_VALUE_CYCLE_BENCH_OFF := $(TEST_DIR)/rt/value-cycle-bench-off$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
 
 $(RT_VALUE_UNIT): tests/rt/value_unit.cpp $(RT_VALUE_DEPS)
@@ -230,11 +233,30 @@ $(RT_VALUE_ROUND2): tests/rt/value_round2.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_round2.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2)
+# D-040 value semantics (L7 step 2.1/2.7a): structs as COW values, nested
+# copy-on-write model, same(), identity summary bit, cycle checker.
+$(RT_VALUE_D040): tests/rt/value_d040.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_d040.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+# Cost of the D-040 cycle check isolated from the store: the same benchmark
+# with the check and with it compiled out; the guard is on the difference.
+$(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/value_cycle_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+$(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK tests/rt/value_cycle_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+.PHONY: bench-rt-value-cycle
+bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
+	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
+
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
 	"$(RT_VALUE_ROUND2)"
 	"$(RT_VALUE_PROPERTY)" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
+	"$(RT_VALUE_D040)" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1}
 
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test
@@ -247,6 +269,7 @@ test-rt-value-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_property.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-property"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_regress.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-regress"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_round2.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-round2"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_d040.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-d040"
 	"$(TEST_DIR)/rt-san/value-unit"
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-round2"
@@ -257,6 +280,7 @@ test-rt-value-sanitize:
 		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
 		echo "PASS stale reference detected: $$m"; done
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
+	"$(TEST_DIR)/rt-san/value-d040" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1}
 
 # Runtime 2.0 CP17 typed handles (src/rt/handle.*, src/rt/handles/): unit,
 # concurrency stress (ASan/UBSan and TSan), callgrind guard, and the

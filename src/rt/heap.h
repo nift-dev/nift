@@ -31,6 +31,23 @@ struct BytesObject : HeapObject {
     explicit BytesObject(std::vector<std::uint8_t> d) : HeapObject(Kind::Bytes), data(std::move(d)) {}
 };
 
+// Identity summary (D-040 V16, the cycle rule): bit 7 of the header's third
+// `counted` byte (accounting uses the low 23 bits) means "this aggregate may
+// contain a callable or a handle, directly or through a child with the bit".
+// It is conservative: set whenever a store might add identity-bearing content
+// (array_mut hands out raw storage, so it sets it too) and cleared only by
+// the cycle checker after it has verified the direct children (rt/value_cycle.h).
+// Plain data therefore never needs a walk: an aggregate whose bit is clear
+// holds no callable or handle anywhere below it.
+inline constexpr std::uint8_t kMayHoldIdentity = 0x80;
+inline bool may_hold_identity(const HeapObject* object) noexcept {
+    return (object->counted[2] & kMayHoldIdentity) != 0;
+}
+inline void mark_may_hold_identity(HeapObject* object) noexcept { object->counted[2] |= kMayHoldIdentity; }
+inline void clear_may_hold_identity(HeapObject* object) noexcept {
+    object->counted[2] = static_cast<std::uint8_t>(object->counted[2] & ~kMayHoldIdentity);
+}
+
 // Copy-on-write aggregates: a Value copy shares the object; mutation through
 // rt::array_mut / rt::object_mut clones it first when refcount > 1.
 struct ArrayObject : HeapObject {
@@ -59,8 +76,10 @@ struct FunctionObject : HeapObject {
     FunctionObject() : HeapObject(Kind::Function) {}
 };
 
-// Struct instances have reference semantics: copies share the instance and
-// field assignment is visible through every copy (semantics.md "Structs").
+// Struct instances are values (D-040 V9): copies share the object until one
+// of them is written, then rt::struct_set / struct_mut clone it (copy-on-write,
+// like arrays and objects). Fields are kept in declaration order, private
+// fields included; equality is structural (type and every field).
 struct StructObject : HeapObject {
     Atom type_name;
     std::vector<std::pair<Atom, Value>> fields;
