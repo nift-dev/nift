@@ -188,3 +188,33 @@ D1 failed: `N3 not linear` (wall-clock), `watch 6 (3 → 4)` and
 it is temporary (cleaned up once processing finishes) or persists after the
 watcher becomes idle or exits — the latter is a correctness defect even if it
 only appears under extreme contention.
+
+## Remote Linux certification validated (CP14 @6c26404, 2026-10-19)
+
+The same commit was certified locally (shared 2-vCPU host) and on a dedicated
+`g6-dedicated-4` Linode (4 vCPU AMD EPYC 7642, Ubuntu 24.04, fresh setup from
+`runtime-2` + a commit bundle; evidence in the scratch `remote-cert/` folder and
+the user's `.claude-linode-runs/cert-cp14/`).
+
+| | Local | Remote |
+|---|---|---|
+| Targets | 173 | 173 |
+| Raw per-target outcomes | — | identical on all 173 |
+| Classification | FAIL 0, FLAKY 0, PASS 168; UNVERIFIED 2 (Go, .NET); SKIPPED-ENVIRONMENTAL 3 (root-only) | FAIL 0, FLAKY 0, PASS 168; BASELINE-FAILURE 2 (Go, .NET); SKIPPED-ENVIRONMENTAL 3 (same) |
+| Queue wait for the heavy lock | ~70 min | none |
+| `make certify` wall time | ~82 min | ~70 min (+3 min setup) |
+| Summed target time | 95 min | 90 min |
+| Cost | — | ~US$0.22 |
+
+The Go and C# bindings fail in both environments for harness reasons, not Nift
+(they also fail on the v4.12 baseline remotely): the remote job's job-wide
+`ulimit -f` killed `dotnet build`, and Ubuntu's Go 1.22 cannot fetch the Go 1.26
+toolchain the module requires. Fix for the next remote run: no job-wide file-size
+limit around `make certify` (its targets carry their own limits), Go from the
+official tarball, .NET from Microsoft's feed. Neither environment counts them as
+passes; CI covers them.
+
+Conclusion (D-033): remote Linux certification is equivalent; it becomes the
+default for subsequent checkpoints. Wall time is dominated by serial exclusive
+targets (`test-build-boundary-nondestructive` alone ~21 min), so more cores help
+little; the gain is no queue and no contention with development work.

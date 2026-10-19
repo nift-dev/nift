@@ -9,7 +9,7 @@ emerge, not continuously. Authoritative per-checkpoint evidence stays in
 Each checkpoint moves through: **implemented → reviewed → locally certified →
 integrated (`runtime-2`) → cross-platform certified** (macOS + Windows CI at a
 milestone). A checkpoint split into phases is complete only when every phase is.
-Linux certification moves to a dedicated Linode once validated (D-033).
+Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `certification.md`).
 
 ## Headline
 
