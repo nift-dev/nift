@@ -1,0 +1,25 @@
+M1 trim strips every isspace byte            DETECTED  builtins-diff: 2988 checks, 2 failures
+M2 index_of counts code points               DETECTED  builtins-diff: 2988 checks, 2 failures
+M3 glob without the dot-file rule            DETECTED  builtins-diff: 2988 checks, 2 failures
+M4 min/max accept mixed kinds                DETECTED  builtins-diff: 2988 checks, 26 failures
+M5 sum exact for large integers              DETECTED  builtins-diff: 2988 checks, 5 failures
+M6 -0.0 is not a size                        DETECTED  builtins-diff: 2988 checks, 2 failures
+M7 split drops a trailing empty field        DETECTED  builtins-diff: 2988 checks, 10 failures
+M8 merge moves replaced keys to the end      DETECTED  builtins-diff: 2988 checks, 8 failures
+M9 to_int rejects a leading plus             DETECTED  builtins-diff: 2988 checks, 4 failures
+M10 unique keeps duplicates                  DETECTED  builtins-diff: 2988 checks, 6 failures
+M11 JSON escapes in upper-case hex           DETECTED  builtins-diff: 2988 checks, 8 failures
+M12 prettify indents by four                 DETECTED  builtins-diff: 2988 checks, 18 failures
+M13 attr_escape keeps apostrophes            DETECTED  builtins-diff: 2988 checks, 5 failures
+M14 large doubles in fixed notation          DETECTED  builtins-diff: 2988 checks, 7 failures
+M15 is_number accepts numeric strings        DETECTED  builtins-diff: 2988 checks, 5 failures
+M16 abs exact for integers                   DETECTED  builtins-diff: 2988 checks, 3 failures
+M17 bytes accepts 256                        DETECTED  builtins-diff: 2988 checks, 2 failures
+M18 decode accepts any byte sequence         DETECTED  builtins-diff: 2988 checks, 1 failures
+M19 json_parse drops exact spellings         DETECTED  builtins-diff: 2988 checks, 83 failures
+M20 sha256 hashes one byte less              DETECTED  builtins-diff: 2988 checks, 11 failures
+M21 validate accepts rejected instances      DETECTED  builtins-diff: 2988 checks, 18 failures
+M22 round half to even                       DETECTED  builtins-diff: 2988 checks, 4 failures
+M23 validate rejection is fatal, not catchable DETECTED  builtins-diff: 2988 checks, 18 failures
+builtins_mutants: 23/23 detected
+exit 0

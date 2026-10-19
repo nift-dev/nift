@@ -1,0 +1,5 @@
+M17 bytes accepts 256                        DETECTED  builtins-diff: 2988 checks, 2 failures
+M18 decode accepts any byte sequence         DETECTED  builtins-diff: 2988 checks, 1 failures
+M20 sha256 hashes one byte less              DETECTED  builtins-diff: 2988 checks, 11 failures
+builtins_mutants: 3/3 detected
+exit 0

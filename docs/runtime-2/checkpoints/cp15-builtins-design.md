@@ -67,20 +67,38 @@ layouts.
   exponent magnitude ≥ 300) become `Decimal`s with that spelling (`0.0`,
   `-0`, `12345678901234567890123`, `1e-400`), others `Double`s; non-finite
   numbers are a parse error. Converted directly to rt values (no legacy
-  value). Errors are the parser's message; callers add legacy's prefix
-  (`invalid structured literal: …`, `inject: …`).
+  value). Errors are the parser's message. Callers: CP16's `inject`,
+  `@json`, `read_val` (they add legacy's prefix, e.g. `inject: …`) and the
+  compiler for `{...}` literals, which runs it **at compile time** on the
+  static source text: success → the native result is the literal's value;
+  any failure → the unit is refused (W9), because legacy then falls back to
+  its Nift literal evaluator (review R3). A `json_parse` error therefore never
+  surfaces at run time for a literal (the earlier "callers add legacy's
+  prefix" was wrong for literals).
 * `validate(schema, value)`: both converted to JSON documents as legacy's
   `runtime_to_json` (Int beyond 2^53 → exact StrNumber; bytes/Error values →
   `validate: … are not JSON serializable`), then the same `jsonschema`
-  validator. A malformed schema is a fatal error (`validate: <reason>`); a
+  validator. **Deliberate change from legacy (review R2):** the conversion is
+  capped at 512 nested levels (the parser's limit); deeper values stop with
+  `Status::Limit` — fatal, uncatchable, code `limit.exceeded` (D-022/D-025),
+  message `validate: value nesting exceeds 512 levels`. Legacy recurses
+  without a bound and crashes (the VM makes such values cheap to build).
+  **Known, not fixed (review R1):** a schema `pattern` can crash or take
+  exponential time (`std::regex`, ReDoS) — identical in legacy; recorded in
+  the consistency register for the cleanup checkpoint. A malformed schema is a fatal error (`validate: <reason>`); a
   rejected instance is legacy's **recoverable** (catchable) Error, code
   `schema.rejected` → new `Status::Recoverable` (treated as Error until
   CP13's try/catch). Returns the value.
 * `copy(v)`, `deepcopy(v)`: a recursively independent value. With
   copy-on-write the result shares storage and the first mutation of either
-  side unshares only the changed path (tested). Structs (legacy re-creates
-  them, identity) and collections are CP12 phase B / CP17 (natives report
-  `Internal`).
+  side unshares only the changed path (tested). Functions and Error values
+  are immutable or identity values and are returned as they are, as legacy
+  copies them (review D1). A struct or handle **anywhere** in the value
+  (legacy re-creates structs) is `Internal` (review D2: the native walks the
+  value); struct cloning is CP17. Wiring rule **W11**: the compiler refuses
+  `copy`/`deepcopy` unless the argument is provably plain (null, bool,
+  number, string, bytes, or arrays/objects of plain values) — until CP17 —
+  so the `Internal` check only makes a future breach loud.
 
 ## Quirks found (register candidates, D-015)
 
@@ -137,7 +155,18 @@ The CP14 workloads' guards are unchanged (re-checked: 0 failures).
 * W9 structured literals: keep legacy's per-bracket meaning only where both
   agree; refuse `[...]` literals containing JSON-only spellings (`\u`
   escapes, `-0`, integers beyond int64) and the reverse until J-Q1 is decided.
+  A `{...}` literal is compiled by running `json_parse` on its source text at
+  compile time: parsed → that value; not JSON for any reason (lone
+  surrogate, `01`, invalid UTF-8, keys duplicated after unescaping, depth
+  beyond 512, non-finite number, trailing comma) → the unit is refused
+  (legacy's fallback evaluator accepts some of these: 44 of 112 invalid
+  literals in the seed-1 run).
 * W10 `validate` with quoted-literal arguments refused (J-Q2).
+* W11 `copy`/`deepcopy` (and `validate`) only on provably plain arguments
+  until CP17 (review D1/D2).
+* `Status::Limit` → fatal error with code `limit.exceeded` (not catchable).
+* `recoverable_code(id)` (`builtin.h`) gives the code of a Recoverable
+  result (`schema.rejected` for validate).
 * `Status::Recoverable` → CP13 builds the catchable Error (`code`
   `schema.rejected`, message as returned); until then it is an Error stop.
 * `json_parse` is called by the compiler (structured literals) and by CP16
@@ -148,7 +177,32 @@ The CP14 workloads' guards are unchanged (re-checked: 0 failures).
 Local, on `runtime-2-cp15-dev` (base `c3b0046`): natives; tests, probe,
 mutants, guards; this record and evidence.
 
+## Review round 1 (adversarial review of CP15, 2026-10-19)
+
+| # | Finding | Fix | Test |
+| --- | --- | --- | --- |
+| D1 | `copy`/`deepcopy` of a function or Error value was `Internal`; legacy copies them | returned as they are; `Internal` only for Struct/Handle | unit (function identity, Error inside an array) |
+| D2 | a struct/handle nested in a copied array/object stayed shared (legacy re-creates structs) | the native walks the value: any nested Struct/Handle is `Internal`; wiring rule W11 (plain arguments only, until CP17) | unit (struct in object in array, handle in object) |
+| R2 | `validate` conversion recursion unbounded: a 200,000-deep value crashed | 512-level cap → `Status::Limit` (fatal, `limit.exceeded`); deliberate change from legacy (crash) | unit (512 ok, 513 Limit, 200,000 Limit) |
+| R3 | `json_parse` ≠ legacy's object-literal path, which falls back to the Nift evaluator | W9 clause: compile-time `json_parse` of `{...}` literals, refuse on failure; doc fixed (here and `json_methods.h`) | differential: invalid JSON literals tallied (seeds 20261018/2/3: 299/294/295 refused; legacy's fallback *accepts* 132/123/128 of them) |
+| R4 | differential missed edges | Decimal receivers via `json_parse` (bound through `{"v": …}.v`), int64 extremes (`-2^63` via the JSON literal), ±0.5/1.5/2.5 frequent; invalid JSON literals (each in its own program); `validate` cases wrapped in try/catch so Recoverable (`caught schema.rejected`) ≠ Error; new mutant M23 | M22 now dies deterministically (4 failures, seed 1); M23 detected (18) |
+| R1 | schema `pattern` crash / ReDoS (`std::regex`) | identical in legacy; recorded in the register, not fixed | — |
+| note | `recoverable_code(id)` was documented but missing | added (`builtin.h/.cpp`) | unit |
+| note | `uniqueItems` is O(n²) (inherited) | guard `fn.validate.unique` at n ≤ 1,000 (exponent 1.95, 100→1,000) | guards |
+| found | UBSan: `make_string` of an empty bytes value's view passed a null pointer to `memcpy` (`value.h:144`, CP09 `inline_text`) — reached by `bytes().decode("utf-8")` | natives never pass a null data pointer (decode, sha256 of empty bytes); the CP09 `inline_text` precondition is reported for CP09 | unit (empty decode, empty sha256), sanitized differential clean |
+
+What was run (round 1; all heavy steps under `heavy.lock`;
+`../evidence/cp15/review1/`):
+
+| Run | Result |
+| --- | --- |
+| `make test-rt-builtins` (unit, differential 5,000, isolation, lint, probe) | unit 793 checks, 0 failures; differential 4,980 compared, 0 differences (188 invalid literals refused); isolation PASS; probe pinned PASS |
+| differential seeds 20261018, 2, 3 × 8,000 | 23,925 compared, 0 differences; 888 invalid JSON literals refused (W9) |
+| `builtins_mutants.py` (all) | 23/23 detected (M22 4 failures, M23 18); bytes mutants M17/M18/M20 re-run after the UBSan fix: 3/3 |
+| `make test-rt-builtins-sanitize` | first run: UBSan stop (null `memcpy` source, above); after the fix: unit 792 + differential 1,993 checks, 0 failures |
+| guards | old locked file re-checked: 34 workloads, 0 failures; re-locked with n = 1,000 added and `fn.validate.unique`: 35 workloads, 0 failures |
+
 ## Evidence
 
 `../evidence/cp15/`: `unit-diff-probe.txt`, `diff-seeds.txt`, `sanitize.txt`,
-`guards-check.txt`, `guards.md`, `mutants.txt`.
+`guards-check.txt`, `guards.md`, `mutants.txt`; `review1/` (round 1).

@@ -1,0 +1,178 @@
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/builtins_unit.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/bytes_methods.cpp src/rt/natives/format_methods.cpp src/rt/natives/json_methods.cpp src/rt/natives/number_methods.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp src/Sha256.cpp src/JsonSchema.cpp -o ".build/rt/builtins-unit"
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/rt/builtins_diff.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/bytes_methods.cpp src/rt/natives/format_methods.cpp src/rt/natives/json_methods.cpp src/rt/natives/number_methods.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp src/Sha256.cpp src/JsonSchema.cpp -o ".build/rt/builtins-diff"
+mkdir -p ".build/rt"
+g++ -Isrc -Iinclude -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -g tests/rt/builtins_bench.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/bytes_methods.cpp src/rt/natives/format_methods.cpp src/rt/natives/json_methods.cpp src/rt/natives/number_methods.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/error.cpp src/rt/handle.cpp src/Sha256.cpp src/JsonSchema.cpp -o ".build/rt/builtins-bench"
+PASS natives link without RuntimeValue/legacy_bridge/render and do not include them
+".build/rt/builtins-unit"
+builtins-unit: 793 checks, 0 failures
+".build/rt/builtins-diff" "$LEGACY" ${RT_BUILTINS_SEED:-20261018} ${RT_BUILTINS_CASES:-5000}
+builtins-diff: seed 20261018, 5000 cases (4980 compared, 523 legacy errors, 20 refused by rule W1) in 887 legacy runs
+  invalid JSON literals (refused by W9): 188; legacy fallback errors 104, legacy fallback succeeds 84
+  any.highlight          49 cases,    0 errors
+  any.prettify           47 cases,    0 errors
+  any.stringify          46 cases,    0 errors
+  arr.chunk              49 cases,   25 errors
+  arr.contains           49 cases,    4 errors
+  arr.drop               49 cases,   14 errors
+  arr.empty              49 cases,    1 errors
+  arr.first              49 cases,   10 errors
+  arr.flatten            49 cases,    1 errors
+  arr.from_entries       49 cases,   26 errors
+  arr.indexOf            49 cases,    1 errors
+  arr.join               49 cases,    5 errors
+  arr.last               49 cases,   10 errors
+  arr.length             49 cases,    4 errors
+  arr.max                49 cases,   16 errors
+  arr.min                49 cases,    8 errors
+  arr.size               49 cases,    1 errors
+  arr.slice              49 cases,   20 errors
+  arr.sum                49 cases,   23 errors
+  arr.take               49 cases,   10 errors
+  arr.unique             49 cases,    3 errors
+  bool.to_string         49 cases,    1 errors
+  bytes.decode           49 cases,   18 errors
+  bytes.empty            49 cases,    0 errors
+  bytes.length           49 cases,    3 errors
+  bytes.size             49 cases,    1 errors
+  bytes.slice            49 cases,   25 errors
+  fn.attr_escape         49 cases,    6 errors
+  fn.bytes               49 cases,    5 errors
+  fn.copy                45 cases,    0 errors
+  fn.deepcopy            47 cases,    0 errors
+  fn.html_escape         49 cases,    5 errors
+  fn.is_array            49 cases,    0 errors
+  fn.is_bool             49 cases,    1 errors
+  fn.is_bytes            49 cases,    1 errors
+  fn.is_collection       49 cases,    4 errors
+  fn.is_enum             49 cases,    3 errors
+  fn.is_float            49 cases,    0 errors
+  fn.is_function         49 cases,    3 errors
+  fn.is_int              49 cases,    5 errors
+  fn.is_null             49 cases,    2 errors
+  fn.is_number           49 cases,    1 errors
+  fn.is_object           49 cases,    1 errors
+  fn.is_string           49 cases,    3 errors
+  fn.is_struct           49 cases,    0 errors
+  fn.max                 49 cases,   13 errors
+  fn.min                 49 cases,   17 errors
+  fn.range               49 cases,    4 errors
+  fn.sha256              49 cases,    6 errors
+  fn.type                49 cases,    1 errors
+  fn.url_encode          49 cases,    5 errors
+  fn.validate            49 cases,   11 errors
+  json.parse (literal)  437 cases,    0 errors
+  null.to_string         49 cases,    2 errors
+  num.abs                49 cases,    2 errors
+  num.ceil               49 cases,    4 errors
+  num.floor              49 cases,    1 errors
+  num.round              49 cases,    0 errors
+  num.to_int             49 cases,   16 errors
+  num.to_string          49 cases,    5 errors
+  obj.empty              49 cases,    1 errors
+  obj.entries            47 cases,    0 errors
+  obj.get                49 cases,    6 errors
+  obj.has                49 cases,    4 errors
+  obj.keys               46 cases,    0 errors
+  obj.merge              49 cases,    4 errors
+  obj.merge_deep         49 cases,    5 errors
+  obj.omit               49 cases,    7 errors
+  obj.pick               49 cases,    6 errors
+  obj.size               49 cases,    1 errors
+  obj.values             45 cases,    0 errors
+  str.contains           50 cases,    5 errors
+  str.empty              50 cases,    1 errors
+  str.encode             49 cases,    6 errors
+  str.ends_with          50 cases,    3 errors
+  str.index_of           50 cases,    5 errors
+  str.last_index_of      50 cases,    5 errors
+  str.length             50 cases,    3 errors
+  str.replace            50 cases,    7 errors
+  str.split              50 cases,    3 errors
+  str.starts_with        50 cases,    2 errors
+  str.substr             49 cases,   20 errors
+  str.to_double          49 cases,   23 errors
+  str.to_int             49 cases,   39 errors
+  str.to_lower           50 cases,    2 errors
+  str.to_string          49 cases,    1 errors
+  str.to_upper           50 cases,    1 errors
+  str.trim               50 cases,    2 errors
+  str.trim_end           50 cases,    3 errors
+  str.trim_start         50 cases,    1 errors
+builtins-diff: 4980 checks, 0 failures
+python3 tools/rt-lint.py src/rt/natives
+PASS rt-lint: 0 problem(s)
+python3 tests/runtime2/builtins/context_probe.py --nift "$LEGACY" \
+	--expect-file tests/runtime2/builtins/context_dependent.txt
+CONTEXT-DEPENDENT obj.length: o.length()
+    top,top-arg,fn               error error: unknown value or malformed expression: o.length()
+    loop,fn-loop                 ok int | [3]
+    loop-arg                     ok [3]
+CONTEXT-DEPENDENT num.to_double: x.to_double()
+    top,top-arg,fn               error error: to_double: unsupported for this value
+    loop,fn-loop                 ok float | [2.5]
+    loop-arg                     ok [2.5]
+CONTEXT-DEPENDENT fmt.chain: o.stringify().stringify()
+    top,fn                       ok string | ["{\"b\":1,\"a\":[2],\"c\":{\"d\":3}}"]
+    top-arg                      ok ["{\"b\":1,\"a\":[2],\"c\":{\"d\":3}}"]
+    loop,fn-loop                 ok string | ["\"{\\\"b\\\":1,\\\"a\\\":[2],\\\"c\\\":{\\\"d\\\":3}}\""]
+    loop-arg                     ok ["\"{\\\"b\\\":1,\\\"a\\\":[2],\\\"c\\\":{\\\"d\\\":3}}\""]
+CONTEXT-DEPENDENT fmt.chain.pretty: o.prettify().stringify()
+    top,fn                       ok string | ["{\n  \"b\": 1,\n  \"a\": [\n    2\n  ],\n  \"c\": {\n    \"d\": 3\n  }\n}"]
+    top-arg                      ok ["{\n  \"b\": 1,\n  \"a\": [\n    2\n  ],\n  \"c\": {\n    \"d\": 3\n  }\n}"]
+    loop,fn-loop                 ok string | ["\"{\\n  \\\"b\\\": 1,\\n  \\\"a\\\": [\\n    2\\n  ],\\n  \\\"c\\\": {\\n    \\\"d\\\": 3\\n  }\\n}\""]
+    loop-arg                     ok ["\"{\\n  \\\"b\\\": 1,\\n  \\\"a\\\": [\\n    2\\n  ],\\n  \\\"c\\\": {\\n    \\\"d\\\": 3\\n  }\\n}\""]
+CONTEXT-DEPENDENT fmt.chain.concat: "" + o.stringify().stringify()
+    top,fn                       ok string | ["{\"b\":1,\"a\":[2],\"c\":{\"d\":3}}"]
+    top-arg                      ok ["{\"b\":1,\"a\":[2],\"c\":{\"d\":3}}"]
+    loop,fn-loop                 ok string | ["\"{\\\"b\\\":1,\\\"a\\\":[2],\\\"c\\\":{\\\"d\\\":3}}\""]
+    loop-arg                     ok ["\"{\\\"b\\\":1,\\\"a\\\":[2],\\\"c\\\":{\\\"d\\\":3}}\""]
+CONTEXT-DEPENDENT num.abs.args: x.abs(1)
+    top,top-arg,fn               error error: abs: expected no arguments
+    loop,fn-loop                 ok float | [2.5]
+    loop-arg                     ok [2.5]
+CONTEXT-DEPENDENT num.round.args: x.round(0)
+    top,top-arg,fn               error error: round: expected no arguments
+    loop,fn-loop                 ok int | [3]
+    loop-arg                     ok [3]
+CONTEXT-DEPENDENT bytes.decode.args: b.decode()
+    top,top-arg,fn               error error: decode: expected encoding
+    loop,loop-arg,fn-loop        error error: decode: encoding must be exactly 'utf-8'
+CONTEXT-DEPENDENT bytes.encode.args: s.encode()
+    top,top-arg,fn               error error: encode: expected encoding
+    loop,loop-arg,fn-loop        error error: encode: encoding must be exactly 'utf-8'
+CONTEXT-DEPENDENT json.validate.lit: validate(sc, "x")
+    top,top-arg,fn               error error: unknown value or malformed expression: x
+    loop,fn-loop                 ok string | ["x"]
+    loop-arg                     ok ["x"]
+SHAPE-DEPENDENT pair.trim.large:
+    first                        ok ["ab"]
+    second                       ok ["\u000b ab"]
+SHAPE-DEPENDENT pair.keys.arity:
+    first                        ok [["b","a","c"]]
+    second                       error error: keys: expected no arguments
+SHAPE-DEPENDENT pair.json.escape:
+    first                        ok ["u00e9"]
+    second                       ok ["é"]
+SHAPE-DEPENDENT pair.json.negzero:
+    first                        ok [0]
+    second                       ok [-0]
+SHAPE-DEPENDENT pair.json.bigint:
+    first                        error error: integer literal outside signed 64-bit range
+    second                       ok [12345678901234567890123]
+SHAPE-DEPENDENT pair.trim.forms:
+    first                        ok ["\u000b ab \u000b"]
+    second                       ok ["ab"]
+SHAPE-DEPENDENT pair.substr.units:
+    first                        ok ["�"]
+    second                       ok ["t"]
+SHAPE-DEPENDENT pair.sum.exact:
+    first                        ok [9007199254740992]
+    second                       ok [9007199254740994]
+SHAPE-DEPENDENT pair.range.exact:
+    first                        ok [[9007199254740992]]
+    second                       ok [[9007199254740993]]
+context_probe: 272 cases x 6 contexts, 10 context-dependent; 11 pairs, 9 shape-dependent
+context_probe: PASS (inventory pinned)
+make exit 0

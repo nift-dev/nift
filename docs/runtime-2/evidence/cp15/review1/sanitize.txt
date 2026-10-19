@@ -1,0 +1,100 @@
+mkdir -p ".build/rt-san"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all tests/rt/builtins_unit.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/bytes_methods.cpp src/rt/natives/format_methods.cpp src/rt/natives/json_methods.cpp src/rt/natives/number_methods.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp src/Sha256.cpp src/JsonSchema.cpp -o ".build/rt-san/builtins-unit"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -Itests/rt -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all tests/rt/builtins_diff.cpp src/rt/natives/array_methods.cpp src/rt/natives/builtin.cpp src/rt/natives/bytes_methods.cpp src/rt/natives/format_methods.cpp src/rt/natives/json_methods.cpp src/rt/natives/number_methods.cpp src/rt/natives/object_methods.cpp src/rt/natives/string_methods.cpp src/rt/natives/support.cpp src/rt/value.cpp src/rt/string.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/heap_account.cpp src/rt/compare.cpp src/rt/number.cpp src/rt/decimal.cpp src/rt/render.cpp src/rt/error.cpp src/rt/handle.cpp src/rt/legacy_bridge.cpp src/RuntimeValue.cpp src/Sha256.cpp src/JsonSchema.cpp -o ".build/rt-san/builtins-diff"
+".build/rt-san/builtins-unit"
+builtins-unit: 792 checks, 0 failures
+".build/rt-san/builtins-diff" "$LEGACY" ${RT_BUILTINS_SEED:-20261018} ${RT_BUILTINS_SAN_CASES:-2000}
+builtins-diff: seed 20261018, 2000 cases (1993 compared, 218 legacy errors, 7 refused by rule W1) in 369 legacy runs
+  invalid JSON literals (refused by W9): 77; legacy fallback errors 44, legacy fallback succeeds 33
+  any.highlight          20 cases,    0 errors
+  any.prettify           20 cases,    0 errors
+  any.stringify          20 cases,    0 errors
+  arr.chunk              20 cases,   10 errors
+  arr.contains           20 cases,    2 errors
+  arr.drop               20 cases,    7 errors
+  arr.empty              20 cases,    1 errors
+  arr.first              20 cases,    5 errors
+  arr.flatten            20 cases,    1 errors
+  arr.from_entries       20 cases,   12 errors
+  arr.indexOf            20 cases,    1 errors
+  arr.join               20 cases,    3 errors
+  arr.last               20 cases,    4 errors
+  arr.length             20 cases,    2 errors
+  arr.max                20 cases,    6 errors
+  arr.min                20 cases,    3 errors
+  arr.size               20 cases,    1 errors
+  arr.slice              20 cases,   10 errors
+  arr.sum                20 cases,    7 errors
+  arr.take               20 cases,    3 errors
+  arr.unique             20 cases,    0 errors
+  bool.to_string         20 cases,    0 errors
+  bytes.decode           19 cases,    5 errors
+  bytes.empty            19 cases,    0 errors
+  bytes.length           19 cases,    1 errors
+  bytes.size             19 cases,    0 errors
+  bytes.slice            19 cases,   10 errors
+  fn.attr_escape         20 cases,    1 errors
+  fn.bytes               19 cases,    2 errors
+  fn.copy                16 cases,    0 errors
+  fn.deepcopy            18 cases,    0 errors
+  fn.html_escape         20 cases,    1 errors
+  fn.is_array            19 cases,    0 errors
+  fn.is_bool             19 cases,    1 errors
+  fn.is_bytes            19 cases,    1 errors
+  fn.is_collection       19 cases,    2 errors
+  fn.is_enum             19 cases,    3 errors
+  fn.is_float            19 cases,    0 errors
+  fn.is_function         19 cases,    0 errors
+  fn.is_int              19 cases,    3 errors
+  fn.is_null             19 cases,    1 errors
+  fn.is_number           19 cases,    0 errors
+  fn.is_object           19 cases,    1 errors
+  fn.is_string           19 cases,    1 errors
+  fn.is_struct           19 cases,    0 errors
+  fn.max                 20 cases,    3 errors
+  fn.min                 20 cases,    7 errors
+  fn.range               20 cases,    0 errors
+  fn.sha256              19 cases,    4 errors
+  fn.type                19 cases,    0 errors
+  fn.url_encode          20 cases,    1 errors
+  fn.validate            19 cases,    6 errors
+  json.parse (literal)  173 cases,    0 errors
+  null.to_string         20 cases,    1 errors
+  num.abs                19 cases,    1 errors
+  num.ceil               19 cases,    2 errors
+  num.floor              19 cases,    1 errors
+  num.round              19 cases,    0 errors
+  num.to_int             19 cases,    7 errors
+  num.to_string          20 cases,    1 errors
+  obj.empty              20 cases,    1 errors
+  obj.entries            19 cases,    0 errors
+  obj.get                20 cases,    3 errors
+  obj.has                20 cases,    1 errors
+  obj.keys               19 cases,    0 errors
+  obj.merge              20 cases,    1 errors
+  obj.merge_deep         20 cases,    1 errors
+  obj.omit               20 cases,    3 errors
+  obj.pick               20 cases,    2 errors
+  obj.size               20 cases,    1 errors
+  obj.values             19 cases,    0 errors
+  str.contains           20 cases,    2 errors
+  str.empty              20 cases,    1 errors
+  str.encode             19 cases,    2 errors
+  str.ends_with          20 cases,    2 errors
+  str.index_of           20 cases,    2 errors
+  str.last_index_of      20 cases,    2 errors
+  str.length             20 cases,    1 errors
+  str.replace            20 cases,    5 errors
+  str.split              20 cases,    2 errors
+  str.starts_with        20 cases,    1 errors
+  str.substr             20 cases,    6 errors
+  str.to_double          20 cases,   11 errors
+  str.to_int             20 cases,   17 errors
+  str.to_lower           20 cases,    1 errors
+  str.to_string          20 cases,    1 errors
+  str.to_upper           20 cases,    0 errors
+  str.trim               20 cases,    1 errors
+  str.trim_end           20 cases,    2 errors
+  str.trim_start         20 cases,    1 errors
+builtins-diff: 1993 checks, 0 failures
+make exit 0

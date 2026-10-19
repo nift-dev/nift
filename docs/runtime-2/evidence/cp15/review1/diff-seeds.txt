@@ -1,0 +1,9 @@
+builtins-diff: seed 20261018, 8000 cases (7969 compared, 864 legacy errors, 31 refused by rule W1) in 1446 legacy runs
+  invalid JSON literals (refused by W9): 299; legacy fallback errors 167, legacy fallback succeeds 132
+builtins-diff: 7969 checks, 0 failures
+builtins-diff: seed 2, 8000 cases (7975 compared, 906 legacy errors, 25 refused by rule W1) in 1471 legacy runs
+  invalid JSON literals (refused by W9): 294; legacy fallback errors 171, legacy fallback succeeds 123
+builtins-diff: 7975 checks, 0 failures
+builtins-diff: seed 3, 8000 cases (7981 compared, 858 legacy errors, 19 refused by rule W1) in 1410 legacy runs
+  invalid JSON literals (refused by W9): 295; legacy fallback errors 167, legacy fallback succeeds 128
+builtins-diff: 7981 checks, 0 failures
