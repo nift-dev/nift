@@ -796,7 +796,14 @@ class Supported:
             out += self.function()
         scope = []
         body = []
-        for _ in range(self.r.randint(3, 7)):
+        # CP12 phase B: some functions are declared after top-level statements
+        # (statements generated before them cannot call them).
+        late_at = self.r.randint(1, 3) if self.r.random() < 0.35 else None
+        for k in range(self.r.randint(3, 7)):
+            if k == late_at:
+                for _ in range(self.r.randint(1, 2)):
+                    body += self.function()
+                self.features["fn:after-statement"] += 1
             body += self.block(scope, 0, False, None, None)
             if body and body[-1].startswith("return"):
                 break
@@ -891,7 +898,9 @@ INJECT = [
     ("bang-precedence", "", "zx := 2\nprint(!zx + 1)", "any", "opaque:irregular-legacy-parse"),
     ("postfix-space", "", "za := [1]\nprint(za [0])", "any", "opaque:legacy-runtime-error"),
 ]
-FN_AFTER = ("fn-after-statement", "print(1)\nfn(zg()) { return 1 }")
+# CP12 phase B: a declaration after statements is supported unless a call can
+# run first; that is the refused form.
+FN_AFTER = ("fn-called-before-declaration", "print(zg())\nfn(zg()) { return 1 }")
 CONTEXTS = ["top", "if", "loop", "fn", "fnloop"]
 
 
@@ -925,7 +934,7 @@ def unsupported_program(seed, index, added=None):
     fns, stmts = lines[:first], lines[first:]
     if added is None and rng.random() < 0.04:
         name, extra = FN_AFTER
-        return base + extra + "\n", "fn-after-statement", name, "top"
+        return base + extra + "\n", "fn-called-before-declaration", name, "top"
     name, add_fns, add_stmts, where, reason = rng.choice(INJECT) if added is None else added
     ctx = "top" if where == "top" else rng.choice(CONTEXTS)
     if add_stmts:

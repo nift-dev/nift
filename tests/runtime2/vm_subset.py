@@ -99,6 +99,10 @@ def supported():
     # gcd in loop contexts (its loop-safe form declares from a literal).
     out.append(("gcd-loop", FUNCTIONS + "k := 0\nwhile (k < 3) { k += 1\nprint(gcd2(1071 * k, 462)) }\n"
                             "while (gcd2(k, 6) < 3) { k += 1 }\nprint(k)\n"))
+    # CP12 phase B: declarations after statements (no call can run first).
+    out.append(("fn-after-statements", "x := 2\nprint(x)\nfn(sq(n)) { return n * n }\nprint(sq(x))\n"
+                                       "fn(cube(n)) { return n * sq(n) }\nk := 0\n"
+                                       "while (k < 2) { k += 1\nprint(cube(k)) }\n"))
     out.append(("top-return", "x := 1\nwhile (x < 9) { x += 1; if (x == 3) { return x } }\n"))
     out.append(("bench-call", "fn(add(a, b)) { return a + b }\ni := 0\ns := 0\n"
                               "while (i < 2000) { s = add(s, i); i += 1 }\nprint(s)\n"))
@@ -117,7 +121,9 @@ UNSUPPORTED = [
     ("for", "for (x : [1, 2]) { print(x) }\n", "statement:For"),
     ("try", "try { print(1) } catch (e) { print(2) }\n", "statement:Try"),
     ("struct", "struct (P) { x := 1 }\nprint(1)\n", "statement:StructDecl"),
-    ("fn-after-statement", "print(1)\nfn(f()) { return 1 }\n", "fn-after-statement"),
+    ("fn-called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"),
+    ("fn-called-before-declaration-transitive", "fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n",
+     "fn-called-before-declaration"),
     ("async-fn", "fn[async](f()) { return 1 }\nprint(1)\n", "fn-flags"),
     ("lambda", "f := (x) => x\nprint(1)\n", "expression:Lambda"),
     ("bare-expression", "x := 1\nx\n", "expression-statement"),

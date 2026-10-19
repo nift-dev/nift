@@ -48,6 +48,9 @@ void check_outputs() {
         {"i := 0\nwhile(i < 5) { i += 1; if(i == 2) { continue } if(i == 4) { break } print(i) }\n", "1\n3\n"},
         {"fn(f(n)) { if(n < 2) { return n } return f(n - 1) + f(n - 2) }\nprint(f(15))\n", "610\n"},
         {"fn(f()) { }\nprint(f())\n", "null\n"},
+        // CP12 phase B: function declarations after statements.
+        {"print(1)\nfn(f()) { return 2 }\nprint(f())\n", "1\n2\n"},
+        {"fn(g()) { return f(3) + 1 }\nprint(5)\nfn(f(x)) { return x }\nprint(g())\n", "5\n4\n"},
         // `a = t` reads t's binding type (text type of a bare name): its BindType must survive.
         {"fn(g(a, b)) { while(b != 0) { t := b; b = a % b; a = t } return a }\nprint(g(1071, 462))\n", "21\n"},
         {"a := [1, 2]\na.push(3)\na[0] = 9\nprint(a[0] + a.length())\n", "12\n"},
@@ -86,7 +89,11 @@ void check_fallbacks() {
     const Case cases[] = {
         {"x := 1\nprint(\"$[x]\")\n", "interpolation"},
         {"fn(f()) { return n }\nprint(f())\n", "free-name"},
-        {"print(1)\nfn(f()) { return 1 }\n", "fn-after-statement"},
+        // CP12 phase B: a declaration after statements is admitted unless a
+        // call can run before it (directly or through another function).
+        {"print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
+        {"fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
+        {"x := 1\nif (x > 5) { print(f()) }\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
         {"const c := 1\n", "declare-const"},
         {"for(x : [1]) { print(x) }\n", "statement:For"},
         {"print(\"a\\tb\")\n", "string-literal"},

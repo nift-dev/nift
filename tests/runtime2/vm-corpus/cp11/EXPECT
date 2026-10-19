@@ -14,7 +14,8 @@ fallback_bare_expression.f fallback expression-statement
 fallback_builtin.f fallback type:print
 fallback_const.f fallback declare-const
 fallback_escape.f fallback string-literal
-fallback_fn_after.f fallback fn-after-statement
+fallback_fn_after.f vm 
+fallback_fn_called_early.f fallback fn-called-before-declaration
 fallback_for.f fallback statement:For
 fallback_free_name.f fallback free-name
 fallback_index_assign_call.f fallback index-target
