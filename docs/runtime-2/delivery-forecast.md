@@ -16,9 +16,16 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
 - Critical path: **CP12 phase B → CP16/CP17 → CP24 → CP25**. CP25 (retire the
   legacy evaluator) needs near-complete VM coverage, so coverage — not built-ins —
   sets the pace.
-- VM coverage (shared corpora): **101 / 786 (12.8 %)**, measured at CP12 phase A.
-  Refusal-reason inventory with sole-blocker and multi-reason counts: in progress
-  (`checkpoints/cp12b-coverage-inventory.md`, pending).
+- VM coverage (shared corpora): **101 / 786 (12.8 %)**, measured at CP12 phase A;
+  104 / 789 with B1 (declarations after statements) on `runtime-2-cp12b-dev`.
+- Inventory complete (2026-10-20, `checkpoints/cp12b-coverage-inventory.md` on the
+  CP12B branch). Curated corpus (589): all of CP12B scope → 30.4 %; CP12B +
+  CP13–CP16 → +142 scripts (only +40 without CP12B). Modules block 124, structs 37,
+  declaration order 48; enums occur in no corpus. Chained calls on call results
+  block 153 (VM subset gap). **About 180 curated scripts depend on features no
+  checkpoint owns** (`for` 21, lambdas/functions as values 88, unscheduled
+  built-ins 60, methods outside CP14/15 57, lambda-taking methods 38): as
+  scheduled, CP25's zero-fallback gate is unreachable — roadmap decision pending.
 - **Target (owner, 2026-10-19): complete the Runtime 2.0 implementation within
   seven days, with the following week as contingency.** A stretch target, not
   permission to weaken correctness or certification. Workstreams overlap (agents
@@ -42,7 +49,8 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
 | CP09–CP11 | ✓ | ✓ | ✓ | ✓ | ✓ (CI @c6fac06) | — | — | — | |
 | **CP12 phase A** (engine selection, replay removed) | ✓ | ✓ (2 rounds) | ✓ @ebc2656 | ✓ bd1c8a9 | pending | CP11 | — | — | planted-defect gate permanent |
 | **CP12 phase B** (globals, `GETDYN`, modules, structs, enums) | started 2026-10-19 (inventory) | | | | | CP12A | large | **high** | the coverage engine; agent assigned |
-| CP13 diagnostics | ✓ (on `spec-integration`) | ✓ (design) | | | | CP12A | small | low | some gates rerun on new base pending |
+| **CP13 phase A** (prevalidation, multi-line return, `runtime.*` codes, site-DX) | ✓ | ✓ (design) | ✗ @fb9112d (4 FAIL: trailing-comma false rejection ×2, python binding missing `src/rt/parser.cpp`, test-integrity ×6) | | | CP12A | fixes in progress | low–medium | re-certify on Linode after fixes |
+| CP13 phase B (VM `throw`/`try`, structured error records, JSON diagnostics, `eval` prevalidation) | | | | | | CP13A | medium | **medium–high** | corpus scripts waiting on `try`; affects unwinding/cleanup |
 | **CP14 phase A** (F1/F2/F3/F6, 73 natives) | ✓ | ✓ | ✓ @6c26404 | ✓ 2026-10-19 | pending | CP12A | certification | low | coverage unchanged by itself (104/788) |
 | **CP14 phase B** (F4 mutating ×9, F5 callbacks ×17: `map`, `sort_by`, `filter`…) | design only | ✓ (design) | | | | CP12B place model (F4); native→compiled callbacks (F5) | medium | medium | `sort_by` 19, `map` 9 corpus refusals |
 | CP15 built-ins B | natives ✓, wiring written | ✓ (natives) | | | | CP14 | small–medium | low | time natives moved to CP16 |
