@@ -19,7 +19,7 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L4 | Declarations typed against bindings visible at loop preparation | Consistent declarations everywhere | correctness | X | D-015, CP11 M1 |
 | L5 | Statements after `break`/`continue` in the same block run | `break`/`continue` always jump | correctness | X | D-014, D-015 |
 | L6 | Built-ins win over user functions; varies by context | Consistent lexical resolution, user definitions shadow | correctness | A | D-009 #3, D-014 |
-| L7 | Aliasing depends on argument shape (`f(o.k)` aliases, `f(a)` copies) | Explicit, documented value/reference rules | correctness | X | D-015, CP11 D6 |
+| L7 | Aliasing depends on argument shape (`f(o.k)` aliases, `f(a)` copies) | Value semantics with copy-on-write for all ordinary values incl. structs, maps, sets; `same()` only for identity types (D-040) | correctness | A (D-040; VM refuses today) | D-015, CP11 D6 |
 | L8 | Ordinary runtime errors (index, type, undefined callable, arity, arithmetic) are uncatchable | Catchable; internal VM failures and resource exhaustion stay distinct | correctness | A (staged) | D-009 #7, D-022 |
 | L9 | Syntax errors found while running, after earlier output | Rejected before anything runs, both engines | correctness | A (CP13) | D-022 |
 | L10 | Errors reported at call site / outermost loop statement / `try` start | Reported where they occur | correctness | D (VM) · site-dx (legacy try/catch) | D-018 #3, D-022 |
@@ -53,3 +53,4 @@ implemented · **D** = done (link) · **X** = VM refuses the construct today.
 | L38 | `uniqueItems` validation is O(n²) | Linear (hash-based) | medium | R | CP15 review N3 |
 | L39 | `{"a": 1e-400}.a == 0` is false; `to_int("1e-400")` errors; `abs(INT64_MIN)` is the double `9.223372036854776e+18` typed `int` | Consistent underflow and exact integer results (with L14, L32) | correctness | R | CP15 review N6 |
 | L40 | Values nested deeper than the JSON limit crash `validate` in legacy (unbounded recursion) | Loud `limit.exceeded` (VM does this from CP15) | correctness | A (CP15) | CP15 review R2 |
+| L42 | Structs fail inside loop bodies ("value has no member") in legacy; `deepcopy(id(a[0]))` still aliases; `a[0].push(x)` / `o.k.push(x)` are errors | One meaning everywhere; resolved by D-040 value semantics | correctness | R (found by L7 probes; L41 is reserved on the CP12B branch) | L7 proposal |

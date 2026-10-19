@@ -775,3 +775,43 @@ language-cleanup checkpoint.
 - The lifecycle cost (create+resolve+release ~1,250 → ~2,100 instructions) is
   accepted while the resolve hot path is unchanged; the guard stays, and
   optimisation waits for measurements that justify it.
+
+## D-040 — L7: value semantics for ordinary values (owner, 2026-10-20)
+
+Evidence: `checkpoints/l7-aliasing-proposal.md` (branch `l7-design`, eff20687):
+113 legacy probes; legacy aliases only for certain syntactic shapes and contexts,
+which cannot satisfy D-018. All four recommendations approved:
+
+1. **Ordinary values** (arrays, objects and other compound values) have value
+   semantics, implemented with copy-on-write, in **both engines** (D-018).
+   Assignment, parameter passing, returns, container extraction and closure
+   capture have defined value behaviour independent of source-expression syntax.
+   Copy-on-write is an implementation detail and must never be observable.
+   Value semantics apply recursively: nested values never share mutation.
+2. **Structs** are values too. The affected fixture and regression assertions
+   are updated explicitly under L7, never silently.
+3. **Maps and sets** are values. Copying a container holding CP17 handles keeps
+   handle identity and never duplicates the underlying resource; mutating either
+   container stays independent.
+4. **`same()`** is restricted to identity-bearing types (handles and other
+   shared-identity resources); on ordinary values it is a clear argument/type
+   error. `==` keeps value equality. Storage sharing is never exposed.
+
+Migration: an optional legacy aliasing audit mode is implemented. VM warnings
+about modifying extracted values stay opt-in unless shown to have a low
+false-positive rate. Measured impacts (including the `diff` package contract
+assertion and the v46 import-worker alias test) are explicit approved
+differences.
+
+Correctness: nested copying, parameters, returns, closures, loops, async
+boundaries and handle-containing containers are defined and tested. Whether
+cyclic ordinary values can exist is determined: either an acyclic invariant is
+established and enforced, or cycle semantics are defined explicitly — no
+garbage collector to preserve a legacy quirk. Every intentional change has an
+independently checked differential fixture.
+
+Performance: keep the legacy quadratic `x = f(x)` reproducer; add guards for
+large nested values, mutation after copy, and repeated assignment.
+
+Process: isolated from CP13/CP15 compiler integration; normal independent
+review and certification; CP25's zero-fallback requirement unchanged.
