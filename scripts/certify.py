@@ -14,9 +14,14 @@ failure alone, and classifies each target:
   UNVERIFIED            a dependency or platform is unavailable here (detected from
                         the environment AND the log: missing tool, blocked toolchain
                         download, missing sibling checkout); CI covers these
-  BASELINE-FAILURE      fails identically on the v4.12.0 baseline tree under the
-                        same conditions (pre-existing, not a Runtime 2.0 regression)
-  FAIL                  anything else
+  BASELINE-FAILURE      fails on the v4.12.0 baseline tree at the same failing step,
+                        run as the same user as the candidate result it is
+                        compared with (pre-existing, not a Runtime 2.0 regression)
+  FAIL                  anything else, including a baseline failure at a different
+                        or unidentified step
+
+The policy is the pure function decide(), table-tested in
+tests/runtime2/certification_guard.sh.
 
 Only PASS counts as a pass. Exit status is 1 when any target is FAIL (or when a
 --strict run has anything but PASS/FLAKY), else 0. Logs: .build/certify/<target>.log;
@@ -268,6 +273,37 @@ def failure_signature(text):
     return None
 
 
+def decide(f):
+    """The whole classification policy, as a pure function of observed facts.
+
+    Order of evidence: pass; re-run alone; environment detected from the log;
+    unprivileged re-run; baseline under the same user at the same failing step.
+    Anything not positively shown to be acceptable is FAIL: a baseline failure
+    never excuses a candidate failure at a different or unidentified step.
+    """
+    t = f["target"]
+    if f["rc"] == 0:
+        return "PASS", ""
+    if f["load_sensitive"]:
+        # Already ran with no competing target: a later pass does not resolve
+        # the failure (owner review, D-012). Thresholds unchanged.
+        return "FAIL", (f"load-sensitive guard failed under exclusive execution "
+                        f"(re-run alone: {'passed' if f['rerun_rc'] == 0 else 'failed'}); see .build/certify/{t}.log")
+    if f["rerun_rc"] == 0:
+        return "FLAKY", "failed in the concurrent run, passed when re-run alone"
+    if f.get("unverified"):
+        return "UNVERIFIED", "; ".join(f["unverified"])
+    if f.get("unpriv_rc") == 0:
+        return "SKIPPED-ENVIRONMENTAL", f"fails only as root; passes as unprivileged user '{f['user']}'"
+    if f.get("base_rc") not in (None, 0) and f.get("base_has_target"):
+        cs, bs = f.get("cand_step"), f.get("base_step")
+        if cs is not None and cs == bs:
+            return "BASELINE-FAILURE", f"also fails on the v4.12.0 baseline at the same step, same user: {cs}"
+        return "FAIL", (f"baseline also fails, but at a different or unidentified step "
+                        f"(candidate: {cs}; baseline: {bs}); see {f.get('cand_log')}")
+    return "FAIL", f"see .build/certify/{t}.log"
+
+
 def ensure_baseline(path, jobs):
     if not (path / "Makefile").exists():
         return False
@@ -355,66 +391,41 @@ def main():
     baseline_ready = None
     baseline_user_copy = None
     for t, r in sorted(results.items()):
-        if r["rc"] == 0:
-            r["status"], r["reason"] = "PASS", ""
-            continue
-        rc, _ = run_target(ROOT, t, logdir / f"{t}.rerun.log", a.timeout)
-        if t in LOAD_SENSITIVE:
-            # Already ran with no competing target: a later pass does not
-            # resolve the failure (owner review, D-012). Thresholds unchanged.
-            r["status"] = "FAIL"
-            r["reason"] = (f"load-sensitive guard failed under exclusive execution "
-                           f"(re-run alone: {'passed' if rc == 0 else 'failed'}); see .build/certify/{t}.log")
-            continue
-        if rc == 0:
-            r["status"], r["reason"] = "FLAKY", "failed in the concurrent run, passed when re-run alone"
-            continue
-        text = (logdir / f"{t}.log").read_text(errors="replace") + (logdir / f"{t}.rerun.log").read_text(errors="replace")
-        unverified = detect_unverified(text)
-        if unverified:
-            r["status"], r["reason"] = "UNVERIFIED", "; ".join(unverified)
-            continue
-        # The candidate's furthest-reaching failure: as root, unless the
-        # unprivileged run was made (it gets past root-only steps and may fail
-        # later, e.g. CP13 @0b879df: root failed at a root-only smoke, the
-        # unprivileged run failed later on a real regression).
-        cand_log, base_user = logdir / f"{t}.log", None
-        if os.geteuid() == 0 and user:
-            if user_copy is None:
-                user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
-                prepare_copy(ROOT, user_copy, user)
-            urc, _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user=user)
-            if urc == 0:
-                r["status"], r["reason"] = "SKIPPED-ENVIRONMENTAL", f"fails only as root; passes as unprivileged user '{user}'"
-                continue
-            cand_log, base_user = logdir / f"{t}.unprivileged.log", user
-        if baseline:
-            if baseline_ready is None:
-                baseline_ready = ensure_baseline(baseline, a.jobs)
-            if baseline_ready:
-                # Compare like with like: the baseline runs as the same user as
-                # the candidate log it is compared with.
-                base_dir = baseline
-                if base_user:
-                    if baseline_user_copy is None:
-                        baseline_user_copy = Path(pwd.getpwnam(base_user).pw_dir) / "nift-certify-baseline-copy"
-                        prepare_copy(baseline, baseline_user_copy, base_user)
-                    base_dir = baseline_user_copy
-                blog = logdir / f"{t}.baseline.log"
-                brc, _ = run_target(base_dir, t, blog, a.timeout, user=base_user)
-                btext = blog.read_text(errors="replace")
-                if brc != 0 and "No rule to make target" not in btext:
-                    csig = failure_signature(cand_log.read_text(errors="replace"))
-                    bsig = failure_signature(btext)
-                    if csig is not None and csig == bsig:
-                        r["status"], r["reason"] = "BASELINE-FAILURE", (
-                            f"also fails on the v4.12.0 baseline ({baseline}) at the same step: {csig}")
-                        continue
-                    r["status"], r["reason"] = "FAIL", (
-                        f"baseline also fails, but at a different or unidentified step "
-                        f"(candidate: {csig}; baseline: {bsig}); see {cand_log.relative_to(ROOT)}")
-                    continue
-        r["status"], r["reason"] = "FAIL", f"see .build/certify/{t}.log"
+        # Gather facts; the verdict comes only from decide(), which is pure and
+        # table-tested (tests/runtime2/certification_guard.sh).
+        f = {"target": t, "rc": r["rc"], "load_sensitive": t in LOAD_SENSITIVE, "user": user}
+        if r["rc"] != 0:
+            f["rerun_rc"], _ = run_target(ROOT, t, logdir / f"{t}.rerun.log", a.timeout)
+        if r["rc"] != 0 and f["rerun_rc"] != 0 and not f["load_sensitive"]:
+            text = (logdir / f"{t}.log").read_text(errors="replace") + (logdir / f"{t}.rerun.log").read_text(errors="replace")
+            f["unverified"] = detect_unverified(text)
+            cand_log, base_user = logdir / f"{t}.log", None
+            if not f["unverified"] and os.geteuid() == 0 and user:
+                if user_copy is None:
+                    user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                    prepare_copy(ROOT, user_copy, user)
+                f["unpriv_rc"], _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user=user)
+                # The unprivileged run gets past root-only steps and may fail later:
+                # it is the candidate result the baseline must be compared with.
+                cand_log, base_user = logdir / f"{t}.unprivileged.log", user
+            if not f["unverified"] and f.get("unpriv_rc") != 0 and baseline:
+                if baseline_ready is None:
+                    baseline_ready = ensure_baseline(baseline, a.jobs)
+                if baseline_ready:
+                    base_dir = baseline   # same user as the candidate log it is compared with
+                    if base_user:
+                        if baseline_user_copy is None:
+                            baseline_user_copy = Path(pwd.getpwnam(base_user).pw_dir) / "nift-certify-baseline-copy"
+                            prepare_copy(baseline, baseline_user_copy, base_user)
+                        base_dir = baseline_user_copy
+                    blog = logdir / f"{t}.baseline.log"
+                    f["base_rc"], _ = run_target(base_dir, t, blog, a.timeout, user=base_user)
+                    btext = blog.read_text(errors="replace")
+                    f["base_has_target"] = "No rule to make target" not in btext
+                    f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
+                    f["base_step"] = failure_signature(btext)
+                    f["cand_log"] = str(cand_log.relative_to(ROOT))
+        r["status"], r["reason"] = decide(f)
 
     order = ["FAIL", "BASELINE-FAILURE", "UNVERIFIED", "SKIPPED-ENVIRONMENTAL", "FLAKY", "PASS"]
     counts = {k: sum(1 for r in results.values() if r["status"] == k) for k in order}

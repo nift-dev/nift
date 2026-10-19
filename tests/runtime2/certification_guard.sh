@@ -63,26 +63,45 @@ print(f'PASS certification guard: certify-targets reaches {len(required)} requir
       f'{len([s for s in ci_scripts if s in CI_ONLY])} CI-only: ' + ', '.join(f'{k} ({v})' for k, v in CI_ONLY.items() if k in ci_scripts))
 PY
 
-# BASELINE-FAILURE must only be claimed when the baseline fails at the same step
-# (CP13 phase A @0b879df: a root-only failure on both trees masked a later
-# regression that only the unprivileged run reached).
+# Self-test of the classification policy (scripts/certify.py decide()). A failure
+# is accepted only when positively shown to be acceptable; in particular an
+# earlier root-only failure shared with the baseline cannot mask a later
+# candidate regression (CP13 phase A @0b879df, test-v43-language).
 python3 - <<'PY'
 import sys
 sys.path.insert(0, 'scripts')
 import certify
-sig = certify.failure_signature
-root = 'NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nboom\nmake: *** [Makefile:1136: test-v43-language] Error 1\n'
-unpriv = ('NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nPASS\n'
-          'NIFT_BIN=x tests/v43_final_language_smoke.sh\nerror: t.nift:1:36: bad\n'
-          'make: *** [Makefile:1160: test-v43-language] Error 1\n')
+sig, decide = certify.failure_signature, certify.decide
+ROOT_ONLY = 'NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nboom\nmake: *** [Makefile:1136: test-v43-language] Error 1\n'
+LATER = ('NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nPASS\n'
+         'NIFT_BIN=x tests/v43_final_language_smoke.sh\nerror: t.nift:1:36: bad\n'
+         'make: *** [Makefile:1160: test-v43-language] Error 1\n')
+base = dict(target='t', rc=1, load_sensitive=False, rerun_rc=1, user='tester')
+def case(**kw): return decide({**base, **kw})[0]
 checks = [
-    (sig(root), 'tests/v43_cp112_filevalue_wall_smoke.sh'),
-    (sig(unpriv), 'tests/v43_final_language_smoke.sh'),
-    (sig('no step here\nmake: *** [x] Error 2\n'), None),
-    (sig(root) == sig(unpriv), False),
+    ('signature root-only step', sig(ROOT_ONLY), 'tests/v43_cp112_filevalue_wall_smoke.sh'),
+    ('signature later step', sig(LATER), 'tests/v43_final_language_smoke.sh'),
+    ('signature unidentified', sig('nothing\nmake: *** [x] Error 2\n'), None),
+    ('pass', case(rc=0), 'PASS'),
+    ('flaky', case(rerun_rc=0), 'FLAKY'),
+    ('load-sensitive never flaky', case(load_sensitive=True, rerun_rc=0), 'FAIL'),
+    ('unverified', case(unverified=['tool x not installed']), 'UNVERIFIED'),
+    ('root-only', case(unpriv_rc=0), 'SKIPPED-ENVIRONMENTAL'),
+    # The CP13 masking scenario, end to end: root fails at the root-only step on
+    # both trees; unprivileged candidate fails later; unprivileged baseline passes.
+    ('masking: unprivileged baseline passes', case(unpriv_rc=1, base_rc=0, base_has_target=True,
+        cand_step=sig(LATER), base_step=None), 'FAIL'),
+    # Same, if the unprivileged baseline failed at the earlier step only.
+    ('masking: baseline fails earlier', case(unpriv_rc=1, base_rc=1, base_has_target=True,
+        cand_step=sig(LATER), base_step=sig(ROOT_ONLY)), 'FAIL'),
+    ('genuine pre-existing (same step, same user)', case(unpriv_rc=1, base_rc=1, base_has_target=True,
+        cand_step=sig(LATER), base_step=sig(LATER)), 'BASELINE-FAILURE'),
+    ('unidentified steps never excuse', case(base_rc=1, base_has_target=True, cand_step=None, base_step=None), 'FAIL'),
+    ('target absent from baseline', case(base_rc=2, base_has_target=False), 'FAIL'),
+    ('no baseline available', case(), 'FAIL'),
 ]
-bad = [(got, want) for got, want in checks if got != want]
+bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
-    print('FAIL certify failure_signature:', bad); sys.exit(1)
-print(f'PASS certify failure_signature ({len(checks)} checks)')
+    print('FAIL certify classification self-test:', bad); sys.exit(1)
+print(f'PASS certify classification self-test ({len(checks)} cases)')
 PY
