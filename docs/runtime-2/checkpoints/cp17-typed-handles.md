@@ -429,6 +429,11 @@ Heavy runs went through `scratchpad/heavy.sh` with `nice make -j1`.
 | `vm-handle-box.patch` (scratch worktree, both patches applied) | `handle_box_unit` 12 / 0 under ASan+UBSan; `make test-rt-value` and `make test-rt-handles` pass |
 | earlier: TSan lock-removal mutant | TSan reports a data race (exit 66) |
 
+D-039 rerun at tip `4c641df5`: `make test-rt-handles` unit 234, lifecycle
+208, stress 515 (0 failures, gates and lint clean); ASan/UBSan unit 234,
+lifecycle 208, stress 315; TSan lifecycle 208, stress 315 (no reports);
+mutants 35 of 35 killed; guards within +10 % (2,089 / 251 / 2,163 / 8,444 Ir).
+
 One hang was found during development, and it was a defect in the test. With
 the build-on-error test, the main thread was in `close_context` → `close_one`
 waiting for the page's obligation, while the test's settler thread waited for
