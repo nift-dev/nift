@@ -37,9 +37,9 @@ const KindSpec* HandleTable::kind_spec(HandleKind kind) const {
     return entry.registered ? &entry.spec : nullptr;
 }
 
-HandleStatus HandleTable::open_context(ContextKind kind, ContextId parent, ContextId& out) {
+HandleStatus HandleTable::open_context(ContextKind kind, ContextId parent, ContextId& out, std::string label) {
     std::lock_guard<std::mutex> lock(mu_);
-    return contexts_.open(kind, parent, out);
+    return contexts_.open(kind, parent, out, std::move(label));
 }
 
 HandleStatus HandleTable::cancel_context(ContextId id) {
@@ -135,9 +135,16 @@ std::vector<CleanupFailure>& HandleTable::failures_of(ContextId owner) {
 HandleTable::Started HandleTable::begin_cleanup_locked(std::uint32_t index, ReleaseReason reason) {
     const ContextId owner = store_.slot(index).owner;
     const std::uint64_t id = store_.slot(index).record;
-    Started started{store_.take(index, *list_of(owner)), reason, LifeState::Active, TerminationCause::None, false};
-    if (owner == kDetached) ++detached_in_flight_;
-    else ++contexts_.find(owner)->in_flight;
+    Started started{store_.take(index, *list_of(owner)), reason, LifeState::Active, TerminationCause::None, false,
+                    {}, false};
+    if (owner == kDetached) {
+        ++detached_in_flight_;
+    } else {
+        ExecContext& c = *contexts_.find(owner);
+        ++c.in_flight;
+        started.label = c.label;
+        started.context_error = reason == ReleaseReason::ContextEnd && c.ending_on_error;
+    }
     LifeRecord& r = *records_.find(id);
     started.state = r.state;
     started.cause = r.cause;
@@ -172,7 +179,7 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
     lock.unlock();
     CleanupOutcome outcome = CleanupOutcome::completed();
     CleanupEvent event{t.kind, t.handle, t.owner, started.reason, t.resource, started.state, started.cause,
-                       started.ticket ? &ticket : nullptr};
+                       started.label, started.context_error, started.ticket ? &ticket : nullptr};
     bool threw = false;
     if (spec.cleanup) {
         try {
@@ -191,13 +198,16 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
         if (failed && failure) {
             const bool lost = outcome.result == CleanupOutcome::Result::Lost;
             *failure = CleanupFailure{t.handle, t.kind, t.owner, started.reason, cause_of(started.reason),
-                                      lost ? LifeState::Lost : LifeState::Failed, outcome.code, outcome.message};
+                                      lost ? LifeState::Lost : LifeState::Failed,
+                                      lost ? FailureDetail::Unconfirmed : outcome.detail, started.label,
+                                      outcome.code, outcome.message};
         }
         ticket.complete(std::move(outcome));
     } else if (!started.ticket && threw) {  // a bookkeeping-only hook threw: still loud
         lock.lock();
         failures_of(t.owner).push_back(CleanupFailure{t.handle, t.kind, t.owner, started.reason, started.cause,
-                                                      LifeState::Failed, outcome.code, outcome.message});
+                                                      LifeState::Failed, FailureDetail::Other, started.label,
+                                                      outcome.code, outcome.message});
         lock.unlock();
     }
     // A ticket the hook left behind with pending() settles here as unresolved.
@@ -267,7 +277,11 @@ bool HandleTable::settle(std::uint64_t id, CleanupOutcome&& outcome) {
     bool failed = false;
     if (!LifecycleStore::settle(*r, std::move(outcome), failure, failed)) return false;
     ++settled_;
-    if (failed) failures_of(r->owner).push_back(std::move(failure));
+    if (failed) {
+        const ExecContext* c = r->owner == kDetached ? nullptr : contexts_.find(r->owner);
+        if (c) failure.context_label = c->label;
+        failures_of(r->owner).push_back(std::move(failure));
+    }
     if (r->obligation) {
         r->obligation = false;
         if (std::size_t* n = obligations_of(r->owner)) --*n;

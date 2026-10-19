@@ -7,6 +7,7 @@
 #include "rt/handles/types.h"
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,8 @@ struct ExecContext {
     ContextId parent = kDetached;      // kDetached = root
     ContextState state = ContextState::Open;
     bool build_family = false;         // a build context or nested in one: no detach
+    bool ending_on_error = false;      // set by close_context(id, true) for the closing subtree
+    std::string label;                 // diagnostics: "page 'index'", "build", ...
     std::vector<ContextId> children;   // in open order
     OwnerList handles;                 // owned handles in creation order
     std::size_t in_flight = 0;         // cleanup hooks running for handles taken from this context
@@ -32,7 +35,7 @@ struct ExecContext {
 class ContextTree {
 public:
     // Opens a context nested in `parent` (kDetached for a root).
-    HandleStatus open(ContextKind kind, ContextId parent, ContextId& out);
+    HandleStatus open(ContextKind kind, ContextId parent, ContextId& out, std::string label = {});
     // The open or closing context `id`, or null (status says why).
     ExecContext* find(ContextId id, HandleStatus& status);
     ExecContext* find(ContextId id) { HandleStatus ignored; return find(id, ignored); }

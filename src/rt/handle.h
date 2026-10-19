@@ -55,8 +55,8 @@ enum class HandleStatus : std::uint8_t {
 // error with a `runtime.*` code.
 enum class HandleErrorClass : std::uint8_t { None, Recoverable, Internal, Limit, Error };
 
-const char* handle_status_code(HandleStatus status);   // e.g. "internal.handle_stale"
-const char* handle_status_text(HandleStatus status);   // e.g. "stale handle (released)"
+const char* handle_status_code(HandleStatus status);   // e.g. "runtime.handle_closed"
+const char* handle_status_text(HandleStatus status);   // e.g. "handle is closed"
 HandleErrorClass handle_error_class(HandleStatus status);
 
 class HandleRegistry {

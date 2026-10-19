@@ -35,13 +35,19 @@ void HandleTable::close_one(ContextId id, CloseReport& report, std::unique_lock<
     idle_.notify_all();
 }
 
-CloseReport HandleTable::close_context(ContextId id) {
+CloseReport HandleTable::close_context(ContextId id, bool on_error) {
     CloseReport report;
     std::unique_lock<std::mutex> lock(mu_);
     ExecContext* c = contexts_.find(id, report.status);
     if (!c) return report;
     if (c->state == ContextState::Closing) { report.status = HandleStatus::ContextClosed; return report; }
-    for (const ContextId each : contexts_.begin_close(id)) close_one(each, report, lock);
+    report.label = c->label;
+    report.on_error = on_error;
+    const std::vector<ContextId> order = contexts_.begin_close(id);
+    for (const ContextId each : order) {
+        if (ExecContext* e = contexts_.find(each)) e->ending_on_error = e->ending_on_error || on_error;
+    }
+    for (const ContextId each : order) close_one(each, report, lock);
     return report;
 }
 

@@ -1,0 +1,211 @@
+--- a/src/rt/value.h
++++ b/src/rt/value.h
+@@ -49,6 +49,21 @@
+     Command,  // CP16: a cmd() pipeline builder (legacy "\x1fnift:cmd:N"); started groups are Process
+ };
+ 
++// CP17/D-035: a counted handle boxed on the VM heap. The box holds one
++// handle-table reference; its refcount (per isolate, like every heap object)
++// counts the VM's references. When the last VM reference dies the box is
++// destroyed and `release` drops the table reference, which schedules cleanup
++// without blocking. The Value keeps (kind, generation) inline for the fast
++// checks; the id lives in the box. Built only by rt/handles/handle_box.h.
++struct HandleBoxObject : HeapObject {
++    std::uint64_t id = 0;
++    std::uint32_t generation = 0;
++    HandleKind handle_kind = HandleKind::None;
++    void* table = nullptr;
++    void (*release)(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) = nullptr;
++    HandleBoxObject() : HeapObject(Kind::Handle) {}
++};
++
+ class Value {
+ public:
+     static constexpr std::size_t kInlineStringCapacity = 14;
+@@ -89,12 +104,18 @@
+         Value v; v.set_kind(Kind::Handle); v.bytes_[14] = static_cast<unsigned char>(kind);
+         v.set_payload(id); std::memcpy(v.bytes_ + 8, &generation, 4); return v;
+     }
++    // Takes ownership of one reference to `box` (a counted handle).
++    static Value adopt_handle_box(HandleBoxObject* box) noexcept {
++        Value v; v.set_kind(Kind::Handle); v.bytes_[14] = static_cast<unsigned char>(box->handle_kind);
++        v.set_pointer(box); std::memcpy(v.bytes_ + 8, &box->generation, 4); v.bytes_[12] = kBoxedHandle; return v;
++    }
+ 
+     Kind kind() const noexcept { return static_cast<Kind>(bytes_[15]); }
+     bool is(Kind k) const noexcept { return kind() == k; }
+     bool is_null() const noexcept { return kind() == Kind::Null; }
+     bool is_number() const noexcept { return kind() == Kind::Int || kind() == Kind::Double || kind() == Kind::Decimal; }
+-    bool is_heap() const noexcept { return heap_kind(kind()) && !inline_string(); }
++    bool is_heap() const noexcept { return (heap_kind(kind()) && !inline_string()) || boxed_handle(); }
++    bool boxed_handle() const noexcept { return kind() == Kind::Handle && bytes_[12] == kBoxedHandle; }
+     bool inline_string() const noexcept { return kind() == Kind::String && (bytes_[14] & kInlineFlag) != 0; }
+ 
+     bool as_bool() const noexcept { return payload() != 0; }
+@@ -103,7 +124,11 @@
+     HeapObject* heap() const noexcept { HeapObject* p; std::memcpy(&p, bytes_, sizeof p); return p; }
+     template <class T> T* heap_as() const noexcept { return static_cast<T*>(heap()); }
+     HandleKind handle_kind() const noexcept { return static_cast<HandleKind>(bytes_[14]); }
+-    std::uint64_t handle_id() const noexcept { return payload(); }
++    std::uint64_t handle_id() const noexcept {
++        return boxed_handle() ? static_cast<const HandleBoxObject*>(heap())->id : payload();
++    }
++    // The plain (unboxed) identity of a handle value, for the handle table.
++    Value handle_identity() const noexcept { return handle(handle_kind(), handle_id(), handle_generation()); }
+     std::uint32_t handle_generation() const noexcept { std::uint32_t g; std::memcpy(&g, bytes_ + 8, 4); return g; }
+     std::uint32_t refcount() const noexcept { return is_heap() ? heap()->refcount : 0; }
+ 
+@@ -154,6 +179,7 @@
+     }
+ 
+     static constexpr unsigned char kInlineFlag = 0x80;
++    static constexpr unsigned char kBoxedHandle = 0x01;  // bytes_[12] of a boxed handle
+     static bool heap_kind(Kind k) noexcept {
+         switch (k) {
+             case Kind::Decimal: case Kind::String: case Kind::Bytes: case Kind::Array: case Kind::Object:
+diff --git a/src/rt/handles/handle_box.cpp b/src/rt/handles/handle_box.cpp
+new file mode 100644
+index 00000000..a5f82cdc
+--- /dev/null
++++ b/src/rt/handles/handle_box.cpp
+@@ -0,0 +1,30 @@
++#include "rt/handles/handle_box.h"
++
++namespace nift::rt::handles {
++
++namespace {
++
++void release_box(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) {
++    static_cast<HandleTable*>(table)->drop(Value::handle(kind, id, generation));
++}
++
++} // namespace
++
++Value box_counted_handle(HandleTable& table, const Value& handle) {
++    if (!handle.is(Kind::Handle) || handle.boxed_handle()) return handle;
++    auto* box = new HandleBoxObject();
++    box->id = handle.handle_id();
++    box->generation = handle.handle_generation();
++    box->handle_kind = handle.handle_kind();
++    box->table = &table;
++    box->release = release_box;
++    return Value::adopt_handle_box(box);
++}
++
++Value share_into_isolate(HandleTable& table, const Value& boxed) {
++    const Value plain = boxed.handle_identity();
++    if (table.retain(plain) != HandleStatus::Ok) return plain;  // closed: the identity still reports handle_closed
++    return box_counted_handle(table, plain);
++}
++
++} // namespace nift::rt::handles
+diff --git a/src/rt/handles/handle_box.h b/src/rt/handles/handle_box.h
+new file mode 100644
+index 00000000..fe0d8077
+--- /dev/null
++++ b/src/rt/handles/handle_box.h
+@@ -0,0 +1,18 @@
++#pragma once
++// VM values for counted handles (CP17/D-035): boxes a handle-table reference
++// in a refcounted heap value, so the VM's own reference counting decides when
++// the last script reference is gone. Requires the HandleBoxObject patch to
++// rt/value.h (tests/runtime2/cp17/patches/vm-handle-box.patch).
++#include "rt/handles/table.h"
++
++namespace nift::rt::handles {
++
++// Adopts one table reference to `handle` (the creator's reference from a
++// counted create(), or one from retain()) into a new boxed Value. Plain
++// handles (uncounted kinds) are returned unchanged.
++Value box_counted_handle(HandleTable& table, const Value& handle);
++// A boxed value for another isolate: retains a new table reference (refcounts
++// of heap values are per isolate; boxes never cross isolates).
++Value share_into_isolate(HandleTable& table, const Value& boxed);
++
++} // namespace nift::rt::handles
+diff --git a/src/rt/heap_account.cpp b/src/rt/heap_account.cpp
+index 5df7ac4a..0e62004c 100644
+--- a/src/rt/heap_account.cpp
++++ b/src/rt/heap_account.cpp
+@@ -40,6 +40,7 @@ std::size_t raw_footprint(const HeapObject* object) {
+             return sizeof(ErrorObject) + text_storage(e->message) + text_storage(e->code) +
+                    text_storage(e->category) + text_storage(e->source);
+         }
++        case Kind::Handle: return sizeof(HandleBoxObject);
+         default: return 0;
+     }
+ }
+diff --git a/src/rt/value.cpp b/src/rt/value.cpp
+index bebecf32..56b06c17 100644
+--- a/src/rt/value.cpp
++++ b/src/rt/value.cpp
+@@ -55,6 +55,12 @@ void delete_object(HeapObject* object) {
+         case Kind::Function: delete static_cast<FunctionObject*>(object); return;
+         case Kind::Struct: delete static_cast<StructObject*>(object); return;
+         case Kind::Error: delete static_cast<ErrorObject*>(object); return;
++        case Kind::Handle: {  // a counted handle box: drop its table reference (never blocks)
++            auto* box = static_cast<HandleBoxObject*>(object);
++            if (box->release) box->release(box->table, box->handle_kind, box->id, box->generation);
++            delete box;
++            return;
++        }
+         default: return;  // immediate kinds never reach the heap
+     }
+ }
+diff --git a/tests/rt/handle_box_unit.cpp b/tests/rt/handle_box_unit.cpp
+new file mode 100644
+index 00000000..4594b178
+--- /dev/null
++++ b/tests/rt/handle_box_unit.cpp
+@@ -0,0 +1,51 @@
++// CP17/D-035 VM hook: counted handles boxed in refcounted heap values.
++#include "rt/compare.h"
++#include "rt/handles/handle_box.h"
++#include "rt/handles/table.h"
++#include "rt_test.h"
++
++#include <vector>
++
++using namespace nift::rt;
++using namespace nift::rt::handles;
++
++int main() {
++    int cleaned = 0;
++    std::vector<CompletionTicket> reaper;
++    HandleTable t;
++    KindSpec spec;
++    spec.name = "process";
++    spec.cleanup = [&](CleanupEvent& e) {
++        ++cleaned;
++        reaper.push_back(std::move(*e.ticket));
++        return CleanupOutcome::pending();
++    };
++    t.register_kind(HandleKind::Process, spec);
++    ContextId s;
++    t.open_context(ContextKind::Script, kDetached, s);
++    Value plain;
++    t.create(s, HandleKind::Process, std::make_shared<int>(1), plain, CreateOptions{true});
++    {
++        Value boxed = box_counted_handle(t, plain);
++        CHECK(boxed.boxed_handle() && boxed.is_heap() && boxed.refcount() == 1);
++        CHECK(boxed.handle_id() == plain.handle_id() && boxed.handle_generation() == plain.handle_generation());
++        CHECK(equal(boxed, plain) && hash(boxed) == hash(plain));
++        std::shared_ptr<void> out;
++        CHECK(t.resolve(boxed.handle_identity(), HandleKind::Process, s, out) == HandleStatus::Ok);
++        Value alias = boxed;           // a VM copy: refcount, no table traffic
++        CHECK(boxed.refcount() == 2);
++        Value other_isolate = share_into_isolate(t, boxed);
++        CHECK(other_isolate.boxed_handle() && other_isolate.heap() != boxed.heap());
++        boxed = Value();
++        CHECK(cleaned == 0);           // alias and the other isolate's box still refer
++        alias = Value();
++        CHECK(cleaned == 0);
++    }                                  // the last box dies: cleanup is scheduled, never awaited
++    CHECK(cleaned == 1 && reaper.size() == 1);
++    std::shared_ptr<void> out;
++    CHECK(t.resolve(plain, HandleKind::Process, s, out) == HandleStatus::Closed);
++    CHECK(t.stats().pending_obligations == 1);
++    reaper.back().complete(CleanupOutcome::completed());
++    CHECK(t.stats().pending_obligations == 0 && t.close_context(s).failures.empty());
++    return rt_test::finish("rt handle box unit");
++}

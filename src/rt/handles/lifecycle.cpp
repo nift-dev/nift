@@ -35,6 +35,36 @@ const LifeRecord* LifecycleStore::find(std::uint64_t id) const {
     return it == records_.end() ? nullptr : &it->second;
 }
 
+namespace {
+
+// Lost always means "termination unconfirmed"; Failed never does.
+FailureDetail normalized(const CleanupOutcome& outcome) {
+    if (outcome.result == CleanupOutcome::Result::Lost) return FailureDetail::Unconfirmed;
+    if (outcome.detail == FailureDetail::None || outcome.detail == FailureDetail::Unconfirmed) {
+        return FailureDetail::Other;
+    }
+    return outcome.detail;
+}
+
+const char* default_code(FailureDetail detail) {
+    switch (detail) {
+        case FailureDetail::Unconfirmed: return "internal.handle_cleanup_lost";
+        case FailureDetail::ExitedCleanupIncomplete: return "internal.handle_cleanup_incomplete";
+        default: return "internal.handle_cleanup_failed";
+    }
+}
+
+const char* default_message(FailureDetail detail) {
+    switch (detail) {
+        case FailureDetail::AliveAfterKill: return "still alive after forced termination";
+        case FailureDetail::Unconfirmed: return "termination could not be confirmed";
+        case FailureDetail::ExitedCleanupIncomplete: return "exited, but cleanup could not be completed";
+        default: return "cleanup failed";
+    }
+}
+
+} // namespace
+
 bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed) {
     failed = false;
     if (is_settled(record.state)) return false;
@@ -44,14 +74,11 @@ bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, Cleanu
         default: record.state = LifeState::Failed; break;
     }
     failed = true;
-    const bool lost = record.state == LifeState::Lost;
+    const FailureDetail detail = normalized(outcome);
     failure = CleanupFailure{record.handle, record.kind, record.owner, record.reason, record.cause, record.state,
-                             outcome.code.empty() ? (lost ? "internal.handle_cleanup_lost"
-                                                          : "internal.handle_cleanup_failed")
-                                                  : std::move(outcome.code),
-                             outcome.message.empty() ? (lost ? "termination could not be confirmed"
-                                                             : "cleanup failed")
-                                                     : std::move(outcome.message)};
+                             detail, {},
+                             outcome.code.empty() ? default_code(detail) : std::move(outcome.code),
+                             outcome.message.empty() ? default_message(detail) : std::move(outcome.message)};
     return true;
 }
 

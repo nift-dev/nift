@@ -4,7 +4,7 @@
 
 namespace nift::rt::handles {
 
-HandleStatus ContextTree::open(ContextKind kind, ContextId parent, ContextId& out) {
+HandleStatus ContextTree::open(ContextKind kind, ContextId parent, ContextId& out, std::string label) {
     bool build_family = is_build_kind(kind);
     if (parent != kDetached) {
         HandleStatus status;
@@ -18,6 +18,7 @@ HandleStatus ContextTree::open(ContextKind kind, ContextId parent, ContextId& ou
     c.kind = kind;
     c.parent = parent;
     c.build_family = build_family;
+    c.label = std::move(label);
     if (parent != kDetached) contexts_[parent].children.push_back(id);
     else roots_.push_back(id);
     out = id;

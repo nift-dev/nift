@@ -63,7 +63,7 @@ Taken SlotStore::take(std::uint32_t index, OwnerList& list) {
         s.state = SlotState::Retired;
         ++retired_;
     } else {
-        ++s.generation;  // every outstanding copy of the handle is now stale
+        ++s.generation;  // every outstanding copy of the handle is now closed
         s.state = SlotState::Free;
         free_.push_back(index);
     }

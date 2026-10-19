@@ -12,6 +12,17 @@ const char* release_reason_name(ReleaseReason reason) {
     return "unknown";
 }
 
+const char* failure_detail_name(FailureDetail detail) {
+    switch (detail) {
+        case FailureDetail::None: return "none";
+        case FailureDetail::AliveAfterKill: return "alive-after-kill";
+        case FailureDetail::Unconfirmed: return "termination-unconfirmed";
+        case FailureDetail::ExitedCleanupIncomplete: return "exited-cleanup-incomplete";
+        case FailureDetail::Other: return "other";
+    }
+    return "unknown";
+}
+
 const char* life_state_name(LifeState state) {
     switch (state) {
         case LifeState::Active: return "active";

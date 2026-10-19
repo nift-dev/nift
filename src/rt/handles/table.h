@@ -58,7 +58,8 @@ public:
     }
 
     // Contexts (D-029/D-030): Script, Build, BuildHook, PageRender, AutoRebuild.
-    HandleStatus open_context(ContextKind kind, ContextId parent, ContextId& out);
+    // `label` names the context in cleanup events and reports.
+    HandleStatus open_context(ContextKind kind, ContextId parent, ContextId& out, std::string label = {});
     // Marks a context and its descendants Cancelling: no new handles,
     // children, detaches or inbound transfers; existing handles stay open.
     HandleStatus cancel_context(ContextId id);
@@ -67,7 +68,10 @@ public:
     // reason ContextEnd; then waits until every obligation of these contexts
     // has settled (CP16 bounds that wait). The report lists every Failed/Lost
     // settle of their resources; it is final.
-    CloseReport close_context(ContextId id);
+    // `on_error`: the context is ending on an error (fatal error, failed page
+    // or hook); its descendants end with it on the same error. Hooks see it in
+    // CleanupEvent::context_error; the report carries it.
+    CloseReport close_context(ContextId id, bool on_error = false);
     // Whether `id` is a build-family context, where detach() is
     // DetachForbidden: lets a native refuse a detached launch up front.
     HandleStatus context_in_build(ContextId id, bool& in_build) const;
@@ -149,6 +153,8 @@ private:
         LifeState state;
         TerminationCause cause;
         bool ticket;
+        std::string label;     // the owner's label
+        bool context_error;    // the owner is ending on an error
     };
 
     HandleStatus resolve_checked(const Value& handle, HandleKind kind, ContextId accessor, const void* type_tag,

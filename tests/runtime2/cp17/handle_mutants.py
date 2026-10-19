@@ -32,6 +32,9 @@ M=[
  ("unreported-ticket-forgotten","src/rt/handles/completion.cpp","    if (table_) {\n        complete(","    if (false) {\n        complete("),
  ("drop-no-abandon","src/rt/handles/table.cpp","--s.refs > 0) return HandleStatus::Ok;","--s.refs >= 0) return HandleStatus::Ok;"),
  ("no-capacity","src/rt/handles/slot_store.cpp","if (slots_.size() >= capacity_) return HandleStatus::LimitExceeded;",""),
+ ("lost-detail-not-normalized","src/rt/handles/lifecycle.cpp","    if (outcome.result == CleanupOutcome::Result::Lost) return FailureDetail::Unconfirmed;\n",""),
+ ("no-context-label","src/rt/handles/table.cpp","        started.label = c.label;\n",""),
+ ("no-context-error","src/rt/handles/table.cpp","started.context_error = reason == ReleaseReason::ContextEnd && c.ending_on_error;","started.context_error = false;"),
  ("limit-setting-ignored","src/rt/handles/table.cpp","if (!invalid_setting_.empty()) status = HandleStatus::InvalidSetting;","if (false) status = HandleStatus::InvalidSetting;"),
 ]
 res=[]

@@ -66,6 +66,11 @@ struct CleanupEvent {
     const std::shared_ptr<void>& resource;    // the hook may copy it (the reaper's own ownership)
     LifeState state;                          // lifecycle when cleanup began
     TerminationCause cause;                   // what started termination (None while Active)
+    // The owning context's label ("page 'index'", "build", "script x.f"; empty
+    // when detached) and whether that context is ending on an error (D-035:
+    // one source of truth for CP16's warnings; false unless reason is ContextEnd).
+    const std::string& context_label;
+    bool context_error;
     // Non-null exactly when `state` was Active: the hook is then responsible
     // for the resource's termination and must either return a final outcome
     // or move the ticket out, return pending() and complete it later. Null
@@ -74,22 +79,40 @@ struct CleanupEvent {
     CompletionTicket* ticket;
 };
 
+// What kind of cleanup failure (D-035). The three process cases are kept apart
+// so a report never calls an exited process "alive" or "lost":
+//   AliveAfterKill          Failed: known to be alive after forced termination
+//   Unconfirmed             Lost:   termination could not be confirmed
+//   ExitedCleanupIncomplete Failed: known to have exited, but reaping or handle
+//                                   cleanup could not be completed
+//   Other                   Failed: any other definitive failure
+enum class FailureDetail : std::uint8_t { None, AliveAfterKill, Unconfirmed, ExitedCleanupIncomplete, Other };
+const char* failure_detail_name(FailureDetail detail);
+
 // What a hook (or a ticket) reports. Completed/Failed/Lost are final; Pending
 // means "scheduled, the moved-out ticket will report".
 struct CleanupOutcome {
     enum class Result : std::uint8_t { Completed, Failed, Lost, Pending };
     Result result = Result::Completed;
-    std::string code;     // specific code; empty -> a default per result
-    std::string message;
+    std::string code;     // specific code; empty -> a default per detail
+    std::string message;  // empty -> a default per detail
+    FailureDetail detail = FailureDetail::None;
     static CleanupOutcome success() { return {}; }
     static CleanupOutcome completed() { return {}; }
     static CleanupOutcome failure(std::string code, std::string message) {
-        return CleanupOutcome{Result::Failed, std::move(code), std::move(message)};
+        return CleanupOutcome{Result::Failed, std::move(code), std::move(message), FailureDetail::Other};
+    }
+    static CleanupOutcome alive_after_kill(std::string code, std::string message) {
+        return CleanupOutcome{Result::Failed, std::move(code), std::move(message), FailureDetail::AliveAfterKill};
     }
     static CleanupOutcome lost(std::string code, std::string message) {
-        return CleanupOutcome{Result::Lost, std::move(code), std::move(message)};
+        return CleanupOutcome{Result::Lost, std::move(code), std::move(message), FailureDetail::Unconfirmed};
     }
-    static CleanupOutcome pending() { return CleanupOutcome{Result::Pending, {}, {}}; }
+    static CleanupOutcome exited_cleanup_incomplete(std::string code, std::string message) {
+        return CleanupOutcome{Result::Failed, std::move(code), std::move(message),
+                              FailureDetail::ExitedCleanupIncomplete};
+    }
+    static CleanupOutcome pending() { return CleanupOutcome{Result::Pending, {}, {}, FailureDetail::None}; }
 };
 
 // Runs without the table lock held, on the thread that triggered cleanup
@@ -118,12 +141,16 @@ struct CleanupFailure {
     ReleaseReason reason = ReleaseReason::Explicit;   // why the slot was given up (Explicit if still open)
     TerminationCause cause = TerminationCause::None;  // what started termination
     LifeState state = LifeState::Failed;              // Failed or Lost
+    FailureDetail detail = FailureDetail::Other;      // Lost <=> Unconfirmed
+    std::string context_label;                        // the owner's label at settle time (empty: detached)
     std::string code;
     std::string message;
 };
 
 struct CloseReport {
     HandleStatus status = HandleStatus::Ok;   // Ok, ContextClosed or UnknownContext
+    std::string label;                        // the closed context's label
+    bool on_error = false;                    // it ended on an error (close_context(id, true))
     std::size_t cleaned = 0;                  // handles whose cleanup this close started
     std::size_t contexts = 0;                 // contexts ended (the context and its descendants)
     std::vector<CleanupFailure> failures;     // in settle order (D-035: every unresolved obligation

@@ -34,6 +34,7 @@ struct FakeProcess {
 // it keeps the process after the script's last reference is gone).
 struct Reaper {
     std::mutex mu;
+    std::vector<std::pair<std::string, bool>> seen;  // (context label, context ending on error) per hook call
     std::vector<std::pair<std::shared_ptr<FakeProcess>, CompletionTicket>> queue;
     void schedule(std::shared_ptr<FakeProcess> p, CompletionTicket t) {
         p->terminate_calls++;  // "SIGTERM sent"
@@ -60,6 +61,7 @@ KindSpec process_kind(Reaper& reaper) {
     spec.detach_forbidden_code = "process.detach_in_build";
     spec.cleanup = [&reaper](CleanupEvent& e) {
         auto p = std::static_pointer_cast<FakeProcess>(e.resource);
+        { std::lock_guard<std::mutex> lock(reaper.mu); reaper.seen.emplace_back(e.context_label, e.context_error); }
         if (!e.ticket) return CleanupOutcome::pending();           // termination already started: bookkeeping only
         if (e.owner == kDetached) return CleanupOutcome::completed();  // detached: survives, bookkeeping released
         if (!p->alive) return CleanupOutcome::completed();          // exited and reaped: nothing to terminate
@@ -379,5 +381,7 @@ int main() {
     handle_closed_identity();
     transfers(200);
     limit_setting();
+    context_label_and_error();
+    exited_but_cleanup_incomplete();
     return rt_test::finish("rt handle lifecycle unit");
 }
