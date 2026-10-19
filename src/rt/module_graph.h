@@ -80,7 +80,9 @@ struct ModuleGraph {
     std::uint32_t offset = 0;  // source offset in that module
     // modules[0] is the entry unit: path/identity only (its Ast is the caller's).
     std::vector<std::unique_ptr<Module>> modules;
-    std::vector<std::filesystem::path> dependencies;  // every module read, in first-read order
+    // Every module read, in first-read order: deterministic, legacy's read
+    // order (a contract; the page record sorts its own copy).
+    std::vector<std::filesystem::path> dependencies;
     std::vector<std::filesystem::path> absent;        // modules looked for and not readable
 };
 

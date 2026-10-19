@@ -18,6 +18,7 @@
 #include <random>
 #include <string>
 #include <system_error>
+#include <vector>
 
 #ifndef _WIN32
 #include <sys/stat.h>
@@ -206,17 +207,19 @@ void check_details() {
     const TempRoot root;
     const auto probe = [&](const char* name) { return root.copy(kProbes / name / "p", name); };
     {
-        // Resolution relative to each importer, dependencies in first-read order.
-        const Planned p = plan(probe("nested_relative"), InitPolicy::RefuseReinitialisation);
+        // Resolution relative to each importer. Dependencies are compared by
+        // full path (the copy lives under a random root) in first-read order,
+        // which is a contract (module_graph.h: legacy's read order).
+        const fs::path main = probe("nested_relative");
+        const fs::path dir = main.parent_path();
+        const Planned p = plan(main, InitPolicy::RefuseReinitialisation);
         CHECK(p.graph.ok && p.graph.modules.size() == 4);
-        CHECK(p.graph.dependencies.size() == 3);
-        if (p.graph.dependencies.size() == 3) {
-            CHECK(name_of(p.graph.dependencies[0]) == "s.nft");
-            CHECK(name_of(p.graph.dependencies[1]) == "m2.nft");
-            CHECK(p.graph.dependencies[1].parent_path().filename() == "p");  // ../ from sub/
-            CHECK(name_of(p.graph.dependencies[2]) == "t.nft");
-            CHECK(p.graph.dependencies[2].parent_path().filename() == "sub");
-        }
+        const std::vector<fs::path> want = {dir / "sub" / "s.nft", dir / "m2.nft" /* ../ from sub/ */,
+                                            dir / "sub" / "t.nft"};
+        CHECK(p.graph.dependencies == want);
+        if (p.graph.dependencies != want)
+            for (const fs::path& d : p.graph.dependencies)
+                std::fprintf(stderr, "  dependency %s\n", d.string().c_str());
         CHECK(p.graph.modules[0]->imports.size() == 1 && p.graph.modules[1]->imports.size() == 2);
         CHECK(p.graph.modules[1]->exports.size() == 1 && p.graph.modules[1]->exports[0] == "sf");
     }
