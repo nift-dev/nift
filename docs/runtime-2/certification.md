@@ -179,3 +179,12 @@ across rebases (ccache is not installed here), check whether
 `test-build-boundary-nondestructive` and `test-build-boundary` repeat the same
 builds, and whether `test-rt-vm` and `test-rt-vm-mutants` share their unmutated
 runs.
+
+## Follow-up: site-DX checks under extreme CPU starvation (recorded 2026-10-19)
+
+With `test-site-dx` at `nice 19` against four CPU burners, three checks outside
+D1 failed: `N3 not linear` (wall-clock), `watch 6 (3 → 4)` and
+`recovery: marker left`. Not investigated yet. For the marker, establish whether
+it is temporary (cleaned up once processing finishes) or persists after the
+watcher becomes idle or exits — the latter is a correctness defect even if it
+only appears under extreme contention.
