@@ -156,3 +156,26 @@ platform is claimed only after its CI job passes on the pushed commit.
   scheduling regressions, so rerun the wall-clock test in the next preflight-
   passing benchmark window and record the result here. Until then the target
   is not counted as a pass in local certification.
+
+## Where certification time goes (measured 2026-10-19, `feature-serve` @c285fa4)
+
+172 targets, 64 min of summed target time (34 min of it exclusive), run at
+`-j2`; wall time about 50 min for targets plus the prebuild (a full rebuild,
+since rebases touch every source mtime), roughly 80 min end to end on an idle
+host. Longer runs were lock waits, not certify itself.
+
+| Target | Minutes | Share |
+|---|---:|---:|
+| test-build-boundary-nondestructive (exclusive) | 21.3 | 33.5 % |
+| test-runtime2-rt-diff-selftest | 11.1 | 17.5 % |
+| test-rt-vm | 8.4 | 13.3 % |
+| test-build-boundary (exclusive) | 4.2 | 6.6 % |
+| test-python-binding (exclusive) | 3.6 | 5.6 % |
+| test-node-binding (exclusive) | 3.4 | 5.4 % |
+| everything else (166 targets) | 12.2 | 18.6 % |
+
+Candidates (not applied; none skips or weakens a gate): cache object files
+across rebases (ccache is not installed here), check whether
+`test-build-boundary-nondestructive` and `test-build-boundary` repeat the same
+builds, and whether `test-rt-vm` and `test-rt-vm-mutants` share their unmutated
+runs.

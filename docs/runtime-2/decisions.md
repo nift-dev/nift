@@ -582,3 +582,9 @@ must be removed or justified when build recovery integrates.
     the reason, is not duplicated across a pipeline, and may become suppressible
     without disabling cleanup. 2,000 ms is a documented default that may become
     configurable later; no new configuration machinery in CP16.
+- **Ownership by call shape (owner).** A synchronous `run()` collects all output
+  and reaps every stage before returning. A streaming/started handle leaves
+  responsibility with the enclosing execution context (not the caller forever);
+  explicit detachment moves it outside that context. Implementation and tests
+  keep these three events distinct. D-030 is complete; no further CP16 design
+  expansion.
