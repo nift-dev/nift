@@ -667,3 +667,18 @@ must be removed or justified when build recovery integrates.
 - After SIGTERM, non-blocked script code may run for at most the documented
   grace + bound window while managed children are cleaned up; a context that ends
   on an error terminates its processes without the cleanup warning.
+- **Refinements (owner).** Pipe capture drains stdout/stderr concurrently,
+  bounds while reading, cleans up descendants holding the pipe, and keeps launch
+  failure, nonzero exit, timeout, cancellation and `limit.exceeded` distinct;
+  modes documented (capture / pipe / stream / detached). `{"text": …}` is fed while
+  draining output, survives early exit/broken pipe without crash or hang, and is
+  strings only (binary stdin later via a byte form or stream handle);
+  `{"file": …}` follows OS semantics, `--fs-root` and build dependency
+  recording; no shell; compatible with CP19/CP20 redirection. Deadlines use a
+  monotonic clock, cancel the whole pipeline, are race-safe, record expiry even
+  if the process exits during grace, and are the mechanism CP22 reuses; a
+  deadline marks when cancellation begins. SIGTERM immediately marks the context
+  as shutting down: no new launches, builds, renders or other externally visible
+  operations; exit status is signal-derived; the window is a normal-shutdown
+  guarantee, not protection from SIGKILL or crashes. Error-ended contexts
+  suppress routine cleanup warnings but still report genuine cleanup failures.
