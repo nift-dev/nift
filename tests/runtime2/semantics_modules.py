@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CP12 phase B: CP08-style probes of legacy `import`/`export` semantics.
 
-  semantics_modules.py --nift ./nift [--record]
+  semantics_modules.py --nift ./nift [--record] [--dir semantics-structs]
 
 Each probe is a directory tests/runtime2/semantics-modules/<probe>/ with the
 program in p/ (entry p/main.f, modules beside it) and the expected result of
@@ -38,7 +38,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
     ap.add_argument("--record", action="store_true")
+    ap.add_argument("--dir", default="semantics-modules", help="probe directory under tests/runtime2")
     args = ap.parse_args()
+    global HERE
+    HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.dir)
     nift = os.path.abspath(args.nift)
     failures = 0
     probes = sorted(d for d in os.listdir(HERE) if os.path.isdir(os.path.join(HERE, d, "p")))
@@ -55,7 +58,7 @@ def main():
             if got != want:
                 failures += 1
                 print(f"FAIL {probe}: got {got!r}, expected {want!r}")
-    print(f"{'PASS' if not failures else 'FAIL'} semantics modules: {len(probes)} probes, {failures} failure(s)")
+    print(f"{'PASS' if not failures else 'FAIL'} {args.dir}: {len(probes)} probes, {failures} failure(s)")
     return 1 if failures else 0
 
 

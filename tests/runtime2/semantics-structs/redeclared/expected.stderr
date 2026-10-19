@@ -1,0 +1,1 @@
+error: $P/p/main.f:3:7: cannot access member 'y' because the current JSON value is not an object
