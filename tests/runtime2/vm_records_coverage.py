@@ -35,7 +35,12 @@ CP12 refusals lifted with their safety conditions, as differential suites.
               occurs: the declared binding takes the passed value's type, and
               a reassignment fails exactly when the new value's type differs
               (an int into a double binding is a number: accepted). Legacy
-              and NIFT_VM=1 must both match it.
+              and NIFT_VM=1 must both match it, with the declaration typed by
+              its text on every path (D-046 #1). Known legacy inconsistency
+              L52: in prepared (loop) code legacy types a parameter copy by
+              the value; there the oracle states the intended result, legacy's
+              actual output is pinned, and the VM must refuse the program so
+              NIFT_VM=1 stays byte-identical to legacy.
 
   vm_records_coverage.py --nift ./nift
 """
@@ -91,24 +96,29 @@ PARAM_DECL = [
     ("pd_reassign_top_only", True, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\nf(2.5)\nf("a")\n'),
 ]
 
+# Known legacy inconsistencies: name -> (register entry, legacy's actual
+# printed lines, legacy ends with an error). The VM must refuse these programs.
+LEGACY_INCONSISTENT = {
+    'pd_register_type_loop': ('L52', ['100'], True),
+}
+
 # name -> (printed lines, a binding-type error ends the run), derived from the
 # arguments by the rule above (pd_pad: s padded with "." to the width).
 ORACLE = {
     'pd_types_loop': (['"a"', '2', '2.5', '[1,"b"]', '{"k":1}', '"top"', '7'], False),
     'pd_types_literals': (['"a"', '2', '2.5', '[1,2]', '{"k":1}'], False),
     'pd_pad': (['item0.;it....;x.....;', 'top..'], False),
-    # Exception, legacy's canonical text typing (outside prepared code a
-    # binding's type comes from its declaring text, nift_binding_type_from_text):
-    # x := 1e2 is a double binding holding 100, so the first call's `out` is
-    # double and `out = 2.5` is accepted; by the value rule alone it would fail.
+    # Textual declaration typing (D-046 #1): x := 1e2 is a double binding
+    # holding 100; copying the parameter keeps double, so `out = 2.5` is
+    # accepted on the first call and fails on the int call.
     'pd_register_type_top': (['100', '100', '2.5', '100'], True),
     'pd_reassign_double_then_string': (['1.5'], True),
     'pd_reassign_double_then_int': (['1.5'], True),
     'pd_reassign_string_loop_top': (['x', 'x'], True),
     'pd_reassign_untyped_args': (['7', '7'], True),
-    # In prepared (loop) code legacy types by the value (P4): `out` is int
-    # (100), so `out = 2.5` fails at the first call: the value rule.
-    'pd_register_type_loop': (['100'], True),
+    # The same in loop code: the intended result (D-046 #1); legacy differs
+    # here (L52, LEGACY_INCONSISTENT).
+    'pd_register_type_loop': (['100', '2.5', '100'], True),
     'pd_reassign_top_only': (['1.5'], True),
 }
 
@@ -183,7 +193,16 @@ def main():
             outcome = st and st.get("outcome")
             lines, error = ORACLE[name]
             want = ("\n".join(lines) + "\n").encode()
-            for label, got in (("legacy", legacy), ("NIFT_VM=1", auto)):
+            checked = (("legacy", legacy), ("NIFT_VM=1", auto))
+            if name in LEGACY_INCONSISTENT:
+                entry, legacy_lines, legacy_error = LEGACY_INCONSISTENT[name]
+                legacy_want = ("\n".join(legacy_lines) + "\n").encode()
+                if legacy[0] != legacy_want or (legacy[2] != 0) != legacy_error:
+                    failures.append(f"{name}: legacy no longer shows {entry} ({legacy[0]!r}, exit {legacy[2]})")
+                if outcome in ("vm", "vm-error"):
+                    failures.append(f"{name}: {entry} case must be refused, ran on the VM ({outcome})")
+                checked = ()
+            for label, got in checked:
                 if got[0] != want or (got[2] != 0) != error or (error and b"binding" not in got[1]):
                     failures.append(f"{name}: {label} differs from the oracle: stdout {got[0]!r} exit {got[2]} "
                                     f"stderr {got[1][-120:]!r}; oracle {want!r} error {error}")
