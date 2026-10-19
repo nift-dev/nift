@@ -698,3 +698,17 @@ must be removed or justified when build recovery integrates.
 - Coordinator calls (within existing decisions): the handle capacity becomes a
   named setting reported by `limit.exceeded` (D-028 convention); nested contexts
   may use their ancestors' handles, parents and siblings may not use a child's.
+- **Refinements (owner).** Last-reference release only *schedules* cleanup via
+  CP16's process machinery (no blocking in VM execution); a thread-safe lifecycle
+  state machine guarantees exactly-once cleanup across release, deadline,
+  cancellation and context end; the reaper keeps internal ownership until the OS
+  resource is reclaimed; detached processes survive their last reference. Host
+  transfer is atomic, refused (and the resource reclaimed) when the destination
+  is ending, and is how async workers return handles. Closed handles keep
+  identity (`runtime.handle_closed`, never misread as forged); timeout and
+  cancellation outcomes are preserved, not turned into `handle_closed`; `close()`
+  is idempotent, other operations on a closed handle raise. Cleanup failure is
+  declared only after the bounded procedure is exhausted or the OS reports a
+  definitive failure; `Lost` means "termination could not be confirmed"; a
+  context never reports final success with cleanup obligations unresolved;
+  original errors and signal-derived statuses stay primary.
