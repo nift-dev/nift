@@ -15,7 +15,7 @@ ModuleSource load_module_source(const std::filesystem::path& path) {
     std::error_code ec;
     std::ifstream in;
     if (std::filesystem::is_regular_file(path, ec)) in.open(path, std::ios::binary);
-    if (!in) {
+    if (!in.is_open() || !in) {  // a never-opened stream is not in a failed state
         out.message = "script is not readable: " + path.generic_string();
         return out;
     }
