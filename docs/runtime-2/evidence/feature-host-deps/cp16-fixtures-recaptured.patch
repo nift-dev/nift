@@ -37,8 +37,8 @@ diff -ruN a/tests/runtime2/cp16/expected/fs_write/trace.jsonl cp16/expected/fs_w
  {"ctx":"script","op":"read","arg":"$BASE/w/vals.txt","res":"33"}
 diff -ruN a/tests/runtime2/cp16/expected/site_contain/files.txt cp16/expected/site_contain/files.txt
 --- a/tests/runtime2/cp16/expected/site_contain/files.txt	2026-10-19 10:30:15.019706519 +1100
-+++ b/tests/runtime2/cp16/expected/site_contain/files.txt	2026-10-19 11:52:22.995505605 +1100
-@@ -3,14 +3,22 @@
++++ b/tests/runtime2/cp16/expected/site_contain/files.txt	2026-10-19 14:51:40.934674324 +1100
+@@ -3,14 +3,24 @@
  d tmp/ 755
  d w/ 755
  f ext/by-cp.txt 644 8 d4e4877bac978b79
@@ -52,10 +52,12 @@ diff -ruN a/tests/runtime2/cp16/expected/site_contain/files.txt cp16/expected/si
  f w/.nift/config.json (nift metadata)
 -f w/.nift/failed.json (nift metadata)
 +d w/.nift/content/ 755
++d w/.nift/data/ 755
 +d w/.nift/public/ 755
 +d w/.nift/templates/ 755
  f w/.nift/tracked.json (nift metadata)
 +f w/.nift/content/index.html.hash (nift metadata)
++f w/.nift/data/p.txt.hash (nift metadata)
 +f w/.nift/public/index.info.json (nift metadata)
 +f w/.nift/templates/template.html.hash (nift metadata)
  f w/content/index.html 644 184 cecb19e5de5678a1
@@ -64,7 +66,7 @@ diff -ruN a/tests/runtime2/cp16/expected/site_contain/files.txt cp16/expected/si
  f w/templates/template.html 644 37 12c5e448e367a89a
 diff -ruN a/tests/runtime2/cp16/expected/site_contain/steps.txt cp16/expected/site_contain/steps.txt
 --- a/tests/runtime2/cp16/expected/site_contain/steps.txt	2026-10-19 10:30:15.007732705 +1100
-+++ b/tests/runtime2/cp16/expected/site_contain/steps.txt	2026-10-19 11:52:22.994700466 +1100
++++ b/tests/runtime2/cp16/expected/site_contain/steps.txt	2026-10-19 14:51:40.933987423 +1100
 @@ -1,24 +1,12 @@
  == step 1: nift build --all
 -exit 1

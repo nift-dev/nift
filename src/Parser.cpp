@@ -909,6 +909,7 @@ bool Parser::stream_open(std::shared_ptr<StreamInstance> stream,
                          const fs::path& path, std::string& error) {
     stream->path = path;
     if (stream->kind == StreamInstance::Kind::Output) {
+        if (!guard_build_write("ofstream", path, error)) return false;
         stream->output = std::make_shared<std::ofstream>(path, std::ios::binary | std::ios::trunc);
         if (!*stream->output)
             return fail_recoverable(nift::detail::DiagnosticCode::StreamOpenFailed,

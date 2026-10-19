@@ -17,6 +17,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <poll.h>
+#include <sys/syscall.h>
 extern char **environ;
 #else
 #include <windows.h>
@@ -99,6 +102,30 @@ static int open_temp(std::string& path, size_t stage){
     fd=nift_process_owned_fd(fd);
     if(fd>=0)nift_process_test_temp(path);
     return fd;
+}
+// feature-host-deps: SIGKILL a stage and, on Linux, every descendant it
+// started (found through /proc/<pid>/task/<tid>/children, each stopped first
+// so it cannot fork while the tree is walked). Elsewhere only the stage.
+static void kill_stage_tree(pid_t root){
+#if defined(__linux__)
+    std::vector<pid_t> tree{root};
+    for(std::size_t i=0;i<tree.size()&&tree.size()<4096;++i){
+        kill(tree[i],SIGSTOP);
+        const std::string task_dir="/proc/"+std::to_string(tree[i])+"/task";
+        if(DIR* tasks=opendir(task_dir.c_str())){
+            while(dirent* task=readdir(tasks)){
+                if(task->d_name[0]=='.')continue;
+                std::ifstream children(task_dir+"/"+task->d_name+"/children");
+                long child=0;
+                while(children>>child)if(child>0&&std::find(tree.begin(),tree.end(),static_cast<pid_t>(child))==tree.end())tree.push_back(static_cast<pid_t>(child));
+            }
+            closedir(tasks);
+        }
+    }
+    for(auto it=tree.rbegin();it!=tree.rend();++it)kill(*it,SIGKILL);
+#else
+    kill(root,SIGKILL);
+#endif
 }
 // Reads the whole capture through its descriptor, from offset 0. With a
 // limit (feature-host-deps, D-028) the buffer never holds or reserves more
@@ -202,9 +229,57 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     int status = 0;
     auto status_code = [](int st) { return WIFEXITED(st) ? WEXITSTATUS(st) : (WIFSIGNALED(st) ? 128 + WTERMSIG(st) : 1); };
     r.stages.assign(specs.size(), ProcessStageResult{});
+    // feature-host-deps (D-028): with a capture limit the captures are watched
+    // while the stages run. Once either holds more than the limit, every stage
+    // still running is killed (SIGKILL, like the setup-failure path above) and
+    // reaped, so a never-ending producer cannot fill the disk or hang Nift.
+    // The check runs between short waits (pidfd poll on Linux, a capped sleep
+    // elsewhere), so the files may overshoot by what the stages write in one
+    // interval (at most 2 ms). On Linux the stages' descendants are killed too
+    // (kill_stage_tree); elsewhere only the stages (no per-pipeline process
+    // group before CP16, D-030 C3).
+    std::vector<int> stage_status(pids.size(), 0);
+    if (capture && capture_limit && !pids.empty()) {
+        std::vector<bool> reaped(pids.size(), false);
+        std::size_t running = pids.size();
+        bool killed = false;
+        auto over_limit = [&]() -> const char* {
+            struct stat info{};
+            if (ofd >= 0 && fstat(ofd, &info) == 0 && static_cast<std::uint64_t>(info.st_size) > capture_limit) return "stdout";
+            if (efd >= 0 && fstat(efd, &info) == 0 && static_cast<std::uint64_t>(info.st_size) > capture_limit) return "stderr";
+            return nullptr;
+        };
+        long pause_us = 50;
+        while (running) {
+            for (std::size_t index = 0; index < pids.size(); ++index) {
+                if (reaped[index]) continue;
+                int st = 0;
+                const pid_t done = waitpid(pids[index], &st, killed ? 0 : WNOHANG);
+                if (done == pids[index] || (done < 0 && errno != EINTR)) { reaped[index] = true; stage_status[index] = st; --running; }
+            }
+            if (!running || killed) continue;
+            if (const char* which = over_limit()) {
+                r.capture_limit_exceeded = which;
+                for (std::size_t index = 0; index < pids.size(); ++index) if (!reaped[index]) kill_stage_tree(pids[index]);
+                killed = true;
+                continue;
+            }
+            bool waited = false;
+#if defined(__linux__) && defined(SYS_pidfd_open)
+            for (std::size_t index = 0; index < pids.size() && !waited; ++index) {
+                if (reaped[index]) continue;
+                const int pidfd = static_cast<int>(syscall(SYS_pidfd_open, pids[index], 0));
+                if (pidfd >= 0) { struct pollfd pfd{pidfd, POLLIN, 0}; poll(&pfd, 1, 2); close(pidfd); waited = true; }
+            }
+#endif
+            if (!waited) { usleep(static_cast<useconds_t>(pause_us)); if (pause_us < 2000) pause_us *= 2; }
+        }
+    } else {
+        for (std::size_t index = 0; index < pids.size(); ++index)
+            while (waitpid(pids[index], &stage_status[index], 0) < 0 && errno == EINTR) {}
+    }
     for (std::size_t index = 0; index < pids.size(); ++index) {
-        int st = 0;
-        while(waitpid(pids[index], &st, 0)<0 && errno==EINTR){};
+        const int st = stage_status[index];
         status = st;
         auto& stage = r.stages[index];
         stage.exit_code = status_code(st);
@@ -221,10 +296,10 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
     // launch failures are reported in r.stages.
     if (specs.size() == 1 && r.launched && r.error.empty() && !exec_error.empty()) { r.launched = false; r.error = exec_error; r.exec_failed = true; }
     if (capture) {
-        bool out_exceeded=false,err_exceeded=false;
-        r.out = read_fd_all(ofd,capture_limit,&out_exceeded);
+        bool out_exceeded=!r.capture_limit_exceeded.empty(),err_exceeded=false;
+        if(!out_exceeded) r.out = read_fd_all(ofd,capture_limit,&out_exceeded);
         if(!out_exceeded) r.err = read_fd_all(efd,capture_limit,&err_exceeded);
-        if(out_exceeded||err_exceeded){r.out.clear();r.err.clear();r.capture_limit_exceeded=out_exceeded?"stdout":"stderr";stream=false;}
+        if(out_exceeded||err_exceeded){r.out.clear();r.err.clear();if(r.capture_limit_exceeded.empty())r.capture_limit_exceeded=out_exceeded?"stdout":"stderr";stream=false;}
         if (stream) { std::cout << r.out; std::cerr << r.err; }
     }
     if (ofd >= 0) close(ofd);

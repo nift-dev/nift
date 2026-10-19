@@ -29,8 +29,11 @@ from pathlib import Path
 
 NIFT = os.path.abspath(os.environ.get("NIFT_BIN") or "./nift")
 MiB = 1 << 20
-LIMIT = 16 * MiB                     # NIFT_READ_LIMIT for the memory cases
-SLACK = 16 * MiB                     # allocator/arena slack on top of the bound
+LIMIT = 64 * MiB                     # NIFT_READ_LIMIT for the memory cases
+# Slack well below the limit, so a buffer bounded at 2 x limit (or a growth
+# step holding 2 x limit) fails RLIMIT_AS and the RSS check (review R4).
+SLACK = 8 * MiB
+FSIZE_LIMIT = 512 * MiB
 failures = []
 
 
@@ -68,8 +71,14 @@ def run(script_text, cwd, limit=LIMIT, address_space=None, env_extra=None, timeo
         env.update(env_extra)
 
     def limit_memory():
-        if address_space:
-            resource.setrlimit(resource.RLIMIT_AS, (address_space, address_space))
+        # Never fill the disk: no file written by nift or its children may
+        # exceed FSIZE_LIMIT (captures included).
+        cap = address_space or 4 << 30   # always bounded (standing rule)
+        for kind, value in ((resource.RLIMIT_FSIZE, FSIZE_LIMIT), (resource.RLIMIT_AS, cap)):
+            hard = resource.getrlimit(kind)[1]
+            if hard != resource.RLIM_INFINITY:
+                value = min(value, hard)
+            resource.setrlimit(kind, (value, value))
 
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         proc = subprocess.Popen([NIFT, str(script)], cwd=cwd, stdout=out, stderr=err, env=env,
@@ -181,10 +190,10 @@ def cases(work, address_space, rss_bound):
     exceed("ifstream(/dev/zero) >> token", "extraction", 's := ifstream("/dev/zero")\nt := ""\ns >> t', work, address_space, rss_bound)
     exceed("ifstream(/dev/zero).read_val", "read_val", 's := ifstream("/dev/zero")\nx := s.read_val()', work, address_space, rss_bound)
     # Bounded reads below the limit keep working on an endless device.
-    proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 64) { n = n + s.read_bytes(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
+    proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read_bytes(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
-    check("read_bytes(limit/2) x 64 from /dev/zero (32 x limit streamed)",
-          proc.returncode == 0 and proc.stdout.strip() == str(32 * LIMIT), (proc.stdout + proc.stderr)[-300:])
+    check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
+          proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
 
     # --- streaming handles files larger than the limit -----------------------
     big = work / "big.txt"
@@ -235,6 +244,10 @@ def cases(work, address_space, rss_bound):
                'r := cmd("%s", "-c", "%d", "/dev/zero").run()' % (head, 2 * LIMIT), work, address_space, rss_bound)
     else:
         print("SKIP process capture (no head)")
+
+    stream_errors(work)
+    stdin_read(work, address_space, rss_bound)
+    capture_cases(work, address_space, rss_bound)
 
     # --- configuration --------------------------------------------------------
     for raw, expect in [("1K", 1024), ("2MiB", 2 * MiB), ("1g", 1 << 30), ("4096", 4096), ("3m", 3 * MiB)]:
@@ -339,6 +352,110 @@ def page_build(work):
           fixed.returncode == 0 and b"GOOD:v2" in (site / "public" / "index.html").read_bytes(), fixed.stdout + fixed.stderr)
     status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
     check("page build: up to date afterwards", "up to date" in status, status)
+
+
+
+def stream_errors(work):
+    """review D1: an I/O error while reading a line is the catchable
+    stream.read_failed, never an uncaught C++ exception."""
+    (work / "adir").mkdir(exist_ok=True)
+    for name, path in (("directory", work / "adir"), ("EIO (/proc/self/mem)", "/proc/self/mem")):
+        if name.startswith("EIO") and not os.path.exists("/proc/self/mem"):
+            print("SKIP read_line EIO (no /proc/self/mem)")
+            continue
+        script = ('x := ""\ntry { s := ifstream("%s"); x = s.read_line() } catch(e) { x = "CAUGHT " + e.code + " " + e.message }\n'
+                  'print(x)\nprint("AFTER")\n' % path)
+        proc = run(script, work, limit=None)
+        check("read_line on a %s: catchable read error" % name,
+              proc.returncode == 0 and "CAUGHT stream.read_failed read_line: input failure" in proc.stdout and "AFTER" in proc.stdout,
+              (proc.stdout + proc.stderr)[-300:])
+
+
+def stdin_read(work, address_space, rss_bound):
+    """review D7: read() (one stdin line in a standalone script) is bounded."""
+    small = 1024
+    for size, ok in ((small, True), (small + 1, False)):
+        data = work / "stdin.txt"
+        data.write_bytes(b"s" * size + b"\nnext\n")
+        with data.open("rb") as handle:
+            proc = run('x := read()\nprint(x.length())\nprint(read())\nprint("AFTER")\n', work, limit=small, stdin=handle)
+        if ok:
+            check("read(): stdin line of exactly the limit", proc.returncode == 0 and proc.stdout.split() == [str(small), "next", "AFTER"],
+                  proc.stdout + proc.stderr)
+        else:
+            check("read(): stdin line one byte over is a limit error", limit_error(proc, "read", small), proc.stdout + proc.stderr)
+    with open("/dev/zero", "rb") as handle:
+        proc = run('x := read()\nprint("AFTER")\n', work, address_space=address_space, stdin=handle)
+    check("read(): endless stdin (/dev/zero) stops at the limit", limit_error(proc, "read"), (proc.stdout + proc.stderr)[-300:])
+    check("read(): endless stdin peak RSS %d MiB within %d MiB" % (proc.peak_rss // MiB, rss_bound // MiB), proc.peak_rss <= rss_bound)
+
+
+def leftover(tag):
+    """PIDs whose command line contains `tag` (Linux /proc)."""
+    found = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % entry, "rb") as handle:
+                if tag.encode() in handle.read():
+                    found.append(int(entry))
+        except OSError:
+            pass
+    return found
+
+
+def capture_cases(work, address_space, rss_bound):
+    """review D5: run()/cmd().run() captures are bounded while the child runs:
+    a never-ending producer is stopped promptly (it and its descendants),
+    reaped, and the run fails with the normal limit error."""
+    if not os.path.isdir("/proc") or not shutil.which("yes") or not shutil.which("head") or not shutil.which("sh"):
+        print("SKIP capture-while-running cases (needs /proc, yes, head, sh)")
+        return
+    tag = "nift-capture-probe-%d" % os.getpid()
+    marker = work / "marker"
+    cases = [
+        ("run(yes) never ends", 'r := run("yes", "%s")' % tag),
+        ("run(head -c 150000000 /dev/zero)", 'r := run("head", "-c", "150000000", "/dev/zero")'),
+        ("cmd(yes).pipe(cat).run()", 'r := cmd("yes", "%s").pipe(cmd("cat")).run()' % tag),
+        ("run(sh -c 'yes; touch marker') kills the descendant", 'r := run("sh", "-c", "yes %s; touch %s")' % (tag, marker)),
+        ("stderr capture of an endless producer", 'r := run("sh", "-c", "yes %s >&2")' % tag),
+    ]
+    for name, body in cases:
+        started = time.monotonic()
+        proc = run('try {\n%s\n} catch(e) { print("CAUGHT") }\nprint("AFTER")\n' % body, work, address_space=address_space, timeout=60)
+        elapsed = time.monotonic() - started
+        check("%s: fatal run limit error (exit %d, %.2fs)" % (name, proc.returncode, elapsed),
+              limit_error(proc, "run") and elapsed < 20, (proc.stdout + proc.stderr)[-300:])
+        time.sleep(0.5)
+        left = leftover(tag)
+        check("%s: no producer left running" % name, not left, str(left))
+        for pid in left:
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        check("%s: marker never created (child stopped before finishing)" % name, not marker.exists())
+        check("%s: peak RSS %d MiB within %d MiB" % (name, proc.peak_rss // MiB, rss_bound // MiB), proc.peak_rss <= rss_bound)
+    # Children reaped: no zombie children of this test (each nift reaped its own).
+    zombies = [e for e in os.listdir("/proc") if e.isdigit() and _state(e) == "Z" and _ppid(e) == os.getpid()]
+    check("no zombie processes left by the capture cases", not zombies, str(zombies))
+
+
+def _state(pid):
+    try:
+        with open("/proc/%s/stat" % pid) as handle:
+            return handle.read().rsplit(")", 1)[1].split()[0]
+    except (OSError, IndexError):
+        return ""
+
+
+def _ppid(pid):
+    try:
+        with open("/proc/%s/stat" % pid) as handle:
+            return int(handle.read().rsplit(")", 1)[1].split()[1])
+    except (OSError, IndexError, ValueError):
+        return -1
 
 
 if __name__ == "__main__":

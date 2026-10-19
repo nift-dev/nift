@@ -46,7 +46,10 @@ printf 'print(cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/dat
 out="$("$NIFT" s.f 2>&1)"; echo "$out" | grep NEIGHBOUR-2 >/dev/null && pass "standalone absolute read" || bad "standalone read: $out"
 
 # --fs-root remains an explicit restriction.
-if "$NIFT" --fs-root="$W/project" s.f >/dev/null 2>&1; then bad "--fs-root did not restrict"; else pass "--fs-root still restricts when requested"; fi
+# (Options follow the script path; `nift --fs-root=R s.f` is an unknown shell
+# option and would fail for the wrong reason.)
+out="$("$NIFT" s.f --fs-root="$W/project" 2>&1)"
+if echo "$out" | grep -q "path escapes configured filesystem root"; then pass "--fs-root still restricts when requested"; else bad "--fs-root did not restrict: $out"; fi
 
 # Nift-owned state stays protected: untracking/removing never touches external files.
 "$NIFT" rm index >/dev/null 2>&1 || "$NIFT" rm / >/dev/null 2>&1

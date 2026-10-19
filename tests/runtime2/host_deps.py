@@ -24,7 +24,10 @@ import subprocess
 import sys
 import tempfile
 import threading
+import hashlib
+import json
 import re
+import resource
 import time
 from pathlib import Path
 
@@ -46,8 +49,18 @@ failures = []
 UP_TO_DATE = re.compile(r"all \d+ tracked files? (is|are) up to date")
 
 
+def bounded():
+    # Standing rule: every nift run is bounded in disk, memory and time.
+    for kind, value in ((resource.RLIMIT_FSIZE, 256 << 20), (resource.RLIMIT_AS, 4 << 30)):
+        hard = resource.getrlimit(kind)[1]
+        if hard != resource.RLIM_INFINITY:
+            value = min(value, hard)
+        resource.setrlimit(kind, (value, value))
+
+
 def nift(cwd, *args, env=None, check=True):
-    proc = subprocess.run(PRIV + [NIFT, *args], cwd=cwd, capture_output=True, text=True, timeout=120, env=env)
+    proc = subprocess.run(PRIV + [NIFT, *args], cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
+                          preexec_fn=bounded)
     if check and proc.returncode != 0:
         raise RuntimeError("nift %s failed in %s:\n%s%s" % (" ".join(args), cwd, proc.stdout, proc.stderr))
     return proc
@@ -60,9 +73,10 @@ def page_lines(root):
 
 def tree(root):
     out = {}
-    # Tracked page outputs only (`nift init` also seeds public/assets, which
-    # is authored output, not built).
-    for path in sorted((root / "public").rglob("*.html")):
+    # Tracked page outputs (`nift init` also seeds public/assets, which is
+    # authored output, not built) and the page's copy destinations.
+    # Copy destinations written by the page (cp()/file().copy()) count as output.
+    for path in sorted(list((root / "public").rglob("*.html")) + list((root / "copies").glob("*"))):
         if path.is_file():
             out[str(path.relative_to(root))] = path.read_bytes()
     return out
@@ -73,7 +87,7 @@ def clean_oracle(root, oracle):
         shutil.rmtree(oracle)
     oracle.mkdir()
     for path in root.iterdir():
-        if path.name in ("public", ".nift"):
+        if path.name in ("public", ".nift", "copies"):
             continue
         dest = oracle / path.name
         if path.is_symlink():
@@ -138,6 +152,12 @@ K:@script { xK := ""; try { xK = open("data/perm.txt") } catch(e) { xK = "denied
 Q:@script { xQ := ""; try { sQ := ifstream("data/perm-stream.txt"); xQ = sQ.read_line(); close(sQ) } catch(e) { xQ = "denied" }; return xQ }
 G:@script { pG := page("other"); return pG.content }
 H:@script { pH := page("other"); return pH.metadata.title }
+U:@script { pU := page("fmpage"); return pU.metadata.title }
+V:@script { gV := async (aV) => { return open(aV) }; return await gV("data/async.txt") }
+Y:@script { gY := async (aY) => { return exists(aY) }; return await gY("data/async-missing.txt") }
+@fn(rdthread(pT)) { sT2 := ifstream(pT); xT2 := sT2.read_line(); close(sT2); return xT2 }
+R:@script { tR := thread(rdthread, "data/thread.txt"); return tR.join() }
+D:@script { mkdir("copies"); cp("data/cp-src.txt", "copies/cp-copy.txt"); fD := file("data/fc-src.txt"); gD := fD.copy("copies/fc-copy.txt"); return "copied" }
 </p>
 """
 
@@ -171,6 +191,21 @@ def setup(work, mode):
     write(root / "content" / "index.html", PAGE.replace("EXT", str(ext)))
     nift(root, "track", "other", "Other")
     write(root / "content" / "other.html", "---\ntitle: meta-1\n---\nother-1\n")
+    # A page whose metadata comes from an external front-matter file.
+    nift(root, "track", "fmpage", "FmPage")
+    write(root / "content" / "fmpage.html", "fm body\n")
+    write(root / "meta" / "fmpage.json", '{"title": "ext-1"}\n')
+    tracked = root / ".nift" / "tracked.json"
+    document = json.loads(tracked.read_text())
+    for entry in document["tracked"]:
+        if entry["name"] == "fmpage":
+            entry["frontmatter"] = "meta/fmpage.json"
+    tracked.write_text(json.dumps(document, indent=2))
+    write(data / "async.txt", "async-1\n")
+    write(data / "thread.txt", "thread-1\n")
+    write(data / "cp-src.txt", "cp-1\n")
+    write(data / "fc-src.txt", "fc-1\n")
+
     return root, ext
 
 
@@ -186,10 +221,11 @@ def scenario(mode, work):
     data = root / "data"
     nift(root, "build", "--all")
     lines = page_lines(root)
-    expect = ["O:open-1", "B:", "F:file-1", "W:rw-1", "L:line-1", "A:all-1", "X:tok-1", "E:abs-1", "P:parent-1",
-              "S:target-1", "T:stream-target-1", "M:none", "N:none", "I:none", "J:none", "H:meta-1"]
+    expect = ["O:open-1", "B:" + hashlib.sha256(b"bytes-1\n").hexdigest(), "F:file-1", "W:rw-1", "L:line-1", "A:all-1", "X:tok-1", "E:abs-1", "P:parent-1",
+              "S:target-1", "T:stream-target-1", "M:none", "N:none", "I:none", "J:none", "H:meta-1",
+              "U:ext-1", "V:async-1", "Y:false", "R:thread-1", "D:copied"]
     for prefix in expect:
-        if not any(line.startswith(prefix) for line in lines):
+        if prefix not in lines:
             failures.append((mode, "initial " + prefix))
             print("FAIL [%s] initial output lacks %s: %s" % (mode, prefix, lines))
     if PERMISSIONS and not any(line == "K:denied" for line in lines):
@@ -216,6 +252,12 @@ def scenario(mode, work):
         ("appeared file removed (open_bytes)", lambda: (data / "missing-bytes.txt").unlink()),
         ("page(x).content edit", lambda: edit(root / "content" / "other.html", "---\ntitle: meta-1\n---\nother-2\n")),
         ("page(x).metadata edit", lambda: edit(root / "content" / "other.html", "---\ntitle: meta-2\n---\nother-2\n")),
+        ("page(x).metadata external front matter edit", lambda: edit(root / "meta" / "fmpage.json", '{"title": "ext-2"}\n')),
+        ("async function open() edit", lambda: edit(data / "async.txt", "async-2\n")),
+        ("async function exists() target appears", lambda: write(data / "async-missing.txt", "here\n")),
+        ("thread() worker ifstream edit", lambda: edit(data / "thread.txt", "thread-2\n")),
+        ("cp() source edit", lambda: edit(data / "cp-src.txt", "cp-2\n")),
+        ("file().copy() source edit", lambda: edit(data / "fc-src.txt", "fc-2\n")),
     ]
     if PERMISSIONS:
         steps += [
@@ -230,6 +272,37 @@ def scenario(mode, work):
         action()
         compare(mode, name, root, oracle)
     mid_stream(mode, root, oracle)
+    move_source(mode, root)
+
+
+def move_source(mode, root):
+    """file().move()/mv(): the source is gone afterwards; it reappearing must
+    rebuild the page (a clean build cannot be the oracle here: the first build
+    consumed the source)."""
+    write(root / "data" / "mv-a.txt", "mv-a-1\n")
+    write(root / "data" / "mv-b.txt", "mv-b-1\n")
+    nift(root, "track", "mover", "Mover")
+    write(root / "content" / "mover.html",
+          '<p>@script { xm := "a"; try { fm := file("data/mv-a.txt"); gm := fm.move("public/moved-a.html") } catch(e) { xm = "-" }; try { mv("data/mv-b.txt", "public/moved-b.html") } catch(e) { xm = xm + "-" }; return xm }</p>\n')
+    nift(root, "build")
+    status = nift(root, "status").stdout
+    check_ok = UP_TO_DATE.search(status) is not None
+    print(("PASS" if check_ok else "FAIL") + " [%s] move: up to date after moving the sources" % mode)
+    if not check_ok:
+        failures.append((mode, "move up to date"))
+    for name, src in (("file().move", "mv-a"), ("mv()", "mv-b")):
+        write(root / "data" / (src + ".txt"), src + "-2\n")
+        status = nift(root, "status").stdout
+        stale = UP_TO_DATE.search(status) is not None
+        print(("FAIL" if stale else "PASS") + " [%s] %s: source reappearing rebuilds the page" % (mode, name))
+        if stale:
+            failures.append((mode, name + " source reappears"))
+        nift(root, "build")
+        moved = (root / "public" / ("moved-" + src[-1] + ".html")).read_text()
+        ok = moved == src + "-2\n" and not (root / "data" / (src + ".txt")).exists()
+        print(("PASS" if ok else "FAIL") + " [%s] %s: new source moved" % (mode, name))
+        if not ok:
+            failures.append((mode, name + " new source moved"))
 
 
 MID_PAGE = r"""<p>
@@ -249,7 +322,8 @@ def mid_stream(mode, root, oracle):
     write(root / "content" / "streamed.html", MID_PAGE)
     nift(root, "build")
     (ctl / "sync").write_text("")
-    proc = subprocess.Popen(PRIV + [NIFT, "build"], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(PRIV + [NIFT, "build"], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            preexec_fn=bounded)
     deadline = time.monotonic() + 30
     while not (ctl / "opened").exists() and time.monotonic() < deadline and proc.poll() is None:
         time.sleep(0.01)

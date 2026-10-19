@@ -1414,6 +1414,7 @@ test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
 	"$(READ_LIMIT_UNIT)"
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/host_deps.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/build_write_ownership.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
 test: test-runtime2-host-deps
 

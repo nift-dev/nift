@@ -81,6 +81,7 @@ public:
            TimerClock timer_clock = {});
     ~Parser();
     RenderResult render();
+    RenderResult render_unsettled();
 
     // Native script hosts used by direct scripts / the Nift shell.
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path, bool project_build = false);
@@ -198,6 +199,22 @@ private:
     // feature-host-deps: page("x").content / .metadata read page x's content
     // file; record it as a dependency (or its absence) like any other read.
     void observe_page_member(const std::string& page, const std::string& member);
+    // feature-host-deps: true when reads are recorded (a page render or build
+    // script, including its async/thread workers); false for standalone scripts.
+    bool observing() const { return (!standalone_script_host_ || worker_observing_) && !host_.root().empty(); }
+    bool worker_observing_ = false;
+    // Waits for this parser's async/thread workers and merges what they
+    // observed into `into` (each worker once). Exported by a worker after it
+    // settled its own workers.
+    void settle_worker_observations(RenderResult& into);
+    // feature-host-deps: the source of cp()/mv()/file().copy()/.move(): a
+    // dependency with a snapshot when it exists, else a failed read.
+    void observe_copy_source(const std::filesystem::path& source);
+    // feature-host-deps (D-028/D-006 interim): during a page build or build
+    // script, refuse (fatal) any script write into the project's .nift/.
+    // Also refuses writes/removals of another tracked page's build outputs
+    // (owner decision D-006); the page's own outputs and unowned paths pass.
+    bool guard_build_write(const std::string& operation, const std::filesystem::path& path, std::string& error, bool removes = false);
     // feature-host-deps: the configured whole-read limit (NIFT_READ_LIMIT);
     // false with a fatal error when the setting is invalid.
     bool read_limit(const std::string& operation, std::uint64_t& limit, std::string& error);
@@ -423,7 +440,16 @@ private:
     std::uint64_t next_lambda_instance_id_ = 1;
     std::uint64_t next_runtime_temporary_id_ = 1;
     bool suppress_next_call_frame_ = false;
+    // feature-host-deps (D-028): what an async/thread worker observed while a
+    // page (or build script) was being rendered; merged into the page's
+    // result when the render ends (settle_worker_observations).
+    struct WorkerObservations {
+        std::set<std::string> dependencies, reqs;
+        ReadObservations observed;
+    };
     struct ThreadInstance {
+        std::shared_ptr<WorkerObservations> observed;  // guarded by mutex
+        bool observed_merged = false;
         std::thread worker;
         mutable std::mutex mutex;
         mutable std::mutex join_mutex;
@@ -450,10 +476,13 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<AtomicInstance>> atomic_instances_;
     struct AsyncInstance {
+        std::shared_ptr<WorkerObservations> observed;  // guarded by mutex
+        bool observed_merged = false;
         mutable std::mutex mutex;
         std::condition_variable cv;
         nift::detail::WorkerCompletion<nift::RuntimeValue> completion;
     };
+    std::shared_ptr<WorkerObservations> export_worker_observations();
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
     std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
     std::vector<std::function<void()>> deferred_worker_cleanups_;

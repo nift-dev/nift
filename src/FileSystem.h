@@ -92,6 +92,14 @@ std::uint64_t hash_path_streamed(const std::filesystem::path& path);
 // otherwise a stable token for the failure ("errno:13", "win:5"). Never
 // blocks (FIFOs are probed non-blocking) and reads no data.
 std::string read_access_error(const std::filesystem::path& path);
+// feature-host-deps: rename(from, to); when that fails only because the two
+// paths are on different filesystems (EXDEV) and `from` is a regular file,
+// copy it to a temporary sibling of `to` (permissions and mtime kept), rename
+// that over `to` (atomic on the destination filesystem), then remove `from`.
+// Directories, symlinks and special files keep the EXDEV error.
+// On failure `from` is intact unless *partial is set: the destination was
+// written completely but `from` could not be removed afterwards (both exist).
+bool move_path(const std::filesystem::path& from, const std::filesystem::path& to, std::error_code& error, bool* partial = nullptr);
 std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);
 bool stored_hash_changed(const std::filesystem::path& root, const std::filesystem::path& path);
 bool write_stored_hash(const std::filesystem::path& root, const std::filesystem::path& path);

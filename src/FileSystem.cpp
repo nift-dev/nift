@@ -1,6 +1,7 @@
 #include "FileSystem.h"
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <array>
 #include <cerrno>
 #include <fstream>
@@ -837,6 +838,33 @@ std::string read_access_error(const fs::path& path) {
     ::close(fd);
     return {};
 #endif
+}
+
+bool move_path(const fs::path& from, const fs::path& to, std::error_code& error, bool* partial) {
+    error.clear();
+    if (partial) *partial = false;
+    fs::rename(from, to, error);
+    if (!error) return true;
+    if (error != std::errc::cross_device_link) return false;
+    const std::error_code cross_device = error;
+    std::error_code ignored;
+    const auto status = fs::symlink_status(from, ignored);
+    if (ignored || !fs::is_regular_file(status)) { error = cross_device; return false; }
+    fs::path temporary = to;
+    temporary += ".nift-tmp-" + std::to_string(static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code step;
+    fs::copy_file(from, temporary, fs::copy_options::overwrite_existing, step);
+    if (!step) {
+        const auto modified = fs::last_write_time(from, ignored);
+        if (!ignored) fs::last_write_time(temporary, modified, ignored);
+        fs::rename(temporary, to, step);
+    }
+    if (step) { fs::remove(temporary, ignored); error = step; return false; }
+    // The destination is complete; a source that cannot be removed is an error
+    // (the data now exists twice), reported like any failed move.
+    if (!fs::remove(from, step) && step) { error = step; if (partial) *partial = true; return false; }
+    error.clear();
+    return true;
 }
 
 fs::path hash_file_path(const fs::path& root, const fs::path& path) {

@@ -357,6 +357,8 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     pending_control_={};
     std::string resource_error;
     if(!finalize_script_resources(resource_error) && rr.ok){rr.ok=false;rr.error.message=resource_error;rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeResourceLifecycle,resource_error);}
+    // feature-host-deps (D-028): a build script's async/thread workers' reads.
+    if(observing())settle_worker_observations(rr);
     return rr;
 }
 

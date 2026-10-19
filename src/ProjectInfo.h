@@ -174,6 +174,12 @@ private:
     bool save_failed_pages(const std::unordered_set<std::string>& succeeded,
                            const std::unordered_set<std::string>& failed);
 public:
+    // feature-host-deps (D-006 decision): the tracked page that owns `path` as
+    // a build output (its output file or one of its pagination outputs), or
+    // nullopt. `path` must already be canonical (std::filesystem::
+    // weakly_canonical); owner outputs are canonicalised the same way, so a
+    // symlinked output directory or an alternative spelling still matches.
+    std::optional<std::string> output_owner(const std::filesystem::path& canonical_path) const;
     // Drops untracked names (and removes the list when it becomes empty);
     // run on every build and by untrack/rm/mv. False on a write failure.
     bool prune_failed_pages();
@@ -182,6 +188,10 @@ private:
     mutable std::unordered_set<std::string> tracked_output_index_;
     mutable bool tracked_output_index_valid_ = false;
     mutable std::mutex tracked_output_index_mutex_;
+    struct PaginatedOwner { std::string directory, prefix, extension, name; };
+    mutable std::unordered_map<std::string, std::string> output_owner_index_;
+    mutable std::vector<PaginatedOwner> paginated_owner_index_;
+    mutable bool output_owner_index_valid_ = false;
     mutable std::size_t tracked_index_size_ = static_cast<std::size_t>(-1);
     mutable std::mutex hash_mutex_;
     mutable std::unordered_map<std::string, std::uint64_t> current_hash_cache_;

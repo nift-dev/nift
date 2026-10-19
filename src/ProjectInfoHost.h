@@ -134,6 +134,27 @@ public:
         return false;
     }
 
+    std::optional<std::string> output_owner(const std::filesystem::path& canonical_path) const override {
+        return project_.output_owner(canonical_path);
+    }
+
+    std::vector<std::filesystem::path> page_member_sources(const std::string& page_name, const std::string& member) const override {
+        std::vector<std::filesystem::path> sources;
+        if (member != "content" && member != "metadata") return sources;
+        const auto hi = project_.hierarchy_index();
+        if (!hi) return sources;
+        const std::size_t idx = hi->index_of(page_name);
+        if (idx == HierarchyIndex::NO_PARENT) return sources;
+        const TrackedInfo& info = project_.tracked[idx];
+        sources.push_back(project_read::content_path_of(project_.root, project_.config, info));
+        if (member == "metadata") {
+            if (info.frontmatter) sources.push_back((project_.root / *info.frontmatter).lexically_normal());
+            for (const auto& file : project_.config.schema_files) sources.push_back((project_.root / file).lexically_normal());
+            for (const auto& file : project_.config.taxonomy_files) sources.push_back((project_.root / file).lexically_normal());
+        }
+        return sources;
+    }
+
     bool is_contract_name(const std::string& name) const override {
         return project_.config.contracts.count(name) != 0;
     }

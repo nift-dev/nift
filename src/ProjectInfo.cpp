@@ -183,8 +183,48 @@ void ProjectInfo::rebuild_tracked_index() const {
         std::lock_guard<std::mutex> lock(tracked_output_index_mutex_);
         tracked_output_index_.clear();
         tracked_output_index_valid_ = false;
+        output_owner_index_.clear();
+        paginated_owner_index_.clear();
+        output_owner_index_valid_ = false;
     }
     tracked_index_size_ = tracked.size();
+}
+
+std::optional<std::string> ProjectInfo::output_owner(const fs::path& canonical_path) const {
+    if (tracked_index_size_ != tracked.size()) rebuild_tracked_index();
+    std::lock_guard<std::mutex> lock(tracked_output_index_mutex_);
+    if (!output_owner_index_valid_) {
+        output_owner_index_.clear();
+        paginated_owner_index_.clear();
+        for (const auto& info : tracked) {
+            std::error_code error;
+            const fs::path output = fs::weakly_canonical(output_path(info), error);
+            output_owner_index_.emplace((error ? output_path(info).lexically_normal() : output).generic_string(), info.name);
+            if (info.paginate) {
+                // Pages 2..N: <dir>/<stem>-N<ext>, or <dir>/N<ext> for "/" and "x/" names.
+                const fs::path page2 = pagination_output_path(info, 2);
+                const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+                const std::string file = page2.filename().generic_string();
+                const std::string prefix = file.substr(0, file.size() - extension.size() - 1);
+                const fs::path directory = fs::weakly_canonical(page2.parent_path(), error);
+                paginated_owner_index_.push_back({(error ? page2.parent_path().lexically_normal() : directory).generic_string(), prefix, extension, info.name});
+            }
+        }
+        output_owner_index_valid_ = true;
+    }
+    const auto it = output_owner_index_.find(canonical_path.generic_string());
+    if (it != output_owner_index_.end()) return it->second;
+    const std::string directory = canonical_path.parent_path().generic_string();
+    const std::string file = canonical_path.filename().generic_string();
+    for (const auto& owner : paginated_owner_index_) {
+        if (owner.directory != directory || file.size() <= owner.prefix.size() + owner.extension.size()) continue;
+        if (file.compare(0, owner.prefix.size(), owner.prefix) != 0) continue;
+        if (file.compare(file.size() - owner.extension.size(), owner.extension.size(), owner.extension) != 0) continue;
+        const std::string number = file.substr(owner.prefix.size(), file.size() - owner.prefix.size() - owner.extension.size());
+        if (!number.empty() && number.find_first_not_of("0123456789") == std::string::npos && number != "0" && number != "1" && number[0] != '0')
+            return owner.name;
+    }
+    return std::nullopt;
 }
 
 bool ProjectInfo::is_tracked_output(const fs::path& path) const {

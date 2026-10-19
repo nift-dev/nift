@@ -121,6 +121,15 @@ public:
     virtual bool page_ref_for(const std::string&, std::string&) const { return false; }
     virtual bool resolve_page_member(const std::string&, const std::string&,
                                      nift::RuntimeValue&, std::string&) const { return false; }
+    // feature-host-deps (D-028): the files a page member's value was read
+    // from (page("x").content: x's content file; .metadata: also its external
+    // front matter, schema and taxonomy files), so the reading page records
+    // them as dependencies. Hosts without such members return none.
+    virtual std::vector<std::filesystem::path> page_member_sources(const std::string&, const std::string&) const { return {}; }
+    // feature-host-deps (owner decision D-006): the tracked page owning a
+    // canonical path as a build output, if any. Hosts without tracked pages
+    // own nothing.
+    virtual std::optional<std::string> output_owner(const std::filesystem::path&) const { return std::nullopt; }
 
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to

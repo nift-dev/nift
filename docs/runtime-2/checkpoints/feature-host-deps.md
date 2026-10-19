@@ -38,6 +38,11 @@ before.
 | read of a missing path (ENOENT, ENOTDIR, dangling symlink) | `absent` (as `exists()` and `sha256_file()` already did) | the path appears |
 | read of an existing path that cannot be opened (EACCES, ELOOP, ENXIO, …) | `unreadable[path] = token` where token = `filesystem::read_access_error(path)` (`errno:13`) | the token changes (becomes readable, other error, disappears) |
 
+Cost of the stream snapshot (review R3): in hash/hybrid page builds the
+whole file is hashed at open, regardless of how many bytes the page then
+consumes, and the build engine hashes it again when it writes the page's
+metadata (twice in total, streamed, bounded memory). Follow-up F9: hash once.
+
 Why "at open" for streams: what a stream will consume is not known at open,
 and recording at read would need per-read bookkeeping; recording at open is
 conservative (a stream opened and never read still makes the page depend on
@@ -57,6 +62,15 @@ computed by the same function at render and at check time (POSIX
 `open(O_RDONLY|O_NONBLOCK|O_NOCTTY|O_CLOEXEC)` then `close`, never reads, never
 blocks on a FIFO; Windows `CreateFileW(GENERIC_READ)`), so they agree by
 construction. Older page-info has no section and is unaffected.
+
+**Guarantee by mode (review R1).** Hash and hybrid compare content hashes and
+see every content change. Modified mode compares mtimes only, so it misses
+any change that leaves the dependency's mtime older than the page's build
+metadata: a same-mtime rewrite, a file renamed over the dependency with an
+older mtime (also mid-stream), a symlink re-pointed at an older file, and
+permission changes on a file that was read (F6). The "incremental equals
+clean" guarantee of this checkpoint is therefore stated for hash and hybrid;
+modified mode keeps its documented mtime contract.
 
 Symlinks: the recorded spelling is the path as given (lexically normal);
 mtime checks use `stat` (follows links) and hashes read through the link, so
@@ -106,15 +120,64 @@ be project-local `.f` files, and package-store containment (`must stay inside
 the owning package`). None of these used the removed check. `@path`/`@pathto`
 keep their containment: they compute site URLs, not filesystem accesses.
 
+## 2b. Build writes respect output ownership (owner decision on review D6)
+
+During a website build (page renders and build scripts, including their
+async/thread workers), every script write API checks its destination
+**immediately before the write** (`Parser::guard_build_write`):
+
+| Destination | Result |
+|---|---|
+| inside the project's `.nift/` | refused: `<op>: refusing to write Nift build metadata during a build: <path>` |
+| an output owned by **another** tracked page (its output file or a pagination output `…-N.html`/`N.html`, N ≥ 2) | refused: `<op>: refusing to overwrite` (or `remove`) `the build output of tracked page '<name>' during a build: <path>` |
+| the current page's own outputs | allowed (tracking stays correct: the build writes them afterwards) |
+| unowned files, including inside `public/` | allowed (existing output-management rules) |
+| outside the project | allowed (OS permissions, optional `--fs-root`) |
+
+Both errors are fatal (`policy.restricted_operation`, not catchable), so the
+page fails loudly (D-020: last-good output kept) and nothing is rebuilt
+automatically. Ownership is Nift's existing notion: the tracked pages'
+output paths (`ProjectInfo::output_owner`, built lazily next to the existing
+`is_tracked_output` index); no new declaration mechanism. Resolution uses
+filesystem semantics: the canonical parent directory plus the final name
+(what an unlink or rename replaces) and, for writes, also the fully resolved
+path (a symlink to another page's output, inside or outside the project), so
+`..`, symlinked directories, absolute and alternative spellings are caught;
+owner outputs are canonicalised the same way (symlinked output directories,
+D-026). Guarded APIs: `cp`/`mv` targets and move sources, `rm`, `touch`,
+`mkdir`, `file().copy/move/remove` (and the move source), `file().save()`
+(the write of `file().open("w"/"a"/"rw")`), `ofstream`/output `s.open()`,
+`minify` output, and `cmd().stdout()/.stderr()` redirect targets. Standalone
+scripts own no pages and are unaffected. Race: see F11.
+
+Old vs new: before, `file("x").copy("public/other.html")`, `cp`, `rm`, `mv`,
+`save`, `ofstream` or a `cmd().stdout()` redirect silently replaced or
+removed another page's output and `nift status` still reported that page up
+to date; a copy onto `.nift/tracked.json` broke the project. Now each is
+refused with the owning page named (`tests/runtime2/build_write_ownership.sh`,
+which fails on the base binary).
+
 ## 3. Bounded whole reads (`limit.exceeded`)
 
 ### Setting and default
 
-`NIFT_READ_LIMIT=<bytes>[K|M|G|T|KiB|MiB|GiB|TiB]` (binary multiples,
-≥ 1 byte). **Default 1 GiB (1073741824 bytes)**: the VM heap budget
-(`VmOptions::heap_budget`, D-028 "currently 1 GiB"), so any value one engine
-can materialise the other can hold too, and every whole read that works
-today on realistic inputs keeps working. It follows the existing convention
+`NIFT_READ_LIMIT=<bytes>[B|K|KB|KiB|M|MB|MiB|G|GB|GiB|T|TB|TiB]`
+(case-insensitive; every suffix is **binary**, so `1kb` = 1024; ≥ 1 byte).
+**Default 1 GiB (1073741824 bytes).** Owner (D-030): `NIFT_READ_LIMIT` (a
+bound on materialising one whole read or capture) and the VM heap budget
+(total VM-managed memory, `NIFT_VM_HEAP_BUDGET`) are **independent settings**
+that both default to 1 GiB for now; neither tracks the other, and raising one
+does not raise the other. The same default means a whole read that fits the
+read limit is not, by itself, larger than the VM budget, and every whole read
+that works today on realistic inputs keeps working.
+
+The limit is **per read, not per process**: each operation's buffer is
+bounded separately, and the value it produces is then ordinary program data
+(assigning it, concatenating it or returning it may copy it). A whole read
+peaks at about 2 × the file size of address space for sources of unknown size
+(growth step: the replaced buffer ≤ limit/2 plus the new buffer ≤ limit) and
+at about 1 × for regular files (pre-sized). With async/thread workers reading
+concurrently the worst case is about (workers + 1) × 2 × limit. It follows the existing convention
 for runtime limits (`NIFT_VM_HEAP_BUDGET`, `NIFT_VM_OUTPUT_LIMIT`: environment
 variables) and is read per operation. An invalid value (`0`, `-1`, `abc`,
 `12Q`, overflow) is a fatal `native.invalid_argument` naming the setting at
@@ -229,16 +292,20 @@ not counted). "Unbounded" = can read an unbounded amount into memory.
 | `file(p)` (handle) / `.exists()` | — / P | none | — |
 | `file().open("r")` / `("rw")` | D (**rw new**), A, U (**new**) | none | no (**new**; `w`/`a` read too, Q-H8) |
 | file-object reads (`read`, `read_line`, …) | (covered by open) | — | in memory already bounded at open |
-| `file().copy/move` | — (writes; not traced, F1) | **none (new; was project root)** | no (OS copy) |
-| `file().remove`, `save`, `touch`, `mkdir`, `cp`/`mv`/`rm`, `ofstream` | W (except `file().copy/move/remove`, F1) | none | no |
+| `cp()`, `file().copy` | source D/A (**new, review D4**); destination W (`file().copy`: **new**, untraced F1) | none (**`file().copy`: new; was project root**) | no (OS copy) |
+| `mv()`, `file().move` | source A after the move (**new**: it reappearing rebuilds; D/A if the move failed); destination W; cross-device fallback (**new, R5**) | none (**`file().move`: new**) | no |
+| `file().remove`, `save`, `touch`, `mkdir`, `rm`, `ofstream` | W | none; **writes into `.nift/` refused during builds (new, interim D6)** | no |
 | `ifstream`/`s.open`, stream reads | D at open, A, U (**new**) | none | no (**per call, new**) |
 | `exists`, `is_file`, `is_dir`, `stat` | P/A (+ D for `stat` of a file) | none | no |
 | `ls`, `ls(glob)`, `glob` | L | none | no (entry names only) |
 | `sha256_file` | D (streamed), A, U (**U new**) | none | no (streamed; never-EOF devices hash forever, §3) |
-| `inject` | D | none | no (**regular files, size-checked, new**) |
+| `inject` | D | none | no (**regular files, checked by `st_size` at open only, new**: a file growing between the size check and the read is read up to its size at read time; narrow window, F3 class) |
 | `minify(file)` | D, A/P (**new**), output W (**new**) | none | no (**new**) |
-| `page(x).content` / `.metadata` | D on x's content (**new**) | n/a (tracked pages) | regular file sized by `stat` (F3) |
-| `run`, `cmd().run()` | — (by design, CP02) | none | no (**captures bounded, new**) |
+| `page(x).content` | D on x's content file (**new**) | n/a (tracked pages) | regular file sized by `stat` (F3) |
+| `page(x).metadata` | D on x's content file, its external front-matter file and every configured schema and taxonomy file (**new**, review D2) | n/a | regular file sized by `stat` (F3) |
+| any read inside `async` functions / `thread()` workers | recorded in the worker and merged into the page when the render ends (**new**, review D3) | as the API | as the API |
+| `read()` (stdin line, standalone only) | n/a (standalone) | — | no (**bounded, new**, review D7) |
+| `run`, `cmd().run()` | — (by design, CP02) | none | no (**captures bounded while the child runs, new**, review D5) |
 | command-style statements (`git status` line) | — | none | **yes**: captured then printed (F2) |
 | `import`, `module_path`, `package_path` | D (`read-source`) | package store only (integrity rule, not D-002) | regular file sized by `stat` (F3) |
 | template `@input`, `@markup`, `@json`, `@script` sources, templates, content, pagination | D; missing/unreadable fails the page (D-020 rebuild) | none (CP03) | regular file sized by `stat` (F3) |
@@ -263,44 +330,100 @@ not counted). "Unbounded" = can read an unbounded amount into memory.
 * **F6** Modified mode is mtime-only: re-pointing a symlink at an older file,
   or `chmod 000` on a file that was read, is not seen (hash/hybrid see both).
   Pre-existing for every read API.
-* **F7** `tests/runtime2/fs_freedom.sh` checks `--fs-root` with
-  `nift --fs-root=R s.f`, which fails as an unknown shell option rather than
-  because of the restriction, so that check passes vacuously.
-  `file_copy_move_freedom.sh` uses the working spelling (`nift s.f --fs-root=R`).
+* **F7** (fixed in review round 1) `tests/runtime2/fs_freedom.sh` checked
+  `--fs-root` with `nift --fs-root=R s.f`, which fails as an unknown shell
+  option, so the check passed vacuously; it now uses `nift s.f --fs-root=R`
+  and asserts the restriction message. `NIFT_FS_ROOT`/`--fs-root` apply to
+  standalone scripts only (`run_script` enables the filesystem root only when
+  not building a project).
 * **F8** A `--read-limit` CLI flag (like `--fs-root`) was not added; the
   setting is environment-only like the other runtime limits.
+* **F9** Streams in hash/hybrid builds hash the whole file at open and again
+  at metadata time (R3); hash once (e.g. reuse the open-time snapshot when the
+  file is unchanged).
+* **F10** Modified mode could compare ctime, inode and size in addition to
+  mtime (R1) to see renames-over and permission changes.
+* **F11** Build-write ownership (implemented, §2b) is checked immediately
+  before each write, with no transaction: a path that changes between the
+  check and the write (a symlink swapped in by another process) is not
+  covered. The check covers `ProjectInfoHost` (CLI builds); embedding hosts
+  own no outputs (`RenderHost::output_owner` returns none).
+* **F12** Capture limit while the child runs: on Linux the stages and their
+  descendants (via `/proc/<pid>/task/*/children`, stopped then killed) are
+  killed; elsewhere only the stages. A descendant that already left the
+  stage's tree (re-parented to init) keeps running until CP16's per-pipeline
+  process groups and cleanup (D-030 C1–C3). The capture files can overshoot
+  the limit by what the stages write in one check interval (≤ 2 ms).
+* **NOTE** `nift rm <name>` exits 0 when `<name>` is not tracked (e.g.
+  `nift rm index`, the index page is `/`), so a typo untracks nothing
+  silently; reported, not changed here.
+
+## 4b. Review round 1 (independent review of `6aeca9b`)
+
+| # | Finding | Resolution |
+|---|---|---|
+| D1 | `read_line` on a directory or `/proc/self/mem`: the filebuf's read error escaped as an uncaught C++ exception (before: catchable `read_line: input failure`) | the bounded line loop catches it, sets badbit and raises the recoverable `stream.read_failed` again; same for `read()` |
+| D2 | `page(x).metadata` stale when x uses an external front-matter file | `RenderHost::page_member_sources`: content file, external front matter, schema and taxonomy files are recorded |
+| D3 | reads inside `async` functions and `thread()` workers were discarded (pre-existing) | **merge option**: workers of a page render or build script record like the page (`worker_observing_`), export their dependencies/requirements/observations (after settling their own workers) into the future/thread state under its mutex, and the render merges every worker's export once when it ends (`settle_worker_observations`, which waits for the workers exactly as the destructor already did). Snapshots go through the host's mutex-protected observation map. Un-awaited futures and un-joined threads are covered too |
+| D4 | the source of `cp()`/`file().copy`/`file().move` never recorded (pre-existing) | copies: source dependency + snapshot (or absence); moves: source absence after the move (a dependency on a consumed source would rebuild and fail forever), so a new source rebuilds |
+| D5 | captures unbounded while the child runs (disk fill, hang on `run("yes")`) | the captures are checked between short waits (pidfd poll on Linux, ≤ 2 ms); past the limit the stages and their descendants are SIGKILLed and reaped, then the normal limit error (F12 for the limits of this) |
+| D6 | no protection of `.nift/` or other pages' outputs (pre-existing) | owner decision: ownership-based refusal (§2b): `.nift/` and other pages' outputs refused, own outputs/unowned/outside allowed, spelling-independent |
+| D7 | `read()` (stdin line) unbounded | bounded line reader |
+| R1–R3 | modified-mode rename-over; per-read limit; double hash | documented (§1, §3), follow-ups F9, F10 |
+| R4 | `read_limit.py` could not tell `limit` from `2 × limit` | limit 64 MiB, slack 8 MiB |
+| R5 | cross-device `move`/`mv()` failed with EXDEV | `filesystem::move_path`: copy to a temporary sibling (permissions and mtime kept), rename over the destination, remove the source; directories/symlinks keep EXDEV. Owner semantics: a failed copy leaves the original intact (temporary removed, `io.move_failed`); a source that cannot be removed after a complete copy is a recoverable `io.move_failed` naming both paths (`move: copied to <dest> but could not remove the source <src>: …`), never success |
+| tests | vacuous untrack check, vacuous `B:` check, F7, `file().copy("dir")` | fixed; `file().copy/move` into an existing directory keep the file name, as `cp()`/`mv()` |
 
 ## 5. Tests
 
+**Resource limits (owner standing rule).** Every test added by this
+checkpoint runs nift inside hard limits even where the implementation
+enforces its own: disk (`RLIMIT_FSIZE`/`ulimit -f`), memory
+(`RLIMIT_AS`/`ulimit -v`), lifetime (`timeout`), and the capture cases check
+for leftover child processes and zombies.
+
+
 | Test | What it proves | Base `59e9fa5` | This branch |
 |---|---|---|---|
-| `tests/runtime2/host_deps.py` | incremental == clean build after each of 22 edits, in modified, hash and hybrid, and "up to date" afterwards (no perpetual rebuild); plus an edit made while the page is part-way through a stream | 54 FAIL (18 steps × 3 modes: every `open_bytes`, `rw`, `ifstream`, missing-file, unreadable, `page(x)` and mid-stream step), 93 PASS (controls: `open`, `file().open("r")`, external, symlink via `open`) | 147 PASS, 0 FAIL |
-| `tests/runtime2/file_copy_move_freedom.sh` | external/absolute/parent/symlinked `file().copy/move` in a page; `--fs-root` restricts the destination; untracking leaves external files | 15 FAIL, 1 PASS (`copy: path must stay inside the Nift project`; `--fs-root` did not cover the destination) | 15 PASS |
-| `tests/runtime2/read_limit.py` | exact boundary vs one over (files, lines, FIFO, capture); `/dev/zero`, `/dev/full`, FIFOs (finite, endless writer), growing file, empty file; every read API; streaming beyond the limit; setting parsing and invalid values; default 1 GiB; page build keeps last-good output; all memory cases under `RLIMIT_AS` = baseline + 1.5 × limit + 48 MiB with peak RSS ≤ baseline + limit + 48 MiB | 51 FAIL, 37 PASS (no limit error anywhere; devices/FIFOs stopped only by RLIMIT_AS) | 88 PASS (incl. the default-1-GiB case, run because MemAvailable ≥ 4 GiB) |
-| `tests/read_limit_unit.cpp` | parser, boundary, capacity never above the limit, growth never replaces a buffer above limit/2, endless source pulls ≤ limit + 1 + one block, max-bytes reads, stream errors; normal and ASan/UBSan | n/a | pass (`-O2`, and `-fsanitize=address,undefined`); 3 seeded mutants of `ReadLimit.h` (no limit/2 jump, off-by-one probe, unbounded request) and a `reserve`-in-place mutant each fail it |
+| `tests/runtime2/host_deps.py` | incremental == clean build after each edit (open, open_bytes, file().open r/rw, ifstream line/all/extraction, external, parent traversal, symlink targets, missing files appearing/removed, unreadable → readable, `page(x).content/.metadata` incl. external front matter, reads in `async` functions and `thread()` workers, `cp()`/`file().copy()` sources) in modified, hash and hybrid, "up to date" afterwards; an edit while the page is part-way through a stream; `file().move`/`mv()` sources reappearing | 84 FAIL, 114 PASS | 198 PASS |
+| `tests/runtime2/file_copy_move_freedom.sh` | external/absolute/parent/symlinked `file().copy/move` in a page, copy into an existing directory, `--fs-root` covers the destination, cross-device `file().move`/`mv()` to `/dev/shm`, `.nift/` writes refused, real untracking leaves external files | 23 FAIL, 2 PASS | all PASS |
+| `tests/runtime2/build_write_ownership.sh` | §2b: 15 ways to overwrite/remove another page's output (copy, cp via symlinked dir, `..`, absolute, outside symlink, rm, file().remove, mv/move away and onto, save, ofstream, touch, cmd().stdout) refused naming the owner; `.nift/` refused via symlink; own output, unowned `public/` file, outside path allowed; standalone unaffected; R5 partial-failure semantics (copy failure keeps the original, undeletable source reported) | 25 FAIL, 4 PASS (the 4 do not discriminate) | all PASS |
+| `tests/runtime2/read_limit.py` | boundaries (files, lines, FIFO, stdin, capture), devices, FIFOs, growing file, every read API, streaming beyond the limit, read_line I/O errors catchable (directory, `/proc/self/mem` EIO), `read()` bounded, captures stopped while the child runs (`yes`, `head -c 150000000`, pipeline, descendant of `sh -c`, stderr) with no leftover processes or zombies and the marker never created, setting parsing, default 1 GiB, page-build state; limit 64 MiB, RLIMIT_AS = baseline + 1.5 × limit + 8 MiB, peak RSS ≤ baseline + limit + 8 MiB | 52 FAIL, 63 PASS | 115 PASS |
+| `tests/read_limit_unit.cpp` | parser, boundary, capacity ≤ limit, growth never replaces a buffer above limit/2, endless source pulls ≤ limit + 1 + one block, max-bytes reads, stream errors; `-O2` and ASan/UBSan | n/a | pass |
 
-Make target: `make test-runtime2-host-deps` (also part of `make test`).
+Make target: `make test-runtime2-host-deps` (unit + the four suites; part of `make test`).
 
-### Results (this branch @ commit below, binary built from it; "before" = `nift` built from base `59e9fa5`, objects compiled from identical sources in the `nift-serve` worktree @`b411f3f` and relinked here)
-
-Measured peak RSS in the exceeding cases: 10 MiB (rejected from `st_size`)
-to 23 MiB (`/dev/zero` read to the 16 MiB limit) against a baseline VmHWM of
-6 MiB, under RLIMIT_AS 50 MiB.
+### Results after review round 1 (binary built from the round-1 commit)
 
 | Suite | Result |
 |---|---|
-| `make test-runtime2-host-deps` (unit + 3 suites above) | pass |
-| `make test-runtime2-fs-freedom` | pass |
-| `make test-runtime2-dynamic-reads` (both scripts) | pass |
+| `make test-runtime2-host-deps` | pass (364 PASS lines) |
+| `make test-runtime2-fs-freedom` (with the F7 fix) | pass |
+| `make test-runtime2-dynamic-reads` | pass |
 | `make test-contracts` | pass |
 | `make test-site-dx` | pass |
-| `make test-conformance` | 9/9 pass |
+| `make test-conformance` | 9/9 |
 | `make test-test-integrity`, `make test-runtime2-certification-guard` | pass |
-| `make test-build-recovery` | `build_recovery.py`: 1 of 986 FAIL on the first run (`hybrid targeted: following build is a no-op`); 3 more runs: 2, 3, 1 FAIL, always `hybrid …: following build is a no-op`; the **base binary fails the same way** (3 runs: 4, 2, 1 FAIL, same check), so it is a pre-existing hybrid-mode timing flake, not this change. `build_recovery_random.py`: PASS (80 steps × 3 modes, 0 problems) |
-| CP16 fixtures `capture.py --check` (30 probes) | base binary: 30 OK. This binary: 25 OK, 5 DIFF, all intended: `site_deps` (bytes/ifstream now dependencies; steps 10–13 detect the edits), `site_contain` (`file().copy` outside the project succeeds), `fs_read` (`open_bytes` traced `read`), `fs_write`, `fs_eacces` (`open("rw")` traced `read`). Re-captured (`--write --runs 2`, stable across directories) in a scratch copy; then 30/30 OK. Patch for the CP16 branch: `docs/runtime-2/evidence/feature-host-deps/cp16-fixtures-recaptured.patch` |
+| `make test-build-recovery` | `build_recovery.py` 986 checks PASS (the known hybrid no-op flake did not occur in this run); `build_recovery_random.py` PASS |
+| `read_limit_unit` under ASan/UBSan | pass |
+| reviewer probes `exp1`–`exp5` (harness pointed at this worktree, under `ulimit -f/-v`) | `exp2`, `exp4`: pass. `exp1`: all hash/hybrid steps pass, including async; 5 modified-mode failures, all documented modified-mode limits (same-mtime edits, symlink re-pointed at an older file; R1). `exp3`: external front matter passes in all modes; rename-over with an older mtime fails in modified mode only (R1). `exp5`: the probe's own page fails to build on the base binary too (`unknown value or malformed expression: project` inside the `while` condition), so it tests nothing here |
+
+CP16 fixtures (`capture.py --check`, 30 probes, scratch copy): base binary
+30 OK. This binary, against the original expected files: 6 intended DIFFs:
+`site_deps` (`open_bytes`/`ifstream` now dependencies; steps 10–13 detect
+the edits), `site_contain` (`file().copy` outside the project succeeds, and
+its source `data/p.txt` is now a dependency), `fs_read` (`open_bytes` traced
+`read`), `fs_write` and `fs_eacces` (`open("rw")` traced `read`). Re-captured
+(`--write --runs 2`, stable across directories), then 30/30 OK. Patch for the
+CP16 branch: `docs/runtime-2/evidence/feature-host-deps/cp16-fixtures-recaptured.patch`.
+
+Measured peak RSS in the exceeding cases (limit 64 MiB): 11 MiB (rejected
+from `st_size`, capture stopped early) to 70 MiB (endless stdin read to the
+limit) against a baseline VmHWM of 6 MiB, under RLIMIT_AS 114 MiB.
 
 Not run: `make certify` (owner), sanitizer builds of `nift`, the regression
-suite, macOS/Windows.
+suite, macOS/Windows, a mutant build of `nift` for R4 (the unit test's
+mutants cover the growth rule).
 
 ## 6. Note for CP16
 

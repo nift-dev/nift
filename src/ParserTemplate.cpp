@@ -3366,6 +3366,14 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
 }
 
 RenderResult Parser::render() {
+    // feature-host-deps (D-028): reads made by async/thread workers belong to
+    // the page; wait for them and merge what they observed.
+    RenderResult result = render_unsettled();
+    if (observing()) settle_worker_observations(result);
+    return result;
+}
+
+RenderResult Parser::render_unsettled() {
     if (auto it=json_bindings_.find("frontmatter"); it!=json_bindings_.end() && it->second && it->second->is_object() && it->second->has("_error")) { result_.ok=false; result_.error={tracked_info_.name,host_.content_path(tracked_info_),0,(*it->second)["_error"].string}; return result_; }
     const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
