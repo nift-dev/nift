@@ -889,3 +889,32 @@ move into an explicit `native.*` namespace (`native.cp(...)`, multi-source forms
 preserved) with the old global names deprecated under language cleanup, instead
 of staying as `cp()` etc. A bounded feasibility and migration investigation is
 running; no public API change until decided.
+
+## D-043 — Linode capacity by budget, not instance count (owner, 2026-10-20; supersedes the 2-instance cap of D-033)
+
+The fixed two-instance cap is removed. Temporary Linodes are provisioned by
+workload demand (initially 3–4 concurrent, more when productive), under the
+**US$10 aggregate campaign budget**, which is enforced on **committed spend** =
+accrued cost + maximum remaining cost of every live campaign instance to its TTL
+(`linode.py` refuses a create that would exceed it; shorten TTLs, use a cheaper
+type, or ask the owner). Every instance (Claude's or DeepSeek's) carries the
+`nift-rt2-campaign` tag, an owner/purpose tag and a TTL tag, and is visible in
+one inventory; other owners' deleted-instance spend is recorded in
+`external-spend.txt`. TTLs, evidence retrieval, verified deletion, credential
+protection and pinned SSH host keys stay mandatory. No idle capacity; workers
+are reused for consecutive jobs and deleted when their queue is empty.
+Independent workloads (CP12B, CP17, L7, memory investigation) get their own
+workers; performance baselines run on uncontended workers. DeepSeek may
+provision within these limits without per-operation approval.
+
+Also decided (owner, same day):
+- **D-041 interpretations approved:** a repeated import rebinds the same
+  exports; a failed module initialisation stays failed within its context, and
+  later imports report the original failure without re-running side effects.
+- **L7 cycles (D-040 addendum):** ordinary values are acyclic — a value never
+  contains itself directly or indirectly (shared copy-on-write storage between
+  distinct values is not a cycle; identity-bearing handles/functions may refer to
+  internally cyclic resources). Enforced at mutation boundaries with
+  `runtime.reference_cycle` and tests for direct and indirect cycles, without a
+  full graph traversal on ordinary assignments; the implementation's cost is
+  measured and reported.
