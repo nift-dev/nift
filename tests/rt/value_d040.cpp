@@ -17,17 +17,26 @@
 // 6. heap accounting: objects at and above the 512 MiB and 1 GiB boundaries,
 //    several large objects, counter arithmetic (concern 3)
 // 7. copy-on-write metadata: the identity summary bit across copies
+// 8. tag-byte masking: with the bit set on every heap kind, kind, equality,
+//    hash, rendering, serialization, legacy conversion, footprint, cloning and
+//    destruction match the unmarked value
 // 5. the cycle checker against brute-force reachability on random graphs of
 //    captured cells, closures, handles and payloads; plain stores never walk
 #include "rt/aggregate.h"
 #include "rt/compare.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/legacy_bridge.h"
+#include "rt/natives/format_methods.h"
+#include "rt/render.h"
+#include "rt/error.h"
+#include "RuntimeValue.h"
 #include "rt/string.h"
 #include "rt/value_cycle.h"
 #include "rt_test.h"
 
 #include <cstdlib>
+#include <functional>
 #include <map>
 #include <random>
 #include <set>
@@ -637,6 +646,84 @@ void cow_metadata() {
     CHECK(may_contain_identity(e) && e.heap() != c.heap());
 }
 
+
+// ---- 8. tag-byte masking: the summary bit never changes what a value is -------
+// The bit shares the header's tag byte with the Kind. Every reader of the
+// header kind masks it (HeapObject::kind()); everything else reads the Value's
+// own kind byte, which is set from the masked kind. Set the bit on every heap
+// kind and check that kind, equality, hash, truthiness, rendering,
+// serialization, legacy conversion, footprint, cloning and destruction all
+// match the unmarked twin.
+struct Twin { Value plain, marked; bool aggregate; };
+
+Value with_bit(Value v) {
+    if (v.is_heap()) mark_may_hold_identity(v.heap());
+    return v;
+}
+
+std::string serialized(const Value& v) {
+    std::string out, error;
+    bool internal = false;
+    const bool ok = nift::rt::natives::serialize(v, false, out, error, internal);
+    return (ok ? "ok:" : "no:") + out + "|" + error + (internal ? "|internal" : "");
+}
+
+std::string legacy_text(const Value& v) {
+    nift::RuntimeValue out;
+    std::string error;
+    if (!to_legacy(v, out, error)) return "error:" + error;
+    try {
+        return out.dump();
+    } catch (const std::exception& e) {
+        return std::string("throws:") + e.what();
+    }
+}
+
+void tag_masking() {
+    std::vector<std::pair<const char*, std::function<Value()>>> makers = {
+        {"string", [] { return make_string("a heap string longer than fourteen bytes"); }},
+        {"decimal", [] { return make_decimal("123456789012345678901234567890.5", 1.2345678901234568e29); }},
+        {"bytes", [] { return make_bytes({1, 2, 3}); }},
+        {"array", [] { Value a = make_array(); array_push(a, I(1)); array_push(a, make_string("x")); return a; }},
+        {"object", [] { Value o = make_object(); object_set(o, atom("k"), I(2)); return o; }},
+        {"struct", [] { Value s = make_struct(atom("P")); struct_add_field(s, atom("x"), I(3)); return s; }},
+        {"error", [] { return make_user_error("boom"); }},
+    };
+    for (auto& [name, make] : makers) {
+        Value plain = make(), marked = with_bit(make());
+        CHECK(marked.kind() == plain.kind() && marked.heap()->kind() == plain.kind());
+        CHECK(equal(plain, marked) && equal(marked, plain) && hash(plain) == hash(marked));
+        CHECK(truthy(plain) == truthy(marked));
+        std::string a, b;
+        CHECK(append_rendered(plain, a) == append_rendered(marked, b) && a == b);
+        CHECK(serialized(plain) == serialized(marked));
+        CHECK(legacy_text(plain) == legacy_text(marked));
+        CHECK(heap_footprint(plain.heap()) == heap_footprint(marked.heap()));
+        CHECK(std::string(kind_name(marked.kind())) == kind_name(plain.kind()));
+        if (!(std::string(name) == "array" || std::string(name) == "object" || std::string(name) == "struct")) continue;
+        // Cloning a marked aggregate: the clone has the right kind and keeps the bit.
+        Value share = marked;
+        Value clone = marked;
+        if (clone.is(Kind::Array)) array_push(clone, I(9));
+        if (clone.is(Kind::Object)) object_set(clone, atom("z"), I(9));
+        if (clone.is(Kind::Struct)) struct_add_field(clone, atom("z"), I(9));
+        CHECK(clone.heap() != share.heap() && clone.kind() == plain.kind() && clone.heap()->kind() == plain.kind());
+        CHECK(may_hold_identity(clone.heap()) && equal(share, plain));
+    }
+    // Functions: identity values; the bit (never set by stores) changes nothing either.
+    Value f = Value::adopt(new FunctionObject());
+    Value g = with_bit(f);
+    CHECK(g.kind() == Kind::Function && f.heap()->kind() == Kind::Function && equal(f, g) && same(f, g) == Sameness::Same);
+    // adopt() of an object whose bit is already set yields the right kind.
+    auto* raw = new ArrayObject();
+    mark_may_hold_identity(raw);
+    Value adopted = Value::adopt(raw);
+    CHECK(adopted.kind() == Kind::Array && array_size(adopted) == 0 && may_contain_identity(adopted));
+    // Destruction of marked objects of every kind (ASan/UBSan check the frees).
+    for (auto& [name, make] : makers) { Value v = with_bit(make()); (void)name; }
+    CHECK(true);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -652,6 +739,7 @@ int main(int argc, char** argv) {
     plain_stores_never_walk();
     large_accounting();
     cow_metadata();
+    tag_masking();
     std::printf("seed %lu scale %ld\n", seed, scale);
     return rt_test::finish("rt value D-040");
 }

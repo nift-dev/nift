@@ -489,6 +489,7 @@ bench-rt-vm: $(TARGET) $(RT_VM_RUN)
 
 # Callgrind instruction counts, rt::Value vs legacy RuntimeValue (needs valgrind).
 bench-rt-value: $(RT_VALUE_BENCH)
+	python3 tests/rt/value_bench_guard.py --self-test tests/rt/value_bench_baseline.json
 	tools/rt-bench.sh "$(RT_VALUE_BENCH)" | tee "$(TEST_DIR)/rt/value-bench-table.md"
 	python3 tests/rt/value_bench_guard.py "$(TEST_DIR)/rt/value-bench-table.md" tests/rt/value_bench_baseline.json
 

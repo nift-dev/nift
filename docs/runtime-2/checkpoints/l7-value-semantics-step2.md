@@ -71,6 +71,49 @@ section (§6) once the investigation's final report arrives.
   * a clone that keeps a function keeps the bit;
   * soundness over random programs (§4).
 
+## 2b. Audit: no reader sees the summary bit as part of the kind
+
+The bit is stored only in `HeapObject::tag`. Each Value keeps its own kind
+byte (`Value::bytes_[15]`), and that byte never carries the bit.
+
+| Reader | What it reads | Masked |
+| --- | --- | --- |
+| `HeapObject::kind()` (`value.h`) | `tag & kKindMask` | yes: the only kind accessor on the header |
+| `may_hold_identity`, `mark_…`, `clear_…` (`heap.h`) | bit 7 only | n/a |
+| `Value::adopt`, `Value::replace_heap` (`value.h`) | `object->kind()`, written into the Value's kind byte | yes. These are the only paths from the header to a Value. A clone gets the bit before `replace_heap`, so this matters |
+| `destroy_heap_object`: `detach_children`, `delete_object`, `has_children` (`value.cpp`) | `object->kind()` | yes |
+| `relocate_storage` (`aggregate.cpp`) | `object->kind()` | yes |
+| `raw_footprint` (`heap_account.cpp`) | `object->kind()` | yes |
+| kind checks, `compare`/`equal`/`hash`/`truthy` (`compare.cpp`) | `Value::kind()` | not affected: the Value's kind byte |
+| rendering (`render.cpp`), `stringify`/`serialize` (`natives/format_methods.cpp`), every other native | `Value::kind()` | not affected |
+| `legacy_bridge.cpp` (`to_legacy`/`from_legacy`) | `Value::kind()` | not affected |
+| VM dispatch (`vm.cpp`, `vm_ops.cpp`), compiler, script runner | `Value::kind()` | not affected |
+| C ABI and embedding (`include/nift/*`, `src/Engine*`) | no `rt::Value` or header access (legacy `RuntimeValue` only) | not affected |
+| `Value::raw()` | no callers outside `value.h` | n/a |
+
+No file outside the owned value layer reads `HeapObject::tag` or the former
+`HeapObject::kind` member (grep across `src/` and `include/`).
+
+**Regression test** (`value_d040` §8). The bit is set on a heap value of
+every kind: heap string, decimal, bytes, array, object, struct, error and
+function. Against an unmarked twin, the test checks that these all match:
+
+* the Value kind and the header `kind()`;
+* `equal` in both directions, and `hash`;
+* `truthy` and `append_rendered`;
+* `serialize` (stringify);
+* `to_legacy` plus `dump`;
+* `heap_footprint` and `kind_name`.
+
+It also checks that:
+
+* cloning a marked array, object or struct gives the right kind and keeps
+  the bit;
+* `adopt` of an object whose bit is already set gives the right kind;
+* destroying every marked kind is clean under ASan/UBSan.
+
+The mutant "unmasked `kind()`" crashes the suite (SIGSEGV), so it is caught.
+
 ## 3. Heap accounting and budgets (memory investigation concern 3)
 
 **Requirement.** An object larger than the representable footprint must
@@ -122,7 +165,7 @@ This also closes a pre-L7 gap. A single object above 1 GiB used to count
 ## 4. Tests
 
 `tests/rt/value_d040.cpp` is part of `test-rt-value` and
-`test-rt-value-sanitize`. Default seed 20261020: 111,896 checks, 0
+`test-rt-value-sanitize`. Default seed 20261020: 111,961 checks, 0
 failures, at `-O1` and under ASan/UBSan. It covers:
 
 1. structs: copies, nested place writes, structural equality and hash, other
@@ -144,7 +187,8 @@ failures, at `-O1` and under ASan/UBSan. It covers:
    refused, 8,839 allowed). Plain stores never walk, and a conservatively
    marked plain array is verified once, then skipped;
 7. large-object accounting (§3);
-8. copy-on-write metadata (§2).
+8. copy-on-write metadata (§2);
+9. tag-byte masking on every heap kind (§2b).
 
 Maps and sets have no VM value kind yet (CP15B). Their value-layer tests
 arrive with that kind; the language-level self-insertion fixtures for maps
@@ -193,11 +237,25 @@ run subtracted; base = `c385d396`):
 * The heap-accounting change costs nothing measurable because of the
   out-of-line slow path and the inlined footprint.
 
-**Guard.** `bench-rt-value` now fails when a workload exceeds the locked
-baseline (`tests/rt/value_bench_baseline.json`) by more than 2 %. Counts
-from another toolchain are reported, not judged. The baseline is the table
-above (GCC 13.3.0). The worker's run (REMOTE JOB) confirms it on the
-certification toolchain.
+**Guard and its reconciliation with the +2.9 %.**
+
+* `bench-rt-value` compares against a baseline **locked at the step-2.1
+  tip** (`tests/rt/value_bench_baseline.json`, the "Now" column above), not
+  against the pre-L7 base. The tolerance stays 2 %.
+* The +2.9 % on object set against `c385d396` is the owner-approved cost of
+  the summary bit. It is recorded as an approved exception in the baseline
+  (`approved_exceptions`, together with the pre-L7 counts under
+  `pre_l7_base`), and the guard prints it on every run.
+* The guard is not loosened. The same 2 % applies to every workload,
+  including object set, measured from its new locked value.
+* The guard's own self-test runs first in `bench-rt-value`
+  (`value_bench_guard.py --self-test`). It builds tables from the baseline
+  and requires:
+  * every workload at +1.9 % passes;
+  * each single workload at +2.1 %, object set included, fails;
+  * a missing workload fails.
+* Counts from another toolchain are reported, not judged. The worker's run
+  (REMOTE JOB) confirms the baseline on the certification toolchain.
 
 **Cycle-check cost, isolated from the store** (`make
 bench-rt-value-cycle`). The same captured-cell stores run with the check
@@ -230,6 +288,9 @@ their own commits with their own tests and evidence.
     disabled and gone with it enabled), a deep-nesting stress test,
     ASan/UBSan, and the bounded `ulimit -v` matrix.
   * Waits for memcheck2's final report.
+* **Permanent reproducers.** The original failing reproducers of C1 and C3
+  (the memcheck scripts and `destroy_oom`) are kept as permanent regression
+  cases, not just their recorded outcomes.
 * **C3.** `join` and `replace` build results without checking the heap
   budget. The fix checks and reserves before allocating, with
   overflow-checked size arithmetic. It lives in `string_methods.cpp`, which

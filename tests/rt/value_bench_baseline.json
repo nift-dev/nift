@@ -1,5 +1,5 @@
 {
- "comment": "L7 step 2.1 baseline (D-040 identity summary bit accepted, about +3 % on object set); locked from make bench-rt-value at -O2",
+ "comment": "L7 step 2.1 baseline, locked at the step-2.1 tip (make bench-rt-value, -O2). The guard compares against these counts, not against the pre-L7 base; the tolerance stays 2 %.",
  "toolchain": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
  "tolerance": 0.02,
  "rt_ir": {
@@ -8,5 +8,18 @@
   "index only (1M reads)": 4000200,
   "object set (128k sets, 64 keys)": 13759108,
   "object get only (128k gets, 64 keys)": 5121113
+ },
+ "approved_exceptions": {
+  "object set (128k sets, 64 keys)": "+2.9 % against the pre-L7 base c385d396 (13,375,314 -> 13,759,108 Ir): the D-040 identity summary bit maintained on every store, approved by the owner (2026-10-20). Locked here at the new value; later growth above +2 % of it still fails."
+ },
+ "pre_l7_base": {
+  "commit": "c385d396",
+  "rt_ir": {
+   "copy (1000 copies of a 10k-string array)": 4654714,
+   "push (100k numbers)": 13232191,
+   "index only (1M reads)": 4000186,
+   "object set (128k sets, 64 keys)": 13375314,
+   "object get only (128k gets, 64 keys)": 5121319
+  }
  }
 }
