@@ -760,9 +760,18 @@ lexical globals, module bindings and genuinely caller-dependent lookup; only the
 last is refused before execution. Final migration diagnostics belong to the
 language-cleanup checkpoint.
 
-## D-039 — CP17 interim answers (coordinator, 2026-10-20; pending owner objection)
+## D-039 — CP17 close and detach semantics (owner, 2026-10-20)
 
-- Explicit `close()` ends the resource even while other references exist; those
-  references then raise `runtime.handle_closed`.
-- Failures of detached resources appear in the shutdown report and do not change
-  the exit status (detaching opts out of ownership).
+- Explicit `close()` closes the underlying resource for every reference to the
+  handle; later operations through any alias raise `runtime.handle_closed`;
+  repeated `close()` stays idempotent (tested).
+- Dropping a reference releases it; dropping the last reference schedules
+  cleanup; explicit `close()` closes regardless of remaining references.
+- Failures occurring **after** successful detachment do not change the exit
+  status. Failure to **establish** detachment (ownership not transferred or
+  promised lifetime not established) is a reportable operation failure.
+- A detached outcome appears in the shutdown report only if Nift genuinely knows
+  it; Nift does not retain supervision solely to report it.
+- The lifecycle cost (create+resolve+release ~1,250 → ~2,100 instructions) is
+  accepted while the resolve hot path is unchanged; the guard stays, and
+  optimisation waits for measurements that justify it.
