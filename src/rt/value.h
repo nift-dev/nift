@@ -46,7 +46,7 @@ struct HeapObject {
 };
 static_assert(sizeof(HeapObject) == 8, "HeapObject header must stay 8 bytes");
 static_assert(static_cast<unsigned>(Kind::Error) <= HeapObject::kKindMask, "every Kind must fit the tag's low bits");
-void destroy_heap_object(HeapObject* object);
+void destroy_heap_object(HeapObject* object) noexcept;
 
 // Handle kinds are typed tags, never strings (decision 5). Values carry
 // (kind, id, generation); registries own the resource (rt/handle.h).
@@ -134,6 +134,16 @@ public:
         }
         std::memset(bytes_, 0, sizeof bytes_);
         return last;
+    }
+
+    // destroy_heap_object only (pointer reversal, rt/value.cpp): parks a raw,
+    // non-owning pointer in a dead child slot as a Null-kind value (so no
+    // release ever touches it) and takes it back. Nothing else may call these.
+    void park_pointer(HeapObject* p) noexcept { std::memset(bytes_, 0, sizeof bytes_); set_pointer(p); }
+    HeapObject* take_parked() noexcept {
+        HeapObject* p = heap();
+        std::memset(bytes_, 0, sizeof bytes_);
+        return p;
     }
 
     // Refcounts saturate: an object whose count reaches kImmortal is never

@@ -207,6 +207,8 @@ RT_VALUE_REGRESS := $(TEST_DIR)/rt/value-regress$(EXEEXT)
 RT_VALUE_BENCH := $(TEST_DIR)/rt/value-bench$(EXEEXT)
 RT_VALUE_ROUND2 := $(TEST_DIR)/rt/value-round2$(EXEEXT)
 RT_VALUE_D040 := $(TEST_DIR)/rt/value-d040$(EXEEXT)
+RT_VALUE_DESTROY_OOM := $(TEST_DIR)/rt/value-destroy-oom$(EXEEXT)
+RT_VALUE_DESTROY_OOM_SMALL := $(TEST_DIR)/rt/value-destroy-oom-small$(EXEEXT)
 RT_VALUE_CYCLE_BENCH := $(TEST_DIR)/rt/value-cycle-bench$(EXEEXT)
 RT_VALUE_CYCLE_BENCH_OFF := $(TEST_DIR)/rt/value-cycle-bench-off$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
@@ -239,6 +241,17 @@ $(RT_VALUE_D040): tests/rt/value_d040.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_d040.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# Memory investigation C1: releasing a value needs no memory (failing
+# operator new; permanent regression for the destroy_oom reproducer).
+$(RT_VALUE_DESTROY_OOM): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/value_destroy_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+# A one-slot in-frame buffer: small graphs reach the spill and the
+# pointer-reversal fallback at every injected allocation failure.
+$(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 tests/rt/value_destroy_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
@@ -247,7 +260,11 @@ $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 $(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK tests/rt/value_cycle_bench.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
-.PHONY: bench-rt-value-cycle test-rt-heap-saturation
+.PHONY: bench-rt-value-cycle test-rt-heap-saturation test-rt-memory-c1
+# Memory investigation C1 end to end: running out of memory mid-script ends
+# with the original error, never an abort in the release (workers only).
+test-rt-memory-c1: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/memory_c1.sh
 # Large values count at their real size against the VM heap budget (~1.5 GiB
 # RSS; workers only, not part of `make test`).
 test-rt-heap-saturation: $(TARGET)
@@ -255,12 +272,14 @@ test-rt-heap-saturation: $(TARGET)
 bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
 	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
 
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040)
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
 	"$(RT_VALUE_ROUND2)"
 	"$(RT_VALUE_PROPERTY)" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 	"$(RT_VALUE_D040)" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1}
+	"$(RT_VALUE_DESTROY_OOM)"
+	"$(RT_VALUE_DESTROY_OOM_SMALL)"
 
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test
@@ -279,6 +298,8 @@ test-rt-value-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_regress.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-regress"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_round2.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-round2"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_d040.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-d040"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_destroy_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-destroy-oom"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -DNIFT_RT_DESTROY_LOCAL=1 tests/rt/value_destroy_oom.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/value-destroy-oom-small"
 	"$(TEST_DIR)/rt-san/value-unit"
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-round2"
@@ -290,6 +311,8 @@ test-rt-value-sanitize:
 		echo "PASS stale reference detected: $$m"; done
 	"$(TEST_DIR)/rt-san/value-property" $${RT_VALUE_SEED:-20261017} $${RT_VALUE_SCALE:-1}
 	"$(TEST_DIR)/rt-san/value-d040" $${RT_VALUE_SEED:-20261020} $${RT_VALUE_SCALE:-1} no-large
+	"$(TEST_DIR)/rt-san/value-destroy-oom"
+	"$(TEST_DIR)/rt-san/value-destroy-oom-small"
 
 # Runtime 2.0 CP17 typed handles (src/rt/handle.*, src/rt/handles/): unit,
 # concurrency stress (ASan/UBSan and TSan), callgrind guard, and the

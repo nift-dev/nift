@@ -273,33 +273,108 @@ The first implementation (hash sets, `std::function`) cost 120–500 ns per
 walking store. Reused flat buffers and a visitor interface brought it to
 these numbers.
 
-## 6. Memory investigation defects C1 and C3 (separate; planned, not started)
+## 6. Memory investigation defects (C1, C2, C3, accounting follow-up)
 
 These are existing runtime defects, recorded separately from L7 and fixed in
-their own commits with their own tests and evidence.
+their own commits, each with its original reproducers kept as permanent
+regression tests. Evidence: memcheck jobs (`scratchpad/rjobs/memcheck{,2}/out`,
+prototypes on `memcheck-repro` 7fab21a6).
 
-* **C1.** `destroy_heap_object`'s worklist allocates during `noexcept`
-  destruction, so the VM aborts (SIGABRT) under `ulimit -v`, also during
-  teardown after "memory budget exceeded".
-  * Requirement: destruction stays non-recursive and needs no heap
-    allocation once memory is exhausted, and the original failure is
-    reported intact.
-  * Evidence planned: cause and effect (the SIGABRT is back with the fix
-    disabled and gone with it enabled), a deep-nesting stress test,
-    ASan/UBSan, and the bounded `ulimit -v` matrix.
-  * Waits for memcheck2's final report.
-* **Permanent reproducers.** The original failing reproducers of C1 and C3
-  (the memcheck scripts and `destroy_oom`) are kept as permanent regression
-  cases, not just their recorded outcomes.
-* **C3.** `join` and `replace` build results without checking the heap
-  budget. The fix checks and reserves before allocating, with
-  overflow-checked size arithmetic. It lives in `string_methods.cpp`, which
-  is sequenced after the DeepSeek case-conversion change (`cased` stays
-  untouched).
-  * Tests: output-size overflow, large replacements, zero-length patterns,
-    repeated expansion, allocation failure, and the allowed bounded
-    temporary overhead defined against the configured budget.
-  * Coordinated through the coordinator before editing.
+### 6.0 Harness fixes from worker run l7-value-layer-2 (commit 7576aebc)
+
+* `test-rt-value-sanitize` failed because the job ran it under `ulimit -v`
+  and ASan could not reserve its shadow memory. The target now refuses to
+  start under `ulimit -v`, and the ASan run of value-d040 skips the
+  address-space section (`no-large`); that section keeps running under
+  `ulimit -v` in the non-ASan `test-rt-value`.
+* `test-rt-heap-saturation`: the controls (512 MiB in 700 MiB, 1 GiB in
+  1088 MiB) were refused because the budget counts a string's capacity and
+  the 8-character seed grows to capacity 1.875 x length (libstdc++: new
+  capacity = max(needed, 2 x old), starting from the 15-byte inline buffer).
+  A 15-character seed keeps capacity == length, so the cases are 480 MiB in
+  512 MiB (runs), 960 MiB under 512 MiB (refused), 960 MiB in 1088 MiB (runs)
+  and one more byte (capacity 1920 MiB) under 1088 MiB (refused; a count
+  saturating at the 1 GiB field would be 1 GiB - 64 and pass). The refusal
+  cases are not loosened. The self-append's temporary copy of the operand is
+  not counted; it is bounded (one operand, freed within the instruction).
+
+### 6.1 C1: releasing a value needs no memory
+
+* **Defect.** `destroy_heap_object` (runs inside `noexcept` `~Value` and
+  `operator=`) kept dying aggregates on a `std::vector` worklist. When the
+  address space was exhausted, the first `push_back` threw inside `noexcept`:
+  `std::terminate`, SIGABRT, in 18 of 24 cells of the memcheck2 `ulimit -v`
+  matrix, sometimes after "memory budget exceeded" had already been printed
+  (the VM unwinding the script's values).
+* **Fix.** A fixed in-frame buffer (32 pointers) first, then a heap spill
+  vector; when the spill cannot grow, that subtree is destroyed in place by
+  pointer reversal. Nothing in the release path can throw, recurse or need
+  memory (`destroy_heap_object` is `noexcept`).
+* **Pointer reversal, why it is correct.** Only objects whose refcount just
+  reached 0 (`release_detached`) are entered; such an object is unreachable
+  from anything else, so rewriting its storage is invisible.
+  * Descending from `cur` into its dying child at slot `i`: the child is
+    untallied, the slot is overwritten with the parent link (`park_pointer`,
+    a Null-kind value, so no destructor or release ever follows it), and `i`
+    is stored in `cur`'s header (refcount + the 3 `counted` bytes, 56 bits),
+    which is free because `cur` is dead and already untallied.
+  * Ascending: the parent link is read back from the parent's slot
+    (`take_parked` leaves a plain Null), the child is deleted with its
+    header's `counted` bytes cleared first (so the accounting is not charged
+    with the resume index), and the scan resumes at `i + 1`.
+  * Children that are still referenced elsewhere (shared copy-on-write
+    children, the same object reached twice) only lose one reference, exactly
+    as in the normal path; they are never entered.
+  * O(objects) time, O(1) space; the tag byte is untouched.
+* **Tests (permanent).** `tests/rt/value_destroy_oom.cpp` (from the
+  `destroy_oom` reproducer) with a replaceable failing `operator new`, built
+  twice: as is, and with a one-slot in-frame buffer (`-DNIFT_RT_DESTROY_LOCAL=1`,
+  `value-destroy-oom-small`) so small graphs reach the spill and the reversal.
+  Both run in `test-rt-value` and under ASan+UBSan in `test-rt-value-sanitize`.
+  * Cases: leaf; flat (1,000 strings); nested (1,000); deep (a 1,000,000-level
+    chain, no allocation); deep-reversal (3,000,000 levels walked by pointer
+    reversal); wide (1,000 dying aggregates, spill refused); wide-partial (the
+    spill grows k = 1..6 times, then fails); spines (80 mixed object / struct /
+    array spines up to 20,000 deep, resuming at non-zero child indexes);
+    bushy (fan-out 3, depth 9); mixed (shared children and an outside
+    reference to an inner node, which survives intact); control (no failure).
+    Each checks the live allocation count and live heap bytes return exactly
+    to their pre-build values.
+  * Property (`property [seeds]`, 3,000 seeds): random small DAGs (arrays,
+    objects, structs; copy-on-write clones that share all their children;
+    the same child repeated in one parent; outside references to random
+    nodes). For every graph, the release is repeated with allocation failure
+    injected from every index k on, and at only index k, for every k the
+    release reaches. After each: survivors match the model exactly (labels,
+    kinds, child order), every surviving object's refcount equals its outside
+    handles plus its edges from surviving objects, live heap bytes equal the
+    base plus every survivor's footprint, and after dropping the outside
+    references the live allocation count is back to the base. With the
+    one-slot buffer: 3,000 graphs, 8,720 releases, 3,101 injected failures.
+  * `tests/runtime2/memory_c1.sh` (`make test-rt-memory-c1`, workers): the
+    memcheck `c1_push.f` matrix, 12 `ulimit -v` limits x {default budget,
+    budget beyond the limit}; every cell must exit 70 with its original
+    reason ("memory budget exceeded" or "out of memory (std::bad_alloc)") and
+    no "terminate called".
+* **Cause and effect.** The same test built against the pre-fix
+  `value.cpp`: 8 of the 10 cases abort with "terminate called after throwing
+  an instance of 'std::bad_alloc'" (leaf and control pass, as they never use
+  the worklist); with the fix, all pass. (Local, GCC 13.)
+* **Mutation check** (one-slot build under ASan, 400 property seeds): ignoring
+  refcounts while reversing (entering shared children: ASan
+  heap-use-after-free) and dropping the spill (LeakSanitizer) are caught;
+  not untallying a descended child is caught (286 failures);
+  swallowing a refused spill (leak) and losing the resume index are caught by
+  LeakSanitizer. Two mutants are equivalent at testable sizes and survive:
+  skipping a child on resume (the parent's destructor then releases it
+  through the normal path) and deleting without clearing the resume bytes
+  (they are zero below 2^32 children).
+* **ASan without `ulimit -v`.** The ASan+UBSan build of the test runs clean
+  with `ulimit -v` unlimited (LeakSanitizer on): 92,930 checks (32-slot
+  buffer) and 123,040 checks (one-slot buffer), 0 failures, ~15 s and
+  ~1.1 GiB RSS each (local).
+* **Performance.** See §5 for the guard run of this tip (value bench and
+  release workloads).
 
 ## 7. Remaining gates
 
