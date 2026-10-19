@@ -39,6 +39,23 @@ Linux certification runs on a dedicated Linode (D-033; validated on CP14, see `c
   combination) **and** estimated effort, respecting dependencies; weight real
   package and website usage above synthetic corpora.
 
+## Integration queue (2026-10-20 06:30 AEDT)
+
+Whichever candidate is ready first certifies and integrates first; the other
+rebases (owner, 2026-10-20). A ready checkpoint never waits for an earlier-
+scheduled one.
+
+| Candidate | State | Blocks |
+|---|---|---|
+| CP15 phase A (+ records20k after) | final gate run; then Linode | — |
+| feature-host-deps | rebase + targeted re-verification (waited ~18 h) | CP12B legacy module side; CP16 legacy side |
+| CP17 | adversarial review | CP16 swap |
+| CP12B (B1, chains, globals below compiler, VM module loader) | gates on rebased branch; compiler hookup after CP15 | CP12C |
+| CP16 | implementation; CP17 swap pending | CP20, CP24 |
+
+Temporary scaffolding to remove: VM `import-reinitialised` refusal — removal
+condition: legacy and VM both implement and verify initialise-once (D-041).
+
 ## Checkpoints
 
 | Checkpoint | Implemented | Reviewed | Locally certified | Integrated | Cross-platform | Depends on | Remaining effort | Bottleneck risk | Notes |
