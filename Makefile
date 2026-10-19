@@ -542,6 +542,19 @@ $(RT_VM_MUTANTS): $(filter-out $(RT_VM_MUTATED),$(CLI_OBJECTS)) $(RT_VM_MUTANT_O
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
 
+# CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()
+# options. Not linked into nift until the VM wiring.
+RT_HOST_SOURCES := $(sort $(wildcard src/rt/host/*.cpp))
+RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) src/HostTrace.h tests/rt/rt_test.h
+RT_HOST_LAYER_UNIT := $(TEST_DIR)/rt/host-layer-unit$(EXEEXT)
+$(RT_HOST_LAYER_UNIT): tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$@"
+
+.PHONY: test-rt-host
+test-rt-host: $(RT_HOST_LAYER_UNIT)
+	"$(RT_HOST_LAYER_UNIT)"
+
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)
 	python3 benchmarks/runtime2/vm_compare.py --nift "$(CURDIR)/$(TARGET)" --baseline "$${NIFT_BASELINE:-../baseline-src/nift}" \

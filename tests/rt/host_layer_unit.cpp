@@ -1,0 +1,476 @@
+// CP16 Host layer unit tests: error table, op table, trace v1/v2 formats and
+// emission points, HostCall classification, recording hooks, path
+// resolution, run() options (alternative A) and the temporary handle adapter.
+#include "rt/host/handle_adapter_tmp.h"
+#include "rt/host/host_call.h"
+#include "rt/host/host_error.h"
+#include "rt/host/host_op.h"
+#include "rt/host/host_trace.h"
+#include "rt/host/path.h"
+#include "rt/host/run_options.h"
+#include "rt_test.h"
+
+#include <cstring>
+#include <map>
+#include <string>
+#include <vector>
+
+using namespace nift::rt::host;
+
+namespace {
+
+struct SpySink : TraceSink {
+    std::vector<std::string> lines;
+    std::string ctx = "script";
+    void write_line(const std::string& line) override { lines.push_back(line); }
+    std::string context() override { return ctx; }
+};
+
+struct SpyObserver : Observer {
+    std::vector<std::string> calls;
+    void presence(const std::filesystem::path& p, bool exists, std::string_view kind) override {
+        calls.push_back("presence " + p.generic_string() + " " + (exists ? "1 " : "0 ") + std::string(kind));
+    }
+    void read(const std::filesystem::path& p, std::string_view bytes) override { calls.push_back("read " + p.generic_string() + " " + std::to_string(bytes.size())); }
+    void read_hash_only(const std::filesystem::path& p, std::string_view) override { calls.push_back("hash " + p.generic_string()); }
+    void streamed_read(const std::filesystem::path& p, std::uint64_t size, const std::uint64_t*) override { calls.push_back("streamed " + p.generic_string() + " " + std::to_string(size)); }
+    void metadata_read(const std::filesystem::path& p) override { calls.push_back("metadata " + p.generic_string()); }
+    void written(const std::filesystem::path& p) override { calls.push_back("written " + p.generic_string()); }
+    void listing(const std::string& key, const std::filesystem::path&) override { calls.push_back("listing " + key); }
+    void environment(const std::string& name, const std::optional<std::string>& v) override { calls.push_back("env " + name + (v ? "=" + *v : "")); }
+    void environment_snapshot() override { calls.push_back("snapshot"); }
+    void platform(const std::string& v) override { calls.push_back("platform " + v); }
+};
+
+PathPolicy script_policy() {
+    PathPolicy p;
+    p.standalone = true;
+    p.base = "/work/dir";
+    p.getenv = [](const char* name) -> const char* { return std::strcmp(name, "HOME") == 0 ? "/home/u" : nullptr; };
+    return p;
+}
+
+void test_error_table() {
+    CHECK(catchable("io.open_failed"));
+    CHECK(catchable("stream.flush_failed"));
+    CHECK(catchable("json.parse_failed"));
+    CHECK(!catchable("limit.exceeded"));
+    CHECK(!catchable("runtime.invalid_argument"));
+    CHECK(!catchable("process.detach_in_build"));
+    CHECK(!catchable("no.such_code"));
+    CHECK(status_for_code("io.write_failed") == HostStatus::Recoverable);
+    CHECK(status_for_code("limit.exceeded") == HostStatus::Limit);
+    CHECK(status_for_code("internal.host_call") == HostStatus::Internal);
+    CHECK(status_for_code("runtime.invalid_operation") == HostStatus::Fatal);
+    CHECK(status_for_code("unknown.code") == HostStatus::Internal);
+    HostError e;
+    CHECK(make_error(e, "io.open_failed", "open: cannot open path", 2) == HostStatus::Recoverable);
+    CHECK(e.code == "io.open_failed" && e.message == "open: cannot open path" && e.sys_error == 2);
+    // every catchable code is Recoverable and every Recoverable code is catchable
+    for (const char* code : {"io.open_failed", "io.read_failed", "io.create_failed", "io.write_failed", "io.atomic_replace_failed",
+                             "io.copy_failed", "io.move_failed", "io.remove_failed", "io.directory_read_failed",
+                             "io.change_directory_failed", "io.metadata_failed", "stream.open_failed", "stream.read_failed",
+                             "stream.write_failed", "stream.flush_failed", "stream.close_failed"}) {
+        CHECK(catchable(code));
+        CHECK(status_for_code(code) == HostStatus::Recoverable);
+    }
+}
+
+void test_op_table() {
+    for (int i = 0; i < static_cast<int>(HostOp::Count_); ++i) {
+        const auto& info = op_info(static_cast<HostOp>(i));
+        CHECK(static_cast<int>(info.op) == i);
+        CHECK(info.v2_name && *info.v2_name);
+        CHECK((info.v1_name == nullptr) == (info.v1_point == TracePoint::None));
+    }
+    // design §2.4 v1 timing column
+    CHECK(op_info(HostOp::Read).v1_point == TracePoint::PostOk);
+    CHECK(op_info(HostOp::Stat).v1_point == TracePoint::PostAlways);
+    CHECK(op_info(HostOp::List).v1_point == TracePoint::Pre);
+    CHECK(op_info(HostOp::Glob).v1_point == TracePoint::Pre);
+    CHECK(op_info(HostOp::Open).v1_point == TracePoint::Pre);
+    for (HostOp w : {HostOp::Save, HostOp::Touch, HostOp::Remove, HostOp::Mkdir, HostOp::CopyTo, HostOp::MoveTo, HostOp::MoveFrom})
+        CHECK(op_info(w).v1_point == TracePoint::Pre && op_is_write(w));
+    CHECK(op_info(HostOp::Getenv).v1_point == TracePoint::PostOk);
+    CHECK(op_info(HostOp::GetenvTemplate).v1_point == TracePoint::PostAlways);
+    CHECK(op_info(HostOp::EnvAll).v1_point == TracePoint::Pre);
+    CHECK(op_info(HostOp::Spawn).v1_point == TracePoint::Pre);
+    for (HostOp u : {HostOp::ReadBytes, HostOp::StreamOpen, HostOp::StreamWrite, HostOp::Inject, HostOp::FileCopy, HostOp::FileMove,
+                     HostOp::FileRemove, HostOp::Chdir, HostOp::Setenv, HostOp::Unsetenv, HostOp::Which, HostOp::Clock, HostOp::Sleep, HostOp::Random})
+        CHECK(op_info(u).v1_point == TracePoint::None);
+    CHECK(std::string(op_info(HostOp::CopyTo).v1_name) == "copy-to");
+    CHECK(std::string(op_info(HostOp::GetenvTemplate).v1_name) == "getenv");
+}
+
+void test_trace_format() {
+    // byte-identical to src/HostTrace.h emit() (legacy v1)
+    CHECK(TraceChannel::format_v1("script", "read", "/a/b\"c", "12") ==
+          "{\"ctx\":\"script\",\"op\":\"read\",\"arg\":\"/a/b\\\"c\",\"res\":\"12\"}\n");
+    CHECK(TraceChannel::format_v1("p\n", "stat", "x\x01", "") == "{\"ctx\":\"p\\n\",\"op\":\"stat\",\"arg\":\"x\\u0001\",\"res\":\"\"}\n");
+    TraceV2Record r;
+    r.op = "save";
+    r.arg = "/abs/x";
+    r.res = "error";
+    r.err = "io.write_failed";
+    CHECK(TraceChannel::format_v2("script", r) == "{\"v\":2,\"ctx\":\"script\",\"op\":\"save\",\"arg\":\"/abs/x\",\"res\":\"error\",\"err\":\"io.write_failed\"}\n");
+    TraceV2Record s;
+    s.op = "spawn";
+    s.arg = "sh";
+    s.res = "launched";
+    s.has_argv = true;
+    s.argv = {"sh", "-c", "a b"};
+    s.has_cwd = true;
+    s.cwd = "/w";
+    CHECK(TraceChannel::format_v2("script", s) ==
+          "{\"v\":2,\"ctx\":\"script\",\"op\":\"spawn\",\"arg\":\"sh\",\"res\":\"launched\",\"argv\":[\"sh\",\"-c\",\"a b\"],\"cwd\":\"/w\"}\n");
+    CHECK(TraceChannel::parse_version(nullptr) == TraceChannel::V1);
+    CHECK(TraceChannel::parse_version("") == TraceChannel::V1);
+    CHECK(TraceChannel::parse_version("1") == TraceChannel::V1);
+    CHECK(TraceChannel::parse_version("2") == TraceChannel::V2);
+    CHECK(TraceChannel::parse_version("3") == -1);
+    CHECK(TraceChannel::parse_version("2x") == -1);
+    SpySink sink;
+    TraceChannel off(TraceChannel::Off, &sink);
+    off.emit_v1("read", "x", "1");
+    off.emit_v2(r);
+    CHECK(sink.lines.empty());
+    TraceChannel nosink(TraceChannel::V2, nullptr);
+    CHECK(nosink.version() == TraceChannel::Off);
+}
+
+// Runs one op through HostCall on both channels and returns the lines.
+struct Run { std::vector<std::string> v1, v2; std::vector<std::string> recorded; HostStatus status; };
+
+Run run_op(HostOp op, const char* builtin, const std::string& raw, bool ok, const char* code = "io.open_failed",
+           HostStatus st = HostStatus::Recoverable, const std::string& res = "", const Observation& obs = Observation()) {
+    Run out{};
+    for (int version : {1, 2}) {
+        SpySink sink;
+        SpyObserver observer;
+        TraceChannel channel(version, &sink);
+        PathPolicy policy = script_policy();
+        HostCallEnv env{&channel, &observer, &policy};
+        {
+            HostCall call(env, op, builtin);
+            CHECK(call.resolve(raw) == HostStatus::Ok);
+            call.begin();
+            if (version == 1) out.v1 = sink.lines;  // lines present before the attempt
+            if (ok) out.status = call.succeed(res, obs);
+            else {
+                HostError e;
+                make_error(e, code, std::string(builtin) + ": failed");
+                out.status = call.fail(st, e);
+            }
+        }
+        if (version == 1) {
+            out.v1.push_back("--after--");
+            for (const auto& l : sink.lines) out.v1.push_back(l);
+            out.recorded = observer.calls;
+        } else out.v2 = sink.lines;
+    }
+    return out;
+}
+
+void test_hostcall_points() {
+    // read: v1 after success only; nothing on failure
+    auto r = run_op(HostOp::Read, "open", "data.txt", true, nullptr, HostStatus::Ok, "5");
+    CHECK(r.v1.size() == 2 && r.v1[0] == "--after--");
+    CHECK(r.v1[1] == "{\"ctx\":\"script\",\"op\":\"read\",\"arg\":\"/work/dir/data.txt\",\"res\":\"5\"}\n");
+    CHECK(r.v2.size() == 1 && r.v2[0] == "{\"v\":2,\"ctx\":\"script\",\"op\":\"read\",\"arg\":\"/work/dir/data.txt\",\"res\":\"5\"}\n");
+    auto rf = run_op(HostOp::Read, "open", "missing.txt", false);
+    CHECK(rf.status == HostStatus::Recoverable);
+    CHECK(rf.v1.size() == 1);  // only the marker: no v1 line for a failed read
+    CHECK(rf.v2.size() == 1 && rf.v2[0].find("\"res\":\"error\",\"err\":\"io.open_failed\"") != std::string::npos);
+    CHECK(rf.recorded.empty());
+    // writes: v1 BEFORE the attempt, with empty res; a failed save is distinguishable only in v2 (Q-H10)
+    auto w = run_op(HostOp::Save, "save", "out/../o.txt", false, "io.write_failed");
+    CHECK(w.v1.size() == 3 && w.v1[0] == "{\"ctx\":\"script\",\"op\":\"save\",\"arg\":\"/work/dir/o.txt\",\"res\":\"\"}\n" && w.v1[1] == "--after--");
+    CHECK(w.v2.size() == 1 && w.v2[0] == "{\"v\":2,\"ctx\":\"script\",\"op\":\"save\",\"arg\":\"/work/dir/o.txt\",\"res\":\"error\",\"err\":\"io.write_failed\"}\n");
+    auto wok = run_op(HostOp::Save, "save", "o.txt", true);
+    CHECK(wok.v2.size() == 1 && wok.v2[0].find("\"res\":\"ok\"") != std::string::npos);
+    CHECK(wok.recorded.size() == 1 && wok.recorded[0] == "written /work/dir/o.txt");
+    // stat: after the query, also on error (res "error")
+    Observation so;
+    so.exists = true;
+    so.kind = "file";
+    so.metadata = true;
+    auto st = run_op(HostOp::Stat, "stat", "f", true, nullptr, HostStatus::Ok, "file", so);
+    CHECK(st.v1.size() == 2 && st.v1[1].find("\"op\":\"stat\"") != std::string::npos && st.v1[1].find("\"res\":\"file\"") != std::string::npos);
+    CHECK(st.recorded.size() == 2 && st.recorded[0] == "presence /work/dir/f 1 file" && st.recorded[1] == "metadata /work/dir/f");
+    auto ste = run_op(HostOp::Stat, "exists", "f", false, "io.metadata_failed");
+    CHECK(ste.v1.size() == 2 && ste.v1[1].find("\"res\":\"error\"") != std::string::npos);
+    // untraced in v1, traced in v2
+    auto u = run_op(HostOp::ReadBytes, "open_bytes", "b.bin", true, nullptr, HostStatus::Ok, "3");
+    CHECK(u.v1.size() == 1);
+    CHECK(u.v2.size() == 1 && u.v2[0].find("\"op\":\"read-bytes\"") != std::string::npos);
+    // ~ expands in scripts
+    auto t = run_op(HostOp::Touch, "touch", "~/x", true);
+    CHECK(t.v1[0].find("\"arg\":\"/home/u/x\"") != std::string::npos);
+}
+
+void test_hostcall_classification() {
+    SpySink sink;
+    TraceChannel channel(TraceChannel::V2, &sink);
+    HostCallEnv env{&channel, nullptr, nullptr};
+    {
+        HostCall call(env, HostOp::Remove, "rm");
+        call.set_arg("/x");
+        call.begin();
+        HostError e;
+        make_error(e, "io.remove_failed", "rm: denied");
+        // A catchable code reported as fatal is a classification bug -> Internal.
+        CHECK(call.fail(HostStatus::Fatal, e) == HostStatus::Internal);
+        CHECK(call.error().code == "internal.host_call");
+    }
+    {
+        HostCall call(env, HostOp::Remove, "rm");
+        call.set_arg("/x");
+        call.begin();
+        HostError e;
+        make_error(e, "limit.exceeded", "rm: big");
+        CHECK(call.fail(HostStatus::Recoverable, e) == HostStatus::Internal);
+    }
+    {
+        HostCall call(env, HostOp::Read, "open");
+        call.set_arg("/x");
+        // succeed() without begin(): refused, never traced at the wrong time
+        CHECK(call.succeed("1") == HostStatus::Internal);
+    }
+    sink.lines.clear();
+    {
+        HostCall call(env, HostOp::Sleep, "sleep");
+        call.set_arg("10");
+        call.begin();
+        // destroyed without an outcome
+    }
+    CHECK(sink.lines.size() == 1 && sink.lines[0].find("\"err\":\"internal.host_call\"") != std::string::npos);
+    // a second outcome is ignored
+    sink.lines.clear();
+    {
+        HostCall call(env, HostOp::Clock, "epoch");
+        call.begin();
+        CHECK(call.succeed("ok") == HostStatus::Ok);
+        HostError e;
+        make_error(e, "host.service_failed", "x");
+        CHECK(call.fail(HostStatus::Fatal, e) == HostStatus::Ok);
+    }
+    CHECK(sink.lines.size() == 1);
+}
+
+void test_policy_refusal() {
+    SpySink s1, s2;
+    TraceChannel c1(TraceChannel::V1, &s1), c2(TraceChannel::V2, &s2);
+    PathPolicy policy = script_policy();
+    policy.allow = [](const std::filesystem::path& p, std::string& reason) {
+        if (p.generic_string().rfind("/work/", 0) == 0) return true;
+        reason = "path is outside --fs-root";
+        return false;
+    };
+    for (TraceChannel* c : {&c1, &c2}) {
+        HostCallEnv env{c, nullptr, &policy};
+        HostCall call(env, HostOp::Stat, "exists");
+        CHECK(call.resolve("/etc/passwd") == HostStatus::Fatal);
+        CHECK(call.error().code == "runtime.invalid_operation");
+        CHECK(call.error().message == "exists: path is outside --fs-root");
+        CHECK(call.finished());
+    }
+    CHECK(s1.lines.empty());  // legacy validates before tracing
+    CHECK(s2.lines.size() == 1 && s2.lines[0].find("\"err\":\"runtime.invalid_operation\"") != std::string::npos);
+}
+
+void test_recording_table() {
+    SpyObserver observer;
+    PathPolicy policy = script_policy();
+    HostCallEnv env{nullptr, &observer, &policy};
+    auto ok = [&](HostOp op, const char* raw, const Observation& obs, const char* res = "") {
+        HostCall call(env, op, "b");
+        if (raw) call.resolve(raw); else call.set_arg("NAME");
+        call.begin();
+        call.succeed(res, obs);
+    };
+    Observation read;
+    read.bytes = "hello";
+    ok(HostOp::Read, "r.txt", read);
+    Observation rw;
+    rw.bytes = "abc";
+    rw.open_mode = "rw";
+    ok(HostOp::Open, "rw.txt", rw);
+    Observation r;
+    r.bytes = "abc";
+    r.open_mode = "r";
+    ok(HostOp::Open, "r2.txt", r);
+    Observation w;
+    w.open_mode = "w";
+    ok(HostOp::Open, "w.txt", w);
+    Observation missing;
+    missing.exists = false;
+    ok(HostOp::Stat, "nope", missing, "missing");
+    Observation listing;
+    listing.listing_key = "dir:/work/dir";
+    ok(HostOp::List, ".", listing);
+    Observation env_value;
+    env_value.env_value = std::string("v");
+    ok(HostOp::Getenv, nullptr, env_value, "found");
+    ok(HostOp::EnvAll, nullptr, Observation());
+    Observation plat;
+    plat.platform = "linux";
+    ok(HostOp::Platform, nullptr, plat);
+    Observation streamed;
+    streamed.size = 42;
+    ok(HostOp::StreamOpen, "s.txt", streamed);
+    ok(HostOp::Spawn, nullptr, Observation());  // processes record nothing
+    ok(HostOp::Mkdir, "d", Observation());
+    const std::vector<std::string> expected = {
+        "read /work/dir/r.txt 5", "hash /work/dir/rw.txt", "read /work/dir/r2.txt 3", "presence /work/dir/nope 0 ",
+        "listing dir:/work/dir", "env NAME=v", "snapshot", "platform linux", "streamed /work/dir/s.txt 42", "written /work/dir/d"};
+    CHECK(observer.calls == expected);
+    // failures record nothing
+    observer.calls.clear();
+    {
+        HostCall call(env, HostOp::Read, "open");
+        call.resolve("x");
+        call.begin();
+        HostError e;
+        make_error(e, "io.open_failed", "open: cannot open path");
+        call.fail(HostStatus::Recoverable, e);
+    }
+    CHECK(observer.calls.empty());
+    // standalone (null observer): nothing, no crash
+    HostCallEnv none{nullptr, nullptr, &policy};
+    HostCall call(none, HostOp::Read, "open");
+    call.resolve("x");
+    call.begin();
+    CHECK(call.succeed("1", read) == HostStatus::Ok);
+}
+
+void test_paths() {
+    PathPolicy p = script_policy();
+    Resolved r;
+    HostError e;
+    CHECK(resolve_path(p, "a/../b/./c", "open", r, e) == HostStatus::Ok && r.trace_path() == "/work/dir/b/c");
+    CHECK(resolve_path(p, "~", "open", r, e) == HostStatus::Ok && r.trace_path() == "/home/u");
+    CHECK(resolve_path(p, "~/q", "open", r, e) == HostStatus::Ok && r.trace_path() == "/home/u/q");
+    CHECK(resolve_path(p, "~x", "open", r, e) == HostStatus::Ok && r.trace_path() == "/work/dir/~x");
+    CHECK(resolve_path(p, "/abs/../x", "open", r, e) == HostStatus::Ok && r.trace_path() == "/x");
+    CHECK(r.spelled == "/abs/../x");
+    p.standalone = false;  // page: no ~ expansion, base = project root
+    p.base = "/site";
+    CHECK(resolve_path(p, "~/q", "open", r, e) == HostStatus::Ok && r.trace_path() == "/site/~/q");
+}
+
+OptionObject obj(std::initializer_list<std::pair<std::string, OptionValue>> items) { return OptionObject(items); }
+
+std::string parse_err(const OptionObject& o) {
+    RunOptions out;
+    HostError e;
+    const HostStatus s = parse_run_options(o, "run", out, e);
+    if (s == HostStatus::Ok) return "OK";
+    CHECK(s == HostStatus::Fatal);
+    CHECK(e.code == "runtime.invalid_argument");
+    CHECK(!catchable(e.code));
+    return e.message;
+}
+
+void test_run_options() {
+    RunOptions o;
+    HostError e;
+    CHECK(parse_run_options({}, "run", o, e) == HostStatus::Ok && o.present && o.mode == RunMode::Capture && !o.timeout && !o.kill_after);
+    CHECK(parse_run_options(obj({{"mode", OptionValue::of_string("stream")}}), "run", o, e) == HostStatus::Ok && o.mode == RunMode::Stream);
+    CHECK(parse_run_options(obj({{"mode", OptionValue::of_string("interactive")}, {"kill_after_ms", OptionValue::of_int(500)}}), "run", o, e) == HostStatus::Ok);
+    CHECK(o.mode == RunMode::Interactive && o.kill_after && o.kill_after->count() == 500 && o.returns_handle());
+    CHECK(parse_run_options(obj({{"mode", OptionValue::of_string("detached")}}), "run", o, e) == HostStatus::Ok && o.returns_handle());
+    CHECK(parse_run_options(obj({{"timeout_ms", OptionValue::of_number(5000)}, {"kill_after_ms", OptionValue::of_number(1000)}}), "run", o, e) == HostStatus::Ok);
+    CHECK(o.mode == RunMode::Capture && o.timeout->count() == 5000 && o.kill_after->count() == 1000 && !o.returns_handle());
+    CHECK(parse_run_options(obj({{"timeout_ms", OptionValue::of_int(0)}}), "run", o, e) == HostStatus::Ok && o.timeout->count() == 0);
+    CHECK(parse_run_options(obj({{"mode", OptionValue::of_string("capture")}}), "run", o, e) == HostStatus::Ok);
+    // unknown keys: fatal with a suggestion
+    CHECK(parse_err(obj({{"timout_ms", OptionValue::of_int(1)}})) == "run: unknown option 'timout_ms' (did you mean 'timeout_ms'?)");
+    CHECK(parse_err(obj({{"Mode", OptionValue::of_string("stream")}})) == "run: unknown option 'Mode' (did you mean 'mode'?)");
+    CHECK(parse_err(obj({{"kill-after-ms", OptionValue::of_int(1)}})) == "run: unknown option 'kill-after-ms' (did you mean 'kill_after_ms'?)");
+    CHECK(parse_err(obj({{"timeuot_ms", OptionValue::of_int(1)}})) == "run: unknown option 'timeuot_ms' (did you mean 'timeout_ms'?)");
+    CHECK(parse_err(obj({{"bogus", OptionValue::of_int(1)}})) == "run: unknown option 'bogus' (options: mode, timeout_ms, kill_after_ms)");
+    CHECK(parse_err(obj({{"stdin", OptionValue::of_string("null")}})) == "run: unknown option 'stdin' (options: mode, timeout_ms, kill_after_ms)");
+    // an unknown key is reported even when another option is also invalid
+    CHECK(parse_err(obj({{"mode", OptionValue::of_int(1)}, {"tmeout_ms", OptionValue::of_int(1)}})).find("unknown option 'tmeout_ms'") != std::string::npos);
+    // value errors
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("streem")}})) == "run: mode must be one of capture, stream, interactive, detached (did you mean 'stream'?)");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("background")}})) == "run: mode must be one of capture, stream, interactive, detached");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_int(1)}})) == "run: mode must be a string, not number");
+    CHECK(parse_err(obj({{"mode", OptionValue::other("array")}})) == "run: mode must be a string, not array");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_int(-1)}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_number(1.5)}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_number(1e300)}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_string("5")}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_bool(true)}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"kill_after_ms", OptionValue()}, {"mode", OptionValue::of_string("interactive")}})) == "run: kill_after_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_int(kMaxOptionMilliseconds + 1)}})) == "run: timeout_ms must be a non-negative integer");
+    CHECK(parse_err(obj({{"timeout_ms", OptionValue::of_int(kMaxOptionMilliseconds)}})) == "OK");
+    // incompatible combinations
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("detached")}, {"timeout_ms", OptionValue::of_int(5)}})) == "run: deadline is not allowed for a detached process");
+    CHECK(parse_err(obj({{"kill_after_ms", OptionValue::of_int(5)}})) == "run: kill_after_ms needs timeout_ms in mode capture (nothing else can cancel a blocking run)");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("stream")}, {"kill_after_ms", OptionValue::of_int(5)}})).find("in mode stream") != std::string::npos);
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("detached")}, {"kill_after_ms", OptionValue::of_int(5)}})) == "OK");
+    CHECK(parse_err(obj({{"mode", OptionValue::of_string("interactive")}, {"timeout_ms", OptionValue::of_int(5)}})) == "OK");
+    // context check
+    RunOptions det;
+    det.mode = RunMode::Detached;
+    CHECK(check_run_context(det, true, "run", e) == HostStatus::Fatal && e.code == "process.detach_in_build");
+    CHECK(check_run_context(det, false, "run", e) == HostStatus::Ok);
+    RunOptions cap;
+    CHECK(check_run_context(cap, true, "run", e) == HostStatus::Ok);
+    // edit distance
+    CHECK(edit_distance("", "") == 0);
+    CHECK(edit_distance("abc", "acb") == 1);
+    CHECK(edit_distance("mode", "") == 4);
+    CHECK(suggest_option("md", run_option_keys()).empty());  // too short to guess
+    CHECK(suggest_option("timeout", run_option_keys()).empty() || suggest_option("timeout", run_option_keys()) == "timeout_ms");
+}
+
+void test_adapter() {
+    // TEMPORARY stand-in for CP17's table: only what the process hook needs.
+    using namespace tmp_handles;
+    std::vector<std::string> log;
+    TemporaryTable t([&](const CleanupEvent& ev) {
+        log.push_back(*static_cast<std::string*>(ev.resource.get()) + ":" + std::to_string(static_cast<int>(ev.reason)));
+        return CleanupOutcome::success();
+    });
+    const ContextId script = t.open_context(ContextKind::Script, kDetached);
+    const ContextId build = t.open_context(ContextKind::Build, kDetached);
+    const ContextId page = t.open_context(ContextKind::PageRender, build);
+    CHECK(!t.build_family(script) && t.build_family(build) && t.build_family(page));
+    const auto h1 = t.create(script, std::make_shared<std::string>("one"));
+    const auto h2 = t.create(script, std::make_shared<std::string>("two"));
+    const auto h3 = t.create(page, std::make_shared<std::string>("three"));
+    const auto h4 = t.create(script, std::make_shared<std::string>("four"));
+    const auto h5 = t.create(script, std::make_shared<std::string>("five"));
+    CHECK(t.create(script, nullptr) == 0);
+    CHECK(t.resolve(h1) != nullptr);
+    CHECK(!t.release(h1, page));  // not the owner
+    CHECK(t.release(h1, script));
+    CHECK(t.resolve(h1) == nullptr);  // stale
+    CHECK(t.drop(h5));
+    CHECK(!t.detach(h3, page));  // refused in the build family
+    CHECK(t.detach(h4, script));
+    t.close_context(script);
+    CHECK(t.resolve(h2) == nullptr && t.resolve(h4) != nullptr);
+    t.close_context(page);
+    t.shutdown();
+    const std::vector<std::string> expected = {"one:0", "five:1", "two:2", "three:2", "four:3"};
+    CHECK(log == expected);
+}
+
+} // namespace
+
+int main() {
+    test_error_table();
+    test_op_table();
+    test_trace_format();
+    test_hostcall_points();
+    test_hostcall_classification();
+    test_policy_refusal();
+    test_recording_table();
+    test_paths();
+    test_run_options();
+    test_adapter();
+    return rt_test::finish("host-layer-unit");
+}
