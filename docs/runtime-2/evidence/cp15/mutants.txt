@@ -1,0 +1,8 @@
+M16 abs exact for integers                   DETECTED  builtins-diff: 2988 checks, 3 failures
+M17 bytes accepts 256                        DETECTED  builtins-diff: 2987 checks, 3 failures  (after adding byte-boundary elements; first run: SURVIVED, 0 failures)
+M18 decode accepts any byte sequence         DETECTED  builtins-diff: 2988 checks, 4 failures
+M19 json_parse drops exact spellings         DETECTED  builtins-diff: 2988 checks, 136 failures
+M20 sha256 hashes one byte less              DETECTED  builtins-diff: 2988 checks, 9 failures
+M21 validate accepts rejected instances      DETECTED  builtins-diff: 2988 checks, 21 failures
+M22 round half to even                       DETECTED  builtins-diff: 2988 checks, 1 failures
+builtins_mutants: 7/7 detected (CP14 M1-M15: see ../cp14/)

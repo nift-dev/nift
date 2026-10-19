@@ -1,0 +1,6 @@
+builtins-diff: seed 20261018, 8000 cases (7976 compared, 873 legacy errors, 24 refused by rule W1) in 895 legacy runs
+builtins-diff: 7976 checks, 0 failures
+builtins-diff: seed 2, 8000 cases (7977 compared, 881 legacy errors, 23 refused by rule W1) in 896 legacy runs
+builtins-diff: 7977 checks, 0 failures
+builtins-diff: seed 3, 8000 cases (7982 compared, 902 legacy errors, 18 refused by rule W1) in 916 legacy runs
+builtins-diff: 7982 checks, 0 failures
