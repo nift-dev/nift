@@ -1,0 +1,13 @@
+{
+  "tolerance": 1.1,
+  "n": [
+    2000,
+    22000
+  ],
+  "ir_per_iteration": {
+    "cycle": 1256.0,
+    "resolve": 250.0,
+    "counted": 1368.0,
+    "context": 5055.2
+  }
+}
