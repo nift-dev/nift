@@ -385,6 +385,15 @@ class Supported:
             a, o, s = self.var(scope, "a"), self.var(scope, "o"), self.var(scope, "s")
             opts = ([f"{a}.length()", f"{a}.size()", f"{a}[0]", f"{a}[{a}.length() - 1]"] if a else []) + \
                    ([f"{o}.n", f'{o}["n"]'] if o else []) + ([f"{s}.length()"] if s else [])
+            # CP12 phase B: index and method links on call results and literals.
+            chain = []
+            if not self.restricted:
+                fa = self.call(scope, "a", d + 1)
+                chain = ([f"{fa}.length()", f"{fa}[0]"] if fa else []) + \
+                        ["[1, 2, 3][1]", "[4, 5].length()", '"abc".length()', '{"n": 7}["n"]']
+            if chain and self.r.random() < 0.3:
+                self.features["chain"] += 1
+                return self.r.choice(chain)
             if opts:
                 self.features["access"] += 1
                 return self.r.choice(opts)
@@ -808,7 +817,9 @@ class Supported:
             if body and body[-1].startswith("return"):
                 break
         # Make sure every function is called at least once, from a loop.
+        self.in_arg += 1  # user-call arguments: no member/index paths (path-in-call-argument)
         calls = [f"{n}({', '.join(self.arg([], pk, 1) for pk in ps)})" for n, ps, _ in self.fns]
+        self.in_arg -= 1
         c = self.name("c")
         loop = [f"{c} := 0", f"while ({c} < 2) {{", f"{c} += 1"] + [f"print({x})" if k in "ids" else x
                                                                     for x, (_, _, k) in zip(calls, self.fns)] + ["}"]
@@ -1122,7 +1133,7 @@ REQUIRED_FEATURES = [
     "loop:top", "loop:top:nested", "loop:fn", "jump", "while:mutual", "while:call", "recursion",
     "recursion:mutual", "call:recursive", "jump:fn", "jump:top", "param:i", "param:d", "param:s", "param:b", "param:a",
     "param:o", "param:push", "return:i", "return:d", "return:s", "return:b", "return:a", "ternary", "coalesce",
-    "logical", "not", "access", "top-return", "loop:calls-every-function", "fn:after-statement",
+    "logical", "not", "access", "top-return", "loop:calls-every-function", "fn:after-statement", "chain",
 ] + [f"cmp:{k}:{op}" for k in ("i", "d", "s") for op in CMP] + [
     f"cmp:{k}:{op}" for k in ("b", "a", "o", "mixed", "null") for op in ("==", "!=")]
 
