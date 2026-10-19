@@ -85,6 +85,20 @@ def outcome_key(st):
     return f"{st['outcome']}:{st['reason']}"
 
 
+def prevalidated(nift, path, cwd, extra, timeout):
+    """CP13 (D-022 #3): the unit is rejected by syntax prevalidation before
+    engine selection (NIFT_PREVALIDATE=only exits 65), on both engines alike:
+    nothing executes and no VM statistics exist. A static refusal."""
+    env = base_env(cwd, extra)
+    env["NIFT_PREVALIDATE"] = "only"
+    try:
+        p = subprocess.run([nift, os.path.basename(path)], cwd=cwd, env=env, capture_output=True,
+                           stdin=subprocess.DEVNULL, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False
+    return p.returncode == 65
+
+
 def check(nift, item, work, timeout):
     family, name, source, extra = item[:4]
     expect = item[4] if len(item) > 4 else None
@@ -97,6 +111,8 @@ def check(nift, item, work, timeout):
     try:
         _, cst = run(nift, path, d, "classify", extra, timeout)
         if not cst:
+            if prevalidated(nift, path, d, extra, timeout):
+                return family, name, "prevalidated", "fallback", source, None, None
             return family, name, "no-stats", "fail", source, None, None
         if cst["outcome"] == "fallback":
             ok = not expect or any(outcome_key(cst).startswith(e) for e in expect)

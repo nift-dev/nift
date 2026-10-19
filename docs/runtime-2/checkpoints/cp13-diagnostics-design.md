@@ -528,6 +528,38 @@ still fails on the 6 VM-only cases whose units fall back (`statement:Try`
 ×2, `statement:StructDecl`, `free-name`, `opaque:irregular-legacy-parse`,
 `context:assignment-error`), as before integration.
 
+### Integration gate runs (`spec-integration` on `runtime-2` `4b2fc909`, CP14 certified)
+
+2026-10-19, `heavy.sh`, D-031 limits. The code under test is identical to the
+CP13 tip (the rebase onto `4b2fc909` changed docs only; verified by diff).
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-diagnostics` | baseline 89: 75 pass, 0 fail, 12 site-dx, 2 superseded (D-022#3); changes `old` 34: 12 pass, 0 fail, 7 site-dx, 15 superseded (both-engine decisions); changes `new` 34: 26 pass, 0 fail, 8 VM-only; codes and JSON fixture checks PASS |
+| baseline `--vm` | 73 pass, 0 fail, 12 site-dx, 4 superseded |
+| changes `--expect new --vm` | 28 pass, **6 fail** (VM-only decisions whose units fall back: `statement:Try` ×2, `statement:StructDecl`, `free-name`, `opaque:irregular-legacy-parse`, `context:assignment-error`) — pending T2–T4 / phase B, not a CP13-integration regression |
+| `make test-runtime2-prevalidate-gate` | rules 89/89; zero-false-rejection gate (tool) PASS: 102 rejections, each citing a rule, 0 unreviewed |
+| gate `--mode check` (the CLI wiring itself) | PASS: 102 rejections, each citing a rule, 0 unreviewed |
+| `make test-rt-parser` | CP10 oracle 0 mismatched in every corpus (syntax errors 34/34 identical, legacy cases, VM corpus, semantics, rt-diff, cp410, smoke 1,783, gen 6,587); negative gate 1,957 programs, 0 failures |
+| `make test-diagnostics`, `make test-site-dx`, `test-source-map`, `diagnostic-outcome-unit` | PASS |
+| `make test-rt-vm` | PASS (rt-diff 815 entries, 0 differing, 7 approved; adversarial 37,470, 0 non-approved; supported generator 500/500; unsupported 500/500; every other step) |
+
+Harness changes needed by the wiring (prevalidation before engine selection
+leaves no VM statistics for a syntactically invalid unit): `vm_adversarial.py`
+counts a unit with no statistics as the static outcome `prevalidated` only
+when `NIFT_PREVALIDATE=only` confirms the rejection (exit 65); anything else
+without statistics still fails. The gate's check mode parses the `[code] rule`
+suffix across lines (R2 messages quote the rest of the statement).
+
+Coverage and generator rates (before = CP14 certified, after = this stage):
+shared corpora 104 units on the VM (84 `vm`, 20 `vm-error`) before and after,
+rt-diff 0 differing (the one former `parse-error` corpus script is now
+prevalidated); supported generator seed 1: 500/500 before and after (narrowed
+shape 6); unsupported 500/500; general generator seed 1: 72/300 before and
+after, identical refusal reasons; its 300 mutants: 55 are now `prevalidated`
+(syntax errors rejected before engine selection, formerly
+`parse-error`/`opaque:legacy-runtime-error` fallbacks), no difference.
+
 ## (e) Work breakdown
 
 | Task | Content | Owned files | Depends on | State |

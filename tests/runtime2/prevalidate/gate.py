@@ -115,7 +115,8 @@ def validate(nift, path, mode, work, tool):
         # NIFT_PREVALIDATE=only prints `<file>:<l>:<c>: <message> [<code>] <rule>`
         # (integration: the CLI wiring reports the rule like the tool does).
         err = p.stderr.decode(errors='replace').strip()
-        m = re.search(r':(\d+):\d+: (.*) \[([a-z_.]+)\] (\S+)$', err)
+        # (messages may span lines: R2 quotes the rest of the statement)
+        m = re.search(r':(\d+):\d+: (.*) \[([a-z_.]+)\] (\S+)\s*$', err, re.S)
         if m:
             return 'reject', m.group(4), f'{m.group(2)} [{m.group(3)}]', int(m.group(1))
         m = re.search(r':(\d+):\d+: (.*)', err)
