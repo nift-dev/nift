@@ -682,3 +682,19 @@ must be removed or justified when build recovery integrates.
   operations; exit status is signal-derived; the window is a normal-shutdown
   guarantee, not protection from SIGKILL or crashes. Error-ended contexts
   suppress routine cleanup warnings but still report genuine cleanup failures.
+
+## D-035 — Typed-handle policy (owner, 2026-10-19; CP17)
+- **Abandoned handles** are detected by reference counting: counted handle kinds
+  are wrapped in a reference-counted VM value, and dropping the last reference
+  cleans the resource up promptly (with the cleanup warning for a live process).
+  Requires VM support when CP17 is wired into the VM.
+- **Ownership transfer** is host-internal only (e.g. async workers handing results
+  to a parent); scripts can only `detach`, which is refused in builds.
+- **Error codes:** using a closed handle is a catchable `runtime.handle_closed`;
+  forged, cross-table and wrong-kind handles stay fatal `internal.handle_*` (the
+  compiler prevents scripts from forging handles).
+- **Cleanup failure** (e.g. a process that could not be killed, `Lost`) makes the
+  run exit nonzero (D-020); any original error stays the primary diagnostic.
+- Coordinator calls (within existing decisions): the handle capacity becomes a
+  named setting reported by `limit.exceeded` (D-028 convention); nested contexts
+  may use their ancestors' handles, parents and siblings may not use a child's.
