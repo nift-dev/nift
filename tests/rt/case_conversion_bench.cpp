@@ -37,15 +37,19 @@ double run(BuiltinId id, const Value& input, std::size_t reps, std::size_t& chec
 
 int main(int argc, char** argv) {
     const std::size_t reps = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 200;
-    const std::string long_ascii(100000, 'a');
-    const std::string short_ascii = "aBcDeFgH";
-    const Value long_value = make_string(long_ascii);
-    const Value short_value = make_string(short_ascii);
+    const Value long_lower_input = make_string(std::string(100000, 'A'));
+    const Value long_upper_input = make_string(std::string(100000, 'a'));
+    const Value short_lower_input = make_string("AbCdEfGh");
+    const Value short_upper_input = make_string("aBcDeFgH");
     std::size_t checksum = 0;
-    const double long_ns = run(BuiltinId::StrToUpper, long_value, reps, checksum);
-    const double short_ns = run(BuiltinId::StrToUpper, short_value, reps * 100, checksum);
-    std::printf("long_100k_ns_per_call %.2f\n", long_ns / static_cast<double>(reps));
-    std::printf("short_8_ns_per_call %.2f\n", short_ns / static_cast<double>(reps * 100));
+    const double long_upper_ns = run(BuiltinId::StrToUpper, long_upper_input, reps, checksum);
+    const double long_lower_ns = run(BuiltinId::StrToLower, long_lower_input, reps, checksum);
+    const double short_upper_ns = run(BuiltinId::StrToUpper, short_upper_input, reps * 100, checksum);
+    const double short_lower_ns = run(BuiltinId::StrToLower, short_lower_input, reps * 100, checksum);
+    std::printf("long_100k_upper_ns_per_call %.2f\n", long_upper_ns / static_cast<double>(reps));
+    std::printf("long_100k_lower_ns_per_call %.2f\n", long_lower_ns / static_cast<double>(reps));
+    std::printf("short_8_upper_ns_per_call %.2f\n", short_upper_ns / static_cast<double>(reps * 100));
+    std::printf("short_8_lower_ns_per_call %.2f\n", short_lower_ns / static_cast<double>(reps * 100));
     std::printf("checksum %zu\n", checksum);
     return 0;
 }

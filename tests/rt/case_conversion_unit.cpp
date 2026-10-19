@@ -6,7 +6,6 @@
 #include "rt/string.h"
 #include "rt_test.h"
 
-#include <cctype>
 #include <clocale>
 #include <cstdio>
 #include <string>
@@ -35,19 +34,22 @@ Result call(BuiltinId id, const Value& receiver, std::size_t extra_args = 0) {
 
 std::string text_of(const Value& value) { return std::string(string_view_of(value)); }
 
-unsigned char c_upper(unsigned char c) {
-    return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
+// Fixed ASCII oracle, independent of the process locale and of the C library.
+// This is the approved CP14 contract: A-Z and a-z only; every other byte is
+// unchanged.
+unsigned char ascii_upper(unsigned char c) {
+    return c >= 'a' && c <= 'z' ? static_cast<unsigned char>(c - ('a' - 'A')) : c;
 }
 
-unsigned char c_lower(unsigned char c) {
-    return static_cast<unsigned char>(std::tolower(static_cast<int>(c)));
+unsigned char ascii_lower(unsigned char c) {
+    return c >= 'A' && c <= 'Z' ? static_cast<unsigned char>(c + ('a' - 'A')) : c;
 }
 
 std::string expected(const std::string& text, bool upper) {
     std::string out = text;
     for (char& c : out) {
         const unsigned char byte = static_cast<unsigned char>(c);
-        c = static_cast<char>(upper ? c_upper(byte) : c_lower(byte));
+        c = static_cast<char>(upper ? ascii_upper(byte) : ascii_lower(byte));
     }
     return out;
 }
@@ -75,8 +77,8 @@ int main() {
     for (int value = 0; value < 256; ++value) {
         const std::string one(1, static_cast<char>(value));
         const unsigned char byte = static_cast<unsigned char>(value);
-        const std::string want_upper(1, static_cast<char>(c_upper(byte)));
-        const std::string want_lower(1, static_cast<char>(c_lower(byte)));
+        const std::string want_upper(1, static_cast<char>(ascii_upper(byte)));
+        const std::string want_lower(1, static_cast<char>(ascii_lower(byte)));
         const Result up = call(upper, make_string(one));
         const Result lo = call(lower, make_string(one));
         CHECK(up.status == Status::Ok && up.out.is(Kind::String));
@@ -126,14 +128,15 @@ int main() {
         const char* saved = std::setlocale(LC_CTYPE, nullptr);
         const std::string saved_copy = saved ? saved : "C";
         bool checked = false;
-        for (const char* candidate : {"C.UTF-8", "C.utf8", "en_US.UTF-8", "en_US.utf8"}) {
+        for (const char* candidate : {"C.UTF-8", "C.utf8", "en_US.UTF-8", "en_US.utf8", "de_DE.UTF-8",
+                                       "tr_TR.UTF-8", "tr_TR.ISO-8859-9"}) {
             if (std::setlocale(LC_CTYPE, candidate) == nullptr) continue;
             for (int value = 0; value < 256; ++value) {
                 const std::string one(1, static_cast<char>(value));
                 const Result up = call(upper, make_string(one));
                 const Result lo = call(lower, make_string(one));
-                const std::string want_up(1, static_cast<char>(c_upper(static_cast<unsigned char>(value))));
-                const std::string want_lo(1, static_cast<char>(c_lower(static_cast<unsigned char>(value))));
+                const std::string want_up(1, static_cast<char>(ascii_upper(static_cast<unsigned char>(value))));
+                const std::string want_lo(1, static_cast<char>(ascii_lower(static_cast<unsigned char>(value))));
                 CHECK(up.status == Status::Ok && up.out.is(Kind::String) && text_of(up.out) == want_up);
                 CHECK(lo.status == Status::Ok && lo.out.is(Kind::String) && text_of(lo.out) == want_lo);
             }
