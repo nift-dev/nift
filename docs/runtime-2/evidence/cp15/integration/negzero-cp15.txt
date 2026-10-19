@@ -1,0 +1,38 @@
+[cp15] arr-alone            same
+[cp15] arr-nested           same
+[cp15] arr-in-obj-fallback  same
+[cp15] scalar               same
+[cp15] scalar-concat        same
+[cp15] scalar-stringify     same
+[cp15] fn-arg               same
+[cp15] fn-arg-obj           same
+[cp15] fn-return            same
+[cp15] fn-return-obj        same
+[cp15] arith-mul            same
+[cp15] arith-mul-dbl        same
+[cp15] arith-neg-dbl        same
+[cp15] arith-div            refused (require-error number-literal)
+[cp15] obj-var              refused (require-error aliasing)
+[cp15] obj-var-member       same
+[cp15] obj-print            refused (require-error type:print)
+[cp15] obj-concat           same
+[cp15] obj-member-concat    same
+[cp15] obj-equal            same
+[cp15] obj-loop             refused (require-error context:negative-zero)
+[cp15] obj-loop-string      same
+[cp15] obj-fnloop           refused (require-error context:negative-zero)
+[cp15] obj-fntop            same
+[cp15] nested-sort          same
+[cp15] nested-keys          same
+[cp15] json-negzero-arith   same
+[cp15] json-negzero-double  same
+[cp15] json-negzero-join    same
+[cp15] div-json-negzero     same
+[cp15] arith-negzero-double same
+[cp15] big-1e400            refused (require-error number-literal)
+[cp15] denormal-min         same
+[cp15] denormal-below       same
+[cp15] exact-int            same
+[cp15] zero-frac            same
+[cp15] exp-spell            same
+[cp15] 37 shapes: 0 differ, 6 refused (legacy runs them), 31 same

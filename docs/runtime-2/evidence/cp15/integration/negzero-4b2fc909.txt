@@ -1,0 +1,58 @@
+[4b2fc909-vm] arr-alone            same
+[4b2fc909-vm] arr-nested           same
+[4b2fc909-vm] arr-in-obj-fallback  same
+[4b2fc909-vm] scalar               same
+[4b2fc909-vm] scalar-concat        same
+[4b2fc909-vm] scalar-stringify     same
+[4b2fc909-vm] fn-arg               same
+[4b2fc909-vm] fn-arg-obj           DIFFERS
+    legacy '-0\n' rc=0 ''
+    vm     '0\n' rc=0 ''
+[4b2fc909-vm] fn-return            same
+[4b2fc909-vm] fn-return-obj        DIFFERS
+    legacy '{"b":-0}\n' rc=0 ''
+    vm     '{"b":0}\n' rc=0 ''
+[4b2fc909-vm] arith-mul            same
+[4b2fc909-vm] arith-mul-dbl        same
+[4b2fc909-vm] arith-neg-dbl        same
+[4b2fc909-vm] arith-div            refused (require-error number-literal)
+[4b2fc909-vm] obj-var              refused (require-error aliasing)
+[4b2fc909-vm] obj-var-member       DIFFERS
+    legacy '-0\n0\ns-0\n' rc=0 ''
+    vm     '0\n0\ns0\n' rc=0 ''
+[4b2fc909-vm] obj-print            refused (require-error type:print)
+[4b2fc909-vm] obj-concat           DIFFERS
+    legacy 'o={"b":-0}\n' rc=0 ''
+    vm     'o={"b":0}\n' rc=0 ''
+[4b2fc909-vm] obj-member-concat    DIFFERS
+    legacy 'b=-0\n' rc=0 ''
+    vm     'b=0\n' rc=0 ''
+[4b2fc909-vm] obj-equal            same
+[4b2fc909-vm] obj-loop             refused (require-error context:negative-zero)
+[4b2fc909-vm] obj-loop-string      DIFFERS
+    legacy '-0\n-0\n' rc=0 ''
+    vm     '0\n0\n' rc=0 ''
+[4b2fc909-vm] obj-fnloop           refused (require-error context:negative-zero)
+[4b2fc909-vm] obj-fntop            DIFFERS
+    legacy '{"b":{"c":-0}}\n' rc=0 ''
+    vm     '{"b":{"c":0}}\n' rc=0 ''
+[4b2fc909-vm] nested-sort          DIFFERS
+    legacy '[{"b":1},{"b":-0}]\n' rc=0 ''
+    vm     '[{"b":1},{"b":0}]\n' rc=0 ''
+[4b2fc909-vm] nested-keys          DIFFERS
+    legacy '-0\n{"b":[-0]}\n' rc=0 ''
+    vm     '0\n{"b":[0]}\n' rc=0 ''
+[4b2fc909-vm] json-negzero-arith   same
+[4b2fc909-vm] json-negzero-double  refused (require-error number-literal)
+[4b2fc909-vm] json-negzero-join    DIFFERS
+    legacy '-0,1\n' rc=0 ''
+    vm     '0,1\n' rc=0 ''
+[4b2fc909-vm] div-json-negzero     same
+[4b2fc909-vm] arith-negzero-double same
+[4b2fc909-vm] big-1e400            refused (require-error number-literal)
+[4b2fc909-vm] denormal-min         refused (require-error number-literal)
+[4b2fc909-vm] denormal-below       refused (require-error number-literal)
+[4b2fc909-vm] exact-int            refused (require-error number-literal)
+[4b2fc909-vm] zero-frac            refused (require-error number-literal)
+[4b2fc909-vm] exp-spell            refused (require-error number-literal)
+[4b2fc909-vm] 37 shapes: 10 differ, 12 refused (legacy runs them), 15 same

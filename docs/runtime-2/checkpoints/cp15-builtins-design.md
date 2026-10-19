@@ -71,8 +71,9 @@ layouts.
   `@json`, `read_val` (they add legacy's prefix, e.g. `inject: …`) and the
   compiler for `{...}` literals, which runs it **at compile time** on the
   static source text: success → the native result is the literal's value;
-  any failure → the unit is refused (W9), because legacy then falls back to
-  its Nift literal evaluator (review R3). A `json_parse` error therefore never
+  any failure → the literal is compiled as a Nift literal, because legacy then
+  falls back to its Nift literal evaluator (review R3; W9 as amended at
+  integration, option A). A `json_parse` error therefore never
   surfaces at run time for a literal (the earlier "callers add legacy's
   prefix" was wrong for literals).
 * `validate(schema, value)`: both converted to JSON documents as legacy's
@@ -158,9 +159,10 @@ The CP14 workloads' guards are unchanged (re-checked: 0 failures).
   A `{...}` literal is compiled by running `json_parse` on its source text at
   compile time: parsed → that value; not JSON for any reason (lone
   surrogate, `01`, invalid UTF-8, keys duplicated after unescaping, depth
-  beyond 512, non-finite number, trailing comma) → the unit is refused
-  (legacy's fallback evaluator accepts some of these: 44 of 112 invalid
-  literals in the seed-1 run).
+  beyond 512, non-finite number, trailing comma, `.5`, `1.`, `'q'`) → compiled
+  as a Nift literal (legacy's fallback), where the CP10/CP11 guards refuse
+  what they always refused (amended at integration, option A; see
+  "Integration: W9 option A and the -0 defect").
 * W10 `validate` with quoted-literal arguments refused (J-Q2).
 * W11 `copy`/`deepcopy` (and `validate`) only on provably plain arguments
   until CP17 (review D1/D2).
@@ -180,7 +182,7 @@ by the single integration owner. Rules applied:
 | Rule | Implementation |
 | --- | --- |
 | W8 bytes | **Refused, not widened**: CP12's kind set is frozen (its 0x80 is Unknown). Every built-in with a fixed bytes result or a bytes receiver (`bytes()`, `encode`, bytes `length size empty slice decode`) is refused before execution, `builtin-bytes:<name>`; `static_assert`s pin the bit layouts. `sha256` of a string binds (bytes values cannot exist on the VM). Widening = a 16-bit kind set in CP12's inference (backlog). |
-| W9 `{...}` literals | `UnitCompiler::object_literal` runs `natives::json_parse` on the literal's source text at compile time: JSON → that value as a constant (`LoadK`; copy-on-write on first mutation); a literal of constants only (numbers, strings without interpolation, `true/false/null`, negated numbers, nested literals of those) that is not JSON → refused, `json-literal`; a literal with expressions (never JSON) compiles as before. |
+| W9 `{...}` literals | `UnitCompiler::object_literal` runs `natives::json_parse` on the literal's source text at compile time: JSON → that value as a constant (`LoadK`; copy-on-write on first mutation); not JSON → compiled as a Nift literal exactly as in CP14 (legacy's fallback evaluator), so the CP10/CP11 guards (opaque statements, `number-literal`, `string-literal`, escaped strings, `context:negative-zero`) refuse what they refused before; an inner `{...}` of a fallback literal is again tried as JSON, as in legacy. One JSON-path refusal: in loop code (loop bodies, functions called from loops) a JSON literal holding an integral negative zero (`-0`, `-0e0`; not `-0.0`) that legacy's prepared parser accepts (no string-valued member, numbers in range: `legacy_prepared_parse_accepts`) is refused, `context:negative-zero`, because legacy's prepared path reads it as Nift there (`0`) and as JSON (`-0`) elsewhere. (Integration amendment, option A: the earlier "constants-only literal that is not JSON → refused, `json-literal`" duplicated those guards and refused literals CP12/CP14 had verified equal to legacy.) |
 | W10 | a string-literal argument of `validate` → `builtin-literal-arg:validate`. |
 | W11 | `validate`, `copy`, `deepcopy`: an argument whose kinds include Unknown → `builtin-plain-arg:<name>` (the VM has no struct, handle or function values, so known kinds are plain). |
 | N-Q2, B-Q2, J-Q3 | W1 arity refusals (`builtin-arity:<name>`). |
@@ -192,7 +194,7 @@ by the single integration owner. Rules applied:
 Tests: `tests/runtime2/vm_builtins.py` gains the CP15 bodies (numbers,
 `sha256`/`validate`/`copy`/`deepcopy`, JSON literals with JSON-only
 spellings, mixed literals) in the five contexts, error programs (N1, `sha256`
-kinds, a rejected and a malformed `validate`), refusals (W8 ×2, W9, W10,
+kinds, a rejected and a malformed `validate`), refusals (W8 ×2, W9 guards, W10,
 N-Q2) and the VM-only `Limit` check (600-deep value: exit 1,
 `limit.exceeded`, not catchable; legacy is not the oracle there, review R2).
 
@@ -225,6 +227,104 @@ What was run (round 1; all heavy steps under `heavy.lock`;
 | `builtins_mutants.py` (all) | 23/23 detected (M22 4 failures, M23 18); bytes mutants M17/M18/M20 re-run after the UBSan fix: 3/3 |
 | `make test-rt-builtins-sanitize` | first run: UBSan stop (null `memcpy` source, above); after the fix: unit 792 + differential 1,993 checks, 0 failures |
 | guards | old locked file re-checked: 34 workloads, 0 failures; re-locked with n = 1,000 added and `fn.validate.unique`: 35 workloads, 0 failures |
+
+## Integration: W9 option A and the -0 defect (base CP13 phase A `53bc509a`)
+
+**W9 amended (coordinator ruling, option A).** As first wired, W9 refused a
+`{...}` literal of constants that `json_parse` rejects (`json-literal`). That
+duplicated the CP10/CP11 guards and refused literals CP12/CP14 had verified
+equal to legacy's fallback (`{"x": .5}`, `{"s": 'q'}`, `1.`): `test-rt-vm`
+seed 1 failed with 317 `json-literal` refusals in the supported, former and
+unsupported generator suites (log kept with the integration evidence). Now:
+JSON → `LoadK` constant, unchanged; not JSON → the CP14 literal path, which
+is legacy's fallback, so every spelling the guards refused before is still
+refused with its earlier reason (`01`/`1e400`/big integers/`-0.0`/denormals:
+`number-literal`; escaped strings: `opaque:legacy-runtime-error`). The
+`w9-not-json-dot` refusal case became supported.
+
+**The -0 defect (open on runtime-2 since `4b2fc909`, closed here).** Legacy
+reads a JSON-valid `{...}` literal as JSON, so `{"b": -0}` holds the Decimal
+spelled `-0`; the CP12/CP14 VM compiled it as the Nift negation `-0` → `0`.
+`print({"b": -0}.stringify())`-like programs printed `{"b":0}` on the VM and
+`{"b":-0}` on legacy (silent, exit 0 both). The W9 JSON path fixes it, also
+for a JSON object nested in a non-JSON literal (legacy re-reads the inner
+`{...}` as JSON; the VM's `object_literal` recurses the same way).
+`negzero_probe.py` runs the same shapes against both binaries
+(`../evidence/cp15/integration/negzero-4b2fc909.txt`, `negzero-cp15.txt`).
+
+**Context dependence found while fixing it (refused, CP12 #11 class).** In
+loop code (loop bodies, functions called from loops) legacy's prepared
+parser reads an object literal it accepts (no string-valued member, every
+number in range) as Nift, where an integral negative zero (`-0`, `-0e0`,
+`-0e-5`; not `-0.0`) becomes `0`; elsewhere, or when that parser rejects the
+literal, legacy reads it as JSON (`-0`). So on the JSON path, in loop-reachable
+code, a literal holding an integral negative zero that
+`legacy_prepared_parse_accepts` accepts is refused, `context:negative-zero`.
+Every other JSON-only spelling (`0.0`, `1.50`, `1e300`, `1e-400`, `5e-324`,
+big integers, `-0.0`) reads the same in every context (probed).
+
+**Negative zero: intended behaviour (owner; established on legacy, not
+inferred from JSON output).**
+
+1. *The sign of zero is never observable as a number.* Division by any zero
+   is the `division by zero` error, whatever the sign or spelling (`1 / -0`,
+   `1 / {"b": -0.0}.b`, `1 / (-0.5 * 0)`). Arithmetic that yields an IEEE
+   negative zero (`-0.5 * 0`, `0 * -1`, `-(0.5 - 0.5)`) prints `0` through
+   `print`, `stringify` and concatenation. `-0 == 0` and `{"b": -0} ==
+   {"b": 0}` are `true`; `{"b": -0}.b < 0` is `false`.
+2. *Only a spelling is preserved.* A JSON-literal number keeps its source
+   spelling (`-0`, `-0.0`, like `1.50` or `12345678901234567890123`) through
+   storage, member and index access, nesting in arrays and objects, `print`,
+   `stringify`, `join` and string concatenation.
+3. *Arithmetic gives the canonical form.* `v + 0`, `v - 0`, `v * 1`,
+   `v * -1` of a `-0`/`-0.0` value print `0`; negation flips the spelling's
+   sign (`-(-0)` → `0`, `-(-0.0)` → `0.0`). `"-0".to_int()`,
+   `"-0.0".to_double()` are `0`.
+
+The VM follows 1–3 (tests: `vm_builtins.py` `negzero-sign` in the five
+contexts, `negzero-negation`, `negzero-nested-sort`, `negzero-shapes`,
+`w9-meet`, `w9-json-negzero-nested`, `w9-fallback-array-negzero`, errors
+`negzero-div-*`, refusals `w9-json-negzero-loop`/`-fnloop`,
+`w9-fallback-negzero-loop`).
+
+**Why the generators missed it, and the permanent coverage.** The supported
+generator's pools (`ILIT`, `DLIT`, `SLIT`) held only spellings on which the
+JSON and Nift readings agree; every spelling where they differ was refused
+(`number-literal`) before CP15, except `-0`, which no pool contained. The
+generator now adds a `"v"` member of JSON-only values (`VLIT`: `-0`, `-0e0`,
+`0.0`, `-0.0`, `1.50`, `1E2`, `1e300`, `-2.5e-300`, `±1e-400`, `5e-324`,
+`4.9e-324`, the smallest normal, the largest double, `2^53 + 1`, `±10^22`
+integers) to a share of its object literals, in three forms: flat, nested
+(arrays and objects inside the JSON literal; only when every other member is
+already spelled as JSON) and mixed (an inner JSON object inside a literal
+legacy reads as Nift: `.5`, `'q'`, expressions). **No narrowing relative to
+CP14 (D-036):** the members are drawn on a separate random stream and added
+to the finished program text, after every decision the generator takes on
+the text (text types, binding references, retries), and the literal's own
+text is never respelled; constructs added to the unsupported generator
+(`{"a": 1e400}`: not JSON, not finite, `number-literal`) come in extra
+programs beyond the suite's count. Proof: every program of the supported,
+former and unsupported generators for seeds 1–3 (4,500) equals the CP14
+(`4b2fc909`) generator's program once the added members are removed
+(`../evidence/cp15/integration/generator_cp14_identity.py`, output
+`generator-cp14-identity.txt`: 0 differ; 4,869 members added in 2,657
+programs). The one pre-existing narrowing (CP14 stage, coordinator ruling
+2026-10-19: `double-via-binding-assign`, with its known-refused fixtures) is
+unchanged; the generator reports how many times it applied (6 at seed 1).
+
+**CP12 text typing, digit-led root (found by the new generator forms).**
+Legacy types a declaration from its text (`expression_type`), splitting at
+top-level `+`/`-` outside parentheses and brackets but not braces, so
+`v := {..., "v": -1e-400}` ends in the fragment `1e`, looked up as a binding
+name. CP12's port left any such root to be resolved at compile time and
+refused a name it cannot resolve (`text-type-name`, a later binding could
+exist), or, in a function called from a loop, any declaration whose text
+type is not known statically (`prepared-decl-type`). A root that starts with
+a digit can name no binding or field, so legacy's lookup always misses and
+the type is -1: the port's inference (`text_type.cpp`) now returns the known
+type -1 for such a root, everywhere; every other unresolved name is handled
+as before (case: `texttype-digit-root`, top level, loop body and a function
+called from a loop).
 
 ## Evidence
 
