@@ -311,6 +311,28 @@ Fixes:
     writes into the output directory and into the project while a page fails.
     In every case the hook-run count stays flat, the banner is printed once,
     and the watcher recovers.
+  - **Certification flake (fix-cert-flakes).** Under load the check reported
+    "D1 symlink: watcher loops (5 -> 7)". Traces with hook-run times show
+    the hook runs on every 200 ms poll while healthy (4 runs before the edit),
+    then exactly three attempts after the failing edit: the failed build,
+    the first-failure retry, and one more retry because that retry saw
+    `generated.txt` rewritten by the hook. That is the build's own write, but
+    its content is unknown after a failure from a healthy state. After that
+    the identical rewrite is recognised and the watcher is idle (7 in every
+    variant). The old check sampled 0.6 s after the banner. Under load,
+    attempts 2 and 3 landed after that sample, so it counted them as a loop.
+    The symlinked output directory is skipped as intended: with a hook that
+    writes only through it, the watcher settles after the failed build and
+    its single retry. The check now waits until there has been no hook run
+    for 2 s, then requires 2 more quiet seconds. It allows at most 4 runs
+    after the edit (the 3 attempts plus one healthy build that may already
+    be in flight), forbids a "modifies watched files" report (it would mean
+    the output directory or an identical rewrite was treated as an edit),
+    and still requires one banner and recovery. Mutation check: with
+    `build_auto_snapshot` using `absolute().lexically_normal()` instead of
+    `weakly_canonical` (so `site -> real` is no longer skipped), the old check
+    passes (8 -> 8). The new one fails: "a build hook modifies watched files
+    on every build (real/hook.log)".
 - **D2: `@path` overhead.**
   - **Cause.** The check called `path_within`, which runs `weakly_canonical`
     twice per `@path`, even when the warning was disabled.

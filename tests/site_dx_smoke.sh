@@ -539,7 +539,26 @@ kill "$auto_pid" 2>/dev/null; wait "$auto_pid" 2>/dev/null; auto_pid=""
 
 # Review D1: whatever the output-dir spelling, a pre-build hook that writes
 # into the output directory (or the project) while a page fails must not make
-# the watcher loop: at most the failed build plus one settling retry run.
+# the watcher loop. The hook runs once per watcher build: every 200 ms poll
+# while healthy, then, after the failing edit, exactly these attempts
+# (BuildAutoRetryPolicy): (1) the failed build, (2) the unconditional
+# first-failure retry, (3) one more retry because (2) saw generated.txt
+# rewritten by the hook - its own write, but its content is not yet known
+# after a failure from a healthy state - after which the identical rewrite is
+# recognised and the watcher goes idle. Plus at most one healthy build already
+# in flight when the edit landed. The output directory (hook.log) is never
+# watched under any spelling, so no "modifies watched files" report appears.
+# The check waits for the watcher to become idle instead of sampling at a
+# fixed delay (under load (2) and (3) can land >0.6 s after the banner).
+wait_hook_idle() { # hook-log quiet-tenths timeout-tenths -> 0 when no run for quiet-tenths
+  local n=0 quiet=0 last now
+  last=$(grep -c . "$1")
+  while [ $n -lt "$3" ]; do
+    sleep 0.1; n=$((n + 1)); now=$(grep -c . "$1")
+    if [ "$now" = "$last" ]; then quiet=$((quiet + 1)); [ $quiet -ge "$2" ] && return 0; else quiet=0; last=$now; fi
+  done
+  return 1
+}
 auto_variant() { # label output-dir-value output-dir-filesystem-path
   local dir="$work/auto-$1" out_fs
   new_project "$dir" || return
@@ -558,13 +577,22 @@ PY
   auto_pid=$!
   wait_for "grep -q non-interactive ../auto-$1.out" 50
   sleep 0.5
+  local edit_at; edit_at=$(grep -c . "$out_fs/hook.log")
   echo '@input("missing.html")' > content/index.html
   wait_for "grep -q 'build failed' ../auto-$1.err" 80 || fail "D1 $1: failure not reported"
-  sleep 0.6
-  local before; before=$(grep -c . "$out_fs/hook.log")
-  sleep 2
-  local after; after=$(grep -c . "$out_fs/hook.log")
-  [ "$after" -le "$((before + 1))" ] && pass "D1 $1: no rebuild loop while failing ($before -> $after hook runs)" || fail "D1 $1: watcher loops ($before -> $after)"
+  # Idle = no hook run for 2 s (10 polls); a loop never gets there.
+  if wait_hook_idle "$out_fs/hook.log" 20 300; then
+    local before; before=$(grep -c . "$out_fs/hook.log")
+    sleep 2
+    local after; after=$(grep -c . "$out_fs/hook.log")
+    [ "$after" -eq "$before" ] && pass "D1 $1: watcher idle while failing ($before -> $after hook runs)" || fail "D1 $1: watcher loops ($before -> $after)"
+    [ "$((before - edit_at))" -le 4 ] && pass "D1 $1: settles in failed build + 2 retries ($edit_at -> $before hook runs)" \
+      || fail "D1 $1: unexplained extra builds after the edit ($edit_at -> $before hook runs; expected at most 4)"
+  else
+    fail "D1 $1: watcher loops (never idle: $edit_at -> $(grep -c . "$out_fs/hook.log") hook runs in 30 s)"
+  fi
+  grep -q 'modifies watched files' ../auto-$1.err && fail "D1 $1: watcher treats the build's own writes as edits: $(grep 'modifies watched' ../auto-$1.err)" \
+    || pass "D1 $1: own writes (output dir, identical rewrite) not reported as edits"
   [ "$(grep -c 'build failed; still watching' ../auto-$1.err)" -eq 1 ] && pass "D1 $1: failure banner printed once" || fail "D1 $1: banner repeated $(grep -c 'build failed' ../auto-$1.err)x"
   echo '<p>fixed</p>' > content/index.html
   wait_for "grep -q fixed '$out_fs/index.html'" 80 && pass "D1 $1: recovers" || fail "D1 $1: no recovery"
