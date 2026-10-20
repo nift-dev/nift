@@ -42,7 +42,14 @@ CASES = [
 ]
 
 
-def run(nift, program, mode, work):
+# Programs CP13's prevalidation (D-022 #3, src/CLI.cpp) rejects before an
+# engine is selected: no statistics are written with it on. Their inventory
+# reason is checked with NIFT_PREVALIDATE=off; with it on, the run must fail
+# with the diagnostic and write nothing.
+PREVALIDATION_REJECTS = {"parse-error"}
+
+
+def run(nift, program, mode, work, extra=None):
     path = os.path.join(work, "t.f")
     with open(path, "w") as f:
         f.write(program)
@@ -50,8 +57,13 @@ def run(nift, program, mode, work):
     if os.path.exists(stats):
         os.remove(stats)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work, "NIFT_VM": mode, "NIFT_VM_STATS": stats}
+    env.update(extra or {})
     p = subprocess.run(["timeout", "60", nift, "t.f"], cwd=work, env=env, capture_output=True)
-    return p, json.loads(open(stats).read().splitlines()[-1])
+    try:
+        return p, json.loads(open(stats).read().splitlines()[-1])
+    except (OSError, IndexError, ValueError):
+        # No statistics line: reported as this case's failure, not a harness crash.
+        return p, None
 
 
 def main():
@@ -62,8 +74,24 @@ def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix="vm-inventory-") as work:
         for name, program, want in CASES:
-            p1, classify = run(nift, program, "classify", work)
-            p2, every = run(nift, program, "classify-all", work)
+            extra = None
+            if name in PREVALIDATION_REJECTS:
+                p0, none = run(nift, program, "classify-all", work)
+                if none is not None or p0.returncode == 0 or b"error:" not in p0.stderr:
+                    failures += 1
+                    print(f"FAIL {name}: prevalidation should reject before the engine (exit {p0.returncode}, "
+                          f"statistics {none is not None}, stderr {p0.stderr[-120:]!r})")
+                    continue
+                extra = {"NIFT_PREVALIDATE": "off"}
+            p1, classify = run(nift, program, "classify", work, extra)
+            p2, every = run(nift, program, "classify-all", work, extra)
+            missing = [(mode, p) for mode, p, st in (("classify", p1, classify), ("classify-all", p2, every))
+                       if st is None]
+            if missing:
+                failures += 1
+                print(f"FAIL {name}: no statistics line: " + "; ".join(
+                    f"NIFT_VM={mode} exit {p.returncode}, stderr {p.stderr[-200:]!r}" for mode, p in missing))
+                continue
             got = {r["reason"] for r in every["reasons"] if not r["consequential"]}
             problems = []
             if p2.returncode != 0 or p2.stdout:
