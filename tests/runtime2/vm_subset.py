@@ -62,6 +62,9 @@ BODIES = {
                        'print([1, [2]] != [1, [2]])\nprint(1 == "1")\nprint((1 + 2) <= 3)\n'
                        'print((1 < 2) && (2 > 1))\nprint(!(1 >= 2))\n',
     "decl_from_outer": "g := 2.5\nj := 0\nwhile (j < 1) {\n  h := g\n  h = 1.5\n  print(h)\n  j += 1\n}\n",
+    "interpolation": 'x := 7\nprint("v=$[x]!")\n',
+    "escapes": 'print("a\\tb")\nprint("q\\\"r")\n',
+    "big_integer": 'print(9007199254740993)\n',
 }
 
 FUNCTIONS = (
@@ -165,9 +168,10 @@ UNSUPPORTED = [
     ("unresolved-name", "print(args)\n", "unresolved-name"),
     # Literals.
     ("zero-decimal", "print(0.0)\n", "number-literal"),
-    ("big-integer", "print(9007199254740993)\n", "number-literal"),
-    ("escape", 'print("a\\tb")\n', "string-literal"),
-    ("interpolation", 'x := 1\nprint("$[x]")\n', "interpolation"),
+    ("leading-zero", "print(01)\n", "number-literal"),
+    ("hex-literal", "print(0x10)\n", "opaque:legacy-runtime-error"),
+    ("overflow-exponent", "print(1e309)\n", "number-literal"),
+    ("escaped-dollar", 'print("a\\$[1]")\n', "opaque:irregular-legacy-parse"),
     # Names legacy dispatches specially.
     ("builtin-fn-name", "fn(is_null(x)) { return 1 }\nprint(is_null(2))\n", "fn-name-reserved"),
     ("reserved-binding", "title := 1\nprint(title)\n", "binding-name-reserved"),

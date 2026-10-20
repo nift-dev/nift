@@ -13,15 +13,15 @@ fallback_bare_expression.f fallback expression-statement
 # CP14 wiring: split() is a bound built-in; the unit is still refused, now for print() of its array result.
 fallback_builtin.f fallback type:print
 fallback_const.f fallback declare-const
-fallback_escape.f fallback string-literal
+fallback_escape.f vm
 fallback_fn_after.f vm 
 fallback_fn_called_early.f fallback fn-called-before-declaration
 fallback_for.f fallback statement:For
 fallback_free_name.f fallback free-name
 fallback_index_assign_call.f fallback index-target
-fallback_interpolation.f fallback interpolation
+fallback_interpolation.f vm
 fallback_lambda.f fallback expression:Lambda
-fallback_large_literal.f fallback number-literal
+fallback_large_literal.f vm
 # CP13 integration (D-022 #3): syntax errors are rejected before engine selection (same output).
 fallback_parse_error.f prevalidated
 fallback_postfix_space.f fallback opaque:legacy-runtime-error

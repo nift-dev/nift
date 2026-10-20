@@ -80,6 +80,16 @@ private:
     bool expr_any(NodeId id, std::uint16_t& operand);
     bool reg_any(NodeId id, std::uint16_t& reg);
     bool constant_of(const Node& node, Value& value, bool& is_constant);
+    // CP15B: lower an interpolated String node (children: StringPart/literal
+    // text and expressions) into existing string operations.
+    bool interpolation(const Node& node, std::uint16_t dst);
+    // Conservative local scalar proof for interpolation parts. The unit kind
+    // inference does not visit String children (infer*.cpp is not ours), so
+    // this uses bindings, literals, operators, native result rules and simple
+    // user-function returns. kKindUnknown means "not proven".
+    std::uint8_t interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
+    std::uint8_t interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
+    void collect_returns(NodeId id, std::vector<NodeId>& out) const;
     bool binary(const Node& node, std::uint16_t dst);
     bool logical(const Node& node, std::uint16_t dst);
     bool coalesce(const Node& node, std::uint16_t dst);

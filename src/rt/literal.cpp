@@ -2,8 +2,10 @@
 
 #include "rt/string.h"
 
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <string>
 
 namespace nift::rt {
@@ -73,9 +75,9 @@ bool valid_utf8(std::string_view text) {
 bool decode_number_literal(std::string_view text, Value& out) {
     if (all_digits(text)) {
         if (text.size() > 1 && text.front() == '0') return false;
-        if (text.size() > 16) return false;
-        const std::int64_t value = std::strtoll(std::string(text).c_str(), nullptr, 10);
-        if (value >= kSafeInteger) return false;
+        std::int64_t value = 0;
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (parsed.ec != std::errc() || parsed.ptr != text.data() + text.size()) return false;
         out = Value::integer(value);
         return true;
     }
@@ -96,16 +98,60 @@ bool decode_number_literal(std::string_view text, Value& out) {
     return true;
 }
 
+NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out) {
+    if (text == "9223372036854775808") {  // rt-lint: allow-string-compare compile time
+        out = Value::integer(std::numeric_limits<std::int64_t>::min());
+        return NegativeLiteral::Decoded;
+    }
+    Value value;
+    if (!decode_number_literal(text, value)) return NegativeLiteral::Invalid;
+    if (value.is(Kind::Int)) {
+        if (value.as_int() == 0) return NegativeLiteral::Zero;
+        out = Value::integer(-value.as_int());
+        return NegativeLiteral::Decoded;
+    }
+    if (value.is(Kind::Double)) {
+        if (value.as_double() == 0) return NegativeLiteral::Zero;
+        out = Value::number(-value.as_double());
+        return NegativeLiteral::Decoded;
+    }
+    return NegativeLiteral::Invalid;
+}
+
 bool decode_string_literal(std::string_view text, Value& out) {
     if (text.size() < 2 || (text.front() != '"' && text.front() != '\'') || text.back() != text.front()) return false;
     const std::string_view body = text.substr(1, text.size() - 2);
-    for (char c : body) {
+    std::string decoded;
+    decoded.reserve(body.size());
+    for (std::size_t i = 0; i < body.size(); ++i) {
+        const char c = body[i];
+        if (c == '\\') {
+            if (++i >= body.size()) return false;  // trailing backslash
+            switch (body[i]) {
+                case 'n': decoded.push_back('\n'); break;
+                case 't': decoded.push_back('\t'); break;
+                case 'r': decoded.push_back('\r'); break;
+                case '\\': decoded.push_back('\\'); break;
+                case '"': decoded.push_back('"'); break;
+                case '\'': decoded.push_back('\''); break;
+                default:
+#if defined(NIFT_INTERP_MUTANT) && NIFT_INTERP_MUTANT == 2
+                    break;  // negative control: drop the escape payload
+#else
+                    decoded.push_back(body[i]);  // legacy drops the backslash
+                    break;
+#endif
+            }
+            continue;
+        }
         const auto byte = static_cast<unsigned char>(c);
-        if (c == '\\' || c == '$' || byte < 0x20 || byte == 0x7f) return false;
+        if (byte < 0x20 || byte == 0x7f) return false;  // raw control/NUL: later class
+        if (c == '$' && i + 1 < body.size() && body[i + 1] == '[') return false;  // parser emits parts
         if (c == text.front()) return false;
+        decoded.push_back(c);
     }
-    if (!valid_utf8(body)) return false;  // length() counts code points
-    out = make_string(body);
+    if (!valid_utf8(decoded)) return false;  // length() counts code points
+    out = make_string(static_cast<std::string&&>(decoded));
     return true;
 }
 

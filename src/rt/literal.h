@@ -9,16 +9,22 @@
 
 namespace nift::rt {
 
-// Integers without a leading zero below 2^53 become Int; other spellings with
-// a fraction or exponent, at most 15 significant digits and a magnitude below
-// 2^53 become Double. Returns false otherwise (decimal-exact legacy values,
-// octal-looking spellings, huge or tiny magnitudes).
+// Integers without a leading zero in signed 64-bit range become Int; other
+// spellings with a fraction or exponent, at most 15 significant digits and a
+// magnitude below 2^53 become Double. Returns false otherwise (decimal-exact
+// legacy values, octal-looking spellings, huge or tiny magnitudes).
 bool decode_number_literal(std::string_view text, Value& out);
 
-// `text` includes its quotes. Legacy decodes escapes differently on the loop
-// path (a backslash in a loop-body literal is not an escape there), and `$`
-// starts interpolation in some positions, so only literals without `\`, `$`
-// and control bytes are accepted.
+enum class NegativeLiteral { Decoded, Zero, Invalid };
+// The magnitude text of a unary-negated number literal. INT64_MIN's magnitude
+// (9223372036854775808) is decoded exactly; zero means the runtime negation
+// must remain (-0); Invalid is a number-literal refusal (including -0.0).
+NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out);
+
+// `text` includes its quotes. Decodes legacy escapes (`\n`, `\t`, `\r`, `\\`,
+// quoted quote); an unknown escape drops the backslash; a `$` that does not
+// start `$[` is data. Raw control/NUL bytes and `$[` are refused (the parser
+// emits StringParts for interpolation).
 bool decode_string_literal(std::string_view text, Value& out);
 
 } // namespace nift::rt

@@ -99,7 +99,7 @@ bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant
             if (!decode_number_literal(text(node), value)) return fail(node, "number-literal");
             return true;
         case NodeKind::String:
-            if (node.count != 0) return fail(node, "interpolation");
+            if (node.count != 0) { is_constant = false; return true; }  // interpolation lowering
             if (!decode_string_literal(text(node), value)) return fail(node, "string-literal");
             return true;
         case NodeKind::True: value = Value::boolean(true); return true;
@@ -108,12 +108,10 @@ bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant
         case NodeKind::Unary: {
             const Node& operand = ast_.at(node.a);
             if (node.op != Op::Neg || operand.kind != NodeKind::Number) break;
-            if (!decode_number_literal(text(operand), value)) return fail(operand, "number-literal");
-            // -0 stays a run-time negation.
-            if (value.is(Kind::Int) && value.as_int() != 0) { value = Value::integer(-value.as_int()); return true; }
-            if (value.is(Kind::Double) && value.as_double() != 0) {
-                value = Value::number(-value.as_double());
-                return true;
+            switch (decode_negative_number_literal(text(operand), value)) {
+                case NegativeLiteral::Decoded: return true;
+                case NegativeLiteral::Zero: break;  // -0 stays a run-time negation
+                case NegativeLiteral::Invalid: return fail(operand, "number-literal");
             }
             break;
         }
@@ -179,6 +177,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         case NodeKind::Index: return index(node, dst);
         case NodeKind::Array: return array_literal(node, dst);
         case NodeKind::Object: return object_literal(node, dst);
+        case NodeKind::String: return interpolation(node, dst);
         default: return fail(node, std::string("expression:") + node_kind_name(node.kind));
     }
 }

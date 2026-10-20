@@ -2851,6 +2851,18 @@ test-loop-literals: $(TARGET)
 	python3 tests/runtime2/loop-literals/run.py --nift ./$(TARGET)
 test: test-loop-literals
 
+.PHONY: test-runtime2-literals
+test-runtime2-literals: $(TARGET)
+	python3 tests/runtime2/literals/run.py --nift ./$(TARGET) --oracle ./$(TARGET)
+test: test-runtime2-literals
+
+.PHONY: test-runtime2-literals-scaling test-runtime2-literals-mutants
+test-runtime2-literals-scaling: $(TARGET)
+	python3 tests/runtime2/literals/scaling.py --nift ./$(TARGET) --runs 3
+
+test-runtime2-literals-mutants: $(TARGET)
+	bash tests/runtime2/literals/negative_control.sh "$(CURDIR)/$(TARGET)"
+
 # The same suite against the ASan/UBSan build of nift (modified prepared-path
 # literal and output evaluation under the sanitizers).
 .PHONY: test-loop-literals-sanitize

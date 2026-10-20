@@ -87,7 +87,6 @@ void check_fallbacks() {
     // several shapes Opaque that the CP11 compiler also refused; the parser's
     // verdict comes first (the compiler checks stay as a second line).
     const Case cases[] = {
-        {"x := 1\nprint(\"$[x]\")\n", "interpolation"},
         {"fn(f()) { return n }\nprint(f())\n", "free-name"},
         // CP12 phase B: a declaration after statements is admitted unless a
         // call can run before it (directly or through another function).
@@ -96,8 +95,6 @@ void check_fallbacks() {
         {"x := 1\nif (x > 5) { print(f()) }\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
         {"const c := 1\n", "declare-const"},
         {"for(x : [1]) { print(x) }\n", "statement:For"},
-        {"print(\"a\\tb\")\n", "string-literal"},
-        {"print(9007199254740993)\n", "number-literal"},
         {"fn(min(a, b)) { return 0 }\nprint(min(1, 2))\n", "fn-name-reserved"},
         {"x := \"a\"\nprint(x.replace_once(\"a\", \"b\"))\n", "method:replace_once"},  // CP14: split is bound
         {"print(args)\n", "unresolved-name"},
@@ -180,6 +177,9 @@ void check_errors() {
         {"x := 0\ny := -1\nprint(x * y)\n", StopReason::None, "0\n"},
         {"a := [1]\na[0] = \"s\"\nprint(a[0])\n", StopReason::None, "s\n"},
         {"o := {\"k\": 1}\nprint(o.size())\n", StopReason::None, "1\n"},
+        {"x := 1\nprint(\"$[x]\")\n", StopReason::None, "1\n"},
+        {"print(\"a\\tb\")\n", StopReason::None, "a\tb\n"},
+        {"print(9007199254740993)\n", StopReason::None, "9007199254740993\n"},
         {"o := {\"k\": 1}\nprint(o.length())\n", StopReason::Error, "unknown value or malformed expression: o.length()"},
         {"x := 1\nx = x + 0.5\n", StopReason::Error, "cannot assign double to int binding 'x'"},
         // D3: an integral Decimal index (-INT64_MIN) is out of range, as legacy.
@@ -253,7 +253,9 @@ void check_literals() {
     Value v;
     CHECK(decode_number_literal("42", v) && v.is(Kind::Int) && v.as_int() == 42);
     CHECK(decode_number_literal("9007199254740991", v) && v.as_int() == 9007199254740991);
-    CHECK(!decode_number_literal("9007199254740992", v));
+    CHECK(decode_number_literal("9007199254740992", v) && v.as_int() == 9007199254740992);
+    CHECK(decode_number_literal("9223372036854775807", v) && v.as_int() == 9223372036854775807);
+    CHECK(!decode_number_literal("9223372036854775808", v));
     CHECK(!decode_number_literal("007", v));
     CHECK(decode_number_literal("1.5", v) && v.is(Kind::Double) && v.as_double() == 1.5);
     CHECK(decode_number_literal(".5", v) && v.as_double() == 0.5);
@@ -263,8 +265,9 @@ void check_literals() {
     CHECK(!decode_number_literal("0.1000000000000000055511151231257827", v));
     CHECK(decode_string_literal("\"abc\"", v) && string_view_of(v) == "abc");
     CHECK(decode_string_literal("'it'", v) && string_view_of(v) == "it");
-    CHECK(!decode_string_literal("\"a\\nb\"", v));
-    CHECK(!decode_string_literal("\"a$b\"", v));
+    CHECK(decode_string_literal("\"a\\nb\"", v) && string_view_of(v) == "a\nb");
+    CHECK(decode_string_literal("\"a$b\"", v) && string_view_of(v) == "a$b");
+    CHECK(!decode_string_literal("\"a$[x]\"", v));
     CHECK(!decode_string_literal("\"\xff\"", v));
     CHECK(decode_string_literal("\"\xe2\x9c\x93\"", v));
 }
