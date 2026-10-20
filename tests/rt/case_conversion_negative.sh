@@ -2,7 +2,8 @@
 # Negative control for the focused case-conversion tests. Builds the real
 # candidate, then a temporary copy of string_methods.cpp with a deliberately
 # wrong ASCII mapping. The real test must exit 0; the mutant must exit nonzero.
-# Run from anywhere; the script locates the repository root itself.
+# Run from anywhere through make (it passes the source lists); the script
+# locates the repository root itself and compiles from there.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -12,23 +13,24 @@ trap cleanup EXIT
 
 CXX=${CXX:-g++}
 CXXFLAGS=${CXXFLAGS:--std=c++17 -O2 -Wall -Wextra -pedantic -pthread}
-CORE=(
-  "$ROOT/src/rt/value.cpp" "$ROOT/src/rt/string.cpp" "$ROOT/src/rt/aggregate.cpp"
-  "$ROOT/src/rt/atom.cpp" "$ROOT/src/rt/heap_account.cpp" "$ROOT/src/rt/compare.cpp"
-  "$ROOT/src/rt/number.cpp" "$ROOT/src/rt/decimal.cpp" "$ROOT/src/rt/render.cpp"
-  "$ROOT/src/rt/error.cpp" "$ROOT/src/rt/handle.cpp" "$ROOT/src/rt/legacy_bridge.cpp"
-  "$ROOT/src/RuntimeValue.cpp"
-)
+# Source lists come from the Makefile (RT_BUILTINS_CORE / RT_BUILTINS_SOURCES)
+# so the control links exactly what the real test links. Paths are relative to
+# ROOT; every compile runs from ROOT.
+: "${RT_BUILTINS_CORE:?run via 'make test-rt-case-conversion-negative'}"
+: "${RT_BUILTINS_SOURCES:?run via 'make test-rt-case-conversion-negative'}"
+cd "$ROOT"
+read -r -a CORE <<<"$RT_BUILTINS_CORE"
 NATIVES=()
-for file in "$ROOT"/src/rt/natives/*.cpp; do
+for file in $RT_BUILTINS_SOURCES; do
   [ "$(basename "$file")" = "string_methods.cpp" ] || NATIVES+=("$file")
 done
 
-build_and_run() {
-  local source=$1 binary=$2 log=$3
-  "$CXX" -Isrc -Itests/rt $CXXFLAGS "$ROOT/tests/rt/case_conversion_unit.cpp" "$source" \
-    "${NATIVES[@]}" "${CORE[@]}" -o "$binary"
-  "$binary" >"$log" 2>&1
+build() { # source, binary: a build failure is a harness failure, never a detection
+  if ! "$CXX" -I"$ROOT/src" -I"$ROOT/include" -I"$ROOT/tests/rt" $CXXFLAGS \
+       "$ROOT/tests/rt/case_conversion_unit.cpp" "$1" "${NATIVES[@]}" "${CORE[@]}" -o "$2"; then
+    echo "FAIL: could not build $2 (harness error, not a mutant detection)" >&2
+    exit 1
+  fi
 }
 
 cp "$ROOT/src/rt/natives/string_methods.cpp" "$TMP/string_methods.cpp"
@@ -43,14 +45,17 @@ if old not in text:
 open(path, "w").write(text.replace(old, new, 1))
 PY
 
-if ! build_and_run "$ROOT/src/rt/natives/string_methods.cpp" "$TMP/candidate" "$TMP/candidate.log"; then
+build "$ROOT/src/rt/natives/string_methods.cpp" "$TMP/candidate"
+build "$TMP/string_methods.cpp" "$TMP/mutant"
+
+if ! "$TMP/candidate" >"$TMP/candidate.log" 2>&1; then
   echo "FAIL: the unmutated candidate test failed" >&2
   cat "$TMP/candidate.log" >&2
   exit 1
 fi
 echo "candidate: PASS ($(tail -n 1 "$TMP/candidate.log"))"
 
-if build_and_run "$TMP/string_methods.cpp" "$TMP/mutant" "$TMP/mutant.log"; then
+if "$TMP/mutant" >"$TMP/mutant.log" 2>&1; then
   echo "FAIL: the deliberately broken mapping passed the test" >&2
   cat "$TMP/mutant.log" >&2
   exit 1

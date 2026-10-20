@@ -2558,6 +2558,35 @@ $(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
 
+# ASCII case-conversion fast path (DeepSeek, D-044): all 256 bytes, the
+# inline/heap boundary, 1 MiB input, locale independence, unchanged errors.
+RT_CASE_UNIT := $(TEST_DIR)/rt/case-conversion-unit$(EXEEXT)
+RT_CASE_BENCH := $(TEST_DIR)/rt/case-conversion-bench$(EXEEXT)
+
+$(RT_CASE_UNIT): tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+
+$(RT_CASE_BENCH): tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+
+.PHONY: test-rt-case-conversion test-rt-case-conversion-negative bench-rt-case-conversion
+test-rt-case-conversion: $(RT_CASE_UNIT)
+	"$(RT_CASE_UNIT)"
+
+# Permanent negative control: the unmutated test must pass and a planted wrong
+# ASCII mapping must make it exit nonzero (a mutant build failure is an error).
+test-rt-case-conversion-negative:
+	RT_BUILTINS_CORE="$(RT_BUILTINS_CORE)" RT_BUILTINS_SOURCES="$(RT_BUILTINS_SOURCES)" \
+		CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" bash tests/rt/case_conversion_negative.sh
+
+# Both run in `make test`, so `make certify` covers them on every candidate.
+test: test-rt-case-conversion test-rt-case-conversion-negative
+
+bench-rt-case-conversion: $(RT_CASE_BENCH)
+	"$(RT_CASE_BENCH)"
+
 # Natives must not convert to legacy values: the bench binary links the
 # natives with the CP09 value model WITHOUT RuntimeValue.cpp, legacy_bridge.cpp
 # and render.cpp (a call into them fails the link), and the sources must not
@@ -2586,7 +2615,7 @@ test-rt-builtins-guards: $(RT_BUILTINS_BENCH)
 
 .PHONY: test-rt-builtins test-rt-builtins-sanitize test-rt-builtins-probe
 # RT_BUILTINS_SEED / RT_BUILTINS_CASES vary the differential test.
-test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation
+test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative
 	@test -x "$(RT_BUILTINS_LEGACY)" || { echo "legacy oracle $(RT_BUILTINS_LEGACY) missing (set RT_BUILTINS_LEGACY)" >&2; exit 1; }
 	"$(RT_BUILTINS_UNIT)"
 	"$(RT_BUILTINS_DIFF)" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_CASES:-5000}
@@ -2607,3 +2636,5 @@ test-rt-builtins-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-diff"
 	"$(TEST_DIR)/rt-san/builtins-unit"
 	"$(TEST_DIR)/rt-san/builtins-diff" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_SAN_CASES:-2000}
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/case-conversion-unit"
+	"$(TEST_DIR)/rt-san/case-conversion-unit"
