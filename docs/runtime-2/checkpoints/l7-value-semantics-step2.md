@@ -442,9 +442,10 @@ prototypes on `memcheck-repro` 7fab21a6).
 
 ### 6.4 C3: natives check the budget before allocating results
 
-**Status: open (D-047 #4)** until `join` and `replace` are both integrated
-and certified, the heap-limit-zero fix (§6.5) lands, and the bypass
-reproducers pass.
+**Status: open (D-047 #4).** `join` and `replace` are integrated and
+certified (stack 7120b012, runtime-2 6047a52b). The heap-limit-zero fix
+(§6.5) and its passing reproducer are on branch `c3-heap-limit-zero`; C3
+closes when that lands.
 
 * **Defect.** `join` and `replace` built their whole result before the VM
   next compared the live total with the budget, so one call could overshoot
@@ -493,26 +494,28 @@ reproducers pass.
   the budget cases fail and the expansion loop runs out of address space
   (`std::bad_alloc`, abort).
 
-### 6.5 C3 follow-up (open, not fixed): heap_limit == 0 bypasses the check
+### 6.5 C3 follow-up (fixed): heap_limit == 0 bypassed the check
 
-* **Defect.** Natives read `Context::heap_limit == 0` as "budget disabled"
-  (unit tests), and `Vm::update_heap_limit` sets `heap_limit_` to 0 when the
-  register and frame stacks already exceed the budget. A native called then
-  builds its whole result unchecked (`reserve_result`, `ArrayBuilder` and
-  `over_budget` all pass); the VM refuses only at its next check, after the
-  result exists. So the bypass is one native call of any size.
-* **Reproducer** (`tests/runtime2/memory/heap_limit_zero_repro.cpp`, not
-  wired into a target; build it against the rt sources): a 1,024-byte budget
-  minus the initial 4,096 bytes of registers gives `heap_limit` 0, and
-  `join` of 64 x 64 KiB strings returns a 4 MiB result. Output at 3b64c5ca:
-  `budget 1024, heap_limit 0, status 0, result 4194304 bytes` (exit 1 =
-  bypass). End to end, scripts with budgets below the stacks are refused at
-  the first allocation they make themselves, so the bypass is the native
-  call in between.
-* **Fix (deferred: `vm.cpp` is shared with active branches).** Give
-  "disabled" its own representation (for example `SIZE_MAX`, or a flag) so
-  that 0 means "nothing left", and have `update_heap_limit` keep 0 in that
-  meaning. The reproducer then has to report a refusal.
+* **Defect.** Natives read `Context::heap_limit == 0` as "budget disabled",
+  and `Vm::update_heap_limit` sets `heap_limit_` to 0 when the register and
+  frame stacks already exceed the budget; the VM passes that value to natives
+  (`vm_builtin.cpp`). A native called then built its whole result unchecked
+  (`reserve_result`, `ArrayBuilder` and `over_budget` all passed), and the VM
+  refused only at its next check: a bypass of one native call of any size.
+  At 3b64c5ca a 1,024-byte budget let `join` return 4 MiB.
+* **Fix.** "Disabled" has its own value: `Context::kNoHeapLimit`
+  (`SIZE_MAX`), the default for unit tests and host calls without a budget.
+  0 now means no room. `over_budget` and `reserve_result` test against the
+  limit itself; only `kNoHeapLimit` skips the check. No VM change was needed:
+  the VM already passes 0 for "nothing left" (`vm.cpp` untouched).
+* **Test (permanent).** `tests/runtime2/memory/heap_limit_zero_repro.cpp`,
+  now `heap-limit-zero` in `test-rt-value`: with the VM's rule at a 1,024-byte
+  budget (`heap_limit` 0), `reserve_result`, `join` (4 MiB) and `replace`
+  (4 MiB) all refuse (`Status::Memory`); the default context stays unbounded.
+  Cause and effect: against the previous `support.cpp` and `builtin.h` it
+  prints `join ... status 0` and `replace: status 0`, and FAIL (exit 1).
+  `builtins_unit` and `native_budget` now pass `Context::kNoHeapLimit` where
+  they meant "unbudgeted".
 
 ### 6.6 Worker evidence (l7-value-layer-3b, tip 5e3e9d43)
 

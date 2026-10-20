@@ -31,7 +31,7 @@ struct Result {
     std::string error;
 };
 
-Result call(BuiltinId id, std::initializer_list<Value> list, std::size_t heap_limit = 0) {
+Result call(BuiltinId id, std::initializer_list<Value> list, std::size_t heap_limit = Context::kNoHeapLimit) {
     std::vector<Value> args(list);
     Result r{Status::Ok, Value(), {}};
     Context context;

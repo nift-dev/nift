@@ -13,7 +13,7 @@
 
 namespace nift::rt::natives {
 
-bool Context::over_budget() const noexcept { return heap_limit != 0 && live_heap_bytes() > heap_limit; }
+bool Context::over_budget() const noexcept { return live_heap_bytes() > heap_limit; }
 
 Status fail(std::string& error, std::string message) {
     error = static_cast<std::string&&>(message);
@@ -142,7 +142,7 @@ std::size_t size_mul(std::size_t a, std::size_t b) noexcept {
 
 bool reserve_result(const Context& context, std::size_t bytes) noexcept {
     if (bytes >= kMaxResultBytes) return false;  // overflowed, or beyond any std::string
-    if (context.heap_limit == 0) return true;    // budget disabled (unit tests)
+    if (context.heap_limit == Context::kNoHeapLimit) return true;  // budget disabled
     // Rounded as the heap string will be counted (terminator, header, granule).
     const std::size_t counted = size_add(bytes, 1 + kHeapGranule + 64);
     const std::size_t live = live_heap_bytes();

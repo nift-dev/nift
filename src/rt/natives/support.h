@@ -73,7 +73,7 @@ std::size_t size_mul(std::size_t a, std::size_t b) noexcept;
 inline constexpr std::size_t kMaxResultBytes = static_cast<std::size_t>(1) << 62;
 // True when `bytes` more (a buffer about to be allocated, plus whatever
 // uncounted storage the caller still holds) fit the context's heap budget on
-// top of the live total. With the budget disabled (heap_limit = 0) only the
+// top of the live total. With the budget disabled (kNoHeapLimit) only the
 // kMaxResultBytes bound applies.
 bool reserve_result(const Context& context, std::size_t bytes) noexcept;
 

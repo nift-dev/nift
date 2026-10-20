@@ -128,13 +128,13 @@ int main() {
 
     // 2. Zero-length cases: empty array, empty separator, empty elements.
     {
-        Call c = join(make_array(), make_string(","), 0);
+        Call c = join(make_array(), make_string(","), Context::kNoHeapLimit);
         CHECK(c.status == Status::Ok && string_view_of(c.out).empty());
         Value empties = make_array();
         for (int i = 0; i < 1000; ++i) array_push(empties, make_string(""));
-        c = join(empties, make_string(""), 0);
+        c = join(empties, make_string(""), Context::kNoHeapLimit);
         CHECK(c.status == Status::Ok && string_view_of(c.out).empty());
-        c = join(empties, make_string("-"), 0);
+        c = join(empties, make_string("-"), Context::kNoHeapLimit);
         CHECK(c.status == Status::Ok && string_view_of(c.out).size() == 999);
     }
 
@@ -151,7 +151,7 @@ int main() {
         CHECK(g_live == allocs);                 // the partial buffer was freed
         // Within budget: same result as unbudgeted, peak within the headroom.
         Call ok = join(big, make_string("|"), live + (16 << 20));
-        Call ref = join(big, make_string("|"), 0);
+        Call ref = join(big, make_string("|"), Context::kNoHeapLimit);
         CHECK(ok.status == Status::Ok && ref.status == Status::Ok);
         CHECK(string_view_of(ok.out) == string_view_of(ref.out));
         CHECK(string_view_of(ok.out).size() == 64 * (64 << 10) + 63);
@@ -222,7 +222,7 @@ int main() {
         Value mixed = make_array();
         array_push(mixed, make_string("a"));
         array_push(mixed, make_array());
-        Call c = join(mixed, make_string(","), 0);
+        Call c = join(mixed, make_string(","), Context::kNoHeapLimit);
         CHECK(c.status == Status::Error && c.error == "join: elements must be renderable scalar values");
     }
     // 8. replace: large replacements over the budget are refused before the
@@ -239,7 +239,7 @@ int main() {
         Call ok = replace(text, make_string("a"), wide, live + (16 << 20));
         CHECK(ok.status == Status::Ok && string_view_of(ok.out).size() == (std::size_t(1) << 22));
         // Zero-length pattern: legacy's error, nothing built.
-        Call empty = replace(text, make_string(""), wide, 0);
+        Call empty = replace(text, make_string(""), wide, Context::kNoHeapLimit);
         CHECK(empty.status == Status::Error && empty.error == "replace: old string must not be empty");
         // Shrinking needs at most the input's size; no match allocates nothing.
         Call shrink = replace(text, make_string("aa"), make_string(""), live_heap_bytes() + (128 << 10));

@@ -38,9 +38,14 @@ namespace nift::rt::natives {
 
 enum class Status : std::uint8_t { Ok, Error, Internal, Memory, Recoverable, Limit };
 
-// Per-call context. heap_limit = 0 disables the budget check (unit tests).
+// Per-call context. heap_limit bounds the live heap the native may grow to;
+// kNoHeapLimit (the default, for unit tests and host calls without a budget)
+// disables the check. 0 means no room at all: the VM passes 0 when its
+// register and frame stacks already use the whole budget (C3 follow-up: 0 used
+// to mean "disabled", so such calls ran unchecked).
 struct Context {
-    std::size_t heap_limit = 0;
+    static constexpr std::size_t kNoHeapLimit = static_cast<std::size_t>(-1);
+    std::size_t heap_limit = kNoHeapLimit;
     // Natives that build results proportional to more than their inputs check
     // the budget every kBudgetStride items.
     static constexpr std::size_t kBudgetStride = 1024;
