@@ -235,6 +235,14 @@ without converged kinds only an absent binding qualifies). Pins: the 42
 outer-binding programs in `vm_records_coverage.py` and mutant 12 (a double
 outer binding admitted: silent output divergence, rejected). records20k
 (`records` at n = 5,000, 10,000, 20,000) now runs entirely on the VM.
+"Certainly int" holds wherever legacy's lookup can see the binding, not
+only at its initialiser: an int-typed binding never holds a non-int later
+(legacy's binding-type register errors on a double or string assignment,
+an integral or fractional untyped value, a compound assignment, and so
+does the VM, or the program is refused); another function cannot write it
+(`assign-free-name`); a non-int binding of the name in an intermediate
+scope is itself an outer binding and refuses (18 pinned probes,
+OUTER_LATER).
 
 ## Tests
 

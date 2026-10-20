@@ -200,6 +200,44 @@ OUTER_INTEGRAL = [("e2", 'v := [1e2]\ns := v[0]\n', "vm"), ("pt0", 'v := [2.0]\n
                   ("half", 'v := [2.5]\ns := v[0]\n', "prepared-decl-type"),
                   ("lit_e2", 's := 1e2\n', "prepared-decl-type")]
 
+# The owner's check that "certainly int" holds wherever legacy's lookup can
+# see the outer binding, not only at its initialiser: an int-typed binding
+# never holds a non-int afterwards (reassignment to a double or string, an
+# integral or fractional untyped value, compound assignment, in a loop):
+# legacy's binding-type register errors, and so does the VM, or the program
+# is refused; a write from another function is refused (assign-free-name);
+# a non-int binding of that name in an intermediate scope (an `if` block, the
+# calling function, its parameter, the loop body) is refused. Each program
+# is `out := s; out = "b"` called with "a" (loop calls appended where the
+# third field is true); the fourth field is the outcome.
+OUTER_FN_B = 'fn(f(s)) {\n  out := s\n  out = "b"\n  print(out)\n  return 0\n}\n'
+OUTER_LATER = [
+    ('compound_div', 's := 7\ns /= 2\nprint(s)\n', True, 'vm-error'),
+    ('compound_frac', 's := 7\ns += 0.5\nprint(s)\n', True, 'vm-error'),
+    ('incdec', 's := 7\ns++\nprint(s)\n', True, 'vm'),
+    ('int_ok', 's := 7\n', True, 'vm'),
+    ('mutate_via_fn', 'fn(g()) {\n  s = 2.5\n  return 0\n}\ns := 7\ng()\n', True, 'assign-free-name'),
+    ('mutate_via_fn_str', 'fn(g()) {\n  s = "x"\n  return 0\n}\ns := 7\ng()\n', True, 'assign-free-name'),
+    ('reassign_double', 's := 7\ns = 2.5\n', True, 'vm-error'),
+    ('reassign_in_loop', 's := 7\ni := 0\nwhile (i < 1) {\n  s = 2.5\n  f("a")\n  i += 1\n}\n',
+     False, 'context:assignment-error'),
+    ('reassign_in_loop_str', 's := 7\ni := 0\nwhile (i < 1) {\n  s = "x"\n  f("a")\n  i += 1\n}\n',
+     False, 'context:assignment-error'),
+    ('reassign_int_double', 's := 7\ns = 2.0\nprint(s)\n', True, 'vm-error'),
+    ('reassign_string', 's := 7\ns = "x"\n', True, 'vm-error'),
+    ('shadow_fn', 'fn(h()) {\n  s := "x"\n  i := 0\n  while (i < 1) {\n    f("a")\n    i += 1\n'
+     '  }\n  return 0\n}\ns := 7\nh()\n', False, 'prepared-decl-type'),
+    ('shadow_fn_param', 'fn(h(s)) {\n  i := 0\n  while (i < 1) {\n    f("a")\n    i += 1\n  }\n'
+     '  return 0\n}\nh("x")\n', False, 'prepared-decl-type'),
+    ('shadow_if', 's := 7\ni := 0\nwhile (i < 1) {\n  if (true) {\n    s := "x"\n    f("a")\n  }\n'
+     '  i += 1\n}\n', False, 'prepared-decl-type'),
+    ('shadow_loop_decl', 's := 7\ni := 0\nwhile (i < 1) {\n  s := 2.5\n  f("a")\n  i += 1\n}\n',
+     False, 'prepared-decl-type'),
+    ('reassign_untyped_integral', 'w := [2.0]\ns := 7\ns = w[0]\nprint(s)\n', True, 'vm'),
+    ('reassign_untyped_frac', 'w := [2.5]\ns := 7\ns = w[0]\nprint(s)\n', True, 'vm-error'),
+    ('untyped_decl_reassign_frac', 'w := [7, 2.5]\ns := w[0]\ns = w[1]\nprint(s)\n', True, 'vm-error'),
+]
+
 
 def outer_cases():
     """(name, source, expected outcome: "vm" or the refusal reason)."""
@@ -215,6 +253,8 @@ def outer_cases():
                 out.append((f"outer_{g}_{a}_{r}", source, want))
     for g, decl, want in OUTER_INTEGRAL:
         out.append((f"outer_integral_{g}", OUTER_FN.format(r='"b"') + decl + OUTER_LOOP.format(a='"a"'), want))
+    for g, body, loop, want in OUTER_LATER:
+        out.append((f"outer_later_{g}", OUTER_FN_B + body + (OUTER_LOOP.format(a='"a"') if loop else ""), want))
     return out
 
 
@@ -388,12 +428,12 @@ def main():
             auto, st = run(nift, d, "1", a.timeout)
             _, cst = run(nift, d, "classify", a.timeout)
             got = "vm" if cst and cst["outcome"] == "compiled" else cst and cst["reason"]
-            if got != want:
+            if got != want and not (want == "vm-error" and got == "vm"):
                 failures.append(f"{name}: expected {want}, got {cst and (cst['outcome'], cst['reason'])}")
             elif auto != legacy:
                 failures.append(f"{name}: NIFT_VM=1 output differs\n  legacy {legacy}\n  auto   {auto}")
-            elif want == "vm" and (not st or st.get("outcome") != "vm"):
-                failures.append(f"{name}: not on the VM ({st and st.get('outcome')})")
+            elif want in ("vm", "vm-error") and (not st or st.get("outcome") != want):
+                failures.append(f"{name}: expected {want}, got {st and st.get('outcome')}")
             shutil.rmtree(d, ignore_errors=True)
         for name, vm_required, source in PARAM_DECL:
             d = tempfile.mkdtemp(dir=work)
