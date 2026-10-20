@@ -1,0 +1,3 @@
+# Scripts changed for portability in PR #1 that the FreeBSD job does NOT run.
+# Format: path<TAB>reason. Each is reported as NOT RUN, never as a pass.
+tests/v46_b5_cp14_final_certification.sh	aggregate v4.6 certification driver: runs whole make targets that need sibling nift-packages checkouts (sqlite, curl, postgres, mysql) and their native libraries, which this job does not provision

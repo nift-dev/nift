@@ -1,0 +1,53 @@
+name: FreeBSD
+
+# Build and portable regression scripts in a real FreeBSD VM (QEMU on an
+# ubuntu-latest runner). Follows the FreeBSD portability work contributed by
+# @NuLL3rr0r in #1. Read-only token; no secrets are used, so pull requests from
+# forks run with the same (absent) privileges as any other PR job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freebsd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freebsd:
+    name: FreeBSD 14 amd64 build and regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and test in FreeBSD
+        # vmactions/freebsd-vm v1.5.9, pinned by commit.
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc
+        with:
+          release: "14"
+          arch: x86_64
+          cpu: 2
+          mem: 6144
+          copyback: true
+          prepare: |
+            pkg install -y gmake bash python3 git rsync coreutils
+          # The VM runs commands as root; the build and tests run as an
+          # unprivileged user so permission-dependent suites are exercised.
+          run: |
+            pw useradd niftci -m -s /bin/sh
+            chown -R niftci "$PWD"
+            su niftci -c "cd '$PWD' && sh scripts/ci_freebsd.sh"
+      - name: Summary
+        if: always()
+        run: cat .build/freebsd-ci/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no summary (VM step failed before testing)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-ci-logs
+          path: .build/freebsd-ci/
+          if-no-files-found: warn
