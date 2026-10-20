@@ -100,8 +100,11 @@ bool renderable_scalar(const Value& value) {
     }
 }
 
-void append_number(const Value& value, std::string& out) {
-    char buffer[64];
+namespace {
+
+// The rendering of a number: in `buffer` for Int and Double, the stored
+// spelling for a Decimal.
+std::string_view render_number(const Value& value, char (&buffer)[64]) {
     std::to_chars_result converted{buffer, std::errc()};
     if (value.is(Kind::Int)) {
         converted = std::to_chars(buffer, buffer + sizeof buffer, value.as_int());
@@ -114,13 +117,63 @@ void append_number(const Value& value, std::string& out) {
             converted = std::to_chars(buffer, buffer + sizeof buffer, static_cast<long long>(d));
         else
             converted = std::to_chars(buffer, buffer + sizeof buffer, d, std::chars_format::general);
-        if (converted.ec != std::errc()) { out += '0'; return; }
+        if (converted.ec != std::errc()) { buffer[0] = '0'; return std::string_view(buffer, 1); }
     } else {
-        const std::string_view spelling = decimal_spelling(value);  // a StrNumber dumps its spelling
-        out.append(spelling.data(), spelling.size());
-        return;
+        return decimal_spelling(value);  // a StrNumber dumps its spelling
     }
-    out.append(buffer, static_cast<std::size_t>(converted.ptr - buffer));
+    return std::string_view(buffer, static_cast<std::size_t>(converted.ptr - buffer));
+}
+
+} // namespace
+
+void append_number(const Value& value, std::string& out) {
+    char buffer[64];
+    const std::string_view text = render_number(value, buffer);
+    out.append(text.data(), text.size());
+}
+
+std::size_t size_add(std::size_t a, std::size_t b) noexcept {
+    return a > kSizeOverflow - b ? kSizeOverflow : a + b;
+}
+
+std::size_t size_mul(std::size_t a, std::size_t b) noexcept {
+    return b != 0 && a > kSizeOverflow / b ? kSizeOverflow : a * b;
+}
+
+bool reserve_result(const Context& context, std::size_t bytes) noexcept {
+    if (bytes >= kMaxResultBytes) return false;  // overflowed, or beyond any std::string
+    if (context.heap_limit == 0) return true;    // budget disabled (unit tests)
+    // Rounded as the heap string will be counted (terminator, header, granule).
+    const std::size_t counted = size_add(bytes, 1 + kHeapGranule + 64);
+    const std::size_t live = live_heap_bytes();
+    return live <= context.heap_limit && counted <= context.heap_limit - live;
+}
+
+bool BudgetedText::reserve(std::size_t bytes) {
+    if (bytes <= text_.capacity()) return true;
+    // The old storage (if any) is freed by the reallocation but held during it.
+    const std::size_t held = size_add(bytes, text_.capacity());
+    if (held > kUncheckedBytes && !reserve_result(context_, held)) return false;
+    text_.reserve(bytes);
+    return true;
+}
+
+bool BudgetedText::grow(std::size_t extra) {
+    const std::size_t needed = size_add(text_.size(), extra);
+    if (needed == kSizeOverflow) return false;
+    // Small buffers grow as std::string would (unchecked slack, see header).
+    if (size_add(needed, text_.capacity()) <= kUncheckedBytes / 2) return true;
+    // Amortised doubling, as std::string would, but checked first.
+    const std::size_t doubled = size_mul(text_.capacity(), 2);
+    return reserve(needed > doubled ? needed : (doubled < kMaxResultBytes ? doubled : needed));
+}
+
+std::string_view render_scalar(const Value& value, char (&buffer)[64]) {
+    switch (value.kind()) {
+        case Kind::Bool: return value.as_bool() ? std::string_view("true") : std::string_view("false");
+        case Kind::Null: return "null";
+        default: return render_number(value, buffer);
+    }
 }
 
 void append_scalar(const Value& value, std::string& out) {

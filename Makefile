@@ -211,6 +211,7 @@ RT_VALUE_DESTROY_OOM := $(TEST_DIR)/rt/value-destroy-oom$(EXEEXT)
 RT_VALUE_DESTROY_OOM_SMALL := $(TEST_DIR)/rt/value-destroy-oom-small$(EXEEXT)
 RT_HEAP_ACCOUNT_OOM := $(TEST_DIR)/rt/heap-account-oom$(EXEEXT)
 RT_ATOM_BUDGET := $(TEST_DIR)/rt/atom-budget$(EXEEXT)
+RT_NATIVE_BUDGET := $(TEST_DIR)/rt/native-budget$(EXEEXT)
 RT_VALUE_CYCLE_BENCH := $(TEST_DIR)/rt/value-cycle-bench$(EXEEXT)
 RT_VALUE_CYCLE_BENCH_OFF := $(TEST_DIR)/rt/value-cycle-bench-off$(EXEEXT)
 RT_SANITIZE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all
@@ -265,6 +266,11 @@ $(RT_ATOM_BUDGET): tests/rt/atom_budget.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/atom_budget.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# Memory investigation C3: natives check the budget before allocating results.
+$(RT_NATIVE_BUDGET): tests/rt/native_budget.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/native_budget.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS)
@@ -288,7 +294,7 @@ test-rt-heap-saturation: $(TARGET)
 bench-rt-value-cycle: $(RT_VALUE_CYCLE_BENCH) $(RT_VALUE_CYCLE_BENCH_OFF)
 	python3 tests/rt/value_cycle_guard.py "$(RT_VALUE_CYCLE_BENCH)" "$(RT_VALUE_CYCLE_BENCH_OFF)"
 
-test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL) $(RT_HEAP_ACCOUNT_OOM) $(RT_ATOM_BUDGET)
+test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VALUE_ROUND2) $(RT_VALUE_D040) $(RT_VALUE_DESTROY_OOM) $(RT_VALUE_DESTROY_OOM_SMALL) $(RT_HEAP_ACCOUNT_OOM) $(RT_ATOM_BUDGET) $(RT_NATIVE_BUDGET)
 	"$(RT_VALUE_UNIT)"
 	"$(RT_VALUE_REGRESS)"
 	"$(RT_VALUE_ROUND2)"
@@ -298,6 +304,7 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_VALUE_DESTROY_OOM_SMALL)"
 	"$(RT_HEAP_ACCOUNT_OOM)"
 	"$(RT_ATOM_BUDGET)"
+	"$(RT_NATIVE_BUDGET)"
 
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test

@@ -2,6 +2,7 @@
 // Shared argument conversions and checks of the CP14 built-in families, each
 // a port of the legacy helper it names (RuntimeValue.cpp, ParserExpression.cpp).
 #include "rt/natives/builtin.h"
+#include "rt/string.h"
 #include "rt/value.h"
 
 #include <cstddef>
@@ -43,6 +44,73 @@ void append_scalar(const Value& value, std::string& out);
 // Legacy number rendering (RuntimeValue::dump of Number / StrNumber), ported:
 // natives never construct legacy values.
 void append_number(const Value& value, std::string& out);
+
+// ---- Pre-allocation budget check (memory investigation C3) ----
+//
+// Natives whose result can outgrow their inputs (join, replace; next:
+// stringify, flatten) check the heap budget BEFORE every substantial
+// allocation of the result, never after building it: through reserve_result,
+// usually via BudgetedText, which checks before each growth of its buffer.
+// When a check fails the native returns Status::Memory ("memory budget
+// exceeded") and the buffer it held is freed.
+//
+// Allowed temporary overhead, against the configured heap budget (not RSS):
+// the result buffer while it is built, plus, during one reallocation, its
+// previous storage; both are included in the bytes checked, so the live
+// total plus everything the native holds never exceeds the budget. The
+// arguments are already counted (they are live values). A buffer below
+// kUncheckedBytes / 2 (32 KiB) grows as std::string would, unchecked, so the
+// slack per native call is bounded by 96 KiB (a new buffer of at most 64 KiB
+// plus the old one), matching stringify's 64 KiB check stride; every larger
+// growth is checked first.
+inline constexpr std::size_t kUncheckedBytes = std::size_t(64) << 10;
+inline constexpr std::size_t kSizeOverflow = static_cast<std::size_t>(-1);
+// Sums and products that saturate at kSizeOverflow instead of wrapping.
+std::size_t size_add(std::size_t a, std::size_t b) noexcept;
+std::size_t size_mul(std::size_t a, std::size_t b) noexcept;
+// Results at or beyond this many bytes are refused whatever the budget
+// (covers kSizeOverflow and std::string's max_size()).
+inline constexpr std::size_t kMaxResultBytes = static_cast<std::size_t>(1) << 62;
+// True when `bytes` more (a buffer about to be allocated, plus whatever
+// uncounted storage the caller still holds) fit the context's heap budget on
+// top of the live total. With the budget disabled (heap_limit = 0) only the
+// kMaxResultBytes bound applies.
+bool reserve_result(const Context& context, std::size_t bytes) noexcept;
+
+// The rendering of a non-string renderable scalar (number, bool, null), as
+// append_scalar would append it; numbers are rendered into `buffer`.
+std::string_view render_scalar(const Value& value, char (&buffer)[64]);
+
+// A string result built under the budget: every growth of the buffer is
+// checked first (new capacity plus the storage being replaced). append*
+// return false when the budget refuses; the caller returns Status::Memory.
+class BudgetedText {
+public:
+    explicit BudgetedText(const Context& context) : context_(context) {}
+    BudgetedText(const BudgetedText&) = delete;
+    BudgetedText& operator=(const BudgetedText&) = delete;
+    // Capacity for at least `bytes` (checked); for callers that know the size.
+    bool reserve(std::size_t bytes);
+    bool append(std::string_view text) {
+        if (text.size() > text_.capacity() - text_.size() && !grow(text.size())) return false;
+        text_.append(text.data(), text.size());
+        return true;
+    }
+    // Two pieces under one check (a separator and an element).
+    bool append(std::string_view first, std::string_view second) {
+        const std::size_t n = first.size() + second.size();  // both are live strings: no overflow
+        if (n > text_.capacity() - text_.size() && !grow(n)) return false;
+        if (!first.empty()) text_.append(first.data(), first.size());
+        text_.append(second.data(), second.size());
+        return true;
+    }
+    std::string take() { return static_cast<std::string&&>(text_); }
+
+private:
+    bool grow(std::size_t extra);
+    const Context& context_;
+    std::string text_;
+};
 
 // Legacy generated_object_key (CP171): strings as-is, numbers and booleans
 // rendered; any other kind is "<name>: generated key must be string, number,

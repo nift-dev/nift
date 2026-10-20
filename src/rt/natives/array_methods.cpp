@@ -154,19 +154,22 @@ Status arr_contains(const Context&, const Value* args, std::uint32_t argc, Value
     return Status::Ok;
 }
 
-Status arr_join(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+Status arr_join(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     const auto* items = receiver(args, argc);
     if (!items) return internal(error, "join receiver");
     if (argc != 2) return fail(error, "join: expected separator");
     if (!args[1].is(Kind::String)) return fail(error, "join: separator must be a string");
     const std::string_view separator = string_view_of(args[1]);
-    std::string result;
+    // C3: the result buffer grows only after a budget check (BudgetedText).
+    BudgetedText result(context);
+    char buffer[64];
     for (std::size_t i = 0; i < items->size(); ++i) {
-        if (i) result.append(separator.data(), separator.size());
-        if (!renderable_scalar((*items)[i])) return fail(error, "join: elements must be renderable scalar values");
-        append_scalar((*items)[i], result);
+        const Value& item = (*items)[i];
+        if (!renderable_scalar(item)) return fail(error, "join: elements must be renderable scalar values");
+        const std::string_view text = item.is(Kind::String) ? string_view_of(item) : render_scalar(item, buffer);
+        if (!result.append(i ? separator : std::string_view(), text)) return Status::Memory;
     }
-    out = make_string(static_cast<std::string&&>(result));
+    out = make_string(result.take());
     return Status::Ok;
 }
 

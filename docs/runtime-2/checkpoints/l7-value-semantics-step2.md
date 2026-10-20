@@ -438,6 +438,55 @@ prototypes on `memcheck-repro` 7fab21a6).
 * **Status.** Unit tests local; the end-to-end script runs in the worker job
   (needs a `nift` build).
 
+### 6.4 C3: natives check the budget before allocating results
+
+* **Defect.** `join` and `replace` built their whole result before the VM
+  next compared the live total with the budget, so one call could overshoot
+  a configured budget many times over (memcheck: 16x). The §3 side table
+  fixes large values' under-count, not this overshoot.
+* **Fix: one shared check, not per-function patches**
+  (`src/rt/natives/support.h`).
+  * `size_add` / `size_mul`: result-size arithmetic that saturates at
+    `kSizeOverflow` instead of wrapping.
+  * `reserve_result(context, bytes)`: the pre-allocation check; refuses
+    overflowed or impossible sizes (`kMaxResultBytes`, 2^62) whatever the
+    budget, and otherwise requires live total + bytes (rounded as a counted
+    heap string) to fit the context's heap limit.
+  * `BudgetedText`: a string result whose buffer grows only after
+    `reserve_result` approved the new capacity plus the storage it replaces;
+    `append` returns false and the native returns `Status::Memory` ("memory
+    budget exceeded"), freeing its buffer.
+  * **Allowed temporary overhead**, against the configured budget (not RSS):
+    the buffer being built plus, during a reallocation, its previous storage,
+    both inside the checked amount. Buffers below 32 KiB grow unchecked as
+    `std::string` would, so the slack per call is at most 96 KiB (matching
+    the 64 KiB stride planned for stringify).
+  * New natives that build strings use `BudgetedText`; array results already
+    go through `ArrayBuilder`'s budget stride.
+* **Users now:** `join` (`array_methods.cpp`). **Next:** `replace`
+  (`string_methods.cpp`, prepared on local branch `l7-c3-replace`, waiting
+  for the DeepSeek case-conversion integration; `cased` untouched),
+  `stringify` (64 KiB stride) and `flatten`; print's flush before a large
+  append lives in VM output code touched by active branches, coordinated
+  separately.
+* **Performance.** `test-rt-builtins-guards` (callgrind, +10 % locks): all 25
+  workloads within their guards. A first version that computed the exact
+  size in a separate pass failed them (join +27 % to +57 %); the growth-check
+  form costs nothing measurable.
+* **Tests (permanent).** `tests/rt/native_budget.cpp` (in `test-rt-value`;
+  replaced `operator new` recording outstanding bytes and peak): saturating
+  size arithmetic and `reserve_result` edges (overflow refused even
+  unbudgeted, spent budget); zero-length cases (empty array, separator,
+  elements); a 4 MiB join under 1 MiB of headroom refused with the peak held
+  within the headroom, nothing counted or leaked; the same join within
+  budget identical to the unbudgeted one; separators alone over budget;
+  repeated expansion `s = [s, s].join("")` refused at the budget, the live
+  total never above budget + 96 KiB; allocation failure inside the native
+  propagates `std::bad_alloc` without leaks; element errors keep legacy's
+  message. Cause and effect: built against the previous `array_methods.cpp`,
+  the budget cases fail and the expansion loop runs out of address space
+  (`std::bad_alloc`, abort).
+
 ## 7. Remaining gates
 
 * **REMOTE JOB** (worker), covering:
