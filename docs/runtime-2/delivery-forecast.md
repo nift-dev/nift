@@ -69,6 +69,18 @@ it; add a check that the active snapshot contains no script-context `@`
 directives. 4.x compatibility is declared only from the v4.5/v4.6/v4.12
 execution probe, not from source reading.
 
+Package snapshot swap (owner, 2026-10-20: option 1, wait for publication): the
+September snapshot (b978a5a2…) stays the active certification input and CI pins
+until the migrated package commits are published (separate owner approval).
+Prepared, unintegrated: `pkgsnap-adopt` 34d7eb3c (combined dogfood test uses
+`curl.request`). After publication, in one change: snapshot + provenance
+manifest, the seven pins in `runtime2-regression-suite.yml` (each verified to
+exist on GitHub first), and the dogfood test; both package-consuming targets on
+the exact snapshot, then certification. Before publication: package-migration
+review complete, Nift ≥ 4.6.0 stated in READMEs and publication notes, the 32
+non-syntax package commits reviewed separately. Later (not this campaign): one
+machine-readable package manifest generating both snapshot and CI pins.
+
 Temporary scaffolding to remove: VM `import-reinitialised` refusal — removal
 condition: legacy and VM both implement and verify initialise-once (D-041).
 
