@@ -186,6 +186,7 @@ The `context:*` reasons are in "D-018 consequences" above.
 | `type:*` | an operation whose operand kinds may include one legacy rejects | errors; concatenation with an aggregate succeeds only in loop bodies (multi-line JSON) |
 | `aliasing` | aggregate bound/returned/pushed/listed from a place | location reference |
 | `path-in-call-argument` | a member or index read inside a user-call argument, except an argument that is itself a path with certainly-scalar kinds (stage 4, below) | legacy resolves such arguments as locations: an aggregate is shared with the callee; errors quote the raw argument text |
+| `builtin-arg-fault-context` | (stage 4, D2 ruling; register L56) in textual code (not loop code or functions called from it), a built-in method call whose checked first argument can fault: a member or index read, a division or modulo, a call; methods that accept any value are not affected | legacy swallows the fault and reports the method's type message (`contains: argument must be a string`); in loop code it reports the fault |
 | `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` |
 | `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, in loop code | legacy abandons preparing the loop body |
 | `param-type-unpredicted` | (defensive) a parameter type read the analysis did not predict | — |

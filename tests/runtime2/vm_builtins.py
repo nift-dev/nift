@@ -418,12 +418,23 @@ def budget_checks(nift, work, timeout):
     return failures
 
 
+# Stage 4 D2 ruling (VM subset; register L56): in textual code (top level,
+# `if` blocks, functions not called from loops) legacy swallows a fault of a
+# checked method argument and reports the method's type message, in loop code
+# the fault itself; a checked argument that can fault (`q.split(h.sep)`: a
+# member read) is refused there. The same bodies stay supported in loop code.
+REFUSED_IN_CONTEXT = {("shapes", "top"): "builtin-arg-fault-context", ("shapes", "if"): "builtin-arg-fault-context",
+                      ("shapes", "fn-top"): "builtin-arg-fault-context"}
+
+
 def items():
     out = []
     for body_name, body in SUPPORTED.items():
         for ctx, template in CONTEXTS.items():
             indented = "".join("  " + line + "\n" for line in body.splitlines()) if ctx != "top" else body
-            out.append(("supported", f"{body_name}@{ctx}", template.format(body=indented), None))
+            reason = REFUSED_IN_CONTEXT.get((body_name, ctx))
+            out.append(("unsupported" if reason else "supported", f"{body_name}@{ctx}", template.format(body=indented),
+                        reason))
     out += [("supported", n, s, None) for n, s in SUPPORTED_TOP]
     out += [("error", n, s, None) for n, s in ERRORS]
     out += [("unsupported", n, s, r) for n, s, r in UNSUPPORTED]
@@ -450,7 +461,8 @@ def main():
         print("FAIL " + f)
     count = {k: sum(1 for i in todo if i[0] == k) for k in ("supported", "error", "unsupported")}
     print(("PASS" if not failures else "FAIL") + f" vm built-ins: {count['supported']} supported programs "
-          f"({len(SUPPORTED)} bodies x {len(CONTEXTS)} contexts, on the VM, identical to legacy), "
+          f"({len(SUPPORTED)} bodies x {len(CONTEXTS)} contexts less {len(REFUSED_IN_CONTEXT)} refused there, "
+          f"on the VM, identical to legacy), "
           f"{count['error']} error programs, {count['unsupported']} refusals, {len(BUDGET)} budget stops; "
           f"{len(failures)} failure(s)")
     return 1 if failures else 0

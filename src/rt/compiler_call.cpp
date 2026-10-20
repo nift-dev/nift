@@ -108,6 +108,20 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     return builder_ok();
 }
 
+// Can evaluating `id` stop the program: a member or index read, a division
+// or modulo, a call (D2 ruling).
+bool UnitCompiler::may_fault(NodeId id) const {
+    if (id == kNoNode) return false;
+    const Node& n = ast_.at(id);
+    if (n.kind == NodeKind::Member || n.kind == NodeKind::Index || n.kind == NodeKind::Call) return true;
+    if (n.kind == NodeKind::Binary && (n.op == Op::Div || n.op == Op::Mod)) return true;
+    if (may_fault(n.a) || may_fault(n.b) || may_fault(n.c)) return true;
+    const NodeId* list = ast_.list(n);
+    for (std::uint32_t k = 0; k < n.count; ++k)
+        if (may_fault(list[k])) return true;
+    return false;
+}
+
 // CP14 (W2, W4): an argument legacy may skip (lazy validation, Q11) must be
 // one whose evaluation cannot be observed: a literal or a local read.
 bool UnitCompiler::unobservable_argument(NodeId id) {
@@ -148,6 +162,14 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
                 return fail(ast_.at(args[k]), spec.id == natives::BuiltinId::ObjGet
                                                   ? "builtin-default:get"
                                                   : "builtin-lazy-args:" + std::string(spec.name));
+    // D2 ruling (VM subset; register L56): in textual code legacy swallows a
+    // fault while evaluating a checked method argument and reports the
+    // method's type message instead (`s.contains(o.zz)`: "contains: argument
+    // must be a string"), in loop code the fault itself. Refused there when
+    // the argument can fault; later arguments are unobservable (above), and
+    // methods that accept any value (may_fail false) report the fault too.
+    if (receiver != kNoNode && spec.may_fail && !loop_reachable() && node.count > 0 && may_fault(args[0]))
+        return fail(ast_.at(args[0]), "builtin-arg-fault-context");
     const std::uint32_t window = node.count + (receiver != kNoNode ? 1u : 0u);
     if (window > 0x7fff) return fail(node, "limit:arguments");
     const std::uint16_t mark = fb_->top();
