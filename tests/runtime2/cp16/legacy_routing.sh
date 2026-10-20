@@ -15,7 +15,8 @@
 #      reaches them (rt-diff, supervisors);
 # (c2) a SIGKILL of Nift alone, and a SIGTERM to Nift, leave a running child
 #      running (no PDEATHSIG, no SIGINT/SIGTERM cleanup for legacy run());
-# (c3) background descendants outlive a normal script end and page render end.
+# (c3) background descendants outlive a normal script end and page render end;
+# (c4) a capture over NIFT_READ_LIMIT stops the stage and its descendants.
 # Host-managed processes (their ownership, cleanup, cancellation, C1/C2/C3
 # and resource guarantees) are tested by tests/rt/host_process_unit.cpp
 # (make test-rt-host), not here.
@@ -113,6 +114,25 @@ EOF
       kill -9 "$child" 2>/dev/null
     fi
   done
+
+  # 3b. (c4) historical (feature-host-deps D-028, kill_stage_tree): when a
+  #     capture exceeds NIFT_READ_LIMIT, the stage AND its descendants are
+  #     stopped. Checked without a file-size limit and right away, so a
+  #     surviving producer cannot be ended by SIGXFSZ (r3 host-deps finding).
+  cat > lim.f <<'EOF'
+r := run("sh", "-c", "echo $$ > lim.pid; yes cp16-legacy-limit-probe; touch lim-marker")
+EOF
+  rm -f lim.pid lim-marker
+  ( ulimit -f unlimited 2>/dev/null; NIFT_READ_LIMIT=1000000 timeout -k 5 60 "$NIFT" lim.f > lim.out 2>&1 ); lrc=$?
+  sleep 0.2
+  lim_left=""
+  for d in /proc/[0-9]*; do
+    [ "$(cat "$d/comm" 2>/dev/null)" = yes ] && grep -qa cp16-legacy-limit-probe "$d/cmdline" 2>/dev/null && lim_left="$lim_left ${d#/proc/}"
+  done
+  grep -q 'exceeds the read limit' lim.out && [ "$lrc" != 0 ] && ok "(c4) capture limit: fatal limit error" || bad "(c4) capture limit: rc $lrc, $(tail -c 200 lim.out)"
+  if [ -z "$lim_left" ]; then ok "(c4) capture limit stops the stage's descendants (historical)"; else bad "(c4) producer left running:$lim_left"; fi
+  for p in $lim_left; do kill -9 "$p" 2>/dev/null; done
+  [ -e lim-marker ] && bad "(c4) stage finished after the limit" || ok "(c4) stage stopped before finishing"
 
   # 4. (c3) background descendants outlive a normal script end and a page
   #    render end (no cleanup at context end for legacy run()).

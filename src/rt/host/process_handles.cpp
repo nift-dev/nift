@@ -68,8 +68,16 @@ void ProcessResource::terminating(OsTermination cause) {
     handles::TerminationStart info;
     // Closed / already terminating / detached: no ticket; termination happens once.
     if (table->begin_termination(handle, HandleKind::Process, cause_of(cause), ticket, &info) == HandleStatus::Ok &&
-        info.started)
+        info.started) {
         take_ticket(std::move(ticket));
+        // Lifecycle events are delivered after the group's lock is released,
+        // possibly on two threads (a cancel() caller's `terminating`, the host
+        // loop's `settled`): a `settled` delivered before this ticket existed
+        // completed nothing. The group's state is settled before its event is
+        // generated, so checking it after taking the ticket closes the gap
+        // (r3: deadline_races hung in close_context, 1 in ~200 rounds).
+        complete_if_settled();
+    }
 }
 
 void ProcessResource::take_ticket(handles::CompletionTicket ticket) {

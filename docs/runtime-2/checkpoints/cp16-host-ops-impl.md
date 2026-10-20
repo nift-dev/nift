@@ -653,6 +653,8 @@ them against the legacy launcher: exit codes, captures, exec failures 127,
 signals 137, pipelines' per-stage results, env/cwd/redirections/append).
 Differences, all deliberate:
 
+* Cancelling stages outside their own group (legacy) also signals their
+  descendants by parentage, as legacy's `kill_stage_tree` did (capture limit).
 * **Legacy `run()` keeps its historical process semantics** -- a temporary
   compatibility exception, not CP16's lifecycle requirements (§9.6): stages in
   Nift's process group, no PDEATHSIG, no SIGINT/SIGTERM cleanup, no tracking
@@ -676,18 +678,21 @@ tool launches (`nift_run_process` callers outside `run()`/`cmd().run()`),
 ### 9.4 Tests (local, light; heavy gates on Linode)
 
 State after the owner decision of §9.6 (legacy subreaper removed, legacy
-`run()` historical) and the r2 deadline fix:
+`run()` historical), the r2 deadline fix and the r3 fixes (§9.5):
 
 | Test | Result |
 |---|---|
-| `test-rt-host` | 495/0 and 1414/0 |
-| `test-rt-host-sanitize` (ASan/UBSan) | 495/0 and 1414/0 |
-| `test-rt-host-tsan`, 5 runs | 1414/0 each, no ThreadSanitizer report |
+| `test-rt-host` | 495/0 and 1423/0 |
+| `test-rt-host-sanitize` (ASan/UBSan) | 495/0 and 1423/0 |
+| `test-rt-host-tsan` | 1423/0, 2 runs after the r3 fixes (5 runs at 1414 before), no ThreadSanitizer report |
+| `deadline_races` stress (r3 hang) | before the fix: hung in round 211 of 600 (2 CPUs + busy loop); after: 1000 rounds unpinned + 300 pinned to one CPU with a busy loop, no hang |
+| `lifecycle_events_out_of_order` | without the fix: close_context hangs (3 s bound, fails); with it: 20 runs, 0 failures |
+| `read_limit.py` (host-deps) | 0 FAIL |
 | `deadlines` under TSan after the fix | 60 runs, 0 failures (before: 1 in 5) |
 | `cancel_signals_before_stdin_eof` | 20 runs, 0 failures; with the old order: fails |
 | rt-lint | 0 problems |
 | CP16 fixtures `capture.py --check` | 30/30 |
-| `legacy_routing.sh` | 21 PASS: result objects, historical process semantics (c1-c3), trace v2, stdin |
+| `legacy_routing.sh` | 22 PASS: result objects, historical process semantics (c1-c4), trace v2, stdin |
 | `process_capture.sh` | all PASS, case 4 back to the historical expectation (child survives Nift's SIGTERM) |
 | `engine_parity.py` | 153 cases, 0 differences, VM engaged in 0 (§9.2) |
 | `rt_diff_selftest.sh` | PASS, incl. "no process outlives a timed-out entry" |
@@ -721,6 +726,44 @@ fix: 60 TSan runs of `deadlines`, 0 failures; full `test-rt-host`,
 `test-rt-host-sanitize` and `test-rt-host-tsan` (x5) results in §9.4.
 `make test`'s `test-v43-language` failure in r2 is the known root-only
 environmental skip.
+
+Remote job cp16-phase2-r3 (fe95df79), two findings:
+
+1. **`deadline_races` hang (rt-host-deadline-stress, 600 s containment
+   timeout in round 14).** Reproduced locally (2 CPUs, a competing busy loop,
+   round 211 of 600); gdb on the hung test: the main thread in
+   `HandleTable::close_context` waiting for an obligation, the host loop idle
+   in poll, no child left. Cause: **a lifecycle-event ordering gap in the
+   CP16 x CP17 binding**, not a deadline-path or timing issue. The process
+   layer collects lifecycle events under the group's lock and delivers them
+   after unlocking, so two threads can deliver out of order: a `cancel()`
+   caller's `terminating` (collected first) after the host loop's `settled`.
+   `settled` completed nothing (no ticket yet); `terminating` then took a
+   ticket that nobody completed, and the context close waited forever. Fix:
+   `ProcessResource::terminating()` checks the group's settled state after
+   taking its ticket (the state is settled before its event is generated, so
+   one of the two always completes it). Not introduced by the stdin/signal
+   reorder: the gap dates from the CP17 swap (f31dc203); the permanent
+   reproducer `lifecycle_events_out_of_order` delivers the two events by
+   hand in that order and hangs (close_context, 3 s bound) on any version
+   without the fix, the reorder included or not; r2's clean 200 rounds were
+   chance (about 1 in 200 rounds locally). After the fix: see §9.4. The
+   deadline contract is unchanged.
+2. **read_limit.py capture cases, "no producer left running" (2 cases).**
+   Engine and launcher: standalone scripts (the VM refuses `run`, so the
+   legacy interpreter runs them) -> legacy `run()` -> the Host layer's
+   `ProcessGroup` with legacy's flags. On runtime-2 before CP16 (the legacy
+   launcher, host-deps' `kill_stage_tree`, D-028) the capture limit kills the
+   stage **and its descendants**; the base binary leaves no producer, this
+   tip left `yes` running (`sh -c 'yes ...; touch marker'`). The removal had
+   gone past "historical": with `own_group = false` there is no group to
+   signal descendants through, and cancellation signalled the stages only.
+   (Locally the test passed by chance: the orphaned `yes` died of SIGXFSZ at
+   the test's file-size limit before the 0.5 s check.) Fix: cancellation of
+   stages outside their own group also signals their descendants found by
+   parentage (`/proc`, collected before the stages are signalled), like
+   `kill_stage_tree`. The host-deps test is unchanged; legacy_routing.sh
+   (c4) pins it without a file-size limit.
 
 **Tests that assume `/nonexistent` is not a file** (it is a regular file on
 the development host, `/nonexistent` 10,250 bytes, so a path under it fails
@@ -777,7 +820,8 @@ the historical legacy behaviour only and claims no cleanup guarantee for
 legacy-launched descendants -- (c1) stages in Nift's group, reached by a
 group SIGKILL; (c2) a SIGKILL or SIGTERM of Nift alone leaves a running
 child running; (c3) background descendants outlive a normal script end and
-a page render end. Host-managed processes: `tests/rt/host_process_unit.cpp`
+a page render end; (c4) a capture over the read limit stops the stage and its
+descendants (host-deps D-028). Host-managed processes: `tests/rt/host_process_unit.cpp`
 (C1 leftovers and context ends, C2 `sigterm_to_nift_c2`, C3 groups and
 terminal, CP17 lifecycle, deadlines and cancellation, the Host layer's own
 subreaper and orphan sweep, `low_fd_limit` showing the Host launch failing

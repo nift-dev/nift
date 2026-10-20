@@ -48,7 +48,12 @@ void send_signal(State& s, int sig) {
     // stage is unreaped the pgid cannot be reused; afterwards only with live
     // members (Linux: same session).
     std::vector<long> tree;
-    if (s.scope == CancelScope::Tree) tree = runtime::proc_descendants(s.unreaped_pids());
+    // Stages outside their own process group (own_group = false: legacy run()'s
+    // historical semantics) have no group to signal their descendants through;
+    // like the legacy launcher's kill_stage_tree (feature-host-deps D-028),
+    // cancellation reaches the stages' descendants by parentage (Linux /proc),
+    // collected before the stages are signalled (they would be reparented).
+    if (s.scope == CancelScope::Tree || s.pgid <= 0) tree = runtime::proc_descendants(s.unreaped_pids());
     if (sig == SIGKILL && kill_suppressed_for_test()) return;
     if (s.pgid > 0 && (!s.all_reaped() || group_has_members(s))) runtime::host_kill(-s.pgid, sig, "pipeline", &s);
     if (s.pgid <= 0)  // stages in Nift's own group (own_group = false): by pid, unreaped only (no reuse)

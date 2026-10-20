@@ -31,6 +31,7 @@
 #include <set>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <future>
 #include <thread>
 #include <unistd.h>
 #include <vector>
@@ -1235,6 +1236,33 @@ void cancel_signals_before_stdin_eof() {
     CHECK(none_tagged(tag));
 }
 
+// r3 reproducer, permanent: the lifecycle seam's events arrive out of order
+// across threads -- `settled` (host loop) before `terminating` (a cancel()
+// caller). The ticket `terminating` takes must still be completed, or the
+// owning context's close waits forever. Delivery is driven by hand here.
+void lifecycle_events_out_of_order() {
+    const std::string tag = new_tag();
+    Table tb;
+    const auto ctx = tb.open();
+    auto g = start_ok(req({"sh", "-c", "sleep 0.1"}, OutputMode::Interactive, tag));
+    Value h;
+    CHECK(create_process_handle(tb.t, ctx, g, h) == HandleStatus::Ok);
+    std::shared_ptr<ProcessResource> res;
+    CHECK(tb.t.resolve_as(h, HandleKind::Process, ctx, res) == HandleStatus::Ok);
+    g->set_lifecycle_sink(nullptr);  // nothing delivered automatically from here on
+    g->wait();
+    CHECK(wait_until([&] { return g->settled(); }, milliseconds(2000)));
+    if (!res) return;
+    res->settled(g->os_outcome());          // the host loop's late-collected `settled`, delivered first
+    res->terminating(OsTermination::Exited);  // the earlier-collected `terminating`, delivered last
+    auto closing = std::async(std::launch::async, [&] { return tb.t.close_context(ctx, false); });
+    const bool closed = closing.wait_for(std::chrono::seconds(3)) == std::future_status::ready;
+    CHECK(closed);
+    if (!closed) { std::fprintf(stderr, "lifecycle_events_out_of_order: close_context hung\n"); std::_Exit(1); }
+    CHECK(closing.get().failures.empty());
+    CHECK(none_tagged(tag));
+}
+
 void shutdown_refuses_launches() {
     runtime::request_shutdown_for_test(SIGTERM);
     HostStatus st;
@@ -1343,6 +1371,7 @@ int main(int argc, char** argv) {
         {"deadline_suite", deadline_suite},
         {"deadline_races", deadline_races},
         {"cancel_signals_before_stdin_eof", cancel_signals_before_stdin_eof},
+        {"lifecycle_events_out_of_order", lifecycle_events_out_of_order},
         {"shutdown_refuses_launches", shutdown_refuses_launches},
         {"cleanup_failures_reported", cleanup_failures_reported},
         {"sigterm_to_nift_c2", sigterm_to_nift_c2},
