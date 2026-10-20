@@ -2763,3 +2763,9 @@ test-rt-builtins-sanitize:
 test-loop-literals: $(TARGET)
 	python3 tests/runtime2/loop-literals/run.py --nift ./$(TARGET)
 test: test-loop-literals
+
+# The same suite against the ASan/UBSan build of nift (modified prepared-path
+# literal and output evaluation under the sanitizers).
+.PHONY: test-loop-literals-sanitize
+test-loop-literals-sanitize: $(SAN_TARGET)
+	python3 tests/runtime2/loop-literals/run.py --nift "$(SAN_TARGET)"

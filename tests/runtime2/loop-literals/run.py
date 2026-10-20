@@ -3,8 +3,12 @@
 
 Each case runs at top level, inside a while loop, and in a function called from
 a loop. All three must print the same bytes, and those bytes must equal the
-pinned expected output recorded from Nift v4.6.0 (expected/<case>.out), which
-interpolated `$[...]` and decoded escapes in every context. Fails on v4.12.0.
+pinned expected output recorded from Nift v4.6.0 built from its tag
+(expected/<case>.out). v4.6.0 is the authoritative baseline: it interpolated
+`$[...]` and decoded escapes in every context. The suite is not a statement
+about earlier releases (v4.5.0 differs in 3 checks). Known results:
+v4.11.0 2 failures (interpolated declarations in loops, an older defect),
+v4.12.0 26, runtime-2 before 55cb323c/5fe38bd1 fixes 26, after 0.
 Usage: run.py --nift PATH
 """
 import argparse, os, subprocess, sys, tempfile
