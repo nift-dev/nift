@@ -1007,11 +1007,10 @@ test-zero-mutation: $(TARGET)
 test-repair-campaign: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/repair_campaign.py
 
+# Fails closed: exit 77 (strace unavailable, so the ordering guarantee cannot be
+# observed) stays a failure, never a pass (v4.1 CP24 certification contract).
 test-pagination-ordering: $(TARGET)
-	@NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_ordering_smoke.sh; \
-	  status=$$?; \
-	  if [ $$status -eq 77 ]; then echo "test-pagination-ordering: skipped"; \
-	  else exit $$status; fi
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_ordering_smoke.sh
 
 test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
