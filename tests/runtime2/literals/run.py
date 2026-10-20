@@ -24,11 +24,30 @@ def run(nift, text, vm):
         with open(path, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
         env = dict(os.environ)
-        env["NIFT_VM"] = "require" if vm else "0"
+        env["NIFT_VM"] = vm if isinstance(vm, str) else ("require" if vm else "0")
         env.pop("NIFT_VM_STATS", None)
         result = subprocess.run([nift, path], cwd=folder, capture_output=True, text=True,
                                 timeout=60, env=env)
         return result.stdout, result.stderr, result.returncode
+
+
+def same_result(a, b):
+    if a[0] != b[0] or a[2] != b[2]:
+        return False
+    if a[2] == 0:
+        return a[1] == b[1]
+    # Error paths contain the per-run temporary directory; compare the final
+    # diagnostic text, not the absolute path.
+    return a[1].rsplit(": ", 1)[-1].strip() == b[1].rsplit(": ", 1)[-1].strip()
+
+
+def contexts_f1(prelude, body):
+    indented = "".join("  " + line + "\n" for line in body.splitlines())
+    return {
+        "top": prelude + body + "\n",
+        "loop": prelude + "i := 0\nwhile(i < 1) {\n" + indented + "  i += 1\n}\n",
+        "fn-from-loop": prelude + "fn(case()) {\n" + indented + "}\ni := 0\nwhile(i < 1) {\n  case()\n  i += 1\n}\n",
+    }
 
 
 def contexts(prelude, body):
@@ -75,6 +94,22 @@ REFUSED = [
     ("escaped_dollar", "", 'print("a\\$[1]")', "opaque:irregular-legacy-parse"),
 ]
 
+# F1: a callee return expression must never be typed through the caller's
+# scope. These outer bindings deliberately have different kinds from the
+# callee's parameter/local of the same name.
+F1 = [
+    ("f1_parameter_shadow_array", 'x := "s"\nfn(f(x)) { return x }\n',
+     'print("v=$[f([1,2])]")'),
+    ("f1_local_shadow_double", 'y := "s"\nfn(g()) { y := 2.5; return y }\n',
+     'print("v=$[g()]")'),
+    ("f1_local_shadow_bool", 'y := 7\nfn(g()) { y := true; return y }\n',
+     'print("v=$[g()]")'),
+    ("f1_parameter_shadow_string", 'x := 7\nfn(f(x)) { return x }\narg := "s"\n',
+     'print("v=$[f(arg)]")'),
+    ("f1_local_shadow_string", 'y := 7\nfn(g()) { y := "s"; return y }\n',
+     'print("v=$[g()]")'),
+]
+
 ERROR_SIDE_EFFECT = ("interp_error",
                      'fn(f1()) { print("f1"); return 1 }\n'
                      'fn(f2()) { print("f2"); return 1 / 0 }\n'
@@ -105,6 +140,40 @@ def main():
                 passed += 1
                 if args.verbose:
                     print(f"PASS {name} [{context}] rc={got[2]} out={got[0]!r}")
+
+    for name, prelude, body in F1:
+        for context, text in contexts_f1(prelude, body).items():
+            legacy = run(oracle, text, vm=False)
+            default = run(nift, text, vm="1")  # legacy fallback allowed
+            required = run(nift, text, vm="require")
+            # The default engine must match legacy; a refused VM must name the
+            # conservative reason, never exit 70 or report a compiler defect.
+            if not same_result(default, legacy) or required[2] == 70 or \
+                    "compiler defect" in required[1] or "internal failure" in required[1]:
+                failed += 1
+                print(f"FAIL {name} [{context}]")
+                print(f"  legacy   rc={legacy[2]} out={legacy[0]!r} err={legacy[1]!r}")
+                print(f"  default  rc={default[2]} out={default[0]!r} err={default[1]!r}")
+                print(f"  require  rc={required[2]} out={required[0]!r} err={required[1]!r}")
+            elif required[2] == 0:
+                if not same_result(required, legacy):
+                    failed += 1
+                    print(f"FAIL {name} [{context}] VM output differs from legacy")
+                    print(f"  legacy  rc={legacy[2]} out={legacy[0]!r} err={legacy[1]!r}")
+                    print(f"  require rc={required[2]} out={required[0]!r} err={required[1]!r}")
+                else:
+                    passed += 1
+                    if args.verbose:
+                        print(f"PASS {name} [{context}] VM execution")
+            elif "not compiled for the VM" in required[1] and (
+                    "interpolation:unknown-type" in required[1] or "interpolation:non-scalar" in required[1]):
+                refused += 1
+                if args.verbose:
+                    print(f"REFUSED {name} [{context}] (named conservative reason)")
+            else:
+                failed += 1
+                print(f"FAIL {name} [{context}] unexpected require result")
+                print(f"  require rc={required[2]} out={required[0]!r} err={required[1]!r}")
 
     name, prelude, body = ERROR_SIDE_EFFECT
     for context, text in contexts(prelude, body).items():

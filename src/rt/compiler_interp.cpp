@@ -100,7 +100,7 @@ std::uint8_t UnitCompiler::interpolation_function_kind(std::size_t f,
         const Node& ret = ast_.at(id);
         result |= (ret.flags & kFlagBare) || ret.a == kNoNode
                       ? kKindNull
-                      : interpolation_kind(ret.a, active);
+                      : interpolation_literal_kind(ret.a);
     }
     if (returns.empty() || infer_detail::block_falls_through(ast_, fn.b)) result |= kKindNull;
     active.erase(f);
@@ -109,6 +109,16 @@ std::uint8_t UnitCompiler::interpolation_function_kind(std::size_t f,
 }
 
 std::uint8_t UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const {
+    return interpolation_kind_impl(id, active, false);
+}
+
+std::uint8_t UnitCompiler::interpolation_literal_kind(NodeId id) const {
+    std::unordered_set<std::size_t> active;
+    return interpolation_kind_impl(id, active, true);
+}
+
+std::uint8_t UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
+                                                   bool literal_only) const {
     if (id == kNoNode) return kKindUnknown;
     const Node& node = ast_.at(id);
     switch (node.kind) {
@@ -117,19 +127,20 @@ std::uint8_t UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std:
         case NodeKind::True: case NodeKind::False: return kKindBool;
         case NodeKind::Null: return kKindNull;
         case NodeKind::Ident: {
+            if (literal_only) return kKindUnknown;  // never use the caller's scope for a callee return
             const Binding* binding = scopes_.find(text(node));
             if (!binding) return kKindUnknown;
             return scalar_only(binding->decl_kinds);
         }
         case NodeKind::Unary: {
             if (node.op == Op::Not) return kKindBool;
-            const std::uint8_t operand = interpolation_kind(node.a, active);
+            const std::uint8_t operand = interpolation_kind_impl(node.a, active, literal_only);
             if (operand == kKindNumber) return kKindNumber;
             return (operand & kKindAggregate) ? kKindAggregate : kKindUnknown;
         }
         case NodeKind::Binary: {
-            const std::uint8_t left = interpolation_kind(node.a, active);
-            const std::uint8_t right = interpolation_kind(node.b, active);
+            const std::uint8_t left = interpolation_kind_impl(node.a, active, literal_only);
+            const std::uint8_t right = interpolation_kind_impl(node.b, active, literal_only);
             if ((left | right) & kKindUnknown) return kKindUnknown;
             if ((left | right) & kKindAggregate) return kKindAggregate;
             switch (node.op) {
@@ -152,13 +163,17 @@ std::uint8_t UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std:
         case NodeKind::Logical: return kKindBool;
         case NodeKind::Coalesce:
         case NodeKind::Ternary: {
-            if (node.kind == NodeKind::Coalesce)
-                return scalar_only(static_cast<std::uint8_t>(
-                    interpolation_kind(node.a, active) | interpolation_kind(node.b, active)));
-            return scalar_only(static_cast<std::uint8_t>(
-                interpolation_kind(node.b, active) | interpolation_kind(node.c, active)));
+            if (node.kind == NodeKind::Coalesce) {
+                const std::uint8_t left = interpolation_kind_impl(node.a, active, literal_only);
+                const std::uint8_t right = interpolation_kind_impl(node.b, active, literal_only);
+                return scalar_only(static_cast<std::uint8_t>(left | right));
+            }
+            const std::uint8_t left = interpolation_kind_impl(node.b, active, literal_only);
+            const std::uint8_t right = interpolation_kind_impl(node.c, active, literal_only);
+            return scalar_only(static_cast<std::uint8_t>(left | right));
         }
         case NodeKind::Index: {
+            if (literal_only) return kKindUnknown;
             // A literal array and literal position are common in nested
             // interpolation (`$[[1,2][0]]`); prove that element's kind.
             const Node& array = ast_.at(node.a);
@@ -170,10 +185,11 @@ std::uint8_t UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std:
             if (parsed.ec != std::errc() || parsed.ptr != digits.data() + digits.size() || at < 0 ||
                 static_cast<std::uint64_t>(at) >= array.count)
                 return kKindUnknown;
-            return interpolation_kind(ast_.list(array)[static_cast<std::size_t>(at)], active);
+            return interpolation_kind_impl(ast_.list(array)[static_cast<std::size_t>(at)], active, literal_only);
         }
         case NodeKind::Array: case NodeKind::Object: return kKindAggregate;
         case NodeKind::Call: {
+            if (literal_only) return kKindUnknown;
             const Node& callee = ast_.at(node.a);
             if (callee.kind == NodeKind::Ident) {
                 const std::string_view name = text(callee);

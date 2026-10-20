@@ -2863,6 +2863,9 @@ test-runtime2-literals-scaling: $(TARGET)
 test-runtime2-literals-mutants: $(TARGET)
 	bash tests/runtime2/literals/negative_control.sh "$(CURDIR)/$(TARGET)"
 
+test-runtime2-literals-f1-negative: $(TARGET)
+	bash tests/runtime2/literals/f1_negative_control.sh "$(CURDIR)/$(TARGET)"
+
 # The same suite against the ASan/UBSan build of nift (modified prepared-path
 # literal and output evaluation under the sanitizers).
 .PHONY: test-loop-literals-sanitize

@@ -87,7 +87,13 @@ private:
     // inference does not visit String children (infer*.cpp is not ours), so
     // this uses bindings, literals, operators, native result rules and simple
     // user-function returns. kKindUnknown means "not proven".
+    std::uint8_t interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
+                                         bool literal_only) const;
     std::uint8_t interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
+    // Literal/operator-only kinds for a callee return expression: never
+    // resolves an identifier through the caller's scopes and never follows a
+    // call. Used only by interpolation_function_kind (F1).
+    std::uint8_t interpolation_literal_kind(NodeId id) const;
     std::uint8_t interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
     bool binary(const Node& node, std::uint16_t dst);
