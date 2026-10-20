@@ -185,12 +185,36 @@ The `context:*` reasons are in "D-018 consequences" above.
 | --- | --- | --- |
 | `type:*` | an operation whose operand kinds may include one legacy rejects | errors; concatenation with an aggregate succeeds only in loop bodies (multi-line JSON) |
 | `aliasing` | aggregate bound/returned/pushed/listed from a place | location reference |
-| `path-in-call-argument` | a member or index read inside a user-call argument | legacy resolves such arguments as locations: errors quote the raw argument text at statement-dependent positions |
+| `path-in-call-argument` | a member or index read inside a user-call argument, except an argument that is itself a path with certainly-scalar kinds (stage 4, below) | legacy resolves such arguments as locations: an aggregate is shared with the callee; errors quote the raw argument text |
 | `path-in-index` | a member or index read inside index brackets (`a[b[i]]`) | a failing inner index is reported as `unknown value or malformed expression: a[k` |
 | `prepared-unpreparable` | an `if`/`while` condition or `return` expression legacy's prepared parser rejects, in loop code | legacy abandons preparing the loop body |
 | `param-type-unpredicted` | (defensive) a parameter type read the analysis did not predict | — |
 | `context:assignment-error` | (review round 2) an assignment or compound assignment in loop-evaluator code whose binding-type check could fail (the value's kinds include one the declaration's binding type does not accept) | legacy reports "cannot change binding type: x" at the statement, outermost loop statement or call site; canonical "cannot assign T to U binding 'x'" at the assignment |
 | `analysis-limit:kinds` | (defensive) the kind inference did not converge within its budget (review round 1, D1) | — |
+
+### Stage 4 (integration, records20k): scalar path arguments
+
+Coordinator ruling, VM subset; no language change. A user-call argument
+that is itself a member or index path (`pad(records[k].name, 10)`) is
+compiled when CP12 inference proves its kinds certainly scalar: not empty,
+no array or object, not Unknown (`element_of`, `src/rt/infer_types.cpp`,
+from the Member/Index cases of `Inference::expr`, `src/rt/infer.cpp`). For
+such a value legacy's location binding is observably a copy (probes: writes
+and rebinding of the root do not reach the caller; the binding type is the
+value's; the path is evaluated once, arguments left to right). Everything
+else stays refused: aggregate or uncertain kinds, a path inside an
+expression, in parentheses or in index brackets, and built-in and method
+arguments keep their rules. A failing admitted path uses legacy's location
+wording, quoting the whole argument text at its start (`JSON value 'a[i].k'
+has no member 'k'`; index messages quote the same text); member on a
+non-object and index on a non-container cannot occur (refused). The
+existing wording elsewhere is unchanged (`print(o.zz)`: `value has no
+member: zz`). The admission assumes that no write outside the unit changes
+an element's kind; a unit with import or export is refused as a whole, and
+this must still hold when live exports arrive (CP12B, D-046). Pins:
+`tests/runtime2/vm_records_coverage.py` (PATH_ARGUMENTS, the refused
+`path-*` cases) and mutants 10 (admission whatever the kinds) and 11 (the
+value wording) in `vm_mutation_gate.py`.
 
 ## Tests
 

@@ -20,6 +20,11 @@ bug with NIFT_VM_MUTANT=n (src/rt/vm_mutants.h):
   8 the Mod fast path's sign
   9 BindType ignores a text type held in a register (stage 4: a declaration
     from a parameter binds with the unknown type)
+ 10 (compiler) a member or index path argument of a user call is admitted
+    whatever its kinds, aggregates and uncertain kinds included (stage 4,
+    path-argument ruling)
+ 11 a missing member in an admitted path argument gets the value wording
+    (`value has no member: k`), not legacy's location wording
 
 Each suite runs at a modest size: vm_int_bounds (every int opcode at the
 bounds, Python ints), vm_golden (pinned D-018 results), vm_review_cp12,
@@ -42,7 +47,8 @@ MUTANTS = {1: "Sub dispatched to Add in the checked table", 2: "large slow-path 
            3: "spurious overflow in AddI (small operands)", 4: "dropped loop iteration",
            5: "wrong error column", 6: "wrong index number in the index message",
            7: "wrong kinds in the assignment-type message", 8: "Mod fast path sign",
-           9: "BindType ignores the text type register"}
+           9: "BindType ignores the text type register", 10: "path argument admitted whatever its kinds",
+           11: "value wording for a missing member in a path argument"}
 
 
 def suites(nift, rt_diff):

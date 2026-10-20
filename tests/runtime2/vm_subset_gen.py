@@ -303,8 +303,9 @@ class Supported:
         name, params, _ = self.r.choice(c)
         self.features["call:" + kind] += 1
         # CP12: no member or index read inside the arguments of a user call
-        # (legacy resolves them as locations; their diagnostics are not
-        # reproduced, so the compiler refuses them: path-in-call-argument).
+        # (legacy resolves them as locations: path-in-call-argument; a
+        # certainly-scalar path argument is compiled since stage 4 and covered
+        # by vm_records_coverage.py, not generated here).
         self.in_arg += 1
         args = ', '.join(self.arg(scope, pk, d + 1) for pk in params)
         self.in_arg -= 1
@@ -898,7 +899,12 @@ INJECT = [
     ("arity", "fn(zg(x)) { return x }", "print(zg())", "any", "static-error:arity"),
     ("alias-argument", "fn(zg(p)) { p.push(9)\nreturn 0 }", 'zo := {"k": [1]}\nzg(zo.k)', "any", "alias-argument"),
     ("string-arg-number", "fn(zg(n)) { return n }", 'print(zg("2.5"))', "any", "string-arg-type"),
-    ("prepared-decl-fn", "fn(zg(p)) { zq := p\nreturn zq }", "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(1)) }",
+    # Stage 4 (stage4e review): the parameter copy `zq := p` is admitted when
+    # every call passes untyped or int text (legacy types it from the value
+    # there, as the VM does); `zg(1)` therefore compiles and is pinned as
+    # supported in vm_records_coverage.py (pd_int_text_*). A double-typed
+    # argument text stays refused by the stated rule.
+    ("prepared-decl-fn", "fn(zg(p)) { zq := p\nreturn zq }", "zi := 0\nwhile (zi < 1) { zi += 1\nprint(zg(2.5)) }",
      "any", "prepared-decl-type"),
     ("prepared-decl-loop", "", "zi := 0\nwhile (zi < 1) { zi += 1\nzx := 2.5\nzy := zx\nprint(zy) }", "any",
      "prepared-decl-type"),

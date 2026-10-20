@@ -237,12 +237,20 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
     return true;
 }
 
-bool get_member(const Value& object, Atom key, Value& out, Fault& fault) {
+// A noted member read is a path argument of a user call (compiler_call.cpp
+// argument_path): legacy's location wording, quoting the whole path.
+bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fault& fault) {
     if (!object.is(Kind::Object)) return internal(fault, "member");
     if (const Value* member = object_get(object, key)) {
         out = *member;
         return true;
     }
+#ifdef NIFT_VM_MUTANTS
+    if (vm_mutant() == 11) note = nullptr;  // M11: the value wording for a path argument
+#endif
+    if (note)
+        return raise(fault, StopReason::Error, "JSON value '" + note_text(note) + "' has no member '" +
+                                                   std::string(atom_text(key)) + "'");
     return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
 }
 

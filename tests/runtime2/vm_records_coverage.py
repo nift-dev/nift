@@ -5,8 +5,8 @@ CP12 refusals lifted with their safety conditions, as differential suites.
   SUPPORTED   shapes now compiled, each run under NIFT_VM=require and compared
               with legacy byte for byte (stdout, stderr, exit status):
               * a loop call to a function legacy cannot prepare (bare
-                `return`; `?:`/`??`/chained comparison in a `return`, `if` or
-                `while` condition) whose arguments are literals or name reads:
+                `return`; `?:`/`??` in a `return` or `while` condition) whose
+                arguments are literals or name reads:
                 legacy evaluates them twice (M2) but that cannot be observed,
                 and the body runs once on its canonical path;
               * `a.push(v)` of a fresh aggregate (call result, object/array
@@ -47,6 +47,7 @@ CP12 refusals lifted with their safety conditions, as differential suites.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -60,8 +61,12 @@ SUPPORTED = [
     ('push_records_shape', 'fn(make_record(i)) {\n  return {"id": i, "name": "item" + i, "score": (i * 37) % 101, "tags": [i % 3, i % 5]}\n}\nrecords := []\ni := 0\nwhile (i < 4) {\n  records.push(make_record(i))\n  i += 1\n}\nprint(records.stringify())\nprint(records[3].tags[1] + records[2].score)\n'),
     ('push_ternary_lit', 'a := []\ni := 0\nwhile (i < 2) { a.push((i > 0 ? [1] : [2])); i += 1 }\nprint(a.stringify())\n'),
     ('push_then_mutate', 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\na.push(mk(3))\nn := a.length()\nprint(n)\nprint(a.stringify())\n'),
+    # No `if` shape here (stage4e review): every `if` condition legacy's
+    # prepared parser rejects is either refused (a comparison chain:
+    # chain-if-condition below) or not compiled at all (`?:`, `??` and
+    # literals in an `if` header are opaque:irregular-legacy-parse); the
+    # conditions the VM compiles (`!(p < 2)`, `p % 2 == 1`) are preparable.
     ('up_bare_return', 'fn(f(p)) { if (p > 0) { print("pos")\nreturn }\nprint("zero") }\ni := 0\nwhile (i < 2) { f(i); i += 1 }\n'),
-    ('up_chain_if', 'fn(f(p)) { if ((p < 2 ? 1 : 0) == 1) { print("lt") }\nreturn p }\ni := 0\nwhile (i < 3) { print(f(i)); i += 1 }\n'),
     ('up_coalesce', 'fn(f(p)) { return (p ?? 1) }\ni := 0\nwhile (i < 2) { print(f(i)); i += 1 }\n'),
     ('up_fn_from_loop_fn', 'fn(f(p)) { return (true ? p * 2 : 0) }\nfn(g(q)) { return f(q) + 1 }\ni := 0\nwhile (i < 2) { print(g(i)); i += 1 }\n'),
     ('up_neg_lit', 'fn(f(p)) { return (true ? p : 0) }\ni := 0\nwhile (i < 1) { print(f(-3)); i += 1 }\n'),
@@ -72,16 +77,71 @@ SUPPORTED = [
     ('up_while_cond', 'fn(f(p)) { return (p > 0 ? 1 : 0) }\ni := 0\nwhile (i < 3 && f(i) < 5) { print(i); i += 1 }\n'),
 ]
 
+# A member or index path as a user-call argument (coordinator ruling, VM
+# subset): admitted when inference proves its kinds certainly scalar. Reads
+# (the records shape, rooted at a parameter, through another call's
+# arguments), evaluation once and in order, the binding type of a copy, then
+# failures in legacy's location wording (the whole argument text at its
+# start) at top level, in loops and in a function; the existing wording
+# elsewhere (`print(o.zz)`, a declaration in a loop) is unchanged. Run under
+# NIFT_VM=require, identical to legacy byte for byte.
+PATH_ARGUMENTS = [
+    ('pa_records_shape', 'fn(make_record(i)) {\n  return {"id": i, "name": "item" + i, "score": (i * 37) % 101}\n'
+     '}\nfn(pad(s, width)) {\n  out := s\n  while (out.length() < width) {\n    out += "."\n  }\n  return out\n}\n'
+     'records := []\ni := 0\nwhile (i < 4) {\n  records.push(make_record(i))\n  i += 1\n}\nreport := ""\nk := 0\n'
+     'while (k < 4) {\n  report += pad(records[k].name, 7) + ";"\n  k += 1\n}\nprint(report)\n'
+     'print(pad(records[0].name, 2))\n'),
+    ('pa_param_root_loop', 'fn(f(s)) {\n  return s + "!"\n}\nfn(g(o)) {\n  return f(o.k)\n}\nr := {"k": "a"}\n'
+     'i := 0\nwhile (i < 2) {\n  print(g(r))\n  i += 1\n}\n'),
+    ('pa_nested', 'fn(f(s)) {\n  return s + "!"\n}\nfn(g(t)) {\n  return "<" + t + ">"\n}\no := {"k": "a"}\n'
+     'i := 0\nwhile (i < 2) {\n  print(f(g(o.k)))\n  i += 1\n}\nprint(f(g(o.k)))\n'),
+    ('pa_once_order', 'fn(g()) {\n  print("g")\n  return 1\n}\nfn(h()) {\n  print("h")\n  return 2\n}\n'
+     'fn(f(s, t)) {\n  return s + t\n}\na := [5, 7]\nprint(f(a[g()], h()))\nprint(f(h(), a[g()]))\ni := 0\n'
+     'while (i < 1) {\n  print(f(a[g()], a[0]))\n  i += 1\n}\n'),
+    ('pa_type_register', 'fn(f(s)) {\n  out := s\n  print(out)\n  out = "x"\n  print(out)\n  return 0\n}\n'
+     'o := {"k": "a", "n": 1}\nf(o.k)\nf(o.n)\n'),
+    ('pa_double_member', 'fn(f(s)) {\n  return s * 2\n}\no := {"x": 1.25}\na := [0.5, 2.5]\nprint(f(o.x))\ni := 0\n'
+     'while (i < 2) {\n  print(f(a[i]))\n  i += 1\n}\n'),
+    ('pe_missing_top', 'fn(f(s)) {\n  return s\n}\na := [{"k": 1}, {"j": 2}]\nj := 1\nprint(f(a[0].k))\n'
+     'print(f(a[j].k))\n'),
+    ('pe_missing_loop', 'fn(f(s)) {\n  return s\n}\na := [{"k": 1}, {"j": 2}]\ni := 0\nwhile (i < 2) {\n'
+     '  print(f(a[i].k))\n  i += 1\n}\n'),
+    ('pe_missing_mid_loop', 'fn(f(s)) {\n  return s\n}\na := [{"k": {"b": 1}}, {"j": 2}]\ni := 0\nwhile (i < 2) {\n'
+     '  print(f(a[i].k.b))\n  i += 1\n}\n'),
+    ('pe_missing_fn', 'fn(f(s)) {\n  return s\n}\nfn(mk(i)) {\n  if (i == 0) {\n    return {"k": 1}\n  }\n'
+     '  return {"j": 2}\n}\nfn(g(r)) {\n  v := f(r.k)\n  return v\n}\ni := 0\nwhile (i < 2) {\n  print(g(mk(i)))\n'
+     '  i += 1\n}\n'),
+    ('pe_oob_mid_loop', 'fn(f(s)) {\n  return s\n}\na := [{"y": 1}]\ni := 0\nwhile (i < 3) {\n'
+     '  print(f(a[i * 5].y))\n  i += 1\n}\n'),
+    ('pe_oob_top', 'fn(f(s)) {\n  return s\n}\na := [{"y": 1}]\nj := 5\nprint(f(a[j].y))\n'),
+    ('pe_missing_key', 'fn(f(s)) {\n  return s\n}\no := {"k": 1}\nk := "zz"\nprint(f(o[k]))\n'),
+    ('pe_spaces_ok', 'fn(f(s)) {\n  return s\n}\na := [{"k": 1}, {"j": 2}]\nj := 1\nprint(f( a[j].k ))\n'),
+    ('pe_second_arg', 'fn(f(s, t)) {\n  return t\n}\na := [{"k": 1}, {"j": 2}]\nj := 1\nprint(f(1, a[j].k))\n'),
+    ('pe_unchanged_print', 'o := {"k": "a"}\nprint(o.zz)\n'),
+    ('pe_unchanged_decl_loop', 'a := [{"k": 1}, {"j": 2}]\ni := 0\nwhile (i < 2) {\n  v := a[i].k\n  print(v)\n'
+     '  i += 1\n}\n'),
+]
+
+# The same failure where legacy reports a `return` statement: the approved
+# D-018c difference (legacy's `return: ` prefix and the statement's position);
+# stdout, exit status and the message must otherwise be identical.
+PATH_ARGUMENTS_D018C = [
+    ('pe_missing_fn_return', 'fn(f(s)) {\n  return s\n}\nfn(mk(i)) {\n  if (i == 0) {\n    return {"k": 1}\n  }\n'
+     '  return {"j": 2}\n}\nfn(g(r)) {\n  return f(r.k)\n}\nprint(g(mk(0)))\nprint(g(mk(1)))\n'),
+]
+
 PARAM_DECL = [
     # (name, must run on the VM, source); the oracle is ORACLE[name]
-    # Arguments that are paths (path-in-call-argument: legacy resolves them as
-    # locations), aggregates (aliasing) or double-typed text (prepared typing
-    # differs): refused, identical to legacy (stage4d corrected these three).
+    # Arguments that may be aggregates (vals[i]: path-in-call-argument, legacy
+    # binds a location) or double-typed text (prepared typing differs):
+    # refused, identical to legacy (stage4d corrected these). pd_pad's
+    # argument names[k] is a certainly-string path, admitted since the path
+    # argument ruling: now required on the VM.
     ("pd_types_loop", False, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
      'vals := ["a", 2, 2.5, [1, "b"], {"k": 1}]\ni := 0\nwhile (i < 5) { f(vals[i]); i += 1 }\nf("top")\nf(7)\n'),
     ("pd_types_literals", False, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\ni := 0\n'
      'while (i < 1) { f("a"); f(2); f(2.5); f([1, 2]); f({"k": 1}); i += 1 }\n'),
-    ("pd_pad", False, 'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
+    ("pd_pad", True, 'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
      'names := ["item0", "it", "x"]\nk := 0\nr := ""\nwhile (k < 3) { r += pad(names[k], 6) + ";"; k += 1 }\n'
      'print(r)\nprint(pad("top", 5))\n'),
     # On the VM: string, int and untyped (call result) arguments, loops and top level.
@@ -102,6 +162,19 @@ PARAM_DECL = [
      'vals := [2.5, 3, "z"]\ni := 0\nwhile (i < 3) { f(vals[i]); i += 1 }\n'),
     ("pd_register_type_loop", False, 'fn(f(p)) {\n  out := p\n  print(out)\n  out = 2.5\n  print(out)\n  return 0\n}\n'
      'x := 1e2\ni := 0\nwhile (i < 1) { f(x); i += 1 }\nv := 100\nwhile (i < 2) { f(v); i += 1 }\n'),
+    # The generator's prepared-decl-fn shape with an int argument text (stage4e
+    # review: admitted by the rule, legacy types the copy from the value):
+    # in a loop, in a function's loop, that function called from a loop, in
+    # an `if` block's loop.
+    ("pd_int_text_loop", True, 'fn(zg(p)) {\n  zq := p\n  return zq\n}\nzi := 0\nwhile (zi < 1) {\n  zi += 1\n'
+     '  print(zg(1))\n}\n'),
+    ("pd_int_text_fn", True, 'fn(zg(p)) {\n  zq := p\n  return zq\n}\nfn(zw()) {\n  zi := 0\n  while (zi < 1) {\n'
+     '    zi += 1\n    print(zg(1))\n  }\n  return 0\n}\nzw()\n'),
+    ("pd_int_text_fnloop", True, 'fn(zg(p)) {\n  zq := p\n  return zq\n}\nfn(zw()) {\n  zi := 0\n'
+     '  while (zi < 1) {\n    zi += 1\n    print(zg(1))\n  }\n  return 0\n}\nzl := 0\nwhile (zl < 1) {\n'
+     '  zl += 1\n  zw()\n}\n'),
+    ("pd_int_text_if", True, 'fn(zg(p)) {\n  zq := p\n  return zq\n}\nif (true) {\n  zi := 0\n  while (zi < 1) {\n'
+     '    zi += 1\n    print(zg(1))\n  }\n}\n'),
     ("pd_reassign_top_only", True, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\nf(2.5)\nf("a")\n'),
 ]
 
@@ -131,6 +204,10 @@ ORACLE = {
     # here (L52, LEGACY_INCONSISTENT).
     'pd_register_type_loop': (['100', '2.5', '100'], True),
     'pd_reassign_top_only': (['1.5'], True),
+    'pd_int_text_loop': (['1'], False),
+    'pd_int_text_fn': (['1'], False),
+    'pd_int_text_fnloop': (['1'], False),
+    'pd_int_text_if': (['1'], False),
 }
 
 REFUSED = [
@@ -160,6 +237,44 @@ REFUSED = [
      "prepared-fn-unprepared"),
     ("push-binding", 'o := {"k": 1}\na := []\na.push(o)\nprint(a.stringify())\n', "aliasing"),
     ("push-member", 'o := {"k": [1]}\na := []\na.push(o.k)\nprint(a.stringify())\n', "aliasing"),
+    # Path arguments that stay refused (coordinator ruling): an aggregate is
+    # shared with the caller in legacy (the callee pushes, a returned copy is
+    # pushed, a local copy is pushed; a written scalar parameter is refused as
+    # before, alias-argument); a kind that is not certainly scalar: varying
+    # across iterations, the root reassigned, mixed pushes, a member present
+    # only in one branch, Unknown (every source of Unknown is itself refused,
+    # here bytes); an atomic handle stored in a member; a path wrapped in
+    # parentheses or inside an expression (legacy's text differs); member on
+    # a non-object and index on a string (the path's kinds are empty). A unit
+    # with import or export is refused as a whole, which the admission relies
+    # on (no write outside the unit changes a kind).
+    ('path-push-callee', 'fn(f(s)) {\n  s.push(9)\n  return 0\n}\no := {"k": [1]}\nf(o.k)\n'
+     'print(o.k.stringify())\n', 'alias-argument'),
+    ('path-return-push', 'fn(f(s)) {\n  return s\n}\no := {"k": [1]}\nr := f(o.k)\nr.push(2)\n'
+     'print(o.k.stringify())\n', 'path-in-call-argument'),
+    ('path-copy-push', 'fn(f(s)) {\n  t := s\n  t.push(2)\n  return 0\n}\no := {"k": [1]}\nf(o.k)\n'
+     'print(o.k.stringify())\n', 'path-in-call-argument'),
+    ('path-unknown-kind', 'fn(f(s)) {\n  return 0\n}\no := {"k": bytes("ab")}\nf(o.k)\n', 'builtin-bytes:bytes'),
+    ('path-mixed-iter', 'fn(f(s)) {\n  return 0\n}\na := [1, [2]]\ni := 0\nwhile (i < 2) {\n  f(a[i])\n  i += 1\n}\n',
+     'path-in-call-argument'),
+    ('path-root-reassigned', 'fn(f(s)) {\n  return 0\n}\no := {"k": 1}\nf(o.k)\no = {"k": [1]}\nf(o.k)\n',
+     'path-in-call-argument'),
+    ('path-mixed-push', 'fn(f(s)) {\n  return 0\n}\na := []\na.push(1)\na.push([2])\ni := 0\nwhile (i < 2) {\n'
+     '  f(a[i])\n  i += 1\n}\n', 'path-in-call-argument'),
+    ('path-member-branch', 'fn(f(s)) {\n  return 0\n}\no := {"j": 1}\ni := 0\nwhile (i < 2) {\n  if (i > 0) {\n'
+     '    o = {"k": [1]}\n  }\n  f(o.k)\n  i += 1\n}\n', 'path-in-call-argument'),
+    ('path-handle', 'fn(f(s)) {\n  s += 1\n  return 0\n}\nc := atomic<int>(5)\no := {"h": c}\nf(o.h)\nprint(c)\n',
+     'callable:atomic<int>'),
+    ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'statement:Import'),
+    ('path-export', 'fn(f(s)) {\n  return s\n}\no := {"k": 1}\nprint(f(o.k))\nexport(o)\n', 'statement:Export'),
+    ('path-member-on-int', 'fn(f(s)) {\n  return s\n}\no := {"a": 1}\nprint(f(o.a.b))\n', 'path-in-call-argument'),
+    ('path-index-on-string', 'fn(f(s)) {\n  return s\n}\ns := "abc"\nprint(f(s[1]))\n', 'path-in-call-argument'),
+    ('path-paren', 'fn(f(s)) {\n  return s\n}\na := [{"k": 1}, {"j": 2}]\nj := 1\nprint(f((a[j].k)))\n',
+     'path-in-call-argument'),
+    ('path-expression', 'fn(f(s)) {\n  return s\n}\na := [{"k": 1}, {"j": 2}]\nj := 1\nprint(f(a[j].k + 1))\n',
+     'path-in-call-argument'),
+    ('path-write-scalar', 'fn(f(s)) {\n  s = 9\n  return s\n}\no := {"k": 1}\nprint(f(o.k))\nprint(o.k)\n',
+     'alias-argument'),
     ("push-index-loop", 'a := [[1]]\nb := []\ni := 0\nwhile (i < 1) { b.push(a[0]); i += 1 }\nprint(b.stringify())\n',
      "aliasing"),
 ]
@@ -181,6 +296,16 @@ def run(nift, d, mode, timeout):
     return (p.stdout, p.stderr, p.returncode), st
 
 
+def d018c_equal(legacy, vm):
+    """D-018c: one diagnostic each; equal once legacy's `return: ` prefix and
+    both positions are removed (the VM reports the failing expression)."""
+    def strip(err):
+        lines = err.decode("utf-8", "replace").splitlines()
+        return [re.sub(r"^error: .*?:\d+:\d+: (return: )?", "error: ", line) for line in lines]
+    return (legacy[0] == vm[0] and legacy[2] == vm[2] != 0 and len(strip(legacy[1])) == 1
+            and strip(legacy[1]) == strip(vm[1]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -190,7 +315,9 @@ def main():
     failures = []
     work = tempfile.mkdtemp(prefix="nift-vm-records-")
     try:
-        for kind, cases in (("supported", [(n, s, None) for n, s in SUPPORTED]), ("refused", REFUSED)):
+        supported = [(n, s, None) for n, s in SUPPORTED + PATH_ARGUMENTS]
+        d018c = [(n, s, "d018c") for n, s in PATH_ARGUMENTS_D018C]
+        for kind, cases in (("supported", supported + d018c), ("refused", REFUSED)):
             for name, source, reason in cases:
                 d = tempfile.mkdtemp(dir=work)
                 with open(os.path.join(d, "p.f"), "w") as f:
@@ -200,7 +327,9 @@ def main():
                     vm, st = run(nift, d, "require", a.timeout)
                     if not st or st["outcome"] not in ("vm", "vm-error"):
                         failures.append(f"{name}: not on the VM ({st and (st['outcome'], st['reason'])})")
-                    elif vm != legacy:
+                    elif reason == "d018c" and not d018c_equal(legacy, vm):
+                        failures.append(f"{name}: differs beyond D-018c\n  legacy {legacy}\n  vm     {vm}")
+                    elif reason != "d018c" and vm != legacy:
                         failures.append(f"{name}: output differs\n  legacy {legacy}\n  vm     {vm}")
                 else:
                     _, cst = run(nift, d, "classify", a.timeout)
@@ -244,8 +373,10 @@ def main():
         shutil.rmtree(work, ignore_errors=True)
     for f in failures:
         print("FAIL " + f)
-    print(("PASS" if not failures else "FAIL") + f" vm records coverage: {len(SUPPORTED)} supported shapes on the VM "
-          f"(identical to legacy), {len(REFUSED)} refused, {len(PARAM_DECL)} parameter-declaration programs "
+    print(("PASS" if not failures else "FAIL") + f" vm records coverage: {len(SUPPORTED)} supported shapes and "
+          f"{len(PATH_ARGUMENTS) + len(PATH_ARGUMENTS_D018C)} path-argument programs on the VM (identical to "
+          f"legacy, D-018c for {len(PATH_ARGUMENTS_D018C)}), {len(REFUSED)} refused, {len(PARAM_DECL)} "
+          f"parameter-declaration programs "
           f"identical to legacy and to the oracle; {len(failures)} failure(s)")
     return 1 if failures else 0
 

@@ -383,7 +383,7 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
         }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
         case OpCode::SetIndex: return set_index(note, R[in.a], RK(in.b), RK(in.c), fault);
-        case OpCode::GetMember: if (!get_member(R[in.b], Atom{in.c}, out, fault)) return false; break;
+        case OpCode::GetMember: if (!get_member(note, R[in.b], Atom{in.c}, out, fault)) return false; break;
         case OpCode::Push: return push_value(R[in.a], RK(in.b), fault);
         case OpCode::Length: if (!length_of(note, R[in.b], in.c != 0, out, fault)) return false; break;
         case OpCode::TypeMeet:

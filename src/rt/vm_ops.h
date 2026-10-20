@@ -89,7 +89,7 @@ bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note*
 
 bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault);
 bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault);
-bool get_member(const Value& object, Atom key, Value& out, Fault& fault);
+bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fault& fault);
 bool push_value(Value& array, const Value& value, Fault& fault);
 // `length()` (size = false) or `size()` (size = true).
 bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault);

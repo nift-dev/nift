@@ -5,6 +5,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/native.h"
 #include "rt/prepared_parse.h"
+#include "rt/vm_mutants.h"
 
 // Calls (user functions, natives), methods, member and index reads (CP11,
 // CP12). Errors are reported at the failing expression (D-018c).
@@ -58,7 +59,12 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     } restore{*this, saved_textual};
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
     if (!is_native) ++call_args_;
+    const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     for (std::uint32_t k = 0; k < node.count; ++k) {
+        // The argument itself may be a scalar path (argument_path); a path
+        // anywhere else in it, or in an index key, is not.
+        path_arg_ = is_native || index_depth_ > 0 || !bare_argument(node, k) ? kNoNode : args[k];
+        path_chain_ = kNoNode;
         std::uint16_t reg = base;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
@@ -69,6 +75,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!(in_place && k == 0) && !temp(reg)) return false;
         if (!expr_to(args[k], reg)) return false;
     }
+    path_arg_ = saved_path;
+    path_chain_ = saved_chain;
     if (!is_native) --call_args_;
     if (!is_native && loop_reachable()) {
         // Legacy's prepared call types a parameter from the value only, the
@@ -211,14 +219,57 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     return true;
 }
 
+// A member or index path inside user-call arguments (coordinator ruling,
+// VM subset, records20k): legacy binds the parameter to the path as a
+// location. For a scalar value that is observably a copy (writes and
+// rebinding of the root do not reach the parameter, and the binding type is
+// the value's), but an aggregate is shared, so only an argument that is
+// itself a path whose kinds are certainly scalar is admitted (not empty, no
+// aggregate, not Unknown); every other path in call arguments is refused.
+// Its failures use legacy's location wording: the whole argument text, at
+// its start (`f(a[1].k.b)`: `JSON value 'a[1].k.b' has no member 'k'`, see
+// get_member; index messages quote the same text). Member on a non-object and index on a
+// non-container cannot occur: those receivers are refused (type:member,
+// type:index).
+// Assumption: no write outside this unit changes an element's or member's
+// kind. That holds because a unit with import, export or module bindings is
+// refused as a whole (statement:Import, statement:Export); it must still
+// hold when live exports arrive (CP12B, D-046).
+bool UnitCompiler::argument_path(const Node& node, std::string& note) {
+    if (call_args_ == 0) return true;
+    const bool top = path_arg_ != kNoNode && &node == &ast_.at(path_arg_);
+    if (!top && (path_chain_ == kNoNode || &node != &ast_.at(path_chain_)))
+        return fail(node, "path-in-call-argument");
+    const std::uint8_t k = kinds(path_arg_);
+    bool scalar = k != 0 && (k & ~kKindScalar) == 0;
+    MUTATE_PATH_SCALAR(scalar);
+    if (top && !scalar) return fail(node, "path-in-call-argument");
+    note = std::string(text(ast_.at(path_arg_)));
+    path_chain_ = node.a;
+    return true;
+}
+
+// Argument k written without parentheses of its own: legacy quotes the
+// argument's text, `(o.k)` included, which is not the path's.
+bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
+    const std::string_view src = ast_.source();
+    std::uint32_t at = ast_.at(ast_.list(call)[k]).begin;
+    while (at > 0 && (src[at - 1] == ' ' || src[at - 1] == '\t' || src[at - 1] == '\n' || src[at - 1] == '\r')) --at;
+    if (at == 0) return false;
+    if (k > 0) return src[at - 1] == ',';
+    std::uint32_t open = ast_.at(call.a).end;
+    while (open < src.size() && src[open] != '(') ++open;
+    return at - 1 == open;
+}
+
 // Member and index reads can fail at run time (missing member or key, index
 // out of range). Their legacy diagnostics are reproduced where the shape is
-// known: not inside user-call arguments (legacy resolves such paths through
-// its location machinery, whose messages quote the raw argument text) nor
-// inside another index's brackets; there they are refused.
+// known: outside user-call arguments (except an admitted path argument,
+// above) and outside another index's brackets; elsewhere they are refused.
 bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node)) return false;
-    if (call_args_ > 0) return fail(node, "path-in-call-argument");
+    std::string location;
+    if (!argument_path(node, location)) return false;
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
@@ -226,14 +277,16 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(site(node));
-    fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
+    const std::size_t at = fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
+    if (!location.empty()) fb_->note(at, std::move(location));
     fb_->release_to(mark);
     return true;
 }
 
 bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node)) return false;
-    if (call_args_ > 0) return fail(node, "path-in-call-argument");
+    std::string location;
+    if (!argument_path(node, location)) return false;
     if (index_depth_ > 0) return fail(node, "path-in-index");
     const std::uint8_t object_kinds = kinds(node.a), key_kinds = kinds(node.b);
     const bool array = (object_kinds & ~kKindArray) == 0 && (key_kinds & ~kKindNumber) == 0;
@@ -249,7 +302,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (!key_ok) return false;
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::GetIndex, dst, object_reg, key);
-    fb_->note(at, std::string(text(node)));
+    fb_->note(at, location.empty() ? std::string(text(node)) : std::move(location));
     fb_->release_to(mark);
     return true;
 }

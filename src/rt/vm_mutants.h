@@ -8,6 +8,8 @@
 //   M4 a dropped loop iteration (i += 1 from 1 to 3)  M8 the Mod fast path's sign
 //   M9 BindType ignores a text type held in a register (a declaration from a
 //      parameter, stage 4) and binds with the unknown type -1
+//   M10 (compiler) a path argument is admitted whatever its kinds (aggregates too)
+//   M11 a missing member in a path argument gets the value wording, not the location one (vm_ops)
 #include "rt/vm_ops.h"
 
 #ifdef NIFT_VM_MUTANTS
@@ -23,10 +25,13 @@
 #define MUTATE_ERROR_OFFSET(offset) \
     if (vm_mutant() == 5) ++(offset);
 #define BIND_TEXT(c) ((vm_mutant() == 9 && !((c) & kConstantBit)) ? std::int64_t{-1} : RK(c).as_int())
+#define MUTATE_PATH_SCALAR(ok) \
+    if (vm_mutant() == 10) (ok) = true;
 #else
 #define MUTATE_ADDI(x, offset)
 #define MUTATE_MOD(v) (v)
 #define MUTATE_CHECKED_TABLE(table)
 #define MUTATE_ERROR_OFFSET(offset)
 #define BIND_TEXT(c) (RK(c).as_int())
+#define MUTATE_PATH_SCALAR(ok)
 #endif

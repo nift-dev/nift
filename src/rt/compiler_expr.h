@@ -130,6 +130,9 @@ private:
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
     bool kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason);
+    // compiler_call.cpp: a member or index path in user-call arguments.
+    bool argument_path(const Node& node, std::string& note);
+    bool bare_argument(const Node& call, std::uint32_t k) const;
     bool no_alias(NodeId value, const Node& at);
     // kKindUnknown always comes with every kind, so a "may be X" test is
     // conservative for it too (review CP12 round 1, D1).
@@ -176,6 +179,8 @@ private:
     int loop_depth_ = 0;
     bool textual_statement_ = false;  // a statement legacy runs textually inside loop code
     int call_args_ = 0;               // inside user-call arguments
+    NodeId path_arg_ = kNoNode;       // the user-call argument being compiled (argument_path)
+    NodeId path_chain_ = kNoNode;     // the next receiver of an admitted path argument
     int index_depth_ = 0;             // inside index brackets
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;
