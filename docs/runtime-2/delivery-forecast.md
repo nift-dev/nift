@@ -53,6 +53,22 @@ scheduled one.
 | CP12B (B1, chains, globals below compiler, VM module loader) | gates on rebased branch; compiler hookup after CP15 | CP12C |
 | CP16 | implementation; CP17 swap pending | CP20, CP24 |
 
+Queue order (owner, 2026-10-20): CP15 (integrated) → CP17 → feature-host-deps.
+host-deps is certified stacked on the CP17 candidate; it needs no re-certification
+only if CP17 integrates as exactly its certified commit, host-deps' certified
+parent is that commit, and integration adds no code change or conflict
+resolution. Otherwise the affected commit is re-certified. host-deps carries a
+regression fix (hook `file().open` reads recorded again); its guard,
+`test-consumer-snapshots` `declared_filevalue_hook`, stays in `make test`.
+
+Certify package snapshot (D-048 prerequisite, owner 2026-10-20): replace the
+2026-09-20 `nift-packages.tgz` only from the reviewed, corrected package
+commits; keep the old snapshot and its hash as historical evidence; record each
+package's source commit, the new hash and the certification targets that consume
+it; add a check that the active snapshot contains no script-context `@`
+directives. 4.x compatibility is declared only from the v4.5/v4.6/v4.12
+execution probe, not from source reading.
+
 Temporary scaffolding to remove: VM `import-reinitialised` refusal — removal
 condition: legacy and VM both implement and verify initialise-once (D-041).
 
