@@ -199,6 +199,40 @@ a FIFO and an unreadable file): `tests/rt/vm_modules_unit.cpp` plans every legac
 resolution details (relative chains, two spellings, absent files, project
 root) and rebinding.
 
+### Requirement from records20k: path arguments rooted at imported bindings
+
+When CP12B compiles imports, stage 4's path-argument lift (a call argument
+that is a path such as `o.k`, lifted to a location) must **refuse paths whose
+root is an imported binding**. Under D-046 #2 an exported name is the
+module's storage location, so `f(o.k)` with `s.push(9)` in `f` writes into
+the module's state, and the module's own `setk()` can replace `o` between
+the import and the call. Probe (scratchpad `integ/mod/`, records20k):
+
+```
+// m.f
+o := {"k": 1}
+fn(setk()) {
+  o = {"k": [1]}
+  return 0
+}
+export(o)
+export(setk)
+// p2.f
+fn(f(s)) {
+  s.push(9)
+  return 0
+}
+import("m.f")
+setk()
+f(o.k)
+print(o.k.stringify())    // legacy: [1,9]
+```
+
+Legacy (runtime-2 @217ac21b): `p1` (`f(o.k)` read-only) prints `1`, `p2`
+prints `[1,9]`, `p3` (`print(o.k)`) prints `1`. The refusal reason will be
+`path-in-call-argument:imported` until a module-location model lifts it; the
+probes become fixtures with the import hookup.
+
 ### Temporary scaffolding: `import-reinitialised` (removal item)
 
 `InitPolicy` is the single initialisation switch. The default is
