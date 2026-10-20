@@ -421,3 +421,19 @@ Reproducers: `scratchpad/integ/pathq/q2/`, `scratchpad/integ/pathp/method_arg_mi
 records20k owner as separate, attributable commits with regression fixtures,
 and the differential generators extended with failing-path shapes; closed only
 when integrated and certified.
+
+## feature-case-fastpath (DeepSeek) certified on Linode @33c5415 (2026-10-20)
+
+Base `2d191e6b`, tip `33c5415a` (DeepSeek's two commits plus Claude's
+integration commit):
+
+    certify @ 33c5415: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 173
+
+Focused gates before certification (Linode worker job `case-gates1` @244cc396,
+pre-rebase, identical code): built-ins, guards (35 workloads, 0 failures),
+built-ins sanitizer, `test-rt-vm`, mutants, rt-lint, test-integrity, and the
+negative control run from outside the repository (candidate passes; planted
+wrong mapping fails 120 of 1,679 checks). Integration: rebased onto `runtime-2`
+@`041e8efc` (docs-only since the base); non-docs tree equals `33c5415a`
+(package snapshot b978a5a2… unchanged). Linux only. Evidence:
+`.claude-linode-runs/casecert/out.tgz`, `.claude-linode-runs/results/case-gates1/`.
