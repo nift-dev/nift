@@ -149,10 +149,14 @@ void fold_constants(Expr& e){
  e.kind=Kind::Literal; e.literal=std::move(v); e.text.clear(); e.op.clear(); e.name.clear(); e.params.clear(); e.left.reset(); e.right.reset(); e.items.clear();
 }
 
+static bool subtree_needs_literal_completion(const Expr& e){if(e.literal_needs_completion)return true;if(e.left&&subtree_needs_literal_completion(*e.left))return true;if(e.right&&subtree_needs_literal_completion(*e.right))return true;for(auto& item:e.items)if(item&&subtree_needs_literal_completion(*item))return true;return false;}
 static void annotate_completion(Expr& e){
  if(e.kind==Kind::Literal&&!e.literal_token.empty())e.literal_needs_completion=e.literal_token.find_first_of("\\$")!=std::string::npos;
- if(e.kind==Kind::Call)e.output_completion=e.name=="print"||e.name=="err"||e.name=="warn"||(e.left&&e.left->kind==Kind::Member&&(e.left->name=="stringify"||e.left->name=="prettify"||e.left->name=="highlight"));
  if(e.left)annotate_completion(*e.left);if(e.right)annotate_completion(*e.right);for(auto& item:e.items)if(item)annotate_completion(*item);
+ // Output completion is needed only when an operand carries a literal that
+ // still needs escape/interpolation completion; other operands keep the
+ // canonical evaluation path and its diagnostics (D-018).
+ if(e.kind==Kind::Call&&(e.name=="print"||e.name=="err"||e.name=="warn"||(e.left&&e.left->kind==Kind::Member&&(e.left->name=="stringify"||e.left->name=="prettify"||e.left->name=="highlight")))){bool need=false;for(auto& item:e.items)if(item&&subtree_needs_literal_completion(*item)){need=true;break;}e.output_completion=need;}
 }
 static ParseResult parse_bounded_expression(const std::string& source,bool literal_payload){
     if(literal_payload){
