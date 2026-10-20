@@ -100,11 +100,13 @@ bool UnitCompiler::statement(NodeId id) {
     // for the context checks. An `if` condition or `return` expression the
     // prepared parser rejects makes legacy abandon preparing the whole loop
     // body: refused (after the statement's own checks, so their reasons come
-    // first).
+    // first). Stage 4: in the body of a function called from a loop (outside
+    // a loop of its own) legacy abandons preparing the function and runs the
+    // call canonically; admitted, its call sites are checked (prepared.cpp).
     const bool saved_textual = textual_statement_;
     bool unpreparable = false;
     if (loop_reachable() && !statement_preparable(node)) {
-        if (node.kind == NodeKind::If || node.kind == NodeKind::Return) unpreparable = true;
+        if (node.kind == NodeKind::If || node.kind == NodeKind::Return) unpreparable = loop_region();
         else if (node.kind != NodeKind::While) textual_statement_ = true;
     }
     update_flags();
@@ -152,7 +154,7 @@ bool UnitCompiler::if_chain(const Node& node) {
     bool other_ok = false;
     if (other.kind == NodeKind::If) {
         other_ok = if_chain(other);
-        if (other_ok && loop_reachable() && !statement_preparable(other))
+        if (other_ok && loop_region() && !statement_preparable(other))
             other_ok = fail(other, "prepared-unpreparable");
     } else {
         scopes_.push();

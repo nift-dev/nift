@@ -55,13 +55,13 @@ import tempfile
 SUPPORTED = [
     ('push_arrlit_fnloop', 'fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n'),
     ('push_call_loop', 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\ni := 0\nwhile (i < 3) { a.push(mk(i)); i += 1 }\nprint(a.stringify())\nprint(a[2].t[0] + a[1].id)\n'),
-    ('push_call_top', 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\nb := mk(2)\na.push(b.t)\nprint(a.stringify())\n'),
+    ('push_call_top', 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\na.push(mk(2))\nprint(a.stringify())\n'),
     ('push_objlit_loop', 'a := []\ni := 0\nwhile (i < 3) { a.push({"k": i, "s": "v" + i, "l": [i, i]}); i += 1 }\nprint(a.stringify())\n'),
     ('push_records_shape', 'fn(make_record(i)) {\n  return {"id": i, "name": "item" + i, "score": (i * 37) % 101, "tags": [i % 3, i % 5]}\n}\nrecords := []\ni := 0\nwhile (i < 4) {\n  records.push(make_record(i))\n  i += 1\n}\nprint(records.stringify())\nprint(records[3].tags[1] + records[2].score)\n'),
     ('push_ternary_lit', 'a := []\ni := 0\nwhile (i < 2) { a.push((i > 0 ? [1] : [2])); i += 1 }\nprint(a.stringify())\n'),
-    ('push_then_mutate', 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\nx := a[0]\nprint(a.stringify())\n'),
+    ('push_then_mutate', 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\na.push(mk(3))\nn := a.length()\nprint(n)\nprint(a.stringify())\n'),
     ('up_bare_return', 'fn(f(p)) { if (p > 0) { print("pos")\nreturn }\nprint("zero") }\ni := 0\nwhile (i < 2) { f(i); i += 1 }\n'),
-    ('up_chain_if', 'fn(f(p)) { if (p < 2 == true) { print("lt") }\nreturn p }\ni := 0\nwhile (i < 3) { print(f(i)); i += 1 }\n'),
+    ('up_chain_if', 'fn(f(p)) { if ((p < 2 ? 1 : 0) == 1) { print("lt") }\nreturn p }\ni := 0\nwhile (i < 3) { print(f(i)); i += 1 }\n'),
     ('up_coalesce', 'fn(f(p)) { return (p ?? 1) }\ni := 0\nwhile (i < 2) { print(f(i)); i += 1 }\n'),
     ('up_fn_from_loop_fn', 'fn(f(p)) { return (true ? p * 2 : 0) }\nfn(g(q)) { return f(q) + 1 }\ni := 0\nwhile (i < 2) { print(g(i)); i += 1 }\n'),
     ('up_neg_lit', 'fn(f(p)) { return (true ? p : 0) }\ni := 0\nwhile (i < 1) { print(f(-3)); i += 1 }\n'),
@@ -74,13 +74,22 @@ SUPPORTED = [
 
 PARAM_DECL = [
     # (name, must run on the VM, source); the oracle is ORACLE[name]
-    ("pd_types_loop", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
+    # Arguments that are paths (path-in-call-argument: legacy resolves them as
+    # locations), aggregates (aliasing) or double-typed text (prepared typing
+    # differs): refused, identical to legacy (stage4d corrected these three).
+    ("pd_types_loop", False, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
      'vals := ["a", 2, 2.5, [1, "b"], {"k": 1}]\ni := 0\nwhile (i < 5) { f(vals[i]); i += 1 }\nf("top")\nf(7)\n'),
-    ("pd_types_literals", True, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\ni := 0\n'
+    ("pd_types_literals", False, 'fn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\ni := 0\n'
      'while (i < 1) { f("a"); f(2); f(2.5); f([1, 2]); f({"k": 1}); i += 1 }\n'),
-    ("pd_pad", True, 'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
+    ("pd_pad", False, 'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
      'names := ["item0", "it", "x"]\nk := 0\nr := ""\nwhile (k < 3) { r += pad(names[k], 6) + ";"; k += 1 }\n'
      'print(r)\nprint(pad("top", 5))\n'),
+    # On the VM: string, int and untyped (call result) arguments, loops and top level.
+    ("pd_scalars_loop", True, 'fn(dbl()) { return 2.5 }\nfn(f(s)) {\n  out := s\n  print(out.stringify())\n  return 0\n}\n'
+     'i := 0\nwhile (i < 1) { f("a"); f(2); f(dbl()); i += 1 }\nf("top")\nf(7)\n'),
+    ("pd_pad_calls", True, 'fn(nm(k)) {\n  if (k == 0) { return "item0" }\n  if (k == 1) { return "it" }\n  return "x"\n}\n'
+     'fn(pad(s, width)) {\n  out := s\n  while (out.length() < width) { out += "." }\n  return out\n}\n'
+     'k := 0\nr := ""\nwhile (k < 3) { r += pad(nm(k), 6) + ";"; k += 1 }\nprint(r)\nprint(pad("top", 5))\n'),
     ("pd_register_type_top", True, 'fn(f(p)) {\n  out := p\n  print(out)\n  out = 2.5\n  print(out)\n  return 0\n}\n'
      'x := 1e2\nprint(x)\nf(x)\nv := 100\nf(v)\n'),
     ("pd_reassign_double_then_string", False, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\n'
@@ -106,6 +115,8 @@ LEGACY_INCONSISTENT = {
 # arguments by the rule above (pd_pad: s padded with "." to the width).
 ORACLE = {
     'pd_types_loop': (['"a"', '2', '2.5', '[1,"b"]', '{"k":1}', '"top"', '7'], False),
+    'pd_scalars_loop': (['"a"', '2', '2.5', '"top"', '7'], False),
+    'pd_pad_calls': (['item0.;it....;x.....;', 'top..'], False),
     'pd_types_literals': (['"a"', '2', '2.5', '[1,2]', '{"k":1}'], False),
     'pd_pad': (['item0.;it....;x.....;', 'top..'], False),
     # Textual declaration typing (D-046 #1): x := 1e2 is a double binding
@@ -123,6 +134,22 @@ ORACLE = {
 }
 
 REFUSED = [
+    # Integration review (stage4d): these were listed as supported, but each
+    # contains a construct that is refused for a reason that still holds: a
+    # pushed member of a binding and a declaration from an array element are
+    # places (aliasing, L7: legacy binds locations); `p < 2 == true` is a
+    # comparison chain (CP12 F2: legacy splits chains differently). Kept here
+    # with that reason; the supported list has the corrected programs.
+    ("push-member-after-call", 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\nb := mk(2)\na.push(b.t)\nprint(a.stringify())\n', "aliasing"),
+    ("decl-from-pushed-element", 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\nx := a[0]\nprint(a.stringify())\n', "aliasing"),
+    ("chain-if-condition", 'fn(f(p)) { if (p < 2 == true) { print("lt") }\nreturn p }\ni := 0\nwhile (i < 3) { print(f(i)); i += 1 }\n', "comparison-chain"),
+    # The parameter copy where legacy's prepared typing differs from the
+    # declared type: a binding of the same name outside the function
+    # (review2_m1_param_caller_scope), a double-typed argument text.
+    ("param-copy-outer-name", 'fn(f(a)) {\n  b := a\n  b = 1.5\n  return b\n}\na := "s"\ni := 0\n'
+     'while (i < 1) { print(f(2.5)); i += 1 }\n', "prepared-decl-type"),
+    ("param-copy-double-text", 'fn(f(s)) {\n  out := s\n  print(out)\n  return 0\n}\ni := 0\n'
+     'while (i < 1) { f(2.5); i += 1 }\n', "prepared-decl-type"),
     ("decl-param-expression", 'fn(f(s)) {\n  out := s + ""\n  return out\n}\ni := 0\nwhile (i < 1) { print(f("a")); i += 1 }\n',
      "prepared-decl-type"),
     ("effect-argument", 'fn(g(x)) { print("g " + x)\nreturn x }\nfn(f(p)) { return (true ? p : 0) }\n'

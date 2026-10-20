@@ -49,7 +49,7 @@ public:
         mark_unpreparable_functions();
         check_unpreparable_calls();
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f)
-            check_regions(ast_.at(plan_.functions[f]).b, marked_[f], plan_.functions[f]);
+            check_regions(ast_.at(plan_.functions[f]).b, marked_[f], f);
         if (!result_.refused) top_level([this](NodeId id) { check_regions(id, false); return !result_.refused; });
         for (std::size_t f = 0; f < plan_.functions.size() && !result_.refused; ++f) {
             caller_ = static_cast<int>(f);
@@ -168,15 +168,14 @@ private:
     // types of the bindings visible at that loop's header; that is the
     // binding the VM resolves unless the name is (re)declared inside the
     // loop (a loop-local shadow, as in `a := 2.5; b := a`).
-    void check_regions(NodeId body, bool prepared_function, NodeId fn = kNoNode) {
+    void check_regions(NodeId body, bool prepared_function, std::size_t f = 0) {
         if (prepared_function) {
-            std::unordered_set<std::string_view> params;
-            walk(ast_, fn, [&](NodeId, const Node& n) {
-                if (n.kind == NodeKind::Param) params.insert(ast_.text(n));
+            std::vector<std::string_view> params;
+            walk(ast_, plan_.functions[f], [&](NodeId, const Node& n) {
+                if (n.kind == NodeKind::Param) params.push_back(ast_.text(n));
                 return true;
             });
-            walk(ast_, body,
-                 [&](NodeId, const Node& n) { return check_declaration(n, nullptr, &params); });
+            walk(ast_, body, [&](NodeId, const Node& n) { return check_declaration(n, nullptr, f, &params); });
             return;
         }
         outermost_loops(body, [this](const Node& n) {
@@ -223,17 +222,33 @@ private:
 
     // Legacy types the declaration from the text after `:=` (decl_type),
     // evaluated when the body is prepared.
-    // Stage 4 ruling: in a prepared function, a declaration whose text is
-    // exactly one parameter name takes that parameter's bound type (its type
-    // register, P5), as legacy's BindType; any other text naming a binding is
-    // refused.
-    bool check_declaration(const Node& n, const std::unordered_set<std::string_view>* risky_names,
-                           const std::unordered_set<std::string_view>* params = nullptr) {
+    // Stage 4 (D-046 #1): `x := p` keeps p's declared type (P5). Legacy types it when preparing, from
+    // `p` in the caller's scopes (decl_type; not found: the value's type): admitted only where that is
+    // equal, i.e. no binding p outside the function and every call passes p untyped or int text.
+    // Otherwise refused (review2_m1_param_caller_scope, L52).
+    bool param_copy_matches_legacy(std::size_t f, const std::vector<std::string_view>& params, std::size_t k) {
+        if (!names_collected_) collect_declared_names(), names_collected_ = true;
+        if (global_names_.count(params[k])) return false;
+        for (std::size_t g = 0; g < plan_.functions.size(); ++g)
+            if (g != f && function_names_[g].count(params[k])) return false;
+        return walk(ast_, root_, [&](NodeId, const Node& n) {
+            if (callee_index(n) != static_cast<int>(f)) return true;
+            if (k >= n.count) return false;
+            const Node& arg = ast_.at(ast_.list(n)[k]);
+            const TextType t = infer_text_type(ast_.text(arg));
+            return arg.kind == NodeKind::String || (t.kind == TextType::Kind::Known && (t.known == -1 || t.known == 2));
+        });
+    }
+
+    bool check_declaration(const Node& n, const std::unordered_set<std::string_view>* risky_names, std::size_t f = 0,
+                           const std::vector<std::string_view>* params = nullptr) {
         if (n.kind != NodeKind::Declare) return true;
         const std::string_view src = ast_.source();
         const std::uint32_t op = detail::find_in(src, ":=", n.begin, n.end);
         if (op == n.end) return refuse(n, "prepared-decl-type");
-        if (params && params->count(detail::trim(src.substr(op + 2, n.end - op - 2)))) return true;
+        for (std::size_t k = 0; params && k < params->size(); ++k)
+            if ((*params)[k] == detail::trim(src.substr(op + 2, n.end - op - 2)))
+                return param_copy_matches_legacy(f, *params, k) || refuse(n, "prepared-decl-type");
         if (refers_to(infer_text_type(src.substr(op + 2, n.end - op - 2)), risky_names))
             return refuse(n, "prepared-decl-type");
         return true;
