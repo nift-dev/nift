@@ -365,7 +365,7 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_run.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
-test-rt-vm: $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	"$(RT_VM_UNIT)"
 	"$(RT_VM_GLOBALS)"
 	"$(RT_VM_MODULES)"
@@ -1479,15 +1479,23 @@ test-build-recovery: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/build_recovery_random.py
 
 # D-010: test-all must keep reaching the comprehensive suites.
-test-runtime2-certification-guard:
+test-runtime2-certification-guard: test-runtime2-vm-corpus-complete
 	bash tests/runtime2/certification_guard.sh
+
+# Golden-corpus completeness (existence only; never generates outputs): every
+# vm-corpus/semantics .f has its .stdout/.stderr/.exit; the selftest removes a
+# golden from a copy and must fail naming it. Seconds; before certification.
+.PHONY: test-runtime2-vm-corpus-complete
+test-runtime2-vm-corpus-complete:
+	bash tests/runtime2/vm_corpus_complete.sh
+	bash tests/runtime2/vm_corpus_complete.sh --selftest
 
 # Runtime 2.0 CP07: process capture parity and no leaked capture files.
 test-runtime2-process-capture: $(TARGET)
 	$(LOAD_SENSITIVE_DEFER) NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
 
 # Runtime 2.0 VM regression corpus (golden outputs from the canonical evaluator).
-test-runtime2-vm-corpus: $(TARGET)
+test-runtime2-vm-corpus: test-runtime2-vm-corpus-complete $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/vm_corpus.sh
 
 # CP13 diagnostic corpus (docs/runtime-2/checkpoints/cp13-diagnostics-design.md):
