@@ -262,6 +262,21 @@ bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
     return at - 1 == open;
 }
 
+// The outermost member/index chain `node` belongs to (D1, path wording):
+// legacy resolves a postfix path operand as one text and quotes all of it in
+// an index message (`a[5].y`: 'a[5].y'); a method call or parentheses end the
+// chain. Sets the chain for `node`'s receiver, compiled next.
+const Node& UnitCompiler::chain_enter(const Node& node) {
+    const Node& top = chain_next_ == &node ? *chain_top_ : node;
+    const std::string_view src = ast_.source();
+    std::uint32_t at = ast_.at(node.a).end;
+    while (at < src.size() && (src[at] == ' ' || src[at] == '\t' || src[at] == '\n' || src[at] == '\r')) ++at;
+    const char joint = node.kind == NodeKind::Member ? '.' : '[';
+    chain_top_ = &top;
+    chain_next_ = at < src.size() && src[at] == joint ? &ast_.at(node.a) : nullptr;
+    return top;
+}
+
 // Member and index reads can fail at run time (missing member or key, index
 // out of range). Their legacy diagnostics are reproduced where the shape is
 // known: outside user-call arguments (except an admitted path argument,
@@ -273,7 +288,10 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
-    if (!reg_any(node.a, object)) return false;
+    chain_enter(node);
+    const bool receiver_ok = reg_any(node.a, object);
+    chain_next_ = nullptr;
+    if (!receiver_ok) return false;
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(site(node));
@@ -295,14 +313,17 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
-    if (!reg_any(node.a, object_reg)) return false;
+    const Node& chain = chain_enter(node);
+    const bool receiver_ok = reg_any(node.a, object_reg);
+    chain_next_ = nullptr;
+    if (!receiver_ok) return false;
     ++index_depth_;
     const bool key_ok = expr_any(node.b, key);
     --index_depth_;
     if (!key_ok) return false;
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::GetIndex, dst, object_reg, key);
-    fb_->note(at, location.empty() ? std::string(text(node)) : std::move(location));
+    fb_->note(at, location.empty() ? std::string(text(chain)) : std::move(location));
     fb_->release_to(mark);
     return true;
 }

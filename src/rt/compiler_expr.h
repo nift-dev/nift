@@ -133,6 +133,7 @@ private:
     // compiler_call.cpp: a member or index path in user-call arguments.
     bool argument_path(const Node& node, std::string& note);
     bool bare_argument(const Node& call, std::uint32_t k) const;
+    const Node& chain_enter(const Node& node);
     bool no_alias(NodeId value, const Node& at);
     // kKindUnknown always comes with every kind, so a "may be X" test is
     // conservative for it too (review CP12 round 1, D1).
@@ -181,6 +182,8 @@ private:
     int call_args_ = 0;               // inside user-call arguments
     NodeId path_arg_ = kNoNode;       // the user-call argument being compiled (argument_path)
     NodeId path_chain_ = kNoNode;     // the next receiver of an admitted path argument
+    const Node* chain_top_ = nullptr;   // the outermost member/index chain (chain_enter)
+    const Node* chain_next_ = nullptr;  // its next receiver
     int index_depth_ = 0;             // inside index brackets
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;

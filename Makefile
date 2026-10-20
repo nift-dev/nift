@@ -460,6 +460,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 		--count $${RT_VM_SUBSET_GEN:-500}
 	python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_former_replay.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} \
@@ -502,6 +503,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
