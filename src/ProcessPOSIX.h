@@ -1,5 +1,6 @@
 #pragma once
 #ifndef _WIN32
+#include <atomic>
 #include <cerrno>
 #include <fcntl.h>
 #include <mutex>
@@ -7,6 +8,18 @@
 // Serialize Nift-owned descriptor setup through fork. This closes the portable
 // pipe/mkstemp + fcntl race on platforms without atomic CLOEXEC creation.
 inline std::mutex& nift_process_launch_mutex() { static std::mutex value; return value; }
+// CP16: every component that forks reports its direct children here, while
+// holding the launch mutex, so the Host layer (subreaper: adopted orphans are
+// Nift's children too) never reaps a child some other code waits for.
+using NiftChildObserver = void (*)(long pid);
+inline std::atomic<NiftChildObserver>& nift_process_child_observer() {
+    static std::atomic<NiftChildObserver> value{nullptr};
+    return value;
+}
+inline void nift_process_note_child(long pid) {
+    if (pid <= 0) return;
+    if (const NiftChildObserver observer = nift_process_child_observer().load()) observer(pid);
+}
 inline bool nift_process_cloexec(int fd) { return fcntl(fd,F_SETFD,FD_CLOEXEC)>=0; }
 inline int nift_process_owned_fd(int fd) {
     if(fd<0)return fd;

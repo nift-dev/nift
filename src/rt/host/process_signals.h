@@ -36,6 +36,12 @@ void clear_shutdown_for_test();
 
 // ---- subreaper and orphan sweep (Linux) ----
 bool enable_subreaper();   // false where unavailable
+// For the legacy interpreter (cp16-host-ops-impl.md §9.3): reports of other
+// components' direct children are switched on (ProcessPOSIX.h), the children
+// Nift already has are recorded as theirs, then the subreaper is enabled.
+// Orphans of legacy run() stages (which stay in Nift's process group) are
+// then Nift's children: reaped when they exit and terminated by C2.
+bool enable_subreaper_for_legacy();
 bool subreaper_enabled();
 // Terminates and reaps processes reparented to Nift that belong to no
 // indexed group and to no detached session (sid), excluding pids for which

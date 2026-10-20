@@ -85,6 +85,10 @@ handles::HandleTable& legacy_process_table() {
     if (!is(current_term, SIG_DFL) || !(int_ignored || is(current_int, SIG_DFL))) return;
     if (!host::runtime::install_signal_cleanup()) return;
     installed = true;
+    // C2 for background members: legacy run() stages stay in Nift's process
+    // group, so a member a stage leaves behind is found by parentage instead
+    // (subreaper; reaped after each run() and at script end, terminated by C2).
+    host::runtime::enable_subreaper_for_legacy();
     if (int_ignored) {
         struct sigaction ignore {};
         ignore.sa_handler = SIG_IGN;
@@ -160,6 +164,7 @@ bool Parser::run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint6
     // Ctrl-C) reaches them. Hence no C3 group and no C1 leftover tracking for
     // legacy run(); C2 still terminates them (by pid) on SIGINT/SIGTERM.
     request.own_group = false;
+    request.exec_report_optional = true;  // CP07: capture works under `ulimit -n 6`
     for (const auto& spec : specs) {
         host::SpawnStage stage;
         stage.program = spec.program;
@@ -185,6 +190,7 @@ bool Parser::run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint6
         return false;
     }
     const host::ProcessResult& result = group->wait();
+    host::runtime::reap_adopted_children();  // background members that already exited (no zombies)
     if (host::runtime::shutting_down()) {
         // C2: SIGINT/SIGTERM arrived while the call ran; the watcher is ending
         // Nift with the signal. The script stops here instead of running on
@@ -214,6 +220,9 @@ bool Parser::run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint6
 }
 
 bool Parser::end_host_process_context(std::string& error, bool on_error) {
+#ifndef _WIN32
+    host::runtime::reap_adopted_children();
+#endif
     if (!host_process_context_) return true;
     const handles::ContextId id = host_process_context_;
     host_process_context_ = 0;

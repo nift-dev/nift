@@ -15,6 +15,7 @@
 #include "rt/host/process_call.h"
 #include "rt/host/process_cleanup.h"
 #include "rt/host/process_runtime.h"
+#include "ProcessPOSIX.h"  // nift_process_launch_mutex (fork-site contract)
 #include "rt/host/run_request.h"
 #include "rt_test.h"
 
@@ -822,6 +823,22 @@ void low_fd_limit() {
     CHECK(!r.launched && r.state == GroupState::LaunchFailed);
     CHECK(r.error == "cannot create pipe: Too many open files");
     CHECK(fd_count() == base);
+    // Room for the two capture files but not the exec-failure report pipe: the
+    // Host layer's own launches fail loudly (launch failure stays distinct
+    // from an exit status); only the legacy-compatibility flag launches anyway.
+    {
+        auto plain = req({"true"}, OutputMode::FileCapture, tag);
+        auto legacy = plain;
+        legacy.exec_report_optional = true;
+        low.rlim_cur = limit_with_free_slots(3);  // two captures + one (a pipe needs two)
+        ::setrlimit(RLIMIT_NOFILE, &low);
+        auto rp = run_ok(plain);
+        auto rl = run_ok(legacy);
+        ::setrlimit(RLIMIT_NOFILE, &old);
+        CHECK(!rp.launched && rp.state == GroupState::LaunchFailed && rp.error == "cannot create pipe: Too many open files");
+        CHECK(rl.launched && rl.exit_code == 0);
+        CHECK(fd_count() == base);
+    }
     // a limit that fits: 300 launches, no descriptor leak
     low.rlim_cur = limit_with_free_slots(12);
     ::setrlimit(RLIMIT_NOFILE, &low);
@@ -1010,6 +1027,35 @@ void subreaper_reaps_orphans() {
     std::this_thread::sleep_for(milliseconds(300));  // SIGCHLD has woken the loop by now
     int status = 0;
     CHECK(::waitpid(foreign, &status, 0) == foreign && WIFEXITED(status) && WEXITSTATUS(status) == 7);
+}
+
+// Legacy run() (own_group = false, cp16-host-ops-impl.md §9.3): background
+// members a stage leaves in Nift's group are adopted (subreaper) and reaped by
+// reap_adopted_children(); a child another component reported is left to it.
+void legacy_adopted_children() {
+    if (!runtime::enable_subreaper()) { std::printf("legacy_adopted_children: SKIPPED\n"); return; }
+    runtime::set_child_reporting(true);
+    const std::string tag = new_tag();
+    auto r = req({"sh", "-c", "sleep 0.2 &"}, OutputMode::FileCapture, tag);
+    r.own_group = false;
+    auto g = start_ok(r);
+    g->wait();
+    CHECK(g->pgid() == -1);
+    pid_t reported = -1;
+    {
+        // The contract for every fork site: fork and report under the launch mutex.
+        std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
+        reported = ::fork();
+        if (reported == 0) ::_exit(7);
+        runtime::note_direct_child(reported);
+    }
+    std::this_thread::sleep_for(milliseconds(500));  // the orphan and the reported child have exited
+    runtime::reap_adopted_children();  // (the host loop may have reaped it already: SIGCHLD in this binary)
+    CHECK(none_tagged(tag));
+    int status = 0;
+    CHECK(::waitpid(reported, &status, 0) == reported && WIFEXITED(status) && WEXITSTATUS(status) == 7);
+    CHECK(no_zombies());
+    runtime::set_child_reporting(false);
 }
 
 // ---- D-034 ----
@@ -1299,6 +1345,7 @@ int main(int argc, char** argv) {
         {"handle_lifecycle", handle_lifecycle},
         {"detached_rules", detached_rules},
         {"low_fd_limit", low_fd_limit},
+        {"legacy_adopted_children", legacy_adopted_children},
         {"trace_spawn", trace_spawn},
         {"pipe_mode_suite", pipe_mode_suite},
         {"stdin_suite", stdin_suite},

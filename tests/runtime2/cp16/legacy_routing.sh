@@ -5,10 +5,22 @@
 #
 #   1. result objects unchanged (expected values: runtime-2 e8e4b106, legacy launcher)
 #   2. children stay in Nift's process group (legacy; no C3/C1 for legacy run())
-#   3. a SIGKILL to Nift's group reaches them, a SIGKILL to Nift alone does not
+#   3. a SIGKILL to Nift's group reaches them, a SIGKILL to Nift alone does not;
+#      background members left by a run() outlive a normal script end (legacy)
+#      but are terminated by SIGINT/SIGTERM to Nift (C2) and by a group SIGKILL
 #   4. C2: SIGTERM to Nift terminates the children, Nift ends with SIGTERM
 #   5. trace v2 from the legacy interpreter: one format per file
 #   6. stdin is inherited (FileCapture)
+#
+# Ownership classes (owner conditions for the legacy run() exception,
+# cp16-host-ops-impl.md §9.3): (a) SIGINT/SIGTERM to Nift terminates the
+# legacy children (running stages and the background members they left);
+# (b) processes the Host layer manages follow their CP16/CP17 contract --
+# tests/rt/host_process_unit.cpp (make test-rt-host), not this script;
+# (c) legacy background descendants on an ordinary context exit (script end,
+# page render end) survive, exactly as the documented exception says; (d) an
+# unrelated process in the same session survives Nift's signal handling.
+# No assertion here requires that nothing is left when (c) allows survival.
 #
 # D-031: file-size and address-space limits, a timeout on every nift call,
 # and every process the tests start is killed by its recorded PID at exit.
@@ -101,6 +113,77 @@ EOF
       if [ -n "$child" ] && alive "$child"; then ok "SIGKILL to Nift alone leaves the child running (legacy)"; else bad "child [$child] died with Nift"; fi
       kill -9 "$child" 2>/dev/null
     fi
+  done
+
+  # 3b. Background members a legacy run() leaves behind (the call returned,
+  #     the member lives on). Legacy behaviour is kept when the script ends
+  #     normally (no C1 for legacy run(): the member outlives the script), but
+  #     SIGINT/SIGTERM to Nift (C2) terminates it, and so does a SIGKILL to
+  #     Nift's process group (rt-diff, supervisors).
+  cat > bgend.f <<'EOF'
+r := cmd("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > bgend.pid").run()
+print("done")
+EOF
+  rm -f bgend.pid
+  N bgend.f > /dev/null 2>&1
+  bge=$(cat bgend.pid 2>/dev/null); echo "$bge" > bgend-kill.pid
+  sleep 0.3
+  if [ -n "$bge" ] && alive "$bge"; then ok "(c) background member outlives a normal script end (legacy exception)"; else bad "background member [$bge] did not outlive its script"; fi
+  kill -9 "$bge" 2>/dev/null
+  # (c) the same at a page render end
+  if [ -d "$HERE/probes/sites/site_run/site" ]; then
+    cp -r "$HERE/probes/sites/site_run/site" csite && mkdir -p csite/data
+    cat > csite/content/index.html <<'EOF'
+R:@script { return run("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > bg.pid; echo ok").stdout }
+EOF
+    (cd csite && timeout -k 5 60 "$NIFT" build --all > ../csite.out 2>&1); crc=$?
+    cbg=$(cat csite/bg.pid 2>/dev/null); echo "$cbg" > csite-kill.pid
+    expect "(c) page build succeeds" "0" "$crc"
+    sleep 0.3
+    if [ -n "$cbg" ] && alive "$cbg"; then ok "(c) background member outlives the page render (legacy exception)"; else bad "page background member [$cbg] did not outlive the render"; fi
+    kill -9 "$cbg" 2>/dev/null
+  fi
+  # Adopted members that exit are reaped (no zombie children of Nift).
+  cat > zomb.f <<'EOF'
+a := cmd("sh", "-c", "sleep 0.1 >/dev/null 2>&1 &").run()
+b := cmd("sh", "-c", "sleep 0.1 >/dev/null 2>&1 &").run()
+c := cmd("sh", "-c", "sleep 0.4").run()
+d := cmd("sh", "-c", "true").run()
+print(cmd("sh", "-c", "ps -o stat= --ppid $PPID | grep -c Z").run().stdout)
+EOF
+  if command -v ps >/dev/null; then expect "adopted background members reaped (zombie children of Nift)" "0||" "$(N zomb.f 2>&1 | tr '\n' '|')"; fi
+  cat > bgsig.f <<'EOF'
+r := cmd("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > bgsig.pid").run()
+w := cmd("sh", "-c", "echo $$ > hold.pid; sleep 30").run()
+print("not reached")
+EOF
+  for how in TERM INT group; do
+    rm -f bgsig.pid hold.pid
+    # SIGINT at its default even if this shell runs us as a background job.
+    if [ "$how" = group ]; then
+      setsid "$NIFT" bgsig.f > bgsig.out 2>&1 & npid=$!
+    else
+      python3 -c 'import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execv(sys.argv[1], sys.argv[1:])' "$NIFT" bgsig.f > bgsig.out 2>&1 & npid=$!
+    fi
+    PIDS+=("$npid")
+    i=0; while [ ! -s hold.pid ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+    bgm=$(cat bgsig.pid 2>/dev/null); hold=$(cat hold.pid 2>/dev/null)
+    echo "$bgm" > "bgsig-$how.pid"; echo "$hold" > "hold-$how.pid"
+    if [ -z "$bgm" ] || ! alive "$bgm"; then bad "bg member not running before the signal ($how)"; continue; fi
+    # (d) an unrelated process: started by this shell, not by Nift, same session
+    sleep 30 & sib=$!; PIDS+=("$sib")
+    case $how in TERM) kill -TERM "$npid";; INT) kill -INT "$npid";; group) kill -9 -- "-$npid";; esac
+    gone_within "$npid" 150 || kill -9 "$npid" 2>/dev/null
+    wait "$npid"; rc=$?
+    case $how in TERM) want=143;; INT) want=130;; group) want=137;; esac
+    expect "(a) Nift ends with the signal ($how)" "$want" "$rc"
+    if gone_within "$bgm" 80; then ok "(a) legacy background member terminated ($how)"; else bad "background member [$bgm] survived ($how)"; fi
+    if gone_within "$hold" 80; then ok "(a) running legacy stage terminated ($how)"; else bad "stage [$hold] survived ($how)"; fi
+    grep -q 'not reached' bgsig.out && bad "script continued after $how" || true
+    if [ "$how" != group ]; then
+      if alive "$sib"; then ok "(d) unrelated process in the same session survives Nift's $how handling"; else bad "unrelated process [$sib] killed by Nift's $how handling"; fi
+    fi
+    kill -9 "$sib" 2>/dev/null; wait "$sib" 2>/dev/null
   done
 
   # 4. C2: SIGTERM to Nift blocked in run(): the child is terminated (after

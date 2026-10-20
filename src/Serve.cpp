@@ -27,6 +27,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #else
+#include "ProcessPOSIX.h"  // CP16: launch mutex, child reporting
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -221,7 +222,12 @@ ProbeResult run_probe(const std::string& program, const std::vector<std::string>
 #ifdef __linux__
     const pid_t parent = getpid();
 #endif
+    // CP16: fork and report the child under the launch mutex (the Host
+    // layer's subreaper must never reap a child this function waits for).
+    std::unique_lock<std::mutex> launch_lock(nift_process_launch_mutex());
     const pid_t pid = fork();
+    if (pid > 0) nift_process_note_child(pid);
+    if (pid != 0) launch_lock.unlock();
     if (pid < 0) { close(ends[0]); close(ends[1]); return r; }
     if (pid == 0) {
 #ifdef __linux__

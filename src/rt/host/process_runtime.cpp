@@ -69,8 +69,14 @@ bool proc_read(long pid, ProcInfo& out) {
     if (!close_paren) return false;
     char state = '?';
     long ppid = 0, pgrp = 0, session = 0;
-    if (std::sscanf(close_paren + 1, " %c %ld %ld %ld", &state, &ppid, &pgrp, &session) != 4) return false;
+    unsigned long long start = 0;
+    // state ppid pgrp session, 15 fields skipped (tty_nr .. itrealvalue), starttime
+    static const char* const kFormat =
+        " %c %ld %ld %ld %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu";
+    const int fields = std::sscanf(close_paren + 1, kFormat, &state, &ppid, &pgrp, &session, &start);
+    if (fields < 4) return false;
     out.pid = pid; out.state = state; out.ppid = ppid; out.pgrp = pgrp; out.session = session;
+    out.start = fields == 5 ? start : 0;
     return true;
 }
 

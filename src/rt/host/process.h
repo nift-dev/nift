@@ -82,6 +82,11 @@ struct SpawnRequest {
     // Nift's group (a supervisor's killpg, Ctrl-C) reaches them; Nift
     // signals them by pid; no leftover tracking (C1) and no terminal handoff.
     bool own_group = true;
+    // Legacy compatibility only (the legacy run() exception, cp16-host-ops-impl.md
+    // §9.3): when no descriptor is left for the exec-failure report pipe,
+    // launch anyway (an exec failure is then only its 127/126 status, as the
+    // legacy launcher did) instead of failing the launch.
+    bool exec_report_optional = false;
     std::function<void()> flush_output;          // Stream: flush Nift's buffered stdout/stderr first
     std::string builtin = "run";                 // message prefix
 };

@@ -250,7 +250,7 @@ bool launch_stage(Launch& l, std::size_t i) {
     if (!last && !make_pipe(link)) { l.fail(pipe_error()); return false; }
     int report[2] = {-1, -1};
     if (!make_pipe(report)) {
-        if (!l.detached && (errno == EMFILE || errno == ENFILE)) {
+        if (!l.detached && s.req.exec_report_optional && (errno == EMFILE || errno == ENFILE)) {
             // Out of descriptors: launch without the exec-failure report
             // (legacy CP07: capture works under `ulimit -n 6`). An exec
             // failure is then seen only as exit status 127/126.
