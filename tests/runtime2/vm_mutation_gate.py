@@ -90,10 +90,20 @@ def run_one(label, name, cmd, logs):
     tail = (p.stdout.strip().splitlines() or [""])[-1][:160]
     with open(os.path.join(logs, f"{label}-{name}.log"), "w") as f:
         f.write(f"$ {' '.join(cmd)}\nexit {p.returncode}\n--- stdout\n{p.stdout}\n--- stderr\n{p.stderr}")
-    lines = [f"  [{label}] {name}: {'PASS' if p.returncode == 0 else 'REJECT'} ({time.time() - start:.0f}s) {tail}"]
-    if p.returncode != 0 and label == "0":  # the unmutated binary must pass: show why it did not
+    # A suite counts only if it ran to its own summary: rc 0 with a final "PASS ..."
+    # line, or rc != 0 with a final "FAIL ..." line. Anything else (crash, abort,
+    # missing summary) is ABORTED, never a rejection: a mutant is not "rejected"
+    # by a suite that did not finish.
+    if p.returncode == 0 and tail.startswith("PASS "):
+        verdict = "PASS"
+    elif p.returncode != 0 and tail.startswith("FAIL "):
+        verdict = "REJECT"
+    else:
+        verdict = "ABORTED"
+    lines = [f"  [{label}] {name}: {verdict} (rc {p.returncode}, {time.time() - start:.0f}s) {tail}"]
+    if verdict != "PASS" and (label == "0" or verdict == "ABORTED"):
         lines += ["      | " + x for x in (p.stdout + p.stderr).strip().splitlines()[-25:]]
-    return p.returncode != 0, lines
+    return verdict, lines
 
 
 def run_all(labels, rt_diff, logs, jobs):
@@ -104,15 +114,20 @@ def run_all(labels, rt_diff, logs, jobs):
     with cf.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
         done = list(pool.map(lambda w: run_one(w[0], w[1], w[2], logs), work))
     rejected = {label: [] for label, _ in labels}
+    aborted = []
     current = None
-    for (label, name, _), (rej, lines) in zip(work, done):
+    if len(done) != len(work):
+        aborted.append(("*", f"{len(work) - len(done)} planned check(s) produced no result"))
+    for (label, name, _), (verdict, lines) in zip(work, done):
         if label != current:
             current = label
             print("unmutated (NIFT_VM_MUTANT=0):" if label == "0" else f"mutant {label} ({MUTANTS[int(label)]}):")
         print("\n".join(lines), flush=True)
-        if rej:
+        if verdict == "REJECT":
             rejected[label].append(name)
-    return rejected
+        elif verdict == "ABORTED":
+            aborted.append((label, name))
+    return rejected, aborted
 
 
 def main():
@@ -132,7 +147,10 @@ def main():
     failures = 0
     mutants = [int(x) for x in args.mutants.split(",") if x]
     labels = [("0", wrapper(binary, 0, d))] + [(str(m), wrapper(binary, m, d)) for m in mutants]
-    rej = run_all(labels, args.rt_diff, logs, args.jobs)
+    rej, aborted = run_all(labels, args.rt_diff, logs, args.jobs)
+    for label, name in aborted:
+        failures += 1
+        print(f"FAIL check [{label}] {name} did not complete (no summary line or inconsistent exit status)")
     rejected = rej["0"]
     if rejected:
         failures += 1
@@ -144,6 +162,7 @@ def main():
             print(f"FAIL mutant {m} ({MUTANTS[m]}) survived every suite")
     for m, by in results.items():
         print(f"mutant {m} {MUTANTS[m]}: {'REJECTED by ' + ', '.join(by) if by else 'SURVIVED'}")
+    print(f"matrix {len(labels)} binaries x {len(suites(binary, args.rt_diff))} suites, {len(aborted)} incomplete check(s)")
     print(("PASS" if not failures else "FAIL") + f" vm mutation gate: unmutated passes, {len(results)} mutants, "
           f"{sum(1 for v in results.values() if v)} rejected, {failures} failure(s)")
     return 1 if failures else 0
