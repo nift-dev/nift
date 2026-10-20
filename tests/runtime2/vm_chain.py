@@ -7,9 +7,9 @@ Every shape below runs in four contexts (top level, loop body, a function
 called from the top level, a function called from a loop) on legacy and on
 NIFT_VM=1; stdout, stderr and exit status must be identical or match a CP12
 policy (vm_policies.py: loop code's `invalid index` wording, D-018c). The
-shapes the VM admits must run on the VM (outcome vm/vm-error) — except that
-`fo`, which returns an object literal, cannot be prepared by legacy and is
-refused in loop-called code (`prepared-fn-unprepared`, phase A); member
+shapes the VM admits must run on the VM (outcome vm/vm-error) — `fo`,
+which returns an object literal, cannot be prepared by legacy; since stage 4
+its loop calls with a literal argument are admitted as well; member
 reads on call results and literals must be refused before execution
 (`postfix-receiver:member`, language-consistency L43).
 """
@@ -74,8 +74,11 @@ def check(args, work, item):
     verdict, policy = vm_policies.classify((a[1], a[2], a[0]), (b[1], b[2], b[0]), st, src)
     if verdict not in ("same", "approved"):
         problems.append(f"legacy {a[:3]!r} != vm {b[:3]!r}")
-    if "fo(" in expr and ctx in ("loop", "fnloop"):
-        want = "prepared-fn-unprepared"
+    # Stage 4 (records20k ruling): a loop call to a function legacy cannot
+    # prepare is admitted when its arguments are literals or name reads
+    # (`fo(2)`: the double evaluation cannot be observed; an argument with an
+    # effect stays prepared-fn-unprepared, vm_records_coverage.py). So `fo`
+    # shapes keep their own expectation in loop contexts too.
     outcome = st.get("outcome")
     if want == "vm" and outcome not in ("vm", "vm-error"):
         problems.append(f"expected on the VM, got {outcome} {st.get('reason')}")
