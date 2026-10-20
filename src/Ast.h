@@ -28,6 +28,10 @@ struct Expr {
     NumericBinaryOp prepared_numeric_operator() const;
     nift::RuntimeValue literal;
     std::unique_ptr<Expr> left, right; std::vector<std::unique_ptr<Expr>> items;
+    // Set once after parsing (annotate_completion): a literal whose token needs the
+    // canonical decoder (escape or `$`), and a call routed through the canonical
+    // output/presentation completion (print/err/warn, stringify/prettify/highlight).
+    bool literal_needs_completion=false; bool output_completion=false;
 };
 struct Context {
     std::function<nift::detail::EvalOutcome<nift::RuntimeValue>(const Expr&)> literal_outcome;
