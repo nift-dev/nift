@@ -5,6 +5,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/native.h"
 #include "rt/prepared_parse.h"
+#include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
 
 // Calls (user functions, natives), methods, member and index reads (CP11,
@@ -60,11 +61,13 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
     if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
+    const Node* const saved_print = print_arg_;
     for (std::uint32_t k = 0; k < node.count; ++k) {
         // The argument itself may be a scalar path (argument_path); a path
         // anywhere else in it, or in an index key, is not.
         path_arg_ = is_native || index_depth_ > 0 || !bare_argument(node, k) ? kNoNode : args[k];
         path_chain_ = kNoNode;
+        print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
         std::uint16_t reg = base;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
@@ -77,6 +80,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     }
     path_arg_ = saved_path;
     path_chain_ = saved_chain;
+    print_arg_ = saved_print;
     if (!is_native) --call_args_;
     if (!is_native && loop_reachable()) {
         // Legacy's prepared call types a parameter from the value only, the
@@ -277,6 +281,27 @@ const Node& UnitCompiler::chain_enter(const Node& node) {
     return top;
 }
 
+// D3 (path wording): legacy's textual evaluator resolves a path whose
+// receiver has an index other than plain digits (`a[j].k`, `w["y"].k`,
+// `a[ 1 ].k`) as one text, and a missing member is reported as `JSON value
+// '<receiver>' has no member 'k'`; with digit indexes only, or on its
+// prepared evaluator (loop code, functions called from it), as `value has no
+// member: k`, except for a path that is a print argument by itself, which it
+// resolves as text there too.
+bool UnitCompiler::receiver_text_wording(const Node& node, const Node& chain) const {
+    if (loop_reachable() && print_arg_ != &chain) return false;
+    const std::string_view src = ast_.source();
+    for (const Node* n = &ast_.at(node.a); n->kind == NodeKind::Member || n->kind == NodeKind::Index;
+         n = &ast_.at(n->a)) {
+        if (n->kind != NodeKind::Index) continue;
+        const std::uint32_t open = detail::find_in(src, "[", ast_.at(n->a).end, n->end);
+        if (open + 1 >= n->end) return true;
+        const std::string_view key = src.substr(open + 1, n->end - 1 - (open + 1));
+        if (key.empty() || key.find_first_not_of("0123456789") != std::string_view::npos) return true;
+    }
+    return false;
+}
+
 // Member and index reads can fail at run time (missing member or key, index
 // out of range). Their legacy diagnostics are reproduced where the shape is
 // known: outside user-call arguments (except an admitted path argument,
@@ -288,10 +313,11 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
-    chain_enter(node);
+    const Node& chain = chain_enter(node);
     const bool receiver_ok = reg_any(node.a, object);
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
+    if (location.empty() && receiver_text_wording(node, chain)) location = std::string(text(ast_.at(node.a)));
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(site(node));
