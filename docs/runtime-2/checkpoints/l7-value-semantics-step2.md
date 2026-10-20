@@ -435,10 +435,16 @@ prototypes on `memcheck-repro` 7fab21a6).
   budget exceeded", the 1,000-key control runs 3,000,000 rounds.
   `value_round2`'s accounting check now allows for the 200 atoms it interns
   (they stay charged).
-* **Status.** Unit tests local; the end-to-end script runs in the worker job
-  (needs a `nift` build).
+* **Status.** Rule accepted provisionally (D-047 #3); CP23 revisits
+  thread-local atom lifetime and context isolation for long-lived contexts.
+  Unit tests local; the end-to-end script runs in the worker job (needs a
+  `nift` build).
 
 ### 6.4 C3: natives check the budget before allocating results
+
+**Status: open (D-047 #4)** until `join` and `replace` are both integrated
+and certified, the heap-limit-zero fix (§6.5) lands, and the bypass
+reproducers pass.
 
 * **Defect.** `join` and `replace` built their whole result before the VM
   next compared the live total with the budget, so one call could overshoot
