@@ -1148,3 +1148,17 @@ by ownership class (no contradictory "nothing left behind" for permitted legacy
 descendants) and include an unrelated process surviving Nift's signal handling.
 **Removal condition: CP25 cannot complete while any execution path relies on
 this exception.** Not a broader redesign of legacy process management.
+
+**Amendment (owner, 2026-10-20): no legacy subreaper.** The Linux-only
+legacy subreaper (child adoption and reaping for legacy-launched descendants)
+is withdrawn and is to be removed from the CP16 branch; no further engineering,
+review or certification effort goes into legacy process management. Legacy
+`run()` keeps its historical behaviour, including its existing background-child
+lifetime and signal-handling limitations. Those limitations are temporary
+compatibility exceptions under this record, not satisfied CP16 guarantees;
+legacy tests assert the historical behaviour by ownership class and claim no
+cleanup guarantee for legacy-launched descendants. The Host layer's process
+ownership, cleanup, cancellation and resource guarantees are unchanged.
+Inexpensive correctness fixes that benefit both engines may stay; a
+legacy-only, Linux-specific adoption mechanism does not qualify. The CP25
+removal condition now covers the legacy launcher and all of its exceptions.

@@ -81,7 +81,7 @@ review complete, Nift ≥ 4.6.0 stated in READMEs and publication notes, the 32
 non-syntax package commits reviewed separately. Later (not this campaign): one
 machine-readable package manifest generating both snapshot and CI pins.
 
-Temporary scaffolding to remove: legacy `run()` process-group exception (CP16, decisions.md) — removal condition: CP25 cannot complete while any execution path relies on it.
+Temporary scaffolding to remove: legacy `run()` launcher and its exceptions (process group, background-child lifetime, signal handling; CP16, decisions.md; no legacy subreaper per the 2026-10-20 amendment) — removal condition: CP25 cannot complete while any execution path relies on them.
 Temporary scaffolding to remove: VM `import-reinitialised` refusal — removal
 condition: legacy and VM both implement and verify initialise-once (D-041).
 
