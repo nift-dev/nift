@@ -374,3 +374,30 @@ integrated tree and is kept only as supporting evidence. Integration: rebased
 onto `runtime-2` (docs-only commits since `a8efbd76`); the non-docs tree equals
 `90252d5e`. Linux only. Evidence: `.claude-linode-runs/cp17r3/out.tgz`,
 `.claude-linode-runs/cp17cert/out.tgz` (pre-rebase run). Instances destroyed.
+
+## feature-host-deps: first run not certified @8b37d3f; certified @847e65d (2026-10-20)
+
+First run (base `975dbb1a`, tip `8b37d3f7`): `FAIL 1, PASS 170` (plus the three
+root-only targets). `test-consumer-snapshots` failed deterministically (also on
+rerun and as `tester`; baseline passes): `declared_filevalue_hook` expects a
+post-build hook that reads a declared dependency changed during the build to
+fail with "observed at multiple versions", and the build succeeded. Cause: the
+D-028 rewrite of `file().open` replaced the unconditional
+`host_.observe_dependency(path, data)` with `observe_read()`, which returns
+early when the parser is not observing (standalone hook scripts), so hook reads
+stopped being reported. Fix: `e2e86749` (restore the host observation when not
+observing; integrated as `c7971365`). Verified on the failing instance before
+re-certification (27/27 contractual cases, `declared_filevalue_hook: true`).
+The guard stays permanent: `test-consumer-snapshots` is part of `make test`.
+
+Certified run: base `a8efbd76`, parent CP17 `90252d5e` (the certified CP17
+commit), tip `847e65d9`:
+
+    certify @ 847e65d: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 171
+
+Integration: rebased onto `runtime-2` @`d7161643`, whose non-docs tree equals
+CP17's certified tree; the integrated non-docs tree equals `847e65d9`
+(source, tests, fixtures and build files; the certify package snapshot
+`nift-packages.tgz` b978a5a2… is unchanged). Linux only. Evidence:
+`.claude-linode-runs/hostdeps/out.tgz` (failed run), `.claude-linode-runs/hostdeps4/out.tgz`.
+Instances destroyed.
