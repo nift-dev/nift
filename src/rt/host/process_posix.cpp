@@ -366,6 +366,9 @@ void send_signal(State& s, int sig) {
     if (s.scope == CancelScope::Tree) tree = runtime::proc_descendants(s.unreaped_pids());
     if (sig == SIGKILL && kill_suppressed_for_test()) return;
     if (s.pgid > 0 && (!s.all_reaped() || group_has_members(s))) runtime::host_kill(-s.pgid, sig, "pipeline", &s);
+    if (s.pgid <= 0)  // stages in Nift's own group (own_group = false): by pid, unreaped only (no reuse)
+        for (const auto& stage : s.st)
+            if (stage.pid > 0 && !stage.reaped) runtime::host_kill(stage.pid, sig, "pipeline-pid", &s);
     for (long pid : tree) runtime::host_kill(pid, sig, "tree", &s);
 }
 
@@ -792,7 +795,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     }
     const bool null_stdin = detached || s.req.stdin_mode == StdinMode::Null;
     const bool blocking = mode == OutputMode::FileCapture || mode == OutputMode::PipeCapture || mode == OutputMode::Stream || mode == OutputMode::Inherit;
-    const bool want_handoff = !detached && blocking && !stdin_pipe && !null_stdin && stages.front().stdin_path.empty() && terminal_foreground();
+    const bool want_handoff = !detached && s.req.own_group && blocking && !stdin_pipe && !null_stdin && stages.front().stdin_path.empty() && terminal_foreground();
 
     // Environment snapshot once per launch.
     std::map<std::string, std::string> base_env;
@@ -865,7 +868,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
                 }
                 ::close(pid_pipe[1]);
             } else {
-                if (::setpgid(0, target_pgid) != 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
+                if (s.req.own_group && ::setpgid(0, target_pgid) != 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
                 if (want_handoff && i == 0) {
                     struct sigaction ign {};
                     ign.sa_handler = SIG_IGN;
@@ -925,8 +928,10 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
             if (got == sizeof value && value > 0) stage_pid = static_cast<pid_t>(value);
             else stage_pid = -1;
         } else {
-            if (i == 0) s.pgid = pid;
-            ::setpgid(pid, s.pgid);  // both sides set it: no window where the child is outside its group
+            if (s.req.own_group) {
+                if (i == 0) s.pgid = pid;
+                ::setpgid(pid, s.pgid);  // both sides set it: no window where the child is outside its group
+            }
             if (want_handoff && i == 0) ::tcsetpgrp(STDIN_FILENO, pid);
         }
         auto& stage = s.st[i];
@@ -976,7 +981,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
         // error, as legacy does. Nothing is left running.
         for (auto& stage : s.st)
             if (stage.pid <= 0 && stage.result.error.empty()) stage.result.error = s.parent_error;
-        if (!detached && s.pgid > 0) begin_cancel(s, CancelScope::Pipeline, CancelReason::Cleanup, Millis(0));
+        if (!detached) begin_cancel(s, CancelScope::Pipeline, CancelReason::Cleanup, Millis(0));
         s.cancelled = false;
         s.leftover_started = true;
         close_fd(s.out_fd);
@@ -1415,9 +1420,15 @@ ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason reason
         }
         run_loop(s, this, op.lk, Clock::now(), nullptr);  // one non-blocking step
     }
-    if (s.finished && s.left_phase == State::Phase::None && s.pgid > 0 && group_has_members(s)) {
-        outcome.leftovers_terminated = true;
-        leftover_step(s);  // sends SIGTERM now
+    if (s.finished && s.left_phase == State::Phase::None) {
+        if (s.pgid > 0 && group_has_members(s)) {
+            outcome.leftovers_terminated = true;
+            leftover_step(s);  // sends SIGTERM now
+        } else {
+            // Nothing left in the group: settled now, not at the next pump
+            // (the lifecycle may already report this group settled).
+            leftover_step(s);
+        }
     }
     return outcome;
 }

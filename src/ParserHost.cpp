@@ -155,6 +155,11 @@ bool Parser::run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint6
     // lock, so the next build waits for it. No PR_SET_PDEATHSIG here; SIGINT/
     // SIGTERM still terminate the children (C2).
     request.die_with_parent = false;
+    // Legacy contract (rt-diff-selftest, supervisors): the stages stay in
+    // Nift's process group, so a signal to that group (killpg by a harness,
+    // Ctrl-C) reaches them. Hence no C3 group and no C1 leftover tracking for
+    // legacy run(); C2 still terminates them (by pid) on SIGINT/SIGTERM.
+    request.own_group = false;
     for (const auto& spec : specs) {
         host::SpawnStage stage;
         stage.program = spec.program;
@@ -189,6 +194,7 @@ bool Parser::run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint6
     }
     // C1: background members still in the call's process group belong to
     // this execution context; they are terminated (silently) when it ends.
+    // (Only for a call in its own group; legacy run() is not, see above.)
     if (!group->detached() && group->has_live_members()) {
         bool registered = false;
         handles::HandleTable& table = legacy_process_table();

@@ -488,12 +488,30 @@ std::size_t reap_adopted_orphans() {
 
 #ifndef _WIN32
 namespace {
+bool pid_alive(long pid) {
+#ifdef __linux__
+    ProcInfo info;
+    return proc_read(pid, info) && info.state != 'Z' && info.state != 'X';
+#else
+    return ::kill(static_cast<pid_t>(pid), 0) == 0;
+#endif
+}
+// A group in Nift's own process group (own_group = false) is signalled and
+// watched by its unreaped stage pids, never by group (that would be Nift).
 bool group_alive(const IndexedGroup& g) {
+    if (g.pgid <= 0) {
+        for (long pid : g.stage_pids) if (pid_alive(pid)) return true;
+        return false;
+    }
 #ifdef __linux__
     return !proc_group_members(g.pgid, static_cast<long>(::getsid(0))).empty();
 #else
     return ::kill(-static_cast<pid_t>(g.pgid), 0) == 0;
 #endif
+}
+void signal_group(const IndexedGroup& g, int sig, const char* site) {
+    if (g.pgid > 0) { host_kill(-g.pgid, sig, site, nullptr); return; }
+    for (long pid : g.stage_pids) if (pid_alive(pid)) host_kill(pid, sig, site, nullptr);
 }
 void sleep_until_or(Clock::time_point until, const std::function<bool()>& done) {
     while (Clock::now() < until && !done()) std::this_thread::sleep_for(Millis(10));
@@ -503,15 +521,15 @@ void sleep_until_or(Clock::time_point until, const std::function<bool()>& done) 
 std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait) {
     std::vector<IndexedGroup> groups;
     for (auto& g : index_snapshot())
-        if (!g.detached && g.pgid > 0 && group_alive(g)) groups.push_back(g);
-    for (const auto& g : groups) host_kill(-g.pgid, SIGTERM, "c2-term", nullptr);
+        if (!g.detached && (g.pgid > 0 || !g.stage_pids.empty()) && group_alive(g)) groups.push_back(g);
+    for (const auto& g : groups) signal_group(g, SIGTERM, "c2-term");
     auto any_alive = [&] {
         for (const auto& g : groups) if (group_alive(g)) return true;
         return false;
     };
     sleep_until_or(Clock::now() + kill_after, [&] { return !any_alive(); });
     for (const auto& g : groups)
-        if (group_alive(g)) host_kill(-g.pgid, SIGKILL, "c2-kill", nullptr);
+        if (group_alive(g)) signal_group(g, SIGKILL, "c2-kill");
     sleep_until_or(Clock::now() + post_kill_wait, [&] { return !any_alive(); });
     return groups.size();
 }

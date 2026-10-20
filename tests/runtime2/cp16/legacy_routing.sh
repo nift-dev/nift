@@ -4,9 +4,9 @@
 # ProcessGroup, and its Host reads trace through the Host layer.
 #
 #   1. result objects unchanged (expected values: runtime-2 e8e4b106, legacy launcher)
-#   2. C3: each call is its own process group
-#   3. C1: background members of a call end with the script
-#   4. C2: SIGTERM to Nift terminates the managed children, Nift ends with SIGTERM
+#   2. children stay in Nift's process group (legacy; no C3/C1 for legacy run())
+#   3. a SIGKILL to Nift's group reaches them, a SIGKILL to Nift alone does not
+#   4. C2: SIGTERM to Nift terminates the children, Nift ends with SIGTERM
 #   5. trace v2 from the legacy interpreter: one format per file
 #   6. stdin is inherited (FileCapture)
 #
@@ -71,39 +71,37 @@ expect "result objects unchanged" \
   "$(N res.f 2>&1 | tr '\n' '|'; echo "rc=${PIPESTATUS[0]}")"
 
 if [ -d /proc/self ]; then
-  # 2. C3: the child leads its own process group (legacy: Nift's group).
+  # 2. Legacy process group: run() children stay in Nift's process group
+  #    (no C3 for legacy run(); cp16-host-ops-impl.md §9.3).
   cat > pgid.f <<'EOF'
-print(cmd("sh", "-c", "echo $$ $(cut -d' ' -f5 /proc/$$/stat)").run().stdout)
+print(cmd("sh", "-c", "echo $(cut -d' ' -f5 /proc/$$/stat) $(cut -d' ' -f5 /proc/$PPID/stat)").run().stdout)
 EOF
-  read -r cpid cpgid < <(N pgid.f 2>&1)
-  if [ -n "${cpid:-}" ] && [ "$cpid" = "${cpgid:-}" ]; then ok "C3: run() child leads its own process group"; else bad "C3: pid [$cpid] pgid [$cpgid]"; fi
+  read -r cpgid npgid < <(N pgid.f 2>&1)
+  if [ -n "${cpgid:-}" ] && [ "$cpgid" = "${npgid:-}" ]; then ok "run() child stays in Nift's process group"; else bad "child pgid [$cpgid], Nift pgid [$npgid]"; fi
 
-  # 3. C1: a background member left in the call's group is terminated when
-  #    the script ends (it does not outlive Nift), without blocking the call.
-  cat > c1.f <<'EOF'
-r := cmd("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $!").run()
-print(r.stdout)
+  # 3. A signal to Nift's process group reaches the child (rt-diff and other
+  #    supervisors kill the group); SIGKILL to Nift alone does not (a hook's
+  #    child keeps the build lock: test-consumer-snapshots interrupt barrier).
+  cat > grp.f <<'EOF'
+r := cmd("sh", "-c", "echo $$ > grp.pid; sleep 30").run()
 EOF
-  start=$(date +%s%N)
-  bg=$(N c1.f 2>&1 | head -n1)
-  ms=$(( ($(date +%s%N) - start) / 1000000 ))
-  echo "$bg" > c1.pid
-  if [ -n "$bg" ] && gone_within "$bg" 30; then ok "C1: background member terminated at script end"; else bad "C1: background pid [$bg] still alive"; fi
-  if [ "$ms" -lt 10000 ]; then ok "C1: script end not delayed (${ms} ms)"; else bad "C1: script took ${ms} ms"; fi
-
-  # 3b. C1 in a page render: the page's execution context ends with its render.
-  HERE_SITE="$HERE/probes/sites/site_run/site"
-  if [ -d "$HERE_SITE" ]; then
-    cp -r "$HERE_SITE" site && mkdir -p site/data
-    cat > site/content/index.html <<'EOF'
-R:@script { return run("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > bg.pid; echo ok").stdout }
-EOF
-    (cd site && timeout -k 5 60 "$NIFT" build --all > ../build.out 2>&1); brc=$?
-    bgp=$(cat site/bg.pid 2>/dev/null); echo "$bgp" > page.pid
-    expect "C1 (page): build succeeds" "0" "$brc"
-    if [ -n "$bgp" ] && gone_within "$bgp" 30; then ok "C1 (page): background member terminated at render end"; else bad "C1 (page): background pid [$bgp] alive"; fi
-    grep -q 'R:ok' site/public/index.html 2>/dev/null && ok "C1 (page): output unchanged" || bad "C1 (page): output"
-  fi
+  for how in group pid; do
+    rm -f grp.pid
+    setsid "$NIFT" grp.f > /dev/null 2>&1 & npid=$!
+    PIDS+=("$npid")
+    i=0; while [ ! -s grp.pid ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+    child=$(cat grp.pid 2>/dev/null); cp grp.pid "grp-$how.pid" 2>/dev/null
+    sleep 0.1
+    if [ "$how" = group ]; then kill -9 -- "-$npid"; else kill -9 "$npid"; fi
+    wait "$npid" 2>/dev/null
+    if [ "$how" = group ]; then
+      if [ -n "$child" ] && gone_within "$child" 30; then ok "SIGKILL to Nift's group ends the child"; else bad "child [$child] survived its group's SIGKILL"; fi
+    else
+      sleep 0.3
+      if [ -n "$child" ] && alive "$child"; then ok "SIGKILL to Nift alone leaves the child running (legacy)"; else bad "child [$child] died with Nift"; fi
+      kill -9 "$child" 2>/dev/null
+    fi
+  done
 
   # 4. C2: SIGTERM to Nift blocked in run(): the child is terminated (after
   #    the grace period when it ignores SIGTERM) and Nift ends with SIGTERM.

@@ -76,6 +76,12 @@ struct SpawnRequest {
     Millis post_kill_wait{5000};                 // bound after SIGKILL before a stage is Lost
     bool in_build = false;                       // detaching is refused (process.detach_in_build)
     bool die_with_parent = true;                 // Linux PR_SET_PDEATHSIG(SIGKILL) on managed stages
+    // C3: the pipeline is its own process group (signalled as a unit, leftover
+    // members found by group, terminal handed off). false: the stages stay in
+    // Nift's process group, as legacy run() launched them -- a signal to
+    // Nift's group (a supervisor's killpg, Ctrl-C) reaches them; Nift
+    // signals them by pid; no leftover tracking (C1) and no terminal handoff.
+    bool own_group = true;
     std::function<void()> flush_output;          // Stream: flush Nift's buffered stdout/stderr first
     std::string builtin = "run";                 // message prefix
 };
