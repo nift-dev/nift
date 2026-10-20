@@ -514,6 +514,19 @@ reproducers pass.
   that 0 means "nothing left", and have `update_heap_limit` keep 0 in that
   meaning. The reproducer then has to report a refusal.
 
+### 6.6 Worker evidence (l7-value-layer-3b, tip 5e3e9d43)
+
+All 16 steps passed (`scratchpad/rjobs/l7-value-layer-3b/out/summary.txt`):
+build, rt-lint, test-rt-value, test-rt-value-sanitize (no `ulimit -v`;
+value-d040 111,932 checks without the large section), test-rt-vm,
+test-rt-builtins, builtins guards (25/25), cycle bench, heap saturation
+(4/4, §6.0), memory-c1 (24/24 cells exit 70 with the original reason: 7
+"out of memory (std::bad_alloc)" and 5 "memory budget exceeded" at the
+default budget, 12 "out of memory" with the large budget; no abort),
+memory-c2 (5/5), value bench vs c5844915 (copy +0.20 %, push -1.52 %, index,
+object set and get +0.00 %), and at the tip the replace change
+(native-budget 105 checks, builtins unit, guards 25/25).
+
 ## 7. Remaining gates
 
 * **REMOTE JOB** (worker), covering:
