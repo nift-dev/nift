@@ -219,7 +219,7 @@ default for subsequent checkpoints. Wall time is dominated by serial exclusive
 targets (`test-build-boundary-nondestructive` alone ~21 min), so more cores help
 little; the gain is no queue and no contention with development work.
 
-## Open defect on `runtime-2`: `-0` in JSON-valid object literals (found 2026-10-20)
+## Closed defect: `-0` in JSON-valid object literals (found 2026-10-20, closed by CP15 @9cf5cd0)
 
 Found by the CP15 integration owner while building the W9 differential set; not
 caught by any certification of CP12 phase A or CP14 phase A.
@@ -240,6 +240,10 @@ phase A candidate, which is mid-certification. CP15's evidence must show the
 4b2fc909 failure and the fix on the same cases, extend the probes to other `-0`
 shapes, and add `-0` and similar value-preservation edges to the supported
 generator. Closed only when CP15 integrates.
+
+**Closed 2026-10-20:** CP15 integrated on its certified commit; its evidence
+shows the 4b2fc909 failure and the fix on the same cases, with `-0` probes and
+generator edges added (`checkpoints/cp15-builtins-design.md`).
 
 ## Remote environment: Go and .NET were never actually installed (corrects the CP14 record)
 
@@ -339,3 +343,20 @@ saturation under-counting but not C3; it adds one allocation inside `noexcept`
 
 Owner: the L7 agent (single owner of the VM value layer), with C1/C3 commits and
 evidence kept separately attributable from L7's own changes.
+
+## CP15 phase A certified on Linode @9cf5cd0 (2026-10-20)
+
+Instance g6-dedicated-2, fresh Ubuntu 24.04, mandatory toolchain preflight
+passed (Go from the proxy toolchain zip, .NET 10, `GOTOOLCHAIN=local`). Base
+`5e4e6144`, tip `9cf5cd0f`; `make certify` exit 0 after 6,333 s:
+
+    certify @ 9cf5cd0: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 170
+
+SKIPPED-ENVIRONMENTAL (fail only as root, pass as unprivileged `tester`, same
+three as CP13 @53bc509a): `test-dependency-status`, `test-unreadable-source`,
+`test-v43-language`. Linux only; cross-platform verification is the next CI
+milestone. Integration: rebased onto `runtime-2` (docs-only changes since
+the base); the non-docs diff against `9cf5cd0f` is empty, so the
+certification applies to the integrated tree. Evidence:
+`.claude-linode-runs/cp15/out.tgz` (certify log and per-target logs).
+Instance destroyed after the evidence was copied (confirmed by the API).
