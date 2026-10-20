@@ -44,7 +44,11 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+
+# Suites that enforce wall-clock limits per program; never run two at once.
+TIMING_SENSITIVE = {"adversarial", "former-replay"}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MUTANTS = {1: "Sub dispatched to Add in the checked table", 2: "large slow-path result off by 1000",
@@ -111,8 +115,21 @@ def run_all(labels, rt_diff, logs, jobs):
     its own temporary directory), so they may run concurrently. Results and the
     printed report are identical to the sequential order whatever --jobs is."""
     work = [(label, name, cmd) for label, nift in labels for name, cmd in suites(nift, rt_diff)]
+    # Suites with their own wall-clock budgets (deep recursion, large-output
+    # bail-outs, per-program timeouts) must not run concurrently with each
+    # other: under oversubscription their timeouts flip outcomes (measured
+    # 2026-10-20: --jobs 8 on 4 vCPU made the unmutated adversarial suite time
+    # out). At most one of them runs at a time; the rest are scheduled freely.
+    serial = threading.Semaphore(1)
+
+    def one(w):
+        if w[1] in TIMING_SENSITIVE:
+            with serial:
+                return run_one(w[0], w[1], w[2], logs)
+        return run_one(w[0], w[1], w[2], logs)
+
     with cf.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
-        done = list(pool.map(lambda w: run_one(w[0], w[1], w[2], logs), work))
+        done = list(pool.map(one, work))
     rejected = {label: [] for label, _ in labels}
     aborted = []
     current = None
