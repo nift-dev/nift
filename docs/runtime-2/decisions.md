@@ -1052,3 +1052,42 @@ From CP12B's three-way check (nift.dev, legacy, approved semantics;
    state; zero means no budget left), the permanent bypass reproducers pass, and
    the shared reservation mechanism is verified against the documented budget
    semantics. The `vm.cpp` change is sequenced when ownership permits.
+
+## D-048 — Script context uses scripting syntax only; `@` directives are template syntax (owner, 2026-10-20)
+
+Supersedes the "other `@` forms are not banned automatically" part of D-047 #1.
+
+1. **Rule.** `@`-prefixed directives are template syntax. In script parsing
+   context (standalone scripts, script packages, REPL input, executable script
+   blocks; decided by parser context, not file extension) only the canonical
+   scripting statements are accepted. `@fn`, `@import` and `@struct` are
+   rejected there, with **no deprecated compatibility aliases**. Rejection
+   happens before any execution or side effect, in both engines.
+2. **Remaining directives.** Each of the other `@` forms accepted in script
+   context today (`@for @if @while @script @item @content @return @input
+   @fragment @paginate @markup @json @enum @type @ent @context`, internal
+   `@__*`) gets its canonical scripting equivalent established from the actual
+   grammar of both engines, never by mechanically stripping `@`. A form with no
+   scripting equivalent is listed as such. The inventory, with per-form legacy
+   reproducers and doc excerpts (D-046), comes back for review before the
+   rejection is implemented for those forms.
+3. **Template text is untouched.** Template-parsed content, nested templates,
+   string literals, comments and generated template source keep `@` syntax.
+   The migration is parser-aware and targeted. No bulk textual removal of `@`.
+4. **Migration.** Package files, project scripts and repository fixtures that
+   use `@fn`/`@import`/`@struct` as script directives are migrated, with
+   behaviour verified before and after. No test is removed to make a suite pass.
+   Packages are verified against the Runtime 2.0 build. Released Nift 4.x
+   behaviour is not changed. Updated packages are checked against the release
+   versions they claim to support, and are not published if they need an
+   unreleased runtime.
+5. **Documentation (D-045).** nift.dev changes are prepared but not published
+   before the release: remove the `@import`-in-scripts compatibility promise,
+   switch struct docs and package examples to the verified canonical script
+   form, and add a short migration note on the intentional tightening.
+6. **Delegation and sequencing.** This work, `@fn` rejection and trailing `//`
+   comments (D-046 #5) form one DeepSeek parser assignment. DeepSeek owns the
+   parser files, syntax fixtures and fixture/package migrations it is given.
+   Claude reviews independently and runs certification. It starts only after
+   CP15 integrates and parser ownership is free, and does not interrupt CP15,
+   CP17, CP12B, L7 or their certification.
