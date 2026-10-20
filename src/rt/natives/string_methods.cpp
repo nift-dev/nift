@@ -200,7 +200,7 @@ Status str_ends_with(const Context&, const Value* args, std::uint32_t argc, Valu
     return Status::Ok;
 }
 
-Status str_replace(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+Status str_replace(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     std::string_view text;
     if (!receiver(args, argc, text)) return internal(error, "replace receiver");
     if (argc != 3) return fail(error, "replace: expected old and replacement strings");
@@ -211,17 +211,17 @@ Status str_replace(const Context&, const Value* args, std::uint32_t argc, Value&
     std::size_t pos = text.find(pattern);
     if (pos == std::string_view::npos) { out = args[0]; return Status::Ok; }
     // Legacy replace_string_linear: left to right, non-overlapping, one pass.
-    std::string result;
-    result.reserve(text.size());
+    // C3: the buffer grows only after a budget check (BudgetedText).
+    BudgetedText result(context);
+    if (!result.reserve(text.size())) return Status::Memory;
     std::size_t begin = 0;
     while (pos != std::string_view::npos) {
-        result.append(text.data() + begin, pos - begin);
-        result.append(replacement.data(), replacement.size());
+        if (!result.append(std::string_view(text.data() + begin, pos - begin), replacement)) return Status::Memory;
         begin = pos + pattern.size();
         pos = text.find(pattern, begin);
     }
-    result.append(text.data() + begin, text.size() - begin);
-    out = make_string(static_cast<std::string&&>(result));
+    if (!result.append(std::string_view(text.data() + begin, text.size() - begin))) return Status::Memory;
+    out = make_string(result.take());
     return Status::Ok;
 }
 

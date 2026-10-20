@@ -11,6 +11,7 @@
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
 #include "rt/natives/array_methods.h"
+#include "rt/natives/string_methods.h"
 #include "rt/natives/support.h"
 #include "rt/string.h"
 
@@ -86,6 +87,20 @@ Value strings(std::size_t count, std::size_t length) {
     Value a = make_array(count);
     for (std::size_t i = 0; i < count; ++i) array_push(a, make_string(std::string(length, char('a' + i % 26))));
     return a;
+}
+
+Call replace(const Value& text, const Value& pattern, const Value& replacement, std::size_t heap_limit) {
+    Value args[3] = {text, pattern, replacement};
+    Context context;
+    context.heap_limit = heap_limit;
+    Call c{Status::Ok, Value(), {}, 0, 0};
+    const std::size_t start = g_outstanding;
+    g_peak = start;
+    g_largest = 0;
+    c.status = str_replace(context, args, 3, c.out, c.error);
+    c.peak_extra = g_peak - start;
+    c.largest = g_largest;
+    return c;
 }
 
 } // namespace
@@ -209,6 +224,47 @@ int main() {
         array_push(mixed, make_array());
         Call c = join(mixed, make_string(","), 0);
         CHECK(c.status == Status::Error && c.error == "join: elements must be renderable scalar values");
+    }
+    // 8. replace: large replacements over the budget are refused before the
+    //    buffer outgrows the headroom; within budget the result is exact.
+    {
+        const Value text = make_string(std::string(1 << 16, 'a'));       // 65,536 matches of "a"
+        const Value wide = make_string(std::string(64, 'b'));            // 4 MiB result
+        const std::size_t live = live_heap_bytes();
+        const long allocs = g_live;
+        Call c = replace(text, make_string("a"), wide, live + (1 << 20));
+        CHECK(c.status == Status::Memory);
+        CHECK(c.peak_extra <= (1u << 20));
+        CHECK(live_heap_bytes() == live && g_live == allocs);
+        Call ok = replace(text, make_string("a"), wide, live + (16 << 20));
+        CHECK(ok.status == Status::Ok && string_view_of(ok.out).size() == (std::size_t(1) << 22));
+        // Zero-length pattern: legacy's error, nothing built.
+        Call empty = replace(text, make_string(""), wide, 0);
+        CHECK(empty.status == Status::Error && empty.error == "replace: old string must not be empty");
+        // Shrinking needs at most the input's size; no match allocates nothing.
+        Call shrink = replace(text, make_string("aa"), make_string(""), live_heap_bytes() + (128 << 10));
+        CHECK(shrink.status == Status::Ok && string_view_of(shrink.out).empty());
+        Call none = replace(text, make_string("z"), wide, live + 1);  // tight, but nothing to build
+        CHECK(none.status == Status::Ok && none.out.heap() == text.heap());
+    }
+    // 9. Repeated expansion through replace: s = s.replace("x", "xx").
+    {
+        const std::size_t limit = live_heap_bytes() + (8 << 20);
+        Value s = make_string(std::string(1000, 'x'));
+        int steps = 0;
+        Status last = Status::Ok;
+        while (steps < 40) {
+            const std::size_t live = live_heap_bytes();
+            CHECK(live <= limit + kSlack);
+            Call c = replace(s, make_string("x"), make_string("xx"), limit);
+            last = c.status;
+            CHECK(c.peak_extra <= (live < limit ? limit - live : 0) + kSlack);
+            if (c.status != Status::Ok) break;
+            s = c.out;
+            ++steps;
+        }
+        CHECK(last == Status::Memory);
+        CHECK(steps >= 10 && steps < 40);
     }
     return rt_test::finish("native-budget");
 }
