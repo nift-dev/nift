@@ -393,6 +393,7 @@ test-rt-vm: $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs
 	python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
+	python3 tools/rt-vm/cp12b_inventory.py selftest
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).

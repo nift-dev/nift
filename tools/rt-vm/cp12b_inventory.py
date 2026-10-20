@@ -3,6 +3,8 @@
 
   cp12b_inventory.py collect --nift ./nift --out DIR [--projunits DIR] [--gen 300] [--seed 1]
   cp12b_inventory.py analyse DIR [--json OUT]
+  cp12b_inventory.py owners DIR       the ownership table (D-036), receiver-aware
+  cp12b_inventory.py selftest
 
 collect runs `NIFT_VM=classify-all` (parse + compile only, nothing executes;
 src/rt/refusal_inventory.h) over
@@ -114,9 +116,19 @@ def collect_generator(nift, out, count, seed, work):
 # ---- analysis -------------------------------------------------------------
 
 def load_lists():
-    """CP14/CP15 built-in names (from the CP15 branch's X-macro list, which
-    extends CP14's), when available locally; otherwise empty."""
+    """CP14/CP15 built-in names: the repository's own X-macro list (CP15 is
+    integrated; entries after the first `---- CP15` banner are CP15's), else
+    the CP14 integration and CP15 branch checkouts beside it; else empty."""
     names = {"CP14": set(), "CP15": set()}
+    own = os.path.join(REPO, "src", "rt", "natives", "builtin_list.inc")
+    if os.path.exists(own):
+        cp = "CP14"
+        for line in open(own):
+            if line.startswith("// ----") and "CP15" in line:
+                cp = "CP15"
+            if line.startswith("NIFT_RT_BUILTIN("):
+                names[cp].add(line.split('"')[1])
+        return names
     base = os.path.dirname(REPO)
     for cp, path in (("CP14", "nift-integ/src/rt/natives/builtin_list.inc"),
                      ("CP15", "nift-cp15/src/rt/natives/builtin_list.inc")):
@@ -249,8 +261,52 @@ SUBSET_FORMS = {"declare-const", "declare-pattern", "assign-target", "compound-t
                 "push-receiver", "postfix-receiver-call", "statement:FnDecl"}
 
 
-def owner(reason, lists, ctx=frozenset()):
-    """(owning checkpoint or phase, scope) for every refusal reason."""
+# Constructs whose refusal leaves a receiver the VM cannot type: a method
+# called on what they produce is re-reported as `method:<name>` (directly,
+# when chain masking replaces the refused call, or through the binding that
+# holds the result). Coordinator, 2026-10-20; decisions.md "CP15B scope
+# correction" (runtime-2 9162c477).
+HANDLE_CONSTRUCTORS = {"map", "set", "stack", "queue", "file", "open", "ifstream", "ofstream", "open_bytes",
+                       "read_bytes", "bytes", "stream", "timer", "collection"}
+
+
+def has_native(name, lists):
+    return any(name in names for names in lists.values())
+
+
+def receiver_constructs(lists, ctx):
+    """The script's refused constructs that can be a method's receiver."""
+    out = []
+    for r in sorted(ctx):
+        head, _, name = r.partition(":")
+        if r in STRUCTISH:
+            out.append(r)
+        elif head == "callable" and not has_native(name, lists) and (
+                name in CONCURRENCY or name in PROCESS or name in HANDLE_CONSTRUCTORS or name.startswith("ffi_")
+                or name.startswith("atomic")):
+            out.append(r)
+    return out
+
+
+def receiver_owner(name, lists, ctx, item):
+    """Owner of `method:<name>` when a native for `name` exists for some
+    receiver kind: the refused receiver construct's owner; else (no refused
+    receiver in the script) the inference of receiver kinds; ambiguous or
+    unidentified receivers are reported as unattributed, never guessed."""
+    candidates = receiver_constructs(lists, ctx)
+    owners = sorted({owner(c, lists, ctx)[0] for c in candidates})
+    if len(owners) == 1:
+        return owners[0], "method on a refused receiver (" + ", ".join(candidates) + ")"
+    if len(owners) > 1:
+        return "unattributed", "method with a native; refused receivers of several owners (" + ", ".join(owners) + ")"
+    if item is not None and item.get("consequential"):
+        return "unattributed", "method with a native on a masked receiver (receiver not identified)"
+    return "CP12C", "receiver kinds (inference)"
+
+
+def owner(reason, lists, ctx=frozenset(), item=None):
+    """(owning checkpoint or phase, scope) for every refusal reason; `item`
+    is the inventory entry ({reason, consequential, ...}) when known."""
     head, _, name = reason.partition(":")
     if reason in ("fn-after-statement", "fn-called-before-declaration"):
         return "CP12b", "B1 declaration order (done)"
@@ -271,6 +327,8 @@ def owner(reason, lists, ctx=frozenset()):
         return "CP13", "undefined name (legacy run-time error)"
     if reason in ("fn-as-value", "call-binding", "expression:Lambda", "callee", "statement:For", "statement:FnDecl"):
         return "CP12C", "functions as values, closures, lambdas, for"
+    if head == "method" and (has_native(name, lists) or name == "push"):
+        return receiver_owner(name, lists, ctx, item)
     if head in ("callable", "method"):
         for cp in ("CP14", "CP15"):
             if name in lists[cp]:
@@ -302,6 +360,8 @@ def owner(reason, lists, ctx=frozenset()):
             if "fn-flags" in ctx:
                 return "CP22/CP24", "fn[async] (CP22), @fn deferred bodies (CP24)"
             return "CP13", "errors (undefined callable, error/warn/throw)"
+        if head == "method":
+            return "unattributed", "method without a native and no identified owner"
         return "CP15B", "remaining pure built-ins and methods"
     if reason in ("statement:Try", "statement:Throw", "parse-error") or head in ("static-error", "type"):
         return "CP13", "errors, try/catch, type errors with legacy diagnostics, prevalidation"
@@ -461,6 +521,59 @@ def jsonable(x):
     return x
 
 
+OWNER_ORDER = ["CP12b", "CP12C", "CP13", "CP14", "CP14B", "CP15", "CP15B", "CP16", "CP16/CP20", "CP16/CP24", "CP18",
+               "CP19", "CP22", "CP22/CP23", "CP22/CP24", "CP24", "language-cleanup", "unattributed"]
+
+
+def owners_table(rows, lists):
+    """Markdown rows: owner | scope | reasons with the number of scripts
+    carrying each; `unattributed` last (never guessed)."""
+    groups = collections.defaultdict(collections.Counter)
+    for r in rows:
+        items = r.get("reasons", [])
+        ctx = frozenset(i["reason"] for i in items)
+        seen = set()
+        for i in items:
+            key = (owner(i["reason"], lists, ctx, i), i["reason"])
+            if key not in seen:
+                seen.add(key)
+                groups[key[0]][i["reason"]] += 1
+    lines = ["| Owner | Scope | Reasons (scripts carrying the reason) |", "| --- | --- | --- |"]
+    rank = {o: k for k, o in enumerate(OWNER_ORDER)}
+    for (own, scope), cnt in sorted(groups.items(), key=lambda kv: (rank.get(kv[0][0], len(rank) - 1), kv[0])):
+        lines.append(f"| {own} | {scope} | " + ", ".join(f"`{x}` {n}" for x, n in cnt.most_common()) + " |")
+    if not any(own == "unattributed" for own, _ in groups):
+        lines.append("| unattributed | — | none |")
+    return lines
+
+
+def selftest():
+    """Receiver-aware attribution of `method:<name>` (fixed lists, no corpus)."""
+    lists = {"CP14": {"join", "stringify", "to_string", "contains"}, "CP15": {"abs"}}
+    cases = [
+        # A thread handle's method: the refused thread() constructor owns it.
+        (("method:join", {"callable:thread", "method:join"}, {"consequential": True}), "CP22/CP23"),
+        # A struct instance's method: structs own it.
+        (("method:stringify", {"statement:StructDecl", "method:stringify"}, None), "CP12b"),
+        # No refused receiver in the script: receiver-kind inference.
+        (("method:to_string", {"method:to_string"}, {"consequential": False}), "CP12C"),
+        # Receivers of two owners: unattributed, not guessed.
+        (("method:contains", {"callable:thread", "statement:StructDecl", "method:contains"}, None), "unattributed"),
+        # A masked receiver nothing identifies: unattributed.
+        (("method:join", {"method:join", "free-name:undeclared"}, {"consequential": True}), "unattributed"),
+        # Unchanged: a method without a native keeps its by-name owner.
+        (("method:map", {"method:map"}, None), "CP14B"),
+    ]
+    failures = 0
+    for (reason, ctx, item), want in cases:
+        got = owner(reason, lists, frozenset(ctx), item)
+        if got[0] != want:
+            failures += 1
+            print(f"FAIL owner({reason}, {sorted(ctx)}, {item}) = {got}, expected {want}")
+    print(f"{'PASS' if not failures else 'FAIL'} cp12b_inventory selftest: {len(cases)} cases, {failures} failure(s)")
+    return 1 if failures else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -474,7 +587,20 @@ def main():
     a = sub.add_parser("analyse")
     a.add_argument("dir")
     a.add_argument("--json")
+    o = sub.add_parser("owners")
+    o.add_argument("dir")
+    sub.add_parser("selftest")
     args = ap.parse_args()
+    if args.cmd == "selftest":
+        return selftest()
+    if args.cmd == "owners":
+        rows = []
+        for corpus in ("shared", "projects", "generator"):
+            path = os.path.join(args.dir, corpus + ".jsonl")
+            if os.path.exists(path):
+                rows += [json.loads(line) for line in open(path)]
+        print("\n".join(owners_table(rows, load_lists())))
+        return 0
     if args.cmd == "collect":
         nift = os.path.abspath(args.nift)
         os.makedirs(args.out, exist_ok=True)
