@@ -401,3 +401,23 @@ CP17's certified tree; the integrated non-docs tree equals `847e65d9`
 `nift-packages.tgz` b978a5a2… is unchanged). Linux only. Evidence:
 `.claude-linode-runs/hostdeps/out.tgz` (failed run), `.claude-linode-runs/hostdeps4/out.tgz`.
 Instances destroyed.
+
+## Open VM defects: error wording on paths (found 2026-10-20, records20k stage 4)
+
+Present on `runtime-2` since CP12/CP15 (reproduced on the CP15 binary); both
+engines exit non-zero, but the VM's message differs from legacy's, so these are
+real divergences, not approved differences. Found by the records20k owner while
+probing the scalar path-argument lift; not caught by any certification because
+no differential corpus produces a failing path inside these shapes.
+
+| Program | Legacy | VM |
+|---|---|---|
+| `v := a[5].y` / `print(a[5].y)` (index out of range, then member; also `a[0][5].y`, `if (a[5].y.z == 1)`) | quotes `'a[5].y'` (whole chain) | quotes `'a[5]'` |
+| `s.contains(o.zz)` (missing member in a method argument) | `contains: argument must be a string` | `value has no member: zz` |
+| `print(a[j].k)`, `k` missing | `JSON value 'a[j]' has no member 'k'` | `value has no member: k` |
+
+Reproducers: `scratchpad/integ/pathq/q2/`, `scratchpad/integ/pathp/method_arg_missing.f`,
+`scratchpad/integ/pathr/pe_unchanged_method.f`. Disposition: fixed by the
+records20k owner as separate, attributable commits with regression fixtures,
+and the differential generators extended with failing-path shapes; closed only
+when integrated and certified.
