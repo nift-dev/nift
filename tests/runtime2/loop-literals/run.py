@@ -23,7 +23,7 @@ def run(nift, text):
         return r.stdout + r.stderr, r.returncode
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--nift", required=True); ap.add_argument("--record", action="store_true")
-    a = ap.parse_args(); fails = 0; n = 0
+    a = ap.parse_args(); a.nift = os.path.abspath(a.nift); fails = 0; n = 0
     for line in open(os.path.join(HERE, "cases.txt")):
         if not line.strip(): continue
         name, stmt = line.rstrip("\n").split("\t", 1)
