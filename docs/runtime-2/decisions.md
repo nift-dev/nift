@@ -1106,3 +1106,20 @@ consequences: the certify package snapshot is stale and still uses
 `@struct`/`@import`, so it must be refreshed from the migrated repositories
 before D-048 enforcement lands (otherwise certification would test obsolete
 sources); and the D-048 rule itself is unchanged.
+
+### CP15B scope correction (coordinator, 2026-10-20)
+
+DeepSeek's CP15B inventory (on CP12B `3b632fff` and `4f5a00df`) found no viable
+pure built-in slice; the "~57 methods" in the forecast misread D-036's count of
+curated *scripts*. Reconciliation by receiver: (1) `method:<name>` reasons for
+names that already have a native (`join`, `to_string`, `push`, `stringify`,
+`contains`, …) come mostly from the inventory's chain masking of a refused
+receiver; the receiver is the blocker, and `owner()` will classify them by
+receiver instead of by name. (2) Collections `map()`/`set()`/`stack()` and their
+mutators are values under D-040; legacy's collection handle strings are an
+implementation detail, not the contract; their VM representation depends on the
+L7 value layer, so they form a later L7-dependent CP15B slice. CP17 typed handles
+remain for identity-bearing resources only. (3) `same()` stays with L7, applying
+D-040 with old/new compatibility tests; no new decision. (4) CP15B slice 1 is its
+other D-036 reason: literal spellings and string interpolation. No corpus or
+acceptance criterion changes.

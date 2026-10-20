@@ -89,7 +89,7 @@ condition: legacy and VM both implement and verify initialise-once (D-041).
 | **CP14 phase A** (F1/F2/F3/F6, 73 natives) | ✓ | ✓ | ✓ @6c26404 | ✓ 2026-10-19 | pending | CP12A | certification | low | coverage unchanged by itself (104/788) |
 | **CP14 phase B** (F4 mutating ×9, F5 callbacks ×17: `map`, `sort_by`, `filter`…; all callback-taking collection methods, D-036) | design only | ✓ (design) | | | | CP12B place model (F4); native→compiled callbacks (F5) | medium | medium | `sort_by` 19, `map` 9 corpus refusals |
 | CP15 built-ins B (phase A) | natives ✓, wiring written | ✓ (natives) | | | | CP14 | small–medium | low | time natives moved to CP16 |
-| **CP15 phase B** (remaining pure built-ins and methods) | | | | | | CP15A, CP12C for callbacks | medium | medium | new (D-036); ~57 methods + pure built-ins |
+| **CP15 phase B** (remaining pure built-ins and methods) | | | | | | CP15A, CP12C for callbacks | medium | medium | new (D-036). Corrected 2026-10-20: the D-036 "57" counts curated *scripts*, not operations; no viable pure-native slice exists (DeepSeek inventory). Slice 1 = literal spellings + interpolation (interpolation 110 shared scripts, string-literal 34, number-literal 8). Collections `map`/`set`/`stack` (values under D-040) wait for the L7 value layer; `same()` is L7 |
 | records20k coverage | designed | | | | | CP14 | small | low–medium | push of fresh values; loop-called fns returning objects |
 | CP16 host ops | started (host layer) | design ✓ | | | | CP14, CP17, host-deps | large | **high** | D-028–D-031 decided |
 | CP17 typed handles | started | | | | | (CP16 consumes it) | medium | medium | built before CP16's concrete handles |
