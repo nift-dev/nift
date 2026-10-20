@@ -63,7 +63,7 @@ replay_type_change.f vm-error cannot assign string to int binding 'x'
 strings.f vm 
 top_return.f vm 
 # CP11 review round 1 regressions.
-review_d1_zero_literals.f fallback number-literal
+review_d1_zero_literals.f vm
 review_d2_jump_not_last.f fallback jump-not-last
 review_d3_string_size.f fallback type:length
 review_d4_builtin_name.f fallback fn-name-reserved

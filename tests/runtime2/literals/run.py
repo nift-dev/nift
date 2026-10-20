@@ -81,6 +81,12 @@ SUCCESS = [
     ("dollar_plain", "", 'print("a$b")'),
     ("dollar_shell", "", 'print("$HOME;$(touch nope)")'),
     ("int64_plain", "", 'print(9223372036854775807)\nprint(-9223372036854775808)\nprint(9007199254740993)'),
+    ("decimal_zero", "",
+     'print(0.0)\nprint(0.00)\nprint(0.000)\nprint(0.0e5)\nprint(0.0e0)\nprint(-0.0)'),
+    ("decimal_extreme", "",
+     'print(1e21)\nprint(1e300)\nprint(1.7976931348623157e308)\nprint(1e-400)\nprint(5e-324)'),
+    ("interp_decimal", "", 'print("z=$[0.0] h=$[1e300] t=$[5e-324]")'),
+    ("decimal_exponent_zero", "", 'print(0e5)\nprint(0E0)'),
 ]
 
 # (name, prelude, body, expected VM refusal reason)
@@ -90,8 +96,11 @@ REFUSED = [
      "interpolation:unknown-type"),
     ("hex_literal", "", "print(0x10)", "opaque:legacy-runtime-error"),
     ("overflow_exponent", "", "print(1e309)", "number-literal"),
-    ("zero_decimal", "", "print(0.0)", "number-literal"),
     ("leading_zero", "", "print(01)", "number-literal"),
+    ("negative_zero_exponent", "", "print(-0e5)", "number-literal"),
+    ("non_json_underflow", "", "print(.03e-467)", "number-literal"),
+    ("leading_zero_extreme", "", "print(06490551634104E-452)", "number-literal"),
+    ("non_json_trailing_dot", "", "print(0.e-266)", "opaque:legacy-runtime-error"),
     ("escaped_dollar", "", 'print("a\\$[1]")', "opaque:irregular-legacy-parse"),
 ]
 

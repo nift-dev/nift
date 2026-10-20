@@ -1,5 +1,6 @@
 #include "rt/literal.h"
 
+#include "rt/number.h"
 #include "rt/string.h"
 
 #include <charconv>
@@ -11,8 +12,6 @@
 namespace nift::rt {
 
 namespace {
-
-constexpr std::int64_t kSafeInteger = 9007199254740992;  // 2^53
 
 bool all_digits(std::string_view text) {
     if (text.empty()) return false;
@@ -44,6 +43,35 @@ bool scan_decimal(std::string_view text, int& significant, long& exponent) {
     exponent = std::strtol(std::string(text.substr(p)).c_str(), nullptr, 10);
     if (negative) exponent = -exponent;
     return true;
+}
+
+// JSON's number grammar, which is also the shape legacy keeps as StrNumber.
+bool json_number(std::string_view text) {
+    std::size_t p = 0;
+    if (p < text.size() && text[p] == '-') ++p;
+    if (p >= text.size()) return false;
+    if (text[p] == '0') {
+        ++p;
+        if (p < text.size() && text[p] >= '0' && text[p] <= '9') return false;
+    } else if (text[p] >= '1' && text[p] <= '9') {
+        while (p < text.size() && text[p] >= '0' && text[p] <= '9') ++p;
+    } else {
+        return false;
+    }
+    if (p < text.size() && text[p] == '.') {
+        ++p;
+        const std::size_t start = p;
+        while (p < text.size() && text[p] >= '0' && text[p] <= '9') ++p;
+        if (p == start) return false;
+    }
+    if (p < text.size() && (text[p] == 'e' || text[p] == 'E')) {
+        ++p;
+        if (p < text.size() && (text[p] == '+' || text[p] == '-')) ++p;
+        const std::size_t start = p;
+        while (p < text.size() && text[p] >= '0' && text[p] <= '9') ++p;
+        if (p == start) return false;
+    }
+    return p == text.size();
 }
 
 bool valid_utf8(std::string_view text) {
@@ -85,16 +113,21 @@ bool decode_number_literal(std::string_view text, Value& out) {
     int significant = 0;
     long exponent = 0;
     // Legacy parses a decimal literal as JSON (jsonic json.h, number scan) and
-    // keeps its spelling as an exact StrNumber when the value is zero with a
+    // keeps its spelling as an exact StrNumber when a zero value has a
     // fraction (`0.0`, `0.00`, `0.0e5` print as written; review D1) or the
-    // exponent magnitude is 300 or more. Those literals are refused: every
-    // zero-valued decimal spelling and every exponent of magnitude >= 300.
-    if (!scan_decimal(text, significant, exponent) || significant > 15 || exponent >= 300 || exponent <= -300)
-        return false;
+    // exponent magnitude is 300 or more. Other finite spellings have the same
+    // value as a double.
+    if (!scan_decimal(text, significant, exponent)) return false;
     const double value = std::strtod(std::string(text).c_str(), nullptr);
-    if (!std::isfinite(value) || std::fabs(value) >= static_cast<double>(kSafeInteger)) return false;
-    if (value == 0) return false;  // zero spelling (D1) or underflow
-    out = Value::number(value);
+    if (!std::isfinite(value)) return false;  // includes 1e309 (L55)
+    const bool exact = (value == 0.0 && text.find('.') != std::string_view::npos) ||
+                       exponent >= 300 || exponent <= -300;
+    if (exact) {
+        if (!json_number(text)) return false;  // non-JSON spellings stay refused
+        out = make_decimal(std::string(text), value);
+    } else {
+        out = Value::number(value);
+    }
     return true;
 }
 
@@ -111,8 +144,14 @@ NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out
         return NegativeLiteral::Decoded;
     }
     if (value.is(Kind::Double)) {
-        if (value.as_double() == 0) return NegativeLiteral::Zero;
+        // An exponent-only negative zero (`-0e5`) keeps a distinct legacy
+        // spelling and is outside this decoder's admitted forms.
+        if (value.as_double() == 0) return NegativeLiteral::Invalid;
         out = Value::number(-value.as_double());
+        return NegativeLiteral::Decoded;
+    }
+    if (value.is(Kind::Decimal)) {
+        out = negate(value);
         return NegativeLiteral::Decoded;
     }
     return NegativeLiteral::Invalid;

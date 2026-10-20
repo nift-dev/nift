@@ -106,12 +106,6 @@ void check_fallbacks() {
         {"if(1 { }\n", "parse-error"},
         {"x := 2\nprint(!x + 1)\n", "opaque:irregular-legacy-parse"},
         {"x := 2\ny := 1\nprint(y && !x || true)\n", "prefix-not-precedence"},
-        // Review round 1. D1: zero-valued decimal spellings keep their text in legacy.
-        {"print(0.0)\n", "number-literal"},
-        {"x := 0.00\nprint(-x)\n", "number-literal"},
-        {"print(0.0e5)\n", "number-literal"},
-        {"print(-0.0)\n", "number-literal"},
-        {"print(1.0e-300)\n", "number-literal"},  // exponent >= 300: exact spelling in legacy
         // D2: legacy ignores a jump followed by statements in its block.
         {"i := 0\nwhile(i < 3) { i += 1; break; print(\"after\") }\n", "jump-not-last"},
         {"i := 0\nwhile(i < 3) { i += 1; if(true) { continue; print(\"x\") } }\n", "jump-not-last"},
@@ -261,8 +255,12 @@ void check_literals() {
     CHECK(decode_number_literal(".5", v) && v.as_double() == 0.5);
     CHECK(decode_number_literal("5.", v) && v.as_double() == 5.0);
     CHECK(decode_number_literal("1e3", v) && v.as_double() == 1000.0);
-    CHECK(!decode_number_literal("1e300", v));
-    CHECK(!decode_number_literal("0.1000000000000000055511151231257827", v));
+    CHECK(decode_number_literal("1e300", v) && v.is(Kind::Decimal));
+    CHECK(decode_number_literal("0.1000000000000000055511151231257827", v) && v.as_double() == 0.1);
+    CHECK(decode_number_literal("0.0", v) && v.is(Kind::Decimal));
+    CHECK(decode_number_literal("5e-324", v) && v.is(Kind::Decimal));
+    CHECK(!decode_number_literal(".03e-467", v));
+    CHECK(!decode_number_literal("06490551634104E-452", v));
     CHECK(decode_string_literal("\"abc\"", v) && string_view_of(v) == "abc");
     CHECK(decode_string_literal("'it'", v) && string_view_of(v) == "it");
     CHECK(decode_string_literal("\"a\\nb\"", v) && string_view_of(v) == "a\nb");

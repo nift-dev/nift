@@ -4,6 +4,7 @@
 #include "rt/infer_types.h"
 #include "rt/infer_builtins.h"
 #include "rt/literal.h"
+#include "rt/number.h"
 
 #include <cmath>
 #include <deque>
@@ -117,10 +118,9 @@ private:
         TyRef t;
         switch (n.kind) {
             case NodeKind::Number: {
-                Value v;
-                if (!decode_number_literal(ast_.text(n), v)) t = kinds_ty(kKindNumber);
-                else t = constant(id, v.is(Kind::Int) ? static_cast<double>(v.as_int()) : v.as_double());
-                break;
+                Value v; if (!decode_number_literal(ast_.text(n), v)) t = kinds_ty(kKindNumber);
+                else if (v.is(Kind::Decimal)) t = kinds_ty(number_is_integer(v) ? kKindInt : kKindFrac);
+                else { t = constant(id, v.is(Kind::Int) ? static_cast<double>(v.as_int()) : v.as_double()); } break;
             }
             case NodeKind::String: t = kinds_ty(kKindString); break;
             case NodeKind::True: case NodeKind::False: t = kinds_ty(kKindBool); break;

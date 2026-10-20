@@ -9,16 +9,18 @@
 
 namespace nift::rt {
 
-// Integers without a leading zero in signed 64-bit range become Int; other
-// spellings with a fraction or exponent, at most 15 significant digits and a
-// magnitude below 2^53 become Double. Returns false otherwise (decimal-exact
-// legacy values, octal-looking spellings, huge or tiny magnitudes).
+// Integers without a leading zero in signed 64-bit range become Int. Other
+// finite canonical JSON spellings with a fraction or exponent become Decimal
+// when a zero-valued spelling has a fraction or the exponent magnitude is at
+// least 300, and Double otherwise. Non-JSON forms in those classes are refused.
+// Returns false for non-finite values, octal-looking spellings and malformed
+// decimal forms.
 bool decode_number_literal(std::string_view text, Value& out);
 
 enum class NegativeLiteral { Decoded, Zero, Invalid };
 // The magnitude text of a unary-negated number literal. INT64_MIN's magnitude
 // (9223372036854775808) is decoded exactly; zero means the runtime negation
-// must remain (-0); Invalid is a number-literal refusal (including -0.0).
+// must remain (-0); Invalid is a number-literal refusal.
 NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out);
 
 // `text` includes its quotes. Decodes legacy escapes (`\n`, `\t`, `\r`, `\\`,

@@ -876,7 +876,6 @@ INJECT = [
     ("native", "", "print(stringify(1))", "any", "callable:stringify"),
     # CP14 wiring: split is a bound built-in; replace_once is batch C (CP16).
     ("method", "", 'zs := "a,b"\nprint(zs.replace_once("a", "b"))', "any", "method:replace_once"),
-    ("zero-decimal", "", "print(0.0)", "any", "number-literal"),
     ("leading-zero", "", "print(01)", "any", "number-literal"),
     ("hex-literal", "", "print(0x10)", "any", "opaque:legacy-runtime-error"),
     ("overflow-exponent", "", "print(1e309)", "any", "number-literal"),

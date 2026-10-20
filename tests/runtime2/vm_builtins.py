@@ -195,6 +195,8 @@ SUPPORTED_TOP = [
                                'print(a6.stringify())\no9 := {"a": {"b": 0.10, "c": [1, {"d": -0e0}]}, "e": .5}\n'
                                'print(o9.stringify())\n'),
     ("w9-fallback-array-negzero", 'o5 := {"a": [-0, {"b": -0}], "c": .5}\nprint(o5.stringify())\n'),
+    ("w9-fallback-zero-decimal", 'o := {"a": -0.0, "b": .5}\nprint(o.stringify())\n'),
+    ("w9-fallback-denormal", 'o := {"a": 5e-324, "b": .5}\nprint(o.stringify())\n'),
     # Negation (unary minus of a possibly integer operand is refused in loop
     # code, CP12 #11): `-(-0)` is 0, `-(-0.0)` is 0.0 (legacy flips the
     # spelling's sign), `-(0.5 - 0.5)` prints 0.
@@ -294,8 +296,6 @@ UNSUPPORTED = [
     ("w9-fallback-leading-zero", 'o := {"z": 01, "a": 1}\nprint(o.stringify())\n', "number-literal"),
     ("w9-fallback-non-finite", 'o := {"z": 1e400, "a": 1}\nprint(o.stringify())\n', "number-literal"),
     ("w9-fallback-int-range", 'o := {"a": 12345678901234567890123, "b": .5}\nprint(o.stringify())\n', "number-literal"),
-    ("w9-fallback-zero-decimal", 'o := {"a": -0.0, "b": .5}\nprint(o.stringify())\n', "number-literal"),
-    ("w9-fallback-denormal", 'o := {"a": 5e-324, "b": .5}\nprint(o.stringify())\n', "number-literal"),
     ("w9-fallback-escape", 'o := {"z": "\\xff", "a": 1}\nprint(o.stringify())\n', "opaque:legacy-runtime-error"),
     # An integral negative zero in a JSON literal: legacy reads it as 0 in
     # loop code (loop bodies, functions called from loops), -0 elsewhere.
