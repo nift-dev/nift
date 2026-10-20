@@ -121,6 +121,14 @@ curated.
 
 Gates for the fix and for H1 below the compiler: see "Tests run (round 2)".
 
+Interaction with CP14's W6 (found by cp12b-gates10, after the rebase brought
+the CP14 wiring in): `o.stringify().stringify()` used to be refused as
+`postfix-receiver` before W6's presentation-chain check was reached
+(`vm_builtins.py` q14 expected that). With call-result receivers compiling,
+W6 refuses it with its own reason, `builtin-presentation-chain`. The program
+is refused in every context either way (legacy prints `{"a":1}`); the
+expectation's premise was outdated and now names W6.
+
 ## H1 globals: the parts below the compiler (coordinator item 2)
 
 Done (`c8ffc7ca`): opcodes `GetGlobal`/`SetGlobal` (VM cold path; no hot

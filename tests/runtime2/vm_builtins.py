@@ -274,9 +274,13 @@ UNSUPPORTED = [
     # Q3 object length() in loop code (context).
     ("q3-object-length-loop", 'o := {"a": 1}\ni := 0\nwhile (i < 1) { i += 1\nprint(o.length()) }\n',
      "context:object-length"),
-    # Q14 / W6 presentation chain: a method call on a call result is
-    # refused first (postfix-receiver); W6 is the defence in depth.
-    ("q14-presentation-chain", 'o := {"a": 1}\nprint(o.stringify().stringify())\n', "postfix-receiver"),
+    # Q14 / W6 presentation chain: refused in every context (legacy composes
+    # the chain over the original value outside loop code). Since CP12b's
+    # chained postfix (cp12b-resolver.md, accepted) a method call on a call
+    # result compiles, so the refusal is W6's own reason; before it,
+    # postfix-receiver refused first and W6 was defence in depth. The program
+    # is refused either way; only the refusing layer changed.
+    ("q14-presentation-chain", 'o := {"a": 1}\nprint(o.stringify().stringify())\n', "builtin-presentation-chain"),
     # F4 mutating methods and F5 callbacks: not wired.
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n", "method:pop"),
     ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n", "method:sort"),
