@@ -653,25 +653,13 @@ them against the legacy launcher: exit codes, captures, exec failures 127,
 signals 137, pipelines' per-stage results, env/cwd/redirections/append).
 Differences, all deliberate:
 
-* **Legacy `run()` process groups: a temporary compatibility exception**,
-  not CP16's lifecycle requirements -- see §9.6.
-* **C2**: installed at the first managed launch when SIGTERM is at its default
-  (stages in Nift's group are terminated by pid, adopted members as above)
-  (SIGINT default or ignored: an ignored SIGINT, e.g. a shell background job,
-  stays ignored); never in the interactive shell or under `--auto`'s own
-  handler. A `run()` that returns while Nift is shutting down fails, so the
-  script does not run on; Nift ends with the signal (143/130). Signal wake-up
-  is a futex on Linux (no descriptor).
-* **No PDEATHSIG for legacy launches** (part of the §9.6 exception): `test-consumer-snapshots`' interrupt
-  barrier requires a hook's child to outlive a SIGKILLed Nift and keep the
-  build lock. SIGKILL of Nift therefore behaves as before.
-* Low descriptors (CP07 "capture under `ulimit -n 6`" kept): for legacy
-  `run()` only (`exec_report_optional`, part of the §9.6 exception; the Host
-  layer's own launches still fail loudly), the exec-failure report pipe is
-  optional when out of descriptors (an exec failure is then
-  only its 127/126 status, as legacy); a blocking call arms no host-loop
-  timer (`ProcessGroup::start_for_wait`); `group_has_members` first asks
-  `kill(-pgid, 0)`.
+* **Legacy `run()` keeps its historical process semantics** -- a temporary
+  compatibility exception, not CP16's lifecycle requirements (§9.6): stages in
+  Nift's process group, no PDEATHSIG, no SIGINT/SIGTERM cleanup, no tracking
+  of background descendants, launch without the exec-failure report when out
+  of descriptors (CP07 `ulimit -n 6`).
+* A blocking call arms no host-loop timer (`ProcessGroup::start_for_wait`);
+  `group_has_members` first asks `kill(-pgid, 0)` (Host layer, both engines).
 * Parent-side launch failures (pipe/fork/capture-file creation) keep the Host
   layer's texts ("cannot create pipe: ...") instead of legacy's "pipe failed" /
   "fork failed"; reachable only by fault injection.
@@ -683,19 +671,27 @@ Not moved: Windows keeps the legacy launcher (`process_win.cpp` reports
 compiled here — no Windows toolchain), the interactive shell's command
 statements and job control (CP19–CP21), templates' `@run`-style and package
 tool launches (`nift_run_process` callers outside `run()`/`cmd().run()`),
-`Serve`. The subreaper is not enabled from the CLI (job-control orphans).
+`Serve`.
 
 ### 9.4 Tests (local, light; heavy gates on Linode)
 
+State after the owner decision of §9.6 (legacy subreaper removed, legacy
+`run()` historical) and the r2 deadline fix:
+
 | Test | Result |
 |---|---|
-| `test-rt-host` | 495/0 and 1402/0 |
-| CP16 fixtures `capture.py --check` | 30/30 (base and this binary) |
-| `legacy_routing.sh` (new, `make test`) | 23 PASS: result objects, C3, C1 script and page, C2 plain and SIGTERM-ignoring (SIGKILL after the 2,000 ms grace), trace v2 (all lines v2; failed read with its code; v1 unchanged), stdin |
-| `process_capture.sh` | 10 PASS; case 4 flipped (C2) |
-| `engine_parity.py` (new, `make test`) | 153 cases, 0 differences, VM engaged in 0 (§9.2) |
-| `host_deps.py`, `dynamic_reads.sh`, `sha256_builtins.sh` | pass |
-| `test-consumer-snapshots` | interrupt barrier 6/6 after the PDEATHSIG decision; the suite itself has timing-sensitive cases that fail intermittently on this loaded host for the base binary too (`versions`, `fingerprint_migration`), so its verdict is taken from Linode |
+| `test-rt-host` | 495/0 and 1414/0 |
+| `test-rt-host-sanitize` (ASan/UBSan) | 495/0 and 1414/0 |
+| `test-rt-host-tsan`, 5 runs | 1414/0 each, no ThreadSanitizer report |
+| `deadlines` under TSan after the fix | 60 runs, 0 failures (before: 1 in 5) |
+| `cancel_signals_before_stdin_eof` | 20 runs, 0 failures; with the old order: fails |
+| rt-lint | 0 problems |
+| CP16 fixtures `capture.py --check` | 30/30 |
+| `legacy_routing.sh` | 21 PASS: result objects, historical process semantics (c1-c3), trace v2, stdin |
+| `process_capture.sh` | all PASS, case 4 back to the historical expectation (child survives Nift's SIGTERM) |
+| `engine_parity.py` | 153 cases, 0 differences, VM engaged in 0 (§9.2) |
+| `rt_diff_selftest.sh` | PASS, incl. "no process outlives a timed-out entry" |
+| interrupt barrier (test-consumer-snapshots) | 6/6 |
 
 ### 9.5 Remote job cp16-phase2 (671f2236): fixes
 
@@ -707,6 +703,24 @@ tool launches (`nift_run_process` callers outside `run()`/`cmd().run()`),
 | 4 rt-diff-selftest leftovers | legacy run() children in their own group (C3) | §9.3: `own_group = false` for legacy run() |
 | 5 `test-rt-lint` | `src/rt/host` broke the CP09 lint (file and function size, own headers, line length, string compares) | `process_posix.cpp` split by concern (`process_posix_{sys,state,launch,loop,lifecycle}`), `process_runtime.cpp` split (`process_{loop,reaper,signals}`), headers for `process_common`/`process_win`, long lines wrapped, cold-file markers for option parsing, trace-version parsing and `HostCall` mode checks; `PASS rt-lint: 0 problem(s)` |
 | 6 rt-host-tsan | environment (worker 9 `vm.mmap_rnd_bits`) | rerun |
+
+Remote job cp16-phase2-r2 (93581517): `rt-host-tsan` failed `deadlines`
+(`host_process_unit.cpp:462`, `r.timed_out && r.out.empty() && ms < 3000`).
+**Classification: an ordering bug in the Host layer's cancellation start,
+exposed by TSan's slowdown -- not a data race (no ThreadSanitizer report) and
+not the environment.** Evidence: instrumented locally under TSan (5 runs),
+`timed_out` was true and `ms` 209-217 every time; in 1 of 5 `out` was
+`"never"`. `begin_cancel()` closed the stages' stdin *before* sending
+SIGTERM, so a child blocked in `read` saw EOF and ran its next command (`echo
+never`) before the signal arrived; TSan widened that window. Fix: signal
+first, then close stdin (the cancellation sequence is otherwise unchanged;
+the deadline contract is unchanged). Permanent reproducer:
+`cancel_signals_before_stdin_eof` (a test hook pauses 50 ms between the two
+steps; with the old order it fails every run, with the fix never). After the
+fix: 60 TSan runs of `deadlines`, 0 failures; full `test-rt-host`,
+`test-rt-host-sanitize` and `test-rt-host-tsan` (x5) results in §9.4.
+`make test`'s `test-v43-language` failure in r2 is the known root-only
+environmental skip.
 
 **Tests that assume `/nonexistent` is not a file** (it is a regular file on
 the development host, `/nonexistent` 10,250 bytes, so a path under it fails
@@ -724,104 +738,77 @@ nonzero status, PATH lookup by regular file), so they pass either way; a page
 build would record such a path as unreadable instead of absent. Paths with
 `/nonexistent-<name>` (no directory component) are unaffected.
 
-### 9.6 Temporary compatibility exception: legacy `run()` process groups
+### 9.6 Temporary compatibility exception: legacy `run()` keeps its historical process semantics
 
-Status: approved provisionally by the owner, with conditions (coordinator,
-2026-10-20). **This is a compatibility exception for the transition, not an
-implementation of CP16's lifecycle requirements.** It applies to the legacy
-interpreter's `run()`/`cmd().run()` only. The Host layer's own `run()` (VM
-natives, `run()` options) keeps every CP16/CP17 lifecycle, cleanup and
-ownership guarantee unchanged: its defaults are `own_group = true`,
-`die_with_parent = true`, `exec_report_optional = false`, and the
-adopted-orphan rules are switched on only by `enable_subreaper_for_legacy`.
+Owner decision (2026-10-20, superseding the provisional process-group
+exception and the legacy-only subreaper). **This is a temporary
+compatibility exception for the transition, not an implementation of CP16's
+lifecycle requirements.** It extends the decision recorded at `runtime-2`
+@`6413f7a4` (text to append: below). It covers the legacy interpreter's
+`run()`/`cmd().run()` only; the Host layer's own `run()` (VM natives, `run()`
+options) keeps every CP16/CP17 ownership, cleanup, cancellation and resource
+guarantee, unchanged and tested (`make test-rt-host`).
 
-Why: two pinned contracts need legacy's process-group semantics --
-rt-diff-selftest (killing Nift's process group must reach the children) and
-test-consumer-snapshots' interrupt barrier (a SIGKILL of Nift alone must
-leave a hook's child running, holding the build lock). Only children in
-Nift's own process group satisfy both (§9.5 item 4).
+Legacy `run()` launches through the Host layer (`ProcessGroup`, trace,
+result mapping) with three legacy-only request flags: `own_group = false`,
+`die_with_parent = false`, `exec_report_optional = true`; it installs no
+C2 handler and registers nothing with CP17. The Host layer's defaults are
+`own_group = true`, `die_with_parent = true`, `exec_report_optional = false`.
 
-| | legacy `run()` (exception) | Host layer `run()` |
+| | legacy `run()` (historical, exception) | Host layer `run()` |
 |---|---|---|
-| cleanup at context end (C1) | none: background members outlive the script / page render, as before | leftover group members terminated when the owning CP17 context ends (D-030, D-035) |
-| dedicated process group (C3) | no: stages stay in Nift's process group (a signal to that group reaches them) | yes: one group per pipeline, signalled as a unit |
-| terminal ownership | unchanged: Nift's group keeps the terminal | the pipeline's group gets the terminal for a blocking call (§11.8) |
-| SIGINT/SIGTERM cleanup (C2) | yes: running stages by pid; background members found by parentage (Linux subreaper, `sweep_orphans`) with their descendants; other components' children and unrelated processes untouched; on macOS only the running stages | yes: every indexed group (SIGTERM, grace, SIGKILL, bounded wait) |
+| cleanup at context end (C1) | none: background descendants outlive the script / page render | leftover group members terminated when the owning CP17 context ends (D-030, D-035) |
+| dedicated process group (C3) | no: stages in Nift's process group (a signal to that group reaches them) | one group per pipeline, signalled as a unit |
+| terminal ownership | Nift's group keeps the terminal | the pipeline's group gets the terminal for a blocking call (§11.8) |
+| SIGINT/SIGTERM to Nift (C2) | no cleanup: Nift ends by the signal's default action; running children and background descendants keep running | every managed group: SIGTERM, grace, SIGKILL, bounded wait, then Nift ends with the signal |
 | SIGKILL of Nift alone | children keep running (no PDEATHSIG) | managed stages die with Nift (PDEATHSIG, Linux) |
-| parent of a background member while Nift lives | Nift (Linux subreaper; legacy-visible difference) | the pipeline's group members are Nift's descendants as launched |
-| lifecycle ownership | none in CP17's table while `own_group` is false (no group to own; the residue machinery is wired but inert) | CP17 owns identity, counts, contexts and the lifecycle verdict; CP16 reports OS facts |
-| launch with no descriptor left for the exec report | launches; an exec failure is only its 127/126 status (legacy) | fails loudly (`cannot create pipe: ...`): launch failure stays distinct |
+| lifecycle ownership | none (no CP17 resource) | CP17 owns identity, counts, contexts and the verdict; CP16 reports OS facts |
+| no descriptor left for the exec-failure report | launches; an exec failure is only its 127/126 status | fails loudly (`cannot create pipe: ...`) |
 
-How C2 reaches background members without a group: where C2 is installed
-(first legacy launch, SIGTERM at its default, not the interactive shell),
-`runtime::enable_subreaper_for_legacy()` makes Nift a subreaper, so a member a
-stage leaves behind is adopted by Nift. Adopted members that exit are reaped
-after each legacy `run()` and at script end (`reap_adopted_children`:
-`/proc/self/task/*/children`; no SIGCHLD handler, since legacy code is not
-prepared for EINTR, and no host loop, so no descriptor); on SIGINT/SIGTERM
-they are terminated with their descendants (`sweep_orphans`, after the
-indexed groups). Every component that forks reports its direct children
-under the launch mutex (`nift_process_note_child`, `ProcessPOSIX.h`: the
-legacy launcher, job control, `serve`, whose fork now holds the mutex),
-identified by pid and start time, so the subreaper never reaps or signals a
-child some other code waits for.
+Why these limitations are kept: they are legacy's observable behaviour, and
+existing contracts depend on parts of it (rt-diff-selftest: a SIGKILL of
+Nift's group reaches the children; test-consumer-snapshots' interrupt
+barrier: a hook's child outlives a SIGKILL of Nift and keeps the build lock;
+`process_capture.sh` case 4: a child survives Nift's SIGTERM; CP07: capture
+under `ulimit -n 6`).
 
-Scope of the subreaper (coordinator conditions for r3). The kernel adopts
-every orphaned descendant of a subreaper; what Nift *does* with adopted
-processes is scoped: (1) it is enabled only where C2 is installed, i.e. in
-processes that run the legacy interpreter outside the interactive shell and
-outside `--auto`'s own signal handler -- never in the shell (job control) and
-never in `nift serve` (which runs no parser); (2) reaping (adopted zombies
-only) and C2's sweep never touch a child another component forked and
-reported (legacy launcher, job control, serve), identified by pid and start
-time; (3) C2's sweep signals only adopted processes still in Nift's own
-process group and session -- where descendants of Nift's legacy launches
-remain unless they move themselves (a daemon that calls `setsid` escapes, as
-before). Exact attribution to `run()` alone is not possible while the stages
-share Nift's group: descendants of the legacy launcher's other launches in a
-build (template command directives, package `git` runs, which go through the
-same launcher in Nift's group) are adopted and swept alike; they are Nift's
-own legacy launches too. Pinned by the unit test
-`foreign_children_concurrent` (reported children forked and waited for by
-another thread while legacy launches leave orphans, the reaper runs and C2's
-sweep runs concurrently; a mutant that drops the reported-child check fails
-it) and stressed in the remote job with `deadline_races` and
-`legacy_adopted_children`.
+Tests, by ownership class: `tests/runtime2/cp16/legacy_routing.sh` asserts
+the historical legacy behaviour only and claims no cleanup guarantee for
+legacy-launched descendants -- (c1) stages in Nift's group, reached by a
+group SIGKILL; (c2) a SIGKILL or SIGTERM of Nift alone leaves a running
+child running; (c3) background descendants outlive a normal script end and
+a page render end. Host-managed processes: `tests/rt/host_process_unit.cpp`
+(C1 leftovers and context ends, C2 `sigterm_to_nift_c2`, C3 groups and
+terminal, CP17 lifecycle, deadlines and cancellation, the Host layer's own
+subreaper and orphan sweep, `low_fd_limit` showing the Host launch failing
+loudly where the legacy flag launches).
 
-**Legacy-visible difference.** While Nift lives, an adopted background
-process sees Nift as its parent (`getppid()`, `/proc/<pid>/stat`), not init
-or the session's subreaper as with the old launcher, and Nift reaps it when
-it exits. When Nift exits normally the process lives on and is reparented to
-the system's reaper exactly as before (fixture in `legacy_routing.sh`).
+Removed (owner decision): the legacy-only Linux subreaper (adoption of
+legacy descendants, `reap_adopted_children`, fork-site child reporting in
+`ProcessPOSIX.h`/`Process.cpp`/`JobControl.cpp`/`Serve.cpp`, the C2 sweep of
+adopted members, `ProcInfo::start`), C2 for legacy `run()` (and with it the
+interactive-shell switch), and the inert legacy C1 context plumbing in the
+parser. Kept: the Host layer's own subreaper and orphan sweep (slice 1,
+§11.9; not legacy adoption).
 
-**Platforms.** The subreaper is Linux-only: `PR_SET_CHILD_SUBREAPER`,
-`own_children()` (`/proc/self/task/*/children`) and the sweep are compiled
-under `#ifdef __linux__`; elsewhere `enable_subreaper_for_legacy()`,
-`sweep_orphans()` and `reap_adopted_children()` are stubs returning
-false/0. On macOS (and other non-Linux POSIX) C2 itself works (self-pipe
-watcher, SIGTERM/grace/SIGKILL by pid to the running legacy stages), but
-background members a stage left behind are not reached: they stay in Nift's
-process group, so a signal to that group (Ctrl-C at a terminal, a
-supervisor's killpg) still ends them, while a signal to Nift alone does not
--- the old launcher's behaviour. Windows keeps the legacy launcher entirely
-(§9.3); the Host layer's Windows slice is untested.
+**Removal condition.** CP25 cannot complete while any execution path relies
+on this exception: CP25 must eliminate the legacy launcher and all of its
+exceptions (process semantics above, `exec_report_optional`, and the legacy
+launcher callers listed in §9.3).
 
-Tests, by ownership class (`tests/runtime2/cp16/legacy_routing.sh`, unit tests
-in `tests/rt/host_process_unit.cpp`): (a) SIGINT/SIGTERM to Nift terminates
-the legacy stages and the background members they left, and a SIGKILL of
-Nift's group reaches them; (b) Host-managed processes: the process unit
-suite (C1 leftovers, context ends, CP17 lifecycle, `low_fd_limit` showing the
-Host launch failing loudly where the legacy flag launches); (c) legacy
-background descendants survive an ordinary script end and page render end;
-(d) an unrelated process in the same session, started outside Nift, survives
-Nift's SIGTERM/SIGINT handling. No test asserts "nothing left" where (c)
-allows survival; rt-diff-selftest's "no process outlives a timed-out entry"
-is a group SIGKILL, which the exception covers.
+Text to append to the `runtime-2` decision entry (@`6413f7a4`, not edited on
+this branch):
 
-**Removal condition.** CP25 (legacy retirement) cannot complete while any
-execution path relies on this exception (the coordinator adds this to the
-CP25 checklist on `runtime-2`). Restoring C1/C3 for legacy `run()` before
-then is deferred to CP25; the alternative in the meantime is the subreaper
-machinery above (adopted members found by parentage), which could terminate
-background members at context end -- not done, because it would change the
-legacy behaviour this exception keeps.
+> Amendment (owner, 2026-10-20): the legacy-only subreaper is withdrawn and
+> legacy `run()` keeps its historical process semantics, including its
+> signal-handling limitation: no SIGINT/SIGTERM cleanup of legacy children
+> (the earlier "SIGINT/SIGTERM cleanup of its children is required and
+> tested" is superseded), no PDEATHSIG, no background-descendant cleanup, no
+> dedicated group or terminal ownership, launch without the exec-failure
+> report when out of descriptors. These are temporary compatibility
+> exceptions, not satisfied CP16 guarantees; legacy tests assert historical
+> behaviour by ownership class and claim no cleanup for legacy-launched
+> descendants. The Host layer's run() is unchanged. CP25 cannot complete
+> while any execution path relies on these exceptions: it must eliminate the
+> legacy launcher and all its exceptions.
+
