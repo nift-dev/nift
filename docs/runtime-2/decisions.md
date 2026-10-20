@@ -1162,3 +1162,34 @@ ownership, cleanup, cancellation and resource guarantees are unchanged.
 Inexpensive correctness fixes that benefit both engines may stay; a
 legacy-only, Linux-specific adoption mechanism does not qualify. The CP25
 removal condition now covers the legacy launcher and all of its exceptions.
+
+## D-049 — Package compatibility targets Runtime 2.0 (owner, 2026-10-20)
+
+There are no existing package users to protect, and Runtime 2.0 replaces the
+legacy engine, so package compatibility work targets Runtime 2.0 and later
+Nift releases rather than historical 4.x minimum versions.
+
+1. Runtime 2.0 is the package compatibility baseline.
+2. The historical minimum-version campaign (v4.6.0–v4.12.0) stops. Its
+   evidence is kept as a record, including the finding that the published
+   "Requires Nift 4.6.0 or later" is untrue for fuzzy, redis, semver, url,
+   csv and diff. No engineering time goes into package compatibility with
+   Nift 4.6–4.12.
+3. The canonical `import()` migration, the MDX template corrections and the
+   package tests are kept.
+4. All 25 packages stay in scope, including `csv` and `diff`. Failures on
+   historical releases are not grounds to drop them.
+5. Package test failures on Runtime 2.0 are used to identify missing runtime
+   capabilities or package defects.
+6. README minimum-version wording is set once the Runtime 2.0 release version
+   is known. Until then no README claims compatibility that has not been
+   tested.
+7. Package CI exercises supported future Nift versions, including the latest
+   runtime development branch where practical. Compatibility is a continuous
+   regression-testing guarantee, not a historical version number.
+
+Package compatibility does not wait for CP25: packages are tested against the
+developing VM now, and certified finally against the release candidate. No
+package pushes are authorised yet. This is not a new package-certification
+project; existing package tests run against the new runtime as part of normal
+development.
