@@ -1,0 +1,22 @@
+{
+ "ops": null,
+ "output": "R:plain\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "data/r.txt",
+   "hook.f"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "9204976078360809519",
+   "data/r.txt": "13480361243988023619",
+   "hook.f": "8421886364924424086"
+  },
+  "kinds": {
+   "data/r.txt": "file"
+  },
+  "reqs": [
+   "data/r.txt"
+  ]
+ }
+}

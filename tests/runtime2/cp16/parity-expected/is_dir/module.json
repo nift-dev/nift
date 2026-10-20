@@ -1,0 +1,20 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "lib/m.f"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "1290689256330519509",
+   "lib/m.f": "2321819579686240741"
+  },
+  "kinds": {
+   "data": "directory"
+  },
+  "reqs": [
+   "data"
+  ]
+ }
+}

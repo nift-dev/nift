@@ -1,0 +1,7 @@
+{
+ "ops": [
+  "{\"arg\": \"$ROOT/data/missing.txt\", \"err\": \"io.open_failed\", \"op\": \"read\", \"res\": \"error\", \"v\": 2}"
+ ],
+ "output": "ok\n",
+ "recording": null
+}

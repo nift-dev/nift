@@ -1,0 +1,16 @@
+{
+ "ops": null,
+ "output": "\nR:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "4450732313231976563"
+  },
+  "listings": {
+   "dir:data": "ca26a560e3810ba2"
+  },
+  "reqs": []
+ }
+}

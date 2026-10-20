@@ -1,0 +1,14 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "6466797033016592698"
+  },
+  "environment-snapshot": "$FP",
+  "reqs": []
+ }
+}

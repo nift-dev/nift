@@ -33,6 +33,13 @@ HostStatus HostCall::resolve(std::string_view raw, PathSemantics semantics) {
     return HostStatus::Ok;
 }
 
+void HostCall::adopt(const std::filesystem::path& resolved) {
+    target_ = Resolved();
+    target_.spelled = resolved.generic_string();
+    target_.path = resolved;
+    resolved_ = true;
+}
+
 void HostCall::set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled, const std::string& cwd_absolute) {
     spawn_ = true;
     argv_ = argv;
@@ -117,7 +124,11 @@ HostStatus HostCall::fail(HostStatus status, const HostError& error, std::string
     const auto& info = op_info(op_);
     if (env_.trace && begun_ && !refused_ && info.v1_point == TracePoint::PostAlways) env_.trace->emit_v1(info.v1_name, trace_arg(), v1_res);
     emit_v2("error", error_.code);
-    if (begun_ && !refused_ && status_ == HostStatus::Recoverable) record_failure();  // fatal/limit: the run ends (legacy records nothing)
+    // Fatal/limit: the run ends and legacy records no read. A listing is the
+    // exception: legacy records its fingerprint before the attempt, whatever follows.
+    if (begun_ && !refused_ &&
+        (status_ == HostStatus::Recoverable || (status_ == HostStatus::Fatal && info.recording == Recording::Listing)))
+        record_failure();
     return status_;
 }
 
@@ -134,14 +145,14 @@ void HostCall::record(const Observation& obs) {
             o->presence(path, obs.exists, obs.kind);
             if (obs.metadata && obs.exists && obs.kind == "file") o->metadata_read(path);
             break;
-        case Recording::Listing: o->listing(obs.listing_key, path); break;
+        case Recording::Listing: o->listing(obs.listing_key.empty() ? listing_key_ : obs.listing_key, path); break;
         case Recording::Environment: o->environment(arg_, obs.env_value); break;
         case Recording::EnvironmentSnapshot: o->environment_snapshot(); break;
         case Recording::Platform: o->platform(obs.platform); break;
         case Recording::Written: o->written(path); break;
         case Recording::OpenMode: {
             const std::string_view mode = obs.open_mode.empty() ? std::string_view(open_mode_) : obs.open_mode;
-            if (mode == "r" || mode == "rw") o->read(path, obs.bytes);  // "rw" reads the file too (D-028)
+            if (mode == "r" || mode == "rw") o->open_read(path, obs.bytes);  // "rw" reads the file too (D-028)
             break;
         }
     }
@@ -159,6 +170,11 @@ void HostCall::record_failure() {
         case Recording::Read: case Recording::StreamedRead: reading = true; break;
         case Recording::StreamOpen: reading = !output_stream_; break;
         case Recording::OpenMode: reading = open_mode_ == "r" || open_mode_ == "rw"; break;
+        case Recording::Listing:
+            // The fingerprint says "missing"/"unreadable": the page is rebuilt
+            // when the directory appears or becomes readable.
+            if (!listing_key_.empty()) o->listing(listing_key_, target_.path);
+            return;
         default: break;
     }
     if (reading) o->failed_read(target_.path);

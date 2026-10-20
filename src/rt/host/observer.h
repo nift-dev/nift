@@ -27,6 +27,10 @@ public:
     virtual ~Observer() = default;
     virtual void presence(const std::filesystem::path& path, bool exists, std::string_view kind) = 0;
     virtual void read(const std::filesystem::path& path, std::string_view bytes) = 0;
+    // A read made by file().open("r"/"rw"). Same as read() unless the
+    // observer says otherwise: legacy hook/standalone contexts still report
+    // these bytes to the host (c7971365) while ignoring other reads.
+    virtual void open_read(const std::filesystem::path& path, std::string_view bytes) { read(path, bytes); }
     virtual void failed_read(const std::filesystem::path& path) = 0;   // absent if missing, else unreadable
     virtual void stream_open(const std::filesystem::path& path) = 0;   // file-backed input stream opened (hashed at open)
     virtual void streamed_read(const std::filesystem::path& path, std::uint64_t size, const std::uint64_t* hash) = 0;

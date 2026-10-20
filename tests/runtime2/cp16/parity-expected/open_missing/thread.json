@@ -1,0 +1,16 @@
+{
+ "ops": null,
+ "output": "\nR:ok\n",
+ "recording": {
+  "absent": [
+   "data/missing.txt"
+  ],
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "7743394551251089534"
+  },
+  "reqs": []
+ }
+}

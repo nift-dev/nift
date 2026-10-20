@@ -6,10 +6,12 @@
 #include "HostTrace.h"
 #include "ReadLimit.h"
 #include "ParserAsyncPool.h"
+#include "ParserHost.h"
 
 #include <fstream>
 
 namespace fs = std::filesystem;
+namespace host = nift::rt::host;
 
 namespace {
 // Trace spelling: absolute, lexically normal (the harness maps temp roots).
@@ -24,61 +26,58 @@ void Parser::trace_host(const char* op, const fs::path& path, const std::string&
     if (nift::trace::enabled()) nift::trace::emit(op, trace_path(path), result);
 }
 
+// CP16: the observation primitives run their operation as a HostCall (trace
+// from the op table, recording through ParserHostObserver). Ops traced after
+// the attempt (stat, read, getenv) are equivalent whether the primitive is
+// called around the attempt or right after it.
 Parser::FsInfo Parser::inspect_path(const fs::path& path) const {
+    ParserHostObserver observer(*this);
+    host::HostCall call(parser_host_env(&observer), host::HostOp::Stat, "stat");
+    call.adopt(path);
+    call.begin();
     FsInfo info = inspect_path_unobserved(path);
-    if (nift::trace::enabled()) trace_host("stat", path, info.error ? "error" : info.exists ? info.type : "missing");
-    if (!info.error) observe_presence(path, info.exists, info.type);
+    if (info.error) {
+        call.fail(host::HostStatus::Recoverable, parser_host_error("io.metadata_failed", info.error_message), "error");
+        return info;
+    }
+    host::Observation observation;
+    observation.exists = info.exists;
+    observation.kind = info.type;
+    call.succeed(info.exists ? info.type : std::string("missing"), observation);
     return info;
 }
 
+// Recording-only helpers: the one implementation is PageObserver (shared by
+// every engine); these keep the legacy call sites that record without a Host
+// call (page members, copy sources, template absences).
 void Parser::observe_presence(const fs::path& path, bool exists, const std::string& kind) const {
-    if (!observing()) return;
-    // inspect_path is const for its callers, but the Parser itself is never a
-    // const object while rendering; recording an observation is not a change
-    // to the evaluation state that const protects.
-    auto& result = const_cast<Parser*>(this)->result_;
-    const std::string spelling = nift::observe::spell(host_.root(), path);
-    if (exists) {
-        result.reqs.insert(spelling);                // stale if it disappears
-        if (!kind.empty()) result.observed.kinds[spelling] = kind;  // stale if its type changes
-    } else {
-        result.observed.absent.insert(spelling);     // stale if it appears
-    }
+    ParserHostObserver(*this).presence(path, exists, kind);
 }
 
 void Parser::observe_read(const fs::path& path, const std::string& bytes) {
-    if (nift::trace::enabled()) trace_host("read", path, std::to_string(bytes.size()));
-    if (!observing()) return;
-    result_.dependencies.insert(host_.relative(path));
-    host_.observe_dependency(path, bytes);
+    ParserHostObserver observer(*this);
+    host::HostCall call(parser_host_env(&observer), host::HostOp::Read, "read");
+    call.adopt(path);
+    call.begin();
+    host::Observation observation;
+    observation.bytes = bytes;
+    call.succeed(std::to_string(bytes.size()), observation);
 }
 
 void Parser::observe_streamed_read(const fs::path& path, std::uint64_t size, const std::uint64_t* snapshot) {
-    if (nift::trace::enabled()) trace_host("read", path, std::to_string(size));
-    if (!observing()) return;
-    result_.dependencies.insert(host_.relative(path));
-    if (snapshot) host_.observe_dependency_hash(path, *snapshot);
+    ParserHostObserver observer(*this);
+    host::HostCall call(parser_host_env(&observer), host::HostOp::ReadBytes, "read");
+    call.adopt(path);
+    call.begin();
+    host::Observation observation;
+    observation.size = size;
+    observation.hash = snapshot;
+    call.succeed(std::to_string(size), observation);
 }
 
-void Parser::observe_failed_read(const fs::path& path) {
-    if (!observing()) return;
-    std::error_code error;
-    const auto status = fs::status(path, error);
-    if (!error && !fs::exists(status)) { observe_presence(path, false); return; }
-    if (error && (error == std::errc::no_such_file_or_directory || error == std::errc::not_a_directory)) {
-        observe_presence(path, false);
-        return;
-    }
-    result_.observed.unreadable[nift::observe::spell(host_.root(), path)] = filesystem::read_access_error(path);
-}
+void Parser::observe_failed_read(const fs::path& path) { ParserHostObserver(*this).failed_read(path); }
 
-void Parser::observe_stream_open(const fs::path& path) {
-    if (!observing()) return;
-    result_.dependencies.insert(host_.relative(path));
-    // Hashed at open: an edit made while the page streams the file leaves the
-    // recorded snapshot different from the file, so the next build rebuilds.
-    if (read_snapshot_wanted()) host_.observe_dependency_hash(path, filesystem::hash_path_streamed(path));
-}
+void Parser::observe_stream_open(const fs::path& path) { ParserHostObserver(*this).stream_open(path); }
 
 void Parser::observe_page_member(const std::string& page, const std::string& member) {
     if (member != "content" && member != "metadata") return;
@@ -208,42 +207,39 @@ bool Parser::read_snapshot_wanted() const {
     return observing() && host_.observe_dependencies;
 }
 
-void Parser::observe_metadata_read(const fs::path& path) {
-    if (!observing()) return;
-    result_.dependencies.insert(host_.relative(path));
-    host_.observe_dependency_hash(path, filesystem::hash_path(path));
-}
+void Parser::observe_metadata_read(const fs::path& path) { ParserHostObserver(*this).metadata_read(path); }
 
 void Parser::note_written(const fs::path& path, const char* op) {
     if (nift::trace::enabled()) trace_host(op, path, "");
     note_written_untraced(path);
 }
 
-void Parser::note_written_untraced(const fs::path& path) {
-    if (!observing()) return;
-    std::error_code error;
-    const fs::path absolute = fs::absolute(path, error);
-    result_.observed.written.insert((error ? path : absolute).lexically_normal());
-}
+void Parser::note_written_untraced(const fs::path& path) { ParserHostObserver(*this).written(path); }
 
+// A listing observed before the attempt (legacy order): the fingerprint is
+// computed from the filesystem itself, whatever the attempt then finds.
 void Parser::observe_listing(const std::string& key, const fs::path& path) {
-    if (nift::trace::enabled()) trace_host(key.rfind("glob:", 0) == 0 ? "glob" : "list", path, "");
-    if (!observing()) return;
-    result_.observed.listings[key] = host_.listing_fingerprint(key);
+    ParserHostObserver observer(*this);
+    host::HostCall call(parser_host_env(&observer), key.rfind("glob:", 0) == 0 ? host::HostOp::Glob : host::HostOp::List, "ls");
+    call.adopt(path);
+    call.set_listing_key(key);
+    call.begin();
+    call.succeed();
 }
 
-void Parser::observe_environment(const std::string& name, const nift::HostResult& value) {
-    if (nift::trace::enabled())
-        nift::trace::emit("getenv", name, value.status == nift::HostStatus::Found ? "found" :
-                                          value.status == nift::HostStatus::NotFound ? "unset" : "error");
-    if (!observing()) return;
-    // NIFT_HOOK_* values are invocation-local facts about the tracked item
-    // (target, paths, phase) supplied by the build itself, not the process
-    // environment; they change only with tracked metadata, which already
-    // invalidates the page.
-    if (name.rfind("NIFT_HOOK_", 0) == 0) return;
-    if (value.status == nift::HostStatus::Found) result_.observed.env[name] = value.value;
-    else if (value.status == nift::HostStatus::NotFound) result_.observed.env[name] = std::nullopt;
+void Parser::observe_environment(const std::string& name, const nift::HostResult& value, bool template_directive) {
+    ParserHostObserver observer(*this);
+    host::HostCall call(parser_host_env(&observer), template_directive ? host::HostOp::GetenvTemplate : host::HostOp::Getenv,
+                        "getenv");
+    call.set_arg(name);
+    call.begin();
+    if (value.status == nift::HostStatus::Error) {
+        call.fail(host::HostStatus::Fatal, parser_host_error("host.service_failed", "getenv: " + value.error), "error");
+        return;
+    }
+    host::Observation observation;
+    if (value.status == nift::HostStatus::Found) observation.env_value = value.value;
+    call.succeed(value.status == nift::HostStatus::Found ? "found" : "unset", observation);
 }
 
 std::string RenderHost::listing_fingerprint(const std::string& key) const {

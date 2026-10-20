@@ -102,7 +102,9 @@ void test_op_table() {
     CHECK(op_info(HostOp::GetenvTemplate).v1_point == TracePoint::PostAlways);
     CHECK(op_info(HostOp::EnvAll).v1_point == TracePoint::Pre);
     CHECK(op_info(HostOp::Spawn).v1_point == TracePoint::Pre);
-    for (HostOp u : {HostOp::ReadBytes, HostOp::StreamOpen, HostOp::StreamWrite, HostOp::Inject, HostOp::FileCopy, HostOp::FileMove,
+    CHECK(op_info(HostOp::ReadBytes).v1_point == TracePoint::PostOk && std::string(op_info(HostOp::ReadBytes).v1_name) == "read");
+    CHECK(op_info(HostOp::ReadBytes).recording == Recording::StreamedRead);
+    for (HostOp u : {HostOp::StreamOpen, HostOp::StreamWrite, HostOp::Inject, HostOp::FileCopy, HostOp::FileMove,
                      HostOp::FileRemove, HostOp::Chdir, HostOp::Setenv, HostOp::Unsetenv, HostOp::Which, HostOp::Clock, HostOp::Sleep, HostOp::Random})
         CHECK(op_info(u).v1_point == TracePoint::None);
     CHECK(std::string(op_info(HostOp::CopyTo).v1_name) == "copy-to");
@@ -207,9 +209,13 @@ void test_hostcall_points() {
     auto ste = run_op(HostOp::Stat, "exists", "f", false, "io.metadata_failed");
     CHECK(ste.v1.size() == 2 && ste.v1[1].find("\"res\":\"error\"") != std::string::npos);
     // untraced in v1, traced in v2
-    auto u = run_op(HostOp::ReadBytes, "open_bytes", "b.bin", true, nullptr, HostStatus::Ok, "3");
+    auto u = run_op(HostOp::StreamOpen, "ifstream", "b.bin", true, nullptr, HostStatus::Ok, "");
     CHECK(u.v1.size() == 1);
-    CHECK(u.v2.size() == 1 && u.v2[0].find("\"op\":\"read-bytes\"") != std::string::npos);
+    CHECK(u.v2.size() == 1 && u.v2[0].find("\"op\":\"stream-open\"") != std::string::npos);
+    // open_bytes/sha256_file: v1 `read` after success (host-deps), v2 read-bytes
+    auto rb = run_op(HostOp::ReadBytes, "open_bytes", "b.bin", true, nullptr, HostStatus::Ok, "3");
+    CHECK(rb.v1.size() == 2 && rb.v1[1].find("\"op\":\"read\"") != std::string::npos && rb.v1[1].find("\"res\":\"3\"") != std::string::npos);
+    CHECK(rb.v2.size() == 1 && rb.v2[0].find("\"op\":\"read-bytes\"") != std::string::npos);
     // ~ expands in scripts
     auto t = run_op(HostOp::Touch, "touch", "~/x", true);
     CHECK(t.v1[0].find("\"arg\":\"/home/u/x\"") != std::string::npos);
@@ -603,6 +609,67 @@ void test_shutdown_refusals() {
 
 } // namespace
 
+// Legacy routing (cp16-host-ops-impl.md §9): adopted targets, file().open's
+// open_read hook, listings recorded whatever the outcome.
+void test_legacy_routing_hooks() {
+    SpyObserver observer;
+    HostCallEnv env{nullptr, &observer, nullptr};
+    {
+        HostCall call(env, HostOp::Read, "open");
+        call.adopt("/p/../q/./r.txt");
+        CHECK(call.target().trace_path() == "/q/r.txt");          // trace: absolute, lexically normal
+        CHECK(call.target().path.generic_string() == "/p/../q/./r.txt");  // recording: as given
+        call.begin();
+        Observation o;
+        o.bytes = "xy";
+        call.succeed("2", o);
+    }
+    struct OpenSpy : SpyObserver {
+        void open_read(const std::filesystem::path& p, std::string_view bytes) override {
+            calls.push_back("open_read " + p.generic_string() + " " + std::to_string(bytes.size()));
+        }
+    } open_spy;
+    HostCallEnv open_env{nullptr, &open_spy, nullptr};
+    for (const char* mode : {"r", "rw", "w", "a"}) {
+        HostCall call(open_env, HostOp::Open, "open");
+        call.adopt(std::string("/o/") + mode);
+        call.set_open_mode(mode);
+        call.begin();
+        Observation o;
+        o.bytes = "abc";
+        call.succeed("", o);
+    }
+    CHECK((open_spy.calls == std::vector<std::string>{"open_read /o/r 3", "open_read /o/rw 3"}));
+    // the default open_read is read()
+    {
+        HostCall call(env, HostOp::Open, "open");
+        call.adopt("/o/default");
+        call.set_open_mode("r");
+        call.begin();
+        Observation o;
+        o.bytes = "abcd";
+        call.succeed("", o);
+    }
+    // listing: recorded on success, on a recoverable and on a fatal failure;
+    // a refusal (shutdown, policy) records nothing
+    auto list = [&](const char* key, HostStatus st, const char* code) {
+        HostCall call(env, HostOp::List, "ls");
+        call.adopt("/d");
+        call.set_listing_key(key);
+        call.begin();
+        if (st == HostStatus::Ok) { call.succeed(); return; }
+        HostError e;
+        make_error(e, code, "ls: failed");
+        call.fail(st, e);
+    };
+    list("dir:a", HostStatus::Ok, nullptr);
+    list("dir:b", HostStatus::Recoverable, "io.directory_read_failed");
+    list("dir:c", HostStatus::Fatal, "runtime.invalid_operation");
+    const std::vector<std::string> expected = {"read /p/../q/./r.txt 2", "read /o/default 4", "listing dir:a", "listing dir:b",
+                                               "listing dir:c"};
+    CHECK(observer.calls == expected);
+}
+
 int main() {
     test_error_table();
     test_op_table();
@@ -616,5 +683,6 @@ int main() {
     test_stdin_option();
     test_stdin_file_and_request();
     test_shutdown_refusals();
+    test_legacy_routing_hooks();
     return rt_test::finish("host-layer-unit");
 }

@@ -1,0 +1,20 @@
+{
+ "ops": null,
+ "output": "\nR:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "data/r.txt"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "13195353070902790260",
+   "data/r.txt": "13480361243988023619"
+  },
+  "kinds": {
+   "data/r.txt": "file"
+  },
+  "reqs": [
+   "data/r.txt"
+  ]
+ }
+}

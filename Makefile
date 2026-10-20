@@ -10,7 +10,10 @@ LDLIBS ?=
 PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
 # Runtime 2.0 (src/rt): linked into nift from CP11 (opt-in VM, NIFT_VM=1).
 RT_LINK_SOURCES := $(sort $(wildcard src/rt/*.cpp src/rt/natives/*.cpp))
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES)
+# CP16: the legacy interpreter's Host ops and run() go through the Host layer
+# (src/rt/host) and its process residues live on CP17's handle table.
+RT_HOST_LINK_SOURCES := $(sort $(wildcard src/rt/host/*.cpp src/rt/handles/*.cpp))
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/PageObserver.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES) $(RT_HOST_LINK_SOURCES)
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -342,7 +345,7 @@ test-rt-value-sanitize:
 # Runtime 2.0 CP17 typed handles (src/rt/handle.*, src/rt/handles/): unit,
 # concurrency stress (ASan/UBSan and TSan), callgrind guard, and the
 # no-legacy-handle-strings gate for VM paths. Not linked into nift yet (CP16
-# adds src/rt/handles/*.cpp to RT_LINK_SOURCES when it uses the table).
+# links src/rt/handles/*.cpp into nift through RT_HOST_LINK_SOURCES).
 RT_HANDLE_SOURCES := src/rt/handle.cpp $(sort $(wildcard src/rt/handles/*.cpp)) src/rt/value.cpp src/rt/string.cpp \
 	src/rt/heap_account.cpp
 RT_HANDLE_DEPS := $(RT_HANDLE_SOURCES) src/rt/handle.h $(wildcard src/rt/handles/*.h) src/rt/value.h \
@@ -543,7 +546,7 @@ test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
 
 # CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()
-# options, process model, CP17 binding. Not linked into nift until the VM wiring. Process
+# options, process model, CP17 binding. Linked into nift (RT_HOST_LINK_SOURCES, CP16 legacy routing). Process
 # tests run contained (D-031: ulimit -f/-v, timeout, own session, cleanup).
 RT_HOST_SOURCES := $(sort $(wildcard src/rt/host/*.cpp))
 # The process binding uses CP17's handle table (RT_HANDLE_SOURCES).
@@ -1621,6 +1624,19 @@ test-runtime2-vm-corpus-complete:
 	bash tests/runtime2/vm_corpus_complete.sh
 	bash tests/runtime2/vm_corpus_complete.sh --selftest
 
+# Runtime 2.0 CP16: legacy run()/cmd().run() and Host reads through the Host
+# layer (C1-C3, unchanged result objects, trace v2). Contained (D-031).
+.PHONY: test-runtime2-cp16-legacy
+test-runtime2-cp16-legacy: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/cp16/legacy_routing.sh
+test: test-runtime2-cp16-legacy
+# Owner requirement (CP16): dependency recording is the same whichever engine
+# starts the read, in every context; legacy recordings pinned per context.
+.PHONY: test-runtime2-cp16-engine-parity
+test-runtime2-cp16-engine-parity: $(TARGET)
+	python3 tests/runtime2/cp16/engine_parity.py --nift "$(CURDIR)/$(TARGET)" --expected tests/runtime2/cp16/parity-expected
+test: test-runtime2-cp16-engine-parity
+
 # Runtime 2.0 CP07: process capture parity and no leaked capture files.
 test-runtime2-process-capture: $(TARGET)
 	$(LOAD_SENSITIVE_DEFER) NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/process_capture.sh
@@ -2385,6 +2401,9 @@ $(TEST_DIR)/rt-parser-unit$(EXEEXT): tests/rt/parser_unit.cpp $(RT_PARSER_SOURCE
 # The legacy objects only (CP11 links src/rt into nift; the oracle compiles the
 # parser sources itself, so the src/rt objects are left out to avoid duplicates).
 RT_LEGACY_ORACLE_OBJECTS := $(filter-out src/nift.o src/CLI.o $(RT_LINK_SOURCES:.cpp=.o),$(CLI_OBJECTS))
+# CP16: the legacy objects use the Host layer (kept above), whose handle table
+# needs these src/rt objects.
+RT_LEGACY_ORACLE_OBJECTS += src/rt/handle.o src/rt/value.o src/rt/string.o src/rt/heap_account.o
 $(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(RT_LEGACY_ORACLE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_LEGACY_ORACLE_OBJECTS) $(LDLIBS) -o $@

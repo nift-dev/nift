@@ -27,7 +27,9 @@ constexpr HostOpInfo kOps[] = {
     {HostOp::GetenvTemplate, "getenv", TP::PostAlways, "getenv", R::Environment},
     {HostOp::EnvAll, "env-all", TP::Pre, "env-all", R::EnvironmentSnapshot},
     {HostOp::Spawn, "spawn", TP::Pre, "spawn", R::None},
-    {HostOp::ReadBytes, nullptr, TP::None, "read-bytes", R::Read},             // D-028: recorded after host-deps
+    // D-028 (host-deps): open_bytes() and sha256_file() are traced `read`
+    // and recorded as dependencies, hashed from the streamed bytes.
+    {HostOp::ReadBytes, "read", TP::PostOk, "read-bytes", R::StreamedRead},
     {HostOp::StreamOpen, nullptr, TP::None, "stream-open", R::StreamOpen},     // D-028: input streams at successful open
     {HostOp::StreamRead, nullptr, TP::None, "stream-read", R::None},
     {HostOp::StreamWrite, nullptr, TP::None, "stream-write", R::None},

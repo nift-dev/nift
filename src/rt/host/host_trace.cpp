@@ -40,20 +40,9 @@ public:
     std::string context() override { return nift::trace::detail::context(); }
 };
 
-int take_version() {
-    const char* text = std::getenv("NIFT_TRACE_HOST_VERSION");
-    int version = TraceChannel::parse_version(text);
-    if (text) {
-#ifdef _WIN32
-        _putenv_s("NIFT_TRACE_HOST_VERSION", "");
-#else
-        ::unsetenv("NIFT_TRACE_HOST_VERSION");
-#endif
-    }
-    // An invalid value keeps the parity channel (v1): tracing is test
-    // infrastructure and must never change other output.
-    return version < 0 ? TraceChannel::V1 : version;
-}
+// Taken once, with the descriptor (src/HostTrace.h), which also removes the
+// variable from the environment.
+int take_version() { return nift::trace::detail::version() == 2 ? TraceChannel::V2 : TraceChannel::V1; }
 
 } // namespace
 

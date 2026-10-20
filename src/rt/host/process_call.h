@@ -12,6 +12,8 @@
 
 namespace nift::rt::host {
 
-std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status, HostError& error);
+// `wait_at_once`: the caller calls wait() right away (ProcessGroup::start_for_wait).
+std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status, HostError& error,
+                                           bool wait_at_once = false);
 
 } // namespace nift::rt::host

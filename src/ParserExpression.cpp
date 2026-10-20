@@ -7,6 +7,7 @@
 #include "HostTrace.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "ParserHost.h"
 #include "ReadLimit.h"
 #include "FeatureFlags.h"
 #include "ParserAsyncPool.h"
@@ -983,12 +984,20 @@ bool Parser::execute_file_method(const nift::RuntimeValue& base,const std::strin
                         if(method=="exists"){if(!no_args())return false;const auto info=inspect_path(f->path);out=nift::RuntimeValue(info.exists&&!info.error);return true;}
                         if(method=="open"){
                             if(f->open){error="open: file is already open";return false;}if(operand_count>1){error="open: expected zero or one mode";return false;}std::string m="r";if(operand_count==1&&!sarg(0,m))return false;
-                            if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}if(nift::trace::enabled())trace_host("open",f->path,m);std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
-                            if((m=="r"||m=="rw")&&!ex){observe_failed_read(f->path);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: file does not exist",error);}
-                            if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
-                            const bool reading=m=="r"||m=="rw";std::string data;if(ex){switch(read_whole_file("open",f->path,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:return false;case WholeRead::ReadFailed:if(reading)observe_failed_read(f->path);return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open: input failure",error);default:if(reading)observe_failed_read(f->path);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);}
+                            if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}
+                            // CP16: one Host call (v1 `open` line before the attempt, the mode as result).
+                            // A failed "r"/"rw" open is recorded as a failed read; "w"/"a" read nothing.
+                            ParserHostObserver host_observer(*this);nift::rt::host::HostCall open_call(parser_host_env(&host_observer),nift::rt::host::HostOp::Open,"open");
+                            open_call.adopt(f->path);open_call.set_open_mode(m);open_call.set_pre_result(m);open_call.begin();
+                            std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
+                            if((m=="r"||m=="rw")&&!ex){open_call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed","open: file does not exist"));return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: file does not exist",error);}
+                            if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";open_call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("runtime.invalid_operation",error));return false;}
+                            const bool reading=m=="r"||m=="rw";std::string data;if(ex){switch(read_whole_file("open",f->path,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:open_call.fail(nift::rt::host::HostStatus::Limit,parser_host_error("limit.exceeded",error));return false;case WholeRead::ReadFailed:open_call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.read_failed","open: input failure"));return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open: input failure",error);default:open_call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed","open: cannot read path"));return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);}
                             // feature-host-deps (D-028): "rw" reads the file too, so it is a dependency like "r".
-                            if(reading){observe_read(f->path,data);if(!observing())host_.observe_dependency(f->path,data);}}
+                            // Legacy v1 writes a `read` line after the `open` line; the recording is the
+                            // open's (open_read: hook/standalone contexts still report the bytes, c7971365).
+                            if(reading){nift::rt::host::HostCall read_call(parser_host_env(nullptr),nift::rt::host::HostOp::Read,"open");read_call.adopt(f->path);read_call.begin();read_call.succeed(std::to_string(data.size()));}}
+                            {nift::rt::host::Observation opened;opened.bytes=data;opened.open_mode=m;open_call.succeed(m,opened);}
                             f->mode=m;f->existed_at_open=ex;if(m=="w"){f->saved=std::move(data);f->working.clear();f->saved_is_working=false;}else{f->working=std::move(data);f->saved.clear();f->saved_is_working=true;}f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
                         }
                         if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->saved_is_working=false;f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
@@ -2535,6 +2544,36 @@ if(!home)home=std::getenv("USERPROFILE");
 #endif
 if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
             auto checked_path=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(resource_path_authority_.enforce_project_root&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}return true;};
+            // CP16: whole-file reads of open()/cat() as one Host call each
+            // (trace, failure recording and success recording by the Host layer).
+            auto host_whole_read=[&](const std::string& name,const fs::path& p,std::string& data)->bool{
+                ParserHostObserver host_observer(*this);
+                nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::Read,name);
+                call.adopt(p);call.begin();
+                std::error_code ec;if(fs::is_directory(p,ec)){error=name+": path is a directory";call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("runtime.invalid_operation",error));return false;}
+                switch(read_whole_file(name,p,data,error)){
+                    case WholeRead::Ok:break;
+                    case WholeRead::Limit:call.fail(nift::rt::host::HostStatus::Limit,parser_host_error("limit.exceeded",error));return false;
+                    case WholeRead::ReadFailed:call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.read_failed",name+": input failure"));return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,name+": input failure",error);
+                    default:call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed",name+": cannot open path"));return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,name+": cannot open path",error);
+                }
+                nift::rt::host::Observation read;read.bytes=data;call.succeed(std::to_string(data.size()),read);return true;
+            };
+            // ls() of one directory: the listing fingerprint is recorded
+            // whatever the outcome (legacy observes it before listing).
+            auto host_list_directory=[&](const fs::path& p,bool require_directory,nift::RuntimeValue& listed)->bool{
+                ParserHostObserver host_observer(*this);
+                nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::List,"ls");
+                call.adopt(p);call.set_listing_key(nift::observe::directory_key(host_.root(),p));call.begin();
+                std::error_code ec;
+                if(require_directory&&(!fs::is_directory(p,ec)||ec)){
+                    if(ec){call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.directory_read_failed","ls: "+ec.message()));return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);}
+                    error="ls: path is not a readable directory";call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("runtime.invalid_operation",error));return false;}
+                std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());
+                if(ec){call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.directory_read_failed","ls: "+ec.message()));return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);}
+                std::sort(names.begin(),names.end());for(const auto& n:names)listed.array.emplace_back(n);
+                call.succeed(std::to_string(names.size()));return true;
+            };
             std::vector<nift::detail::SourceText> args;std::vector<bool> q;
 #ifdef NIFT_COMPAT_SPLIT_FRAMES
             {
@@ -2553,7 +2592,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(args.empty()){error="run: expected executable and optional arguments";return false;}
                 std::vector<std::string> vals;
                 for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()&&!x.is_number()&&!x.is_bool()){error="run: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="run: arguments must be scalar";return false;}}
-                ProcessSpec spec;spec.program=vals.front();spec.args.assign(vals.begin()+1,vals.end());std::uint64_t capture_limit=0;if(!read_limit("run",capture_limit,error))return false;auto pr=nift_run_process(spec,true,false,capture_limit);if(!pr.capture_limit_exceeded.empty())return fail_read_limit("run","captured "+pr.capture_limit_exceeded+" of "+spec.program,capture_limit,error);
+                ProcessSpec spec;spec.program=vals.front();spec.args.assign(vals.begin()+1,vals.end());std::uint64_t capture_limit=0;if(!read_limit("run",capture_limit,error))return false;ProcessResult pr;if(!run_host_pipeline({spec},capture_limit,pr,error))return false;if(!pr.capture_limit_exceeded.empty())return fail_read_limit("run","captured "+pr.capture_limit_exceeded+" of "+spec.program,capture_limit,error);
                 out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);if(!pr.error.empty())out["error"]=nift::RuntimeValue(pr.error);return true;
             }
             if(call_args("which",args,q)){if(args.size()!=1){error="which: expected command name";return false;}std::string n;if(!string_arg("which",args,q,0,n))return false;static const std::unordered_set<std::string> builtins={"ls","cd","pwd","cat","touch","exists","cp","mv","rm","mkdir","copy","move","remove","make_dir","run","cmd"};if(builtins.count(n)){out=nift::RuntimeValue("nift:"+n);return true;}std::string p;if(nift_find_executable(n,p)){out=nift::RuntimeValue(p);return true;}out=nift::RuntimeValue(nullptr);return true;}
@@ -2568,11 +2607,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("status",args,q)){if(!args.empty()){error="status: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("status",proj))return false;auto names=automation_status(*proj);out=nift::RuntimeValue::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("tracked",args,q)){if(!args.empty()){error="tracked: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("tracked",proj))return false;auto names=automation_tracked_names(*proj);out=nift::RuntimeValue::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("project_root",args,q)){if(!args.empty()){error="project_root: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("project_root",proj))return false;out=nift::RuntimeValue(fs::absolute(proj->root).generic_string());return true;}
-            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;auto v=host_.environment(k);if(v.status==nift::HostStatus::Error){error="getenv: "+v.error;return false;}observe_environment(k,v);out=v.status==nift::HostStatus::Found?nift::RuntimeValue(v.value):nift::RuntimeValue(nullptr);return true;}
-            if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}if(nift::trace::enabled())nift::trace::emit("env-all","","");if(!standalone_script_host_)result_.observed.environment_snapshot=true;return host_.environment_snapshot(out,error);}
+            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;auto v=host_.environment(k);observe_environment(k,v);if(v.status==nift::HostStatus::Error){error="getenv: "+v.error;return false;}out=v.status==nift::HostStatus::Found?nift::RuntimeValue(v.value):nift::RuntimeValue(nullptr);return true;}
+            if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}ParserHostObserver host_observer(*this);nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::EnvAll,"env");call.set_arg("");call.begin();if(!host_.environment_snapshot(out,error)){call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("host.service_failed",error));return false;}call.succeed();return true;}
             if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_os()));return true;}
             if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_arch()));return true;}
-            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}if(!standalone_script_host_&&!host_.root().empty())result_.observed.platform=host_.platform();out=nift::RuntimeValue(host_.platform());return true;}
+            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}ParserHostObserver host_observer(*this);nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::Platform,"platform");call.set_arg("");call.begin();nift::rt::host::Observation observed;observed.platform=host_.platform();call.succeed(observed.platform,observed);out=nift::RuntimeValue(host_.platform());return true;}
             if(call_args("module_path",args,q)||call_args("package_path",args,q)){
                 const std::string name=text.rfind("module_path",0)==0?"module_path":"package_path";
                 std::vector<nift::RuntimeValue> values;
@@ -2780,8 +2819,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             auto path_values=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(resource_path_authority_.enforce_project_root&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
             if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!guard_build_write("remove",rp,error,true))return false;note_written(rp,"remove");if(!fs::remove(rp,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{return execute_filesystem_operation(mv?PreparedFilesystemOperation::Kind::Move:PreparedFilesystemOperation::Kind::Copy,args.size(),[&](std::size_t i,nift::RuntimeValue& value){return arg_value(args,q,i,value);},out,error);}}
-            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::string data;switch(read_whole_file("cat",p,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:return false;case WholeRead::ReadFailed:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"cat: input failure",error);default:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"cat: cannot open path",error);}observe_read(p,data);execution_output_->write_stdout(data);out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();observe_listing(nift::observe::directory_key(host_.root(),p),p);std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(resource_path_authority_.enforce_project_root&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){observe_listing(nift::observe::glob_key(host_.root(),p),p);
+            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::string data;if(!host_whole_read("cat",p,data))return false;execution_output_->write_stdout(data);out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();return host_list_directory(p,false,out);}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(resource_path_authority_.enforce_project_root&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){observe_listing(nift::observe::glob_key(host_.root(),p),p);
                 const bool absolute=fs::path(raw).is_absolute();
                 if (absolute) {
                     auto paths=glob_expand(p);
@@ -2853,11 +2892,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     m.prefix.reset();
                 }
                 return true;
-            }observe_listing(nift::observe::directory_key(host_.root(),p),p);std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
-            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::string data;switch(read_whole_file("open",p,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:return false;case WholeRead::ReadFailed:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open: input failure",error);default:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot open path",error);}observe_read(p,data);out=nift::RuntimeValue(std::move(data));return true;}
-            if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";return false;}nift::RuntimeBytes data;switch(read_whole_file("open_bytes",p,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:return false;case WholeRead::ReadFailed:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open_bytes: input failure",error);default:observe_failed_read(p);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open_bytes: cannot open path",error);}
+            }return host_list_directory(p,true,out);}
+            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::string data;if(!host_whole_read("open",p,data))return false;out=nift::RuntimeValue(std::move(data));return true;}
+            if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;
+                ParserHostObserver host_observer(*this);nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::ReadBytes,"open_bytes");call.adopt(p);call.begin();
+                std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("runtime.invalid_operation",error));return false;}nift::RuntimeBytes data;switch(read_whole_file("open_bytes",p,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:call.fail(nift::rt::host::HostStatus::Limit,parser_host_error("limit.exceeded",error));return false;case WholeRead::ReadFailed:call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.read_failed","open_bytes: input failure"));return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open_bytes: input failure",error);default:call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed","open_bytes: cannot open path"));return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open_bytes: cannot open path",error);}
                 // feature-host-deps (D-028): open_bytes() is a dependency like open().
-                {std::uint64_t snapshot=filesystem::kHashBytesSeed;const bool want_snapshot=read_snapshot_wanted();if(want_snapshot)snapshot=filesystem::hash_bytes_update(snapshot,data.data(),data.size());observe_streamed_read(p,data.size(),want_snapshot?&snapshot:nullptr);}
+                {std::uint64_t snapshot=filesystem::kHashBytesSeed;const bool want_snapshot=read_snapshot_wanted();if(want_snapshot)snapshot=filesystem::hash_bytes_update(snapshot,data.data(),data.size());nift::rt::host::Observation read;read.size=data.size();read.hash=want_snapshot?&snapshot:nullptr;call.succeed(std::to_string(data.size()),read);}
                 out=nift::RuntimeValue(std::move(data));return true;}
             // feature-sha256: native SHA-256 of a string/bytes value or of a
             // file's raw bytes (streamed). Both yield to a same-named user
@@ -2879,25 +2920,33 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 struct Snapshot{std::uint64_t hash=filesystem::kHashBytesSeed;} snapshot;
                 const bool want_snapshot=read_snapshot_wanted();
                 const nift::crypto::Sha256ChunkObserver observer=want_snapshot?static_cast<nift::crypto::Sha256ChunkObserver>([](void* context,const std::uint8_t* data,std::size_t size){auto* s=static_cast<Snapshot*>(context);s->hash=filesystem::hash_bytes_update(s->hash,data,size);}):nullptr;
+                ParserHostObserver host_observer(*this);
+                nift::rt::host::HostCall call(parser_host_env(&host_observer),nift::rt::host::HostOp::ReadBytes,"sha256_file");
+                call.adopt(p);call.begin();
                 const auto result=nift::crypto::sha256_file(p,observer,&snapshot);
                 switch(result.status){
-                    case nift::crypto::Sha256FileStatus::Ok:
-                        observe_streamed_read(p,result.size,want_snapshot?&snapshot.hash:nullptr);
-                        out=nift::RuntimeValue(nift::crypto::sha256_hex(result.digest));return true;
+                    case nift::crypto::Sha256FileStatus::Ok:{
+                        nift::rt::host::Observation read;read.size=result.size;read.hash=want_snapshot?&snapshot.hash:nullptr;
+                        call.succeed(std::to_string(result.size),read);
+                        out=nift::RuntimeValue(nift::crypto::sha256_hex(result.digest));return true;}
                     case nift::crypto::Sha256FileStatus::NotFound:
-                        // A page that catches this must rebuild when the file appears.
-                        observe_presence(p,false);
+                        // A page that catches this must rebuild when the file appears
+                        // (the failed read is recorded as an absence).
+                        call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed","sha256_file: cannot open path"));
                         return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"sha256_file: cannot open path",error);
                     case nift::crypto::Sha256FileStatus::IsDirectory:
-                        error="sha256_file: path is a directory";return false;
+                        error="sha256_file: path is a directory";call.fail(nift::rt::host::HostStatus::Fatal,parser_host_error("runtime.invalid_operation",error));return false;
                     case nift::crypto::Sha256FileStatus::OpenFailed:
                         // feature-host-deps: rebuild when the path becomes readable.
-                        observe_failed_read(p);
+                        call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.open_failed","sha256_file: cannot open path"));
                         return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"sha256_file: cannot open path",error);
                     case nift::crypto::Sha256FileStatus::ReadFailed:
+                        // D-028 (Host layer rule): a failed read is recorded like any
+                        // other (legacy did not record this mid-read I/O error).
+                        call.fail(nift::rt::host::HostStatus::Recoverable,parser_host_error("io.read_failed","sha256_file: input failure"));
                         return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"sha256_file: input failure",error);
                 }
-                error="sha256_file: internal error";return false;
+                error="sha256_file: internal error";call.fail(nift::rt::host::HostStatus::Internal,parser_host_error("internal.host_call",error));return false;
             }
 #ifdef NIFT_COMPAT_SPLIT_FRAMES
                 group_handled = false;return false;
@@ -3392,7 +3441,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="stdin"||method=="stdout"||method=="stderr"||method=="cwd"){std::string v;if((aa.size()<1||aa.size()>2)||!sval(0,v))return false;auto&st=(method=="stdin"?c->stages.front():c->stages.back());if(method=="stdin")st.stdin_path=v;else if(method=="stdout"){st.stdout_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stdout=m=="append";}}else if(method=="stderr"){st.stderr_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stderr=m=="append";}}else for(auto&x:c->stages)x.cwd=v;out=base;return true;}
                         if(method=="env"){if(aa.size()!=2){error="env: expected name and value";return false;}std::string k,v;if(!sval(0,k)||!sval(1,v))return false;for(auto&x:c->stages)x.env[k]=v;out=base;return true;}
                         if(method=="run"){if(!aa.empty()){error="run: command method takes no arguments";return false;}if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}for(const auto& stage:c->stages){const fs::path base_dir=stage.cwd.empty()?fs::current_path():stage.cwd;for(const auto* redirect:{&stage.stdout_path,&stage.stderr_path}){if(redirect->empty())continue;fs::path target(*redirect);if(target.is_relative())target=base_dir/target;if(!guard_build_write("run",target,error))return false;}}
-                        std::uint64_t capture_limit=0;if(!read_limit("run",capture_limit,error))return false;auto pr=nift_run_pipeline(c->stages,true,false,capture_limit);if(!pr.capture_limit_exceeded.empty())return fail_read_limit("run","captured "+pr.capture_limit_exceeded+" of "+(c->stages.empty()?std::string("command"):c->stages.back().program),capture_limit,error);out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);if(!pr.error.empty())out["error"]=nift::RuntimeValue(pr.error);if(c->stages.size()>1){nift::RuntimeValue stages=nift::RuntimeValue::make_array();for(const auto& st:pr.stages){nift::RuntimeValue o=nift::RuntimeValue::make_object();o["launched"]=nift::RuntimeValue(st.launched);o["exit_code"]=nift::RuntimeValue((double)st.exit_code);if(!st.error.empty())o["error"]=nift::RuntimeValue(st.error);stages.array.push_back(std::move(o));}out["stages"]=std::move(stages);}return true;}
+                        std::uint64_t capture_limit=0;if(!read_limit("run",capture_limit,error))return false;ProcessResult pr;if(!run_host_pipeline(c->stages,capture_limit,pr,error))return false;if(!pr.capture_limit_exceeded.empty())return fail_read_limit("run","captured "+pr.capture_limit_exceeded+" of "+(c->stages.empty()?std::string("command"):c->stages.back().program),capture_limit,error);out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);if(!pr.error.empty())out["error"]=nift::RuntimeValue(pr.error);if(c->stages.size()>1){nift::RuntimeValue stages=nift::RuntimeValue::make_array();for(const auto& st:pr.stages){nift::RuntimeValue o=nift::RuntimeValue::make_object();o["launched"]=nift::RuntimeValue(st.launched);o["exit_code"]=nift::RuntimeValue((double)st.exit_code);if(!st.error.empty())o["error"]=nift::RuntimeValue(st.error);stages.array.push_back(std::move(o));}out["stages"]=std::move(stages);}return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
                         bool handled=false;

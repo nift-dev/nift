@@ -1,0 +1,15 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "data/rw.txt"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "6166727067414358680",
+   "data/rw.txt": "13881839514045730526"
+  },
+  "reqs": []
+ }
+}

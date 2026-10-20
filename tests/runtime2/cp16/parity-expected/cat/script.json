@@ -1,0 +1,7 @@
+{
+ "ops": [
+  "{\"arg\": \"$ROOT/data/r.txt\", \"op\": \"read\", \"res\": \"4\", \"v\": 2}"
+ ],
+ "output": "r-1\nok\n",
+ "recording": null
+}

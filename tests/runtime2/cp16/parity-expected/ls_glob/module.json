@@ -1,0 +1,18 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "lib/m.f"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "1290689256330519509",
+   "lib/m.f": "7439968848071863910"
+  },
+  "listings": {
+   "glob:data/*.txt": "$FP"
+  },
+  "reqs": []
+ }
+}

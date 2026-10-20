@@ -1,14 +1,14 @@
 # CP16 — Host operations: implementation record (slice 1, Host layer)
 
-Status: **in progress, slice 1 of the Host layer** (`runtime-2-cp16-dev`,
-local, not pushed). Base: `runtime-2` @`6181549b`. Design: `cp16-host-ops-design.md`
+Status: **in progress: slice 1 (Host layer) done; phase 2 (legacy routing, §9) done, awaiting certification** (`runtime-2-cp16-dev`,
+local, not pushed). Base: `runtime-2` @`6181549b` (slice 1), @`e8e4b106` (phase 2). Design: `cp16-host-ops-design.md`
 (§1–§12, cherry-picked from `runtime-2-cp16-design` @`d4310bc`). Decisions:
 D-028, D-029, D-030 (alternative A), D-031. Owner decision 2026-10-19: start
 with the isolated Host-layer components whose contracts are approved, without
 depending on uncertified VM interfaces.
 
-Nothing here is reachable from `nift` yet: `src/rt/host/` is built only by the
-new test targets (`RT_LINK_SOURCES` is `src/rt/*.cpp`, not recursive). No file
+Slice 1 was not reachable from `nift`; since phase 2 (§9) the Host layer is
+linked into `nift` and serves the legacy interpreter's reads and `run()`. No file
 owned by another agent was edited (compiler/VM/natives, `handle.*`, the
 legacy files `feature-host-deps` changes).
 
@@ -19,7 +19,7 @@ legacy files `feature-host-deps` changes).
 | Error codes and catchability | `host_error.{h,cpp}` | §2.6. One table: code → required status, catchable. |
 | Host-op table | `host_op.{h,cpp}` | §2.4/§2.5. Per op: v1 name and emission point (`Pre`, `PostOk`, `PostAlways`, `None`), v2 name, recording rule. |
 | Trace channel v1/v2 | `host_trace.{h,cpp}` | §2.4, O2 adopted. v1 byte-identical to `src/HostTrace.h`; v2 behind `NIFT_TRACE_HOST_VERSION=2`. |
-| Dependency-recording hooks | `observer.h` | §2.5. **Interface only**; the `PageObserver` waits for `feature-host-deps` (§9 order of work). |
+| Dependency-recording hooks | `observer.h`; `src/PageObserver.*` | §2.5. Interface in the Host layer; the one recorder, shared by every engine, since phase 2 (§9.2). |
 | Path resolution | `path.{h,cpp}` | §3. Legacy `resolve_path` rules; containment only as an opt-in policy. |
 | `HostCall` | `host_call.{h,cpp}` | §2. resolve → v1 point → attempt → classify → v2 → record. |
 | `run()` options (alternative A) | `run_options.{h,cpp}` | §12.2, D-030. |
@@ -145,13 +145,11 @@ are finished asynchronously by the reaper.
 | Item | Why deferred |
 |---|---|
 | VM wiring (natives, `Context.handles`, W12–W24, option conversion from `rt::Value`) | CP13–CP15 integration owns `src/rt/compiler*`, `vm*`, `natives/*`; not certified yet |
-| `PageObservation` extraction, `PageObserver` | waits until `feature-host-deps` is integrated (design §9; D-028) |
 | FS/EN/TI/RN Host implementations (`Host` interface §2.2, `FaultHost`) | slice 2; needs host-deps' `ReadLimit.h` and FileSystem changes to land first, so reads use the shared bounded-read code instead of a copy |
 | Reading `NIFT_READ_LIMIT` | `capture_limit` is a parameter; the setting is parsed by host-deps' `ReadLimit.h` (not integrated) |
 | Windows `ProcessGroup` | no Windows toolchain here; job-object helpers written, untested; every entry point reports `process.unsupported` |
 | Detached pipelines | not needed by alternative A (`run()` is one command); refused loudly |
 | `auto_superseded_pass`, `build_*` lifetime tests, `terminal_foreground_handoff` (pty), `exit_sigint`, macOS/Windows rows | need the build engine/CLI wiring, a pty harness, or other platforms |
-| Linking `src/rt/host` into `nift` | nothing calls it yet; added when the first native uses it |
 | Checking `shutting_down()` before a build or page render | the build engine is not wired to the Host layer yet; the flag is exported for it (§6.4) |
 
 **CP22 items (recorded, D-034 item 6).**
@@ -235,8 +233,8 @@ Also aligned with host-deps (D-028) for the coming PageObserver: `rw` opens
 are dependencies like `r`; file-backed input streams record at open; a
 recoverable read failure records the path (absent or unreadable); HostCall
 always calls the observer it is given, so hook and standalone contexts can
-keep reporting `file().open` reads to the host (legacy c7971365). The
-observer itself is still interface-only (no CP16 code reroutes legacy reads).
+keep reporting `file().open` reads to the host (legacy c7971365). Phase 2
+(§9) implements the recorder (`PageObserver`) and reroutes legacy reads.
 
 ## 5. Owner answers (D-034) and where they are implemented
 
@@ -569,3 +567,136 @@ still-open handle. Cleanup failure → nonzero exit: via
 context label and error flag (owner, D-035): `ContextCleanup` is gone. (b)
 Members alive after SIGKILL map to `Failed` (`alive_after_kill`), an
 unconfirmed stage to `Lost` (owner).
+
+## 9. Phase 2: legacy Host reads and processes through the Host layer
+
+Base: `runtime-2` @`e8e4b106` (host-deps integrated @`2d191e6b`, CP17 swap
+@`b4a086ed` accepted). The Host layer and CP17's handle table are now linked
+into `nift` (`RT_HOST_LINK_SOURCES`); the legacy interpreter performs its
+Host reads and its `run()`/`cmd().run()` launches through it, with the
+recording hooks live.
+
+**Scope of "don't touch the parser/lexer".** Read as Runtime 2.0's
+`src/rt` parser, lexer, `compiler_expr` literal region, `natives/*`, `value*`
+and records20k's `compiler.cpp`/`prepared.cpp`: none of them changed. Routing
+the *legacy* interpreter's reads necessarily edits its host call sites in
+`src/Parser*.cpp` (no grammar, evaluation or dispatch change).
+
+### 9.1 What goes through `HostCall`
+
+| Legacy operation | Host op (v1 / v2) | Recording |
+|---|---|---|
+| `open()`, `cat()` | `Read` (`read` / `read`) | dependency + hash; failure: absent / unreadable |
+| `open_bytes()`, `sha256_file()` | `ReadBytes` (`read` / `read-bytes`) | streamed hash; failure as above |
+| `file().open(m)` | `Open` (`open`+`read` / `open`, `read`) | `r`,`rw`: `open_read` (hook/standalone contexts still report the bytes, c7971365); `w`,`a`: none |
+| `ifstream()`, `ofstream()` | `StreamOpen` (— / `stream-open`) | input: dependency hashed at open; output: none |
+| `exists`, `is_file`, `is_dir`, `stat`, `file().exists`, template directory walks | `Stat` (`stat` / `stat`) | presence / kind (+ metadata for `stat()` of a file) |
+| `ls()` (dir), template listings | `List` (`list` / `list`) | listing fingerprint, recorded on success **and** failure (legacy observed before listing) |
+| `ls()` (glob) | `Glob` | as list |
+| `getenv()`, `@getenv` | `Getenv` / `GetenvTemplate` | environment value (not `NIFT_HOOK_*`) |
+| `env()`, `platform()` | `EnvAll` / `Platform` | snapshot / platform (legacy's non-standalone conditions) |
+| `minify()` source read | `Read` via `observe_read` | as `open()` |
+| `run()`, `cmd().run()` | `Spawn` per stage (`spawn` / `spawn` with argv, cwd) | none |
+
+Paths: legacy resolves and validates (three copies of `resolve_path`, the
+`--fs-root`/project-root messages unchanged) and the call **adopts** the
+result (`HostCall::adopt`; the trace spells it absolute and lexically
+normal). Op table change: `ReadBytes` is traced `read` after success (host-deps
+made `open_bytes()` a traced dependency; the CP16 fixtures were re-captured by
+host-deps and are applied in `56ecb7b1`).
+
+Still traced by legacy's own emitter (not Host calls yet): writes (`save`,
+`touch`, `mkdir`, `remove`, `copy-to`, `move-*`), template `read-source` /
+`read-json`, job-control `spawn`. Under `NIFT_TRACE_HOST_VERSION=2` these lines
+are written in v2 framing (`"v":2`, v1 result class, no `err`), so a trace file
+never mixes formats; the version is now taken with the descriptor in
+`src/HostTrace.h`.
+
+### 9.2 One recorder for every engine (owner requirement)
+
+`src/PageObserver.{h,cpp}` is the only implementation of the recording rules
+(moved unchanged from `ParserObservation.cpp`). An engine supplies its
+RenderHost, RenderResult and the context's mode (`observing`, `standalone`);
+the legacy interpreter's `ParserHostObserver` is a `PageObserver` built from
+the parser. Legacy's remaining record-only call sites (page members, copy
+sources, template absences) delegate to it too. The VM's host natives, when
+they land (CP13–CP15 own `natives/*`), construct the same `PageObserver` and
+hand it to their `HostCall`s; nothing else records.
+
+**Parity fixture** (`tests/runtime2/cp16/engine_parity.py`, `make
+test-runtime2-cp16-engine-parity`, in `make test`): 17 reads (all of 9.1's
+recorded reads, plus a failed open) × 9 contexts (page `@script`, function,
+imported module, async task, thread, pre-build hook, custom build script,
+post-build hook, standalone script) = 153 cases, each run with `NIFT_VM`
+unset and `NIFT_VM=1`; page-info dependency fields (or, for standalone
+scripts, which record nothing, the v2 Host-op stream) are compared, and
+legacy's recordings are pinned in `tests/runtime2/cp16/parity-expected/`.
+Results: 0 differences. **The VM was engaged in none of the 153 cases**, and
+the harness says so per case: the VM runs standalone scripts only and has no
+host natives yet (each script case falls back: `fallback:callable:open`,
+...); page, hook and build contexts never reach it. So today the fixture
+proves (a) one recorder, (b) recording unchanged by this phase in every
+context — the 136 page/hook/build recordings were identical to the
+pre-routing binary (`e8e4b106` + `56ecb7b1`) before they were pinned; the 17
+script cases were pinned from this binary because the v2 Host-op stream did
+not exist before — and (c) it fails at once if an engine records differently.
+`--require-vm` makes "VM not engaged" a failure, for when the VM runs these
+contexts. A seeded change of one pinned recording is reported as DIFF.
+
+### 9.3 `run()` / `cmd().run()` on `ProcessGroup`
+
+`Parser::run_host_pipeline` (`src/ParserHost.cpp`) maps `ProcessSpec` to a
+`FileCapture` request (capture limit = the `NIFT_READ_LIMIT` value, 0 =
+unbounded), launches through `start_traced(..., wait_at_once)` and maps the
+result back. Result objects are unchanged (`legacy_routing.sh` case 1 pins
+them against the legacy launcher: exit codes, captures, exec failures 127,
+signals 137, pipelines' per-stage results, env/cwd/redirections/append).
+Differences, all deliberate:
+
+* **C3**: every call is its own process group; with terminal stdin the group
+  gets the terminal for the call, so Ctrl-C reaches the child, not Nift (as in
+  a shell).
+* **C1**: background members left in a call's group belong to the execution
+  context (one CP17 context per legacy parser, opened at the first residue,
+  `register_run_residue`). It ends at script end
+  (`finalize_script_resources`), page render end (`render()`) or parser
+  destruction; members are terminated silently; a genuine cleanup failure is
+  an error of the script/page (D-035: "process cleanup failed: ...").
+* **C2**: installed at the first managed launch when SIGTERM is at its default
+  (SIGINT default or ignored: an ignored SIGINT, e.g. a shell background job,
+  stays ignored); never in the interactive shell or under `--auto`'s own
+  handler. A `run()` that returns while Nift is shutting down fails, so the
+  script does not run on; Nift ends with the signal (143/130). Signal wake-up
+  is a futex on Linux (no descriptor).
+* **No PDEATHSIG for legacy launches**: `test-consumer-snapshots`' interrupt
+  barrier requires a hook's child to outlive a SIGKILLed Nift and keep the
+  build lock. SIGKILL of Nift therefore behaves as before.
+* Low descriptors (CP07 "capture under `ulimit -n 6`" kept): the exec-failure
+  report pipe is optional when out of descriptors (an exec failure is then
+  only its 127/126 status, as legacy); a blocking call arms no host-loop
+  timer (`ProcessGroup::start_for_wait`); `group_has_members` first asks
+  `kill(-pgid, 0)`.
+* Parent-side launch failures (pipe/fork/capture-file creation) keep the Host
+  layer's texts ("cannot create pipe: ...") instead of legacy's "pipe failed" /
+  "fork failed"; reachable only by fault injection.
+* `sha256_file()` mid-read I/O errors now record the failed read (the Host
+  layer's D-028 rule; legacy recorded nothing in that one case).
+
+Not moved: Windows keeps the legacy launcher (`process_win.cpp` reports
+`process.unsupported`; the Windows build compiles the Host layer but was not
+compiled here — no Windows toolchain), the interactive shell's command
+statements and job control (CP19–CP21), templates' `@run`-style and package
+tool launches (`nift_run_process` callers outside `run()`/`cmd().run()`),
+`Serve`. The subreaper is not enabled from the CLI (job-control orphans).
+
+### 9.4 Tests (local, light; heavy gates on Linode)
+
+| Test | Result |
+|---|---|
+| `test-rt-host` | 495/0 and 1402/0 |
+| CP16 fixtures `capture.py --check` | 30/30 (base and this binary) |
+| `legacy_routing.sh` (new, `make test`) | 23 PASS: result objects, C3, C1 script and page, C2 plain and SIGTERM-ignoring (SIGKILL after the 2,000 ms grace), trace v2 (all lines v2; failed read with its code; v1 unchanged), stdin |
+| `process_capture.sh` | 10 PASS; case 4 flipped (C2) |
+| `engine_parity.py` (new, `make test`) | 153 cases, 0 differences, VM engaged in 0 (§9.2) |
+| `host_deps.py`, `dynamic_reads.sh`, `sha256_builtins.sh` | pass |
+| `test-consumer-snapshots` | interrupt barrier 6/6 after the PDEATHSIG decision; the suite itself has timing-sensitive cases that fail intermittently on this loaded host for the base binary too (`versions`, `fingerprint_migration`), so its verdict is taken from Linode |

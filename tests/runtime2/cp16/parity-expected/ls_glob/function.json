@@ -1,0 +1,16 @@
+{
+ "ops": null,
+ "output": "\nR:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "999758659663638885"
+  },
+  "listings": {
+   "glob:data/*.txt": "$FP"
+  },
+  "reqs": []
+ }
+}

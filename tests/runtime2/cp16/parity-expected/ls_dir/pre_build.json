@@ -1,0 +1,18 @@
+{
+ "ops": null,
+ "output": "R:plain\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "hook.f"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "9204976078360809519",
+   "hook.f": "3563318122794696002"
+  },
+  "listings": {
+   "dir:data": "ca26a560e3810ba2"
+  },
+  "reqs": []
+ }
+}

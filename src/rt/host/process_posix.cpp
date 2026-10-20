@@ -342,6 +342,8 @@ void rearm(State& s);
 bool group_has_members(const State& s) {
     if (s.pgid <= 0) return false;
 #ifdef __linux__
+    // Fast path (every legacy run() asks): no process at all in the group.
+    if (::kill(-s.pgid, 0) != 0 && errno == ESRCH) return false;
     const long session = s.detached ? static_cast<long>(s.pgid) : static_cast<long>(::getsid(0));
     return !runtime::proc_group_members(s.pgid, session).empty();
 #else
@@ -721,6 +723,10 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& 
     return start_impl(std::move(req), status, error, true);
 }
 
+std::shared_ptr<ProcessGroup> ProcessGroup::start_for_wait(SpawnRequest req, HostStatus& status, HostError& error) {
+    return start_impl(std::move(req), status, error, false);
+}
+
 std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostStatus& status, HostError& error, bool arm) {
     status = HostStatus::Ok;
     status = validate(req, error);
@@ -817,11 +823,18 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
         const bool last = i + 1 == stages.size();
         int link[2] = {-1, -1};
         if (!last && !make_pipe(link)) { parent_fail(std::string("cannot create pipe: ") + std::strerror(errno)); break; }
-        int report[2];
+        int report[2] = {-1, -1};
         if (!make_pipe(report)) {
-            parent_fail(std::string("cannot create pipe: ") + std::strerror(errno));
-            if (link[0] >= 0) { ::close(link[0]); ::close(link[1]); }
-            break;
+            if (!detached && (errno == EMFILE || errno == ENFILE)) {
+                // Out of descriptors: launch without the exec-failure report
+                // (legacy CP07: capture works under `ulimit -n 6`). An exec
+                // failure is then seen only as exit status 127/126.
+                report[0] = report[1] = -1;
+            } else {
+                parent_fail(std::string("cannot create pipe: ") + std::strerror(errno));
+                if (link[0] >= 0) { ::close(link[0]); ::close(link[1]); }
+                break;
+            }
         }
         int pid_pipe[2] = {-1, -1};  // detached: child1 reports the grandchild's pid
         if (detached && !make_pipe(pid_pipe)) {
@@ -838,7 +851,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
         }
         if (pid == 0) {
             // ---- child: async-signal-safe only ----
-            ::close(report[0]);
+            if (report[0] >= 0) ::close(report[0]);
             if (detached) {
                 ::close(pid_pipe[0]);
                 if (::setsid() < 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
@@ -893,7 +906,7 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
             p.exec(rep);
         }
         // ---- parent ----
-        ::close(report[1]);
+        if (report[1] >= 0) ::close(report[1]);
         pid_t stage_pid = pid;
         if (detached) {
             ::close(pid_pipe[1]);
@@ -924,13 +937,13 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
         stage.result.state = stage_pid > 0 ? StageState::Running : StageState::LaunchFailed;
         int payload[3] = {0, 0, 0};
         std::size_t got = 0;
-        while (got < sizeof payload) {
+        while (report[0] >= 0 && got < sizeof payload) {
             const ssize_t n = ::read(report[0], reinterpret_cast<char*>(payload) + got, sizeof payload - got);
             if (n < 0 && errno == EINTR) continue;
             if (n <= 0) break;
             got += static_cast<std::size_t>(n);
         }
-        ::close(report[0]);
+        if (report[0] >= 0) ::close(report[0]);
         if (got == sizeof payload) {
             stage.exec_failed = true;
             stage.result.launched = false;

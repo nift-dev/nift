@@ -60,6 +60,7 @@ enum class ParserWholeRead { Ok, Missing, OpenFailed, ReadFailed, Limit };
 class Parser {
     friend struct SourceTranslationTestAccess;
     friend struct RtParserOracleAccess;  // CP10 legacy-translation oracle (tests/rt)
+    friend class ParserHostObserver;     // CP16: recording hooks of the Host layer (ParserHost.h)
 public:
     // Shared filesystem type-inspection result backing exists/is_file/is_dir/stat.
     // One metadata query (std::filesystem::status) derives exists + type; size is
@@ -226,7 +227,17 @@ private:
     WholeRead read_whole_file(const std::string& operation, const std::filesystem::path& path, std::string& out, std::string& error);
     WholeRead read_whole_file(const std::string& operation, const std::filesystem::path& path, nift::RuntimeBytes& out, std::string& error);
     void observe_listing(const std::string& key, const std::filesystem::path& path);
-    void observe_environment(const std::string& name, const nift::HostResult& value);
+    void observe_environment(const std::string& name, const nift::HostResult& value, bool template_directive = false);
+    // CP16 (ParserHost.cpp): run()/cmd().run() launch through the Host
+    // layer's ProcessGroup (own process group per pipeline, C3; SIGINT/
+    // SIGTERM cleanup, C2). Background members a call leaves in its group
+    // belong to this parser's execution context (C1) and are terminated when
+    // it ends: end_host_process_context() (script end, page render end,
+    // destruction). False with `error` set when a cleanup genuinely failed.
+    bool run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint64_t capture_limit, ProcessResult& out,
+                           std::string& error);
+    bool end_host_process_context(std::string& error, bool on_error = false);
+    std::uint64_t host_process_context_ = 0;
     // Consume a callable's return into `out`, propagating any location that the
     // return carried so a following declaration can rebind to the same location.
     void consume_return(nift::RuntimeValue& out) {

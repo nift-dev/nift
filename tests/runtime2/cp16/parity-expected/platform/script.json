@@ -1,0 +1,7 @@
+{
+ "ops": [
+  "{\"arg\": \"\", \"op\": \"platform\", \"res\": \"native\", \"v\": 2}"
+ ],
+ "output": "ok\n",
+ "recording": null
+}

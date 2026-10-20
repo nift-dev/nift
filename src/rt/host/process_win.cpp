@@ -103,6 +103,9 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& 
     status = make_error(error, "process.unsupported", req.builtin + ": the Host process layer is not implemented on Windows yet");
     return nullptr;
 }
+std::shared_ptr<ProcessGroup> ProcessGroup::start_for_wait(SpawnRequest req, HostStatus& status, HostError& error) {
+    return start(std::move(req), status, error);
+}
 ProcessResult ProcessGroup::run(SpawnRequest req, HostStatus& status, HostError& error) {
     start(std::move(req), status, error);
     return ProcessResult();

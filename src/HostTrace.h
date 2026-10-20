@@ -74,9 +74,39 @@ inline int take_descriptor() {
     return fd;
 #endif
 }
+// CP16: NIFT_TRACE_HOST_VERSION ("2" selects the v2 channel; unset, empty,
+// "1" or anything else keep v1) is taken together with the descriptor and
+// removed from the environment like NIFT_TRACE_HOST, so scripts and children
+// see the same environment with and without tracing.
+inline int& version_slot() {
+    static int value = 1;
+    return value;
+}
+inline int take_version() {
+    const char* value = std::getenv("NIFT_TRACE_HOST_VERSION");
+    const int version = value && std::strcmp(value, "2") == 0 ? 2 : 1;
+    if (value) {
+#ifdef _WIN32
+        _putenv_s("NIFT_TRACE_HOST_VERSION", "");
+#else
+        ::unsetenv("NIFT_TRACE_HOST_VERSION");
+#endif
+    }
+    return version;
+}
 inline int descriptor() {
-    static const int fd = take_descriptor();
+    static const int fd = [] {
+        const bool requested = std::getenv("NIFT_TRACE_HOST") != nullptr;
+        const int taken = take_descriptor();
+        if (requested) version_slot() = take_version();
+        return taken;
+    }();
     return fd;
+}
+// 1 or 2 (meaningful while tracing is enabled).
+inline int version() {
+    (void)descriptor();
+    return version_slot();
 }
 inline std::mutex& write_mutex() {
     static std::mutex mutex;
@@ -125,9 +155,14 @@ inline bool enabled() { return detail::descriptor() >= 0; }
 inline void initialize() { (void)detail::descriptor(); }
 using detail::child_label;
 
+// The legacy emitter. Host ops routed through the CP16 Host layer trace via
+// nift::rt::host::TraceChannel instead (same descriptor and mutex); the ops
+// still traced here are written in the active version's framing: under v2 a
+// line carries "v":2 and the v1 result class (no "err"), so one trace file
+// never mixes formats.
 inline void emit(const char* op, const std::string& arg, const std::string& result) {
     if (!enabled()) return;
-    std::string line = "{\"ctx\":\"";
+    std::string line = detail::version() == 2 ? "{\"v\":2,\"ctx\":\"" : "{\"ctx\":\"";
     detail::escape(line, detail::context());
     line += "\",\"op\":\"";
     line += op;

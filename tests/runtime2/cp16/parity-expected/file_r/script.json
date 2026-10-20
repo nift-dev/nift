@@ -1,0 +1,8 @@
+{
+ "ops": [
+  "{\"arg\": \"$ROOT/data/r.txt\", \"op\": \"read\", \"res\": \"4\", \"v\": 2}",
+  "{\"arg\": \"$ROOT/data/r.txt\", \"op\": \"open\", \"res\": \"r\", \"v\": 2}"
+ ],
+ "output": "ok\n",
+ "recording": null
+}

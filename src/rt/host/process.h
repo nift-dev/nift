@@ -168,6 +168,10 @@ public:
     // pipeline) are returned as a status with `error` set and no group;
     // OS-level launch failures are a group in state LaunchFailed (a value).
     static std::shared_ptr<ProcessGroup> start(SpawnRequest request, HostStatus& status, HostError& error);
+    // As start(), for a caller that calls wait() at once (legacy run()): no
+    // host-loop timer or watch is armed in between, so a plain blocking call
+    // uses no descriptor beyond its own (CP07: capture under `ulimit -n 6`).
+    static std::shared_ptr<ProcessGroup> start_for_wait(SpawnRequest request, HostStatus& status, HostError& error);
     // The checks start() makes before launching anything (also used by the
     // traced launch so a refused request emits no v1 spawn line).
     static HostStatus validate(const SpawnRequest& request, HostError& error);

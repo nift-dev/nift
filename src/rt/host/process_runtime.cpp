@@ -24,6 +24,7 @@
 #endif
 #ifdef __linux__
 #include <sys/prctl.h>
+#include <linux/futex.h>
 #endif
 
 namespace nift::rt::host::runtime {
@@ -517,7 +518,59 @@ std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait) {
 
 // ---------------------------------------------------------------- C2 signal cleanup
 namespace {
+// Wakes the watcher thread from the signal handler. Linux: a futex word (no
+// descriptor: the legacy CP07 guarantee "capture works under ulimit -n 6"
+// leaves no room for one). Elsewhere: a self-pipe.
+#ifdef __linux__
+std::atomic<int> g_wake_word{0};  // 0 nothing, > 0 signal number, -1 stop
+void wake_post(int value) {  // async-signal-safe
+    g_wake_word.store(value);
+    ::syscall(SYS_futex, reinterpret_cast<int*>(&g_wake_word), FUTEX_WAKE_PRIVATE, 1, nullptr, nullptr, 0);
+}
+int wake_wait() {
+    for (;;) {
+        const int value = g_wake_word.exchange(0);
+        if (value != 0) return value;
+        ::syscall(SYS_futex, reinterpret_cast<int*>(&g_wake_word), FUTEX_WAIT_PRIVATE, 0, nullptr, nullptr, 0);
+    }
+}
+bool wake_open() {
+    // A previous watcher (uninstalled) consumes its stop value first (bounded).
+    for (int i = 0; i < 1000 && g_wake_word.load() == -1; ++i) ::usleep(1000);
+    return true;
+}
+void wake_close() {}
+#else
 int g_signal_pipe[2] = {-1, -1};
+void wake_post(int value) {
+    const unsigned char byte = value < 0 ? 0 : static_cast<unsigned char>(value);
+    if (g_signal_pipe[1] >= 0) { ssize_t ignored = ::write(g_signal_pipe[1], &byte, 1); (void)ignored; }
+}
+int wake_wait() {
+    const int fd = g_signal_pipe[0];
+    for (;;) {
+        unsigned char byte = 0;
+        const ssize_t n = ::read(fd, &byte, 1);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0 || byte == 0) { ::close(fd); return -1; }
+        return byte;
+    }
+}
+bool wake_open() {
+    int fds[2];
+    if (::pipe(fds) != 0) return false;
+    for (int fd : fds) ::fcntl(fd, F_SETFD, FD_CLOEXEC);
+    ::fcntl(fds[1], F_SETFL, ::fcntl(fds[1], F_GETFL) | O_NONBLOCK);
+    g_signal_pipe[0] = fds[0];
+    g_signal_pipe[1] = fds[1];
+    return true;
+}
+void wake_close() {
+    ::close(g_signal_pipe[1]);
+    g_signal_pipe[1] = -1;
+    g_signal_pipe[0] = -1;  // closed by the watcher
+}
+#endif
 std::atomic<bool> g_terminating{false};
 std::atomic<int> g_signal{0};
 std::atomic<bool> g_installed{false};
@@ -531,18 +584,14 @@ extern "C" void nift_host_signal_handler(int signo) {
     const int saved = errno;
     g_terminating.store(true);
     g_signal.store(signo);
-    const unsigned char byte = static_cast<unsigned char>(signo);
-    if (g_signal_pipe[1] >= 0) { ssize_t ignored = ::write(g_signal_pipe[1], &byte, 1); (void)ignored; }
+    wake_post(signo);
     errno = saved;
 }
 
-void watcher_loop(int read_fd) {
+void watcher_loop() {
     for (;;) {
-        unsigned char byte = 0;
-        const ssize_t n = ::read(read_fd, &byte, 1);
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0 || byte == 0) { ::close(read_fd); return; }  // uninstalled
-        const int signo = byte;
+        const int signo = wake_wait();
+        if (signo < 0) return;  // uninstalled
         const auto options = signal_options();
         terminate_all_indexed(options.kill_after, options.post_kill_wait);
         {
@@ -594,13 +643,8 @@ void clear_shutdown_for_test() { g_terminating = false; g_signal = 0; }
 bool install_signal_cleanup(SignalCleanupOptions options) {
     if (g_installed.exchange(true)) { signal_options() = std::move(options); return true; }
     signal_options() = std::move(options);
-    int fds[2];
-    if (::pipe(fds) != 0) { g_installed = false; return false; }
-    for (int fd : fds) ::fcntl(fd, F_SETFD, FD_CLOEXEC);
-    ::fcntl(fds[1], F_SETFL, ::fcntl(fds[1], F_GETFL) | O_NONBLOCK);
-    g_signal_pipe[0] = fds[0];
-    g_signal_pipe[1] = fds[1];
-    std::thread(watcher_loop, fds[0]).detach();
+    if (!wake_open()) { g_installed = false; return false; }
+    std::thread(watcher_loop).detach();
     static bool registered = false;
     if (!registered) { registered = true; std::atexit(nift_host_exit_handler); }
     struct sigaction sa{};
@@ -616,12 +660,8 @@ void uninstall_signal_cleanup() {
     if (!g_installed.exchange(false)) return;
     ::sigaction(SIGINT, &g_old_int, nullptr);
     ::sigaction(SIGTERM, &g_old_term, nullptr);
-    const unsigned char stop = 0;
-    ssize_t ignored = ::write(g_signal_pipe[1], &stop, 1);
-    (void)ignored;
-    ::close(g_signal_pipe[1]);
-    g_signal_pipe[1] = -1;
-    g_signal_pipe[0] = -1;  // closed by the watcher
+    wake_post(-1);
+    wake_close();
 }
 
 // ---------------------------------------------------------------- subreaper / orphans

@@ -1,0 +1,18 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "2367309942883292120"
+  },
+  "kinds": {
+   "data": "directory"
+  },
+  "reqs": [
+   "data"
+  ]
+ }
+}

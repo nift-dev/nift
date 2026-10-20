@@ -14,7 +14,8 @@ std::string absolute_cwd(const std::string& spelled) {
 }
 } // namespace
 
-std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status, HostError& error) {
+std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status, HostError& error,
+                                           bool wait_at_once) {
     const std::string builtin = request.builtin;
     status = ProcessGroup::validate(request, error);
     if (status != HostStatus::Ok) {
@@ -38,7 +39,8 @@ std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest 
             return nullptr;
         }
     }
-    auto group = ProcessGroup::start(std::move(request), status, error);
+    auto group = wait_at_once ? ProcessGroup::start_for_wait(std::move(request), status, error)
+                              : ProcessGroup::start(std::move(request), status, error);
     if (!group) {
         for (auto& call : calls) call->fail(status, error);
         return nullptr;

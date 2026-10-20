@@ -1,0 +1,16 @@
+{
+ "ops": null,
+ "output": "R:ok\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "4333099616369501713"
+  },
+  "environment": {
+   "CP16_PARITY_VAR": "v-1"
+  },
+  "reqs": []
+ }
+}

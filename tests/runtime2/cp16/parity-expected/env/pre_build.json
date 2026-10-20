@@ -1,0 +1,16 @@
+{
+ "ops": null,
+ "output": "R:plain\n",
+ "recording": {
+  "dependencies": [
+   "content/a.html",
+   "hook.f"
+  ],
+  "dependency-hashes": {
+   "content/a.html": "9204976078360809519",
+   "hook.f": "13222373529102242510"
+  },
+  "environment-snapshot": "$FP",
+  "reqs": []
+ }
+}

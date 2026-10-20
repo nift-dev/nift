@@ -48,6 +48,10 @@ public:
     // legacy validates before tracing).
     HostStatus resolve(std::string_view raw, PathSemantics semantics = PathSemantics::Lexical);
     const Resolved& target() const { return target_; }
+    // A path the caller already resolved by the same rules (legacy built-ins
+    // resolve and validate before the call; their messages are kept). The
+    // trace spells it absolute and lexically normal; recording uses it as given.
+    void adopt(const std::filesystem::path& resolved);
     // Non-path ops: the trace `arg` (variable name, program, ...).
     void set_arg(std::string arg) { arg_ = std::move(arg); has_arg_ = true; }
     // spawn: v1 `arg` is program and args joined by spaces, `res` the cwd as
@@ -58,6 +62,10 @@ public:
     void set_open_mode(std::string mode) { open_mode_ = std::move(mode); }
     // An output stream (ofstream): its open is not a read.
     void set_output_stream() { output_stream_ = true; }
+    // Listing ops (list/glob): the key recorded on success AND on a
+    // recoverable failure (legacy records the fingerprint, "missing" or
+    // "unreadable" included, whatever the outcome).
+    void set_listing_key(std::string key) { listing_key_ = std::move(key); }
     // v1 result text for ops whose Pre line carries one (open: the mode; spawn: cwd).
     void set_pre_result(std::string res) { pre_res_ = std::move(res); }
 
@@ -89,6 +97,7 @@ private:
     bool has_arg_ = false;
     std::string pre_res_;
     std::string open_mode_;
+    std::string listing_key_;
     bool output_stream_ = false;
     bool spawn_ = false;
     std::vector<std::string> argv_;
