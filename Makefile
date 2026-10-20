@@ -550,7 +550,7 @@ $(RT_VM_MUTANTS): $(filter-out $(RT_VM_MUTATED),$(CLI_OBJECTS)) $(RT_VM_MUTANT_O
 
 .PHONY: test-rt-vm-mutants
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
-	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
+	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff --jobs "$${NIFT_MUTANT_JOBS:-$$(nproc)}"
 
 # CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()
 # options, process model, CP17 binding. Linked into nift (RT_HOST_LINK_SOURCES, CP16 legacy routing). Process

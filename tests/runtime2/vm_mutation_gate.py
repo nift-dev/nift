@@ -38,6 +38,7 @@ The unmutated run must pass every suite; each mutant must fail at least one
 (all suites run for each mutant, so the report shows which reject it).
 """
 import argparse
+import concurrent.futures as cf
 import os
 import stat
 import subprocess
@@ -83,21 +84,34 @@ def wrapper(binary, mutant, d):
     return path
 
 
-def run_suites(nift, rt_diff, label, logs):
-    rejected = []
-    for name, cmd in suites(nift, rt_diff):
-        start = time.time()
-        p = subprocess.run(cmd, capture_output=True, text=True)
-        tail = (p.stdout.strip().splitlines() or [""])[-1][:160]
-        log = os.path.join(logs, f"{label}-{name}.log")
-        with open(log, "w") as f:
-            f.write(f"$ {' '.join(cmd)}\nexit {p.returncode}\n--- stdout\n{p.stdout}\n--- stderr\n{p.stderr}")
-        print(f"  [{label}] {name}: {'PASS' if p.returncode == 0 else 'REJECT'} ({time.time() - start:.0f}s) {tail}",
-              flush=True)
-        if p.returncode != 0:
-            rejected.append(name)
-            if label == "0":  # the unmutated binary must pass: show why it did not
-                print("\n".join("      | " + x for x in (p.stdout + p.stderr).strip().splitlines()[-25:]), flush=True)
+def run_one(label, name, cmd, logs):
+    start = time.time()
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    tail = (p.stdout.strip().splitlines() or [""])[-1][:160]
+    with open(os.path.join(logs, f"{label}-{name}.log"), "w") as f:
+        f.write(f"$ {' '.join(cmd)}\nexit {p.returncode}\n--- stdout\n{p.stdout}\n--- stderr\n{p.stderr}")
+    lines = [f"  [{label}] {name}: {'PASS' if p.returncode == 0 else 'REJECT'} ({time.time() - start:.0f}s) {tail}"]
+    if p.returncode != 0 and label == "0":  # the unmutated binary must pass: show why it did not
+        lines += ["      | " + x for x in (p.stdout + p.stderr).strip().splitlines()[-25:]]
+    return p.returncode != 0, lines
+
+
+def run_all(labels, rt_diff, logs, jobs):
+    """Run every (binary, suite) pair; pairs are independent (each suite works in
+    its own temporary directory), so they may run concurrently. Results and the
+    printed report are identical to the sequential order whatever --jobs is."""
+    work = [(label, name, cmd) for label, nift in labels for name, cmd in suites(nift, rt_diff)]
+    with cf.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        done = list(pool.map(lambda w: run_one(w[0], w[1], w[2], logs), work))
+    rejected = {label: [] for label, _ in labels}
+    current = None
+    for (label, name, _), (rej, lines) in zip(work, done):
+        if label != current:
+            current = label
+            print("unmutated (NIFT_VM_MUTANT=0):" if label == "0" else f"mutant {label} ({MUTANTS[int(label)]}):")
+        print("\n".join(lines), flush=True)
+        if rej:
+            rejected[label].append(name)
     return rejected
 
 
@@ -106,6 +120,8 @@ def main():
     ap.add_argument("--nift", required=True, help="the -DNIFT_VM_MUTANTS build")
     ap.add_argument("--mutants", default=",".join(str(k) for k in MUTANTS))
     ap.add_argument("--rt-diff", action="store_true", help="also run rt-diff over the shared corpora")
+    ap.add_argument("--jobs", type=int, default=int(os.environ.get("NIFT_MUTANT_JOBS", "1")),
+                    help="(binary, suite) pairs run concurrently (default 1: sequential, NIFT_MUTANT_JOBS)")
     ap.add_argument("--logs", help="directory for every suite's full output (default: a temporary directory)")
     args = ap.parse_args()
     binary = os.path.abspath(args.nift)
@@ -114,15 +130,15 @@ def main():
     os.makedirs(logs, exist_ok=True)
     print(f"full suite outputs: {logs}")
     failures = 0
-    print("unmutated (NIFT_VM_MUTANT=0):", flush=True)
-    rejected = run_suites(wrapper(binary, 0, d), args.rt_diff, "0", logs)
+    mutants = [int(x) for x in args.mutants.split(",") if x]
+    labels = [("0", wrapper(binary, 0, d))] + [(str(m), wrapper(binary, m, d)) for m in mutants]
+    rej = run_all(labels, args.rt_diff, logs, args.jobs)
+    rejected = rej["0"]
     if rejected:
         failures += 1
         print(f"FAIL unmutated binary rejected by {rejected}")
-    results = {}
-    for m in (int(x) for x in args.mutants.split(",") if x):
-        print(f"mutant {m} ({MUTANTS[m]}):", flush=True)
-        results[m] = run_suites(wrapper(binary, m, d), args.rt_diff, str(m), logs)
+    results = {m: rej[str(m)] for m in mutants}
+    for m in mutants:
         if not results[m]:
             failures += 1
             print(f"FAIL mutant {m} ({MUTANTS[m]}) survived every suite")
