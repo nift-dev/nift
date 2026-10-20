@@ -1017,3 +1017,38 @@ From CP12B's three-way check (nift.dev, legacy, approved semantics;
 6. **Process:** every proposed language-semantics change carries a minimal
    executable legacy reproducer and the relevant documentation excerpt (two
    decisions so far rested on inaccurate descriptions of legacy).
+
+## D-047 — Script-context `@` syntax; struct migration; C2/C3 status (owner, 2026-10-20)
+
+1. **`@fn(...)` is invalid in standalone script contexts** (standalone `.f`
+   scripts, script packages, the REPL, `@script` blocks) — an intentional
+   syntax-tightening under D-045, not a legacy correction. Canonical forms:
+   scripts `fn(name(args)) { … }`, templates `@fn(name(args)) { … }`. The rule
+   follows the **parsing context, not the file extension** (a file used as a
+   template or fragment keeps template syntax). Both engines reject it before any
+   execution or side effect; the offending package fixture is corrected to
+   `fn(...)`; old/new executable examples, migration guidance and a nift.dev
+   clarification ship with the release. Usage check (2026-10-20): `@fn` in `.f`
+   files: 0 in 79 project scripts, 0 in 10 package files, 5 in the repository's
+   own tests — rare and test/agent-generated, so a clean break.
+   Other `@` forms are **not** banned automatically; inventory of `@`-prefixed
+   script directives in legacy: `@for @import @if @fn @while @script @item
+   @content @return @input @fragment @struct @paginate @markup @json @enum @type
+   @ent @context` (+ internal `@__*`). Findings needing a policy decision:
+   nift.dev documents bare `import(...)` as canonical in script land with
+   `@import(...)` "accepted for compatibility" (13 project scripts and 3 package
+   files use `@import`); `@struct(Name)` is the **only** struct form nift.dev
+   shows, and all package files use it.
+2. **Struct migration (D-040/D-046 #3) approved without a new shared-reference
+   mechanism.** Identity-dependent graphs use ids into an owning collection or
+   handles; migration examples are executable and in documented syntax. A
+   reference type is evaluated separately only if a concrete use case shows the
+   existing mechanisms are inadequate.
+3. **C2** accounting rule (first interning context on a thread pays, once)
+   accepted provisionally; CP23 revisits thread-local atom lifetime and context
+   isolation for long-lived contexts.
+4. **C3 stays open** until `join` and `replace` are both integrated and
+   certified, the heap-limit-zero ambiguity is corrected (explicit "disabled"
+   state; zero means no budget left), the permanent bypass reproducers pass, and
+   the shared reservation mechanism is verified against the documented budget
+   semantics. The `vm.cpp` change is sequenced when ownership permits.
