@@ -130,29 +130,5 @@
   "count": 1,
   "justification": "Errors in called functions are reported at the failing expression in the function.",
   "test": "tests/runtime2/semantics/toplevel_callee_error_location.f (legacy golden toplevel_callee_error_location.stdout, intended toplevel_callee_error_location.r2.stdout)"
- },
- {
-  "id": "loop_interpolation-stdout",
-  "decision": "D-009#6",
-  "entry": "semantics/loop_interpolation.f",
-  "source_sha256": "e408ce93595f392c1799dc481b6a54674392b63040733b1ec0328fbe702120e8",
-  "channel": "stdout",
-  "old": "top=3\nloop=$[x]\nfor=$[e]\n",
-  "new": "top=3\nloop=3\nfor=1\n",
-  "count": 1,
-  "justification": "String interpolation works inside loop bodies.",
-  "test": "tests/runtime2/semantics/loop_interpolation.f (legacy golden loop_interpolation.stdout, intended loop_interpolation.r2.stdout)"
- },
- {
-  "id": "loop_interpolation-combined",
-  "decision": "D-009#6",
-  "entry": "semantics/loop_interpolation.f",
-  "source_sha256": "e408ce93595f392c1799dc481b6a54674392b63040733b1ec0328fbe702120e8",
-  "channel": "combined",
-  "old": "top=3\nloop=$[x]\nfor=$[e]\n",
-  "new": "top=3\nloop=3\nfor=1\n",
-  "count": 1,
-  "justification": "String interpolation works inside loop bodies.",
-  "test": "tests/runtime2/semantics/loop_interpolation.f (legacy golden loop_interpolation.stdout, intended loop_interpolation.r2.stdout)"
  }
 ]

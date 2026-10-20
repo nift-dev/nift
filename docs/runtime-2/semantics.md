@@ -87,7 +87,7 @@ The "Category" column says which applies: **Unchanged** (Runtime 2.0 = legacy),
 | String methods | `length()` counts code points (`"héllo"` → 5); `split` keeps empty fields | `strings_methods.f` | string methods | Unchanged |
 | String indexing | `"abc"[1]` is not supported ("unknown value or malformed expression") | `strings_index.f` | — | Unchanged |
 
-*Update (2026-10-20, loop-literal fix):* the loop divergence above was a legacy regression introduced in v4.12.0 by 5fe38bd1 (prepared-code literal and output completion bypassed); v4.6.0 interpolates in loops. Runtime-2 legacy is fixed (tests/runtime2/loop-literals, v4.6.0 authoritative), so legacy and Runtime 2.0 now agree: `loop_interpolation.stdout` and `cp04/interpolation.stdout` were re-recorded from the fixed legacy and equal the `.r2.*` expectation. D-009#6 no longer describes a behaviour change against the corrected legacy.
+*Update (2026-10-20, loop-literal fix):* the loop divergence above was a legacy regression introduced in v4.12.0 by 5fe38bd1 (prepared-code literal and output completion bypassed); v4.6.0 interpolates in loops. Runtime-2 legacy is fixed (tests/runtime2/loop-literals, v4.6.0 authoritative), so legacy and Runtime 2.0 now agree: `loop_interpolation.stdout` and `cp04/interpolation.stdout` were re-recorded from the fixed legacy and equal the `.r2.*` expectation. D-009#6 no longer describes a behaviour change against the corrected legacy, so its two approval policies were removed from `tools/rt-diff/policies/d009.json` (11 remain); an approval for a difference that no longer exists would be reported unused.
 
 ## Errors
 
