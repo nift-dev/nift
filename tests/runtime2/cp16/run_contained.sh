@@ -11,8 +11,14 @@ if [ "${1:-}" = --sanitized ]; then SANITIZED=1; shift; fi
 BIN=${1:?usage: run_contained.sh [--sanitized] BINARY [ARGS...]}
 shift
 cleanup() {
+  # No pipeline (POSIX sh has no pipefail): read the environment block first,
+  # then match it; an unreadable block is skipped explicitly.
+  nl='
+'
   for env in /proc/[0-9]*/environ; do
-    if { tr '\0' '\n' < "$env"; } 2>/dev/null | grep -q '^NIFT_TEST_PROC_TAG=cp16-'; then
+    block=$( { tr '\0' '\n' < "$env"; } 2>/dev/null ) || continue
+    case "$nl$block" in *"${nl}NIFT_TEST_PROC_TAG=cp16-"*) tagged=1 ;; *) tagged=0 ;; esac
+    if [ "$tagged" = 1 ]; then
       pid=${env#/proc/}; pid=${pid%/environ}
       kill -9 "$pid" 2>/dev/null && echo "run_contained: killed leftover test process $pid" >&2
     fi

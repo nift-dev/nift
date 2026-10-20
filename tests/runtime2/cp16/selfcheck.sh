@@ -7,10 +7,20 @@ set -u
 NIFT=${1:?usage: selfcheck.sh NIFT}
 HERE=$(cd "$(dirname "$0")" && pwd)
 fail=0
+TMP=$(mktemp -d) || exit 2
+trap 'rm -rf "$TMP"' EXIT
 check() { # mode probe expect(OK|DIFF)
-    if [ "$1" = none ]; then out=$(python3 "$HERE/capture.py" --nift "$NIFT" --check --runs 1 --only "$2" | tail -1)
-    else out=$(python3 "$HERE/capture.py" --nift "$NIFT" --check --runs 1 --only "$2" --mutant "$1" | tail -1); fi
-    case "$out" in "$3"*) echo "pass  $1 $2 -> $out";; *) echo "FAIL  $1 $2 expected $3, got $out"; fail=1;; esac
+    # No pipeline (POSIX sh has no pipefail): capture.py's exit status is kept
+    # and must agree with its verdict (0 = OK, 1 = DIFF); a crash is a failure.
+    if [ "$1" = none ]; then python3 "$HERE/capture.py" --nift "$NIFT" --check --runs 1 --only "$2" > "$TMP/out" 2>&1
+    else python3 "$HERE/capture.py" --nift "$NIFT" --check --runs 1 --only "$2" --mutant "$1" > "$TMP/out" 2>&1; fi
+    rc=$?
+    out=$(sed -n '$p' "$TMP/out")
+    want_rc=0; [ "$3" = DIFF ] && want_rc=1
+    case "$out" in
+        "$3"*) if [ "$rc" = "$want_rc" ]; then echo "pass  $1 $2 -> $out"; else echo "FAIL  $1 $2 verdict $out but exit $rc"; fail=1; fi ;;
+        *) echo "FAIL  $1 $2 expected $3 (exit $want_rc), got exit $rc: $out"; fail=1 ;;
+    esac
 }
 for p in fs_read fs_meta fs_write fs_errors proc_run site_deps site_observe; do check none $p OK; done
 check trace-path fs_read DIFF          # wrong path

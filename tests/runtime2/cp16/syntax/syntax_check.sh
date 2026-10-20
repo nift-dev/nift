@@ -20,7 +20,10 @@ for f in "$HERE"/[ABC]_*.f; do
   src="$f"; [ -f "$HERE/$id.mock" ] && src="$HERE/$id.mock"
   { cat "$HERE/mock.f"; sed -E 's/(^|[^.A-Za-z_])run\(/\1mrun(/g; s/(^|[^.A-Za-z_])cmd\(/\1mcmd(/g' "$src"; } > "$WORK/mock.f"
   printf '== %s legacy: ' "$id" >> "$out"
-  (cd "$WORK" && env PATH=/nonexistent "$NIFT" legacy.f 2>&1 | head -1 | sed "s#$WORK/##") >> "$out"
+  # No pipeline (POSIX sh has no pipefail): the legacy run is expected to
+  # fail (PATH without curl); its first output line is the recorded result.
+  (cd "$WORK" && env PATH=/nonexistent "$NIFT" legacy.f > "$WORK/legacy.out" 2>&1)
+  sed -n "1{s#$WORK/##;p;}" "$WORK/legacy.out" >> "$out"
   printf '== %s mock (exit %s):\n' "$id" "$(cd "$WORK" && "$NIFT" mock.f > mock.out 2>&1; echo $?)" >> "$out"
   sed "s#$WORK/##" "$WORK/mock.out" >> "$out"
 done
