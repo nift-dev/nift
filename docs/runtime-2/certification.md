@@ -437,3 +437,51 @@ wrong mapping fails 120 of 1,679 checks). Integration: rebased onto `runtime-2`
 @`041e8efc` (docs-only since the base); non-docs tree equals `33c5415a`
 (package snapshot b978a5a2… unchanged). Linux only. Evidence:
 `.claude-linode-runs/casecert/out.tgz`, `.claude-linode-runs/results/case-gates1/`.
+
+## Stack CP12B + L7 + loop-literal fix certified on Linode @01f18d2 (2026-10-20)
+
+One stacked candidate, certified as a whole (the pass shows the three changes
+coexist; it is not separate per-checkpoint certification). Base `6413f7a4`,
+tip `01f18d29`:
+
+    certify @ 01f18d2: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 174
+
+Contents, bottom up: CP12B phase B through `217ac21b` (B1 tests, missing
+goldens for `cp11/fallback_fn_called_early`, golden-corpus completeness check
+`test-runtime2-vm-corpus-complete`); L7 value layer (12 commits); loop-literal
+fix (splitter escape fix for 55cb323c; literal and output completion restored
+for 5fe38bd1, output completion only where an operand carries a literal
+needing it; `tests/runtime2/loop-literals`, v4.6.0 authoritative); the two
+legacy loop-interpolation goldens re-recorded from the fixed legacy; the
+D-009#6 approvals removed (no longer a difference). g6-dedicated-2, `-j2`,
+4361 s certify; package snapshot b978a5a2… unchanged. Local preflight
+(`precert.sh`) on the same commit: PASS.
+
+Not certified, in order: CP12B @0bea8f1a (missing goldens), L7 @0d62b316
+(same), stack @f3ba494f (two legacy goldens pinned the v4.12 loop regression;
+restarted), stack @ba657a0b (rt-diff self-test: D-009#6 approvals unused). All
+three were detectable by cheap local checks before provisioning; see the
+standing rule below. Integration: rebased onto `runtime-2` @`b37a223b`
+(docs-only since the base); non-docs tree equals `01f18d29`. Linux only.
+Evidence: `.claude-linode-runs/results/stack3/`.
+
+## Standing rule: local preflight before certification (owner, 2026-10-21)
+
+Before launching an expensive certification run, the certifier personally
+establishes that the complete candidate, at its exact commit, passes every
+applicable local gate and that the certification inputs (source, tests,
+fixtures, build files, approval rules, package snapshot) are complete and
+consistent. A subagent's report that its checkpoint passed is not enough. A
+gate that cannot run locally is named before launch. The candidate is frozen
+while certification runs; a defect found mid-run is collected with the rest
+of the results and fixed once. `precert.sh` (fixture completeness, corpus
+against the candidate's own binary, loop literals, rt-diff, rt-diff
+self-test including unused approvals, `test-rt-vm`) is the minimum. Full
+certification stays mandatory for executable changes; notes-only changes keep
+the equivalence exception.
+
+Timing correction to "Where certification time goes": in the @01f18d2 run the
+longest targets were `test-rt-vm-mutants` 1840 s, then
+`test-build-boundary-nondestructive` (exclusive, about 22 min) and
+`test-runtime2-rt-diff-selftest` (about 11 min).
+
