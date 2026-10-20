@@ -1134,3 +1134,17 @@ exceeding US$20. Existing controls are unchanged: inexpensive instance types,
 pinned host keys, TTLs, prompt deletion after evidence is retrieved (verified
 via the API), shared accounting across Claude and DeepSeek. Recorded in
 `scratchpad/infra/linode.py` (`BUDGET_USD = 20.0`).
+
+### CP16 legacy `run()` process-group exception (owner, 2026-10-20; provisional)
+
+Legacy `run()` children stay in Nift's process group during the transition
+(two existing contracts need it: a killpg of Nift's group reaches them, and a
+hook child survives a SIGKILL of Nift alone). Legacy `run()` therefore does not
+guarantee background-process cleanup at context end or a dedicated process
+group/terminal ownership; SIGINT/SIGTERM cleanup of its children is required
+and tested. The Host layer's own `run()` keeps every CP16/CP17 lifecycle,
+cleanup and ownership guarantee and is never weakened for legacy. Tests assert
+by ownership class (no contradictory "nothing left behind" for permitted legacy
+descendants) and include an unrelated process surviving Nift's signal handling.
+**Removal condition: CP25 cannot complete while any execution path relies on
+this exception.** Not a broader redesign of legacy process management.
