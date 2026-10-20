@@ -3,6 +3,6 @@ d home/ 755
 d tmp/ 755
 d w/ 755
 f w/args.sh 755 34 128f1114d9af8a13
-f w/badinterp.sh 755 30 4051a8f4fb5f9900
+f w/badinterp.sh 755 35 73c101a0fa3aa8cc
 f w/main.f 644 957 7767846cb4048a11
 f w/noexec.sh 644 15 3847030cd76d446b

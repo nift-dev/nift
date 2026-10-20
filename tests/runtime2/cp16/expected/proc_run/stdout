@@ -4,7 +4,7 @@
 {"exit_code":0,"stdout":"args:3:*|$HOME|a;b\n","stderr":"","launched":true}
 {"exit_code":127,"stdout":"","stderr":"","launched":false,"error":"executable not found: definitely-missing-cp16"}
 {"exit_code":126,"stdout":"","stderr":"","launched":false,"error":"permission denied: ./noexec.sh"}
-{"exit_code":127,"stdout":"","stderr":"","launched":false,"error":"executable not found: ./badinterp.sh"}
+{"exit_code":127,"stdout":"","stderr":"","launched":false,"error":"interpreter not found: $BASE/ext/missing-interp (from ./badinterp.sh)"}
 {"exit_code":143,"stdout":"","stderr":"","launched":true}
 {"exit_code":137,"stdout":"","stderr":"","launched":true}
 {"exit_code":255,"stdout":"","stderr":"","launched":true}
