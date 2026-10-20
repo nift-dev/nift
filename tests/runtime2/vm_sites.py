@@ -99,7 +99,18 @@ def _candidates(source, root, message):
     m = re.match(rb"^(?:JSON array index \d+ is out of range in |JSON array indices must be non-negative integers "
                  rb"in )'(.*)'\Z", message)
     if m:
-        return [n for n in nodes if n.kind == "Index" and text(source, n) == m.group(1)]
+        # The index message quotes the whole member/index chain the failing
+        # index belongs to (stage 4 D1: `a[5].y` -> 'a[5].y'), or the index
+        # itself: every Index node of a chain with that text.
+        out = [n for n in nodes if n.kind == "Index" and text(source, n) == m.group(1)]
+        for top in nodes:
+            if top.kind in ("Member", "Index") and text(source, top) == m.group(1):
+                c = top
+                while c.kind in ("Member", "Index") and c.children:
+                    if c.kind == "Index" and all(c is not o for o in out):
+                        out.append(c)
+                    c = c.children[0]
+        return out
     m = re.match(rb"^unknown value or malformed expression: (.+)\Z", message)
     if m:
         return [n for n in nodes if n.kind in ("Call", "Index", "Member") and text(source, n) == m.group(1)]

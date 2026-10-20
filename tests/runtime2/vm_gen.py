@@ -221,6 +221,48 @@ class Gen:
         return [f"fn({name}(n)) {{ if(n < 2) {{ return n }} return {name}(n - 1) + {name}(n - 2) }}"]
 
 
+# Stage 4 (path wording defects D1-D3, certification.md): failing paths in
+# the shapes where the VM's wording once differed from legacy's: an index out
+# of range followed by a member, a missing member reached through an index
+# (in print and elsewhere), a missing member in a method argument; at top
+# level, in loop code and in a function, called from either.
+FAIL_DATA = 'zp := [{"a": "x", "n": {"m": 1}}, {"b": "y"}]\nzs := "xyz"\n'
+FAIL_SHAPES = [
+    # an index out of range, then a member (literal indexes: in loop code
+    # legacy says `invalid index`, approved by D-018c only when the index is
+    # the constant the source gives, cp12-engine-selection.md)
+    "print({r}[5].a)", "zv := {r}[5].n.m", 'print("s" + {r}[7].a)', "print({r}[3].n.m)",
+    # a missing member reached through an index
+    "print({r}[{k}].b)", "print({r}[{k}].n.q)", "zv := {r}[{k}].b", 'print("s" + {r}[1].a)', "print({r}[1].n)",
+    # a missing member in a method argument
+    "print(zs.contains({r}[{k}].a))", "print(zs.starts_with({r}[1].a))", "print({r}.contains({r}[{k}].b))",
+    "zv := zs.contains({r}[{k}].b)",
+    # compositions: a failing index or member inside a method argument, inside
+    # a concatenation, inside a comparison
+    "print(zs.contains({r}[5].a))", 'zv := "s" + zs.contains({r}[{k}].n.q)', "print(zs.contains({r}[5].n.m + \"\"))",
+    'print({r}[{k}].b == "y")', "if (zs.starts_with({r}[{k}].b)) {{ print(1) }}",
+]
+
+
+def failing_path(rng):
+    """(definitions before the statements, lines at the end) of one shape."""
+    key = rng.choice(["0", "1", "zk", "zk + 0"])
+    shape = rng.choice(FAIL_SHAPES)
+    where = rng.choice(["top", "loop", "fn-top", "fn-loop"])
+    if where.startswith("fn"):
+        body = shape.format(r="q", k=key).replace("zs.", "t.").replace("zv :=", "w :=")
+        defs = ["fn(zf(q, t, zk)) {", "  " + body, "  return 0", "}"]
+        stmt = "zf(zp, zs, zk)"
+    else:
+        defs, stmt = [], shape.format(r="zp", k=key)
+    tail = FAIL_DATA.splitlines() + [f"zk := {rng.choice(['0', '1'])}"]
+    if where.endswith("loop"):
+        tail += ["zl := 0", "while (zl < 2) {", "  zl += 1", "  " + stmt, "}"]
+    else:
+        tail.append(stmt)
+    return defs, tail
+
+
 def program(seed, index):
     rng = random.Random(seed * 1000003 + index)
     g = Gen(rng)
@@ -231,8 +273,13 @@ def program(seed, index):
         lines += g.function()
     scope = []
     lines += g.block(scope, 0, False, False, rng.randint(3, 12))
-    if rng.random() < 0.1:
-        lines.append(f"return {g.int_expr(scope)}")
+    ret = f"return {g.int_expr(scope)}" if rng.random() < 0.1 else None
+    # Drawn after everything else, so the programs above are unchanged.
+    if rng.random() < 0.15:
+        defs, tail = failing_path(rng)
+        lines = lines[:1] + defs + lines[1:] + tail
+    if ret:
+        lines.append(ret)
     return "\n".join(lines) + "\n"
 
 
