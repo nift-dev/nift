@@ -216,6 +216,25 @@ this must still hold when live exports arrive (CP12B, D-046). Pins:
 `path-*` cases) and mutants 10 (admission whatever the kinds) and 11 (the
 value wording) in `vm_mutation_gate.py`.
 
+Second ruling (coordinator, VM subset; no language change): the parameter
+copy `out := p` in a prepared function (`pad`'s `out := s`) is also
+admitted when bindings named `p` exist outside the function, provided every
+one is certainly int typed: int text, or untyped text whose inferred kinds
+are certainly int (`src/rt/prepared_outer.cpp`). Legacy types the copy when
+preparing, from the binding `p` its scope lookup finds; probes show an
+int-typed binding there types it from the value, like no binding, while a
+string or double one wins whatever its origin (`s := v[0]` holding `"x"`
+included). An integral number is int for legacy's value typing (`1e2`,
+`2.0` held in an untyped binding); a `1e2` literal declaration is double
+text. A string, double or not-certainly-int outer binding, or a parameter of
+another function with that name, stays refused (`prepared-decl-type`); the
+per-call condition (untyped or int argument text) is unchanged. The kinds
+are now inferred before the prepared analysis (refusal order unchanged;
+without converged kinds only an absent binding qualifies). Pins: the 42
+outer-binding programs in `vm_records_coverage.py` and mutant 12 (a double
+outer binding admitted: silent output divergence, rejected). records20k
+(`records` at n = 5,000, 10,000, 20,000) now runs entirely on the VM.
+
 ## Tests
 
 Final build `aeefaa7`, idle host (2 vCPU). Logs: `../evidence/cp12/`.

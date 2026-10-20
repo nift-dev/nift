@@ -31,6 +31,7 @@
 // Prepared-reachable code (over-approximated, which only refuses more): the
 // conditions and bodies of every `while` loop, anywhere, and the whole body
 // of every function called from prepared-reachable code (fixpoint).
+#include "rt/infer.h"
 #include "rt/resolver.h"
 
 #include <cstdint>
@@ -48,6 +49,7 @@ struct PreparedRefusal {
     std::vector<bool> loop_called;
 };
 
-PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan);
+// `kinds`: the unit's converged kinds, or null (rt/prepared_outer.h).
+PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds);
 
 } // namespace nift::rt

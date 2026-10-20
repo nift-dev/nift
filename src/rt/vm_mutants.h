@@ -10,6 +10,7 @@
 //      parameter, stage 4) and binds with the unknown type -1
 //   M10 (compiler) a path argument is admitted whatever its kinds (aggregates too)
 //   M11 a missing member in a path argument gets the value wording, not the location one (vm_ops)
+//   M12 (prepared_outer) a double-typed outer binding of a parameter copy's name is admitted
 #include "rt/vm_ops.h"
 
 #ifdef NIFT_VM_MUTANTS
@@ -27,6 +28,8 @@
 #define BIND_TEXT(c) ((vm_mutant() == 9 && !((c) & kConstantBit)) ? std::int64_t{-1} : RK(c).as_int())
 #define MUTATE_PATH_SCALAR(ok) \
     if (vm_mutant() == 10) (ok) = true;
+#define MUTATE_OUTER_DOUBLE(ok, known) \
+    if (vm_mutant() == 12 && (known) == 3) (ok) = true;
 #else
 #define MUTATE_ADDI(x, offset)
 #define MUTATE_MOD(v) (v)
@@ -34,4 +37,5 @@
 #define MUTATE_ERROR_OFFSET(offset)
 #define BIND_TEXT(c) (RK(c).as_int())
 #define MUTATE_PATH_SCALAR(ok)
+#define MUTATE_OUTER_DOUBLE(ok, known)
 #endif

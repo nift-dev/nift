@@ -2,6 +2,7 @@
 
 // rt-lint: cold-file compile-time analysis, once per unit
 
+#include "rt/prepared_outer.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/text_type.h"
@@ -41,7 +42,8 @@ template <class Visit> bool walk(const Ast& ast, NodeId id, const Visit& visit) 
 
 class Analysis {
 public:
-    Analysis(const Ast& ast, NodeId root, const UnitPlan& plan) : ast_(ast), root_(root), plan_(plan) {}
+    Analysis(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds)
+        : ast_(ast), root_(root), plan_(plan), kinds_(kinds) {}
 
     PreparedRefusal run() {
         mark_prepared_functions();
@@ -223,14 +225,11 @@ private:
     // Legacy types the declaration from the text after `:=` (decl_type),
     // evaluated when the body is prepared.
     // Stage 4 (D-046 #1): `x := p` keeps p's declared type (P5). Legacy types it when preparing, from
-    // `p` in the caller's scopes (decl_type; not found: the value's type): admitted only where that is
-    // equal, i.e. no binding p outside the function and every call passes p untyped or int text.
-    // Otherwise refused (review2_m1_param_caller_scope, L52).
+    // `p` in the caller's scopes (decl_type; not found or int: the value's type): admitted only where
+    // that is equal, i.e. every binding p outside the function is certainly int typed (rt/prepared_outer.h)
+    // and every call passes p untyped or int text. Otherwise refused (review2_m1_param_caller_scope, L52).
     bool param_copy_matches_legacy(std::size_t f, const std::vector<std::string_view>& params, std::size_t k) {
-        if (!names_collected_) collect_declared_names(), names_collected_ = true;
-        if (global_names_.count(params[k])) return false;
-        for (std::size_t g = 0; g < plan_.functions.size(); ++g)
-            if (g != f && function_names_[g].count(params[k])) return false;
+        if (!outer_bindings_int_typed(ast_, root_, plan_, f, params[k], kinds_)) return false;
         return walk(ast_, root_, [&](NodeId, const Node& n) {
             if (callee_index(n) != static_cast<int>(f)) return true;
             if (k >= n.count) return false;
@@ -378,6 +377,7 @@ private:
     const Ast& ast_;
     NodeId root_;
     const UnitPlan& plan_;
+    const UnitKinds* kinds_;  // null: not converged
     std::unordered_set<std::string_view> global_names_, visible_;
     int caller_ = -1;
     bool visible_ready_ = false;
@@ -392,8 +392,8 @@ private:
 
 } // namespace
 
-PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan) {
-    return Analysis(ast, root, plan).run();
+PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds) {
+    return Analysis(ast, root, plan, kinds).run();
 }
 
 } // namespace nift::rt

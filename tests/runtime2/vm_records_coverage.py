@@ -178,6 +178,46 @@ PARAM_DECL = [
     ("pd_reassign_top_only", True, 'fn(f(s)) {\n  out := s\n  out = 1.5\n  print(out)\n  return 0\n}\nf(2.5)\nf("a")\n'),
 ]
 
+# Outer bindings of the copied parameter's name (coordinator ruling, VM
+# subset): legacy types `out := s` from a binding `s` in the caller's scopes
+# when preparing; an int-typed one types it like none, from the value. The 36
+# probes (outer binding x argument x reassignment) and five integral-value
+# ones: admitted (on the VM, or refused only where the reassignment can fail
+# in loop code, context:assignment-error, as for any loop assignment) when
+# every outer `s` is int text or untyped text holding a certainly integral
+# number; refused (prepared-decl-type) for a string or double outer binding of
+# any origin and for an untyped one whose kinds are not certainly int.
+OUTER_FN = 'fn(f(s)) {{\n  out := s\n  out = {r}\n  print(out)\n  return 0\n}}\n'
+OUTER_LOOP = 'i := 0\nwhile (i < 1) {{\n  f({a})\n  i += 1\n}}\n'
+OUTER_BINDINGS = {"none": ("", "admitted"), "str": ('s := "x"\n', "string"), "dbl": ('s := 2.5\n', "double"),
+                  "int": ('s := 7\n', "admitted"), "untyped": ('v := [7]\ns := v[0]\n', "admitted"),
+                  "untyped_str": ('v := ["x"]\ns := v[0]\n', "string")}
+OUTER_VALUES = {"int": "7", "str": '"a"', "dbl": "1.5"}
+# Untyped outer declarations holding integral numbers (legacy: int, value
+# typing) or not certainly integral: argument "a", reassignment "b".
+OUTER_INTEGRAL = [("e2", 'v := [1e2]\ns := v[0]\n', "vm"), ("pt0", 'v := [2.0]\ns := v[0]\n', "vm"),
+                  ("mul", 'v := [1e2]\ns := v[0] * 1\n', "vm"), ("neg", 'v := [-5]\ns := v[0]\n', "vm"),
+                  ("half", 'v := [2.5]\ns := v[0]\n', "prepared-decl-type"),
+                  ("lit_e2", 's := 1e2\n', "prepared-decl-type")]
+
+
+def outer_cases():
+    """(name, source, expected outcome: "vm" or the refusal reason)."""
+    out = []
+    for g, (decl, typing) in OUTER_BINDINGS.items():
+        for a in ("int", "str"):
+            for r in ("int", "str", "dbl"):
+                source = OUTER_FN.format(r=OUTER_VALUES[r]) + decl + OUTER_LOOP.format(a=OUTER_VALUES[a])
+                if typing != "admitted":
+                    want = "prepared-decl-type"
+                else:  # out takes the argument's type; an int accepts nothing else here, a string neither
+                    want = "vm" if r == a else "context:assignment-error"
+                out.append((f"outer_{g}_{a}_{r}", source, want))
+    for g, decl, want in OUTER_INTEGRAL:
+        out.append((f"outer_integral_{g}", OUTER_FN.format(r='"b"') + decl + OUTER_LOOP.format(a='"a"'), want))
+    return out
+
+
 # Known legacy inconsistencies: name -> (register entry, legacy's actual
 # printed lines, legacy ends with an error). The VM must refuse these programs.
 LEGACY_INCONSISTENT = {
@@ -340,6 +380,21 @@ def main():
                         if vm != legacy or not st or st.get("vm_executions", 0) != 0:
                             failures.append(f"{name}: not refused before execution or output differs")
                 shutil.rmtree(d, ignore_errors=True)
+        for name, source, want in outer_cases():
+            d = tempfile.mkdtemp(dir=work)
+            with open(os.path.join(d, "p.f"), "w") as f:
+                f.write(source)
+            legacy, _ = run(nift, d, None, a.timeout)
+            auto, st = run(nift, d, "1", a.timeout)
+            _, cst = run(nift, d, "classify", a.timeout)
+            got = "vm" if cst and cst["outcome"] == "compiled" else cst and cst["reason"]
+            if got != want:
+                failures.append(f"{name}: expected {want}, got {cst and (cst['outcome'], cst['reason'])}")
+            elif auto != legacy:
+                failures.append(f"{name}: NIFT_VM=1 output differs\n  legacy {legacy}\n  auto   {auto}")
+            elif want == "vm" and (not st or st.get("outcome") != "vm"):
+                failures.append(f"{name}: not on the VM ({st and st.get('outcome')})")
+            shutil.rmtree(d, ignore_errors=True)
         for name, vm_required, source in PARAM_DECL:
             d = tempfile.mkdtemp(dir=work)
             with open(os.path.join(d, "p.f"), "w") as f:
@@ -376,7 +431,7 @@ def main():
     print(("PASS" if not failures else "FAIL") + f" vm records coverage: {len(SUPPORTED)} supported shapes and "
           f"{len(PATH_ARGUMENTS) + len(PATH_ARGUMENTS_D018C)} path-argument programs on the VM (identical to "
           f"legacy, D-018c for {len(PATH_ARGUMENTS_D018C)}), {len(REFUSED)} refused, {len(PARAM_DECL)} "
-          f"parameter-declaration programs "
+          f"parameter-declaration programs and {len(outer_cases())} outer-binding programs "
           f"identical to legacy and to the oracle; {len(failures)} failure(s)")
     return 1 if failures else 0
 

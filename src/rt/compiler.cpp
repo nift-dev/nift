@@ -276,13 +276,15 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     }
     // Code whose legacy meaning depends on the prepared evaluator is refused
     // before anything runs (rt/prepared.h).
-    const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan);
+    // The kinds are inferred first (stage 4: outer bindings of a parameter
+    // copy); the order of the refusals is unchanged.
+    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks);
+    const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
         result.offset = prepared.offset;
         return result;
     }
-    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks);
     if (!kinds.converged) {  // never compile with unsound kinds (review D1)
         result.reason = "analysis-limit:kinds";
         result.offset = ast.at(root).begin;

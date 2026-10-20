@@ -25,6 +25,9 @@ bug with NIFT_VM_MUTANT=n (src/rt/vm_mutants.h):
     path-argument ruling)
  11 a missing member in an admitted path argument gets the value wording
     (`value has no member: k`), not legacy's location wording
+ 12 (prepared analysis) a parameter copy `out := p` is admitted although a
+    binding p outside the function is double typed (stage 4, outer-binding
+    ruling)
 
 Each suite runs at a modest size: vm_int_bounds (every int opcode at the
 bounds, Python ints), vm_golden (pinned D-018 results), vm_review_cp12,
@@ -48,7 +51,8 @@ MUTANTS = {1: "Sub dispatched to Add in the checked table", 2: "large slow-path 
            5: "wrong error column", 6: "wrong index number in the index message",
            7: "wrong kinds in the assignment-type message", 8: "Mod fast path sign",
            9: "BindType ignores the text type register", 10: "path argument admitted whatever its kinds",
-           11: "value wording for a missing member in a path argument"}
+           11: "value wording for a missing member in a path argument",
+           12: "double-typed outer binding of a copied parameter admitted"}
 
 
 def suites(nift, rt_diff):
