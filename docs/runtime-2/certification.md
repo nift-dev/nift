@@ -360,3 +360,17 @@ the base); the non-docs diff against `9cf5cd0f` is empty, so the
 certification applies to the integrated tree. Evidence:
 `.claude-linode-runs/cp15/out.tgz` (certify log and per-target logs).
 Instance destroyed after the evidence was copied (confirmed by the API).
+
+## CP17 certified on Linode @90252d5 (2026-10-20)
+
+Base `a8efbd76` (CP15 integrated), tip `90252d5e`; `make certify` exit 0:
+
+    certify @ 90252d5: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 170
+
+SKIPPED-ENVIRONMENTAL: the same three root-only targets as CP13/CP15, each
+passing as unprivileged `tester`. An earlier run of the pre-rebase commit
+`6fea85ec` (base `975dbb1a`, without CP15) gave the same summary; it is not the
+integrated tree and is kept only as supporting evidence. Integration: rebased
+onto `runtime-2` (docs-only commits since `a8efbd76`); the non-docs tree equals
+`90252d5e`. Linux only. Evidence: `.claude-linode-runs/cp17r3/out.tgz`,
+`.claude-linode-runs/cp17cert/out.tgz` (pre-rebase run). Instances destroyed.

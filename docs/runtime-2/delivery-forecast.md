@@ -49,7 +49,7 @@ scheduled one.
 |---|---|---|
 | ~~CP15 phase A~~ | **integrated (certified @9cf5cd0)**; records20k follows | — |
 | feature-host-deps | rebase + targeted re-verification (waited ~18 h) | CP12B legacy module side; CP16 legacy side |
-| CP17 | adversarial review | CP16 swap |
+| ~~CP17~~ | **integrated (certified @90252d5)** | — (CP16 swap can proceed) |
 | CP12B (B1, chains, globals below compiler, VM module loader) | gates on rebased branch; compiler hookup after CP15 | CP12C |
 | CP16 | implementation; CP17 swap pending | CP20, CP24 |
 
