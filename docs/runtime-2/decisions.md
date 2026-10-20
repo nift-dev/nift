@@ -1123,3 +1123,14 @@ remain for identity-bearing resources only. (3) `same()` stays with L7, applying
 D-040 with old/new compatibility tests; no new decision. (4) CP15B slice 1 is its
 other D-036 reason: literal spellings and string interpolation. No corpus or
 acceptance criterion changes.
+
+### D-043 amendment: Linode budget US$20 (owner, 2026-10-20)
+
+The campaign's Linode ceiling is **US$20 total** committed spend (accrued plus
+live campaign instances to their TTL plus recorded external spend), replacing
+the US$10 ceiling. It is not an additional US$20. Necessary certification or
+development work does not stall when spend passes US$10; ask the owner before
+exceeding US$20. Existing controls are unchanged: inexpensive instance types,
+pinned host keys, TTLs, prompt deletion after evidence is retrieved (verified
+via the API), shared accounting across Claude and DeepSeek. Recorded in
+`scratchpad/infra/linode.py` (`BUDGET_USD = 20.0`).
