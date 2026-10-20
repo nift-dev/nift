@@ -485,3 +485,28 @@ longest targets were `test-rt-vm-mutants` 1840 s, then
 `test-build-boundary-nondestructive` (exclusive, about 22 min) and
 `test-runtime2-rt-diff-selftest` (about 11 min).
 
+## records20k (stage 4) certified on Linode @527b692 (2026-10-20)
+
+Base `5394557d`, tip `527b6924`:
+
+    certify @ 527b692: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 174
+
+g6-dedicated-4, `-j4`, 4678 s certify (the 2-vCPU stack run took 4361 s:
+four vCPUs did not shorten it, because the sequential `test-rt-vm-mutants`
+(2068 s) and the exclusive `test-build-boundary-nondestructive` (1552 s) set
+the critical path). Package snapshot b978a5a2… unchanged.
+
+Preflight: all six `precert.sh` targets passed individually on 527b6924, but
+the script did not exit successfully: it was edited in place mid-run (by the
+certifier) and stopped with a syntax error after `test-rt-vm`, before its
+unchanged-candidate check and closing line; HEAD and tree were verified
+unchanged by hand. (precert.sh now runs from a private copy.)
+
+records20k-specific evidence not covered by `make test`/certify: the agent's
+local runs on 527b6924 passed `vm_records20k` (n = 5k/10k/20k on the VM,
+byte-identical to legacy), `vm_records_coverage` (0 failures) and
+`vm_path_wording` (44 on the VM, 16 refused). The worker job `stage4h` on the
+pre-rebase tip fb6e265a did NOT run `vm_records20k` or the benchmark (job-script
+path error); those two are not claimed from it. Benchmark figures remain the
+stage4g ones (@fe20a9b0). Linux only. Evidence: `.claude-linode-runs/results/r20kcert/`.
+
