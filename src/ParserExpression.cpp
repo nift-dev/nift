@@ -988,7 +988,7 @@ bool Parser::execute_file_method(const nift::RuntimeValue& base,const std::strin
                             if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
                             const bool reading=m=="r"||m=="rw";std::string data;if(ex){switch(read_whole_file("open",f->path,data,error)){case WholeRead::Ok:break;case WholeRead::Limit:return false;case WholeRead::ReadFailed:if(reading)observe_failed_read(f->path);return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open: input failure",error);default:if(reading)observe_failed_read(f->path);return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);}
                             // feature-host-deps (D-028): "rw" reads the file too, so it is a dependency like "r".
-                            if(reading)observe_read(f->path,data);}
+                            if(reading){observe_read(f->path,data);if(!observing())host_.observe_dependency(f->path,data);}}
                             f->mode=m;f->existed_at_open=ex;if(m=="w"){f->saved=std::move(data);f->working.clear();f->saved_is_working=false;}else{f->working=std::move(data);f->saved.clear();f->saved_is_working=true;}f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
                         }
                         if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->saved_is_working=false;f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
