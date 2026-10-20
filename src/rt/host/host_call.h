@@ -53,6 +53,11 @@ public:
     // spawn: v1 `arg` is program and args joined by spaces, `res` the cwd as
     // spelled (legacy); v2 gets the argv array and the absolute cwd.
     void set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled, const std::string& cwd_absolute);
+    // file().open: the mode, known before the attempt (a failed "r"/"rw" open
+    // records a failed read; "w"/"a" do not read).
+    void set_open_mode(std::string mode) { open_mode_ = std::move(mode); }
+    // An output stream (ofstream): its open is not a read.
+    void set_output_stream() { output_stream_ = true; }
     // v1 result text for ops whose Pre line carries one (open: the mode; spawn: cwd).
     void set_pre_result(std::string res) { pre_res_ = std::move(res); }
 
@@ -73,6 +78,7 @@ private:
     std::string trace_arg() const;
     void emit_v2(const std::string& res, const std::string& err);
     void record(const Observation& obs);
+    void record_failure();
 
     HostCallEnv env_;
     HostOp op_;
@@ -82,6 +88,8 @@ private:
     std::string arg_;
     bool has_arg_ = false;
     std::string pre_res_;
+    std::string open_mode_;
+    bool output_stream_ = false;
     bool spawn_ = false;
     std::vector<std::string> argv_;
     std::string cwd_absolute_;

@@ -117,6 +117,7 @@ HostStatus HostCall::fail(HostStatus status, const HostError& error, std::string
     const auto& info = op_info(op_);
     if (env_.trace && begun_ && !refused_ && info.v1_point == TracePoint::PostAlways) env_.trace->emit_v1(info.v1_name, trace_arg(), v1_res);
     emit_v2("error", error_.code);
+    if (begun_ && !refused_ && status_ == HostStatus::Recoverable) record_failure();  // fatal/limit: the run ends (legacy records nothing)
     return status_;
 }
 
@@ -128,6 +129,7 @@ void HostCall::record(const Observation& obs) {
         case Recording::None: break;
         case Recording::Read: o->read(path, obs.bytes); break;
         case Recording::StreamedRead: o->streamed_read(path, obs.size, obs.hash); break;
+        case Recording::StreamOpen: if (!output_stream_) o->stream_open(path); break;
         case Recording::Presence:
             o->presence(path, obs.exists, obs.kind);
             if (obs.metadata && obs.exists && obs.kind == "file") o->metadata_read(path);
@@ -137,11 +139,29 @@ void HostCall::record(const Observation& obs) {
         case Recording::EnvironmentSnapshot: o->environment_snapshot(); break;
         case Recording::Platform: o->platform(obs.platform); break;
         case Recording::Written: o->written(path); break;
-        case Recording::OpenMode:
-            if (obs.open_mode == "r") o->read(path, obs.bytes);
-            else if (obs.open_mode == "rw") o->read_hash_only(path, obs.bytes);  // legacy (Q-H2); revisit with host-deps
+        case Recording::OpenMode: {
+            const std::string_view mode = obs.open_mode.empty() ? std::string_view(open_mode_) : obs.open_mode;
+            if (mode == "r" || mode == "rw") o->read(path, obs.bytes);  // "rw" reads the file too (D-028)
             break;
+        }
     }
+}
+
+// D-028: a read that failed is recorded too (absent when missing, unreadable
+// otherwise -- the observer decides which), so the page is rebuilt when the
+// path appears or becomes readable. Only read-class ops; a refusal by the
+// path policy is not a read attempt.
+void HostCall::record_failure() {
+    Observer* o = env_.observer;
+    if (!o || !resolved_) return;
+    bool reading = false;
+    switch (op_info(op_).recording) {
+        case Recording::Read: case Recording::StreamedRead: reading = true; break;
+        case Recording::StreamOpen: reading = !output_stream_; break;
+        case Recording::OpenMode: reading = open_mode_ == "r" || open_mode_ == "rw"; break;
+        default: break;
+    }
+    if (reading) o->failed_read(target_.path);
 }
 
 } // namespace nift::rt::host

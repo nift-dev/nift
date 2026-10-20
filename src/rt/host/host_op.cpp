@@ -28,7 +28,7 @@ constexpr HostOpInfo kOps[] = {
     {HostOp::EnvAll, "env-all", TP::Pre, "env-all", R::EnvironmentSnapshot},
     {HostOp::Spawn, "spawn", TP::Pre, "spawn", R::None},
     {HostOp::ReadBytes, nullptr, TP::None, "read-bytes", R::Read},             // D-028: recorded after host-deps
-    {HostOp::StreamOpen, nullptr, TP::None, "stream-open", R::StreamedRead},   // D-028: input streams at successful open
+    {HostOp::StreamOpen, nullptr, TP::None, "stream-open", R::StreamOpen},     // D-028: input streams at successful open
     {HostOp::StreamRead, nullptr, TP::None, "stream-read", R::None},
     {HostOp::StreamWrite, nullptr, TP::None, "stream-write", R::None},
     {HostOp::StreamClose, nullptr, TP::None, "stream-close", R::None},

@@ -38,7 +38,8 @@ struct SpyObserver : Observer {
         calls.push_back("presence " + p.generic_string() + " " + (exists ? "1 " : "0 ") + std::string(kind));
     }
     void read(const std::filesystem::path& p, std::string_view bytes) override { calls.push_back("read " + p.generic_string() + " " + std::to_string(bytes.size())); }
-    void read_hash_only(const std::filesystem::path& p, std::string_view) override { calls.push_back("hash " + p.generic_string()); }
+    void failed_read(const std::filesystem::path& p) override { calls.push_back("failed " + p.generic_string()); }
+    void stream_open(const std::filesystem::path& p) override { calls.push_back("stream_open " + p.generic_string()); }
     void streamed_read(const std::filesystem::path& p, std::uint64_t size, const std::uint64_t*) override { calls.push_back("streamed " + p.generic_string() + " " + std::to_string(size)); }
     void metadata_read(const std::filesystem::path& p) override { calls.push_back("metadata " + p.generic_string()); }
     void written(const std::filesystem::path& p) override { calls.push_back("written " + p.generic_string()); }
@@ -187,7 +188,7 @@ void test_hostcall_points() {
     CHECK(rf.status == HostStatus::Recoverable);
     CHECK(rf.v1.size() == 1);  // only the marker: no v1 line for a failed read
     CHECK(rf.v2.size() == 1 && rf.v2[0].find("\"res\":\"error\",\"err\":\"io.open_failed\"") != std::string::npos);
-    CHECK(rf.recorded.empty());
+    CHECK(rf.recorded.size() == 1 && rf.recorded[0] == "failed /work/dir/missing.txt");  // D-028: absent/unreadable
     // writes: v1 BEFORE the attempt, with empty res; a failed save is distinguishable only in v2 (Q-H10)
     auto w = run_op(HostOp::Save, "save", "out/../o.txt", false, "io.write_failed");
     CHECK(w.v1.size() == 3 && w.v1[0] == "{\"ctx\":\"script\",\"op\":\"save\",\"arg\":\"/work/dir/o.txt\",\"res\":\"\"}\n" && w.v1[1] == "--after--");
@@ -327,20 +328,32 @@ void test_recording_table() {
     ok(HostOp::Spawn, nullptr, Observation());  // processes record nothing
     ok(HostOp::Mkdir, "d", Observation());
     const std::vector<std::string> expected = {
-        "read /work/dir/r.txt 5", "hash /work/dir/rw.txt", "read /work/dir/r2.txt 3", "presence /work/dir/nope 0 ",
-        "listing dir:/work/dir", "env NAME=v", "snapshot", "platform linux", "streamed /work/dir/s.txt 42", "written /work/dir/d"};
+        "read /work/dir/r.txt 5", "read /work/dir/rw.txt 3", "read /work/dir/r2.txt 3", "presence /work/dir/nope 0 ",
+        "listing dir:/work/dir", "env NAME=v", "snapshot", "platform linux", "stream_open /work/dir/s.txt", "written /work/dir/d"};
     CHECK(observer.calls == expected);
-    // failures record nothing
+    // D-028: a failed read is recorded (absent/unreadable); failed writes,
+    // output streams, w/a opens and fatal failures are not
     observer.calls.clear();
-    {
-        HostCall call(env, HostOp::Read, "open");
-        call.resolve("x");
+    auto fail_op = [&](HostOp op, const char* raw, const char* code, HostStatus st, const char* mode, bool output) {
+        HostCall call(env, op, "b");
+        call.resolve(raw);
+        if (mode) call.set_open_mode(mode);
+        if (output) call.set_output_stream();
         call.begin();
         HostError e;
-        make_error(e, "io.open_failed", "open: cannot open path");
-        call.fail(HostStatus::Recoverable, e);
-    }
-    CHECK(observer.calls.empty());
+        make_error(e, code, "b: failed");
+        call.fail(st, e);
+    };
+    fail_op(HostOp::Read, "x", "io.open_failed", HostStatus::Recoverable, nullptr, false);
+    fail_op(HostOp::Open, "o1", "io.open_failed", HostStatus::Recoverable, "rw", false);
+    fail_op(HostOp::Open, "o2", "io.open_failed", HostStatus::Recoverable, "w", false);
+    fail_op(HostOp::StreamOpen, "in.txt", "stream.open_failed", HostStatus::Recoverable, nullptr, false);
+    fail_op(HostOp::StreamOpen, "out.txt", "stream.open_failed", HostStatus::Recoverable, nullptr, true);
+    fail_op(HostOp::ReadBytes, "b.bin", "io.read_failed", HostStatus::Recoverable, nullptr, false);
+    fail_op(HostOp::Save, "s", "io.write_failed", HostStatus::Recoverable, nullptr, false);
+    fail_op(HostOp::Read, "big", "limit.exceeded", HostStatus::Limit, nullptr, false);
+    const std::vector<std::string> failed = {"failed /work/dir/x", "failed /work/dir/o1", "failed /work/dir/in.txt", "failed /work/dir/b.bin"};
+    CHECK(observer.calls == failed);
     // standalone (null observer): nothing, no crash
     HostCallEnv none{nullptr, nullptr, &policy};
     HostCall call(none, HostOp::Read, "open");
@@ -517,14 +530,14 @@ void test_stdin_file_and_request() {
     CHECK(observer.calls.size() == 1 && observer.calls[0] == "read " + canon + " 6");  // dependency recorded
     CHECK(sink.lines.size() == 1 && sink.lines[0] == "{\"ctx\":\"script\",\"op\":\"read\",\"arg\":\"" + canon + "\",\"res\":\"6\"}\n");
     observer.calls.clear();
-    // missing / directory: catchable io.open_failed, nothing recorded
+    // missing / directory: catchable io.open_failed, recorded as failed reads (D-028)
     CHECK(read_stdin_file(env, "nope.txt", ctx, bytes, e) == HostStatus::Recoverable && e.code == "io.open_failed" && catchable(e.code));
     CHECK(e.message == "run: cannot open stdin file nope.txt");
     CHECK(read_stdin_file(env, "real", ctx, bytes, e) == HostStatus::Recoverable && e.message == "run: cannot open stdin file real: it is a directory");
     // read limit: loud, never truncated
     CHECK(read_stdin_file(env, "big.txt", ctx, bytes, e) == HostStatus::Limit && e.code == "limit.exceeded" && bytes.empty());
     CHECK(e.message == "run: stdin file big.txt exceeds the read limit of 4096 bytes (NIFT_READ_LIMIT)");
-    CHECK(observer.calls.empty());
+    CHECK(observer.calls.size() == 2 && observer.calls[0] == "failed " + d + "/nope.txt" && observer.calls[1].rfind("failed ", 0) == 0);
     // --fs-root policy (checked on the canonical path)
     PathPolicy rooted = policy;
     rooted.allow = [&](const std::filesystem::path& p, std::string& reason) {

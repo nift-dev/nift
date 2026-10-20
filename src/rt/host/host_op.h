@@ -33,14 +33,15 @@ enum class TracePoint : std::uint8_t {
 enum class Recording : std::uint8_t {
     None,
     Read,          // dependency + content hash
-    StreamedRead,  // dependency + streamed hash (sha256_file; file-backed streams, D-028)
+    StreamedRead,  // dependency + streamed hash (sha256_file)
+    StreamOpen,    // file-backed input stream opened: dependency, hashed at open (D-028)
     Presence,      // reqs/kinds, or absent; plus metadata_read when the payload asks (stat() on a file)
     Listing,       // listing fingerprint (dir:/glob: key)
     Environment,   // environment[name]
     EnvironmentSnapshot,
     Platform,
     Written,       // drops the path from observations
-    OpenMode,      // file().open(mode): r -> Read; rw -> hash only (legacy, code reading); w/a -> None
+    OpenMode,      // file().open(mode): r and rw -> Read (D-028); w, a -> None
 };
 
 struct HostOpInfo {

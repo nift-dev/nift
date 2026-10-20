@@ -222,47 +222,21 @@ Not run (deferred, §2): `auto_superseded_pass`, `build_page_unwaited`,
 unchanged as acceptance fixtures for the VM wiring (D-030); they need the
 `run()` native to run on the VM.
 
-## 4. Handles: the temporary stand-in and CP17
+## 4. Handles: on CP17's table (swap done)
 
-CP17 committed its table on `runtime-2-cp17-dev` during this slice
-(`344108c`, `11e98d2`: `src/rt/handles/`, uncertified, not on `runtime-2`).
-Its interface **fits** the process hook:
+CP17 was integrated on `runtime-2` @`02fab6c5` and feature-host-deps
+@`2d191e6b`; CP16 was rebased once onto `2d191e6b` and the swap was made in
+`src/rt/host/process_handles.{h,cpp}` (the only file that sees both sides).
+The temporary stand-in (`handle_adapter_tmp.*`) and the scratch swap test are
+deleted; no competing ownership or lifecycle mechanism remains in the Host
+layer. §8 describes the interface as implemented.
 
-* `KindSpec{"process", hook, "process.detach_in_build"}`, the hook receives
-  `CleanupEvent{kind, handle, owner, reason, resource}` and may keep the
-  resource to finish asynchronously; `ReleaseReason` {Explicit, Abandoned,
-  ContextEnd, Shutdown} maps one to one onto `ProcessRelease`.
-* Counted handles + `HandleRef` give abandonment; `detach()` is refused in
-  the build family with the per-kind code.
-
-What CP17's event does not carry (the context's label for the warning text,
-and whether the context ended on an error, §11.3 "no extra warning") is
-supplied by CP16's own context-end path (`ContextCleanup`), which is also
-where CP17's note asks CP16 to wait once per context. Detach-in-build is
-checked before launching from the context kind CP16 itself opens (CP17's
-integration step 3), so nothing is launched and then refused. The root-context
-orphan sweep runs in that same path after `close_context()`. None of these
-needs a CP17 change.
-
-Evidence: a scratch merge of `runtime-2-cp17-dev` into this branch (clean
-merge) with `tests/runtime2/cp16/cp17-swap/host_cp17_binding.cpp` registering
-the unchanged hook body on the real `HandleTable`: abandonment via
-`HandleRef`, three-group context end waited once, build-family detach refused,
-detached handle untouched by `shutdown()` — 27 checks, 0 failures under
-ASan+UBSan.
-
-The stand-in (`handle_adapter_tmp.{h,cpp}`) copies CP17's vocabulary, is
-used by tests only, and is deleted in the swap commit: rename
-`tmp_handles::` → `handles::`, `TemporaryTable` → `HandleTable`, move the
-binding test into `tests/rt/`. The swap is not committed here because CP17's
-code is not on `runtime-2` yet (committing it would make this branch carry
-CP17's uncertified history).
-
-CP17 added `HandleTable::context_in_build()` (@fbdca07) on request; the swap
-sets `RunRequestContext::in_build` from it, so detach-in-build is refused
-before anything is launched. D-034 item 7: the swap stays uncommitted until
-CP17 is integrated. The swap test was updated for `ContextCleanup::wait()`
-now returning the list of cleanup failures.
+Also aligned with host-deps (D-028) for the coming PageObserver: `rw` opens
+are dependencies like `r`; file-backed input streams record at open; a
+recoverable read failure records the path (absent or unreadable); HostCall
+always calls the observer it is given, so hook and standalone contexts can
+keep reporting `file().open` reads to the host (legacy c7971365). The
+observer itself is still interface-only (no CP16 code reroutes legacy reads).
 
 ## 5. Owner answers (D-034) and where they are implemented
 
@@ -481,7 +455,7 @@ job (2026-10-19 23:14–23:40):
 No tagged test process survived any run. The flake (test scan racing
 `execve()`) and the subreaper zombie defect are closed on this evidence.
 
-## 8. Lifecycle authority: CP16 reports, CP17 decides (to settle at integration)
+## 8. Lifecycle authority: CP16 reports, CP17 decides (implemented)
 
 Owner rule: CP17 owns handle identity, reference counts, context ownership and
 the authoritative lifecycle state (`Active → Terminating → Completed | Failed |
@@ -494,8 +468,8 @@ D-039, review fixes R1–R14: `CompletionTicket`, `begin_termination`,
 **1. Host-side seam (CP16, no CP17 types in `src/rt/host/`).**
 
 ```cpp
-// Set by the binding when the group gets a handle. The process layer calls it
-// without holding the group's lock (the table has its own).
+// Implemented in process.h (enum OsTermination, struct OsOutcome, class
+// LifecycleSink). The process layer calls it without holding the group's lock.
 struct LifecycleSink {
     virtual ~LifecycleSink() = default;
     // CP16 itself starts termination while the handle stays open: deadline
@@ -513,7 +487,7 @@ struct OsOutcome {
     bool members_survived;           // leftover group members still present after SIGKILL + bound
     std::string detail;              // "process 'x' (pid N) ..." for the report
 };
-void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
+void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>, bool replay = true);
 ```
 
 **2. Binding (the swap commit; CP16 code that sees both sides).**
@@ -563,16 +537,24 @@ void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>);
   the same hook (the residue is cleaned up and settled through a ticket like
   any other).
 
-**3. What moves out of CP16 at the swap (no competing mechanism).**
+**3. What moved out of CP16 at the swap (no competing mechanism).**
 
-| CP16 today | After the swap |
+| CP16 before | Now |
 |---|---|
 | `handle_adapter_tmp.*` (stand-in table) | deleted; `handles::HandleTable` |
-| `ProcessGroup::cleanup_failed()`, `GroupState::Lost` used as a verdict | remain OS facts in the result object only; the lifecycle verdict is CP17's `LifeState` |
-| `ContextCleanup::wait()` (one deadline per context end) and its failure list | `close_context()` waits for every obligation (its report is final); CP16 keeps `ContextCleanup` only as the thread-local carrier of the context label and "ended on an error" for the routine warning (CP17's event has neither) |
-| `runtime::report_cleanup_failure` / failure sink | replaced by `CloseReport::failures`, printed by the context-end path after the original error; exit status from `CloseReport::final_exit_status(original)` (D-035: a cleanup failure forces a nonzero exit; an earlier error or 130/143 stays primary) |
-| reaper adoption of abandoned groups | unchanged mechanism (the reaper keeps the group alive and drives it), but completion goes through the moved-out ticket |
-| routine warnings ("still running when … ended", "abandoned while running") | unchanged, CP16's (D-030) |
+| `ProcessGroup::cleanup_failed()`, `GroupState::Lost` | OS facts in the result object only; the verdict is CP17's `LifeState` (`completed` / `lost` `process.lost` / `alive_after_kill` `process.alive_after_kill`) |
+| `ContextCleanup` (label, error flag, one wait per context end, failure list) | deleted: `close_context(id, on_error)` waits for every obligation; `CleanupEvent::context_label` / `context_error` drive the routine warning |
+| `runtime::report_cleanup_failure` / failure sink, settle notifications | deleted: `CloseReport::failures`, `final_exit_status(original)` (D-035) |
+| reaper adoption of abandoned groups | unchanged mechanism; completion through the moved-out ticket |
+| routine warnings | unchanged, CP16's (D-030) |
+
+Implementation details settled during the swap: the hook never blocks (it
+moves the ticket out, starts termination, adopts the group into the reaper
+and returns `pending()`); the group -> sink -> group reference cycle is broken
+when the ticket completes; a run() residue attaches its sink without replay
+(`set_lifecycle_sink(sink, false)`), so the call's own exit does not complete
+the residue's lifecycle before its context ends (found by the
+`alive_after_kill` test); a refused detach cancels the process at once.
 
 **4. D-035 items in the swap.** Reference-counted abandonment: started
 (`interactive`) and `detached` handles are created with
@@ -583,7 +565,7 @@ CP17's `Closed` status to `runtime.handle_closed`; CP16's
 still-open handle. Cleanup failure → nonzero exit: via
 `final_exit_status`, never by CP16 directly.
 
-**5. Open points for integration.** (a) CP17's `CleanupEvent` could carry the
-context's kind/label and whether it ended on an error, which would retire the
-thread-local `ContextCleanup`; (b) whether `members_survived` is `Failed` or
-`Lost` (proposed above: Failed, because the processes are known to be alive).
+**5. Integration points, settled.** (a) CP17's `CleanupEvent` carries the
+context label and error flag (owner, D-035): `ContextCleanup` is gone. (b)
+Members alive after SIGKILL map to `Failed` (`alive_after_kill`), an
+unconfirmed stage to `Lost` (owner).
