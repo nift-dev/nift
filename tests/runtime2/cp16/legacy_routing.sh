@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 ulimit -f 1048576
-ulimit -v 4194304
+[ "${NIFT_SANITIZED:-0}" = 1 ] || ulimit -v 4194304   # sanitizer builds reserve large shadow mappings
 cd "$W" || exit 2
 fail=0
 ok() { echo "PASS $1"; }
