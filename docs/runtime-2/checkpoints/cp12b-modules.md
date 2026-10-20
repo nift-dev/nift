@@ -231,7 +231,8 @@ print(o.k.stringify())    // legacy: [1,9]
 Legacy (runtime-2 @217ac21b): `p1` (`f(o.k)` read-only) prints `1`, `p2`
 prints `[1,9]`, `p3` (`print(o.k)`) prints `1`. The refusal reason will be
 `path-in-call-argument:imported` until a module-location model lifts it; the
-probes become fixtures with the import hookup.
+probes are fixtures `import_path_read`, `import_path_write`,
+`import_path_print` (modules-d041; legacy agrees with all three).
 
 ### Temporary scaffolding: `import-reinitialised` (removal item)
 
@@ -252,7 +253,7 @@ from an engine**; run by `tests/runtime2/modules_d041.py --nift <binary>`.
 `--legacy-today` checks that the fixtures marked `agrees` pass on today's
 legacy and those marked `differs` (with the register entry) still fail, so
 the specification stays honest until legacy implements initialise-once.
-Today: legacy-today PASS (19 fixtures: 8 agree, 11 differ as recorded).
+Today: legacy-today PASS (22 fixtures: 11 agree, 11 differ as recorded).
 
 | Fixture | D-041 expectation | Today's legacy |
 | --- | --- | --- |

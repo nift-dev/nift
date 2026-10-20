@@ -172,6 +172,7 @@ void check_d041_fixtures() {
         {"stateful_array_binding", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
         {"repeated_binding", "ok"}, {"reexport_binding", "ok"}, {"module_fn_lexical", "ok"},
         {"doc_math", "ok"}, {"doc_try_import", "import-nested"},
+        {"import_path_read", "ok"}, {"import_path_write", "ok"}, {"import_path_print", "ok"},
     };
     for (const auto& e : expect) {
         const Planned p = plan(root.copy(kD041 / e.fixture / "p", e.fixture), InitPolicy::OncePerContext);

@@ -1,0 +1,14 @@
+{
+ "about": "A path rooted at an imported binding passed to a function that only reads it.",
+ "legacy": "agrees",
+ "steps": [
+  {
+   "run": [
+    "main.f"
+   ],
+   "stdout": "1\n",
+   "stderr": "",
+   "exit": 0
+  }
+ ]
+}
