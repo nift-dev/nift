@@ -56,7 +56,8 @@ public:
     void set_arg(std::string arg) { arg_ = std::move(arg); has_arg_ = true; }
     // spawn: v1 `arg` is program and args joined by spaces, `res` the cwd as
     // spelled (legacy); v2 gets the argv array and the absolute cwd.
-    void set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled, const std::string& cwd_absolute);
+    void set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled,
+                   const std::string& cwd_absolute);
     // file().open: the mode, known before the attempt (a failed "r"/"rw" open
     // records a failed read; "w"/"a" do not read).
     void set_open_mode(std::string mode) { open_mode_ = std::move(mode); }

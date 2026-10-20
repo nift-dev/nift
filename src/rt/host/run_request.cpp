@@ -46,8 +46,9 @@ HostStatus read_stdin_file(const HostCallEnv& env, const std::string& raw, const
         if (n > 0) {
             if (static_cast<std::uint64_t>(bytes.size()) + static_cast<std::uint64_t>(n) > context.read_limit) {
                 bytes.clear();
-                make_error(error, "limit.exceeded", b + ": stdin file " + raw + " exceeds the read limit of " +
-                                                        std::to_string(context.read_limit) + " bytes (NIFT_READ_LIMIT)");
+                make_error(error, "limit.exceeded",
+                           b + ": stdin file " + raw + " exceeds the read limit of " +
+                               std::to_string(context.read_limit) + " bytes (NIFT_READ_LIMIT)");
                 return call.fail(HostStatus::Limit, error);
             }
             bytes.append(chunk, static_cast<std::size_t>(n));

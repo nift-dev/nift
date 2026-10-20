@@ -98,7 +98,16 @@ struct StageResult {
     long pid = -1;
 };
 
-enum class GroupState : std::uint8_t { Running, Exited, LaunchFailed, Cancelled, TimedOut, LimitExceeded, Lost, Detached };
+enum class GroupState : std::uint8_t {
+    Running,
+    Exited,
+    LaunchFailed,
+    Cancelled,
+    TimedOut,
+    LimitExceeded,
+    Lost,
+    Detached
+};
 const char* group_state_name(GroupState state);
 
 struct ProcessResult {
@@ -115,7 +124,8 @@ struct ProcessResult {
     bool lost = false;
     int signal = 0;                       // the last stage's terminating signal, if any
     std::string capture_limit_exceeded;   // "stdout" / "stderr" when the capture limit was reached
-    std::string limit_message;            // "<builtin>: captured stdout of <prog> exceeds the read limit of N bytes (NIFT_READ_LIMIT)"
+    std::string
+        limit_message;  // "<builtin>: captured stdout of <prog> exceeds the read limit of N bytes (NIFT_READ_LIMIT)"
     // stdin delivery (StdinMode::Text and Interactive writes). An early exit
     // or a closed stdin is not an error: `stdin_complete` is false and the
     // process result is kept. `stdin_error` is set only for a genuine
@@ -248,7 +258,8 @@ public:
 
 private:
     explicit ProcessGroup(std::unique_ptr<State> state);
-    static std::shared_ptr<ProcessGroup> start_impl(SpawnRequest request, HostStatus& status, HostError& error, bool arm);
+    static std::shared_ptr<ProcessGroup> start_impl(SpawnRequest request, HostStatus& status, HostError& error,
+                                                    bool arm);
     std::unique_ptr<State> s_;
 };
 

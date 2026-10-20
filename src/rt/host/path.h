@@ -41,7 +41,7 @@ struct PathPolicy {
 
 // Returns Ok and fills `out`, or Fatal (`runtime.invalid_operation`,
 // "<builtin>: <reason>") when the policy refuses the path.
-HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out, HostError& error,
-                        PathSemantics semantics = PathSemantics::Lexical);
+HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out,
+                        HostError& error, PathSemantics semantics = PathSemantics::Lexical);
 
 } // namespace nift::rt::host

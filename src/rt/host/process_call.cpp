@@ -14,8 +14,8 @@ std::string absolute_cwd(const std::string& spelled) {
 }
 } // namespace
 
-std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status, HostError& error,
-                                           bool wait_at_once) {
+std::shared_ptr<ProcessGroup> start_traced(const HostCallEnv& env, SpawnRequest request, HostStatus& status,
+                                           HostError& error, bool wait_at_once) {
     const std::string builtin = request.builtin;
     status = ProcessGroup::validate(request, error);
     if (status != HostStatus::Ok) {

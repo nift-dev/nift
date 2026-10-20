@@ -44,7 +44,8 @@ handles::CleanupOutcome process_hook(handles::CleanupEvent& event) {
 
 handles::CleanupOutcome ProcessResource::outcome_for(const OsOutcome& facts) {
     if (facts.stage_unconfirmed) return handles::CleanupOutcome::lost("process.lost", facts.detail);
-    if (facts.members_survived) return handles::CleanupOutcome::alive_after_kill("process.alive_after_kill", facts.detail);
+    if (facts.members_survived)
+        return handles::CleanupOutcome::alive_after_kill("process.alive_after_kill", facts.detail);
     return handles::CleanupOutcome::completed();
 }
 
@@ -66,7 +67,8 @@ void ProcessResource::terminating(OsTermination cause) {
     handles::CompletionTicket ticket;
     handles::TerminationStart info;
     // Closed / already terminating / detached: no ticket; termination happens once.
-    if (table->begin_termination(handle, HandleKind::Process, cause_of(cause), ticket, &info) == HandleStatus::Ok && info.started)
+    if (table->begin_termination(handle, HandleKind::Process, cause_of(cause), ticket, &info) == HandleStatus::Ok &&
+        info.started)
         take_ticket(std::move(ticket));
 }
 
@@ -105,8 +107,8 @@ HandleStatus register_process_kind(handles::HandleTable& table) {
     return table.register_typed_kind<ProcessResource>(HandleKind::Process, std::move(spec));
 }
 
-HandleStatus create_process_handle(handles::HandleTable& table, handles::ContextId context, const ProcessGroupPtr& group,
-                                   Value& out) {
+HandleStatus create_process_handle(handles::HandleTable& table, handles::ContextId context,
+                                   const ProcessGroupPtr& group, Value& out) {
     auto resource = std::make_shared<ProcessResource>(group);
     handles::CreateOptions options;
     options.counted = true;  // abandonment by reference count (D-035); detachable (R14)
@@ -117,8 +119,8 @@ HandleStatus create_process_handle(handles::HandleTable& table, handles::Context
     return HandleStatus::Ok;
 }
 
-HandleStatus create_detached_handle(handles::HandleTable& table, handles::ContextId context, const ProcessGroupPtr& group,
-                                    Value& out) {
+HandleStatus create_detached_handle(handles::HandleTable& table, handles::ContextId context,
+                                    const ProcessGroupPtr& group, Value& out) {
     auto resource = std::make_shared<ProcessResource>(group);
     handles::CreateOptions options;
     options.counted = true;  // only counted handles can be detached (R14)
@@ -144,7 +146,8 @@ HandleStatus register_run_residue(handles::HandleTable& table, handles::ContextI
     if (!group || group->detached() || !group->has_live_members()) return HandleStatus::Ok;
     auto resource = std::make_shared<ProcessResource>(group);
     Value handle;
-    const HandleStatus status = table.create(context, HandleKind::Process, resource, handle);  // uncounted: never script-visible
+    const HandleStatus status =
+        table.create(context, HandleKind::Process, resource, handle);  // uncounted: never script-visible
     if (status != HandleStatus::Ok) return status;
     resource->bind(&table, handle);
     group->set_lifecycle_sink(resource, false);  // the call's own exit is not this resource's lifecycle
@@ -152,7 +155,8 @@ HandleStatus register_run_residue(handles::HandleTable& table, handles::ContextI
     return HandleStatus::Ok;
 }
 
-HandleStatus cancel_process(handles::HandleTable& table, const Value& handle, handles::ContextId accessor, bool& anything) {
+HandleStatus cancel_process(handles::HandleTable& table, const Value& handle, handles::ContextId accessor,
+                            bool& anything) {
     anything = false;
     std::shared_ptr<ProcessResource> resource;
     const HandleStatus status = table.resolve_as(handle, HandleKind::Process, accessor, resource);

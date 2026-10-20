@@ -1,4 +1,5 @@
 #include "rt/host/host_trace.h"
+// rt-lint: cold-file parses NIFT_TRACE_HOST_VERSION once per process
 
 #include "HostTrace.h"
 
@@ -58,7 +59,8 @@ TraceChannel& TraceChannel::process_default() {
     return channel;
 }
 
-std::string TraceChannel::format_v1(const std::string& ctx, const char* op, const std::string& arg, const std::string& res) {
+std::string TraceChannel::format_v1(const std::string& ctx, const char* op, const std::string& arg,
+                                    const std::string& res) {
     std::string line = "{\"ctx\":";
     append_string(line, ctx);
     line += ",\"op\":\"";

@@ -1,3 +1,5 @@
+// CP16 Host layer: printable names of process-model states.
+#include "rt/host/process_common.h"
 #include "rt/host/process.h"
 #include "rt/host/process_runtime.h"
 
@@ -33,13 +35,18 @@ const char* group_state_name(GroupState state) {
 HostStatus ProcessGroup::validate(const SpawnRequest& req, HostError& error) {
     const std::string& b = req.builtin;
     if (runtime::shutting_down())
-        return make_error(error, "host.shutting_down", b + ": Nift is shutting down (signal received); no new process is started");
+        return make_error(error, "host.shutting_down",
+                          b + ": Nift is shutting down (signal received); no new process is started");
     if (req.stages.empty()) return make_error(error, "runtime.invalid_argument", b + ": empty pipeline");
     if (req.mode == OutputMode::Detached) {
         if (req.in_build)
-            return make_error(error, "process.detach_in_build", b + ": a detached process is not allowed during a build (use a standalone script)");
-        if (req.timeout) return make_error(error, "runtime.invalid_argument", b + ": deadline is not allowed for a detached process");
-        if (req.stages.size() > 1) return make_error(error, "process.unsupported", b + ": a detached pipeline is not supported");
+            return make_error(error, "process.detach_in_build",
+                              b + ": a detached process is not allowed during a build (use a standalone script)");
+        if (req.timeout)
+            return make_error(error, "runtime.invalid_argument",
+                              b + ": deadline is not allowed for a detached process");
+        if (req.stages.size() > 1)
+            return make_error(error, "process.unsupported", b + ": a detached pipeline is not supported");
     }
     return HostStatus::Ok;
 }

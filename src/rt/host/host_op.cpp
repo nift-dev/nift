@@ -30,7 +30,7 @@ constexpr HostOpInfo kOps[] = {
     // D-028 (host-deps): open_bytes() and sha256_file() are traced `read`
     // and recorded as dependencies, hashed from the streamed bytes.
     {HostOp::ReadBytes, "read", TP::PostOk, "read-bytes", R::StreamedRead},
-    {HostOp::StreamOpen, nullptr, TP::None, "stream-open", R::StreamOpen},     // D-028: input streams at successful open
+    {HostOp::StreamOpen, nullptr, TP::None, "stream-open", R::StreamOpen},  // D-028: input streams at successful open
     {HostOp::StreamRead, nullptr, TP::None, "stream-read", R::None},
     {HostOp::StreamWrite, nullptr, TP::None, "stream-write", R::None},
     {HostOp::StreamClose, nullptr, TP::None, "stream-close", R::None},

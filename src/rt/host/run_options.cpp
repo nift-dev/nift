@@ -1,4 +1,5 @@
 #include "rt/host/run_options.h"
+// rt-lint: cold-file run() option parsing, once per call, never on the VM dispatch path
 
 #include <algorithm>
 #include <cmath>
@@ -30,7 +31,8 @@ std::size_t edit_distance(std::string_view a, std::string_view b) {
         for (std::size_t j = 1; j <= m; ++j) {
             const std::size_t cost = a[i - 1] == b[j - 1] ? 0 : 1;
             d[i][j] = std::min({d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost});
-            if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]) d[i][j] = std::min(d[i][j], d[i - 2][j - 2] + 1);
+            if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1])
+                d[i][j] = std::min(d[i][j], d[i - 2][j - 2] + 1);
         }
     }
     return d[n][m];
@@ -105,14 +107,16 @@ HostStatus parse_stdin(const OptionValue& value, const std::string& b, StdinOpti
     if (value.type != OptionValue::Type::Object)
         return bad(std::string("stdin must be ") + kStdinForms + ", not " + describe(value));
     if (value.keys.size() != 1)
-        return bad(std::string("stdin object must have exactly one key, \"file\" or \"text\" (got ") + std::to_string(value.keys.size()) + ")");
+        return bad(std::string("stdin object must have exactly one key, \"file\" or \"text\" (got ") +
+                   std::to_string(value.keys.size()) + ")");
     const std::string& key = value.keys[0];
     const OptionValue& v = value.values[0];
     static const std::vector<std::string> forms = {"file", "text"};
     if (key != "file" && key != "text") {
         const std::string suggestion = suggest_option(key, forms);
         std::string message = "unknown stdin form '" + key + "'";
-        message += suggestion.empty() ? std::string(" (forms: {\"file\": path}, {\"text\": string})") : " (did you mean '" + suggestion + "'?)";
+        message += suggestion.empty() ? std::string(" (forms: {\"file\": path}, {\"text\": string})")
+                                      : " (did you mean '" + suggestion + "'?)";
         return bad(message);
     }
     if (v.type != OptionValue::Type::String) {
@@ -187,7 +191,8 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
     const auto& in = options.stdin_source;
     if (in.given && options.mode == RunMode::Interactive)
         return bad("stdin is not allowed in mode interactive (the process reads what write() sends)");
-    if (in.given && options.mode == RunMode::Detached && (in.kind == StdinOption::Kind::Inherit || in.kind == StdinOption::Kind::Text))
+    if (in.given && options.mode == RunMode::Detached &&
+        (in.kind == StdinOption::Kind::Inherit || in.kind == StdinOption::Kind::Text))
         return bad(std::string("stdin ") + (in.kind == StdinOption::Kind::Inherit ? "\"inherit\"" : "{\"text\": ...}") +
                    " is not allowed for a detached process (use \"null\" or {\"file\": path})");
     if (options.kill_after && !options.timeout &&
@@ -200,8 +205,9 @@ HostStatus parse_run_options(const OptionObject& object, std::string_view builti
 
 HostStatus check_run_context(const RunOptions& options, bool in_build, std::string_view builtin, HostError& error) {
     if (in_build && options.mode == RunMode::Detached)
-        return make_error(error, "process.detach_in_build",
-                          std::string(builtin) + ": a detached process is not allowed during a build (use a standalone script)");
+        return make_error(
+            error, "process.detach_in_build",
+            std::string(builtin) + ": a detached process is not allowed during a build (use a standalone script)");
     return HostStatus::Ok;
 }
 

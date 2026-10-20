@@ -653,22 +653,30 @@ them against the legacy launcher: exit codes, captures, exec failures 127,
 signals 137, pipelines' per-stage results, env/cwd/redirections/append).
 Differences, all deliberate:
 
-* **C3**: every call is its own process group; with terminal stdin the group
-  gets the terminal for the call, so Ctrl-C reaches the child, not Nift (as in
-  a shell).
-* **C1**: background members left in a call's group belong to the execution
-  context (one CP17 context per legacy parser, opened at the first residue,
-  `register_run_residue`). It ends at script end
-  (`finalize_script_resources`), page render end (`render()`) or parser
-  destruction; members are terminated silently; a genuine cleanup failure is
-  an error of the script/page (D-035: "process cleanup failed: ...").
+* **No C3/C1 for legacy run()** (`SpawnRequest::own_group = false`, remote
+  job cp16-phase2 item 4): the stages stay in Nift's process group, as the
+  legacy launcher left them. Two pinned contracts need exactly that:
+  rt-diff-selftest kills a timed-out entry's process group and expects
+  nothing left (a child in its own group survived it), and
+  test-consumer-snapshots' interrupt barrier expects a hook's child to
+  outlive a SIGKILL of Nift alone (it keeps the build lock). Only Nift's own
+  group satisfies both. Consequently there is no group to find leftover
+  background members by (C1) and no terminal handoff (C3) for legacy
+  `run()`; Nift signals its stages by pid. C1/C3 remain the default for the
+  Host layer's own `run()` options (VM natives). The C1 machinery for legacy
+  (one CP17 context per parser, closed at script end, render end and
+  destruction, `register_run_residue`) stays wired and is inert while
+  `own_group` is false. **Owner decision point:** C1/C3 for legacy run()
+  would need either a change to those two contracts or the subreaper
+  (adopted orphans found by parentage), which is deferred (job control).
 * **C2**: installed at the first managed launch when SIGTERM is at its default
+  (stages in Nift's group are terminated by pid)
   (SIGINT default or ignored: an ignored SIGINT, e.g. a shell background job,
   stays ignored); never in the interactive shell or under `--auto`'s own
   handler. A `run()` that returns while Nift is shutting down fails, so the
   script does not run on; Nift ends with the signal (143/130). Signal wake-up
   is a futex on Linux (no descriptor).
-* **No PDEATHSIG for legacy launches**: `test-consumer-snapshots`' interrupt
+* **No PDEATHSIG for legacy launches** (same reason): `test-consumer-snapshots`' interrupt
   barrier requires a hook's child to outlive a SIGKILLed Nift and keep the
   build lock. SIGKILL of Nift therefore behaves as before.
 * Low descriptors (CP07 "capture under `ulimit -n 6`" kept): the exec-failure
@@ -700,3 +708,14 @@ tool launches (`nift_run_process` callers outside `run()`/`cmd().run()`),
 | `engine_parity.py` (new, `make test`) | 153 cases, 0 differences, VM engaged in 0 (§9.2) |
 | `host_deps.py`, `dynamic_reads.sh`, `sha256_builtins.sh` | pass |
 | `test-consumer-snapshots` | interrupt barrier 6/6 after the PDEATHSIG decision; the suite itself has timing-sensitive cases that fail intermittently on this loaded host for the base binary too (`versions`, `fingerprint_migration`), so its verdict is taken from Linode |
+
+### 9.5 Remote job cp16-phase2 (671f2236): fixes
+
+| Item | Cause | Fix |
+|---|---|---|
+| 1 `deadline_races` (rt-host) | real race: a cleanup request on a finished group with nothing left in it made the group unsettled until the next pump, after its lifecycle had already completed (4/300 locally; 0/300 at slice 1, the cheaper `kill(-pgid, 0)` membership check changed the timing) | `begin_terminate()` settles such a group at once; 0/400 since |
+| 2 `proc_run` fixture | environmental expectation: `#!/nonexistent/interp` gives ENOTDIR on the capture host (`/nonexistent` is a file there) and ENOENT elsewhere, so both launchers (same logic) said "executable not found" here and "interpreter not found" on Linode | interpreter `$BASE/ext/missing-interp` (ENOENT everywhere); re-captured with the base binary |
+| 3 `test-sha256` SIGABRT | not reproduced locally (`make test-sha256` passes, SHA-NI host); no log available yet | rerun in the next job with its log copied |
+| 4 rt-diff-selftest leftovers | legacy run() children in their own group (C3) | §9.3: `own_group = false` for legacy run() |
+| 5 `test-rt-lint` | `src/rt/host` broke the CP09 lint (file and function size, own headers, line length, string compares) | `process_posix.cpp` split by concern (`process_posix_{sys,state,launch,loop,lifecycle}`), `process_runtime.cpp` split (`process_{loop,reaper,signals}`), headers for `process_common`/`process_win`, long lines wrapped, cold-file markers for option parsing, trace-version parsing and `HostCall` mode checks; `PASS rt-lint: 0 problem(s)` |
+| 6 rt-host-tsan | environment (worker 9 `vm.mmap_rnd_bits`) | rerun |

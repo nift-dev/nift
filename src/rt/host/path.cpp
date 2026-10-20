@@ -15,8 +15,8 @@ std::string Resolved::trace_path() const {
     return (ec ? path : absolute).lexically_normal().generic_string();
 }
 
-HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out, HostError& error,
-                        PathSemantics semantics) {
+HostStatus resolve_path(const PathPolicy& policy, std::string_view raw, std::string_view builtin, Resolved& out,
+                        HostError& error, PathSemantics semantics) {
     out.spelled = std::string(raw);
     out.open_path.clear();
     std::string expanded(raw);

@@ -15,6 +15,11 @@
 //    same signal (signal-derived exit status). Detached processes untouched.
 //  - Linux subreaper (PR_SET_CHILD_SUBREAPER) and the orphan sweep for root
 //    context ends (§11.9 row 3).
+//
+// This header holds the shared pieces (warnings, test hooks, signal
+// recording, /proc helpers) and includes the parts: process_loop.h (host
+// loop), process_reaper.h (reaper, termination index), process_signals.h
+// (C2, subreaper, orphan sweep).
 #include "rt/host/process.h"
 
 #include <atomic>
@@ -31,32 +36,6 @@ namespace nift::rt::host::runtime {
 using WarningSink = std::function<void(const std::string&)>;
 void set_warning_sink(WarningSink sink);  // empty: stderr
 void warn(const std::string& line);
-
-// ---- host loop (timers and one-shot fd watches) ----
-// One lazily started thread that sleeps in poll() until the nearest timer or
-// a watched descriptor becomes readable -- no periodic polling. Callbacks run
-// on the loop thread without the loop's lock held. Generic on purpose: CP22's
-// scheduler can take this over (or host it) without changing its users.
-using TaskId = std::uint64_t;
-TaskId loop_at(Clock::time_point when, std::function<void()> fn);  // one-shot timer (monotonic clock)
-TaskId loop_when_readable(int fd, std::function<void()> fn);      // one-shot; the loop owns `fd` and closes it
-void loop_cancel(TaskId id);                                       // no-op for fired/unknown ids
-std::size_t loop_pending();
-std::size_t loop_fd_count();  // descriptors the loop owns (wake pipe + fd watches), for leak checks
-
-// ---- reaper (built on the host loop) ----
-// Pids nobody waits for any more (Lost stages, detached processes adopted
-// under the subreaper, orphans) are reaped when their pidfd becomes readable
-// (fallback without pidfd: a 100 ms timer per pid). Adopted groups (abandoned
-// or explicitly released handles) are kept alive and driven to completion by
-// their own timers.
-void reaper_add_pid(long pid);
-void reaper_adopt(ProcessGroupPtr group);
-// Called by a group once settled; true if it was adopted (and is now released).
-bool reaper_release(const ProcessGroup* group);
-std::size_t reaper_pending();
-// Test support: waits (bounded) until the reaper has nothing left; returns true if idle.
-bool reaper_wait_idle(Millis bound);
 
 // ---- test hooks (only with -DNIFT_HOST_TEST_HOOKS; never user-controllable) ----
 #ifdef NIFT_HOST_TEST_HOOKS
@@ -83,62 +62,6 @@ void test_event(const void* group, const char* what, long a = 0, long b = 0, lon
 // group), so the test build can record it.
 int host_kill(long target, int sig, const char* site, const void* group);
 
-// ---- termination index (not ownership) ----
-struct IndexedGroup { long pgid = -1; std::vector<long> stage_pids; bool detached = false; };
-void index_add(const void* key, IndexedGroup group);
-void index_update_pids(const void* key, std::vector<long> unreaped_stage_pids);
-void index_remove(const void* key);
-std::vector<IndexedGroup> index_snapshot();
-
-// ---- C2: Nift receives SIGINT / SIGTERM ----
-struct SignalCleanupOptions {
-    Millis kill_after{2000};
-    Millis post_kill_wait{5000};
-    // Test hook: called instead of re-raising the signal (the default ends
-    // Nift with the signal's default action, so the exit status is 130/143).
-    std::function<void(int)> on_done;
-};
-bool install_signal_cleanup(SignalCleanupOptions options = SignalCleanupOptions());
-void uninstall_signal_cleanup();
-// True once SIGINT/SIGTERM arrived with the handler installed: Nift is
-// shutting down. From then on no new managed process is launched
-// (`host.shutting_down`) and HostCall refuses every externally visible op
-// (writes, spawns); the build engine checks the same flag before starting a
-// build or a page render (wiring later). Running code may continue to its
-// shutdown path while the watcher terminates the managed children (SIGTERM,
-// grace, SIGKILL, bounded wait); then Nift ends with the signal. If the
-// program exits first, an atexit handler waits for the watcher (bounded) and
-// re-raises, so the exit status is always signal-derived. This is a bounded
-// normal-shutdown guarantee only: SIGKILL or a crash runs none of it.
-bool termination_requested();
-bool shutting_down();
-void request_shutdown_for_test(int signo);  // marks shutting down without a signal (tests)
-void clear_shutdown_for_test();
-// Runs the C2 sequence synchronously (also used by the watcher thread).
-// Returns the number of groups that still had live members.
-std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait);
-
-// ---- subreaper and orphan sweep (Linux) ----
-bool enable_subreaper();   // false where unavailable
-bool subreaper_enabled();
-// Terminates and reaps processes reparented to Nift that belong to no
-// indexed group and to no detached session (sid), excluding pids for which
-// `foreign` returns true (children launched by other code, e.g. legacy job
-// control). Call at the end of a root context (script, build, --auto pass).
-// Returns the number of orphans terminated.
-std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait,
-                          const std::function<bool(long pid)>& foreign = nullptr);
-void note_detached_session(long sid);
-// Every process group the Host layer creates is noted, so adopted orphans
-// can be told apart from children launched by other code.
-void note_managed_pgid(long pgid);
-// Reaps zombie children that are adopted orphans (under the subreaper): a
-// process group Nift created, or a session other than Nift's (escapees,
-// detached sessions). Never an unreaped stage of a live group, never a
-// child of other code in Nift's own session and groups (no waitpid(-1)).
-// Runs on the host loop after SIGCHLD; returns how many were reaped.
-std::size_t reap_adopted_orphans();
-
 // ---- /proc helpers (Linux; empty elsewhere) ----
 struct ProcInfo { long pid = 0; char state = '?'; long ppid = 0; long pgrp = 0; long session = 0; };
 std::vector<ProcInfo> proc_scan();
@@ -149,3 +72,7 @@ std::vector<long> proc_descendants(const std::vector<long>& roots);
 std::vector<long> proc_group_members(long pgid, long session);
 
 } // namespace nift::rt::host::runtime
+
+#include "rt/host/process_loop.h"
+#include "rt/host/process_reaper.h"
+#include "rt/host/process_signals.h"

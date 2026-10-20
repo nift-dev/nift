@@ -38,9 +38,19 @@ struct OptionValue {
     std::vector<OptionValue> values;
     static OptionValue of_int(std::int64_t v) { OptionValue o; o.type = Type::Int; o.integer = v; return o; }
     static OptionValue of_number(double v) { OptionValue o; o.type = Type::Number; o.number = v; return o; }
-    static OptionValue of_string(std::string v) { OptionValue o; o.type = Type::String; o.text = std::move(v); return o; }
+    static OptionValue of_string(std::string v) {
+        OptionValue o;
+        o.type = Type::String;
+        o.text = std::move(v);
+        return o;
+    }
     static OptionValue of_bool(bool v) { OptionValue o; o.type = Type::Bool; o.boolean = v; return o; }
-    static OptionValue other(std::string name) { OptionValue o; o.type = Type::Other; o.type_name = std::move(name); return o; }
+    static OptionValue other(std::string name) {
+        OptionValue o;
+        o.type = Type::Other;
+        o.type_name = std::move(name);
+        return o;
+    }
     static OptionValue object(std::vector<std::pair<std::string, OptionValue>> members) {
         OptionValue o;
         o.type = Type::Object;

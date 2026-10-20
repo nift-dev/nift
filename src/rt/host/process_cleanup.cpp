@@ -11,7 +11,8 @@ CleanupReport process_cleanup(const ProcessGroupPtr& group, ProcessRelease reaso
     const std::string who = "process '" + group->argv0() + "' (pid " + std::to_string(group->pid()) + ")";
     if (reason == ProcessRelease::Abandoned || reason == ProcessRelease::Explicit) {
         const bool live = group->running();
-        group->cancel(CancelScope::Pipeline, reason == ProcessRelease::Abandoned ? CancelReason::Abandoned : CancelReason::Cleanup);
+        group->cancel(CancelScope::Pipeline,
+                      reason == ProcessRelease::Abandoned ? CancelReason::Abandoned : CancelReason::Cleanup);
         if (live) {
             report.live_stage_terminated = true;
             if (reason == ProcessRelease::Abandoned) {
@@ -24,8 +25,8 @@ CleanupReport process_cleanup(const ProcessGroupPtr& group, ProcessRelease reaso
         report.live_stage_terminated = outcome.live_stage_terminated;
         report.leftovers_terminated = outcome.leftovers_terminated;
         if (outcome.live_stage_terminated && !context_error) {
-            runtime::warn("warning: " + who + " was still running when " + (context_label.empty() ? std::string("its context") : context_label) +
-                          " ended; terminated");
+            runtime::warn("warning: " + who + " was still running when " +
+                          (context_label.empty() ? std::string("its context") : context_label) + " ended; terminated");
             report.warned = true;
         }
     }

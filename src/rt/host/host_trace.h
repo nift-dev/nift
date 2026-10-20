@@ -60,7 +60,8 @@ public:
     void emit_v1(const char* op, const std::string& arg, const std::string& res);
     void emit_v2(const TraceV2Record& record);
 
-    static std::string format_v1(const std::string& ctx, const char* op, const std::string& arg, const std::string& res);
+    static std::string format_v1(const std::string& ctx, const char* op, const std::string& arg,
+                                 const std::string& res);
     static std::string format_v2(const std::string& ctx, const TraceV2Record& record);
 
 private:

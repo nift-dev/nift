@@ -9,6 +9,7 @@
 // ProcessGroup entry point reports `process.unsupported` until the Windows
 // slice is implemented and certified in CI.
 #ifdef _WIN32
+#include "rt/host/process_win.h"
 #include "rt/host/process.h"
 
 #include <windows.h>
@@ -62,7 +63,8 @@ bool cancel_job(HANDLE job, DWORD first_stage_pid, DWORD grace_ms, DWORD bound_m
 // Detached: CREATE_BREAKAWAY_FROM_JOB | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
 // if the environment's job forbids breakaway, the caller warns that the
 // process will end with Nift's job (§11.9).
-constexpr DWORD kDetachedFlags = CREATE_BREAKAWAY_FROM_JOB | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_UNICODE_ENVIRONMENT;
+constexpr DWORD kDetachedFlags =
+    CREATE_BREAKAWAY_FROM_JOB | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_UNICODE_ENVIRONMENT;
 constexpr DWORD kManagedFlags = CREATE_SUSPENDED | CREATE_NEW_PROCESS_GROUP | CREATE_UNICODE_ENVIRONMENT;
 
 } // namespace win
@@ -100,7 +102,8 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
 std::shared_ptr<ProcessGroup> ProcessGroup::start(SpawnRequest req, HostStatus& status, HostError& error) {
     status = validate(req, error);
     if (status != HostStatus::Ok) return nullptr;
-    status = make_error(error, "process.unsupported", req.builtin + ": the Host process layer is not implemented on Windows yet");
+    status = make_error(error, "process.unsupported",
+                        req.builtin + ": the Host process layer is not implemented on Windows yet");
     return nullptr;
 }
 std::shared_ptr<ProcessGroup> ProcessGroup::start_for_wait(SpawnRequest req, HostStatus& status, HostError& error) {
@@ -113,8 +116,12 @@ ProcessResult ProcessGroup::run(SpawnRequest req, HostStatus& status, HostError&
 bool ProcessGroup::pump(std::optional<Clock::time_point>) { return true; }
 const ProcessResult& ProcessGroup::wait() { return s_->result; }
 bool ProcessGroup::cancel(CancelScope, CancelReason, std::optional<Millis>) { return false; }
-HostStatus ProcessGroup::write(std::string_view, HostError& error) { return make_error(error, "process.unsupported", "write: unsupported"); }
-HostStatus ProcessGroup::close_stdin(HostError& error) { return make_error(error, "process.unsupported", "close_stdin: unsupported"); }
+HostStatus ProcessGroup::write(std::string_view, HostError& error) {
+    return make_error(error, "process.unsupported", "write: unsupported");
+}
+HostStatus ProcessGroup::close_stdin(HostError& error) {
+    return make_error(error, "process.unsupported", "close_stdin: unsupported");
+}
 std::optional<std::string> ProcessGroup::read_line() { return std::nullopt; }
 std::optional<std::string> ProcessGroup::read(std::size_t) { return std::nullopt; }
 bool ProcessGroup::finished() const { return true; }
@@ -123,7 +130,9 @@ bool ProcessGroup::detached() const { return false; }
 GroupState ProcessGroup::state() const { return s_->result.state; }
 long ProcessGroup::pid() const { return -1; }
 long ProcessGroup::pgid() const { return -1; }
-std::string ProcessGroup::argv0() const { return s_->req.stages.empty() ? std::string() : s_->req.stages.front().program; }
+std::string ProcessGroup::argv0() const {
+    return s_->req.stages.empty() ? std::string() : s_->req.stages.front().program;
+}
 const SpawnRequest& ProcessGroup::request() const { return s_->req; }
 const ProcessResult& ProcessGroup::result() const { return s_->result; }
 std::vector<StageResult> ProcessGroup::stages() const { return s_->result.stages; }

@@ -1,4 +1,5 @@
 #include "rt/host/host_call.h"
+// rt-lint: cold-file one Host op per call (I/O-bound): mode names compared per open, never on the VM dispatch path
 
 #include "rt/host/process_runtime.h"
 
@@ -40,7 +41,8 @@ void HostCall::adopt(const std::filesystem::path& resolved) {
     resolved_ = true;
 }
 
-void HostCall::set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled, const std::string& cwd_absolute) {
+void HostCall::set_spawn(const std::vector<std::string>& argv, const std::string& cwd_spelled,
+                         const std::string& cwd_absolute) {
     spawn_ = true;
     argv_ = argv;
     std::string joined;
@@ -66,7 +68,8 @@ HostStatus HostCall::begin() {
     if ((op_is_write(op_) || op_ == HostOp::Spawn) && runtime::shutting_down()) {
         refused_ = true;
         HostError e;
-        make_error(e, "host.shutting_down", builtin_ + ": Nift is shutting down (signal received); nothing new is written or started");
+        make_error(e, "host.shutting_down",
+                   builtin_ + ": Nift is shutting down (signal received); nothing new is written or started");
         return fail(HostStatus::Fatal, e);
     }
     const auto& info = op_info(op_);
@@ -122,7 +125,8 @@ HostStatus HostCall::fail(HostStatus status, const HostError& error, std::string
         status_ = HostStatus::Internal;
     }
     const auto& info = op_info(op_);
-    if (env_.trace && begun_ && !refused_ && info.v1_point == TracePoint::PostAlways) env_.trace->emit_v1(info.v1_name, trace_arg(), v1_res);
+    if (env_.trace && begun_ && !refused_ && info.v1_point == TracePoint::PostAlways)
+        env_.trace->emit_v1(info.v1_name, trace_arg(), v1_res);
     emit_v2("error", error_.code);
     // Fatal/limit: the run ends and legacy records no read. A listing is the
     // exception: legacy records its fingerprint before the attempt, whatever follows.

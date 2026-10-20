@@ -58,14 +58,14 @@ private:
 HandleStatus register_process_kind(handles::HandleTable& table);
 
 // A started (interactive) process: counted handle owned by `context`.
-HandleStatus create_process_handle(handles::HandleTable& table, handles::ContextId context, const ProcessGroupPtr& group,
-                                   Value& out);
+HandleStatus create_process_handle(handles::HandleTable& table, handles::ContextId context,
+                                   const ProcessGroupPtr& group, Value& out);
 
 // A detached process: counted handle, then detached at once (D-039). If the
 // detach is refused (e.g. DetachForbidden in a build family), the process is
 // cancelled immediately and the handle closed: nothing runs unowned.
-HandleStatus create_detached_handle(handles::HandleTable& table, handles::ContextId context, const ProcessGroupPtr& group,
-                                    Value& out);
+HandleStatus create_detached_handle(handles::HandleTable& table, handles::ContextId context,
+                                    const ProcessGroupPtr& group, Value& out);
 
 // A blocking run() whose call returned with background members still in its
 // group (C1): an uncounted, script-invisible resource in `context`, so the
@@ -77,7 +77,8 @@ HandleStatus register_run_residue(handles::HandleTable& table, handles::ContextI
 // p.cancel(): attached processes start the §11.4 sequence (the lifecycle
 // learns it through the seam); detached ones get the cancel request only
 // (TerminationStart::detached_request: no ticket, nothing supervised).
-HandleStatus cancel_process(handles::HandleTable& table, const Value& handle, handles::ContextId accessor, bool& anything);
+HandleStatus cancel_process(handles::HandleTable& table, const Value& handle, handles::ContextId accessor,
+                            bool& anything);
 
 // Whether a detached launch must be refused before launching (build family).
 HandleStatus detach_refused_here(const handles::HandleTable& table, handles::ContextId context, bool& refused);

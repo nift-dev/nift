@@ -32,7 +32,8 @@ public:
     // these bytes to the host (c7971365) while ignoring other reads.
     virtual void open_read(const std::filesystem::path& path, std::string_view bytes) { read(path, bytes); }
     virtual void failed_read(const std::filesystem::path& path) = 0;   // absent if missing, else unreadable
-    virtual void stream_open(const std::filesystem::path& path) = 0;   // file-backed input stream opened (hashed at open)
+    virtual void stream_open(
+        const std::filesystem::path& path) = 0;  // file-backed input stream opened (hashed at open)
     virtual void streamed_read(const std::filesystem::path& path, std::uint64_t size, const std::uint64_t* hash) = 0;
     virtual void metadata_read(const std::filesystem::path& path) = 0;
     virtual void written(const std::filesystem::path& path) = 0;
