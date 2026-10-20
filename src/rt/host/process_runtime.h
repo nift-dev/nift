@@ -51,6 +51,9 @@ struct EventRecord {
 struct TestHooks {
     std::atomic<bool> suppress_sigkill{false};
     std::atomic<bool> record{false};
+    // Microseconds to pause inside the cancellation start, between signalling
+    // the stages and closing their stdin (pins that order: r2 TSan `deadlines`).
+    std::atomic<int> cancel_gap_us{0};
     std::mutex log_mutex;
     std::vector<EventRecord> log;
 };
@@ -63,10 +66,7 @@ void test_event(const void* group, const char* what, long a = 0, long b = 0, lon
 int host_kill(long target, int sig, const char* site, const void* group);
 
 // ---- /proc helpers (Linux; empty elsewhere) ----
-struct ProcInfo {
-    long pid = 0; char state = '?'; long ppid = 0; long pgrp = 0; long session = 0;
-    unsigned long long start = 0;  // start time (clock ticks since boot): tells a reused pid apart
-};
+struct ProcInfo { long pid = 0; char state = '?'; long ppid = 0; long pgrp = 0; long session = 0; };
 std::vector<ProcInfo> proc_scan();
 bool proc_read(long pid, ProcInfo& out);
 // Descendants of `roots` by parent links (excluding the roots).

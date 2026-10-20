@@ -202,7 +202,6 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool captu
             if(specs[i].foreground_terminal){ struct sigaction z{};z.sa_handler=SIG_DFL;sigaction(SIGTTOU,&z,nullptr);sigaction(SIGTTIN,&z,nullptr);sigaction(SIGINT,&z,nullptr);sigaction(SIGQUIT,&z,nullptr); }
             prepared[i].exec(report[1]);
         }
-        nift_process_note_child(pid);  // CP16: a child this launcher waits for (launch mutex held)
         if (report[1] >= 0) close(report[1]);
         if (report[0] >= 0) {
             int payload[3]={0,0,0};std::size_t got=0;

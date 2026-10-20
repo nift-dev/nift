@@ -229,15 +229,10 @@ private:
     void observe_listing(const std::string& key, const std::filesystem::path& path);
     void observe_environment(const std::string& name, const nift::HostResult& value, bool template_directive = false);
     // CP16 (ParserHost.cpp): run()/cmd().run() launch through the Host
-    // layer's ProcessGroup (own process group per pipeline, C3; SIGINT/
-    // SIGTERM cleanup, C2). Background members a call leaves in its group
-    // belong to this parser's execution context (C1) and are terminated when
-    // it ends: end_host_process_context() (script end, page render end,
-    // destruction). False with `error` set when a cleanup genuinely failed.
+    // layer's ProcessGroup with legacy run()'s historical process semantics
+    // (a temporary compatibility exception, cp16-host-ops-impl.md §9.6).
     bool run_host_pipeline(const std::vector<ProcessSpec>& specs, std::uint64_t capture_limit, ProcessResult& out,
                            std::string& error);
-    bool end_host_process_context(std::string& error, bool on_error = false);
-    std::uint64_t host_process_context_ = 0;
     // Consume a callable's return into `out`, propagating any location that the
     // return carried so a following declaration can rebind to the same location.
     void consume_return(nift::RuntimeValue& out) {

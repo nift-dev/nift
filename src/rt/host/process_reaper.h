@@ -45,21 +45,6 @@ void note_managed_pgid(long pgid);
 // child of other code in Nift's own session and groups (no waitpid(-1)).
 // Runs on the host loop after SIGCHLD; returns how many were reaped.
 std::size_t reap_adopted_orphans();
-// Direct children of other components (legacy launcher, job control, serve):
-// reported through nift_process_note_child (ProcessPOSIX.h) under the launch
-// mutex, identified by pid and start time. Under the subreaper every other
-// child of Nift that is no stage is an adopted orphan.
-void note_direct_child(long pid);
-// Switches on "every other child is an adopted orphan" (only once every fork
-// site reports its children: the legacy interpreter, enable_subreaper_for_legacy).
-void set_child_reporting(bool on);
-bool child_reporting();
-// Nift's current children (Linux: /proc/self/task/*/children; cheap, no full scan).
-std::vector<long> own_children();
-// reap_adopted_orphans() over own_children() only, without SIGCHLD: for the
-// legacy interpreter (after each run() and at script end). Returns how many.
-std::size_t reap_adopted_children();
-bool is_direct_child(long pid);
 // Runs the C2 sequence synchronously (also used by the watcher thread).
 // Returns the number of groups that still had live members.
 std::size_t terminate_all_indexed(Millis kill_after, Millis post_kill_wait);

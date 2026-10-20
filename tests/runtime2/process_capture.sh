@@ -2,7 +2,6 @@
 # Runtime 2.0 CP07: process capture uses anonymous regular files. Expected
 # values are the pre-CP07 (v4.12.0 / runtime-2 c5db14d) behaviour; CP07 must
 # not change any of them (D-006/D-010), and must never leave capture files.
-# CP16 changes one on purpose: case 4 (C2, D-030).
 set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
@@ -57,18 +56,16 @@ ms=$(( ($(date +%s%N) - start) / 1000000 ))
 expect "background descendant output after exit not captured" "[parent|]|" "$out"
 if [ "$ms" -lt 280 ]; then ok "background descendant does not block (${ms} ms)"; else bad "call blocked ${ms} ms"; fi
 
-# 4. CP16 C2 (D-030): a child still running when nift receives SIGTERM is
-#    terminated with it, and nift ends with SIGTERM. (Pre-CP16 the child kept
-#    running: it wrote to a file, not a pipe, so it got no SIGPIPE.)
+# 4. A child still running when nift is terminated keeps running (it writes
+#    to a file, not a pipe, so it gets no SIGPIPE).
 cat > kill.f <<'EOF'
 r := cmd("sh", "-c", "sleep 0.5; echo progress; echo done > side_effect").run()
 print(r.stdout)
 EOF
 "$NIFT" kill.f >/dev/null 2>&1 & pid=$!
-sleep 0.2; kill -TERM "$pid"; wait "$pid" 2>/dev/null; status=$?
+sleep 0.2; kill -TERM "$pid"; wait "$pid" 2>/dev/null
 sleep 0.8
-[ -f side_effect ] && bad "child survived nift's SIGTERM" || ok "child terminated with nift (C2)"
-expect "nift ends with SIGTERM" "143" "$status"
+[ -f side_effect ] && ok "child survives nift being terminated" || bad "child died with nift"
 
 # 5. Capture still works with very few descriptors.
 cat > emf.f <<'EOF'

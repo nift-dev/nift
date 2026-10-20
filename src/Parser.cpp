@@ -3,7 +3,6 @@
 #include "RuntimeJson.h"
 #include "Parser.h"
 #include "ParserHost.h"
-#include "Console.h"
 #include "ReadLimit.h"
 #include "ParserAsyncPool.h"
 #include "ParserHelpers.h"
@@ -724,11 +723,6 @@ void Parser::rollback_file_operation(std::uint64_t checkpoint) {
 
 Parser::~Parser() {
     finalize_execution_workers();
-    // CP16 C1: background members of run() calls end with this execution
-    // context. Entry points that can report it (script end, page render) have
-    // ended the context already; here a genuine failure can only be printed.
-    std::string cleanup_error;
-    if (!end_host_process_context(cleanup_error)) console::error(cleanup_error);
 }
 
 void Parser::copy_capture_bindings(
@@ -790,11 +784,6 @@ void Parser::finalize_execution_workers() {
 
 
 bool Parser::finalize_script_resources(std::string& error) {
-    // CP16 C1: the script's execution context ends here; background members
-    // left by run()/cmd().run() are terminated. A genuine cleanup failure is
-    // an error of the script (D-035).
-    std::string process_error;
-    const bool processes_ok = end_host_process_context(process_error);
     std::vector<std::string> open_paths;
     for (auto& kv : file_instances_) {
         auto& f = *kv.second;
@@ -802,15 +791,10 @@ bool Parser::finalize_script_resources(std::string& error) {
         open_paths.push_back(f.path.generic_string() + (f.dirty ? " (unsaved changes discarded)" : ""));
         f.open = false; f.dirty = false; f.mode.clear(); f.working.clear(); f.saved.clear(); f.cursor = 0;
     }
-    if (open_paths.empty()) {
-        if (processes_ok) return true;
-        error = process_error;
-        return false;
-    }
+    if (open_paths.empty()) return true;
     error = "managed file left open";
     if (open_paths.size() > 1) error += " (" + std::to_string(open_paths.size()) + " files)";
     error += ": " + open_paths.front();
-    if (!processes_ok) error += "; " + process_error;
     return false;
 }
 

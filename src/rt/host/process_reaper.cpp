@@ -188,140 +188,37 @@ void note_managed_pgid(long pgid) {
     managed_pgids().insert(pgid);
 }
 
-namespace {
-struct DirectChild { long pid; unsigned long long start; };
-std::mutex& direct_mutex() { static std::mutex m; return m; }
-std::vector<DirectChild>& direct_children() { static auto* v = new std::vector<DirectChild>; return *v; }
-bool matches(const DirectChild& c, const ProcInfo& p) {
-    return c.pid == p.pid && (c.start == 0 || p.start == 0 || c.start == p.start);
-}
-std::atomic<bool> g_child_reporting{false};
-} // namespace
-
-void set_child_reporting(bool on) { g_child_reporting = on; }
-bool child_reporting() { return g_child_reporting; }
-
-void note_direct_child(long pid) {
-    if (pid <= 0) return;
-    ProcInfo p;
-    const unsigned long long start = proc_read(pid, p) ? p.start : 0;
-    std::lock_guard<std::mutex> lock(direct_mutex());
-    direct_children().push_back(DirectChild{pid, start});
-}
-
-bool is_direct_child(long pid) {
-    ProcInfo p;
-    if (!proc_read(pid, p)) p.pid = pid;
-    std::lock_guard<std::mutex> lock(direct_mutex());
-    for (const auto& c : direct_children()) if (matches(c, p)) return true;
-    return false;
-}
-
-namespace {
-// Reaps the zombie children among `candidates` that are ours (see the
-// header); `all` refreshes the bookkeeping of known groups and direct
-// children (a full scan; null: only the candidates were read).
-std::size_t reap_zombie_children(const std::vector<ProcInfo>& candidates, const std::vector<ProcInfo>* all) {
+std::size_t reap_adopted_orphans() {
 #ifdef __linux__
+    // A stage that exits between fork() and its registration in the index
+    // must not be taken for an orphan: launches hold this mutex across both.
+    std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
     const long self = static_cast<long>(::getpid());
     const long own_session = static_cast<long>(::getsid(0));
     std::set<long> stages;
     for (const auto& g : index_snapshot()) for (long p : g.stage_pids) stages.insert(p);
-    std::vector<DirectChild> direct;
-    {
-        std::lock_guard<std::mutex> direct_lock(direct_mutex());
-        auto& list = direct_children();
-        // Forget direct children that are gone (reaped by their owners): a
-        // full scan, or Nift's current children (a direct child is one until reaped).
-        const std::vector<ProcInfo>* present = all ? all : &candidates;
-        {
-            std::vector<DirectChild> kept;
-            for (const auto& c : list)
-                for (const auto& p : *present)
-                    if (matches(c, p)) { kept.push_back(c); break; }
-            list.swap(kept);
-        }
-        direct = list;
-    }
-    auto is_direct = [&](const ProcInfo& p) {
-        for (const auto& c : direct) if (matches(c, p)) return true;
-        return false;
-    };
-    const bool adopted_rule = subreaper_enabled() && child_reporting();
+    const auto all = proc_scan();
     std::size_t reaped = 0;
     std::lock_guard<std::mutex> lock(managed_mutex());
     auto& known = managed_pgids();
-    for (const auto& p : candidates) {
-        if (p.ppid != self || p.state != 'Z' || stages.count(p.pid) || is_direct(p)) continue;
-        // Ours: a group the Host layer created, another session, or -- under
-        // the subreaper -- any child no other component reported (an orphan
-        // adopted from a legacy run() stage, which stays in Nift's group).
-        const bool ours = known.count(p.pgrp) || p.session != own_session || adopted_rule;
-        if (!ours) continue;  // another component's child: theirs to wait for
+    for (const auto& p : all) {
+        if (p.ppid != self || p.state != 'Z' || stages.count(p.pid)) continue;
+        const bool ours = known.count(p.pgrp) || p.session != own_session;
+        if (!ours) continue;  // another component's child (legacy run(), job control): theirs to wait for
         int status = 0;
         if (::waitpid(static_cast<pid_t>(p.pid), &status, WNOHANG) == static_cast<pid_t>(p.pid)) {
             ++reaped;
             test_event(nullptr, "orphan-reap", p.pid, p.pgrp, status);
         }
     }
-    if (all) {
-        // Forget groups that no longer exist, so a reused pgid of other code is never claimed.
-        std::set<long> present;
-        for (const auto& p : *all) present.insert(p.pgrp);
-        for (auto it = known.begin(); it != known.end();) {
-            if (!present.count(*it)) it = known.erase(it);
-            else ++it;
-        }
+    // Forget groups that no longer exist, so a reused pgid of other code is never claimed.
+    std::set<long> present;
+    for (const auto& p : all) present.insert(p.pgrp);
+    for (auto it = known.begin(); it != known.end();) {
+        if (!present.count(*it)) it = known.erase(it);
+        else ++it;
     }
     return reaped;
-#else
-    (void)candidates; (void)all;
-    return 0;
-#endif
-}
-} // namespace
-
-std::size_t reap_adopted_orphans() {
-#ifdef __linux__
-    // A stage that exits between fork() and its registration in the index
-    // must not be taken for an orphan: launches hold this mutex across both.
-    std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
-    const auto all = proc_scan();
-    return reap_zombie_children(all, &all);
-#else
-    return 0;
-#endif
-}
-
-std::vector<long> own_children() {
-    std::vector<long> out;
-#ifdef __linux__
-    DIR* tasks = ::opendir("/proc/self/task");
-    if (!tasks) return out;
-    while (dirent* task = ::readdir(tasks)) {
-        if (task->d_name[0] == '.') continue;
-        const std::string path = std::string("/proc/self/task/") + task->d_name + "/children";
-        FILE* f = std::fopen(path.c_str(), "r");
-        if (!f) continue;
-        long pid = 0;
-        while (std::fscanf(f, "%ld", &pid) == 1) out.push_back(pid);
-        std::fclose(f);
-    }
-    ::closedir(tasks);
-#endif
-    return out;
-}
-
-std::size_t reap_adopted_children() {
-#ifdef __linux__
-    if (!subreaper_enabled()) return 0;
-    std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
-    std::vector<ProcInfo> candidates;
-    for (long pid : own_children()) {
-        ProcInfo p;
-        if (proc_read(pid, p)) candidates.push_back(p);
-    }
-    return reap_zombie_children(candidates, nullptr);
 #else
     return 0;
 #endif

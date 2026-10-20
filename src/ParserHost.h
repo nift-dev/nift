@@ -31,7 +31,3 @@ inline nift::rt::host::HostCallEnv parser_host_env(nift::rt::host::Observer* obs
 }
 // An error for HostCall::fail (the legacy message is set separately).
 nift::rt::host::HostError parser_host_error(const char* code, std::string message);
-
-// The interactive shell keeps its own SIGINT behaviour: run() there does not
-// install the C2 signal cleanup (cp16-host-ops-impl.md §9).
-void parser_host_set_interactive_shell(bool interactive);

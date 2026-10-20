@@ -92,7 +92,6 @@ ProcessResult ShellJobTable::launch(const std::vector<ProcessSpec>& specs, const
             prepared[i].exec();
         }
         nift_process_test_child(pid);
-        nift_process_note_child(pid);  // CP16: job control waits for it (launch mutex held)
         if (pgid < 0) pgid = pid;
         setpgid(pid, pgid);
         if (prev >= 0) close(prev);

@@ -15,7 +15,6 @@
 #include "rt/host/process_call.h"
 #include "rt/host/process_cleanup.h"
 #include "rt/host/process_runtime.h"
-#include "ProcessPOSIX.h"  // nift_process_launch_mutex (fork-site contract)
 #include "rt/host/run_request.h"
 #include "rt_test.h"
 
@@ -1029,88 +1028,6 @@ void subreaper_reaps_orphans() {
     CHECK(::waitpid(foreign, &status, 0) == foreign && WIFEXITED(status) && WEXITSTATUS(status) == 7);
 }
 
-// Legacy run() (own_group = false, cp16-host-ops-impl.md §9.3): background
-// members a stage leaves in Nift's group are adopted (subreaper) and reaped by
-// reap_adopted_children(); a child another component reported is left to it.
-void legacy_adopted_children() {
-    if (!runtime::enable_subreaper()) { std::printf("legacy_adopted_children: SKIPPED\n"); return; }
-    runtime::set_child_reporting(true);
-    const std::string tag = new_tag();
-    auto r = req({"sh", "-c", "sleep 0.2 &"}, OutputMode::FileCapture, tag);
-    r.own_group = false;
-    auto g = start_ok(r);
-    g->wait();
-    CHECK(g->pgid() == -1);
-    pid_t reported = -1;
-    {
-        // The contract for every fork site: fork and report under the launch mutex.
-        std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
-        reported = ::fork();
-        if (reported == 0) ::_exit(7);
-        runtime::note_direct_child(reported);
-    }
-    std::this_thread::sleep_for(milliseconds(500));  // the orphan and the reported child have exited
-    runtime::reap_adopted_children();  // (the host loop may have reaped it already: SIGCHLD in this binary)
-    CHECK(none_tagged(tag));
-    int status = 0;
-    CHECK(::waitpid(reported, &status, 0) == reported && WIFEXITED(status) && WEXITSTATUS(status) == 7);
-    CHECK(no_zombies());
-    runtime::set_child_reporting(false);
-}
-
-// The adoption path never reaps or signals a child another component forked
-// and reported (job control, serve, the legacy launcher), also while legacy
-// launches leave orphans, the reaper runs and C2's sweep runs concurrently.
-void foreign_children_concurrent() {
-    if (!runtime::enable_subreaper()) { std::printf("foreign_children_concurrent: SKIPPED\n"); return; }
-    runtime::set_child_reporting(true);
-    const std::string tag = new_tag();
-    std::atomic<bool> foreign_ok{true};
-    std::atomic<int> foreign_done{0};
-    std::thread foreign([&] {
-        for (int i = 0; i < 60; ++i) {
-            pid_t pid = -1;
-            {
-                std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
-                pid = ::fork();
-                if (pid == 0) { ::usleep(static_cast<useconds_t>(5000 + (i % 5) * 5000)); ::_exit(1 + i % 100); }
-                runtime::note_direct_child(pid);
-            }
-            int status = 0;
-            const pid_t got = ::waitpid(pid, &status, 0);
-            if (got != pid || !WIFEXITED(status) || WEXITSTATUS(status) != 1 + i % 100) foreign_ok = false;
-            ++foreign_done;
-        }
-    });
-    std::thread legacy([&] {
-        for (int i = 0; i < 20; ++i) {
-            auto r = req({"sh", "-c", "sleep 0.05 >/dev/null 2>&1 & exit 0"}, OutputMode::FileCapture, tag);
-            r.own_group = false;
-            start_ok(r)->wait();
-            runtime::reap_adopted_children();
-        }
-    });
-    const long own_group = static_cast<long>(::getpgrp());
-    std::thread sweeper([&] {
-        while (foreign_done.load() < 60) {
-            runtime::sweep_orphans(milliseconds(20), milliseconds(50), [own_group](long pid) {
-                runtime::ProcInfo info;
-                if (!runtime::proc_read(pid, info)) return true;
-                return runtime::is_direct_child(pid) || info.pgrp != own_group;
-            });
-            std::this_thread::sleep_for(milliseconds(15));
-        }
-    });
-    foreign.join();
-    legacy.join();
-    sweeper.join();
-    CHECK(foreign_ok.load());
-    CHECK(none_tagged(tag, milliseconds(3000)));
-    runtime::reap_adopted_children();
-    CHECK(no_zombies());
-    runtime::set_child_reporting(false);
-}
-
 // ---- D-034 ----
 ProcessResult run_opts(OptionObject opts, std::vector<std::string> argv, const std::string& tag, std::uint64_t limit = 1u << 30) {
     RunOptions o;
@@ -1296,6 +1213,28 @@ void deadline_races() {
     runtime::set_warning_sink(nullptr);
 }
 
+// r2 (TSan) reproducer, permanent: cancellation (a deadline here) must signal
+// the stages before closing their stdin. In the other order a child blocked
+// reading stdin acts on the EOF -- runs its next command, writes output --
+// before the signal arrives; TSan's slowdown widened that window (1 in 5
+// runs captured "never"). The test hook pauses 50 ms between the two steps,
+// which makes the wrong order fail every time and the right one never.
+void cancel_signals_before_stdin_eof() {
+    const std::string tag = new_tag();
+    runtime::test_hooks().cancel_gap_us = 50000;
+    int clean = 0;
+    for (int i = 0; i < 5; ++i) {
+        auto r = req({"sh", "-c", "read x; echo never"}, OutputMode::Interactive, tag);
+        r.timeout = milliseconds(100);
+        auto g = start_ok(r);
+        const auto& res = g->wait();
+        if (res.timed_out && res.out.empty() && res.stages[0].signal == SIGTERM) ++clean;
+    }
+    runtime::test_hooks().cancel_gap_us = 0;
+    CHECK(clean == 5);
+    CHECK(none_tagged(tag));
+}
+
 void shutdown_refuses_launches() {
     runtime::request_shutdown_for_test(SIGTERM);
     HostStatus st;
@@ -1398,13 +1337,12 @@ int main(int argc, char** argv) {
         {"handle_lifecycle", handle_lifecycle},
         {"detached_rules", detached_rules},
         {"low_fd_limit", low_fd_limit},
-        {"legacy_adopted_children", legacy_adopted_children},
-        {"foreign_children_concurrent", foreign_children_concurrent},
         {"trace_spawn", trace_spawn},
         {"pipe_mode_suite", pipe_mode_suite},
         {"stdin_suite", stdin_suite},
         {"deadline_suite", deadline_suite},
         {"deadline_races", deadline_races},
+        {"cancel_signals_before_stdin_eof", cancel_signals_before_stdin_eof},
         {"shutdown_refuses_launches", shutdown_refuses_launches},
         {"cleanup_failures_reported", cleanup_failures_reported},
         {"sigterm_to_nift_c2", sigterm_to_nift_c2},

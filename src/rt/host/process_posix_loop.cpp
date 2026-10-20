@@ -76,7 +76,6 @@ void begin_cancel(State& s, CancelScope scope, CancelReason reason, Millis kill_
     if (reason == CancelReason::Deadline) s.timed_out = true;
     if (reason == CancelReason::Cleanup || reason == CancelReason::Abandoned)
         s.waiting = true;                                 // unread output is discarded
-    if (scope != CancelScope::Child) close_stdin_end(s);  // a child blocked reading stdin sees EOF
     s.phase_at = Clock::now();
     runtime::test_event(&s, "cancel", s.pgid, static_cast<long>(reason), static_cast<long>(scope));
     if (kill_after.count() <= 0) {
@@ -86,6 +85,13 @@ void begin_cancel(State& s, CancelScope scope, CancelReason reason, Millis kill_
         send_signal(s, SIGTERM);
         s.phase = State::Phase::Term;
     }
+    // Then stdin: a child blocked reading it sees EOF. Signal first -- closing
+    // it first let a child act on the EOF (run its next command, write output)
+    // before the signal arrived (r2: `deadlines` under TSan captured "never").
+#ifdef NIFT_HOST_TEST_HOOKS
+    if (const int gap = runtime::test_hooks().cancel_gap_us.load()) ::usleep(static_cast<useconds_t>(gap));
+#endif
+    if (scope != CancelScope::Child) close_stdin_end(s);
 }
 
 void record_exit(StageRt& stage, int status) {

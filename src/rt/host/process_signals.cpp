@@ -2,9 +2,6 @@
 #include "rt/host/process_signals.h"
 
 #include "rt/host/process_runtime.h"
-#ifndef _WIN32
-#include "ProcessPOSIX.h"  // launch mutex, child reporting
-#endif
 
 #include <algorithm>
 #include <atomic>
@@ -120,20 +117,6 @@ void watcher_loop() {
         if (signo < 0) return;  // uninstalled
         const auto options = signal_options();
         terminate_all_indexed(options.kill_after, options.post_kill_wait);
-        // Adopted orphans (legacy run() background members, under the
-        // subreaper): terminated too; other components' children are left alone.
-        // Scope: only adopted processes still in Nift's own process group and
-        // session (where descendants of Nift's legacy launches stay); never a
-        // child another component reported, nor anything that left the group.
-        if (subreaper_enabled() && child_reporting()) {
-            const long own_group = static_cast<long>(::getpgrp());
-            const long own_session = static_cast<long>(::getsid(0));
-            sweep_orphans(options.kill_after, options.post_kill_wait, [own_group, own_session](long pid) {
-                ProcInfo info;
-                if (!proc_read(pid, info)) return true;
-                return is_direct_child(pid) || info.pgrp != own_group || info.session != own_session;
-            });
-        }
         {
             std::lock_guard<std::mutex> lock(g_done_mutex);
             g_cleanup_done = true;
@@ -246,34 +229,6 @@ bool enable_subreaper() {
 }
 bool subreaper_enabled() { return g_subreaper; }
 
-#ifdef __linux__
-namespace {
-void report_direct_child(long pid) { note_direct_child(pid); }
-} // namespace
-#endif
-
-bool enable_subreaper_for_legacy() {
-#ifdef __linux__
-    if (g_subreaper) return true;
-    std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
-    nift_process_child_observer().store(&report_direct_child);
-    set_child_reporting(true);
-    std::set<long> stages;
-    for (const auto& g : index_snapshot()) for (long p : g.stage_pids) stages.insert(p);
-    for (long pid : own_children())
-        if (!stages.count(pid)) note_direct_child(pid);
-    // No SIGCHLD handler and no host loop here: legacy code is not prepared
-    // for EINTR from a new handler, and a plain run() must not cost
-    // descriptors (CP07, `ulimit -n 6`). Adopted orphans are reaped after each
-    // legacy run() and at script end (reap_adopted_children), and C2 sweeps them.
-    if (::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0) return false;
-    g_subreaper = true;
-    return true;
-#else
-    return false;
-#endif
-}
-
 std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::function<bool(long)>& foreign) {
 #ifdef __linux__
     const long self = static_cast<long>(::getpid());
@@ -296,8 +251,6 @@ std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::f
     }
     for (long pid : zombies) { int st; ::waitpid(static_cast<pid_t>(pid), &st, WNOHANG); }
     if (orphans.empty()) return 0;
-    // The orphans' own descendants too (they would be adopted next).
-    for (long pid : proc_descendants(orphans)) host_kill(pid, SIGTERM, "sweep-term-tree", nullptr);
     for (long pid : orphans) host_kill(pid, SIGTERM, "sweep-term", nullptr);
     std::set<long> left(orphans.begin(), orphans.end());
     auto reap = [&] {
@@ -310,8 +263,6 @@ std::size_t sweep_orphans(Millis kill_after, Millis post_kill_wait, const std::f
         return left.empty();
     };
     sleep_until_or(Clock::now() + kill_after, reap);
-    for (long pid : proc_descendants(std::vector<long>(left.begin(), left.end())))
-        host_kill(pid, SIGKILL, "sweep-kill-tree", nullptr);
     for (long pid : left) host_kill(pid, SIGKILL, "sweep-kill", nullptr);
     sleep_until_or(Clock::now() + post_kill_wait, reap);
     for (long pid : left) reaper_add_pid(pid);
@@ -329,7 +280,6 @@ void clear_shutdown_for_test() {}
 bool install_signal_cleanup(SignalCleanupOptions) { return false; }
 void uninstall_signal_cleanup() {}
 bool enable_subreaper() { return false; }
-bool enable_subreaper_for_legacy() { return false; }
 bool subreaper_enabled() { return false; }
 std::size_t sweep_orphans(Millis, Millis, const std::function<bool(long)>&) { return 0; }
 #endif

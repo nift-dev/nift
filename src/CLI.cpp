@@ -19,7 +19,6 @@
 #include "rewrite_content.h"
 #include "redesign_content.h"
 #include "Parser.h"
-#include "ParserHost.h"
 #include "Proc.h"
 #include "RenderHost.h"
 #include "ScriptHost.h"
@@ -1922,9 +1921,6 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 #endif
 static int run_script_shell_loop(Parser& parser, bool load_rc) {
-    // CP16: run() in the interactive shell does not install the C2 SIGINT/
-    // SIGTERM cleanup (the shell keeps its own signal behaviour).
-    parser_host_set_interactive_shell(true);
     std::string pending; ShellJobTable jobs;
     auto history=load_nift_history();
 #ifndef _WIN32

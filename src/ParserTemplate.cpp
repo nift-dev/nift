@@ -3370,14 +3370,6 @@ RenderResult Parser::render() {
     // the page; wait for them and merge what they observed.
     RenderResult result = render_unsettled();
     if (observing()) settle_worker_observations(result);
-    // CP16 C1: the page's execution context ends with its render; background
-    // members left by run()/cmd().run() are terminated (D-035: a genuine
-    // cleanup failure fails the page).
-    std::string process_error;
-    if (!end_host_process_context(process_error, !result.ok) && result.ok) {
-        result.ok = false;
-        result.error = {tracked_info_.name, host_.content_path(tracked_info_), 0, process_error};
-    }
     return result;
 }
 
