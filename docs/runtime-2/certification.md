@@ -510,3 +510,53 @@ pre-rebase tip fb6e265a did NOT run `vm_records20k` or the benchmark (job-script
 path error); those two are not claimed from it. Benchmark figures remain the
 stage4g ones (@fe20a9b0). Linux only. Evidence: `.claude-linode-runs/results/r20kcert/`.
 
+## Stack C3 + CP16 + CP15B stage A certified on Linode @7120b01 (2026-10-20)
+
+One stacked candidate certified as a whole (the pass shows the changes
+coexist; it is not separate per-checkpoint certification). Base `b48845f4`,
+tip `7120b012`:
+
+    certify @ 7120b01: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 179
+
+Contents, bottom up: L7 C3 (`str_replace` uses the shared pre-allocation budget
+check); CP16 (Host process layer, legacy `run()` historical behaviour as a
+temporary exception, lifecycle-event ordering fix, legacy cancellation reaches
+descendants, test scripts without masking pipelines, `libnift_c.a` built fresh
+so no engine object can replace a libffi member, shared binding source list
+`src/rt/host-sources.txt` with guard `test-rt-host-sources-list`); CP15B stage
+A + F1 (DeepSeek: interpolation, escapes, literal `$`, int64 literals;
+callee return kinds never typed through the caller's scope). g6-dedicated-2,
+`-j2`, 5800 s certify (`test-rt-vm-mutants` 2887 s,
+`test-build-boundary-nondestructive` 1621 s). Package snapshot b978a5a2…
+unchanged. `precert.sh` on the exact tip: PASS (including test-integrity,
+rt-lint and the staged-consumer link check); `test-runtime2-literals` 54 PASS /
+22 expected refusals; `test-rt-host-sources-list` OK.
+
+Not certified first: stack @08fea01c (records20k + C3 + CP16 before its fixes):
+FAIL 4 (test-integrity: four CP16 pipelines that could mask failures;
+staged-consumer and go: `ar` replaced libffi's `types.o` with
+`src/rt/handles/types.o`; node and python: binding source lists lacked the Host
+sources), BASELINE-FAILURE 2 (nondestructive proof and go: the same link
+cause, also failing on the v4.12.0 baseline at that step). Evidence:
+`results/stack4-final2/`.
+
+Known limitations recorded with this integration:
+- The F1 negative control (`make test-runtime2-literals-f1-negative`) builds
+  commit `560d9532`, which exists only in DeepSeek's workspace; on any other
+  checkout it fails with "not a tree object". It does NOT pass on a clean
+  checkout. The certifier ran the same check by hand against a tree-identical
+  build of the pre-F1 code (the F1 regressions fail it), which is supporting
+  evidence only. A portable version (a deterministic in-source mutation) is
+  assigned to DeepSeek. The target is not part of `make test`.
+- `scripts/bench-release.sh` builds from its own source list, which has lacked
+  the rt parser sources since CP10 and lacks the Host sources; it is broken and
+  tracked separately.
+- CP15B stage B step 1 (DeepSeek's representation investigation) was rerun by
+  the certifier with GCC 13.3.0: 208/726/33 cases 0 differences, 195 cases 2
+  syntax-only refusals, 88 assignment/parameter cases 36 conservative
+  refusals and no silent divergence with the Decimal-aware inference
+  prototype; identical to DeepSeek's GCC 15.2.0 results. Stage B itself is not
+  integrated.
+
+Linux only. Evidence: `.claude-linode-runs/results/stack6/`.
+
