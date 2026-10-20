@@ -19,8 +19,10 @@ CASES = [
     # (name, program, expected certain reasons)
     ("compiles", "x := 1\nprint(x)\n", set()),
     ("two-methods", 's := "abc"\nprint(s.foo())\nprint(s.bar())\n', {"method:foo", "method:bar"}),
-    ("chained", 's := " a "\nprint(s.trim().to_upper())\n',
-     {"method:to_upper", "method:trim"}),  # CP12b: the chain itself is admitted
+    # CP12b's chained postfix admits the chain and CP14 has `trim` and
+    # `to_upper` natives, so the program compiles (no reasons); vm_chain.py
+    # runs the same chain on the VM against legacy in every context.
+    ("chained", 's := " a "\nprint(s.trim().to_upper())\n', set()),
     ("chained-member", 'fn(f()) { return {"k": 1} }\nprint(f().k)\n', {"postfix-receiver:member"}),
     ("lambda-argument", "xs := [1, 2]\ny := xs.map((v) => v + 1)\nprint(y.join(\",\"))\n",
      {"method:map", "expression:Lambda", "method:join"}),

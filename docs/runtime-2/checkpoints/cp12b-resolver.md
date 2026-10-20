@@ -129,6 +129,14 @@ W6 refuses it with its own reason, `builtin-presentation-chain`. The program
 is refused in every context either way (legacy prints `{"a":1}`); the
 expectation's premise was outdated and now names W6.
 
+Same cause, found by cp12b-gates11: the inventory self-test `chained`
+(`s.trim().to_upper()`) expected `method:trim`/`method:to_upper`, written
+before CP14's string natives were on the branch. With both natives and the
+chain admitted, the program compiles: the expectation is now no reasons, and
+`vm_chain.py` runs `" a ".trim().to_upper()` and
+`fa(1)[2].to_upper().length()` on the VM against legacy in all four
+contexts.
+
 ## H1 globals: the parts below the compiler (coordinator item 2)
 
 Done (`c8ffc7ca`): opcodes `GetGlobal`/`SetGlobal` (VM cold path; no hot

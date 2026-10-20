@@ -35,6 +35,8 @@ SHAPES = [
     ("fo(2)[\"s\"].length()", "vm"), ("fs(3).length()", "vm"), ("[1, [2, 3]][1][0]", "vm"),
     ("[1, 2, 3].length()", "vm"), ("\"héllo\".length()", "vm"), ("{\"k\": [4, 5]}[\"k\"][1]", "vm"),
     ("{\"a\": 1}.size()", "vm"),
+    # method chains over natives (CP14 string methods on a call result)
+    ("\" a \".trim().to_upper()", "vm"), ("fa(1)[2].to_upper().length()", "vm"),
     # run-time errors, reported by the VM as legacy does
     ("fa(1)[7]", "vm"), ("fa(1)[-1]", "type:print"), ("fo(2)[\"zz\"]", "vm"), ("[1, 2][5]", "vm"),
     ("{\"k\": 1}[\"q\"]", "vm"), ("fa(1)[1][9]", "vm"),
