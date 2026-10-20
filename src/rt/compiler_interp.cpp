@@ -98,9 +98,14 @@ std::uint8_t UnitCompiler::interpolation_function_kind(std::size_t f,
     std::uint8_t result = 0;
     for (NodeId id : returns) {
         const Node& ret = ast_.at(id);
-        result |= (ret.flags & kFlagBare) || ret.a == kNoNode
-                      ? kKindNull
-                      : interpolation_literal_kind(ret.a);
+        const std::uint8_t kind = (ret.flags & kFlagBare) || ret.a == kNoNode
+                                      ? kKindNull
+#if defined(NIFT_INTERP_MUTANT) && NIFT_INTERP_MUTANT == 4
+                                      : interpolation_kind(ret.a, active);
+#else
+                                      : interpolation_literal_kind(ret.a);
+#endif
+        result |= kind;
     }
     if (returns.empty() || infer_detail::block_falls_through(ast_, fn.b)) result |= kKindNull;
     active.erase(f);

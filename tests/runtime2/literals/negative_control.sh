@@ -10,7 +10,7 @@ ORACLE=${1:-"$ROOT/nift"}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-for mutant in 1 2 3; do
+for mutant in 1 2 3 4; do
     build="$TMP/m$mutant"
     mkdir -p "$build"
     git -C "$ROOT" archive HEAD | tar -x -C "$build"
@@ -29,4 +29,4 @@ for mutant in 1 2 3; do
     fi
     echo "PASS mutant $mutant: literal tests rejected the mutant"
 done
-echo "PASS negative controls: 3/3 mutants rejected"
+echo "PASS negative controls: 4/4 mutants rejected"

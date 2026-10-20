@@ -41,12 +41,13 @@ def same_result(a, b):
     return a[1].rsplit(": ", 1)[-1].strip() == b[1].rsplit(": ", 1)[-1].strip()
 
 
-def contexts_f1(prelude, body):
+def contexts_f1(prelude, body, fn_prelude):
     indented = "".join("  " + line + "\n" for line in body.splitlines())
+    fn_prelude = "".join("  " + line + "\n" for line in fn_prelude.splitlines())
     return {
         "top": prelude + body + "\n",
         "loop": prelude + "i := 0\nwhile(i < 1) {\n" + indented + "  i += 1\n}\n",
-        "fn-from-loop": prelude + "fn(case()) {\n" + indented + "}\ni := 0\nwhile(i < 1) {\n  case()\n  i += 1\n}\n",
+        "fn-from-loop": prelude + "fn(case()) {\n" + fn_prelude + indented + "}\ni := 0\nwhile(i < 1) {\n  case()\n  i += 1\n}\n",
     }
 
 
@@ -99,15 +100,15 @@ REFUSED = [
 # callee's parameter/local of the same name.
 F1 = [
     ("f1_parameter_shadow_array", 'x := "s"\nfn(f(x)) { return x }\n',
-     'print("v=$[f([1,2])]")'),
+     'print("v=$[f([1,2])]")', 'x := "s"\n'),
     ("f1_local_shadow_double", 'y := "s"\nfn(g()) { y := 2.5; return y }\n',
-     'print("v=$[g()]")'),
-    ("f1_local_shadow_bool", 'y := 7\nfn(g()) { y := true; return y }\n',
-     'print("v=$[g()]")'),
+     'print("v=$[g()]")', 'y := "s"\n'),
+    ("f1_local_shadow_bool", 'y := "s"\nfn(g()) { y := true; return y }\n',
+     'print("v=$[g()]")', 'y := "s"\n'),
     ("f1_parameter_shadow_string", 'x := 7\nfn(f(x)) { return x }\narg := "s"\n',
-     'print("v=$[f(arg)]")'),
+     'print("v=$[f(arg)]")', 'x := 7\narg := "s"\n'),
     ("f1_local_shadow_string", 'y := 7\nfn(g()) { y := "s"; return y }\n',
-     'print("v=$[g()]")'),
+     'print("v=$[g()]")', 'y := 7\n'),
 ]
 
 ERROR_SIDE_EFFECT = ("interp_error",
@@ -141,8 +142,8 @@ def main():
                 if args.verbose:
                     print(f"PASS {name} [{context}] rc={got[2]} out={got[0]!r}")
 
-    for name, prelude, body in F1:
-        for context, text in contexts_f1(prelude, body).items():
+    for name, prelude, body, fn_prelude in F1:
+        for context, text in contexts_f1(prelude, body, fn_prelude).items():
             legacy = run(oracle, text, vm=False)
             default = run(nift, text, vm="1")  # legacy fallback allowed
             required = run(nift, text, vm="require")
