@@ -1,0 +1,1 @@
+error: $ROOT/fallback_fn_called_early.f:2:11: return: undefined callable: f
