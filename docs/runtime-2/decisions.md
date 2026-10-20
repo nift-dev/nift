@@ -1091,3 +1091,18 @@ Supersedes the "other `@` forms are not banned automatically" part of D-047 #1.
    Claude reviews independently and runs certification. It starts only after
    CP15 integrates and parser ownership is free, and does not interrupt CP15,
    CP17, CP12B, L7 or their certification.
+
+### D-047/D-048 inventory correction (2026-10-20)
+
+The D-047 figures "`@struct` in 7 package files, `@import` in 3" were measured
+on the **nift-packages snapshot used by `make certify`** (`nift-packages.tgz`:
+seven native-binding packages, commits of 2026-09-20), not on the current
+package repositories. DeepSeek's audit of the 25 current package repositories
+(2026-10-20) finds package functions already written `fn(...)` and structs
+`struct(...)`, no executable `@fn`/`@struct` script directives (two `@struct`
+occurrences are tests asserting the form is absent), and `@import(...)` as the
+only script-directive form in use (393 occurrences in 90 files). Two
+consequences: the certify package snapshot is stale and still uses
+`@struct`/`@import`, so it must be refreshed from the migrated repositories
+before D-048 enforcement lands (otherwise certification would test obsolete
+sources); and the D-048 rule itself is unchanged.
