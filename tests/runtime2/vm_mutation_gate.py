@@ -128,7 +128,12 @@ def run_all(labels, rt_diff, logs, jobs):
                 return run_one(w[0], w[1], w[2], logs)
         return run_one(w[0], w[1], w[2], logs)
 
-    with cf.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+    # Never more workers than CPUs: at --jobs 8 on 4 vCPU the 64 MiB output
+    # bail-out timed out under load even with the timing-sensitive suites
+    # serialised (equivalence run 2, 2026-10-20); --jobs 2 and 4 matched the
+    # sequential 72-check matrix exactly.
+    jobs = max(1, min(jobs, os.cpu_count() or 1))
+    with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
         done = list(pool.map(one, work))
     rejected = {label: [] for label, _ in labels}
     aborted = []
