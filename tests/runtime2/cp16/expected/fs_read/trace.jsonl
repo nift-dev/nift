@@ -4,6 +4,7 @@
 {"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
 {"ctx":"script","op":"read","arg":"$BASE/w/text.txt","res":"24"}
 {"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
+{"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
 {"ctx":"script","op":"open","arg":"$BASE/w/bin.dat","res":"r"}
 {"ctx":"script","op":"read","arg":"$BASE/w/bin.dat","res":"4"}
 {"ctx":"script","op":"open","arg":"$BASE/w/vals.txt","res":"r"}

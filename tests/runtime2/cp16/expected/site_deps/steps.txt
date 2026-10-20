@@ -59,6 +59,7 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
   ↳ dependency changed: data/open.txt
@@ -73,8 +74,10 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/open.txt
 
 run nift build to rebuild this file
@@ -87,8 +90,10 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/sha.txt
 
@@ -102,8 +107,10 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/inj.json
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/sha.txt
@@ -118,8 +125,10 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/inj.json
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/sha.txt
@@ -135,8 +144,10 @@ Nift status
 1 of 1 tracked file needs rebuilding
 
 /
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/inj.json
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/readval.txt
@@ -154,8 +165,10 @@ Nift status
 
 /
   ↳ dependency changed: data/at.json
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/inj.json
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/readval.txt
@@ -173,8 +186,10 @@ Nift status
 
 /
   ↳ dependency changed: data/at.json
+  ↳ dependency changed: data/bytes.txt
   ↳ dependency changed: data/cat.txt
   ↳ dependency changed: data/file.txt
+  ↳ dependency changed: data/ifstream.txt
   ↳ dependency changed: data/inj.json
   ↳ dependency changed: data/open.txt
   ↳ dependency changed: data/part.html
@@ -190,8 +205,10 @@ exit 0
 cat-2
 built /
     ↳ dependency changed: data/at.json
+    ↳ dependency changed: data/bytes.txt
     ↳ dependency changed: data/cat.txt
     ↳ dependency changed: data/file.txt
+    ↳ dependency changed: data/ifstream.txt
     ↳ dependency changed: data/inj.json
     ↳ dependency changed: data/open.txt
     ↳ dependency changed: data/part.html

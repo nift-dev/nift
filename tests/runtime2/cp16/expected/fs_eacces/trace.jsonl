@@ -1,6 +1,7 @@
 {"ctx":"script","op":"touch","arg":"$BASE/w/ro/new.txt","res":""}
 {"ctx":"script","op":"mkdir","arg":"$BASE/w/ro/sub","res":""}
 {"ctx":"script","op":"open","arg":"$BASE/w/ro/in.txt","res":"rw"}
+{"ctx":"script","op":"read","arg":"$BASE/w/ro/in.txt","res":"2"}
 {"ctx":"script","op":"save","arg":"$BASE/w/ro/in.txt","res":""}
 {"ctx":"script","op":"copy-to","arg":"$BASE/w/copy.txt","res":""}
 {"ctx":"script","op":"copy-to","arg":"$BASE/w/ro/copy.txt","res":""}

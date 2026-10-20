@@ -8,9 +8,11 @@
 {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"a"}
 {"ctx":"script","op":"save","arg":"$BASE/w/w.txt","res":""}
 {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"rw"}
+{"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"19"}
 {"ctx":"script","op":"save","arg":"$BASE/w/w.txt","res":""}
 {"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"25"}
 {"ctx":"script","op":"open","arg":"$BASE/w/w.txt","res":"rw"}
+{"ctx":"script","op":"read","arg":"$BASE/w/w.txt","res":"25"}
 {"ctx":"script","op":"open","arg":"$BASE/w/vals.txt","res":"w"}
 {"ctx":"script","op":"save","arg":"$BASE/w/vals.txt","res":""}
 {"ctx":"script","op":"read","arg":"$BASE/w/vals.txt","res":"33"}

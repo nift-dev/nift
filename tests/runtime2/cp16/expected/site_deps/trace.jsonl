@@ -7,6 +7,7 @@
 {"ctx":"/","op":"read","arg":"$BASE/w/data/cat.txt","res":"6"}
 {"ctx":"/","op":"open","arg":"$BASE/w/data/file.txt","res":"r"}
 {"ctx":"/","op":"read","arg":"$BASE/w/data/file.txt","res":"7"}
+{"ctx":"/","op":"read","arg":"$BASE/w/data/bytes.txt","res":"8"}
 {"ctx":"/","op":"read","arg":"$BASE/w/data/sha.txt","res":"6"}
 {"ctx":"/","op":"stat","arg":"$BASE/w/data/stat.txt","res":"file"}
 {"ctx":"/","op":"open","arg":"$BASE/w/data/readval.txt","res":"r"}
@@ -32,6 +33,7 @@
 {"ctx":"/","op":"read","arg":"$BASE/w/data/cat.txt","res":"6"}
 {"ctx":"/","op":"open","arg":"$BASE/w/data/file.txt","res":"r"}
 {"ctx":"/","op":"read","arg":"$BASE/w/data/file.txt","res":"7"}
+{"ctx":"/","op":"read","arg":"$BASE/w/data/bytes.txt","res":"9"}
 {"ctx":"/","op":"read","arg":"$BASE/w/data/sha.txt","res":"6"}
 {"ctx":"/","op":"stat","arg":"$BASE/w/data/stat.txt","res":"file"}
 {"ctx":"/","op":"open","arg":"$BASE/w/data/readval.txt","res":"r"}

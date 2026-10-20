@@ -6,8 +6,10 @@
   "dependencies": [
    "content/index.html",
    "data/at.json",
+   "data/bytes.txt",
    "data/cat.txt",
    "data/file.txt",
+   "data/ifstream.txt",
    "data/inj.json",
    "data/open.txt",
    "data/part.html",
@@ -19,8 +21,10 @@
   "dependency-hashes": {
    "content/index.html": "908104364561598654",
    "data/at.json": "8686831917336683803",
+   "data/bytes.txt": "11561118954450971347",
    "data/cat.txt": "1640639993685903018",
    "data/file.txt": "504985901252051590",
+   "data/ifstream.txt": "5756062953677647449",
    "data/inj.json": "4019507551379446311",
    "data/open.txt": "4989352667989678064",
    "data/part.html": "13642413092450587795",
@@ -43,8 +47,10 @@
   "dependencies": [
    "content/index.html",
    "data/at.json",
+   "data/bytes.txt",
    "data/cat.txt",
    "data/file.txt",
+   "data/ifstream.txt",
    "data/inj.json",
    "data/open.txt",
    "data/part.html",
@@ -56,8 +62,10 @@
   "dependency-hashes": {
    "content/index.html": "908104364561598654",
    "data/at.json": "10511485757519589046",
+   "data/bytes.txt": "1386060760756083916",
    "data/cat.txt": "1643492126848914677",
    "data/file.txt": "507873218787166001",
+   "data/ifstream.txt": "5753210820514635790",
    "data/inj.json": "5844161391562351554",
    "data/open.txt": "4988413685059375095",
    "data/part.html": "13643369667566942140",
