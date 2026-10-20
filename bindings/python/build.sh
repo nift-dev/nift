@@ -57,6 +57,11 @@ done
 [ -f "$EMBED/src/rt/parser-sources.txt" ] || { echo "error: src/rt/parser-sources.txt missing" >&2; exit 1; }
 RT_PARSER_SOURCES="$(grep -v '^#' "$EMBED/src/rt/parser-sources.txt" | tr '\n' ' ')"
 PARSER_SOURCES="$PARSER_SOURCES $RT_PARSER_SOURCES"
+# The CP16 Host layer, CP17 handle table and PageObserver that the legacy
+# engine calls (shared list, src/rt/host-sources.txt).
+[ -f "$EMBED/src/rt/host-sources.txt" ] || { echo "error: src/rt/host-sources.txt missing" >&2; exit 1; }
+RT_HOST_SOURCES="$(grep -v '^#' "$EMBED/src/rt/host-sources.txt" | tr '\n' ' ')"
+PARSER_SOURCES="$PARSER_SOURCES $RT_HOST_SOURCES"
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \

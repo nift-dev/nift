@@ -61,6 +61,12 @@ with open(os.path.join(NATIVE, "src", "rt", "parser-sources.txt"), encoding="utf
     RT_PARSER_SOURCES = [os.path.join(NATIVE, line.strip()) for line in _list
                          if line.strip() and not line.startswith("#")]
 PARSER_SOURCES += RT_PARSER_SOURCES
+# The CP16 Host layer, CP17 handle table and PageObserver that the legacy
+# engine calls (shared list, src/rt/host-sources.txt).
+with open(os.path.join(NATIVE, "src", "rt", "host-sources.txt"), encoding="utf-8") as _list:
+    RT_HOST_SOURCES = [os.path.join(NATIVE, line.strip()) for line in _list
+                       if line.strip() and not line.startswith("#")]
+PARSER_SOURCES += RT_HOST_SOURCES
 sources = [os.path.join(BASE, s) for s in CABI_SOURCES] + PARSER_SOURCES
 sources.append(os.path.join(BASE, "src", "nift_module.cc"))
 

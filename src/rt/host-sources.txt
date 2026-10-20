@@ -1,0 +1,43 @@
+# The CP16 Host layer, the CP17 handle table and the PageObserver recorder that
+# the legacy engine (src/Parser*.cpp, src/Process.cpp) calls, plus the src/rt
+# support objects the handle table needs. One path per line, relative to the
+# repository root. Every build that compiles src/Parser*.cpp without the whole
+# src/rt must compile these too: bindings/python/build.sh and setup.py,
+# bindings/node/build.sh. (Go and C# load libnift_c, built from all objects.)
+# `make test-rt-host-sources-list` checks this list against the Makefile's
+# RT_HOST_LINK_SOURCES wildcard.
+src/PageObserver.cpp
+src/rt/handle.cpp
+src/rt/value.cpp
+src/rt/string.cpp
+src/rt/heap_account.cpp
+src/rt/handles/completion.cpp
+src/rt/handles/context_tree.cpp
+src/rt/handles/lifecycle.cpp
+src/rt/handles/limit_setting.cpp
+src/rt/handles/native_access.cpp
+src/rt/handles/slot_store.cpp
+src/rt/handles/table.cpp
+src/rt/handles/table_contexts.cpp
+src/rt/handles/types.cpp
+src/rt/host/host_call.cpp
+src/rt/host/host_error.cpp
+src/rt/host/host_op.cpp
+src/rt/host/host_trace.cpp
+src/rt/host/path.cpp
+src/rt/host/process_call.cpp
+src/rt/host/process_cleanup.cpp
+src/rt/host/process_common.cpp
+src/rt/host/process_handles.cpp
+src/rt/host/process_loop.cpp
+src/rt/host/process_posix.cpp
+src/rt/host/process_posix_launch.cpp
+src/rt/host/process_posix_lifecycle.cpp
+src/rt/host/process_posix_loop.cpp
+src/rt/host/process_posix_sys.cpp
+src/rt/host/process_reaper.cpp
+src/rt/host/process_runtime.cpp
+src/rt/host/process_signals.cpp
+src/rt/host/process_win.cpp
+src/rt/host/run_options.cpp
+src/rt/host/run_request.cpp

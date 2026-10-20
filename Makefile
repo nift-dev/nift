@@ -569,6 +569,20 @@ test-rt-host: $(RT_HOST_LAYER_UNIT) $(RT_HOST_PROCESS_UNIT)
 # Contained and fast (~20 s); part of `make test` (D-034).
 test: test-rt-host
 
+# The binding builds compile src/rt/host-sources.txt instead of the whole src/rt;
+# it must name exactly RT_HOST_LINK_SOURCES plus PageObserver and the handle
+# table's src/rt support objects.
+RT_HOST_LIST_EXPECTED := src/PageObserver.cpp src/rt/handle.cpp src/rt/value.cpp src/rt/string.cpp src/rt/heap_account.cpp $(RT_HOST_LINK_SOURCES)
+.PHONY: test-rt-host-sources-list
+test-rt-host-sources-list:
+	@expected="$$(printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort)"; \
+	actual="$$(grep -v '^#' src/rt/host-sources.txt | grep . | LC_ALL=C sort)"; \
+	if [ "$$expected" != "$$actual" ]; then \
+	  echo "src/rt/host-sources.txt is out of date:"; \
+	  echo "--- expected"; printf '%s\n' "$$expected"; echo "--- listed"; printf '%s\n' "$$actual"; exit 1; \
+	fi; echo "test-rt-host-sources-list: OK"
+test: test-rt-host-sources-list
+
 # ThreadSanitizer on the process tests (groups are shared with the host loop thread).
 test-rt-host-tsan:
 	mkdir -p "$(TEST_DIR)/rt-tsan"
@@ -919,9 +933,15 @@ $(TEST_DIR)/pic/%.o: %.c
 
 -include $(C_ABI_PIC:.o=.d)
 
+# libffi's members are re-added under an "ffi_" prefix: `ar r` replaces any
+# member with the same basename, so an engine object such as
+# src/rt/handles/types.o would otherwise silently overwrite libffi's types.o
+# (ffi_type_* definitions) and break static consumers.
 libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
-	cp $(LIBFFI_A) $@
-	ar rcs $@ $(C_ABI_CORE)
+	rm -rf $@ $@.ffi && mkdir -p $@.ffi
+	cd $@.ffi && ar x $(abspath $(LIBFFI_A)) && for m in *.o; do mv "$$m" "ffi_$$m"; done
+	ar rcs $@ $(C_ABI_CORE) $@.ffi/ffi_*.o
+	rm -rf $@.ffi
 
 libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A)
