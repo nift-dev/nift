@@ -2755,3 +2755,11 @@ test-rt-builtins-sanitize:
 	"$(TEST_DIR)/rt-san/builtins-diff" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_SAN_CASES:-2000}
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/case-conversion-unit"
 	"$(TEST_DIR)/rt-san/case-conversion-unit"
+
+# Loop-literal regression (v4.12.0 regressions 55cb323c, 5fe38bd1): string
+# literals, escapes, interpolation and output in top-level, loop and
+# loop-called-function code must match the pinned v4.6.0 output.
+.PHONY: test-loop-literals
+test-loop-literals: $(TARGET)
+	python3 tests/runtime2/loop-literals/run.py --nift ./$(TARGET)
+test: test-loop-literals
