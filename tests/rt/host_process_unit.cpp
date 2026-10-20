@@ -1058,6 +1058,59 @@ void legacy_adopted_children() {
     runtime::set_child_reporting(false);
 }
 
+// The adoption path never reaps or signals a child another component forked
+// and reported (job control, serve, the legacy launcher), also while legacy
+// launches leave orphans, the reaper runs and C2's sweep runs concurrently.
+void foreign_children_concurrent() {
+    if (!runtime::enable_subreaper()) { std::printf("foreign_children_concurrent: SKIPPED\n"); return; }
+    runtime::set_child_reporting(true);
+    const std::string tag = new_tag();
+    std::atomic<bool> foreign_ok{true};
+    std::atomic<int> foreign_done{0};
+    std::thread foreign([&] {
+        for (int i = 0; i < 60; ++i) {
+            pid_t pid = -1;
+            {
+                std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
+                pid = ::fork();
+                if (pid == 0) { ::usleep(static_cast<useconds_t>(5000 + (i % 5) * 5000)); ::_exit(1 + i % 100); }
+                runtime::note_direct_child(pid);
+            }
+            int status = 0;
+            const pid_t got = ::waitpid(pid, &status, 0);
+            if (got != pid || !WIFEXITED(status) || WEXITSTATUS(status) != 1 + i % 100) foreign_ok = false;
+            ++foreign_done;
+        }
+    });
+    std::thread legacy([&] {
+        for (int i = 0; i < 20; ++i) {
+            auto r = req({"sh", "-c", "sleep 0.05 >/dev/null 2>&1 & exit 0"}, OutputMode::FileCapture, tag);
+            r.own_group = false;
+            start_ok(r)->wait();
+            runtime::reap_adopted_children();
+        }
+    });
+    const long own_group = static_cast<long>(::getpgrp());
+    std::thread sweeper([&] {
+        while (foreign_done.load() < 60) {
+            runtime::sweep_orphans(milliseconds(20), milliseconds(50), [own_group](long pid) {
+                runtime::ProcInfo info;
+                if (!runtime::proc_read(pid, info)) return true;
+                return runtime::is_direct_child(pid) || info.pgrp != own_group;
+            });
+            std::this_thread::sleep_for(milliseconds(15));
+        }
+    });
+    foreign.join();
+    legacy.join();
+    sweeper.join();
+    CHECK(foreign_ok.load());
+    CHECK(none_tagged(tag, milliseconds(3000)));
+    runtime::reap_adopted_children();
+    CHECK(no_zombies());
+    runtime::set_child_reporting(false);
+}
+
 // ---- D-034 ----
 ProcessResult run_opts(OptionObject opts, std::vector<std::string> argv, const std::string& tag, std::uint64_t limit = 1u << 30) {
     RunOptions o;
@@ -1346,6 +1399,7 @@ int main(int argc, char** argv) {
         {"detached_rules", detached_rules},
         {"low_fd_limit", low_fd_limit},
         {"legacy_adopted_children", legacy_adopted_children},
+        {"foreign_children_concurrent", foreign_children_concurrent},
         {"trace_spawn", trace_spawn},
         {"pipe_mode_suite", pipe_mode_suite},
         {"stdin_suite", stdin_suite},

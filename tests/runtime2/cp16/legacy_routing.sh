@@ -130,6 +130,33 @@ EOF
   sleep 0.3
   if [ -n "$bge" ] && alive "$bge"; then ok "(c) background member outlives a normal script end (legacy exception)"; else bad "background member [$bge] did not outlive its script"; fi
   kill -9 "$bge" 2>/dev/null
+  # (c) while Nift lives an adopted background member's parent is Nift (the
+  #     subreaper: a legacy-visible difference, §9.6); after a normal exit it
+  #     is reparented to the system's reaper, exactly like an orphan of this
+  #     shell (init, or the session's subreaper).
+  cat > bgppid.f <<'EOF'
+r := cmd("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > bgppid.pid").run()
+p := cmd("sh", "-c", "cut -d' ' -f4 /proc/$(cat bgppid.pid)/stat; echo $PPID").run()
+print(p.stdout)
+EOF
+  rm -f bgppid.pid
+  read -r during nift_pid < <(N bgppid.f 2>&1 | tr '\n' ' ')
+  bgp=$(cat bgppid.pid 2>/dev/null); echo "$bgp" > bgppid-kill.pid
+  ref=$(sh -c 'sleep 30 >/dev/null 2>&1 & echo $!'); echo "$ref" > ref-kill.pid
+  sleep 0.3
+  after=$(cut -d' ' -f4 "/proc/$bgp/stat" 2>/dev/null); ref_parent=$(cut -d' ' -f4 "/proc/$ref/stat" 2>/dev/null)
+  if [ -n "$during" ] && [ "$during" = "$nift_pid" ]; then ok "(c) adopted member's parent is Nift while Nift lives"; else bad "(c) parent during [$during], Nift [$nift_pid]"; fi
+  if [ -n "$bgp" ] && alive "$bgp" && [ -n "$after" ] && [ "$after" = "$ref_parent" ] && [ "$after" != "$nift_pid" ]; then
+    ok "(c) after a normal exit the member lives on, reparented to the system's reaper (pid $after)"
+  else bad "(c) after exit: alive? parent [$after], expected [$ref_parent]"; fi
+  kill -9 "$bgp" "$ref" 2>/dev/null
+  # The interactive shell does not enable the subreaper (nor C2).
+  printf '%s\n' 'r := cmd("sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $! > shbg.pid").run()' \
+    'p := cmd("sh", "-c", "cut -d\" \" -f4 /proc/$(cat shbg.pid)/stat; echo $PPID").run()' 'print(p.stdout)' > shell.in
+  rm -f shbg.pid
+  read -r sh_parent sh_nift < <(timeout -k 5 60 "$NIFT" < shell.in 2>/dev/null | grep -E '^[0-9]+$' | tr '\n' ' ')
+  shbg=$(cat shbg.pid 2>/dev/null); echo "$shbg" > shbg-kill.pid; kill -9 "$shbg" 2>/dev/null
+  if [ -n "$sh_parent" ] && [ -n "$sh_nift" ] && [ "$sh_parent" != "$sh_nift" ]; then ok "interactive shell: no subreaper (member's parent is not Nift)"; else bad "interactive shell: member parent [$sh_parent], Nift [$sh_nift]"; fi
   # (c) the same at a page render end
   if [ -d "$HERE/probes/sites/site_run/site" ]; then
     cp -r "$HERE/probes/sites/site_run/site" csite && mkdir -p csite/data

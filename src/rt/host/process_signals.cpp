@@ -122,8 +122,18 @@ void watcher_loop() {
         terminate_all_indexed(options.kill_after, options.post_kill_wait);
         // Adopted orphans (legacy run() background members, under the
         // subreaper): terminated too; other components' children are left alone.
-        if (subreaper_enabled() && child_reporting())
-            sweep_orphans(options.kill_after, options.post_kill_wait, [](long pid) { return is_direct_child(pid); });
+        // Scope: only adopted processes still in Nift's own process group and
+        // session (where descendants of Nift's legacy launches stay); never a
+        // child another component reported, nor anything that left the group.
+        if (subreaper_enabled() && child_reporting()) {
+            const long own_group = static_cast<long>(::getpgrp());
+            const long own_session = static_cast<long>(::getsid(0));
+            sweep_orphans(options.kill_after, options.post_kill_wait, [own_group, own_session](long pid) {
+                ProcInfo info;
+                if (!proc_read(pid, info)) return true;
+                return is_direct_child(pid) || info.pgrp != own_group || info.session != own_session;
+            });
+        }
         {
             std::lock_guard<std::mutex> lock(g_done_mutex);
             g_cleanup_done = true;
@@ -236,9 +246,11 @@ bool enable_subreaper() {
 }
 bool subreaper_enabled() { return g_subreaper; }
 
+#ifdef __linux__
 namespace {
 void report_direct_child(long pid) { note_direct_child(pid); }
 } // namespace
+#endif
 
 bool enable_subreaper_for_legacy() {
 #ifdef __linux__
@@ -246,12 +258,10 @@ bool enable_subreaper_for_legacy() {
     std::lock_guard<std::mutex> launching(nift_process_launch_mutex());
     nift_process_child_observer().store(&report_direct_child);
     set_child_reporting(true);
-    const long self = static_cast<long>(::getpid());
     std::set<long> stages;
     for (const auto& g : index_snapshot()) for (long p : g.stage_pids) stages.insert(p);
     for (long pid : own_children())
         if (!stages.count(pid)) note_direct_child(pid);
-    (void)self;
     // No SIGCHLD handler and no host loop here: legacy code is not prepared
     // for EINTR from a new handler, and a plain run() must not cost
     // descriptors (CP07, `ulimit -n 6`). Adopted orphans are reaped after each

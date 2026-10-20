@@ -746,8 +746,9 @@ Nift's own process group satisfy both (§9.5 item 4).
 | cleanup at context end (C1) | none: background members outlive the script / page render, as before | leftover group members terminated when the owning CP17 context ends (D-030, D-035) |
 | dedicated process group (C3) | no: stages stay in Nift's process group (a signal to that group reaches them) | yes: one group per pipeline, signalled as a unit |
 | terminal ownership | unchanged: Nift's group keeps the terminal | the pipeline's group gets the terminal for a blocking call (§11.8) |
-| SIGINT/SIGTERM cleanup (C2) | yes: running stages by pid; background members found by parentage (subreaper, `sweep_orphans`) with their descendants; other components' children and unrelated processes untouched | yes: every indexed group (SIGTERM, grace, SIGKILL, bounded wait) |
+| SIGINT/SIGTERM cleanup (C2) | yes: running stages by pid; background members found by parentage (Linux subreaper, `sweep_orphans`) with their descendants; other components' children and unrelated processes untouched; on macOS only the running stages | yes: every indexed group (SIGTERM, grace, SIGKILL, bounded wait) |
 | SIGKILL of Nift alone | children keep running (no PDEATHSIG) | managed stages die with Nift (PDEATHSIG, Linux) |
+| parent of a background member while Nift lives | Nift (Linux subreaper; legacy-visible difference) | the pipeline's group members are Nift's descendants as launched |
 | lifecycle ownership | none in CP17's table while `own_group` is false (no group to own; the residue machinery is wired but inert) | CP17 owns identity, counts, contexts and the lifecycle verdict; CP16 reports OS facts |
 | launch with no descriptor left for the exec report | launches; an exec failure is only its 127/126 status (legacy) | fails loudly (`cannot create pipe: ...`): launch failure stays distinct |
 
@@ -764,6 +765,46 @@ under the launch mutex (`nift_process_note_child`, `ProcessPOSIX.h`: the
 legacy launcher, job control, `serve`, whose fork now holds the mutex),
 identified by pid and start time, so the subreaper never reaps or signals a
 child some other code waits for.
+
+Scope of the subreaper (coordinator conditions for r3). The kernel adopts
+every orphaned descendant of a subreaper; what Nift *does* with adopted
+processes is scoped: (1) it is enabled only where C2 is installed, i.e. in
+processes that run the legacy interpreter outside the interactive shell and
+outside `--auto`'s own signal handler -- never in the shell (job control) and
+never in `nift serve` (which runs no parser); (2) reaping (adopted zombies
+only) and C2's sweep never touch a child another component forked and
+reported (legacy launcher, job control, serve), identified by pid and start
+time; (3) C2's sweep signals only adopted processes still in Nift's own
+process group and session -- where descendants of Nift's legacy launches
+remain unless they move themselves (a daemon that calls `setsid` escapes, as
+before). Exact attribution to `run()` alone is not possible while the stages
+share Nift's group: descendants of the legacy launcher's other launches in a
+build (template command directives, package `git` runs, which go through the
+same launcher in Nift's group) are adopted and swept alike; they are Nift's
+own legacy launches too. Pinned by the unit test
+`foreign_children_concurrent` (reported children forked and waited for by
+another thread while legacy launches leave orphans, the reaper runs and C2's
+sweep runs concurrently; a mutant that drops the reported-child check fails
+it) and stressed in the remote job with `deadline_races` and
+`legacy_adopted_children`.
+
+**Legacy-visible difference.** While Nift lives, an adopted background
+process sees Nift as its parent (`getppid()`, `/proc/<pid>/stat`), not init
+or the session's subreaper as with the old launcher, and Nift reaps it when
+it exits. When Nift exits normally the process lives on and is reparented to
+the system's reaper exactly as before (fixture in `legacy_routing.sh`).
+
+**Platforms.** The subreaper is Linux-only: `PR_SET_CHILD_SUBREAPER`,
+`own_children()` (`/proc/self/task/*/children`) and the sweep are compiled
+under `#ifdef __linux__`; elsewhere `enable_subreaper_for_legacy()`,
+`sweep_orphans()` and `reap_adopted_children()` are stubs returning
+false/0. On macOS (and other non-Linux POSIX) C2 itself works (self-pipe
+watcher, SIGTERM/grace/SIGKILL by pid to the running legacy stages), but
+background members a stage left behind are not reached: they stay in Nift's
+process group, so a signal to that group (Ctrl-C at a terminal, a
+supervisor's killpg) still ends them, while a signal to Nift alone does not
+-- the old launcher's behaviour. Windows keeps the legacy launcher entirely
+(§9.3); the Host layer's Windows slice is untested.
 
 Tests, by ownership class (`tests/runtime2/cp16/legacy_routing.sh`, unit tests
 in `tests/rt/host_process_unit.cpp`): (a) SIGINT/SIGTERM to Nift terminates
