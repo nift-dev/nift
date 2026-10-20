@@ -543,10 +543,13 @@ test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff
 
 # CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()
-# options, process model. Not linked into nift until the VM wiring. Process
+# options, process model, CP17 binding. Not linked into nift until the VM wiring. Process
 # tests run contained (D-031: ulimit -f/-v, timeout, own session, cleanup).
 RT_HOST_SOURCES := $(sort $(wildcard src/rt/host/*.cpp))
-RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) src/HostTrace.h src/ProcessPOSIX.h src/ProcessEnvironment.h tests/rt/rt_test.h
+# The process binding uses CP17's handle table (RT_HANDLE_SOURCES).
+RT_HOST_SOURCES += $(RT_HANDLE_SOURCES)
+RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) $(wildcard src/rt/handles/*.h) src/rt/handle.h src/rt/value.h \
+	src/HostTrace.h src/ProcessPOSIX.h src/ProcessEnvironment.h tests/rt/rt_test.h
 RT_HOST_LAYER_UNIT := $(TEST_DIR)/rt/host-layer-unit$(EXEEXT)
 RT_HOST_PROCESS_UNIT := $(TEST_DIR)/rt/host-process-unit$(EXEEXT)
 $(RT_HOST_LAYER_UNIT): tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)

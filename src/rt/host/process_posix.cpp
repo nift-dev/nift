@@ -308,6 +308,11 @@ struct ProcessGroup::State {
     mutable std::mutex mu;
     std::weak_ptr<ProcessGroup> self;
     std::vector<runtime::TaskId> loop_tasks;
+    // Lifecycle seam (process.h): events are collected under the lock and
+    // delivered after it is released.
+    std::shared_ptr<LifecycleSink> sink;
+    bool term_notified = false;
+    bool settle_notified = false;
     ProcessResult result;
 
     bool all_reaped() const {
@@ -1111,7 +1116,7 @@ bool run_loop(State& s, const void* key, std::unique_lock<std::mutex>& lk, std::
 void rearm(State& s) {
     for (auto id : s.loop_tasks) runtime::loop_cancel(id);
     s.loop_tasks.clear();
-    if (group_settled(s)) { runtime::notify_settled(); return; }
+    if (group_settled(s)) return;
     const auto now = Clock::now();
     Clock::time_point wake = Clock::time_point::max();
     if (s.detached) {
@@ -1143,12 +1148,59 @@ void rearm(State& s) {
     }
 }
 
-// Lock for a public operation; re-arms the host loop when it is released.
+OsOutcome outcome_of(const State& s) {
+    OsOutcome o;
+    o.stage_unconfirmed = s.lost;
+    o.members_survived = s.leftover_failed;
+    const std::string who = "process '" + (s.req.stages.empty() ? std::string() : s.req.stages.front().program) + "' (pid " +
+                            std::to_string(s.st.empty() ? -1L : static_cast<long>(s.st.front().pid)) + ")";
+    if (s.lost) o.detail = who + " did not exit after SIGKILL; left to the reaper";
+    else if (s.leftover_failed) o.detail = who + ": background members survived SIGKILL";
+    return o;
+}
+
+// Collects lifecycle events that became due (lock held); the returned
+// closure delivers them (call it after unlocking).
+std::function<void()> collect_lifecycle(State& s) {
+    if (!s.sink || s.detached) return nullptr;
+    std::vector<std::function<void()>> events;
+    auto sink = s.sink;
+    if (!s.term_notified) {
+        bool due = false;
+        OsTermination cause = OsTermination::Exited;
+        if (s.phase != State::Phase::None && s.reason == CancelReason::Deadline) { due = true; cause = OsTermination::Deadline; }
+        else if (s.phase != State::Phase::None && (s.reason == CancelReason::Explicit || s.reason == CancelReason::Limit)) { due = true; cause = OsTermination::Cancel; }
+        else if (s.finished || s.all_reaped()) due = true;  // every stage exited by itself (leftover handling included)
+        if (due) {
+            s.term_notified = true;
+            events.push_back([sink, cause] { sink->terminating(cause); });
+        }
+    }
+    const bool now_settled = group_settled(s);
+    if (now_settled && !s.settle_notified) {
+        s.settle_notified = true;
+        const OsOutcome facts = outcome_of(s);
+        events.push_back([sink, facts] { sink->settled(facts); });
+    } else if (!now_settled) {
+        s.settle_notified = false;  // a cleanup made it unsettled again: report the next settle too
+    }
+    if (events.empty()) return nullptr;
+    return [events] { for (const auto& e : events) e(); };
+}
+
+// Lock for a public operation; re-arms the host loop and delivers lifecycle
+// events when it is released.
 struct OpLock {
     State& s;
     std::unique_lock<std::mutex> lk;
     explicit OpLock(State& state) : s(state), lk(state.mu) {}
-    ~OpLock() { if (lk.owns_lock()) rearm(s); }
+    ~OpLock() {
+        if (!lk.owns_lock()) return;
+        rearm(s);
+        auto deliver = collect_lifecycle(s);
+        lk.unlock();
+        if (deliver) deliver();
+    }
 };
 } // namespace
 
@@ -1170,12 +1222,11 @@ void ProcessGroup::timer_tick() {
         if (s.finished) leftover_step(s);
     }
     const bool done = group_settled(s);
-    const bool failed = s.lost || s.leftover_failed;
     rearm(s);
+    auto deliver = collect_lifecycle(s);
     lk.unlock();
-    if (done && runtime::reaper_release(this) && failed)
-        runtime::report_cleanup_failure("error: cleanup: process '" + argv0() + "' (pid " + std::to_string(pid()) +
-                                        ") could not be terminated (still running after SIGKILL); left to the reaper");
+    if (deliver) deliver();  // the CP17 binding reports failures; nothing is printed here
+    if (done) runtime::reaper_release(this);
 }
 
 bool ProcessGroup::pump(std::optional<Clock::time_point> until) {
@@ -1367,6 +1418,19 @@ ProcessGroup::TerminateOutcome ProcessGroup::terminate(CancelReason reason) {
 bool ProcessGroup::settled() const {
     std::lock_guard<std::mutex> lock(s_->mu);
     return group_settled(*s_);
+}
+
+OsOutcome ProcessGroup::os_outcome() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
+    return outcome_of(*s_);
+}
+
+void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink> sink, bool replay) {
+    State& s = *s_;
+    OpLock op(s);
+    s.sink = std::move(sink);
+    s.term_notified = !replay && (s.finished || s.all_reaped());
+    s.settle_notified = !replay && group_settled(s);
 }
 
 bool ProcessGroup::cleanup_failed() const {

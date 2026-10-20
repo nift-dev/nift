@@ -1,7 +1,6 @@
 // CP16 Host layer unit tests: error table, op table, trace v1/v2 formats and
 // emission points, HostCall classification, recording hooks, path
 // resolution, run() options (alternative A) and the temporary handle adapter.
-#include "rt/host/handle_adapter_tmp.h"
 #include "rt/host/host_call.h"
 #include "rt/host/host_error.h"
 #include "rt/host/host_op.h"
@@ -589,39 +588,6 @@ void test_shutdown_refusals() {
     CHECK(!catchable("host.shutting_down"));
 }
 
-void test_adapter() {
-    // TEMPORARY stand-in for CP17's table: only what the process hook needs.
-    using namespace tmp_handles;
-    std::vector<std::string> log;
-    TemporaryTable t([&](const CleanupEvent& ev) {
-        log.push_back(*static_cast<std::string*>(ev.resource.get()) + ":" + std::to_string(static_cast<int>(ev.reason)));
-        return CleanupOutcome::success();
-    });
-    const ContextId script = t.open_context(ContextKind::Script, kDetached);
-    const ContextId build = t.open_context(ContextKind::Build, kDetached);
-    const ContextId page = t.open_context(ContextKind::PageRender, build);
-    CHECK(!t.build_family(script) && t.build_family(build) && t.build_family(page));
-    const auto h1 = t.create(script, std::make_shared<std::string>("one"));
-    const auto h2 = t.create(script, std::make_shared<std::string>("two"));
-    const auto h3 = t.create(page, std::make_shared<std::string>("three"));
-    const auto h4 = t.create(script, std::make_shared<std::string>("four"));
-    const auto h5 = t.create(script, std::make_shared<std::string>("five"));
-    CHECK(t.create(script, nullptr) == 0);
-    CHECK(t.resolve(h1) != nullptr);
-    CHECK(!t.release(h1, page));  // not the owner
-    CHECK(t.release(h1, script));
-    CHECK(t.resolve(h1) == nullptr);  // stale
-    CHECK(t.drop(h5));
-    CHECK(!t.detach(h3, page));  // refused in the build family
-    CHECK(t.detach(h4, script));
-    t.close_context(script);
-    CHECK(t.resolve(h2) == nullptr && t.resolve(h4) != nullptr);
-    t.close_context(page);
-    t.shutdown();
-    const std::vector<std::string> expected = {"one:0", "five:1", "two:2", "three:2", "four:3"};
-    CHECK(log == expected);
-}
-
 } // namespace
 
 int main() {
@@ -637,6 +603,5 @@ int main() {
     test_stdin_option();
     test_stdin_file_and_request();
     test_shutdown_refusals();
-    test_adapter();
     return rt_test::finish("host-layer-unit");
 }

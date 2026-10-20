@@ -123,28 +123,6 @@ std::vector<long> proc_group_members(long pgid, long session) {
     return out;
 }
 
-// ---------------------------------------------------------------- failures
-namespace {
-WarningSink& failure_sink() { static WarningSink s; return s; }
-} // namespace
-
-void set_failure_sink(WarningSink sink) {
-    std::lock_guard<std::mutex> lock(warn_mutex());
-    failure_sink() = std::move(sink);
-}
-
-void report_cleanup_failure(const std::string& line) {
-    WarningSink sink;
-    {
-        std::lock_guard<std::mutex> lock(warn_mutex());
-        sink = failure_sink();
-    }
-    if (sink) { sink(line); return; }
-    std::fflush(stdout);
-    std::fprintf(stderr, "%s\n", line.c_str());
-    std::fflush(stderr);
-}
-
 #ifdef NIFT_HOST_TEST_HOOKS
 TestHooks& test_hooks() { static TestHooks h; return h; }
 #endif
@@ -414,27 +392,6 @@ bool reaper_release(const ProcessGroup* group) {
         if (r.pids.empty() && r.groups.empty()) r.idle.notify_all();
     }
     return keep != nullptr;
-}
-
-namespace {
-std::mutex& settle_mutex() { static std::mutex m; return m; }
-std::condition_variable& settle_cv() { static std::condition_variable c; return c; }
-std::atomic<std::uint64_t> g_settle{0};
-} // namespace
-
-std::uint64_t settle_generation() { return g_settle.load(); }
-
-void notify_settled() {
-    {
-        std::lock_guard<std::mutex> lock(settle_mutex());
-        ++g_settle;
-    }
-    settle_cv().notify_all();
-}
-
-void wait_settle_change(std::uint64_t seen, Clock::time_point until) {
-    std::unique_lock<std::mutex> lock(settle_mutex());
-    settle_cv().wait_until(lock, until, [&] { return g_settle.load() != seen; });
 }
 
 std::size_t reaper_pending() {

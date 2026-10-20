@@ -1,33 +1,33 @@
 #pragma once
-// CP16 Host layer: the per-kind cleanup hook for process resources (design
-// §11.3, §11.5; D-030) and the context-end wait.
-//
-// CP17's handle table decides WHEN a process resource is cleaned up
-// (ownership by execution context, reclamation of abandoned handles, detach
-// transfer) and calls the kind's hook exactly once with the reason. This file
-// decides only WHAT happens to the process. Following CP17's integration
-// note, the hook never waits out a grace period: it STARTS the §11.4 sequence
-// and returns; the context-end path then waits once for every group of the
-// context against one deadline (ContextCleanup below).
+// CP16 Host layer: what happens to a process when its handle is cleaned up
+// (design §11.3, §11.5; D-030, D-035). CP17's handle table decides WHEN
+// (ownership by execution context, reference-counted abandonment, detach)
+// and owns the lifecycle verdict; the binding (process_handles.h) calls this
+// from the Process kind's cleanup hook. It never blocks: it STARTS the §11.4
+// sequence and hands an unsettled group to the reaper, whose host-loop
+// timers finish it; the outcome reaches the table through the lifecycle seam
+// (process.h) and the moved-out CompletionTicket.
 //
 //   Abandoned (last counted reference dropped):
-//     running -> cancelled asynchronously (the reaper finishes it) and
+//     running -> cancelled asynchronously and
 //                "warning: process '<argv0>' (pid N) was abandoned while running; terminated"
 //     exited  -> reaped silently, unread output discarded
-//   Explicit (released by its owner): as Abandoned, without the warning.
+//   Explicit (closed by its owner): as Abandoned, without the warning.
 //   ContextEnd:
-//     live stage -> terminated and, unless the context ended on an error,
-//                "warning: process '<argv0>' (pid N) was still running when <context> ended; terminated"
+//     live stage -> terminated and, unless the context is ending on an
+//                error (CleanupEvent::context_error), "warning: process
+//                '<argv0>' (pid N) was still running when <context> ended; terminated"
 //     leftover background descendants (C1) -> terminated silently
-//   Shutdown (CP17: detached handles at table shutdown): nothing.
+//   Shutdown (detached handles at table shutdown): nothing.
 //   Detached groups: never touched, whatever the reason.
 //
 // One warning per group (never one per pipeline stage), and only when Nift
-// actually terminates a still-running process.
+// actually terminates a still-running process. Genuine cleanup failures are
+// not printed here: the table reports them (CloseReport::failures) and they
+// force a nonzero exit (D-035).
 #include "rt/host/process.h"
 
 #include <string>
-#include <vector>
 
 namespace nift::rt::host {
 
@@ -39,39 +39,9 @@ struct CleanupReport {
     bool live_stage_terminated = false;
     bool leftovers_terminated = false;
     bool handed_to_reaper = false;
-    bool queued = false;  // waited for by the active ContextCleanup
 };
 
-// The context-end path (CP16-owned: the code that ends a script, page render,
-// hook, build or --auto pass) wraps the table's close_context() in one of
-// these: hooks running on this thread meanwhile add their groups to it, and
-// wait() drives them all to completion against one deadline (grace + bound,
-// not one grace per process). It also carries what CP17's CleanupEvent does
-// not: the context's label for the warning and whether it ended on an error.
-class ContextCleanup {
-public:
-    ContextCleanup(std::string label, bool failed);
-    ~ContextCleanup();  // wait()s if not done yet
-    ContextCleanup(const ContextCleanup&) = delete;
-    ContextCleanup& operator=(const ContextCleanup&) = delete;
-    static ContextCleanup* current();  // innermost on this thread, or null
-    const std::string& label() const { return label_; }
-    bool failed() const { return failed_; }
-    void add(ProcessGroupPtr group);
-    // Sleeps until every group settled (or grace + bound passed). Returns the
-    // genuine cleanup failures (not terminated / still alive after SIGKILL),
-    // which are also reported through runtime::report_cleanup_failure --
-    // separately from routine warnings and also for error-ended contexts.
-    std::vector<std::string> wait();
-
-private:
-    std::string label_;
-    bool failed_;
-    std::vector<ProcessGroupPtr> groups_;
-    ContextCleanup* previous_;
-    bool waited_ = false;
-};
-
-CleanupReport process_cleanup(const ProcessGroupPtr& group, ProcessRelease reason);
+CleanupReport process_cleanup(const ProcessGroupPtr& group, ProcessRelease reason, const std::string& context_label,
+                              bool context_error);
 
 } // namespace nift::rt::host

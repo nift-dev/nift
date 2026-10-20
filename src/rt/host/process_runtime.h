@@ -32,13 +32,6 @@ using WarningSink = std::function<void(const std::string&)>;
 void set_warning_sink(WarningSink sink);  // empty: stderr
 void warn(const std::string& line);
 
-// ---- cleanup failures (reported separately from routine warnings) ----
-// "error: cleanup: process 'x' (pid N) could not be terminated ..." -- printed
-// even when the context ended on an error (that error stays the primary
-// diagnostic; this is a second, distinct report).
-void set_failure_sink(WarningSink sink);  // empty: stderr
-void report_cleanup_failure(const std::string& line);
-
 // ---- host loop (timers and one-shot fd watches) ----
 // One lazily started thread that sleeps in poll() until the nearest timer or
 // a watched descriptor becomes readable -- no periodic polling. Callbacks run
@@ -59,14 +52,8 @@ std::size_t loop_fd_count();  // descriptors the loop owns (wake pipe + fd watch
 // their own timers.
 void reaper_add_pid(long pid);
 void reaper_adopt(ProcessGroupPtr group);
-// Called by a group once settled; true if it was adopted (the reaper then
-// reports a genuine cleanup failure itself: nobody else will see it).
+// Called by a group once settled; true if it was adopted (and is now released).
 bool reaper_release(const ProcessGroup* group);
-// Settle notifications: a counter bumped whenever a group settles, so a
-// context end can sleep until something changes instead of polling.
-std::uint64_t settle_generation();
-void notify_settled();
-void wait_settle_change(std::uint64_t seen, Clock::time_point until);
 std::size_t reaper_pending();
 // Test support: waits (bounded) until the reaper has nothing left; returns true if idle.
 bool reaper_wait_idle(Millis bound);

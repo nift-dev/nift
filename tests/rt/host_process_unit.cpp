@@ -9,7 +9,8 @@
 // Every test process carries NIFT_TEST_PROC_TAG=<tag> so survivors are found
 // by scanning /proc/*/environ (orphan detection, §11.12). Run under ulimit -f,
 // timeout and child cleanup (D-031); see the Makefile target.
-#include "rt/host/handle_adapter_tmp.h"
+#include "rt/handles/table.h"
+#include "rt/host/process_handles.h"
 #include "rt/host/process.h"
 #include "rt/host/process_call.h"
 #include "rt/host/process_cleanup.h"
@@ -35,6 +36,10 @@
 #include <vector>
 
 using namespace nift::rt::host;
+namespace handles = nift::rt::handles;
+using nift::rt::HandleKind;
+using nift::rt::HandleStatus;
+using nift::rt::Value;
 using std::chrono::milliseconds;
 
 namespace {
@@ -206,6 +211,34 @@ void add_stage(SpawnRequest& r, std::vector<std::string> argv, const std::string
     s.args.assign(argv.begin() + 1, argv.end());
     s.env.push_back({"NIFT_TEST_PROC_TAG", tag});
     r.stages.push_back(s);
+}
+
+// A CP17 handle table with the Process kind registered (one per test).
+struct Table {
+    handles::HandleTable t;
+    Table() { CHECK(register_process_kind(t) == HandleStatus::Ok); }
+    handles::ContextId open(handles::ContextKind kind = handles::ContextKind::Script, const std::string& label = "script",
+                            handles::ContextId parent = handles::kDetached) {
+        handles::ContextId id = 0;
+        CHECK(t.open_context(kind, parent, id, label) == HandleStatus::Ok);
+        return id;
+    }
+};
+
+// A context ending with `group` (already finished, with background members
+// left) as its run() residue: the C1 path through the real table.
+handles::CloseReport end_with_residue(Table& tb, const ProcessGroupPtr& group, bool on_error, bool& registered) {
+    const auto ctx = tb.open();
+    CHECK(register_run_residue(tb.t, ctx, group, registered) == HandleStatus::Ok);
+    return tb.t.close_context(ctx, on_error);
+}
+
+// A context ending with `group` held through a script-visible handle.
+handles::CloseReport end_with_handle(Table& tb, const ProcessGroupPtr& group, bool on_error, const std::string& label = "script") {
+    const auto ctx = tb.open(handles::ContextKind::Script, label);
+    Value h;
+    CHECK(create_process_handle(tb.t, ctx, group, h) == HandleStatus::Ok);
+    return tb.t.close_context(ctx, on_error);
 }
 
 ProcessResult run_ok(SpawnRequest r) {
@@ -603,14 +636,11 @@ void leftovers_c1_and_holders() {
     }
     std::vector<std::string> warnings;
     runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
-    CleanupReport report;
-    {
-        ContextCleanup end("script", false);
-        report = process_cleanup(g, ProcessRelease::ContextEnd);
-        CHECK(end.wait().empty());
-    }
-    // (queued or already settled: a plain `sleep` dies of SIGTERM at once)
-    CHECK(report.leftovers_terminated && !report.live_stage_terminated && !report.warned && !report.handed_to_reaper);
+    Table tb;
+    bool registered = false;
+    const auto report = end_with_residue(tb, g, false, registered);
+    CHECK(registered);  // the call left a background member: a residue resource in the context
+    CHECK(report.status == HandleStatus::Ok && report.failures.empty() && report.cleaned == 1);
     CHECK(warnings.empty());
     CHECK(none_tagged(tag));
     // PipeCapture: a descendant holding the pipe does not hang the call; it is terminated.
@@ -622,72 +652,87 @@ void leftovers_c1_and_holders() {
     runtime::set_warning_sink(nullptr);
 }
 
-// The process hook as CP16 registers it for HandleKind::Process (here on
-// the TEMPORARY stand-in table; with CP17 the lambda body is unchanged).
-tmp_handles::CleanupOutcome process_hook(const tmp_handles::CleanupEvent& ev) {
-    using tmp_handles::ReleaseReason;
-    const ProcessRelease r = ev.reason == ReleaseReason::Explicit ? ProcessRelease::Explicit
-                           : ev.reason == ReleaseReason::Abandoned ? ProcessRelease::Abandoned
-                           : ev.reason == ReleaseReason::ContextEnd ? ProcessRelease::ContextEnd : ProcessRelease::Shutdown;
-    process_cleanup(std::static_pointer_cast<ProcessGroup>(ev.resource), r);
-    return tmp_handles::CleanupOutcome::success();
-}
-
-void adapter_lifecycle() {
-    using namespace tmp_handles;
+void handle_lifecycle() {
     const std::string tag = new_tag();
     std::vector<std::string> warnings;
     runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
-    TemporaryTable table(process_hook);  // TEMPORARY until CP17 (see handle_adapter_tmp.h)
-    const ContextId script = table.open_context(ContextKind::Script, kDetached);
-    // abandoned while running: async termination + one warning, script not blocked
+    Table tb;
+    auto& t = tb.t;
+    const auto script = tb.open();
+    // abandoned (last counted reference dropped) while running: async termination + one warning
     auto running = start_ok(req({"sh", "-c", "trap '' TERM; sleep 30"}, OutputMode::Interactive, tag));
     const long pid = running->pid();
-    const auto h = table.create(script, running);
+    Value h;
+    CHECK(create_process_handle(t, script, running, h) == HandleStatus::Ok);
     running.reset();
     auto t0 = Clock::now();
-    CHECK(table.drop(h));
-    CHECK(ms_since(t0) < 200);  // asynchronous
+    CHECK(t.drop(h) == HandleStatus::Ok);
+    CHECK(ms_since(t0) < 200);  // the hook never blocks
     CHECK(warnings.size() == 1 && warnings[0] == "warning: process 'sh' (pid " + std::to_string(pid) + ") was abandoned while running; terminated");
     CHECK(runtime::reaper_wait_idle(milliseconds(5000)));
     CHECK(none_tagged(tag));
-    // abandoned after exit: silent
-    warnings.clear();
+    handles::LifeState state;
+    handles::TerminationCause cause;
+    CHECK(t.lifecycle(h, HandleKind::Process, state, cause) != HandleStatus::Ok);  // closed: runtime.handle_closed for natives
+    // natural exit while the handle stays open: the table records Completed (cause Exited)
     auto exited = start_ok(req({"true"}, OutputMode::Interactive, tag));
-    CHECK(wait_until([&] { return !exited->running(); }, milliseconds(2000)));
-    const auto h2 = table.create(script, exited);
-    exited.reset();
-    table.drop(h2);
-    CHECK(runtime::reaper_wait_idle(milliseconds(3000)));
+    Value he;
+    CHECK(create_process_handle(t, script, exited, he) == HandleStatus::Ok);
+    CHECK(wait_until([&] {
+        return t.lifecycle(he, HandleKind::Process, state, cause) == HandleStatus::Ok && state == handles::LifeState::Completed;
+    }, milliseconds(2000)));
+    CHECK(cause == handles::TerminationCause::Exited);
+    warnings.clear();
+    CHECK(t.drop(he) == HandleStatus::Ok);  // abandoning an exited process: silent
     CHECK(warnings.empty());
-    // explicit release of a running process: terminated, no warning
+    // deadline on an idle handle: the host loop starts termination, the table records it
+    auto dr = req({"sleep", "30"}, OutputMode::Interactive, tag);
+    dr.timeout = milliseconds(150);
+    auto timed = start_ok(dr);
+    Value hd;
+    CHECK(create_process_handle(t, script, timed, hd) == HandleStatus::Ok);
+    CHECK(wait_until([&] {
+        return t.lifecycle(hd, HandleKind::Process, state, cause) == HandleStatus::Ok && state == handles::LifeState::Completed;
+    }, milliseconds(3000)));
+    CHECK(cause == handles::TerminationCause::Deadline && timed->result().timed_out);
+    // explicit close of a running process: terminated, no warning
     auto rel = start_ok(req({"sleep", "30"}, OutputMode::Interactive, tag));
-    const auto h3 = table.create(script, rel);
-    CHECK(table.release(h3, script));
+    Value hr;
+    CHECK(create_process_handle(t, script, rel, hr) == HandleStatus::Ok);
+    CHECK(t.close(hr, HandleKind::Process, script) == HandleStatus::Ok);
     CHECK(runtime::reaper_wait_idle(milliseconds(5000)));
     CHECK(warnings.empty() && rel->finished() && rel->result().cancelled);
-    rel.reset();
-    // still running at context end: one warning per group (not per stage);
-    // several groups are waited for once (not one grace period each)
-    const ContextId ctx = table.open_context(ContextKind::Script, kDetached);
+    // cancel through the binding: the seam reports Cancel
+    auto can = start_ok(req({"sleep", "30"}, OutputMode::Interactive, tag));
+    Value hc;
+    CHECK(create_process_handle(t, script, can, hc) == HandleStatus::Ok);
+    bool anything = false;
+    CHECK(cancel_process(t, hc, script, anything) == HandleStatus::Ok && anything);
+    can->wait();
+    CHECK(wait_until([&] {
+        return t.lifecycle(hc, HandleKind::Process, state, cause) == HandleStatus::Ok && state == handles::LifeState::Completed;
+    }, milliseconds(2000)));
+    CHECK(cause == handles::TerminationCause::Cancel);
+    CHECK(t.close_context(script).failures.empty());
+    // still running at context end: one warning per group (not per stage); the
+    // close returns once every group settled -- one grace period for all three
+    const auto ctx = tb.open(handles::ContextKind::Script, "script");
     std::vector<ProcessGroupPtr> groups;
     for (int i = 0; i < 3; ++i) {
         auto p = req({"sh", "-c", "trap '' TERM; sleep 30"}, OutputMode::Interactive, tag);
         add_stage(p, {"sleep", "30"}, tag);
         p.kill_after = milliseconds(500);
         groups.push_back(start_ok(p));
-        table.create(ctx, groups.back());
+        Value hg;
+        CHECK(create_process_handle(t, ctx, groups.back(), hg) == HandleStatus::Ok);
     }
     std::this_thread::sleep_for(milliseconds(100));
+    warnings.clear();
     t0 = Clock::now();
-    {
-        ContextCleanup end("script", false);
-        table.close_context(ctx);
-        CHECK(ms_since(t0) < 300);  // the hooks only start the sequence
-        CHECK(end.wait().empty());
-    }
+    const auto report = t.close_context(ctx);
     const double ms = ms_since(t0);
-    CHECK(ms >= 450 && ms < 1500);  // one grace period for all three groups
+    CHECK(report.failures.empty() && report.cleaned == 3 && report.label == "script");
+    CHECK(ms >= 450 && ms < 1500);
     CHECK(warnings.size() == 3);
     if (!warnings.empty())
         CHECK(warnings[0] == "warning: process 'sh' (pid " + std::to_string(groups[2]->pid()) + ") was still running when script ended; terminated");
@@ -695,50 +740,44 @@ void adapter_lifecycle() {
     CHECK(none_tagged(tag, milliseconds(500)));
     // context ended on an error: same cleanup, no warning
     warnings.clear();
-    const ContextId bad = table.open_context(ContextKind::PageRender, kDetached);
     auto err = start_ok(req({"sleep", "30"}, OutputMode::Interactive, tag));
-    table.create(bad, err);
-    {
-        ContextCleanup end("page 'about'", true);
-        table.close_context(bad);
-    }
+    CHECK(end_with_handle(tb, err, true, "page 'about'").failures.empty());
     CHECK(warnings.empty() && err->finished());
-    CHECK(none_tagged(tag, milliseconds(500)));
     // exited before the context ended: reaped, no warning
-    const ContextId q = table.open_context(ContextKind::Script, kDetached);
     auto quick = start_ok(req({"true"}, OutputMode::Interactive, tag));
-    table.create(q, quick);
     CHECK(wait_until([&] { return !quick->running(); }, milliseconds(2000)));
-    {
-        ContextCleanup end("script", false);
-        table.close_context(q);
-    }
+    CHECK(end_with_handle(tb, quick, false).failures.empty());
     CHECK(warnings.empty());
-    // detached: never touched by managed cleanup or shutdown
+    // detached: counted handle detached at once; never touched by context end or shutdown
     const std::string dtag = new_tag();
-    const ContextId d = table.open_context(ContextKind::Script, kDetached);
+    const auto d = tb.open();
     auto det = start_ok(req({"sleep", "30"}, OutputMode::Detached, dtag));
     CHECK(det->detached() && det->pid() > 0 && det->result().state == GroupState::Detached);
-    const auto hd = table.create(d, det);
-    CHECK(table.detach(hd, d));
-    {
-        ContextCleanup end("script", false);
-        table.close_context(d);
-    }
-    table.shutdown();
+    Value hdet;
+    CHECK(create_detached_handle(t, d, det, hdet) == HandleStatus::Ok);
+    handles::ContextId owner = 1;
+    CHECK(t.owner_of(hdet, HandleKind::Process, owner) == HandleStatus::Ok && owner == handles::kDetached);
+    CHECK(t.close_context(d).failures.empty());
     CHECK(tagged(dtag).size() == 1);
-    CHECK(!process_cleanup(det, ProcessRelease::ContextEnd).live_stage_terminated);
-    CHECK(tagged(dtag).size() == 1);
-    // detached: own session, not in Nift's group
     runtime::ProcInfo info;
     CHECK(runtime::proc_read(det->pid(), info) && info.session != static_cast<long>(::getsid(0)) && info.pgrp != ::getpgrp());
-    // cancel is a request while Nift lives
-    CHECK(det->running());
-    CHECK(det->cancel());
-    runtime::reaper_adopt(det);
+    // cancel of a detached handle: a request only (detached_request), nothing supervised
+    CHECK(cancel_process(t, hdet, handles::kAnyAccessor, anything) == HandleStatus::Ok && anything);
     CHECK(none_tagged(dtag));
+    // a detached launch in a build: refused before launching ...
+    const auto build = tb.open(handles::ContextKind::Build, "build");
+    bool refused = false;
+    CHECK(detach_refused_here(t, build, refused) == HandleStatus::Ok && refused);
+    CHECK(detach_refused_here(t, tb.open(), refused) == HandleStatus::Ok && !refused);
+    // ... and, should one get that far, cancelled at once when the detach is refused
+    auto late = start_ok(req({"sleep", "30"}, OutputMode::Detached, dtag));
+    Value hl;
+    CHECK(create_detached_handle(t, build, late, hl) != HandleStatus::Ok);
+    CHECK(none_tagged(dtag));
+    t.shutdown();
     runtime::set_warning_sink(nullptr);
     CHECK(runtime::reaper_wait_idle(milliseconds(5000)));
+    CHECK(none_tagged(tag));
 }
 
 void detached_rules() {
@@ -920,8 +959,10 @@ void escapees_subreaper() {
     }, milliseconds(2000)));
     // group cleanup cannot reach it (it left the group) ...
     {
-        ContextCleanup end("script", false);
-        process_cleanup(g, ProcessRelease::ContextEnd);
+        Table tb;
+        bool registered = true;
+        end_with_residue(tb, g, false, registered);
+        CHECK(!registered);  // it left the group: nothing of the call's group is left to clean up
     }
     CHECK(tagged(tag).size() == 1);
     // ... the root-context orphan sweep does; a detached process is spared
@@ -1027,9 +1068,8 @@ void pipe_mode_suite() {
     runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
     g = start_ok(req({"sleep", "30"}, OutputMode::PipeCapture, tag));
     {
-        ContextCleanup end("script", false);
-        process_cleanup(g, ProcessRelease::ContextEnd);
-        CHECK(end.wait().empty());
+        Table tb;
+        CHECK(end_with_handle(tb, g, false).failures.empty());
     }
     CHECK(warnings.size() == 1 && g->finished() && g->result().state == GroupState::Cancelled);
     runtime::set_warning_sink(nullptr);
@@ -1144,9 +1184,9 @@ void deadline_races() {
         std::this_thread::sleep_for(std::chrono::microseconds(25000 + (i % 7) * 1000));
         std::thread a([&] { g->cancel(); });
         {
-            ContextCleanup end("script", false);
-            process_cleanup(g, ProcessRelease::ContextEnd);
-            end.wait();
+            Table tb;
+            const auto report = end_with_handle(tb, g, false);
+            if (!report.failures.empty()) CHECK(false);
         }
         a.join();
         if (g->finished() && g->settled()) ++ok;
@@ -1168,48 +1208,67 @@ void shutdown_refuses_launches() {
 
 void cleanup_failures_reported() {
     // A process that cannot be terminated (SIGKILL suppressed by the test
-    // hook): the routine warning follows the context's outcome, the genuine
-    // failure is reported separately in both cases.
+    // hook): the routine warning follows the context's outcome; the genuine
+    // failure is decided and reported by the CP17 table (CloseReport), and it
+    // forces a nonzero exit (D-035), in both cases.
     const std::string tag = new_tag();
-    std::vector<std::string> warnings, failures;
+    std::vector<std::string> warnings;
     runtime::set_warning_sink([&](const std::string& w) { warnings.push_back(w); });
-    runtime::set_failure_sink([&](const std::string& f) { failures.push_back(f); });
     runtime::test_hooks().suppress_sigkill = true;
     for (bool failed : {true, false}) {
         warnings.clear();
-        failures.clear();
         auto r = req({"sh", "-c", "trap '' TERM; while :; do sleep 0.05; done"}, OutputMode::Interactive, tag);
         r.kill_after = milliseconds(150);
         r.post_kill_wait = milliseconds(200);
         auto g = start_ok(r);
         std::this_thread::sleep_for(milliseconds(150));  // let sh install its trap first
-        std::vector<std::string> reported;
-        {
-            ContextCleanup end(failed ? "page 'about'" : "script", failed);
-            process_cleanup(g, ProcessRelease::ContextEnd);
-            reported = end.wait();
-        }
+        Table tb;
+        const auto report = end_with_handle(tb, g, failed, failed ? "page 'about'" : "script");
         CHECK(warnings.size() == (failed ? 0u : 1u));
-        CHECK(reported.size() == 1 && failures == reported);
-        if (!reported.empty())
-            CHECK(reported[0] == "error: cleanup: process 'sh' (pid " + std::to_string(g->pid()) +
-                                 ") could not be terminated (still running after SIGKILL); left to the reaper");
-        CHECK(g->result().state == GroupState::Lost && g->cleanup_failed());
+        CHECK(report.on_error == failed);
+        CHECK(report.failures.size() == 1);
+        if (!report.failures.empty()) {
+            const auto& f = report.failures[0];
+            CHECK(f.state == handles::LifeState::Lost && f.code == "process.lost");
+            CHECK(f.message == "process 'sh' (pid " + std::to_string(g->pid()) + ") did not exit after SIGKILL; left to the reaper");
+            CHECK(f.context_label == (failed ? "page 'about'" : "script"));
+        }
+        CHECK(report.final_exit_status(0) == 1);    // D-035: a cleanup failure forces a nonzero exit
+        CHECK(report.final_exit_status(143) == 143);  // an earlier error / signal status stays primary
+        CHECK(g->result().state == GroupState::Lost);
         kill_tagged(tag);
     }
-    // an error-ended context whose processes terminate normally: silent
+    // members alive after SIGKILL (leftovers of a finished run): Failed, alive_after_kill
+    {
+        auto lr = req({"sh", "-c", "(trap '' TERM; while :; do sleep 0.05; done) & sleep 0.15; echo x"}, OutputMode::FileCapture, tag);
+        lr.kill_after = milliseconds(150);
+        lr.post_kill_wait = milliseconds(200);
+        auto g = start_ok(lr);
+        g->wait();
+        Table tb;
+        bool registered = false;
+        const auto report = end_with_residue(tb, g, false, registered);
+        if (!(registered && report.failures.size() == 1)) {
+            std::printf("residue: registered %d failures %zu cleaned %zu\n", registered, report.failures.size(), report.cleaned);
+            for (const auto& f : report.failures) std::printf("  failure state %s code %s msg %s\n", handles::life_state_name(f.state), f.code.c_str(), f.message.c_str());
+            dump_events(Clock::now() - milliseconds(3000));
+        }
+        CHECK(registered && report.failures.size() == 1);
+        if (!report.failures.empty())
+            CHECK(report.failures[0].state == handles::LifeState::Failed && report.failures[0].code == "process.alive_after_kill");
+        kill_tagged(tag);
+    }
+    // an error-ended context whose processes terminate normally: silent, no failure
     runtime::test_hooks().suppress_sigkill = false;
     warnings.clear();
-    failures.clear();
     auto g = start_ok(req({"sleep", "30"}, OutputMode::Interactive, tag));
     {
-        ContextCleanup end("page 'about'", true);
-        process_cleanup(g, ProcessRelease::ContextEnd);
-        CHECK(end.wait().empty());
+        Table tb;
+        const auto report = end_with_handle(tb, g, true, "page 'about'");
+        CHECK(report.failures.empty() && report.final_exit_status(0) == 0);
     }
-    CHECK(warnings.empty() && failures.empty() && g->result().state == GroupState::Cancelled);
+    CHECK(warnings.empty() && g->result().state == GroupState::Cancelled);
     runtime::set_warning_sink(nullptr);
-    runtime::set_failure_sink(nullptr);
     CHECK(runtime::reaper_wait_idle(milliseconds(3000)));
     CHECK(none_tagged(tag));
 }
@@ -1237,7 +1296,7 @@ int main(int argc, char** argv) {
         {"exit_cancel_race", exit_cancel_race},
         {"capture_limit_loud", capture_limit_loud},
         {"leftovers_c1_and_holders", leftovers_c1_and_holders},
-        {"adapter_lifecycle", adapter_lifecycle},
+        {"handle_lifecycle", handle_lifecycle},
         {"detached_rules", detached_rules},
         {"low_fd_limit", low_fd_limit},
         {"trace_spawn", trace_spawn},

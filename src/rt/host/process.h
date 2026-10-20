@@ -124,6 +124,29 @@ struct ProcessResult {
 std::string signal_name(int signo);  // "SIGTERM", ..., "SIG<n>"
 
 enum class CancelScope : std::uint8_t { Child, Pipeline, Tree };
+
+// ---- lifecycle seam (CP17 integration, cp16-host-ops-impl.md §8) ----
+// The process layer reports OS facts; the handle table (CP17) alone decides
+// and records the lifecycle (Completed / Failed / Lost). No CP17 type here:
+// the binding (process_handles.h) implements the sink.
+enum class OsTermination : std::uint8_t { Exited, Deadline, Cancel };  // terminations CP16 starts itself
+struct OsOutcome {
+    bool stage_unconfirmed = false;  // a stage still unreaped after SIGKILL + bound (handed to the reaper)
+    bool members_survived = false;   // leftover group members still present after SIGKILL + bound
+    std::string detail;              // "process 'x' (pid N) ..."
+};
+class LifecycleSink {
+public:
+    virtual ~LifecycleSink() = default;
+    // Once, the first time the process layer itself starts termination:
+    // every stage exited (Exited), the deadline expired (Deadline), or
+    // cancel() / the capture limit (Cancel). Close, abandonment and context
+    // end arrive the other way round, through the cleanup hook.
+    virtual void terminating(OsTermination cause) = 0;
+    // Each time the group becomes settled (finished, leftover cleanup done):
+    // the OS facts. Never called with the group's lock held.
+    virtual void settled(const OsOutcome& facts) = 0;
+};
 enum class CancelReason : std::uint8_t { None, Explicit, Deadline, Limit, Cleanup, Abandoned, Leftover };
 
 // Thread safety: every public member locks the group; the event loop drops
@@ -201,6 +224,13 @@ public:
     bool cleanup_failed() const;
     // Finished, and any requested leftover cleanup done (detached: no cancel in flight).
     bool settled() const;
+    // The OS facts of the settled group (meaningful once settled()).
+    OsOutcome os_outcome() const;
+    // Attaches the lifecycle sink (the CP17 binding). With `replay`, events
+    // that already happened (exit, settle) are delivered at once, in order;
+    // without, the current state counts as reported and only later changes
+    // are (a run() residue: its lifecycle starts when its context ends).
+    void set_lifecycle_sink(std::shared_ptr<LifecycleSink> sink, bool replay = true);
     // True when the group (or, for a detached group, its session) still has a
     // live (non-zombie) member. Linux checks /proc and requires Nift's session
     // for managed groups (guards against pgid reuse); elsewhere kill(-pgid, 0).

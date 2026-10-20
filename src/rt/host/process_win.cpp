@@ -129,6 +129,8 @@ ProcessGroup::TerminateOutcome ProcessGroup::terminate(CancelReason) { return Te
 bool ProcessGroup::has_live_members() const { return false; }
 bool ProcessGroup::cleanup_failed() const { return false; }
 bool ProcessGroup::settled() const { return true; }
+OsOutcome ProcessGroup::os_outcome() const { return OsOutcome(); }
+void ProcessGroup::set_lifecycle_sink(std::shared_ptr<LifecycleSink>, bool) {}
 void ProcessGroup::timer_tick() {}
 std::string signal_name(int signo) { return "SIG" + std::to_string(signo); }
 
