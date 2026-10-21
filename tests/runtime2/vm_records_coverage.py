@@ -346,7 +346,9 @@ REFUSED = [
      '    o = {"k": [1]}\n  }\n  f(o.k)\n  i += 1\n}\n', 'path-in-call-argument'),
     ('path-handle', 'fn(f(s)) {\n  s += 1\n  return 0\n}\nc := atomic<int>(5)\no := {"h": c}\nf(o.h)\nprint(c)\n',
      'callable:atomic<int>'),
-    ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'statement:Import'),
+    # CP12b modules: the unit compiles linked, here refused for its missing module
+    # (a path rooted at an imported binding: vm_modules.py path-arg-imported).
+    ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'import-missing'),
     ('path-export', 'fn(f(s)) {\n  return s\n}\no := {"k": 1}\nprint(f(o.k))\nexport(o)\n', 'statement:Export'),
     ('path-member-on-int', 'fn(f(s)) {\n  return s\n}\no := {"a": 1}\nprint(f(o.a.b))\n', 'path-in-call-argument'),
     ('path-index-on-string', 'fn(f(s)) {\n  return s\n}\ns := "abc"\nprint(f(s[1]))\n', 'path-in-call-argument'),
