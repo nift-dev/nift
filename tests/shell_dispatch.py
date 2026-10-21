@@ -9,6 +9,7 @@ M2 quoting/escaping discarded, M3 eager interpolation).
 import argparse
 import os
 import pty
+import re
 import select
 import shutil
 import signal
@@ -190,7 +191,10 @@ result = run_shell("rm a d1\nexit\n")
 combined = result.stdout + result.stderr
 check("rm a d1 removes a once", not (ROOT / "a").exists())
 check("rm a d1 reports d1 once", combined.count("d1") == 1, combined)
-check("rm a d1 does not re-run rm externally", "cannot remove 'a'" not in combined, combined)
+# A second (external) rm of `a` fails because `a` is already gone. GNU rm says
+# "cannot remove 'a'", BSD/macOS rm says "rm: a: No such file or directory".
+rerun = re.search(r"cannot remove 'a'|\brm: a: ", combined) is not None
+check("rm a d1 does not re-run rm externally", not rerun, combined)
 
 # 4. POSIX bracket glob.
 clean()
