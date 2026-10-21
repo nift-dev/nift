@@ -82,6 +82,22 @@ def tree(root):
     return out
 
 
+def copy_keep_unreadable(src, dst):
+    """copy2, except that a file the harness cannot read (the chmod-000
+    fixtures, when the suite runs unprivileged, as on CI) is recreated empty
+    with the same mode and times: neither engine can read it in the project
+    either, so its bytes cannot reach the oracle's output."""
+    try:
+        return shutil.copy2(src, dst)
+    except PermissionError:
+        st = os.stat(src)
+        with open(dst, "wb"):
+            pass
+        os.chmod(dst, st.st_mode & 0o7777)
+        os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns))
+        return dst
+
+
 def clean_oracle(root, oracle):
     if oracle.exists():
         shutil.rmtree(oracle)
@@ -93,9 +109,9 @@ def clean_oracle(root, oracle):
         if path.is_symlink():
             dest.symlink_to(os.readlink(path))
         elif path.is_dir():
-            shutil.copytree(path, dest, symlinks=True)
+            shutil.copytree(path, dest, symlinks=True, copy_function=copy_keep_unreadable)
         else:
-            shutil.copy2(path, dest)
+            copy_keep_unreadable(path, dest)
     (oracle / ".nift").mkdir()
     for name in ("config.json", "tracked.json"):
         shutil.copy2(root / ".nift" / name, oracle / ".nift" / name)
