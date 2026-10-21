@@ -1003,23 +1003,42 @@ void escapees_subreaper() {
 void subreaper_reaps_orphans() {
     if (!runtime::enable_subreaper()) { std::printf("subreaper_reaps_orphans: SKIPPED\n"); return; }
     const std::string tag = new_tag();
-    auto g = start_ok(req({"sh", "-c", "sleep 0.3 &"}, OutputMode::FileCapture, tag));
+    // The orphan blocks on a FIFO until the test has seen it adopted, so its
+    // lifetime never races the observation (it used to be `sleep 0.3 &`,
+    // which could exit before a loaded machine looked: CI make -j2 test-all).
+    char dir[] = "/tmp/nift-reap-XXXXXX";
+    CHECK(::mkdtemp(dir) != nullptr);
+    const std::string fifo = std::string(dir) + "/go";
+    CHECK(::mkfifo(fifo.c_str(), 0600) == 0);
+    auto g = start_ok(req({"sh", "-c", "read x < '" + fifo + "' &"}, OutputMode::FileCapture, tag));
     g->wait();
     long orphan = -1;
-    CHECK(wait_until([&] {
+    const bool adopted = wait_until([&] {
         auto pids = tagged(tag);
         if (pids.size() != 1) return false;
         runtime::ProcInfo info;
         if (!runtime::proc_read(pids[0], info) || info.ppid != ::getpid()) return false;
         orphan = pids[0];
         return true;
-    }, milliseconds(1000)));  // adopted by Nift
+    }, milliseconds(5000));
+    CHECK(adopted);  // adopted by Nift while it is certainly still alive
+    if (adopted) {
+        // Release it: opening the FIFO for writing completes only together
+        // with the orphan's blocked open for reading.
+        const int w = ::open(fifo.c_str(), O_WRONLY);
+        CHECK(w >= 0);
+        if (w >= 0) { CHECK(::write(w, "x\n", 2) == 2); ::close(w); }
+    } else {
+        kill_tagged(tag);
+    }
     // no Host call from here on: only the host loop can reap it
-    CHECK(none_tagged(tag, milliseconds(2000)));
+    CHECK(none_tagged(tag, milliseconds(3000)));
     CHECK(wait_until([&] {
         runtime::ProcInfo info;
         return !runtime::proc_read(orphan, info);  // gone from /proc = reaped (a zombie would still be listed)
     }, milliseconds(1000)));
+    ::unlink(fifo.c_str());
+    ::rmdir(dir);
     CHECK(no_zombies());
     // a foreign child (same session, Nift's own group): left for its owner
     const pid_t foreign = ::fork();
