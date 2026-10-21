@@ -105,6 +105,8 @@ public:
         return true;
     }
     std::string take() { return static_cast<std::string&&>(text_); }
+    std::size_t size() const noexcept { return text_.size(); }
+    std::size_t capacity() const noexcept { return text_.capacity(); }
 
 private:
     bool grow(std::size_t extra);

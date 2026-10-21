@@ -395,12 +395,25 @@ bool glob_walk(const fs::path& base, const std::vector<std::string>& parts,
             if (!consider(e)) return false;
         return true;
     }
-    std::error_code ec;
-    if (!fs::is_directory(base, ec) || ec) return true;
-    for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
-         !ec && it != end; it.increment(ec))
-        if (!consider(*it)) return false;
-    return true;
+    if constexpr (std::is_same_v<Output, GlobVisitorOutput>) {
+        std::error_code ec;
+        if (!fs::is_directory(base, ec) || ec) return true;
+        for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec))
+            if (!consider(*it)) return false;
+        return true;
+    } else {
+        // Legacy traversal: scan this directory completely before descending,
+        // so no directory handle stays open across recursive calls.
+        std::vector<fs::directory_entry> owned;
+        std::error_code ec;
+        if (!fs::is_directory(base, ec) || ec) return true;
+        for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec)) owned.push_back(*it);
+        for (const auto& e : owned)
+            if (!consider(e)) return false;
+        return true;
+    }
 }
 
 bool is_single_quoted_parameter(const std::string& text) {

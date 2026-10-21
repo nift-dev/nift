@@ -44,6 +44,20 @@ def check(label, peak, proc, failures):
     return True
 
 
+def check_success(label, peak, proc, expected, failures):
+    if proc is None:
+        failures.append(f"{label}: /usr/bin/time unavailable")
+        return False
+    if proc.returncode != 0 or proc.stdout.strip() != expected:
+        failures.append(f"{label}: expected successful output {expected!r}")
+        return False
+    if peak is None or peak > 72 * 1024:
+        failures.append(f"{label}: peak RSS {peak} KiB > 72 MiB")
+        return False
+    print(f"PEAK {label} {peak} KiB")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--nift", required=True)
@@ -94,6 +108,34 @@ def main():
                      subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err), failures):
                 passed += 1
 
+        # R1 successful stream reads: 50 MiB with a 60 MB budget.
+        large = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
+        (root / "case.f").write_text('print(open("/dev/stdin").length())\n')
+        peak, out, err = timed(nift, root, large, input_bytes=b"x" * (50 << 20))
+        if check_success("stdin-success", peak,
+                         subprocess.CompletedProcess([], 0 if out.strip() == b"52428800" else 1, out, err),
+                         b"52428800", failures):
+            passed += 1
+
+        if hasattr(os, "mkfifo"):
+            fifo2 = root / "success.fifo"
+            os.mkfifo(fifo2)
+            def writer2():
+                try:
+                    with open(fifo2, "wb", buffering=0) as out_file:
+                        out_file.write(b"x" * (50 << 20))
+                except (BrokenPipeError, OSError):
+                    pass
+            thread2 = threading.Thread(target=writer2, daemon=True)
+            thread2.start()
+            (root / "case.f").write_text('print(open("success.fifo").length())\n')
+            peak, out, err = timed(nift, root, large)
+            thread2.join(timeout=5)
+            if check_success("fifo-success", peak,
+                             subprocess.CompletedProcess([], 0 if out.strip() == b"52428800" else 1, out, err),
+                             b"52428800", failures):
+                passed += 1
+
         # ls: 20,000 names, 1 MB budget.
         names = root / "names"
         names.mkdir()
@@ -124,6 +166,26 @@ def main():
         if proc.returncode != 0 or proc.stdout.strip() != b"150000":
             failures.append("glob-large-budget: expected successful 150000 matches")
         else:
+            passed += 1
+
+        # R2 duplicate-heavy: the same paths are visited ~6x, but the final
+        # unique result is much smaller. A budget between the two rejects.
+        dup = root / "dup"
+        dup_leaf = dup / "a" / "b" / "c" / "d" / "e"
+        dup_leaf.mkdir(parents=True)
+        for i in range(1000):
+            (dup_leaf / f"f{i:04d}").touch()
+        (root / "case.f").write_text('l := ls("dup/**/**/*"); print(l.length())\n')
+        dup_low = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="1500000")
+        peak, _, err = timed(nift, root, dup_low)
+        if check("glob-duplicate-low", peak,
+                 subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err), failures):
+            passed += 1
+        dup_ok = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="2500000")
+        peak, out, err = timed(nift, root, dup_ok)
+        if check_success("glob-duplicate-ok", peak,
+                         subprocess.CompletedProcess([], 0 if out.strip() == b"1005" else 1, out, err),
+                         b"1005", failures):
             passed += 1
 
         # env / getenv: 60 KB value with a 50 KB budget.

@@ -3,6 +3,7 @@
 // rt-lint: cold-file host I/O helpers; the filesystem calls keep the lexically
 // resolved paths legacy uses.
 #include "rt/natives/host_util.h"
+#include "rt/natives/host_fs_stream.h"
 #include "FileSystem.h"
 #include "ParserHelpers.h"
 #include "Proc.h"
@@ -70,40 +71,7 @@ inline Info inspect(const fs::path& path) {
     return info;
 }
 
-enum class ReadOutcome { Ok, Limit, Budget, InvalidLimit, OpenFailed, ReadFailed };
 
-template <class Buffer>
-inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buffer& out,
-                              std::string_view operation, std::string& error) {
-    const auto setting = nift::readlimit::current();
-    if (!setting.valid) {
-        error = nift::readlimit::invalid_message(std::string(operation), setting);
-        return ReadOutcome::InvalidLimit;
-    }
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return ReadOutcome::OpenFailed;
-    std::uint64_t total = 0;
-    char chunk[64 * 1024];
-    while (in) {
-        in.read(chunk, sizeof chunk);
-        const std::streamsize got = in.gcount();
-        if (in.bad()) return ReadOutcome::ReadFailed;
-        if (got <= 0) break;
-        if (total > setting.bytes - static_cast<std::uint64_t>(got)) {
-            error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
-            return ReadOutcome::Limit;
-        }
-#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
-        if (!reserve_result(context, static_cast<std::size_t>(total + static_cast<std::uint64_t>(got)))) {
-            error = std::string(operation) + ": file exceeds the memory budget";
-            return ReadOutcome::Budget;
-        }
-#endif
-        out.insert(out.end(), chunk, chunk + got);
-        total += static_cast<std::uint64_t>(got);
-    }
-    return ReadOutcome::Ok;
-}
 
 inline Status read_failure(HostCall& call, ReadOutcome outcome, std::string_view name, const std::string& detail,
                     std::string& error) {
@@ -234,9 +202,6 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
 #endif
     const ReadOutcome outcome = read_whole(context, call.target().path, data, name, error);
     if (outcome != ReadOutcome::Ok) return read_failure(call, outcome, name, error, error);
-    if (!reserve_result(context, data.size()))
-        return fail_host(call, host::HostStatus::Limit,
-                         host_error("limit.exceeded", std::string(name) + ": file exceeds the memory budget"), error);
     host::Observation obs;
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 4
     obs.bytes = data;
@@ -271,10 +236,16 @@ inline Status resolve_plain(const Context& context, const std::string& raw, std:
     return Status::Ok;
 }
 
-inline Status preflight_glob(const Context& context, const fs::path& path, std::string_view name,
-                             std::string& error) {
+inline Status collect_glob_paths(const Context& context, const fs::path& path, std::string_view name,
+                                 std::vector<fs::path>& out, std::string& error) {
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 7
+    constexpr bool enforce_budget = false;
+#else
+    constexpr bool enforce_budget = true;
+#endif
+    std::vector<fs::path> matches;
     std::size_t accounted = 0;
-    bool stopped = false;
+    std::size_t key_bytes = 0;
     bool policy_failure = false;
     const bool completed = nift::detail::glob_visit(path, [&](const fs::path& match) {
         if (context.host.paths) {
@@ -284,19 +255,44 @@ inline Status preflight_glob(const Context& context, const fs::path& path, std::
                 host::HostStatus::Ok) {
                 error = policy_error.message;
                 policy_failure = true;
-                stopped = true;
                 return false;
             }
         }
-        accounted = size_add(accounted, match.generic_string().size() + 64);
-        if (!reserve_result(context, accounted)) {
+        const std::size_t text = match.generic_string().size();
+        key_bytes = size_add(key_bytes, text + 64);
+        accounted = size_add(accounted, text + sizeof(fs::path) + 128);
+        if (matches.size() == matches.capacity()) {
+            const std::size_t old_capacity = matches.capacity();
+            const std::size_t capacity =
+                old_capacity < 8 ? 8
+                                : (old_capacity > kSizeOverflow / 2 ? kSizeOverflow : old_capacity * 2);
+            const std::size_t vectors = size_add(size_mul(capacity, sizeof(fs::path)),
+                                                 size_mul(old_capacity, sizeof(fs::path)));
+            if (enforce_budget && !reserve_result(context, size_add(accounted, vectors))) {
+                error = std::string(name) + ": result exceeds the memory budget";
+                return false;
+            }
+            matches.reserve(capacity);
+        }
+        if (enforce_budget && !reserve_result(context, accounted)) {
             error = std::string(name) + ": result exceeds the memory budget";
-            stopped = true;
             return false;
         }
+        matches.push_back(match);
         return true;
     });
-    if (!completed || stopped) return policy_failure ? Status::Error : Status::Limit;
+    if (!completed) return policy_failure ? Status::Error : Status::Limit;
+    // The legacy API sorts by generic spelling and then de-duplicates. Charge
+    // the sort-key allowance before taking that path.
+    if (enforce_budget && !reserve_result(context, size_add(accounted, key_bytes))) {
+        error = std::string(name) + ": result exceeds the memory budget";
+        return Status::Limit;
+    }
+    std::sort(matches.begin(), matches.end(), [](const fs::path& left, const fs::path& right) {
+        return left.generic_string() < right.generic_string();
+    });
+    matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+    out = std::move(matches);
     return Status::Ok;
 }
 
@@ -322,17 +318,10 @@ inline Status collect_paths(const Context& context, const Value& value, std::str
         if (resolve_plain(context, raw, name, resolved, error) != Status::Ok) return Status::Error;
         if (nift::detail::glob_has_magic(raw)) {
             globbed = true;
-#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 7
-            const Status budget = preflight_glob(context, resolved.path, name, error);
+            std::vector<fs::path> matches;
+            const Status budget = collect_glob_paths(context, resolved.path, name, matches, error);
             if (budget != Status::Ok) return budget;
-#endif
-            const auto matches = nift::detail::glob_expand(resolved.path);
-            for (const fs::path& match : matches) {
-                host::Resolved checked;
-                if (resolve_plain(context, match.generic_string(), name, checked, error) != Status::Ok)
-                    return Status::Error;
-                paths.push_back(checked.path);
-            }
+            paths.insert(paths.end(), matches.begin(), matches.end());
         } else {
             paths.push_back(resolved.path);
         }
