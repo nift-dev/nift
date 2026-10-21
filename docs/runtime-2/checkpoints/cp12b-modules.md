@@ -199,6 +199,39 @@ a FIFO and an unreadable file): `tests/rt/vm_modules_unit.cpp` plans every legac
 resolution details (relative chains, two spellings, absent files, project
 root) and rebinding.
 
+### Compilation: source-level linking (2026-10-21)
+
+Implemented (`src/rt/module_link.{h,cpp}`, `script_runner.cpp`). A unit with
+static imports compiles as its **linked text**: every `import(...)`
+statement is replaced by the imported module's own linked text and every
+module `export(...)` is blanked, so the module initialises in place, once,
+at its import, and every analysis (globals, kinds, D-018 contexts, aliasing,
+the records20k lift) spans modules with no cross-unit machinery. This is
+exact under the following refusals (legacy then runs the unit):
+
+| Refusal | Why it is needed |
+| --- | --- |
+| the module graph's (`import-dynamic`, `-package`, `-nested`, `-missing`, `-cycle`, `-parse-error`, `-opaque`, `export-*`, `import-collision`) | static, literal, top-level imports only |
+| `import-reinitialised` (InitPolicy::RefuseReinitialisation) | each module imported once: legacy runs it once too (D-041 #2 removal item) |
+| `module-return` (any top-level `return` in a module) | legacy ends only the module |
+| `import-name-clash` | names declared outside functions and function names are disjoint across units, so one linked unit names each binding once |
+| `import-scope` | a unit names another unit's binding or function only where it imports it (legacy isolates module scopes; module functions resolve names lexically, D-046 #4) |
+| `path-in-call-argument:imported` | records20k: a user-call argument path rooted at a module's binding |
+
+Exported bindings are the module's bindings themselves (D-046 #2). A refusal
+inside a module is located in that module's file. Run-time errors map back
+to the module file and position; while a module initialises, legacy
+prefixes `import: ` once per active import (the VM reports where main's
+active call is, `VmResult::main_offset`, `vm_frames.cpp`); legacy's
+`return: ` prefixes stay under D-018c (vm_policies.py checks the reported
+module file and compares the `import: ` prefixes).
+
+Evidence (development, not certification): `tests/runtime2/vm_modules.py`
+(in test-rt-vm): 60 pinned programs (shapes in every context, the 25 legacy
+probes, the D-041 script fixtures that agree with today's legacy) and
+random import trees (`--gen`; seeds 1-3 x 300 all on the VM and identical
+to legacy). Imports inside `try` stay refused (`import-nested`, D-046 M4).
+
 ### Requirement from records20k: path arguments rooted at imported bindings
 
 When CP12B compiles imports, stage 4's path-argument lift (a call argument
