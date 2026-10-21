@@ -1,5 +1,6 @@
 #include "rt/script_runner.h"
 
+#include "HostTrace.h"
 #include "rt/compiler.h"
 #include "rt/module_link.h"
 #include "rt/parser.h"
@@ -292,6 +293,14 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     // From here on the unit runs on the VM and only on the VM: whatever
     // happens, the legacy engine never runs it (engine selection is final).
     stats.executions = 1;
+    // CP12b modules: legacy traces each module read (`read-source`) when the
+    // import runs; the linked unit read them before running, in the same
+    // order (first read, depth first). No traced host op of the VM can run
+    // before an import yet; when VM host ops are traced (CP16 wiring), these
+    // must move to the import's position.
+    if (link.linked)
+        for (const std::filesystem::path& read : link.graph.dependencies)
+            nift::trace::emit("read-source", read.lexically_normal().generic_string(), "ok");
     Vm vm(*compiled.program, options);
     std::string output;
     const VmResult result = vm.run(output);
