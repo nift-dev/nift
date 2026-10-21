@@ -28,6 +28,14 @@ jobs:
           python3 --version || true
           /usr/bin/python3 --version || true
           echo "PATH=$PATH"
+      - name: Reverse lookup timing (http.server calls socket.getfqdn before listen)
+        run: |
+          for py in /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 python3 /usr/bin/python3; do
+            [ -x "$(command -v $py)" ] || continue
+            echo "== $py"; "$py" -c "import socket,time;t=time.time();n=socket.getfqdn('127.0.0.1');print('getfqdn(127.0.0.1) =',n,'in %.1fs'%(time.time()-t))" || true
+            "$py" -c "import time;t=time.time();import http.server;print('import http.server %.1fs'%(time.time()-t))" || true
+          done
+          scutil --dns | head -30 || true
       - name: Manual serve start (stdout/stderr, process tree)
         run: |
           set -x
@@ -106,6 +114,7 @@ jobs:
       - name: Build-lock diagnostic and the new lock test
         shell: msys2 {0}
         run: |
+          python3 tests/xplat_lock_diag2.py ./nift.exe || echo "lock diag2 FAILED"
           python3 tests/xplat_lock_diag.py ./nift.exe || echo "lock diag FAILED"
           python3 tests/build_lock_orphan_hook.py --nift ./nift.exe || echo "test-build-lock-orphan FAILED"
       - name: Remaining Windows checks the failure skipped
