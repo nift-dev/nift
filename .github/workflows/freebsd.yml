@@ -1,0 +1,92 @@
+name: FreeBSD
+
+# Build and portable regression scripts in a real FreeBSD VM (QEMU on an
+# ubuntu-latest runner). Follows the FreeBSD portability work contributed by
+# @NuLL3rr0r in #1. Read-only token; no secrets are used, so pull requests from
+# forks run with the same (absent) privileges as any other PR job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freebsd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freebsd:
+    name: FreeBSD 14 amd64 build and regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: nift
+      # The package dogfoods resolve the nift-packages repos as a sibling
+      # nift-packages/ directory, pinned to the same set as v44-cross-platform.yml.
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/sqlite
+          ref: e2f6e192f5a72e8220567952170fc814566aa400
+          path: nift-packages/sqlite
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/curl
+          ref: d3c7a29301cb6516cc8cac0ee8d10e903c4c728c
+          path: nift-packages/curl
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/postgres
+          ref: 42873336b721a69d4132541523c05b816ba489eb
+          path: nift-packages/postgres
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/mysql
+          ref: 4526f3794bac2ad8b6d80d087d0abab974eed38c
+          path: nift-packages/mysql
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/redis
+          ref: 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+          path: nift-packages/redis
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/vips
+          ref: 735b9965d6d6c365b4195f0454ded31e577dc5f1
+          path: nift-packages/vips
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/imagemagick
+          ref: dda5437fb20ca92045cea901323c2bd2399f38a8
+          path: nift-packages/imagemagick
+      - name: Build and test in FreeBSD
+        # vmactions/freebsd-vm v1.5.9, pinned by commit.
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc
+        with:
+          release: "14"
+          arch: x86_64
+          cpu: 2
+          mem: 6144
+          copyback: true
+          prepare: |
+            pkg install -y gmake bash python3 git rsync coreutils sqlite3
+          # The VM runs commands as root; the build and tests run as an
+          # unprivileged user so permission-dependent suites are exercised.
+          run: |
+            pw useradd niftci -m -s /bin/sh
+            chown -R niftci "$PWD"
+            su niftci -c "cd '$PWD/nift' && sh scripts/ci_freebsd.sh"
+      - name: Summary
+        if: always()
+        run: cat nift/.build/freebsd-ci/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no summary (VM step failed before testing)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-ci-logs
+          path: nift/.build/freebsd-ci/
+          if-no-files-found: warn

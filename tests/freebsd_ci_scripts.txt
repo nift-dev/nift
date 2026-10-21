@@ -1,0 +1,40 @@
+# Regression scripts run by .github/workflows/freebsd.yml on FreeBSD.
+# Each must pass, or exit 77 when it cannot observe its guarantee there
+# (reported as NOT-VERIFIED, never as a pass). Started from the scripts
+# made portable in PR #1 (FreeBSD compatibility, by @NuLL3rr0r).
+tests/collection_ops_smoke.sh
+tests/config_validation.sh
+tests/contracts_smoke.sh
+tests/control_flow_smoke.sh
+tests/cross_feature_smoke.sh
+tests/diagnostics_smoke.sh
+tests/init_handover_smoke.sh
+tests/init_migration_smoke.sh
+tests/init_targets_smoke.sh
+tests/metadata_safety_smoke.sh
+tests/minify_integration_smoke.sh
+tests/package_combined_dogfood.sh
+tests/pagination_smoke.sh
+tests/path_alias_smoke.sh
+tests/persistence_concurrency_failure_smoke.sh
+tests/process_empty_arg_smoke.sh
+tests/progress_pty_smoke.sh
+tests/requirements_smoke.sh
+tests/template_optional_smoke.sh
+tests/v43_cp127_eval_json_smoke.sh
+tests/v43_cp129_eval_capabilities.sh
+tests/v43_cp131_cp136_project_model.sh
+tests/v43_cp137_cp140_frontmatter.sh
+tests/v43_cp141_cp163_content_model.sh
+tests/v43_cp78_streams_smoke.sh
+tests/v43_frontend_surface_dogfood.sh
+tests/v43_hierarchy_incremental_smoke.sh
+tests/v45_adversarial_runtime.sh
+tests/v45_cli_invocation_smoke.sh
+tests/v46_b5_cp10_lock_graph.sh
+tests/v46_b5_cp11_resolver.sh
+tests/v46_b5_cp12_graph_commands.sh
+tests/v46_b5_cp13_determinism.sh
+tests/v47_deep_expression_smoke.sh
+tests/v48_prepared_collection_guard.sh
+tests/v48_prepared_object_literal_guard.sh
