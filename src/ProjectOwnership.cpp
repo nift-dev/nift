@@ -57,14 +57,22 @@ bool recorded_child_running(const std::filesystem::path& marker) {
     unsigned long pid = 0;
     unsigned long long created = 0;
     while (in >> pid >> created) {
+        // Only a definite answer counts as "exited": an indeterminate query
+        // (access denied, a failed API call) keeps the lock (owner,
+        // 2026-10-21). ERROR_INVALID_PARAMETER is Windows' "no such process".
         HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, pid);
-        if (h == nullptr) continue;  // gone (or not ours to see)
+        if (h == nullptr) {
+            if (GetLastError() == ERROR_INVALID_PARAMETER) continue;  // gone
+            return true;  // exists but cannot be inspected: treat as running
+        }
         FILETIME c{}, e{}, k{}, u{};
-        const bool same = GetProcessTimes(h, &c, &e, &k, &u) &&
-            ((static_cast<unsigned long long>(c.dwHighDateTime) << 32) | c.dwLowDateTime) == created;
-        const bool running = same && WaitForSingleObject(h, 0) == WAIT_TIMEOUT;
+        const bool timed = GetProcessTimes(h, &c, &e, &k, &u) != 0;
+        const DWORD wait = timed ? WaitForSingleObject(h, 0) : WAIT_FAILED;
         CloseHandle(h);
-        if (running) return true;
+        if (!timed || wait == WAIT_FAILED) return true;  // indeterminate
+        const bool same = ((static_cast<unsigned long long>(c.dwHighDateTime) << 32) | c.dwLowDateTime) == created;
+        if (same && wait == WAIT_TIMEOUT) return true;  // the recorded child still runs
+        // otherwise: it exited (signalled), or the pid now belongs to another process
     }
     return false;
 }
