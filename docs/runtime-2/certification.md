@@ -560,3 +560,47 @@ Known limitations recorded with this integration:
 
 Linux only. Evidence: `.claude-linode-runs/results/stack6/`.
 
+
+## C3 heap-limit-zero certified on Linode @f6a09c7 (2026-10-21)
+
+Base `6047a52b`, tip `f6a09c71` (one commit: `Context::kNoHeapLimit` is the
+"no budget" value; a heap limit of 0 means no room, so natives refuse instead
+of building results unchecked; reproducer `heap-limit-zero` permanent in
+`test-rt-value`):
+
+    certify @ f6a09c7: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 179
+
+g6-dedicated-2, `-j2`, job 8357 s (`test-rt-vm-mutants` 3036 s sequential,
+`test-build-boundary-nondestructive` 1704 s). Package snapshot b978a5a2…
+unchanged. Before launch the certifier personally ran `precert.sh` on the exact
+tip (PASS, all nine targets) and `make test-rt-value` (PASS, heap-limit-zero
+PASS), and built the reproducer against the base's `support.cpp`/`builtin.h`:
+it fails there (`join` and `replace` return status 0 at heap_limit 0; exit 1).
+Integrated as the exact certified commit. This closes C3 (D-047 #4).
+Evidence: `.claude-linode-runs/results/c3hlz/`.
+
+## Parallel mutation gate certified on Linode @f1334c7 (2026-10-21; not integrated)
+
+Base `6047a52b`, tip `f1334c76` (`vm_mutation_gate.py --jobs`; timing-sensitive
+suites serialised; only completed checks count; jobs ≤ CPUs; Makefile default
+ceil(nproc/2)), g6-dedicated-4:
+
+    certify @ f1334c7: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 1, PASS 178
+
+- Matrix: all 117 checks (13 binaries × 9 suites) identical to stack6's
+  sequential run in verdict, exit status, failure counts, summaries and
+  rejection lists; 12/12 mutants rejected; 0 incomplete checks.
+  `test-rt-vm-mutants` 1542 s (sequential 2887 s); whole job 91.9 min (stack6
+  on 2 vCPU: 131.7 min).
+- Fault injection (local, jobs 1/2/4 identical): crashed, summary-less,
+  inconsistent and timed-out suites are ABORTED and fail the gate; a worker
+  exception terminates the gate non-zero; a hung suite is bounded by certify's
+  per-target timeout (as before).
+- FLAKY `test-contracts`: `mv: cannot stat
+  '.build/libffi/…/.nift-toolchain-signature.tmp'` — a pre-existing Makefile
+  race (concurrent makes share the fixed `$@.tmp` of the FORCE'd signature
+  rules); not caused by the gate change; not counted as a pass. Fix approved
+  (owner, 2026-10-21): collision-free temporary name.
+- Not integrated: owner decision (2026-10-21) — the gate change and the race
+  fix ride in CP12B's next stack certification and integrate only with it.
+  Evidence: `.claude-linode-runs/results/mutgate/`.

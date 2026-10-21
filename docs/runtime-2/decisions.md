@@ -1052,6 +1052,13 @@ From CP12B's three-way check (nift.dev, legacy, approved semantics;
    state; zero means no budget left), the permanent bypass reproducers pass, and
    the shared reservation mechanism is verified against the documented budget
    semantics. The `vm.cpp` change is sequenced when ownership permits.
+   *Status 2026-10-21: closed.* `join` and `replace` integrated and certified
+   (@7120b01); heap-limit-zero corrected with an explicit no-budget value
+   (`Context::kNoHeapLimit`), certified @f6a09c7; the bypass reproducer is the
+   permanent `heap-limit-zero` test (fails on the old code); `reserve_result`
+   and `over_budget` test against the limit itself, as documented in the L7
+   step-2 record §6.4–6.5. No `vm.cpp` change was needed: the VM already
+   passes 0 for "no room left".
 
 ## D-048 — Script context uses scripting syntax only; `@` directives are template syntax (owner, 2026-10-20)
 

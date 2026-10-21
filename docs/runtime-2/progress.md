@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-18_
+_Last updated: 2026-10-21_
 
 ## Where things stand
 
@@ -32,6 +32,7 @@ _Last updated: 2026-10-18_
 | stack CP12B + L7 + loop literals | integrated — Linux, certified on Linode as one stack (`make certify` @01f18d2 on base 6413f7a4: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, FLAKY 0, PASS 174; SKIPPED-ENVIRONMENTAL 3: root-only, pass as unprivileged `tester`); rebased with no source/test change; cross-platform pending | `runtime-2` | CP12B phase B through 217ac21b (corpus completeness check); L7 value layer; legacy loop-literal regression fix (v4.12.0 5fe38bd1/55cb323c, v4.6.0 authoritative; 57-check regression suite); D-009#6 withdrawn. CP12B and L7 remain open checkpoints; this records their integrated work so far |
 | records20k (stage 4) | integrated — Linux, certified on Linode (`make certify` @527b692 on base 5394557d: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, FLAKY 0, PASS 174; SKIPPED-ENVIRONMENTAL 3: root-only) | `runtime-2` | records20k on the VM: path-argument lift, D1–D3 path wording fixed, records coverage; parity at 5k/10k/20k and the cold whole-program benchmark from local and stage4g evidence (see certification.md) |
 | stack C3 + CP16 + CP15B stage A | integrated — Linux, certified on Linode as one stack (`make certify` @7120b01 on base b48845f4: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, FLAKY 0, PASS 179; SKIPPED-ENVIRONMENTAL 3: root-only) | `runtime-2` | C3 integrated but stays open under D-047 #4 until the heap-limit-zero fix; CP16 Host layer with the legacy `run()` temporary exception (CP25 removes it); CP15B stage A + F1 (DeepSeek), F1 negative control not yet portable (see certification.md); stage B held |
+| C3 heap-limit-zero | integrated — Linux, certified on Linode (`make certify` @f6a09c7 on base 6047a52b: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, FLAKY 0, PASS 179; SKIPPED-ENVIRONMENTAL 3: root-only) | `runtime-2` | `Context::kNoHeapLimit` = no budget; heap limit 0 = no room (natives refuse); `heap-limit-zero` regression in `test-rt-value`, fails on the old code. **C3 closed** (D-047 #4) |
 
 ### CP08 certification evidence (owner-accepted 2026-10-18)
 
