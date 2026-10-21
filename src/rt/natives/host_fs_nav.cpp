@@ -28,8 +28,13 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
         return reserve_result(context, accounted);
     };
     if (glob) {
-        std::vector<fs::path> matches;
-        const Status budget = collect_glob_paths(context, call.target().path, "ls", matches, error);
+        std::vector<std::string> matches;
+        const bool absolute = !has_arg || fs::path(raw).is_absolute();
+        const fs::path base = fs::current_path();
+        std::error_code base_error;
+        const fs::path canonical_base = absolute ? fs::path() : fs::weakly_canonical(base, base_error);
+        const Status budget = collect_glob_paths(context, call.target().path, "ls", matches, error,
+                                                 !absolute, canonical_base);
         if (budget != Status::Ok) {
             if (budget == Status::Limit)
                 return fail_host(call, host::HostStatus::Limit,
@@ -37,24 +42,19 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
             return fail_host(call, host::HostStatus::Fatal,
                              host_error("runtime.invalid_operation", error), error);
         }
-        const bool absolute = !has_arg || fs::path(raw).is_absolute();
-        const fs::path base = fs::current_path();
-        std::error_code base_error;
-        const fs::path canonical_base = absolute ? fs::path() : fs::weakly_canonical(base, base_error);
-        for (const fs::path& match : matches) {
-            std::string rendered;
-            if (absolute) {
-                rendered = match.generic_string();
-            } else {
-                std::error_code ec;
-                const fs::path canonical = fs::weakly_canonical(match, ec);
-                rendered = (ec ? match : canonical.lexically_relative(canonical_base)).generic_string();
-            }
-            if (!account(rendered))
-                return fail_host(call, host::HostStatus::Limit,
-                                 host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
-            names.push_back(rendered);
+        std::size_t retained = strings_retained(matches);
+        std::size_t heap_strings = 0;
+        for (const std::string& match : matches) heap_strings = size_add(heap_strings, string_heap_storage(match));
+        const std::size_t array_storage = size_add(size_mul(matches.size(), sizeof(Value)), retained);
+        if (!reserve_result(context, size_add(size_add(array_storage, heap_strings),
+                                              size_mul(matches.capacity(), sizeof(std::string))))) {
+            return fail_host(call, host::HostStatus::Limit,
+                             host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
         }
+        out = make_array(matches.size());
+        for (std::string& match : matches) array_push(out, make_string(std::move(match)));
+        if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
+        return Status::Ok;
     } else {
         std::error_code ec;
         if (!fs::is_directory(call.target().path, ec)) {

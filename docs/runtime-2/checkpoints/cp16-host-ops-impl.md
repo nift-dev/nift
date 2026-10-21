@@ -856,3 +856,37 @@ this branch):
 > while any execution path relies on these exceptions: it must eliminate the
 > legacy launcher and all its exceptions.
 
+
+## CP16 R4 — exact accounting for stream reads and glob collection
+
+Owner-directed correction round (2026-10-22) after Claude reproduced two
+resource-accounting defects in the R1-R3 candidate.
+
+- **R4a (stream reads).** `read_whole` no longer reserves all remaining heap
+  headroom when an unknown-size stream outgrows its initial 64 KiB buffer. It
+  grows geometrically (the shared `BudgetedText` check charges the old and the
+  replacement capacity), makes one bounded tail reservation only after 1 MiB
+  when the budget is finite, and finalises the completed buffer: if the
+  capacity exceeds the length by more than `max(64 KiB, length/8)`, it performs
+  a checked exact-size allocation (the old and new sizes are charged while both
+  are live) and releases the old buffer. The `std::vector<uint8_t>` bytes path
+  uses the same rules. A 65 KiB or 100 KiB stream no longer retains the whole
+  budget, so a following 20 MiB read succeeds under the same 60 MB budget; the
+  accepted 50 MiB stream results still succeed.
+- **R4b (glob collection).** `collect_glob_paths` stores generic-spelling
+  `std::string` matches instead of `std::filesystem::path` objects. Each match
+  is charged as `sizeof(std::string)` plus its actual heap capacity (capacity+1
+  above the SSO limit), vector growth is charged old+new, and the result is
+  converted to the `ls` array exactly once, with the live strings and the array
+  both charged. Ordering, rendering, `NIFT_FS_ROOT` checks (B1), sorting and
+  de-duplication are unchanged; the accepted R3 traversal and B1 containment
+  code were not touched.
+- **Controls.** `NIFT_HOST_MUTANT=8` skips stream finalisation (caught by the
+  retained-capacity and 3 MiB-then-20 MiB memory cases);
+  `NIFT_HOST_MUTANT=9` restores a fixed per-match allowance (caught by the
+  deep-path glob boundary at 36 MB). Existing host mutants 1-7 and VM mutants
+  1-12 remain rejected.
+- **Evidence.** `tests/runtime2/vm_host_memory.py` records accounted heap
+  (`NIFT_VM_STATS` `heap_bytes`) and peak RSS separately for the stream and
+  glob cases. The R1-R3 report and this R4 round are in
+  `.claude-linode-runs/deepseek/cp16-vm-host-s1/`.

@@ -10,6 +10,7 @@
 #include "ReadLimit.h"
 #include "Sha256.h"
 #include "rt/aggregate.h"
+#include "rt/heap.h"
 #include "rt/host/path.h"
 #include "rt/string.h"
 
@@ -236,38 +237,60 @@ inline Status resolve_plain(const Context& context, const std::string& raw, std:
     return Status::Ok;
 }
 
+inline std::size_t string_storage(const std::string& text) {
+    return sizeof(std::string) + (text.capacity() > 15 ? text.capacity() + 1 : 0);
+}
+
+inline std::size_t string_heap_storage(const std::string& text) {
+    return sizeof(StringObject) + (text.capacity() > 15 ? text.capacity() + 1 : 0);
+}
+
+inline std::size_t strings_retained(const std::vector<std::string>& values) {
+    std::size_t total = 0;
+    for (const std::string& value : values) total = size_add(total, string_storage(value));
+    return total;
+}
+
 inline Status collect_glob_paths(const Context& context, const fs::path& path, std::string_view name,
-                                 std::vector<fs::path>& out, std::string& error) {
+                                 std::vector<std::string>& out, std::string& error, bool display_relative = false,
+                                 const fs::path& canonical_base = {}) {
 #if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 7
     constexpr bool enforce_budget = false;
 #else
     constexpr bool enforce_budget = true;
 #endif
-    std::vector<fs::path> matches;
+    std::vector<std::string> matches;
     std::size_t accounted = 0;
-    std::size_t key_bytes = 0;
     bool policy_failure = false;
     const bool completed = nift::detail::glob_visit(path, [&](const fs::path& match) {
+        std::string spelling = match.generic_string();
         if (context.host.paths) {
             host::Resolved checked;
             host::HostError policy_error;
-            if (host::resolve_path(*context.host.paths, match.generic_string(), name, checked, policy_error) !=
+            if (host::resolve_path(*context.host.paths, spelling, name, checked, policy_error) !=
                 host::HostStatus::Ok) {
                 error = policy_error.message;
                 policy_failure = true;
                 return false;
             }
         }
-        const std::size_t text = match.generic_string().size();
-        key_bytes = size_add(key_bytes, text + 64);
-        accounted = size_add(accounted, text + sizeof(fs::path) + 128);
+        if (display_relative) {
+            std::error_code ec;
+            const fs::path canonical = fs::weakly_canonical(match, ec);
+            spelling = (ec ? match : canonical.lexically_relative(canonical_base)).generic_string();
+        }
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 9
+        accounted = size_add(accounted, spelling.size() + sizeof(fs::path) + 128);
+#else
+        accounted = size_add(accounted, string_storage(spelling));
+#endif
         if (matches.size() == matches.capacity()) {
             const std::size_t old_capacity = matches.capacity();
             const std::size_t capacity =
                 old_capacity < 8 ? 8
                                 : (old_capacity > kSizeOverflow / 2 ? kSizeOverflow : old_capacity * 2);
-            const std::size_t vectors = size_add(size_mul(capacity, sizeof(fs::path)),
-                                                 size_mul(old_capacity, sizeof(fs::path)));
+            const std::size_t vectors = size_add(size_mul(capacity, sizeof(std::string)),
+                                                 size_mul(old_capacity, sizeof(std::string)));
             if (enforce_budget && !reserve_result(context, size_add(accounted, vectors))) {
                 error = std::string(name) + ": result exceeds the memory budget";
                 return false;
@@ -278,19 +301,11 @@ inline Status collect_glob_paths(const Context& context, const fs::path& path, s
             error = std::string(name) + ": result exceeds the memory budget";
             return false;
         }
-        matches.push_back(match);
+        matches.push_back(std::move(spelling));
         return true;
     });
     if (!completed) return policy_failure ? Status::Error : Status::Limit;
-    // The legacy API sorts by generic spelling and then de-duplicates. Charge
-    // the sort-key allowance before taking that path.
-    if (enforce_budget && !reserve_result(context, size_add(accounted, key_bytes))) {
-        error = std::string(name) + ": result exceeds the memory budget";
-        return Status::Limit;
-    }
-    std::sort(matches.begin(), matches.end(), [](const fs::path& left, const fs::path& right) {
-        return left.generic_string() < right.generic_string();
-    });
+    std::sort(matches.begin(), matches.end());
     matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
     out = std::move(matches);
     return Status::Ok;
@@ -318,10 +333,29 @@ inline Status collect_paths(const Context& context, const Value& value, std::str
         if (resolve_plain(context, raw, name, resolved, error) != Status::Ok) return Status::Error;
         if (nift::detail::glob_has_magic(raw)) {
             globbed = true;
-            std::vector<fs::path> matches;
+            std::vector<std::string> matches;
             const Status budget = collect_glob_paths(context, resolved.path, name, matches, error);
             if (budget != Status::Ok) return budget;
-            paths.insert(paths.end(), matches.begin(), matches.end());
+            const std::size_t conversion = size_add(strings_retained(matches),
+                                                    size_mul(matches.size(), sizeof(fs::path)));
+            if (!reserve_result(context, conversion)) {
+                error = std::string(name) + ": result exceeds the memory budget";
+                return Status::Limit;
+            }
+            const std::size_t old_capacity = paths.capacity();
+            const std::size_t needed = size_add(paths.size(), matches.size());
+            std::size_t new_capacity = old_capacity < 8 ? 8 : size_mul(old_capacity, 2);
+            while (new_capacity < needed) new_capacity = size_mul(new_capacity, 2);
+            if (new_capacity > paths.capacity()) {
+                const std::size_t vectors = size_add(size_mul(new_capacity, sizeof(fs::path)),
+                                                     size_mul(old_capacity, sizeof(fs::path)));
+                if (!reserve_result(context, size_add(conversion, vectors))) {
+                    error = std::string(name) + ": result exceeds the memory budget";
+                    return Status::Limit;
+                }
+                paths.reserve(new_capacity);
+            }
+            for (std::string& match : matches) paths.emplace_back(std::move(match));
         } else {
             paths.push_back(resolved.path);
         }

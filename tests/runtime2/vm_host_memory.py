@@ -58,6 +58,33 @@ def check_success(label, peak, proc, expected, failures):
     return True
 
 
+def check_pair(label, peak, proc, expected, failures, max_kib=72 * 1024):
+    if proc is None:
+        failures.append(f"{label}: /usr/bin/time unavailable")
+        return False
+    if proc.returncode != 0 or proc.stdout.decode(errors="replace").strip() != expected:
+        failures.append(f"{label}: expected output {expected!r}, got {proc.stdout!r} rc={proc.returncode}")
+        return False
+    if peak is None or peak > max_kib:
+        failures.append(f"{label}: peak RSS {peak} KiB > {max_kib} KiB")
+        return False
+    print(f"PEAK {label} {peak} KiB")
+    return True
+
+
+def last_stats(path):
+    if not path.exists():
+        return None
+    lines = [line for line in path.read_text().splitlines() if line.strip()]
+    if not lines:
+        return None
+    try:
+        import json
+        return json.loads(lines[-1])
+    except Exception:
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--nift", required=True)
@@ -136,6 +163,41 @@ def main():
                              b"52428800", failures):
                 passed += 1
 
+        # R4a: small unknown-size stream then a 20 MiB regular read, 60 MB
+        # budget. The small result must not retain the whole budget headroom.
+        with open(root / "twenty.bin", "wb") as handle:
+            handle.truncate(20 << 20)
+        (root / "case.f").write_text(
+            's := open("/dev/stdin"); t := open("twenty.bin"); print(s.length()); print(t.length())\n')
+        for kib in (65, 100, 1024, 3072):
+            peak, out, err = timed(nift, root, large, input_bytes=b"x" * (kib << 10))
+            if check_pair(f"stream-{kib}k-then-20m", peak,
+                          subprocess.CompletedProcess([], 0 if out else 1, out, err),
+                          f"{kib << 10}\n20971520", failures):
+                passed += 1
+
+        # R4a capacity: a 3 MiB stream result must finalise to a bounded
+        # retained size. NIFT_VM_STATS reports the live heap after execution.
+        (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
+        cap_stats = root / "cap-stats.jsonl"
+        cap_env = dict(large, NIFT_VM_STATS=str(cap_stats))
+        peak, out, err = timed(nift, root, cap_env, input_bytes=b"x" * (3 << 20))
+        stats = last_stats(cap_stats)
+        if out.strip() == b"3145728" and stats and stats.get("heap_bytes", 1 << 60) <= (4 << 20):
+            print(f"PEAK stream-3m-capacity {peak} KiB heap={stats.get('heap_bytes')}")
+            passed += 1
+        else:
+            failures.append(f"stream-3m-capacity: output={out!r} stats={stats}")
+
+        # R4a: a 1 KiB stream under a 1 GiB budget still succeeds.
+        huge = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="1000000000")
+        (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
+        peak, out, err = timed(nift, root, huge, input_bytes=b"x" * (1 << 10))
+        if out.strip() == b"1024":
+            passed += 1
+        else:
+            failures.append(f"stream-1k-1g: output={out!r} err={err!r}")
+
         # ls: 20,000 names, 1 MB budget.
         names = root / "names"
         names.mkdir()
@@ -148,11 +210,12 @@ def main():
             passed += 1
 
         # glob: 150,000 matches, 1 MB budget.
-        big_dir = root / "big"
-        big_dir.mkdir()
+        big_dir = root / "deep" / "a" / "b" / "c" / "d" / "e" / "f" / "g" / "h"
+        big_dir.mkdir(parents=True)
         for i in range(150000):
             (big_dir / f"f{i:06d}").touch()
-        (root / "case.f").write_text('l := ls("big/*"); print(l.length())\n')
+        deep_glob = 'l := ls("deep/a/b/c/d/e/f/g/h/*"); print(l.length())\n'
+        (root / "case.f").write_text(deep_glob)
         peak, _, err = timed(nift, root, budget)
         if check("glob", peak, subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err),
                  failures):
@@ -160,13 +223,44 @@ def main():
 
         # The same 150,000-match glob with a large budget must succeed.
         allowed = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="1000000000")
-        (root / "case.f").write_text('l := ls("big/*"); print(l.length())\n')
+        (root / "case.f").write_text(deep_glob)
         proc = subprocess.run([nift, "case.f"], cwd=root, env=allowed, stdin=subprocess.DEVNULL,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
         if proc.returncode != 0 or proc.stdout.strip() != b"150000":
             failures.append("glob-large-budget: expected successful 150000 matches")
         else:
             passed += 1
+
+        # R4b: deep-path glob. 36 MB must succeed (the accounting threshold);
+        # 40 MB and 60 MB may succeed with the accounted heap inside the budget
+        # and RSS under the bound, or refuse before RSS exceeds baseline +
+        # budget + 96 KiB + tolerance.
+        base_env = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
+        (root / "case.f").write_text('print(1)\n')
+        base_peak, _, _ = timed(nift, root, base_env)
+        tolerance = 8 << 10  # allocator/stdio tolerance, stated in the report
+        for budget_bytes in (36_000_000, 40_000_000, 60_000_000):
+            env = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET=str(budget_bytes))
+            stats_path = root / f"glob-{budget_bytes}.jsonl"
+            env["NIFT_VM_STATS"] = str(stats_path)
+            (root / "case.f").write_text(deep_glob)
+            peak, out, err = timed(nift, root, env)
+            stats = last_stats(stats_path)
+            bound = (base_peak or 0) + budget_bytes // 1024 + (96 + tolerance)
+            if budget_bytes == 36_000_000:
+                if out.strip() == b"150000" and stats and stats.get("heap_bytes", 1 << 60) <= budget_bytes:
+                    print(f"GLOB {budget_bytes} success heap={stats.get('heap_bytes')} peak={peak} KiB")
+                    passed += 1
+                else:
+                    failures.append(f"glob-deep-{budget_bytes}: required success, out={out!r} stats={stats} err={err!r}")
+            elif out.strip() == b"150000" and stats and stats.get("heap_bytes", 1 << 60) <= budget_bytes:
+                print(f"GLOB {budget_bytes} success heap={stats.get('heap_bytes')} peak={peak} KiB")
+                passed += 1
+            elif b"memory budget" in err and peak is not None and peak <= bound:
+                print(f"GLOB {budget_bytes} refused peak={peak} KiB bound={bound} KiB")
+                passed += 1
+            else:
+                failures.append(f"glob-deep-{budget_bytes}: out={out!r} peak={peak} bound={bound} err={err!r}")
 
         # R2 duplicate-heavy: the same paths are visited ~6x, but the final
         # unique result is much smaller. A budget between the two rejects.
@@ -176,12 +270,12 @@ def main():
         for i in range(1000):
             (dup_leaf / f"f{i:04d}").touch()
         (root / "case.f").write_text('l := ls("dup/**/**/*"); print(l.length())\n')
-        dup_low = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="1500000")
+        dup_low = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="600000")
         peak, _, err = timed(nift, root, dup_low)
         if check("glob-duplicate-low", peak,
                  subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err), failures):
             passed += 1
-        dup_ok = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="2500000")
+        dup_ok = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="700000")
         peak, out, err = timed(nift, root, dup_ok)
         if check_success("glob-duplicate-ok", peak,
                          subprocess.CompletedProcess([], 0 if out.strip() == b"1005" else 1, out, err),

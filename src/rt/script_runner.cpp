@@ -2,6 +2,7 @@
 
 #include "HostTrace.h"
 #include "rt/compiler.h"
+#include "rt/heap_account.h"
 #include "rt/module_link.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
@@ -46,6 +47,7 @@ struct Stats {
     std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
     bool catchable = false;  // vm-error: legacy raises it as a catchable Error
     std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
+    std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
 };
 
 std::string json_escape(const std::string& text) {
@@ -70,7 +72,8 @@ void report(const Stats& s) {
          << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
          << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
          << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false")
-         << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false");
+         << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false")
+         << ",\"heap_bytes\":" << s.heap_bytes;
     const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
         line << ",\"" << name << "\":[";
         for (std::size_t k = 0; k < values.size(); ++k) line << (k ? "," : "") << values[k];
@@ -314,6 +317,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.derived_lines = result.derived_lines;
     stats.evidence_truncated = result.evidence_truncated;
     write_stdout(output, nullptr);
+    stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {
         if (result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
         std::cout.flush();

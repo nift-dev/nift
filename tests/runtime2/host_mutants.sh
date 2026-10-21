@@ -77,4 +77,23 @@ if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP
     exit 1
 fi
 echo "PASS host mutant 7: unbounded glob traversal rejected"
-echo "PASS host negative controls: 7/7 mutants rejected"
+
+for mutant in 8 9; do
+    BUILD="$TMP/m$mutant"
+    mkdir -p "$BUILD"
+    git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+    if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
+        CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
+        >"$TMP/build-$mutant.log" 2>&1; then
+        echo "FAIL host mutant $mutant: build failed (harness failure)" >&2
+        tail -20 "$TMP/build-$mutant.log" >&2
+        exit 1
+    fi
+    if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
+        echo "FAIL host mutant $mutant: memory test passed (mutant not caught)" >&2
+        cat "$TMP/test-$mutant.log" >&2
+        exit 1
+    fi
+    echo "PASS host mutant $mutant: memory test rejected the mutant"
+done
+echo "PASS host negative controls: 9/9 mutants rejected"
