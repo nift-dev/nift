@@ -17,7 +17,8 @@ fallback_escape.f vm
 fallback_fn_after.f vm 
 fallback_fn_called_early.f fallback fn-called-before-declaration
 fallback_for.f fallback statement:For
-fallback_free_name.f fallback free-name
+# CP12b globals: `n` is a top-level binding declared before the call (rt/globals.h G1-G3).
+fallback_free_name.f vm
 fallback_index_assign_call.f fallback index-target
 fallback_interpolation.f vm
 fallback_lambda.f fallback expression:Lambda

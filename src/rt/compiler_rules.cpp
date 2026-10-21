@@ -88,7 +88,11 @@ bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint1
     if (type.kind == TextType::Kind::Known)
         return fb_->constant(Value::integer(type.known), operand) || builder_ok();
     if (type.kind == TextType::Kind::Binding) {
-        if (const Binding* b = scopes_.find(type.binding)) { operand = b->type_reg; return true; }
+        if (const Binding* b = find_binding(type.binding)) {
+            if (b->global) return global_read(b->type_reg, operand);  // CP12b
+            operand = b->type_reg;
+            return true;
+        }
         if (type.binding == "true" || type.binding == "false" ||  // rt-lint: allow-string-compare compile time
             type.binding == "null" || plan_.index.count(type.binding))  // rt-lint: allow-string-compare compile time
             return fb_->constant(Value::integer(-1), operand) || builder_ok();

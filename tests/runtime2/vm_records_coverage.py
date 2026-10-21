@@ -205,7 +205,8 @@ OUTER_INTEGRAL = [("e2", 'v := [1e2]\ns := v[0]\n', "vm"), ("pt0", 'v := [2.0]\n
 # never holds a non-int afterwards (reassignment to a double or string, an
 # integral or fractional untyped value, compound assignment, in a loop):
 # legacy's binding-type register errors, and so does the VM, or the program
-# is refused; a write from another function is refused (assign-free-name);
+# is refused; a write from another function is the global (CP12b) and keeps
+# the int binding type (vm-error, as legacy);
 # a non-int binding of that name in an intermediate scope (an `if` block, the
 # calling function, its parameter, the loop body) is refused. Each program
 # is `out := s; out = "b"` called with "a" (loop calls appended where the
@@ -216,8 +217,8 @@ OUTER_LATER = [
     ('compound_frac', 's := 7\ns += 0.5\nprint(s)\n', True, 'vm-error'),
     ('incdec', 's := 7\ns++\nprint(s)\n', True, 'vm'),
     ('int_ok', 's := 7\n', True, 'vm'),
-    ('mutate_via_fn', 'fn(g()) {\n  s = 2.5\n  return 0\n}\ns := 7\ng()\n', True, 'assign-free-name'),
-    ('mutate_via_fn_str', 'fn(g()) {\n  s = "x"\n  return 0\n}\ns := 7\ng()\n', True, 'assign-free-name'),
+    ('mutate_via_fn', 'fn(g()) {\n  s = 2.5\n  return 0\n}\ns := 7\ng()\n', True, 'vm-error'),
+    ('mutate_via_fn_str', 'fn(g()) {\n  s = "x"\n  return 0\n}\ns := 7\ng()\n', True, 'vm-error'),
     ('reassign_double', 's := 7\ns = 2.5\n', True, 'vm-error'),
     ('reassign_in_loop', 's := 7\ni := 0\nwhile (i < 1) {\n  s = 2.5\n  f("a")\n  i += 1\n}\n',
      False, 'context:assignment-error'),

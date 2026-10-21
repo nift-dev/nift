@@ -896,7 +896,9 @@ INJECT = [
     ("fn-flags", "fn[async](zg()) { return 1 }", "", "top", "fn-flags"),
     ("fn-name-reserved", "fn(is_null(x)) { return 1 }", "", "top", "fn-name-reserved"),
     ("param-name-reserved", "fn(zg(name)) { return 1 }", "print(zg(1))", "top", "param-name-reserved"),
-    ("free-name", "fn(zg()) { return zglobal }", "zglobal := 1\nprint(zg())", "top", "free-name"),
+    # CP12b: a global compiles; only a caller's local resolving the name stays refused.
+    ("free-name", "fn(zg()) { return zglobal }\nfn(zh()) { zglobal := 1\nreturn zg() }", "print(zh())", "top",
+     "free-name"),
     ("arity", "fn(zg(x)) { return x }", "print(zg())", "any", "static-error:arity"),
     ("alias-argument", "fn(zg(p)) { p.push(9)\nreturn 0 }", 'zo := {"k": [1]}\nzg(zo.k)', "any", "alias-argument"),
     ("string-arg-number", "fn(zg(n)) { return n }", 'print(zg("2.5"))', "any", "string-arg-type"),

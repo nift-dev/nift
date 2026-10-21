@@ -71,11 +71,12 @@ bool ordering_kinds_ok(std::uint8_t l, std::uint8_t r) {
 bool UnitCompiler::temp(std::uint16_t& reg) { return fb_->alloc(reg) || builder_ok(); }
 
 bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
-    const Binding* binding = scopes_.find(text(node));
+    const Binding* binding = find_binding(text(node));
     if (!binding) {
         if (plan_.index.count(text(node))) return fail(node, "fn-as-value");
         return fail(node, in_function_ ? "free-name" : "unresolved-name");
     }
+    if (binding->global) return global_read(binding->reg, reg);  // CP12b: a copy of main's slot
     reg = binding->reg;
     return true;
 }
@@ -163,6 +164,10 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
     switch (node.kind) {
         case NodeKind::Ident: {
             std::uint16_t reg = 0;
+            if (const Binding* b = find_binding(text(node)); b && b->global) {  // CP12b
+                fb_->emit(OpCode::GetGlobal, dst, b->reg);
+                return true;
+            }
             if (!local_register(node, reg)) return false;
             if (reg != dst) fb_->emit(OpCode::Move, dst, reg);
             return true;

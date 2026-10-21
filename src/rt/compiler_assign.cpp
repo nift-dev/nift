@@ -42,6 +42,7 @@ bool UnitCompiler::declare(const Node& node) {
     // A declaration in loop code whose binding type legacy's prepared path
     // would derive differently was refused (rt/prepared.h, prepared-decl-type).
     if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
+    note_global_declaration(node, binding);  // CP12b: a global some function reaches
     return true;
 }
 
@@ -58,7 +59,7 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const std::string_view target = text(ast_.at(node.a));
     const bool numeric = (kinds(node.b) & static_cast<std::uint8_t>(~kKindNumber)) == 0;
     const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;
-    const bool exempt = numeric && (own_type || always_double_[scope_index()].count(target));
+    const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target));
     if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
     if (loop_reachable() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
@@ -66,12 +67,15 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
     if (!text_type_of(type, ast_.at(node.b), text_type)) return false;
+    std::uint16_t binding_type = b.type_reg;
+    if (b.global && !global_read(b.type_reg, binding_type)) return false;  // CP12b
     fb_->set_offset(node.begin);
     const std::size_t check = fb_->is_untyped_constant(text_type)
-                                  ? fb_->emit(OpCode::CheckType, value, b.type_reg)
-                                  : fb_->emit(OpCode::CheckAssign, value, b.type_reg, text_type);
+                                  ? fb_->emit(OpCode::CheckType, value, binding_type)
+                                  : fb_->emit(OpCode::CheckAssign, value, binding_type, text_type);
     fb_->note(check, std::string(text(ast_.at(node.a))));
-    fb_->emit(OpCode::Move, b.reg, value);
+    if (b.global) global_put(b, value);
+    else fb_->emit(OpCode::Move, b.reg, value);
     return true;
 }
 
@@ -81,19 +85,25 @@ bool UnitCompiler::assign(const Node& node) {
     if (target.kind == NodeKind::Index) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
-        if (object.kind != NodeKind::Ident || !local_register(object, reg)) return fail(target, "index-assign-target");
+        const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
+        const bool global = holder != nullptr && holder->global;
+        const Binding held = global ? *holder : Binding();
+        if (object.kind != NodeKind::Ident || (!global && !local_register(object, reg)))
+            return fail(target, "index-assign-target");
         if (!element_target_ok(target)) return false;
         if (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
             !kinds_within(target.b, kKindNumber, target, "type:element-assignment") || !no_alias(node.b, node))
             return false;
         if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
+        if (global && !global_take(held, reg)) return false;  // CP12b: in place, after the operands
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
+        if (global) global_put(held, reg);
         return true;
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");
-    const Binding* binding = scopes_.find(text(target));
+    const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
@@ -103,34 +113,35 @@ bool UnitCompiler::assign(const Node& node) {
 bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     const Node& target = ast_.at(node.a);
     const std::uint16_t mark = fb_->top();
+    // CP12b: a global is updated in a register taken from main's slot (after
+    // the right-hand side, which may read it) and stored back.
+    std::uint16_t reg = b.reg, binding_type = b.type_reg, value = 0;
+    Value small;
+    const Node* rhs = node.kind == NodeKind::IncDec ? nullptr : &ast_.at(node.b);
+    const bool immediate = rhs != nullptr && node.op == Op::AddAssign && rhs->kind == NodeKind::Number &&
+                           decode_number_literal(text(*rhs), small) && small.is(Kind::Int) && small.as_int() <= 32767;
+    if (rhs != nullptr && !immediate && !expr_any(node.b, value)) return false;
+    if (b.global && (!global_take(b, reg) || !global_read(b.type_reg, binding_type))) return false;
+    fb_->set_offset(node.begin);
     if (node.kind == NodeKind::IncDec) {
         const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
-        fb_->set_offset(node.begin);
-        fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(up ? 1 : -1));
+        fb_->emit(OpCode::AddI, reg, reg, jump_operand(up ? 1 : -1));
+    } else if (immediate) {
+        fb_->emit(OpCode::AddI, reg, reg, jump_operand(static_cast<int>(small.as_int())));
     } else {
-        const Node& rhs = ast_.at(node.b);
-        Value small;
-        std::uint16_t value = 0;
-        if (node.op == Op::AddAssign && rhs.kind == NodeKind::Number && decode_number_literal(text(rhs), small) &&
-            small.is(Kind::Int) && small.as_int() <= 32767) {
-            fb_->set_offset(node.begin);
-            fb_->emit(OpCode::AddI, b.reg, b.reg, jump_operand(static_cast<int>(small.as_int())));
-        } else {
-            if (!expr_any(node.b, value)) return false;
-            fb_->set_offset(node.begin);
-            switch (node.op) {
-                case Op::AddAssign: fb_->emit(OpCode::AddAssign, b.reg, value); break;
-                case Op::SubAssign: fb_->emit(OpCode::Sub, b.reg, b.reg, value); break;
-                case Op::MulAssign: fb_->emit(OpCode::Mul, b.reg, b.reg, value); break;
-                case Op::DivAssign: fb_->emit(OpCode::Div, b.reg, b.reg, value); break;
-                case Op::ModAssign: fb_->emit(OpCode::Mod, b.reg, b.reg, value); break;
-                default: return fail(node, "compound-operator");
-            }
+        switch (node.op) {
+            case Op::AddAssign: fb_->emit(OpCode::AddAssign, reg, value); break;
+            case Op::SubAssign: fb_->emit(OpCode::Sub, reg, reg, value); break;
+            case Op::MulAssign: fb_->emit(OpCode::Mul, reg, reg, value); break;
+            case Op::DivAssign: fb_->emit(OpCode::Div, reg, reg, value); break;
+            case Op::ModAssign: fb_->emit(OpCode::Mod, reg, reg, value); break;
+            default: return fail(node, "compound-operator");
         }
     }
     if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
-    const std::size_t check = fb_->emit(OpCode::CheckType, b.reg, b.type_reg);
+    const std::size_t check = fb_->emit(OpCode::CheckType, reg, binding_type);
     fb_->note(check, std::string(text(target)));
+    if (b.global) global_put(b, reg);
     fb_->release_to(mark);
     return builder_ok();
 }
@@ -138,7 +149,7 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
 bool UnitCompiler::compound_assign(const Node& node) {
     const Node& target = ast_.at(node.a);
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
-    const Binding* binding = scopes_.find(text(target));
+    const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     const Binding b = *binding;
     // `+=` on two numbers or two strings, the others on numbers (legacy
@@ -156,7 +167,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
         // Legacy's prepared `s += t` on strings skips the binding type check
         // (execute_prepared appends in place), so a binding typed double that
         // holds a string keeps it there and fails canonically.
-        if (node.op == Op::AddAssign && ((l | r) & kKindString) && may_double_[scope_index()].count(text(target)))
+        if (node.op == Op::AddAssign && ((l | r) & kKindString) && may_double_[binding_scope(b)].count(text(target)))
             return fail(node, "context:string-append-type");
     }
     return compound_op(node, b);
@@ -165,7 +176,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
 bool UnitCompiler::inc_dec(const Node& node) {
     const Node& target = ast_.at(node.a);
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
-    const Binding* binding = scopes_.find(text(target));
+    const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;

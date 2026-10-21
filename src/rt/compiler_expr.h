@@ -13,6 +13,7 @@
 // once, errors reported where they occur; D-009#1/#5).
 #include "rt/ast.h"
 #include "rt/codegen.h"
+#include "rt/globals.h"
 #include "rt/natives/builtin.h"
 #include "rt/infer.h"
 #include "rt/resolver.h"
@@ -23,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -31,7 +33,7 @@ namespace nift::rt::detail {
 class UnitCompiler {
 public:
     UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
-                 const std::vector<bool>& loop_called);
+                 const std::vector<bool>& loop_called, const GlobalPlan* globals = nullptr);
 
     // Compiles main (proto 0) and every function (proto k + 1) into `program`.
     bool compile_program(NodeId root, Program& program);
@@ -168,12 +170,27 @@ private:
     }
     bool no_trailing_comma(const Node& node);
     bool temp(std::uint16_t& reg);
+    // CP12b globals (compiler_globals.cpp): the binding of `name` in the code
+    // being compiled: a local, or (in a function) the top-level binding a
+    // resolved free name denotes (Binding::global); nullptr otherwise.
+    const Binding* find_binding(std::string_view name) const;
+    void note_global_declaration(const Node& node, const Binding& binding);
+    bool propagate_global_doubles();
+    // Reads a global's value (or type) slot into a fresh temporary.
+    bool global_read(std::uint16_t slot, std::uint16_t& reg);
+    // A global aggregate taken out of its slot for an in-place update (so the
+    // update does not copy it), and put back after.
+    bool global_take(const Binding& b, std::uint16_t& reg);
+    void global_put(const Binding& b, std::uint16_t reg) { fb_->emit(OpCode::SetGlobal, b.reg, reg); }
+    std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
 
     bool fail(const Node& node, std::string reason);
     bool builder_ok();
     std::string_view text(const Node& node) const { return ast_.text(node); }
 
     bool probe_ = false;
+    const GlobalPlan* globals_ = nullptr;
+    std::unordered_map<std::string_view, Binding> global_bindings_;  // main's binding of each global
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;

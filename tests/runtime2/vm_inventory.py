@@ -29,7 +29,7 @@ CASES = [
     ("for-and-try", "for (i : [1, 2]) {\n  print(i.zap())\n}\ntry {\n  print(1)\n  nothere()\n} catch (e) {\n"
      "  print(e)\n}\n", {"statement:For", "method:zap", "statement:Try", "callable:nothere"}),
     ("fn-after-global", "g := 10\nfn(f(x)) {\n  return x + g\n}\nprint(f(1))\n",
-     {"free-name:global"}),  # CP12b: a declaration after statements is admitted
+     set()),  # CP12b: a declaration after statements and a resolved global compile
     ("global-before-declaration", "fn(f(x)) {\n  g = g + 1\n  return x + g\n}\nprint(f(1))\ng := 10\n",
      {"assign-free-name:before-declaration", "free-name:before-declaration"}),
     ("dynamic-caller", "fn(inner()) { return z }\nfn(outer()) { z := 1\nreturn inner() }\nprint(outer())\n",

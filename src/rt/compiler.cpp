@@ -1,6 +1,7 @@
 #include "rt/compiler.h"
 
 #include "rt/compiler_expr.h"
+#include "rt/globals.h"
 #include "rt/literal.h"
 #include "rt/native.h"
 #include "rt/prepared.h"
@@ -233,7 +234,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
             const Node& receiver = ast_.at(callee.a);
             if (!plain_postfix(expr) || !plain_postfix(callee) || !no_trailing_comma(expr)) return false;
             std::uint16_t reg = 0, value = 0;
-            if (receiver.kind != NodeKind::Ident || !local_register(receiver, reg))
+            const Binding* holder = receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
+            const bool global = holder != nullptr && holder->global;  // CP12b: taken, pushed, put back
+            const Binding held = global ? *holder : Binding();
+            if (receiver.kind != NodeKind::Ident || (!global && !local_register(receiver, reg)))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) return fail(node, "static-error:push-arity");
             const NodeId arg = ast_.list(expr)[0];
@@ -244,8 +248,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
             if (!kinds_within(callee.a, kKindArray, receiver, "type:push") || !no_alias(arg, ast_.at(arg)))
                 return false;
             if (!expr_any(arg, value)) return false;
+            if (global && !global_take(held, reg)) return false;
             fb_->set_offset(expr.begin);
             fb_->emit(OpCode::Push, reg, value);
+            if (global) global_put(held, reg);
             return true;
         }
     }
@@ -278,7 +284,9 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     // before anything runs (rt/prepared.h).
     // The kinds are inferred first (stage 4: outer bindings of a parameter
     // copy); the order of the refusals is unchanged.
-    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks);
+    // CP12b: free names of functions that resolve to top-level bindings.
+    const GlobalPlan globals = plan_globals(ast, root, plan);
+    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks, &globals);
     const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
@@ -290,7 +298,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
         result.offset = ast.at(root).begin;
         return result;
     }
-    detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called);
+    detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -298,7 +306,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
         if (compiler.unknown_hit()) {
             // Unknown kinds come from something refused anyway: report that
             // refusal when the probe finds one (the unit is refused either way).
-            detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called);
+            detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called, &globals);
             probe.probe_unknown();
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {

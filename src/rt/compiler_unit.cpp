@@ -58,8 +58,8 @@ void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
 } // namespace
 
 UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
-                           const std::vector<bool>& loop_called)
-    : ast_(ast), plan_(plan), kinds_(kinds), root_(root), loop_called_(loop_called) {
+                           const std::vector<bool>& loop_called, const GlobalPlan* globals)
+    : globals_(globals), ast_(ast), plan_(plan), kinds_(kinds), root_(root), loop_called_(loop_called) {
     const std::size_t count = plan.functions.size();
     observable_.resize(count);
     std::vector<std::unordered_set<std::string_view>> names(count);
@@ -170,7 +170,7 @@ void UnitCompiler::compute_may_double() {
         return scope < count ? ast_.at(plan_.functions[scope]).b : root_;
     };
     for (bool changed = true; changed;) {
-        changed = false;
+        changed = propagate_global_doubles();  // CP12b: a global's verdicts are main's
         for (std::size_t scope = 0; scope <= count; ++scope) {
             std::vector<NodeId> stack{body_of(scope)};
             while (!stack.empty()) {

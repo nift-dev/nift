@@ -164,7 +164,9 @@ UNSUPPORTED = [
     ("comparison-chain-right", "x := 1\nif (true == (x >= 2)) { print(1) }\n", "comparison-chain"),
     # Review round 3 (F3): tree depth bounded before any analysis.
     ("nesting-limit", "print(" + " + ".join(["1"] * 1000) + ")\n", "nesting-limit"),
-    ("free-name", "fn(f()) { return n }\nn := 1\nprint(f())\n", "free-name"),
+    # CP12b: a free name resolved to a top-level binding compiles (globals);
+    # one only a caller's local can resolve stays refused (L25, D-038).
+    ("free-name", "fn(f()) { return n }\nfn(g()) { n := 1\nreturn f() }\nprint(g())\n", "free-name"),
     ("unresolved-name", "print(args)\n", "unresolved-name"),
     # Literals.
     ("leading-zero", "print(01)\n", "number-literal"),

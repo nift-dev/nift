@@ -30,6 +30,11 @@ struct Binding {
     std::uint8_t decl_kinds = 0xff;
     bool decl_text_double = false;  // the declaring text is always typed double
     bool decl_may_double = false;   // ... or may be (a binding it names may be double)
+    // CP12b globals: a top-level binding a function reaches as a free name
+    // (rt/globals.h); `reg`/`type_reg` are then main's frame slots, which
+    // functions read and write with GetGlobal/SetGlobal (main's frame is at
+    // stack base 0).
+    bool global = false;
 };
 
 class Scopes {
