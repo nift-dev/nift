@@ -71,6 +71,41 @@ def run(nift, path, cwd, mode, extra, timeout):
     return result, st
 
 
+# Timeout policy (owner, 2026-10-21, after the globals certification's
+# FLAKY: the legacy oracle hit the limit on output-64mib-bail under load while
+# the VM finished). Both engines always get the same bound. A program whose
+# output volume is the property under test declares its own bound
+# (VOLUME_TIMEOUTS, seconds at the default --timeout of 5, scaled with
+# --timeout). If exactly one engine times out, the pair is run once more,
+# sequentially, with RETRY_FACTOR times the bound for both engines; the retry
+# is reported (never silent) and a pair that is still asymmetric is a
+# difference (divergent termination). Both engines timing out is 'endless',
+# as before.
+VOLUME_TIMEOUTS = {"output-64mib-bail": 60}
+RETRY_FACTOR = 4
+
+
+def item_timeout(family, name, timeout):
+    if name in VOLUME_TIMEOUTS:
+        return VOLUME_TIMEOUTS[name] * timeout / 5
+    return timeout * (8 if family == "output" else 1)
+
+
+def run_pair(nift, path, cwd, extra, t):
+    """(legacy, vm, vm_stats, retry note or None), both engines bounded by t."""
+    legacy, _ = run(nift, path, cwd, None, extra, t)
+    vm, st = run(nift, path, cwd, "1", extra, t)
+    if (legacy[2] == "timeout") == (vm[2] == "timeout"):
+        return legacy, vm, st, None
+    first = "legacy" if legacy[2] == "timeout" else "vm"
+    legacy, _ = run(nift, path, cwd, None, extra, t * RETRY_FACTOR)
+    vm, st = run(nift, path, cwd, "1", extra, t * RETRY_FACTOR)
+    outcome = ("both completed" if legacy[2] != "timeout" and vm[2] != "timeout"
+               else "both timed out" if legacy[2] == "timeout" and vm[2] == "timeout"
+               else "still asymmetric")
+    return legacy, vm, st, (f"{first} timed out at {t:g}s, retried both at {t * RETRY_FACTOR:g}s: {outcome}")
+
+
 def classify_difference(legacy, vm, st):
     """'same', 'approved:<policy>' (vm_policies.py), 'endless' or 'diff'."""
     verdict, policy = vm_policies.classify(legacy, vm, st)
@@ -112,15 +147,15 @@ def check(nift, item, work, timeout):
         _, cst = run(nift, path, d, "classify", extra, timeout)
         if not cst:
             if prevalidated(nift, path, d, extra, timeout):
-                return family, name, "prevalidated", "fallback", source, None, None
-            return family, name, "no-stats", "fail", source, None, None
+                return family, name, "prevalidated", "fallback", source, None, None, None
+            return family, name, "no-stats", "fail", source, None, None, None
         if cst["outcome"] == "fallback":
             ok = not expect or any(outcome_key(cst).startswith(e) for e in expect)
-            return family, name, outcome_key(cst), "fallback" if ok else "fail", source, None, None
-        t = timeout * (8 if family == "output" else 1)
-        legacy, _ = run(nift, path, d, None, extra, t)
-        vm, st = run(nift, path, d, "1", extra, t)
+            return family, name, outcome_key(cst), "fallback" if ok else "fail", source, None, None, None
+        legacy, vm, st, retry = run_pair(nift, path, d, extra, item_timeout(family, name, timeout))
         verdict = classify_difference(legacy, vm, st)
+        if retry and "asymmetric" in retry:
+            verdict = "diff"
         key = outcome_key(st) if vm[2] != "timeout" else "timeout"
         if st and st["outcome"] in ("internal-error", "replayed"):
             verdict = "diff"
@@ -131,7 +166,7 @@ def check(nift, item, work, timeout):
             verdict = "diff"
         if expect and not any(key.startswith(e) for e in expect):
             verdict = "fail"
-        return family, name, key, verdict, source, legacy, vm
+        return family, name, key, verdict, source, legacy, vm, retry
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -162,10 +197,13 @@ def main():
     tally = collections.defaultdict(collections.Counter)
     verdicts = collections.defaultdict(collections.Counter)
     failures = []
+    retries = []
     try:
         with cf.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            for family, name, key, verdict, source, legacy, vm in pool.map(
+            for family, name, key, verdict, source, legacy, vm, retry in pool.map(
                     lambda item: check(nift, item, work, args.timeout), items):
+                if retry:
+                    retries.append(f"{name}: {retry}")
                 tally[family][key] += 1
                 verdicts[family][verdict] += 1
                 if verdict in ("diff", "fail"):
@@ -200,11 +238,13 @@ def main():
             json.dump({"seed": args.seed, "count": args.count,
                        "families": {k: dict(v) for k, v in tally.items()},
                        "verdicts": {k: dict(v) for k, v in verdicts.items()}}, f, indent=1, sort_keys=True)
+    for line in retries:
+        print("RETRY " + line)
     bad = total["diff"] + total["fail"]
     approved = {k[9:]: n for k, n in sorted(total.items()) if k.startswith("approved:")}
     print(("PASS" if not bad else "FAIL") + f" vm adversarial: {sum(total.values())} programs, {bad} non-approved "
           f"differences, {sum(approved.values())} approved {approved}, {total['endless']} endless, "
-          f"{total['fallback']} static fallbacks")
+          f"{total['fallback']} static fallbacks, {len(retries)} timeout retries")
     return 1 if bad else 0
 
 

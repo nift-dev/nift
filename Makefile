@@ -464,6 +464,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 	python3 tools/rt-lint.py src/rt
 	python3 tools/rt-vm/legacy_names.py --check
 	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
+	python3 tests/runtime2/vm_adversarial_timeout_selftest.py
 	python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} --count $${RT_VM_ADV:-600}
 	python3 tests/runtime2/vm_subset.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
