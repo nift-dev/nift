@@ -1,0 +1,79 @@
+name: xplat diagnose (rt2-xplat-fixes only; not for merge)
+
+# Diagnostic-only workflow for the 2026-10-21 cross-platform failures.
+# It never replaces or weakens a test: it reruns the failing checks with more
+# output, and runs the steps that the failures prevented from running.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-serve:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build
+        run: make -j3 nift
+      - name: Python seen by nift serve
+        run: |
+          set -x
+          command -v python3 python || true
+          python3 --version || true
+          /usr/bin/python3 --version || true
+          echo "PATH=$PATH"
+      - name: Manual serve start (stdout/stderr, process tree)
+        run: |
+          set -x
+          d=$(mktemp -d); mkdir -p "$d/www"; echo hi > "$d/www/index.html"; cd "$d"
+          "$GITHUB_WORKSPACE/nift" serve --dir www --port 18765 > out.txt 2> err.txt &
+          pid=$!
+          sleep 6
+          echo "--- stdout"; cat out.txt; echo "--- stderr"; cat err.txt
+          ps -o pid,ppid,command -p $pid || true
+          pgrep -fl http.server || true
+          curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18765/ || true
+          kill -INT $pid || true; sleep 2; kill -KILL $pid 2>/dev/null || true
+      - name: test-serve (unchanged)
+        run: make test-serve
+        continue-on-error: true
+      - name: Steps the serve failure skipped (corpus, ownership)
+        run: |
+          make test-ownership-unit 2>&1 | tail -20 || true
+
+  windows-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: make diffutils python mingw-w64-ucrt-x86_64-gcc
+      - name: Build
+        shell: msys2 {0}
+        run: make -j2 nift
+      - name: consumer snapshots with the failing assertion's output (copy of the test)
+        shell: msys2 {0}
+        run: |
+          cp tests/consumer_dependency_snapshots.py /tmp/cds_diag.py
+          sed -i 's/r=subprocess.run(\[binary,.build.\],cwd=p,capture_output=True,text=True);assert r.returncode!=0$/r=subprocess.run([binary,"build"],cwd=p,capture_output=True,text=True);assert r.returncode!=0,("DIAG build after kill succeeded",r.returncode,r.stdout,r.stderr,sorted(x.name for x in (p\/".nift").iterdir()))/' /tmp/cds_diag.py
+          grep -n "DIAG" /tmp/cds_diag.py || echo "diagnostic sed did not apply"
+          cp /tmp/cds_diag.py tests/cds_diag.py
+          python3 tests/cds_diag.py --nift ./nift.exe --output .build/cds-diag.json || true
+      - name: Remaining Windows checks the failure skipped
+        shell: msys2 {0}
+        env:
+          MSYS: winsymlinks:nativestrict
+        run: |
+          make test-process-hardening || echo "test-process-hardening FAILED"
+          make test-sha256 || echo "test-sha256 FAILED"
