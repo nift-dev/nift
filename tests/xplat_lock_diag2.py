@@ -50,13 +50,24 @@ def winpid_of_nift():
 
 def scenario(label, interpreter, kill_mode):
     print("\n===== %s: hook interpreter %s, kill by %s" % (label, interpreter, kill_mode))
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         p = t.project(pathlib.Path(td), "diag2")
         (p / "hook.py").write_text(HOOK)
-        (p / "post.f").write_text("r := run(" + json.dumps(interpreter) + ', "hook.py")\n')
+        (p / "post.f").write_text("r := run(" + json.dumps(interpreter) + ', "hook.py")\nprint(r)\n')
         proc = subprocess.Popen([binary, "build", "--all"], cwd=p, text=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
-        t.wait_for(p, "ready", proc)
+        try:
+            t.wait_for(p, "ready", proc, seconds=60)
+        except AssertionError as e:
+            print("no ready marker:", str(e)[:600])
+            print("process tree:\n" + tree())
+            w = winpid_of_nift()
+            if w:
+                subprocess.run(["cmd", "/c", "taskkill /F /T /PID " + str(w)], capture_output=True, text=True)
+            out, err = proc.communicate(timeout=30)
+            print("build stdout:", out[-800:], "\nbuild stderr:", err[-800:])
+            print("files:", sorted(x.name for x in p.iterdir()))
+            return
         rec = p / ".nift/.unfinished.children"
         record = rec.read_text().split() if rec.exists() else []
         print("recorded", record)
