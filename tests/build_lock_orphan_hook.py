@@ -6,8 +6,15 @@ a process the build launched, and which can still modify the build's outputs,
 is running. POSIX gets this from the inherited marker flock; Windows records
 the build's children (ProjectOwnership.cpp). Checked on every platform:
 
-  1. a killed build's post-build hook keeps running: `nift build` and a
-     tracking change (`nift untrack`) are refused while it runs;
+  1. while a killed build's post-build hook is still running, `nift build`
+     and a tracking change (`nift untrack`) are refused. POSIX: the hook
+     always outlives the killed build (checked). Windows: whether it does
+     depends on how Nift dies (a run() child is in a kill-on-close job; the
+     2026-10-21 CI diagnostics: with a native-Windows hook, an MSYS kill left
+     it running and the build was refused until it finished; `taskkill /F`
+     ended it with Nift). The test checks the safety contract, not a
+     survival model: refused while the recorded hook is alive; when it is
+     gone, the next build proceeds. The branch taken is printed;
   2. once the hook exits, `nift build` recovers and succeeds;
   3. a build whose hook finished normally never blocks the next build;
   4. a stale child record (a live pid with a different creation time, i.e. a
@@ -25,16 +32,45 @@ import time
 from shared_dependency_targeted_reproducer import setup
 
 
+def native_windows_python():
+    """The runner's native Windows python.exe (setup-python), or None. A native
+    interpreter reports Windows PIDs, which the liveness check needs."""
+    location = os.environ.get("pythonLocation", "")
+    if not location:
+        return None
+    exe = location.rstrip("\\/") + "\\python.exe"
+    posix = subprocess.run(["cygpath", "-u", exe], capture_output=True, text=True).stdout.strip()
+    return exe if posix and os.path.exists(posix) else None
+
+
 def python_tool():
     # Nift's native Windows CreateProcess does not apply MSYS path translation.
     if os.environ.get("MSYSTEM"):
-        return subprocess.check_output(["cygpath", "-aw", sys.executable], text=True).strip()
+        return native_windows_python() or subprocess.check_output(["cygpath", "-aw", sys.executable],
+                                                                   text=True).strip()
     return sys.executable
 
 
+def hook_alive(p):
+    """Whether the hook process (pid written by the hook itself) is running."""
+    pid = int((p / "hookpid").read_text().split()[0])
+    if os.environ.get("MSYSTEM"):
+        ps = "if (Get-Process -Id %d -ErrorAction SilentlyContinue) { 'alive' } else { 'gone' }" % pid
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout
+        return out.strip() == "alive"
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 HOOK = """from pathlib import Path
-import time
+import os, time
 p = Path('.')
+(p / 'hookpid').write_text(str(os.getpid()))
 (p / 'ready').touch()
 end = time.monotonic() + 60
 while not (p / 'finish').exists():
@@ -86,6 +122,7 @@ def main():
 
         # 1 and 2: killed build, orphaned hook.
         p = project(base, "killed")
+        survived = False
         proc = subprocess.Popen([binary, "build", "--all"], cwd=p, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -93,15 +130,22 @@ def main():
             proc.kill()
             proc.communicate()
             assert (p / ".nift/.unfinished").exists(), "killed build left no unfinished marker"
-            r = nift(binary, p, "build")
-            assert refused(r), ("build not refused while the hook runs", r.returncode, r.stdout, r.stderr)
-            checks += 1
-            r = nift(binary, p, "untrack", "a")
-            assert r.returncode != 0, ("untrack not refused while the hook runs", r.stdout, r.stderr)
-            checks += 1
+            survived = hook_alive(p)
+            if not os.environ.get("MSYSTEM"):
+                assert survived, "POSIX: the hook must outlive the killed build"
+            print("hook %s the killed build" % ("outlived" if survived else "ended with"))
+            if survived:
+                r = nift(binary, p, "build")
+                assert refused(r), ("build not refused while the hook runs", r.returncode, r.stdout, r.stderr)
+                assert hook_alive(p), "hook ended during the refusal check; rerun"
+                checks += 1
+                r = nift(binary, p, "untrack", "a")
+                assert r.returncode != 0, ("untrack not refused while the hook runs", r.stdout, r.stderr)
+                checks += 1
         finally:
             (p / "finish").touch()
-        wait_for(p, "done")
+        if survived:
+            wait_for(p, "done")
         deadline = time.monotonic() + 30
         while True:  # the hook's interpreter may take a moment to exit after writing `done`
             r = nift(binary, p, "build")

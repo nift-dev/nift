@@ -5,9 +5,19 @@ from shared_dependency_targeted_reproducer import setup,run
 
 def python_tool():
  # Nift's native Windows CreateProcess does not apply MSYS path translation.
+ # On Windows prefer the runner's native python.exe: it reports Windows PIDs
+ # (gate liveness below) and models a native hook.
  if os.environ.get('MSYSTEM'):
-  return subprocess.check_output(['cygpath','-aw',sys.executable],text=True).strip()
+  from build_lock_orphan_hook import native_windows_python
+  return native_windows_python() or subprocess.check_output(['cygpath','-aw',sys.executable],text=True).strip()
  return sys.executable
+
+def gate_alive(p):
+ # Safety contract (owner, 2026-10-21/22): the next build is refused while a
+ # process of the killed build is alive; whether it outlives the build is
+ # platform behaviour (POSIX: always; Windows: depends on how Nift dies).
+ from build_lock_orphan_hook import hook_alive
+ return hook_alive(p)
 
 def hash_bytes(data):
  h=14695981039346656037
@@ -69,7 +79,7 @@ def barrier(binary,base,kind):
  p=base/kind;p.mkdir();d,_,_=setup(p,'hash','explicit' if kind=='external' else 'template')
  # One consumer eliminates unrelated output timing.
  tracked(p,[dict(name='a',title='a',template='templates/shared.html' if kind!='external' else '',**({'build':'main.f'} if kind=='external' else {'post-build':'post.f'}))])
- (p/'gate.py').write_text("from pathlib import Path\nimport time\np=Path('.')\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('barrier timeout')\n time.sleep(.005)\n")
+ (p/'gate.py').write_text("from pathlib import Path\nimport os,time\np=Path('.')\n(p/'hookpid').write_text(str(os.getpid()))\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('barrier timeout')\n time.sleep(.005)\n")
  command='r := run('+json.dumps(python_tool())+', "gate.py")\n'
  if kind=='external':
   (p/'content/a.deps.json').write_text(json.dumps({'dependencies':['data/shared.html']}))
@@ -80,7 +90,10 @@ def barrier(binary,base,kind):
   wait(p,'ready',proc)
   if kind=='interrupt':
    assert (p/'public/a.html').exists();assert not metadata(p,'a').exists();proc.kill();proc.communicate();assert (p/'.nift/.unfinished').exists()
-   r=subprocess.run([binary,'build'],cwd=p,capture_output=True,text=True);assert r.returncode!=0
+   alive=gate_alive(p)
+   if not os.environ.get('MSYSTEM'):assert alive,'POSIX: the gate must outlive the killed build'
+   if alive:
+    r=subprocess.run([binary,'build'],cwd=p,capture_output=True,text=True);assert r.returncode!=0 and 'another build appears to be running' in r.stderr,(r.returncode,r.stdout,r.stderr)
    (p/'finish').touch()
    deadline=time.monotonic()+10
    while True:
@@ -177,7 +190,7 @@ def conflicting_reads(binary,base):
  p=base/'conflicting';p.mkdir();setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='',build='main.f')])
  (p/'data/observed.json').write_text('1')
- (p/'gate.py').write_text("from pathlib import Path\nimport time\np=Path('.')\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('timeout')\n time.sleep(.005)\n")
+ (p/'gate.py').write_text("from pathlib import Path\nimport os,time\np=Path('.')\n(p/'hookpid').write_text(str(os.getpid()))\n(p/'ready').touch()\nend=time.monotonic()+10\nwhile not (p/'finish').exists():\n if time.monotonic()>end:raise RuntimeError('timeout')\n time.sleep(.005)\n")
  (p/'main.f').write_text('x := inject("data/observed.json")\nr := run('+json.dumps(python_tool())+', "gate.py")\ny := inject("data/observed.json")\nf := file(getenv("NIFT_HOOK_OUTPUT"))\nf.open("w")\nf.write("output")\nf.save()\nf.close()\n')
  proc=subprocess.Popen([binary,'build','--all'],cwd=p,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  try:
