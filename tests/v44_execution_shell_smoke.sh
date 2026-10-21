@@ -115,7 +115,7 @@ grep -q '"shadowed"' <<<"$shadow_out" || { echo "shadow: $shadow_out" >&2; exit 
 echo "MARK nope"
 # a deliberately nonexistent bare command reports command not found
 nope_out=$(printf 'nonexistentcmdxyz\n' | "$NIFT" 2>&1)
-grep -q 'command not found: nonexistentcmdxyz' <<<"$nope_out" || { echo "$nope_out" >&2; exit 1; }
+grep -q 'nift: nonexistentcmdxyz: command not found' <<<"$nope_out" || { echo "$nope_out" >&2; exit 1; }
 echo "MARK noprocess"
 # --no-process rejects the external fallback
 if printf 'fixtool\n' | PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT" 2>/dev/null | grep -q 'fixtool-ran'; then echo "bare external ran under --no-process" >&2; exit 1; fi

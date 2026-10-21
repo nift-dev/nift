@@ -31,6 +31,7 @@
 #include "rt/parser.h"
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
+#include "shell/CommandDispatch.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1719,7 +1720,7 @@ static std::vector<std::string> shell_tokens(const std::string& line) {
 static std::string quote_nift_string(const std::string& x){std::string r="\"";for(char c:x){if(c=='\\'||c=='\"')r+='\\';r+=c;}return r+'"';}
 static bool shell_glob_expand(const std::string& token,std::vector<std::string>& out){
 #ifndef _WIN32
-    if(token.find_first_of("*?")==std::string::npos){out.push_back(token);return true;}glob_t g{};int rc=glob(token.c_str(),GLOB_NOCHECK,nullptr,&g);if(rc!=0&&rc!=GLOB_NOMATCH){globfree(&g);return false;}for(size_t i=0;i<g.gl_pathc;++i)out.emplace_back(g.gl_pathv[i]);globfree(&g);return true;
+    if(token.find_first_of("*?[")==std::string::npos){out.push_back(token);return true;}glob_t g{};int rc=glob(token.c_str(),GLOB_NOCHECK,nullptr,&g);if(rc!=0&&rc!=GLOB_NOMATCH){globfree(&g);return false;}for(size_t i=0;i<g.gl_pathc;++i)out.emplace_back(g.gl_pathv[i]);globfree(&g);return true;
 #else
     out.push_back(token);return true;
 #endif
@@ -1744,55 +1745,424 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
         return true;
     };
     static const auto is_command_operator = [](const std::string& t){ return t=="|"||t=="<"||t==">"||t==">>"||t=="2>"||t=="2>&1"||t=="&&"||t=="||"||t==";"||t=="&"; };
-static int execute_shell_command(Parser& parser,const std::string& line,bool print_errors=true,ShellJobTable* jobs=nullptr){auto toks=shell_tokens(line);if(toks.empty())return 0;
-    // $[...] interpolation in command arguments (all non-operator tokens).
-    for(auto& t : toks) { if (is_command_operator(t)) continue; std::string ie; if(!command_token_interpolate(parser, t, ie)){ if(print_errors) console::error(ie); return 2; } }
-    if(toks.size()==1 && toks[0]=="jobs") {
-        if(!jobs){if(print_errors)console::error("jobs: no interactive job table");return 2;}
-        for(const auto& j:jobs->jobs(true)){
-            const char* state=j.state==ShellJobState::Running?"Running":(j.state==ShellJobState::Stopped?"Stopped":"Done");
-            std::cout<<"["<<j.id<<"] "<<state; if(j.state==ShellJobState::Done)std::cout<<" ("<<j.exit_code<<")"; std::cout<<"  "<<j.command<<'\n';
+static void add_shell_words(std::set<std::string>& target, const std::string& words) {
+    std::istringstream input(words);
+    std::string word;
+    while (input >> word) target.insert(word);
+}
+
+static nift::shell::ShellSnapshot make_shell_snapshot(const Parser& parser) {
+    nift::shell::ShellSnapshot snapshot;
+    add_shell_words(snapshot.shell_builtins, "cd exit quit jobs fg bg wait");
+    add_shell_words(snapshot.command_builtins, "print pwd");
+    // Bare-token Nift expressions. Command names that D-042 requires to
+    // resolve externally (ls, cp, mv, rm, cat, mkdir, touch, ...) are
+    // deliberately absent; they take the PATH branch even without arguments.
+    add_shell_words(snapshot.nift_expression_names,
+        "true false null build cmd epoch err env os arch hardware_concurrency "
+        "thread await mutex max min module_path page print warn pwd "
+        "secure_random_bytes sha256 sha256_file sleep timer platform getenv "
+        "setenv unsetenv exists file open open_bytes which run len range filter "
+        "map sum keys values entries type string int float bool array object");
+    for (const auto& name : parser.shell_completions("")) snapshot.user_functions.insert(name);
+    snapshot.executable_exists = [](const std::string& name) {
+        std::string resolved;
+        return nift_find_executable(name, resolved);
+    };
+#ifdef _WIN32
+    snapshot.windows = true;
+#endif
+    return snapshot;
+}
+
+static bool shell_env_assignment_token(const std::string& token) {
+    const std::size_t eq = token.find('=');
+    if (eq == std::string::npos || eq == 0) return false;
+    if (!(std::isalpha(static_cast<unsigned char>(token[0])) || token[0] == '_')) return false;
+    for (std::size_t i = 0; i < eq; ++i) {
+        const unsigned char c = static_cast<unsigned char>(token[i]);
+        if (!(std::isalnum(c) || c == '_')) return false;
+    }
+    return true;
+}
+
+static std::size_t shell_name_index(const std::vector<std::string>& tokens) {
+    std::size_t i = 0;
+    while (i < tokens.size() && shell_env_assignment_token(tokens[i])) ++i;
+    if (i < tokens.size() && tokens[i] == "command") ++i;
+    return i;
+}
+
+static std::vector<std::string> shell_external_tokens(const std::vector<std::string>& tokens) {
+    std::vector<std::string> out = tokens;
+    std::size_t i = 0;
+    while (i < out.size() && shell_env_assignment_token(out[i])) ++i;
+    if (i < out.size() && out[i] == "command") out.erase(out.begin() + static_cast<std::ptrdiff_t>(i));
+    return out;
+}
+
+static std::string shell_nift_call(const std::vector<std::string>& tokens, std::size_t name_index) {
+    std::string expression = tokens[name_index] + "(";
+    for (std::size_t i = name_index + 1; i < tokens.size(); ++i) {
+        if (i > name_index + 1) expression += ",";
+        expression += quote_nift_string(tokens[i]);
+    }
+    expression += ")";
+    return expression;
+}
+
+static int run_shell_job_builtin(const std::string& builtin,
+                                 const std::vector<std::string>& args,
+                                 ShellJobTable* jobs,
+                                 bool print_errors) {
+    if (builtin == "jobs") {
+        if (!args.empty()) {
+            if (print_errors) console::error("jobs: expected no arguments");
+            return 2;
+        }
+        if (!jobs) {
+            if (print_errors) console::error("jobs: no interactive job table");
+            return 2;
+        }
+        for (const auto& job : jobs->jobs(true)) {
+            const char* state = job.state == ShellJobState::Running ? "Running"
+                              : (job.state == ShellJobState::Stopped ? "Stopped" : "Done");
+            std::cout << "[" << job.id << "] " << state;
+            if (job.state == ShellJobState::Done) std::cout << " (" << job.exit_code << ")";
+            std::cout << "  " << job.command << '\n';
         }
         return 0;
     }
-    if(!toks.empty() && (toks[0]=="fg" || toks[0]=="bg" || toks[0]=="wait")) {
-        if(!jobs){if(print_errors)console::error(toks[0]+": no interactive job table");return 2;}
-        if(toks.size()>2){if(print_errors)console::error(toks[0]+": expected at most one job id");return 2;}
-        int id=0;
-        if(toks.size()==2){std::string raw=toks[1];if(!raw.empty()&&raw[0]=='%')raw.erase(raw.begin());try{id=std::stoi(raw);}catch(...){if(print_errors)console::error(toks[0]+": invalid job id");return 2;}}
-        if(id==0 && toks[0]!="wait"){auto list=jobs->jobs(false);if(list.empty()){if(print_errors)console::error(toks[0]+": no current job");return 1;}id=list.back().id;}
-        if(toks[0]=="fg"){auto pr=jobs->foreground(id);if(!pr.error.empty()){if(print_errors)console::error("fg: "+pr.error);return 1;}return pr.exit_code;}
-        if(toks[0]=="bg"){std::string e;if(!jobs->background(id,e)){if(print_errors)console::error("bg: "+e);return 1;}return 0;}
-        auto pr=id?jobs->wait(id):jobs->wait_all();if(!pr.error.empty()){if(print_errors)console::error("wait: "+pr.error);return 1;}return pr.exit_code;
+
+    if (!jobs) {
+        if (print_errors) console::error(builtin + ": no interactive job table");
+        return 2;
     }
-    // First try a command-style Nift callable for a simple command. Literal command tokens become strings.
-    bool has_ops=false;for(const auto&t:toks)if(is_command_operator(t))has_ops=true;
-    if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<repl>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
-    // Bash-like command chain. &&/|| are evaluated left-to-right over pipeline exit status.
-    if(std::getenv("NIFT_NO_PROCESS")){if(print_errors)console::error("external process execution disabled");return 126;}
-    size_t pos=0;int last=0;std::string pending_op;
-    while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||"&&toks[end]!=";")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0)||pending_op==";";if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(i+1!=end){if(print_errors)console::error("& must terminate a pipeline");return 2;}continue;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
-        const bool background = end>pos && toks[end-1]=="&";
-        if(background){
-            // '&' is only meaningful as the final token of one pipeline.
-            // It was parsed as an operator and therefore did not become argv.
-            if(!jobs){if(print_errors)console::error("background jobs require the interactive shell");return 2;}
+    if (args.size() > 1) {
+        if (print_errors) console::error(builtin + ": expected at most one job id");
+        return 2;
+    }
+    int id = 0;
+    if (args.size() == 1) {
+        std::string raw = args[0];
+        if (!raw.empty() && raw[0] == '%') raw.erase(raw.begin());
+        try {
+            id = std::stoi(raw);
+        } catch (...) {
+            if (print_errors) console::error(builtin + ": invalid job id");
+            return 2;
         }
-        for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}
-        if(background){auto pr=jobs->launch(stages,line,false);last=pr.exit_code;if(!pr.error.empty()){if(print_errors)console::error(pr.error);return last<0?2:last;}auto js=jobs->jobs(false);if(!js.empty()){const auto&j=js.back();std::cout<<"["<<j.id<<"] "<<j.process_group<<'\n';}return 0;}
-        // A simple foreground command (no operators, no redirection, no
-        // pipeline) is attached directly to the shell's terminal: the child
-        // inherits stdin/stdout/stderr and becomes the foreground process
-        // group, so interactive/terminal programs (fastfetch, top, less,
-        // editors) behave as if launched from Bash. Redirections and
-        // pipelines use their requested pipes/files; run()/cmd() structured
-        // capture is unaffected.
-        const bool direct = !has_ops && stages.size()==1;
-        ProcessResult pr;
-        if(jobs && jobs->supported()) pr=jobs->launch(stages,line,true);
-        else { if(direct) stages[0].foreground_terminal=true; pr=nift_run_pipeline(stages,!direct,!direct); }
-        last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
-    }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
+    }
+    if (id == 0 && builtin != "wait") {
+        auto list = jobs->jobs(false);
+        if (list.empty()) {
+            if (print_errors) console::error(builtin + ": no current job");
+            return 1;
+        }
+        id = list.back().id;
+    }
+    if (builtin == "fg") {
+        auto result = jobs->foreground(id);
+        if (!result.error.empty()) {
+            if (print_errors) console::error("fg: " + result.error);
+            return 1;
+        }
+        return result.exit_code;
+    }
+    if (builtin == "bg") {
+        std::string error;
+        if (!jobs->background(id, error)) {
+            if (print_errors) console::error("bg: " + error);
+            return 1;
+        }
+        return 0;
+    }
+    auto result = id ? jobs->wait(id) : jobs->wait_all();
+    if (!result.error.empty()) {
+        if (print_errors) console::error("wait: " + result.error);
+        return 1;
+    }
+    return result.exit_code;
+}
+
+static int dispatch_shell_state(Parser& parser,
+                                const std::string& builtin,
+                                const std::vector<std::string>& args,
+                                ShellJobTable* jobs,
+                                bool print_errors,
+                                bool& exit_requested,
+                                int& exit_code) {
+    if (builtin == "exit" || builtin == "quit") {
+        if (args.size() > 1) {
+            if (print_errors) console::error(builtin + ": expected at most one status");
+            return 2;
+        }
+        exit_requested = true;
+        exit_code = 0;
+        if (args.size() == 1) {
+            try {
+                exit_code = std::stoi(args[0]);
+            } catch (...) {
+                if (print_errors) console::error(builtin + ": invalid exit status");
+                exit_code = 2;
+            }
+        }
+        return exit_code;
+    }
+    if (builtin == "cd") {
+        std::string expression;
+        if (args.empty()) {
+            const char* home = std::getenv("HOME");
+            if (!home || !*home) {
+                if (print_errors) console::error("cd: HOME is not set");
+                return 1;
+            }
+            expression = "cd(" + quote_nift_string(home) + ")";
+        } else if (args.size() == 1) {
+            expression = "cd(" + quote_nift_string(args[0]) + ")";
+        } else {
+            if (print_errors) console::error("cd: too many arguments");
+            return 2;
+        }
+        auto result = parser.run_statement(expression, "<repl>");
+        if (!result.ok) {
+            if (print_errors) console::error(result.error.message);
+            return 1;
+        }
+        if (!result.output.empty()) std::cout << result.output << '\n';
+        return 0;
+    }
+    return run_shell_job_builtin(builtin, args, jobs, print_errors);
+}
+
+static int run_nift_command(Parser& parser,
+                            const std::vector<std::string>& tokens,
+                            bool print_errors) {
+    const std::size_t name_index = shell_name_index(tokens);
+    if (name_index >= tokens.size()) {
+        if (print_errors) console::error("nift: empty command");
+        return 2;
+    }
+    const std::string expression = shell_nift_call(tokens, name_index);
+    auto result = parser.run_statement(expression, "<repl>");
+    if (result.ok) {
+        if (!result.output.empty()) std::cout << result.output << '\n';
+        return 0;
+    }
+    if (print_errors) console::error(result.error.message);
+    return 1;
+}
+
+static int run_external_tokens(Parser& parser,
+                               const std::vector<std::string>& tokens,
+                               const std::string& line,
+                               bool print_errors,
+                               ShellJobTable* jobs) {
+    (void)parser;
+    if (std::getenv("NIFT_NO_PROCESS")) {
+        if (print_errors) console::error("external process execution disabled");
+        return 126;
+    }
+    bool has_ops = false;
+    for (const auto& token : tokens) {
+        if (token == "|" || token == "<" || token == ">" || token == ">>" ||
+            token == "2>" || token == "2>>" || token == "2>&1" || token == "&") {
+            has_ops = true;
+        }
+    }
+
+    std::vector<ProcessSpec> stages(1);
+    std::size_t stage_index = 0;
+    bool expect_in = false, expect_out = false, expect_err = false;
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        const std::string& token = tokens[i];
+        if (token == "|") { stages.emplace_back(); ++stage_index; continue; }
+        if (token == "<") { expect_in = true; continue; }
+        if (token == ">" || token == ">>") { expect_out = true; stages[stage_index].append_stdout = token == ">>"; continue; }
+        if (token == "2>") { expect_err = true; continue; }
+        if (token == "2>>") { expect_err = true; stages[stage_index].append_stderr = true; continue; }
+        if (token == "2>&1") { stages[stage_index].merge_stderr = true; continue; }
+        if (token == "&") {
+            if (i + 1 != tokens.size()) {
+                if (print_errors) console::error("& must terminate a pipeline");
+                return 2;
+            }
+            continue;
+        }
+        if (expect_in) { stages[stage_index].stdin_path = token; expect_in = false; continue; }
+        if (expect_out) { stages[stage_index].stdout_path = token; expect_out = false; continue; }
+        if (expect_err) { stages[stage_index].stderr_path = token; expect_err = false; continue; }
+        if (stages[stage_index].program.empty()) {
+            const std::size_t eq = token.find('=');
+            if (eq != std::string::npos && eq > 0 && shell_env_assignment_token(token)) {
+                stages[stage_index].env[token.substr(0, eq)] = token.substr(eq + 1);
+                continue;
+            }
+            stages[stage_index].program = token;
+        } else {
+            std::vector<std::string> expanded;
+            if (!shell_glob_expand(token, expanded)) {
+                if (print_errors) console::error("glob expansion failed: " + token);
+                return 2;
+            }
+            stages[stage_index].args.insert(stages[stage_index].args.end(), expanded.begin(), expanded.end());
+        }
+    }
+
+    const bool background = !tokens.empty() && tokens.back() == "&";
+    if (background) {
+        if (!jobs) {
+            if (print_errors) console::error("background jobs require the interactive shell");
+            return 2;
+        }
+    }
+    for (const auto& stage : stages) {
+        if (stage.program.empty()) {
+            if (print_errors) console::error("empty command in pipeline");
+            return 2;
+        }
+    }
+    if (background) {
+        auto result = jobs->launch(stages, line, false);
+        int status = result.exit_code;
+        if (!result.error.empty()) {
+            if (print_errors) console::error(result.error);
+            return status < 0 ? 2 : status;
+        }
+        auto list = jobs->jobs(false);
+        if (!list.empty()) {
+            const auto& job = list.back();
+            std::cout << "[" << job.id << "] " << job.process_group << '\n';
+        }
+        return 0;
+    }
+
+    const bool direct = !has_ops && stages.size() == 1;
+    ProcessResult result;
+    if (jobs && jobs->supported()) {
+        result = jobs->launch(stages, line, true);
+    } else {
+        if (direct) stages[0].foreground_terminal = true;
+        result = nift_run_pipeline(stages, !direct, !direct);
+    }
+    if (!result.error.empty() && print_errors) console::error(result.error);
+    return result.exit_code;
+}
+
+static int execute_shell_command(Parser& parser,
+                                 const std::string& line,
+                                 bool print_errors,
+                                 ShellJobTable* jobs,
+                                 const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
+                                 bool* exit_requested_out = nullptr,
+                                 int* exit_code_out = nullptr) {
+    auto tokens = shell_tokens(line);
+    if (tokens.empty()) return 0;
+    const nift::shell::ShellSnapshot snapshot = supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser);
+    nift::shell::LinePlan plan = nift::shell::classify_line(tokens, snapshot);
+
+    // Interpolation runs exactly once, after classification and before any
+    // dispatch. A failure prevents the whole line from executing.
+    for (auto& segment : plan.segments) {
+        for (auto& token : segment.tokens) {
+            if (is_command_operator(token)) continue;
+            std::string error;
+            if (!command_token_interpolate(parser, token, error)) {
+                if (print_errors) console::error(error);
+                return 2;
+            }
+        }
+    }
+
+    bool exit_requested = false;
+    int exit_code = 0;
+    int last = 0;
+    for (auto& segment : plan.segments) {
+#ifdef NIFT_SHELL_DISPATCH_MUTANT
+        // Test-only negative control: restore the old "try a command-style Nift
+        // callable first, then external" behaviour. Normal builds contain none
+        // of this code.
+        if (!(segment.has_pipe || segment.has_redirection || segment.background) &&
+            segment.first.kind != nift::shell::CommandKind::ShellBuiltin) {
+            const std::size_t mutant_name_index = shell_name_index(segment.tokens);
+            if (mutant_name_index < segment.tokens.size()) {
+                auto mutant_result = parser.run_statement(
+                    shell_nift_call(segment.tokens, mutant_name_index), "<repl>");
+                if (mutant_result.ok) {
+                    if (!mutant_result.output.empty()) std::cout << mutant_result.output << '\n';
+                    last = 0;
+                    continue;
+                }
+            }
+            // Old fallback: a failed command-style Nift call is retried as an
+            // external command.
+            last = run_external_tokens(parser, shell_external_tokens(segment.tokens),
+                                       line, print_errors, jobs);
+            continue;
+        }
+#endif
+        const bool should = segment.connector.empty() ||
+            (segment.connector == "&&" ? last == 0 :
+             segment.connector == "||" ? last != 0 : true);
+        if (!should) continue;
+
+        if (segment.has_pipe || segment.has_redirection || segment.background) {
+            if (segment.first.kind == nift::shell::CommandKind::NotFound) {
+                if (print_errors) console::error("nift: " + segment.first.name + ": command not found");
+                last = 127;
+                continue;
+            }
+            if (segment.first.kind != nift::shell::CommandKind::External) {
+                if (print_errors) {
+                    console::error("nift: " + segment.first.name + ": " +
+                                   nift::shell::command_kind_name(segment.first.kind) +
+                                   " is not supported in a pipeline or redirection");
+                }
+                last = 2;
+                continue;
+            }
+            last = run_external_tokens(parser, shell_external_tokens(segment.tokens), line, print_errors, jobs);
+            continue;
+        }
+
+        switch (segment.first.kind) {
+            case nift::shell::CommandKind::ShellBuiltin: {
+                const std::size_t name_index = shell_name_index(segment.tokens);
+                std::vector<std::string> args;
+                if (name_index + 1 < segment.tokens.size()) {
+                    args.assign(segment.tokens.begin() + static_cast<std::ptrdiff_t>(name_index + 1),
+                                segment.tokens.end());
+                }
+                last = dispatch_shell_state(parser, segment.first.name, args, jobs, print_errors,
+                                            exit_requested, exit_code);
+                break;
+            }
+            case nift::shell::CommandKind::UserFunction:
+            case nift::shell::CommandKind::NiftBuiltin:
+                last = run_nift_command(parser, segment.tokens, print_errors);
+                break;
+            case nift::shell::CommandKind::External:
+                last = run_external_tokens(parser, shell_external_tokens(segment.tokens), line, print_errors, jobs);
+                break;
+            case nift::shell::CommandKind::NotFound:
+                if (print_errors) console::error("nift: " + segment.first.name + ": command not found");
+                last = 127;
+                break;
+            case nift::shell::CommandKind::NiftStatement:
+                // A command line is classified with command_line=true, so a
+                // NiftStatement segment is not produced. Keep the branch
+                // explicit rather than silently externalising it.
+                if (print_errors) console::error("nift: Nift statement is not valid in a command chain");
+                last = 2;
+                break;
+        }
+        if (exit_requested) break;
+    }
+    if (exit_requested_out) *exit_requested_out = exit_requested;
+    if (exit_code_out) *exit_code_out = exit_code;
+    return exit_requested ? exit_code : last;
+}
+
 
 static fs::path nift_history_path(){
     if(const char* home=std::getenv("HOME")) return fs::path(home)/".nift_history";
@@ -1847,8 +2217,10 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const char* b : {"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","module_path","move","mv","open","open_bytes","package_path","page","print","warn","pwd","remove","rm","run","secure_random_bytes","setenv","sha256","sha256_file","sleep","timer","touch","unsetenv","which"})
-        if (std::string_view(b).rfind(prefix, 0) == 0) out.insert(b);
+    std::set<std::string> command_words;
+    add_shell_words(command_words, "cd exit quit jobs fg bg wait print pwd");
+    for (const auto& b : command_words)
+        if (b.rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
         while (std::getline(ss, dir, ':')) { std::error_code ec;
@@ -1950,63 +2322,20 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
-        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);bool command_style=false;{
-            auto sp=trimmed.find_first_of(" \t");
-            auto toks=shell_tokens(trimmed);
-            // A standalone assignment operator as the second token (x = 7,
-            // x += 2) is a Nift statement, not an env-assigned command.
-            const bool assignment_like=toks.size()>=2&&(toks[1]=="="||toks[1]==":="||toks[1]=="+="||toks[1]=="-="||toks[1]=="*="||toks[1]=="/=");
-            // A '(' inside a $[...] interpolation belongs to the command
-            // argument (e.g. echo $[project_root()]), not to Nift statement
-            // syntax, so ignore interpolation spans when routing.
-            std::string no_interp; { bool in_interp=false; bool saw_dollar=false; for(char c : trimmed) { if(c=='['&&!in_interp&&saw_dollar){in_interp=true;saw_dollar=false;continue;} if(in_interp){ if(c==']') in_interp=false; continue; } no_interp+=c; saw_dollar=(c=='$'); } }
-            const bool job_builtin = !toks.empty() && (toks[0]=="jobs" || toks[0]=="fg" || toks[0]=="bg" || toks[0]=="wait");
-            command_style=!assignment_like&&!toks.empty()&&toks[0][0]!='#'&&(job_builtin||sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
-            // Executable paths (./x, ../x, /x, dir/x) are ordinary external
-            // commands even without arguments, exactly like Bash executing a
-            // path: ./hello.f, ./scripts/deploy.f, ../tools/generate.f.
-            // A token is a path command when its first '/' precedes its first
-            // '('; a '/' after '(' is inside a Nift call's arguments (shell_tokens
-            // strips quotes, so import("./x") would otherwise look like a path).
-            if(!command_style&&!assignment_like&&!toks.empty()&&toks[0][0]!='#'){
-                const std::size_t first_paren=toks[0].find('(');
-                const std::size_t first_slash=toks[0].find('/');
-                const bool path_like=toks[0].rfind("./",0)==0||toks[0].rfind("../",0)==0||toks[0][0]=='/'||(first_slash!=std::string::npos&&(first_paren==std::string::npos||first_slash<first_paren));
-                if(path_like)command_style=true;
-            }
+        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);
+        auto toks=shell_tokens(trimmed);
+        const auto snapshot=make_shell_snapshot(parser);
+        if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
+            bool exit_requested=false; int exit_code=0;
+            execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code);
+            pending.clear();
+            if(exit_requested) return exit_code;
+            continue;
         }
-        if(command_style){execute_shell_command(parser,trimmed,true,&jobs);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
-        if(!rr.ok){
-            // A bare unrecognized single token may be an ordinary external
-            // command on PATH (fastfetch, git, env, printf, ...). Nift keeps
-            // precedence: run_statement already had the first chance, so real
-            // bindings, functions, builtins and values evaluate there; only an
-            // otherwise-unrecognized plain identifier falls through to ordinary
-            // external executable/PATH resolution. --no-process stays
-            // authoritative and rejects the fallback.
-            const std::string tv=[&](){std::string s=trimmed;std::size_t a=s.find_first_not_of(" \t\r\n");std::size_t b=s.find_last_not_of(" \t\r\n");return a==std::string::npos?std::string():s.substr(a,b-a+1);}();
-            const bool bare_token = !tv.empty() &&
-                tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
-            if(bare_token){
-                static const std::unordered_set<std::string> shell_builtins={"build","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","open_bytes","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
-                const bool is_builtin = shell_builtins.count(tv) != 0;
-                std::string resolved;
-                const bool on_path = !is_builtin && nift_find_executable(tv, resolved);
-                if(on_path){
-                    if(std::getenv("NIFT_NO_PROCESS")){console::error("external process execution disabled");continue;}
-                    execute_shell_command(parser, tv, true, &jobs);
-                    continue;
-                }
-                if(!is_builtin){
-                    console::error("command not found: " + tv);
-                    continue;
-                }
-            }
-            console::error(rr.error.message);continue;
-        }
+        if(!rr.ok){ console::error(rr.error.message);continue; }
         if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
     if(jobs.has_live_jobs()) jobs.wait_all();
