@@ -1,5 +1,7 @@
 #include "rt/vm_builtin.h"
 
+#include "HostTrace.h"
+
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
 
@@ -19,6 +21,7 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
     const natives::BuiltinSpec& spec = natives::builtin_spec(static_cast<natives::BuiltinId>(id));
     natives::Context context;
     context.heap_limit = heap_limit_;
+    context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {

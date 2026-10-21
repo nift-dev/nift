@@ -205,6 +205,10 @@ test-runtime-value: $(RUNTIME_VALUE_TEST)
 # (neither uses RuntimeValue).
 RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp) src/Sha256.cpp src/JsonSchema.cpp
 RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.inc) tests/rt/rt_test.h tests/rt/legacy_oracle.h
+# CP16 host built-ins: VM natives call HostCall, and the shared helpers they
+# reuse live outside src/rt. Added here so every RT unit that links the native
+# table has the same symbols as nift itself.
+RT_VALUE_SOURCES += $(sort $(wildcard src/rt/host/*.cpp) $(wildcard src/rt/handles/*.cpp)) src/ParserHelpers.cpp src/Process.cpp src/FileSystem.cpp
 RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
 RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
 RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)

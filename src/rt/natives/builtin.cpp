@@ -2,6 +2,7 @@
 
 #include "rt/natives/array_methods.h"
 #include "rt/natives/bytes_methods.h"
+#include "rt/natives/host_ops.h"
 #include "rt/natives/json_methods.h"
 #include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
@@ -30,6 +31,12 @@ constexpr NativeFn kFunctions[] = {
     num_to_int, num_abs, num_floor, num_ceil, num_round,
     fn_bytes, str_encode, bytes_length, bytes_size, bytes_empty, bytes_slice, bytes_decode, fn_sha256,
     fn_validate, fn_copy, fn_copy,
+    host_open, host_open_bytes, host_cat, host_sha256_file,
+    host_exists, host_is_file, host_is_dir, host_stat,
+    host_ls, host_pwd, host_cd, host_touch, host_mkdir, host_mkdir, host_remove, host_remove,
+    host_cp, host_mv, host_mv, host_which,
+    host_getenv, host_env, host_setenv, host_unsetenv, host_os, host_arch, host_platform,
+    host_hardware_concurrency, host_epoch, host_sleep, host_secure_random_bytes,
 };
 
 constexpr BuiltinSpec kSpecs[] = {
@@ -71,7 +78,21 @@ const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name) {
 }
 
 std::string_view recoverable_code(BuiltinId id) {
-    return id == BuiltinId::FnValidate ? kSchemaRejectedCode : std::string_view();
+    switch (id) {
+        case BuiltinId::FnValidate: return kSchemaRejectedCode;
+        case BuiltinId::HostOpen: case BuiltinId::HostOpenBytes: case BuiltinId::HostCat:
+        case BuiltinId::HostSha256File: return "io.open_failed";
+        case BuiltinId::HostExists: case BuiltinId::HostIsFile: case BuiltinId::HostIsDir:
+        case BuiltinId::HostStat: return "io.metadata_failed";
+        case BuiltinId::HostLs: return "io.directory_read_failed";
+        case BuiltinId::HostCd: return "io.change_directory_failed";
+        case BuiltinId::HostTouch: case BuiltinId::HostMkdir: case BuiltinId::HostMakeDir:
+            return "io.create_failed";
+        case BuiltinId::HostRemove: case BuiltinId::HostRm: return "io.remove_failed";
+        case BuiltinId::HostCp: return "io.copy_failed";
+        case BuiltinId::HostMv: case BuiltinId::HostMove: return "io.move_failed";
+        default: return std::string_view();
+    }
 }
 
 Status call_builtin(const BuiltinSpec& spec, const Context& context, const Value* args, std::uint32_t argc,
