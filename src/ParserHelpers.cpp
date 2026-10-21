@@ -311,20 +311,34 @@ struct SharedGlobOutput {
         values.push_back({std::move(absolute), std::move(shared), resolve_leaf});
     }
 };
+struct GlobVisitorOutput {
+    const GlobVisitor& visitor;
+};
+std::shared_ptr<GlobPrefix> prepare_glob_prefix(GlobVisitorOutput&, const fs::path&) { return {}; }
 std::shared_ptr<GlobPrefix> prepare_glob_prefix(std::vector<fs::path>&, const fs::path&) { return {}; }
 std::shared_ptr<GlobPrefix> prepare_glob_prefix(SharedGlobOutput& out, const fs::path& directory) {
     return out.prefix(directory);
 }
-void emit_glob_match(std::vector<fs::path>& out, fs::path absolute,
-                     const fs::directory_entry*, const std::shared_ptr<GlobPrefix>&) { record_glob_prefix_event(GlobPrefixEvent::TerminalPath); out.push_back(std::move(absolute)); }
-void emit_glob_match(SharedGlobOutput& out, fs::path absolute,
+bool emit_glob_match(std::vector<fs::path>& out, fs::path absolute,
+                     const fs::directory_entry*, const std::shared_ptr<GlobPrefix>&) {
+    record_glob_prefix_event(GlobPrefixEvent::TerminalPath);
+    out.push_back(std::move(absolute));
+    return true;
+}
+bool emit_glob_match(SharedGlobOutput& out, fs::path absolute,
                      const fs::directory_entry* entry, const std::shared_ptr<GlobPrefix>& parent) {
     record_glob_prefix_event(GlobPrefixEvent::TerminalPath);
     out.emit(std::move(absolute), entry, parent);
+    return true;
+}
+bool emit_glob_match(GlobVisitorOutput& out, fs::path absolute,
+                     const fs::directory_entry*, const std::shared_ptr<GlobPrefix>&) {
+    record_glob_prefix_event(GlobPrefixEvent::TerminalPath);
+    return out.visitor(std::move(absolute));
 }
 
 template<class Output>
-void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
+bool glob_walk(const fs::path& base, const std::vector<std::string>& parts,
                std::size_t i, Output& out,
                const std::vector<fs::directory_entry>* scanned = nullptr,
                const fs::directory_entry* terminal_entry = nullptr,
@@ -332,8 +346,8 @@ void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
     if (i == parts.size()) {
         std::error_code ec;
         if (fs::exists(base, ec) && !ec)
-            emit_glob_match(out, fs::absolute(base).lexically_normal(), terminal_entry, terminal_parent);
-        return;
+            return emit_glob_match(out, fs::absolute(base).lexically_normal(), terminal_entry, terminal_parent);
+        return true;
     }
     const auto& part = parts[i];
     if (part != "**" && !glob_has_magic(part)) {
@@ -343,45 +357,50 @@ void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
             if (part[k] == '\\' && k + 1 < part.size()) literal += part[++k];
             else literal += part[k];
         }
-        glob_walk(base / literal, parts, i + 1, out);
-        return;
+        return glob_walk(base / literal, parts, i + 1, out);
     }
-    std::vector<fs::directory_entry> owned;
-    if (!scanned) {
-        std::error_code ec;
-        if (!fs::is_directory(base, ec) || ec) {
-            if (part == "**") glob_walk(base, parts, i + 1, out, nullptr, terminal_entry, terminal_parent);
-            return;
-        }
-        for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
-             !ec && it != end; it.increment(ec)) owned.push_back(*it);
-        scanned = &owned;
-    }
-    // Adjacent components on the same base can share this operation-local scan.
-    // Final absolute ordering and deduplication still cover every result.
     if (part == "**") {
-        glob_walk(base, parts, i + 1, out, scanned, terminal_entry, terminal_parent);
+        std::vector<fs::directory_entry> owned;
+        if (!scanned) {
+            std::error_code ec;
+            if (!fs::is_directory(base, ec) || ec)
+                return glob_walk(base, parts, i + 1, out, nullptr, terminal_entry, terminal_parent);
+            for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
+                 !ec && it != end; it.increment(ec)) owned.push_back(*it);
+            scanned = &owned;
+        }
+        if (!glob_walk(base, parts, i + 1, out, scanned, terminal_entry, terminal_parent)) return false;
         for (const auto& e : *scanned) {
-            auto name = e.path().filename().string();
+            const auto name = e.path().filename().string();
             if (!name.empty() && name[0] == '.') continue;
             std::error_code ec;
             if (e.is_directory(ec) && !e.is_symlink(ec))
-                glob_walk(e.path(), parts, i, out, nullptr, &e);
+                if (!glob_walk(e.path(), parts, i, out, nullptr, &e)) return false;
         }
-    } else {
-        // Only zero-width ** components may emit this same candidate later.
-        // Intern its parent lazily on the first actual terminal candidate;
-        // unmatched directories never allocate a prefix descriptor.
-        const bool terminal_suffix=std::all_of(parts.begin()+i+1,parts.end(),
-            [](const auto& component){return component=="**";});
-        std::shared_ptr<GlobPrefix> directory_prefix;
-        for (const auto& e : *scanned) {
-            if (glob_component_match(part, e.path().filename().string())) {
-                if (terminal_suffix && !directory_prefix) directory_prefix=prepare_glob_prefix(out,base);
-                glob_walk(e.path(), parts, i + 1, out, nullptr, &e, directory_prefix);
-            }
-        }
+        return true;
     }
+    // Only zero-width ** components may emit this same candidate later.
+    // Intern its parent lazily on the first actual terminal candidate;
+    // unmatched directories never allocate a prefix descriptor.
+    const bool terminal_suffix = std::all_of(parts.begin() + i + 1, parts.end(),
+        [](const auto& component) { return component == "**"; });
+    std::shared_ptr<GlobPrefix> directory_prefix;
+    const auto consider = [&](const fs::directory_entry& e) {
+        if (!glob_component_match(part, e.path().filename().string())) return true;
+        if (terminal_suffix && !directory_prefix) directory_prefix = prepare_glob_prefix(out, base);
+        return glob_walk(e.path(), parts, i + 1, out, nullptr, &e, directory_prefix);
+    };
+    if (scanned) {
+        for (const auto& e : *scanned)
+            if (!consider(e)) return false;
+        return true;
+    }
+    std::error_code ec;
+    if (!fs::is_directory(base, ec) || ec) return true;
+    for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
+         !ec && it != end; it.increment(ec))
+        if (!consider(*it)) return false;
+    return true;
 }
 
 bool is_single_quoted_parameter(const std::string& text) {
@@ -460,6 +479,19 @@ std::vector<GlobMatch> glob_expand_shared(const fs::path& resolved_pattern) {
     output.values.erase(std::unique(output.values.begin(), output.values.end(),
         [](const auto& a, const auto& b) { return a.absolute == b.absolute; }), output.values.end());
     return std::move(output.values);
+}
+
+bool glob_visit(const fs::path& resolved_pattern, const GlobVisitor& visitor) {
+    const auto generic = resolved_pattern.generic_string();
+    const auto root = resolved_pattern.root_path();
+    std::string relative = root.empty() ? generic : generic.substr(root.generic_string().size());
+    while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());
+    std::vector<std::string> parts;
+    std::stringstream components(relative);
+    std::string part;
+    while (std::getline(components, part, '/')) if (!part.empty()) parts.push_back(part);
+    GlobVisitorOutput output{visitor};
+    return glob_walk(root.empty() ? fs::path(".") : root, parts, 0, output);
 }
 
 // Presentation-method chain recognizer (.stringify()/.prettify()/.highlight()).

@@ -70,44 +70,39 @@ inline Info inspect(const fs::path& path) {
     return info;
 }
 
-enum class ReadOutcome { Ok, Limit, InvalidLimit, OpenFailed, ReadFailed };
+enum class ReadOutcome { Ok, Limit, Budget, InvalidLimit, OpenFailed, ReadFailed };
 
 template <class Buffer>
-inline ReadOutcome read_whole(const fs::path& path, Buffer& out, std::string_view operation, std::string& error) {
+inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buffer& out,
+                              std::string_view operation, std::string& error) {
     const auto setting = nift::readlimit::current();
     if (!setting.valid) {
         error = nift::readlimit::invalid_message(std::string(operation), setting);
         return ReadOutcome::InvalidLimit;
     }
     std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        std::error_code status_error;
-        const fs::file_status st = fs::status(path, status_error);
-        if ((!status_error && !fs::exists(st)) || status_error == std::errc::no_such_file_or_directory ||
-            status_error == std::errc::not_a_directory)
-            return ReadOutcome::OpenFailed;
-        return ReadOutcome::OpenFailed;
-    }
-    std::uint64_t hint = 0;
-    std::error_code size_error;
-    if (fs::is_regular_file(path, size_error)) {
-        const auto size = fs::file_size(path, size_error);
-        if (!size_error) {
-            if (size > setting.bytes) {
-                error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
-                return ReadOutcome::Limit;
-            }
-            hint = size;
-        }
-    }
-    switch (nift::readlimit::read_bounded(in, out, setting.bytes, std::numeric_limits<std::uint64_t>::max(), hint)) {
-        case nift::readlimit::Status::Ok: return ReadOutcome::Ok;
-        case nift::readlimit::Status::Exceeded:
+    if (!in) return ReadOutcome::OpenFailed;
+    std::uint64_t total = 0;
+    char chunk[64 * 1024];
+    while (in) {
+        in.read(chunk, sizeof chunk);
+        const std::streamsize got = in.gcount();
+        if (in.bad()) return ReadOutcome::ReadFailed;
+        if (got <= 0) break;
+        if (total > setting.bytes - static_cast<std::uint64_t>(got)) {
             error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
             return ReadOutcome::Limit;
-        case nift::readlimit::Status::ReadError: return ReadOutcome::ReadFailed;
+        }
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
+        if (!reserve_result(context, static_cast<std::size_t>(total + static_cast<std::uint64_t>(got)))) {
+            error = std::string(operation) + ": file exceeds the memory budget";
+            return ReadOutcome::Budget;
+        }
+#endif
+        out.insert(out.end(), chunk, chunk + got);
+        total += static_cast<std::uint64_t>(got);
     }
-    return ReadOutcome::ReadFailed;
+    return ReadOutcome::Ok;
 }
 
 inline Status read_failure(HostCall& call, ReadOutcome outcome, std::string_view name, const std::string& detail,
@@ -116,6 +111,9 @@ inline Status read_failure(HostCall& call, ReadOutcome outcome, std::string_view
         return fail_host(call, host::HostStatus::Fatal, host_error("runtime.invalid_argument", detail), error);
     if (outcome == ReadOutcome::Limit)
         return fail_host(call, host::HostStatus::Limit, host_error("limit.exceeded", detail), error);
+    if (outcome == ReadOutcome::Budget)
+        return fail_host(call, host::HostStatus::Limit,
+                         host_error("limit.exceeded", std::string(name) + ": file exceeds the memory budget"), error);
     if (outcome == ReadOutcome::ReadFailed)
         return fail_host(call, host::HostStatus::Recoverable,
                          host_error("io.read_failed", std::string(name) + ": input failure"), error);
@@ -234,7 +232,7 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
                              error);
     }
 #endif
-    const ReadOutcome outcome = read_whole(call.target().path, data, name, error);
+    const ReadOutcome outcome = read_whole(context, call.target().path, data, name, error);
     if (outcome != ReadOutcome::Ok) return read_failure(call, outcome, name, error, error);
     if (!reserve_result(context, data.size()))
         return fail_host(call, host::HostStatus::Limit,
@@ -273,6 +271,35 @@ inline Status resolve_plain(const Context& context, const std::string& raw, std:
     return Status::Ok;
 }
 
+inline Status preflight_glob(const Context& context, const fs::path& path, std::string_view name,
+                             std::string& error) {
+    std::size_t accounted = 0;
+    bool stopped = false;
+    bool policy_failure = false;
+    const bool completed = nift::detail::glob_visit(path, [&](const fs::path& match) {
+        if (context.host.paths) {
+            host::Resolved checked;
+            host::HostError policy_error;
+            if (host::resolve_path(*context.host.paths, match.generic_string(), name, checked, policy_error) !=
+                host::HostStatus::Ok) {
+                error = policy_error.message;
+                policy_failure = true;
+                stopped = true;
+                return false;
+            }
+        }
+        accounted = size_add(accounted, match.generic_string().size() + 64);
+        if (!reserve_result(context, accounted)) {
+            error = std::string(name) + ": result exceeds the memory budget";
+            stopped = true;
+            return false;
+        }
+        return true;
+    });
+    if (!completed || stopped) return policy_failure ? Status::Error : Status::Limit;
+    return Status::Ok;
+}
+
 inline Status collect_paths(const Context& context, const Value& value, std::string_view name,
                             std::vector<fs::path>& paths, bool& globbed, std::string& error) {
     std::vector<std::string> raws;
@@ -295,6 +322,10 @@ inline Status collect_paths(const Context& context, const Value& value, std::str
         if (resolve_plain(context, raw, name, resolved, error) != Status::Ok) return Status::Error;
         if (nift::detail::glob_has_magic(raw)) {
             globbed = true;
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 7
+            const Status budget = preflight_glob(context, resolved.path, name, error);
+            if (budget != Status::Ok) return budget;
+#endif
             const auto matches = nift::detail::glob_expand(resolved.path);
             for (const fs::path& match : matches) {
                 host::Resolved checked;

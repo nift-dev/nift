@@ -28,6 +28,18 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
         return reserve_result(context, accounted);
     };
     if (glob) {
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 7
+        const Status budget = preflight_glob(context, call.target().path, "ls", error);
+        if (budget != Status::Ok) {
+            if (budget == Status::Limit)
+                return fail_host(call, host::HostStatus::Limit,
+                                 host_error("limit.exceeded", error), error);
+            return fail_host(call, host::HostStatus::Fatal,
+                             host_error("runtime.invalid_operation", error), error);
+        }
+#endif
+    }
+    if (glob) {
         if (has_arg && fs::path(raw).is_absolute()) {
             for (const fs::path& match : nift::detail::glob_expand(call.target().path)) {
                 const std::string name = match.generic_string();

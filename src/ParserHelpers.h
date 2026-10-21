@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -75,6 +76,12 @@ struct GlobMatch {
 };
 NIFT_PARSER_HELPER_HIDDEN std::vector<GlobMatch> glob_expand_shared(const std::filesystem::path& resolved_pattern);
 NIFT_PARSER_HELPER_HIDDEN std::vector<std::filesystem::path> glob_expand(const std::filesystem::path& resolved_pattern);
+// Additive streaming visitor: traversal order, no collection or sorting. The
+// callback returns false to stop the walk immediately. Existing callers keep
+// the sorted vector interfaces above.
+using GlobVisitor = std::function<bool(const std::filesystem::path&)>;
+NIFT_PARSER_HELPER_HIDDEN bool glob_visit(const std::filesystem::path& resolved_pattern,
+                                          const GlobVisitor& visitor);
 
 NIFT_PARSER_HELPER_HIDDEN bool strip_presentation_chain(const std::string& text, std::string& base,
                                                         bool& pretty, bool& highlight);
