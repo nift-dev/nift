@@ -152,7 +152,9 @@ void fold_constants(Expr& e){
 static bool subtree_needs_literal_completion(const Expr& e){if(e.literal_needs_completion)return true;if(e.left&&subtree_needs_literal_completion(*e.left))return true;if(e.right&&subtree_needs_literal_completion(*e.right))return true;for(auto& item:e.items)if(item&&subtree_needs_literal_completion(*item))return true;return false;}
 static void annotate_completion(Expr& e){
  if(e.kind==Kind::Literal&&!e.literal_token.empty())e.literal_needs_completion=e.literal_token.find_first_of("\\$")!=std::string::npos;
- if(e.left)annotate_completion(*e.left);if(e.right)annotate_completion(*e.right);for(auto& item:e.items)if(item)annotate_completion(*item);
+ if(e.left)annotate_completion(*e.left);
+ if(e.right)annotate_completion(*e.right);
+ for(auto& item:e.items)if(item)annotate_completion(*item);
  // Output completion is needed only when an operand carries a literal that
  // still needs escape/interpolation completion; other operands keep the
  // canonical evaluation path and its diagnostics (D-018).
