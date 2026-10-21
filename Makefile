@@ -2196,29 +2196,50 @@ test-v44-shell-restricted: $(TARGET)
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 # CP19 Slice 1 (D-042): pure classifier unit test and the durable shell
-# dispatch regression suite. The mutant binary is a test-only negative control:
-# it restores the old call-then-fallback path and is never part of normal builds.
+# dispatch regression suite. Three test-only mutant binaries are built below:
+# M1 restores call-then-fallback, M2 discards quote/escape provenance, and M3
+# restores eager interpolation. Normal builds contain none of their code.
 SHELL_DISPATCH_UNIT := $(TEST_DIR)/shell-dispatch-unit$(EXEEXT)
 SHELL_DISPATCH_MUTANT := $(TEST_DIR)/nift-shell-dispatch-mutant$(EXEEXT)
-SHELL_DISPATCH_MUTANT_CLI := $(TEST_DIR)/shell-dispatch-mutant/CLI.o
+SHELL_DISPATCH_MUTANT_QUOTING := $(TEST_DIR)/nift-shell-dispatch-mutant-quoting$(EXEEXT)
+SHELL_DISPATCH_MUTANT_EAGER := $(TEST_DIR)/nift-shell-dispatch-mutant-eager$(EXEEXT)
+SHELL_DISPATCH_MUTANT_DIR := $(TEST_DIR)/shell-dispatch-mutants
+SHELL_DISPATCH_LINK_OBJECTS := $(filter-out src/CLI.o,$(CLI_OBJECTS))
 
 $(SHELL_DISPATCH_UNIT): tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp src/shell/CommandDispatch.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp -o $@
 
-$(SHELL_DISPATCH_MUTANT_CLI): src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
+$(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT=1 -MMD -MP -c $< -o $@
 
-$(SHELL_DISPATCH_MUTANT): $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(SHELL_DISPATCH_MUTANT_CLI) $(LIBFFI_A)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(SHELL_DISPATCH_MUTANT_CLI) $(LDLIBS) -o $@
+$(SHELL_DISPATCH_MUTANT_DIR)/quoting/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT_QUOTING=1 -MMD -MP -c $< -o $@
+
+$(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION=1 -MMD -MP -c $< -o $@
+
+$(SHELL_DISPATCH_MUTANT): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LDLIBS) -o $@
+
+$(SHELL_DISPATCH_MUTANT_QUOTING): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/quoting/CLI.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/quoting/CLI.o $(LDLIBS) -o $@
+
+$(SHELL_DISPATCH_MUTANT_EAGER): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LDLIBS) -o $@
 
 test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
 	$(SHELL_DISPATCH_UNIT)
 
-test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT)
+test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT) $(SHELL_DISPATCH_MUTANT_QUOTING) $(SHELL_DISPATCH_MUTANT_EAGER)
 	$(SHELL_DISPATCH_UNIT)
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/cp19_completion.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: completion PTY needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m1; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_QUOTING)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m2; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_EAGER)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m3; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 
 test: test-cp19-s1-dispatch
 
