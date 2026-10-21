@@ -71,24 +71,63 @@ def run(nift, path, cwd, mode, extra, timeout):
     return result, st
 
 
-# Timeout policy (owner, 2026-10-21, after the globals certification's
-# FLAKY: the legacy oracle hit the limit on output-64mib-bail under load while
-# the VM finished). Both engines always get the same bound. A program whose
-# output volume is the property under test declares its own bound
-# (VOLUME_TIMEOUTS, seconds at the default --timeout of 5, scaled with
-# --timeout). If exactly one engine times out, the pair is run once more,
-# sequentially, with RETRY_FACTOR times the bound for both engines; the retry
-# is reported (never silent) and a pair that is still asymmetric is a
-# difference (divergent termination). Both engines timing out is 'endless',
-# as before.
-VOLUME_TIMEOUTS = {"output-64mib-bail": 60}
+# Timeout and resource policy (owner, 2026-10-21/22: zero flakiness). The
+# globals and CP12B stack certifications reported FLAKY test-rt-vm-mutants:
+# under the gate's parallel load the legacy oracle exceeded the bound on
+# output-64mib-bail (~73 MB of output; legacy ~7 s alone) while the VM
+# finished, and a stress rerun also hit recursion-2-99998 (the VM uses
+# ~870 MB to reach its memory budget). Both engines agree on these programs
+# when they are not starved.
+#  * Both engines always get the same bound.
+#  * HEAVY programs (the volume or memory is the property under test) declare
+#    their own bound (seconds at the default --timeout of 5, scaled with
+#    --timeout) and run under one exclusive lock shared by every harness
+#    process on the machine (the mutation gate runs 13 binaries in parallel),
+#    so they never compete with each other for CPU or memory.
+#  * If exactly one engine times out, the pair is run once more,
+#    sequentially, at RETRY_FACTOR times the bound for both; the retry is
+#    printed (RETRY lines, a count in the summary), never silent; a pair
+#    still asymmetric is a difference (divergent termination). Both engines
+#    timing out stays 'endless'.
+HEAVY = {
+    "output-64mib-bail": 60,  # ~73 MB through a pipe; legacy ~7 s alone
+    "recursion-1-99998": 30, "recursion-1-100005": 30,  # VM ~690 MB
+    "recursion-2-99998": 30, "recursion-2-100005": 30,  # VM ~870 MB
+    "deeptree-eq": 30,  # ~5 s of CPU on both engines
+}
+VOLUME_TIMEOUTS = HEAVY  # name kept for readers of earlier records
 RETRY_FACTOR = 4
+HEAVY_LOCK = os.environ.get("NIFT_ADV_HEAVY_LOCK",
+                            os.path.join(tempfile.gettempdir(), "nift-vm-adversarial-heavy.lock"))
 
 
 def item_timeout(family, name, timeout):
-    if name in VOLUME_TIMEOUTS:
-        return VOLUME_TIMEOUTS[name] * timeout / 5
+    if name in HEAVY:
+        return HEAVY[name] * timeout / 5
     return timeout * (8 if family == "output" else 1)
+
+
+class heavy_lock:
+    """Exclusive, machine-wide (flock; released by the kernel if the holder
+    dies). A no-op where flock is unavailable."""
+    def __init__(self, active):
+        self.active = active
+        self.f = None
+
+    def __enter__(self):
+        if self.active:
+            try:
+                import fcntl
+            except ImportError:
+                return self
+            self.f = open(HEAVY_LOCK, "a")
+            fcntl.flock(self.f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        if self.f:
+            self.f.close()
+        return False
 
 
 def run_pair(nift, path, cwd, extra, t):
@@ -152,7 +191,8 @@ def check(nift, item, work, timeout):
         if cst["outcome"] == "fallback":
             ok = not expect or any(outcome_key(cst).startswith(e) for e in expect)
             return family, name, outcome_key(cst), "fallback" if ok else "fail", source, None, None, None
-        legacy, vm, st, retry = run_pair(nift, path, d, extra, item_timeout(family, name, timeout))
+        with heavy_lock(name in HEAVY):
+            legacy, vm, st, retry = run_pair(nift, path, d, extra, item_timeout(family, name, timeout))
         verdict = classify_difference(legacy, vm, st)
         if retry and "asymmetric" in retry:
             verdict = "diff"

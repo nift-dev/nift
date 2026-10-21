@@ -9,6 +9,7 @@ Cases (fake `nift`, a shell script that sleeps per engine and per attempt):
   endless     both always slow                  -> no retry, both time out
   slow-once   legacy slow only on attempt 1     -> retry reported, both completed
   divergent   legacy always slow, VM fast       -> retry reported, still asymmetric
+  heavy-lock  two processes holding the heavy lane never overlap
 """
 import os
 import sys
@@ -42,6 +43,26 @@ def case(mode):
     return adv.run_pair(nift, path, d, {"MODE": mode}, 0.5)
 
 
+LOCKER = """import sys, time
+sys.path.insert(0, sys.argv[1])
+import vm_adversarial as adv
+with adv.heavy_lock(True):
+    start = time.monotonic()
+    time.sleep(1.0)
+    print(start, time.monotonic())
+"""
+
+
+def heavy_lock_case():
+    import subprocess
+    d = tempfile.mkdtemp(prefix="adv-lock-")
+    env = dict(os.environ, NIFT_ADV_HEAVY_LOCK=os.path.join(d, "heavy.lock"))
+    procs = [subprocess.Popen([sys.executable, "-c", LOCKER, HERE], env=env, stdout=subprocess.PIPE, text=True)
+             for _ in range(2)]
+    spans = sorted(tuple(map(float, p.communicate()[0].split())) for p in procs)
+    return len(spans) == 2 and spans[0][1] <= spans[1][0]
+
+
 def main():
     old = adv.RETRY_FACTOR
     adv.RETRY_FACTOR = 8  # 0.5 s bound, 4 s on retry: the 3 s sleeps finish on retry
@@ -59,11 +80,13 @@ def main():
         legacy, vm, _, retry = case("divergent")
         if not retry or "still asymmetric" not in retry:
             failures.append(f"divergent: {retry}")
+        if not heavy_lock_case():
+            failures.append("heavy-lock: two holders overlapped")
     finally:
         adv.RETRY_FACTOR = old
     for f in failures:
         print("FAIL " + f)
-    print(("PASS" if not failures else "FAIL") + " vm adversarial timeout policy: 4 cases")
+    print(("PASS" if not failures else "FAIL") + " vm adversarial timeout policy: 5 cases")
     return 1 if failures else 0
 
 
