@@ -4,7 +4,8 @@ name: xplat diagnose (rt2-xplat-fixes only; not for merge)
 # It never replaces or weakens a test: it reruns the failing checks with more
 # output, and runs the steps that the failures prevented from running.
 on:
-  workflow_dispatch:
+  push:
+    branches: [rt2-xplat-fixes]
 
 permissions:
   contents: read
