@@ -604,3 +604,44 @@ ceil(nproc/2)), g6-dedicated-4:
 - Not integrated: owner decision (2026-10-21) — the gate change and the race
   fix ride in CP12B's next stack certification and integrate only with it.
   Evidence: `.claude-linode-runs/results/mutgate/`.
+
+## Stack mutation gate + CP15B fixes certified on Linode @da63312 (2026-10-21)
+
+One stacked candidate, base `ab059dd4`, tip `da633128`:
+
+    certify @ da63312: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 179
+
+Contents, bottom up: the parallel mutation gate (4 commits, certified alone
+@f1334c7 above); the Makefile race fix 06ef8781 (each make writes
+`$@.tmp.<pid>`; 12 concurrent makes × 5: old rule 21/60 failed, new 0/60);
+905c707c, `src/Ast.cpp` one statement per line (layout only; the
+`-Wmisleading-indentation` error that failed `warnings-check` in CI on all
+three platforms); CP15B fixes (DeepSeek): portable F1 negative control
+(`NIFT_INTERP_MUTANT=4`, no private commit) and Decimal decoding of
+zero-valued and |exponent| ≥ 300 spellings with Decimal-aware number-literal
+inference (`infer.cpp` `NodeKind::Number` only). g6-dedicated-4, job 5214 s
+(`test-rt-vm-mutants` 1433 s parallel, `test-build-boundary-nondestructive`
+1569 s). Package snapshot b978a5a2… unchanged.
+
+Before launch the certifier ran on the exact tip: `precert.sh` (now including
+`warnings-check`) PASS; `test-runtime2-literals` 66 PASS / 25 refusals;
+`test-runtime2-literals-f1-negative` (mutant fails all 15 F1 cases);
+`test-runtime2-literals-decimal-negative` (6 silent divergences without the
+inference line); `test-rt-value` PASS. Independent CP15B review with GCC 13.3:
+the patches reproduce DeepSeek's trees exactly; changed files `-Werror` clean
+on GCC and Clang; a representation probe of ~2,200 programs over seven
+spelling classes in top-level, loop and loop-called-function contexts found
+no differences outside the approved D-018a (large integers exact in loop
+code) and D-018c (diagnostic position and `return:` prefix) policies.
+
+Mutation-gate verdicts: all 117 checks agree with stack6's sequential matrix
+except where this stack's code changes the inputs: the adversarial suite
+compiles 79 more programs (1011 static fallbacks, was 1090) and one more
+falls under D-001#4, so mutant 1 is now also rejected by `adversarial`
+(stronger detection). To separate code change from scheduling, binaries 0
+and 1 were rerun sequentially (`--jobs 1`) on the same commit: all 18 checks
+identical to the parallel certification run.
+
+Precert gained `warnings-check` (2026-10-21, owner): CI's FFI walls run it on
+all three platforms and `make certify` does not, which is how two warnings
+reached runtime-2. Evidence: `.claude-linode-runs/results/cp15bmg/`.
