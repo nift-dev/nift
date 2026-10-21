@@ -39,28 +39,54 @@ def tree():
 
 
 binary = str(pathlib.Path(sys.argv[1]).resolve())
-with tempfile.TemporaryDirectory() as td:
-    p = t.project(pathlib.Path(td), "diag2")
-    (p / "hook.py").write_text(HOOK)
-    proc = subprocess.Popen([binary, "build", "--all"], cwd=p, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    t.wait_for(p, "ready", proc)
-    hook_pid, hook_ppid = (p / "hookpid").read_text().split()
-    rec = p / ".nift/.unfinished.children"
-    record = rec.read_text().split() if rec.exists() else []
-    print("nift (Popen) pid", proc.pid, "| hook pid", hook_pid, "parent", hook_ppid, "| recorded", record)
-    print("process tree at ready:\n" + tree())
-    proc.kill()
-    proc.communicate()
-    time.sleep(1)
-    # proc.pid and the hook's os.getpid() are msys PIDs under msys2 python; the
-    # record and the process tree carry Windows PIDs.
-    print("after kill: recorded (Windows pid)", alive(record[0]) if record else "-")
-    print("process tree after kill:\n" + tree())
-    (p / "finish").touch()
-    deadline = time.monotonic() + 10
-    while not (p / "done").exists() and time.monotonic() < deadline:
-        time.sleep(0.1)
-    print("hook wrote done after finish:", (p / "done").exists())
-    print("recorded pid 10 s later:", alive(record[0]) if record else "-")
-    print("process tree at end:\n" + tree())
+
+
+def winpid_of_nift():
+    ps = ("Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'nift.exe' } | "
+          "Select-Object -ExpandProperty ProcessId")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.split()
+    return out[0] if out else None
+
+
+def scenario(label, interpreter, kill_mode):
+    print("\n===== %s: hook interpreter %s, kill by %s" % (label, interpreter, kill_mode))
+    with tempfile.TemporaryDirectory() as td:
+        p = t.project(pathlib.Path(td), "diag2")
+        (p / "hook.py").write_text(HOOK)
+        (p / "post.f").write_text("r := run(" + json.dumps(interpreter) + ', "hook.py")\n')
+        proc = subprocess.Popen([binary, "build", "--all"], cwd=p, text=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        t.wait_for(p, "ready", proc)
+        rec = p / ".nift/.unfinished.children"
+        record = rec.read_text().split() if rec.exists() else []
+        print("recorded", record)
+        print("process tree at ready:\n" + tree())
+        if kill_mode == "taskkill":
+            w = winpid_of_nift()
+            print("taskkill /F /PID", w, subprocess.run(["cmd", "/c", "taskkill /F /PID " + str(w)],
+                                                        capture_output=True, text=True).stdout.strip())
+        else:
+            proc.kill()
+        proc.communicate()
+        time.sleep(1)
+        print("after kill: recorded (Windows pid)", alive(record[0]) if record else "-")
+        print("process tree after kill:\n" + tree())
+        r = subprocess.run([binary, "build"], cwd=p, capture_output=True, text=True, timeout=120)
+        print("second build rc", r.returncode, (r.stderr.strip().splitlines() or [""])[0][:160])
+        (p / "finish").touch()
+        deadline = time.monotonic() + 10
+        while not (p / "done").exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        print("orphan hook wrote done after finish:", (p / "done").exists())
+        print("recorded pid at end:", alive(record[0]) if record else "-")
+
+
+msys_python = t.python_tool()
+native = os.environ.get("pythonLocation", "").rstrip("\\/") + "\\python.exe"
+native_posix = subprocess.run(["cygpath", "-u", native], capture_output=True, text=True).stdout.strip()
+print("msys python:", msys_python, "| native python:", native, os.path.exists(native_posix))
+scenario("A", msys_python, "msys-kill")
+scenario("B", msys_python, "taskkill")
+if os.path.exists(native_posix):
+    scenario("C", native, "msys-kill")
+    scenario("D", native, "taskkill")
