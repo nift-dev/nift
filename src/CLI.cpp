@@ -2392,9 +2392,25 @@ static std::vector<std::string> load_nift_history(){
     std::vector<std::string> h;std::ifstream in(nift_history_path());std::string line;while(std::getline(in,line))if(!line.empty())h.push_back(line);if(h.size()>1000)h.erase(h.begin(),h.end()-1000);return h;
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
+static const std::vector<std::string>& nift_completion_names(){
+    static const std::vector<std::string> names={"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","module_path","move","mv","open","open_bytes","package_path","page","print","warn","pwd","remove","rm","run","secure_random_bytes","setenv","sha256","sha256_file","sleep","timer","platform","touch","unsetenv","which"};
+    return names;
+}
+static bool shell_identifier_name(const std::string& name){
+    if(name.empty())return false;
+    if(!(std::isalpha(static_cast<unsigned char>(name[0]))||name[0]=='_'))return false;
+    for(char c:name)if(!(std::isalnum(static_cast<unsigned char>(c))||c=='_'))return false;
+    return true;
+}
+static bool nift_call_form_completion_name(const std::string& candidate){
+    if(!shell_identifier_name(candidate))return false;
+    if(candidate=="print"||candidate=="pwd"||candidate=="cd"||candidate=="exit"||candidate=="quit"||
+       candidate=="jobs"||candidate=="fg"||candidate=="bg"||candidate=="wait")return false;
+    const auto& names=nift_completion_names();
+    return std::find(names.begin(),names.end(),candidate)!=names.end();
+}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","module_path","move","mv","open","open_bytes","package_path","page","print","warn","pwd","remove","rm","run","secure_random_bytes","setenv","sha256","sha256_file","sleep","timer","platform","touch","unsetenv","which"};
-    std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
+    std::set<std::string> out;for(const auto& b:nift_completion_names())if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
     return {out.begin(),out.end()};
@@ -2433,9 +2449,24 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 // used for the leading token so plain cwd files do not crowd command TABs.
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
-    for (auto& c : parser.shell_completions(prefix)) out.insert(c);
     std::set<std::string> command_words;
     add_shell_words(command_words, "cd exit quit jobs fg bg wait print pwd");
+    std::set<std::string> shell_state;
+    add_shell_words(shell_state, "cd exit quit jobs fg bg wait");
+    // N1: Nift built-ins outside the command allow-list are offered in call
+    // form only (open(, file(, exists(, ...), never as bare command words.
+    // Parser-visible names that are also built-ins are therefore suppressed
+    // in bare form and offered only through the call-form candidate.
+    std::set<std::string> call_form_only;
+    for (const auto& name : nift_completion_names()) {
+        if (!nift_call_form_completion_name(name)) continue;
+        call_form_only.insert(name);
+        const std::string candidate = name + "(";
+        if (candidate.rfind(prefix, 0) == 0) out.insert(candidate);
+    }
+    for (auto& c : parser.shell_completions(prefix)) {
+        if (!call_form_only.count(c)) out.insert(c);
+    }
     for (const auto& b : command_words)
         if (b.rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
@@ -2476,6 +2507,43 @@ void complete_token(Parser& parser, std::string& buf, size_t& cursor) {
     }
     std::string common = cands[0];
     for (size_t i = 1; i < cands.size(); ++i) { size_t k = 0; while (k < common.size() && k < cands[i].size() && common[k] == cands[i][k]) ++k; common.resize(k); }
+    const bool all_call_form = std::all_of(cands.begin(), cands.end(), [](const std::string& c) {
+        return !c.empty() && c.back() == '(';
+    });
+    const std::string call = common + "(";
+    const bool call_candidate = std::find(cands.begin(), cands.end(), call) != cands.end();
+    const bool only_bare_or_call = std::all_of(cands.begin(), cands.end(), [&](const std::string& c) {
+        return c == common || (!c.empty() && c.back() == '(');
+    });
+    if (call_candidate && nift_call_form_completion_name(common) && common.size() >= prefix.size()) {
+        // A built-in call-form candidate wins over bare command words and
+        // unrelated PATH names sharing the same prefix (ope -> open(, even
+        // when a PATH open/opencode also exists).
+        buf.replace(tok, cursor - tok, call);
+        cursor = tok + call.size();
+        return;
+    }
+    if (call_candidate && only_bare_or_call && common.size() >= prefix.size()) {
+        // Prefer the call form when a bare command word and a built-in call
+        // share the same prefix (e.g. a PATH `open` plus `open(`).
+        buf.replace(tok, cursor - tok, call);
+        cursor = tok + call.size();
+        return;
+    }
+    if (all_call_form && common.size() >= prefix.size() && (common.empty() || common.back() != '(')) {
+        // Multiple call-form built-ins share a bare prefix (open( and
+        // open_bytes()). Complete to the shortest call form rather than
+        // inserting a bare built-in command word.
+        if (std::find(cands.begin(), cands.end(), call) != cands.end()) {
+            buf.replace(tok, cursor - tok, call);
+            cursor = tok + call.size();
+            return;
+        }
+        std::cout << '\n';
+        for (auto& c : cands) std::cout << c << ' ';
+        std::cout << '\n';
+        return;
+    }
     if (common.size() > prefix.size()) { buf.replace(tok, cursor - tok, common); cursor = tok + common.size(); }
     else { std::cout << '\n'; for (auto& c : cands) std::cout << c << ' '; std::cout << '\n'; }
 }
