@@ -72,9 +72,9 @@ non-allow-listed built-in resolve through `PATH` (or report 127).
 - reject a Nift/user/shell target used as a pipeline or redirection head with a
   clear status-2 diagnostic rather than silently externalising it (pipelines
   remain external-only in this slice);
-- advertise only `print`, `pwd` and the shell-state commands as command
-  completions; the general completion list (including Nift expression names and
-  PATH/file completion) is preserved.
+- advertise only `print`, `pwd`, the shell-state commands, parser-visible user
+  names and PATH executables in command position; the general `nift complete`
+  list and argument/file completion keep Nift expression names.
 
 The completion lists were also kept out of the generated
 `src/rt/legacy_names.cpp` extraction so this slice does **not** modify

@@ -2239,8 +2239,15 @@ void complete_token(Parser& parser, std::string& buf, size_t& cursor) {
     if (!prefix.empty() && (prefix[0] == '"' || prefix[0] == '\'')) { tok = start + 1; prefix = buf.substr(tok, cursor - tok); }
     const bool pathish = prefix.find('/') != std::string::npos || prefix.rfind("./", 0) == 0 || prefix.rfind("~/", 0) == 0 || prefix.rfind(".", 0) == 0;
     std::vector<std::string> cands;
-    if (leading && !pathish) cands = command_completions(parser, prefix);
-    if (cands.empty()) cands = full_shell_completions(parser, prefix);
+    if (leading && !pathish) {
+        // D-042: command position advertises only shell-state commands,
+        // print/pwd, parser-visible user names and PATH executables. Nift
+        // expression names remain available through `nift complete` and
+        // argument/file completion, but are not offered as commands.
+        cands = command_completions(parser, prefix);
+    } else {
+        cands = full_shell_completions(parser, prefix);
+    }
     if (cands.empty()) return;
     std::sort(cands.begin(), cands.end());
     cands.erase(std::unique(cands.begin(), cands.end()), cands.end());
