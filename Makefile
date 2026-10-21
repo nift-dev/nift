@@ -120,23 +120,23 @@ $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A)
 # on every make; the file is rewritten only when its content changes, so an
 # unchanged compiler/target/flags do not invalidate the cached libffi build,
 # while a toolchain or config change forces a rebuild.
+# Each make writes its own temporary file ($@.tmp.<pid>): concurrent makes
+# (make certify runs targets in parallel) used to share $@.tmp, and one's mv
+# could find the other's file already moved (FLAKY test-contracts @f1334c7).
 LIBFFI_SIGNATURE := $(LIBFFI_BUILD)/.nift-toolchain-signature
 $(LIBFFI_SIGNATURE): FORCE
 	@mkdir -p "$(LIBFFI_BUILD)"
-	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
-	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
 
 SAN_LIBFFI_SIGNATURE := $(SAN_LIBFFI_BUILD)/.nift-toolchain-signature
 $(SAN_LIBFFI_SIGNATURE): FORCE
 	@mkdir -p "$(SAN_LIBFFI_BUILD)"
-	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
-	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
 
 TSAN_LIBFFI_SIGNATURE := $(TSAN_LIBFFI_BUILD)/.nift-toolchain-signature
 $(TSAN_LIBFFI_SIGNATURE): FORCE
 	@mkdir -p "$(TSAN_LIBFFI_BUILD)"
-	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
-	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
 
 # The stamp is a real sentinel: libffi is bootstrapped only when the script,
 # provenance, or toolchain signature changed, not on every make.
