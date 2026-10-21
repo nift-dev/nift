@@ -645,3 +645,56 @@ identical to the parallel certification run.
 Precert gained `warnings-check` (2026-10-21, owner): CI's FFI walls run it on
 all three platforms and `make certify` does not, which is how two warnings
 reached runtime-2. Evidence: `.claude-linode-runs/results/cp15bmg/`.
+
+## CP12B globals certified on Linode @3f0924c (2026-10-21)
+
+Candidate `3f0924c5` on base `846da5c1` (runtime-2), four commits: records20k's
+imported-binding requirement and its D-041 fixtures, globals compile (functions
+read and write top-level bindings), and the `global_take` hazard record.
+
+    certify @ 3f0924c: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 1, PASS 178
+
+SKIPPED-ENVIRONMENTAL 3 are the root-only tests (`test-dependency-status`,
+`test-unreadable-source`, `test-v43-language`), passing as the unprivileged
+user. g6-dedicated-4, GCC 13.3. Before launch the certifier ran `precert.sh`
+(including `warnings-check`) on the exact candidate: PASS.
+
+**FLAKY `test-rt-vm-mutants`, cause identified (harness timeout, not the
+candidate).** In the concurrent run the gate rejected the *unmutated* binary:
+one adversarial program (`output-64mib-bail`, seed 3: 1,150,000 prints of a
+64-character line, then `1 / 0`) differed because the **legacy oracle** hit
+the suite's 5 s per-program timeout (legacy needs 6.8 s on this instance
+alone; the VM 0.09 s) while the VM completed. Reproduced 6/6 under load
+(six concurrent runs), passes when run alone (the rerun: unmutated passes, 12
+of 12 mutants rejected, 0 incomplete checks) and locally (same GCC 13.3, both
+the release and the mutants build). Run without a timeout, legacy and VM
+produce identical output (73,600,000 bytes), the same `division by zero`
+diagnostic and exit status 1. Follow-up (test infrastructure): when only the
+oracle times out, rerun that program with a longer limit before counting a
+difference.
+
+Coverage against the integration parent (`cp12b_inventory.py collect --only
+shared`, both binaries built from the exact commits): shared **120 -> 123** of
+788, curated **119 -> 122** of 588 (the 118 -> 121 / 117 -> 120 figures in
+`cp12b-resolver.md` were measured on the older base `ab059dd4`).
+
+**`global_take` and CP13 phase B.** Legacy ends the program on the faults
+that can occur between `global_take` and `global_put`, even inside
+`try`/`catch` (verified with the legacy engine, exit 1, nothing printed by
+`catch`):
+
+    g := [1, 2]
+    fn(f()) {
+      g[5] = 9          # index out of range: 5            (also: g[0] = 1 / 0,
+    }                   #   division by zero; g[0] = [1] - 1, arithmetic
+    try {               #   operators require numeric operands)
+      f()
+    } catch (e) {
+      print("caught")
+    }
+
+So the null slot is unobservable today and must stay so: CP13B must not make
+these faults catchable on the VM (legacy does not catch them), and if it ever
+catches a fault inside a take/put window it must restore the slot first.
+Evidence: `.claude-linode-runs/results/globals/`.
+
