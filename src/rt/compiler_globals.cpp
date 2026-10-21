@@ -55,6 +55,11 @@ bool UnitCompiler::global_read(std::uint16_t slot, std::uint16_t& reg) {
     return true;
 }
 
+// HAZARD (CP13 phase B requirement): between global_take and global_put the
+// global's slot holds null. Today a fault there (SetIndex, Push) ends the
+// program, so it is never observed; once the VM catches errors (try/catch),
+// a caught fault would leave the global null, unlike legacy. CP13B must
+// restore the slot on unwind, or update the global in place without taking.
 bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg) {
     std::uint16_t empty = 0;
     if (!global_read(b.reg, reg) || !temp(empty)) return false;

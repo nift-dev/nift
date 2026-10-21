@@ -85,6 +85,30 @@ reason: `free-name:dynamic-caller` (GETDYN proper), `dynamic-shadow`,
 `legacy-binding`. Today the analysis refines the inventory; the compiler
 does not use it yet.
 
+## H1 globals: compiler hookup (implemented, 2026-10-21)
+
+A function's free name that resolves to a top-level binding (G1-G3) is that
+binding: main's frame is at stack base 0, so its value and type registers
+are absolute slots that functions read with GetGlobal and write with
+SetGlobal (`compiler_globals.{h,cpp}`). Assignments, compound assignments
+and `++`/`--` keep the global's binding-type check with main's binding
+analyses (decl kinds, may-double / always-double, `binding_scope`). `push`
+and element assignment take the aggregate out of its slot (`global_take`),
+update it in place and put it back; operands are evaluated first.
+Evidence: `tests/runtime2/vm_globals.py` (22 shapes x 5 contexts, pinned,
+including a faulting element assignment on a global inside a function,
+`element-assign-range`, error and position identical to legacy or under
+D-018c; random programs). Coverage: shared 118 -> 121 of 788, curated
+117 -> 120 of 588.
+
+**Recorded hazard — requirement for CP13 phase B (VM try/catch):** between
+`global_take` and `global_put` the global's slot holds null. A fault there
+(`SetIndex`, `Push`) ends the program today, so it is never observed (`try`
+is refused on the VM). Once the VM catches errors, a caught fault would
+leave the global null, a silent divergence from legacy. CP13B must restore
+the slot on unwind, or update the global in place without taking it
+(comment at `global_take`).
+
 ## Chained postfix (coordinator item 1)
 
 Cause of the refusal: `plain_postfix` (compiler_rules.cpp) admitted member,
