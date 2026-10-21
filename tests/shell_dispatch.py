@@ -24,7 +24,7 @@ if os.name != "posix":
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nift", default=os.environ.get("NIFT", "./nift"))
-parser.add_argument("--mutant-kind", choices=("m1", "m2", "m3"))
+parser.add_argument("--mutant-kind", choices=("m1", "m2", "m3", "m4"))
 args = parser.parse_args()
 NIFT = str(Path(args.nift).resolve())
 
@@ -423,6 +423,69 @@ check("interpolation cannot reclassify",
       "foo" not in log_text() and "nift: foo: command not found" in (result.stdout + result.stderr),
       result.stdout + result.stderr + log_text())
 
+# 11c. C3: malformed syntax is rejected before anything runs.
+def syntax_case(name, script, token, forbidden=""):
+    clean()
+    result = run_shell(script)
+    combined = result.stdout + result.stderr
+    check(name,
+          f"nift: syntax error near '{token}'" in combined and
+          (not forbidden or forbidden not in result.stdout),
+          f"stdout={result.stdout!r} stderr={result.stderr!r}")
+
+syntax_case("syntax rejects leading &&", "&& echo b\nexit\n", "&&", "b")
+syntax_case("syntax rejects dangling >", "echo hi >\nexit\n", ">", "hi")
+syntax_case("syntax rejects leading |", "| cat f.txt\nexit\n", "|", "cat")
+syntax_case("syntax rejects dangling &&", "echo a &&\nexit\n", "&&", "a")
+syntax_case("syntax rejects dangling ||", "echo a ||\nexit\n", "||", "a")
+syntax_case("syntax rejects double ;;", "echo a ; ;\nexit\n", ";", "a")
+syntax_case("syntax rejects double pipe", "echo a | | cat\nexit\n", "|", "a")
+syntax_case("syntax rejects connector before pipe", "echo a && | cat\nexit\n", "&&", "a")
+syntax_case("syntax rejects non-final &", "echo a & echo b\nexit\n", "&", "a")
+
+clean()
+marker = ROOT / "c3-marker"
+(result := run_shell("/bin/touch c3-marker && echo x >\nexit\n"))
+combined = result.stdout + result.stderr
+check("syntax validates whole line before side effects",
+      not marker.exists() and "nift: syntax error near '>'" in combined,
+      f"marker={marker.exists()} stdout={result.stdout!r} stderr={result.stderr!r}")
+
+clean()
+result = run_shell("true || echo x >\nexit\n")
+combined = result.stdout + result.stderr
+check("syntax validates skipped segment",
+      "x" not in result.stdout and "nift: syntax error near '>'" in combined,
+      f"stdout={result.stdout!r} stderr={result.stderr!r}")
+
+clean()
+bump_file = ROOT / "bump.txt"
+result = run_shell("""
+fn(bump()) {
+  run("sh", "-c", "printf x >> bump.txt")
+  return "hit"
+}
+echo $[bump()] && |
+exit
+""")
+combined = result.stdout + result.stderr
+check("syntax validates before interpolation",
+      (not bump_file.exists() or bump_file.read_text(encoding="utf-8") == "") and
+      "nift: syntax error near '&&'" in combined,
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stdout + result.stderr)
+
+clean()
+result = run_shell("/bin/echo ok ;\nexit\n")
+check("valid trailing semicolon",
+      result.stdout.strip() == "ok" and "syntax error" not in (result.stdout + result.stderr),
+      result.stdout + result.stderr)
+
+clean()
+result = run_shell('/bin/echo "&&" "|" ">" ";"\nexit\n')
+check("quoted operators remain words",
+      result.stdout.strip() == "&& | > ;" and "syntax error" not in (result.stdout + result.stderr),
+      result.stdout + result.stderr)
+
 # 12. A failed interpolation prevents dispatch.
 clean()
 result = run_shell("echo $[missing.value]\nexit\n")
@@ -454,11 +517,26 @@ if args.mutant_kind:
             "quoted operator stays literal",
             "escaped semicolon stays literal",
             "mixed quoted/unquoted glob",
+            "quoted operators remain words",
         },
         "m3": {
             "skipped && interpolation",
             "skipped || interpolation",
             "skipped pipeline interpolation",
+        },
+        "m4": {
+            "syntax rejects leading &&",
+            "syntax rejects dangling >",
+            "syntax rejects leading |",
+            "syntax rejects dangling &&",
+            "syntax rejects dangling ||",
+            "syntax rejects double ;;",
+            "syntax rejects double pipe",
+            "syntax rejects connector before pipe",
+            "syntax rejects non-final &",
+            "syntax validates whole line before side effects",
+            "syntax validates skipped segment",
+            "syntax validates before interpolation",
         },
     }[args.mutant_kind]
     missing = sorted(expected.difference(failures))

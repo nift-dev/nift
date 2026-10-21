@@ -2248,6 +2248,16 @@ static int execute_shell_command(Parser& parser,
         supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser);
     nift::shell::LinePlan plan = nift::shell::classify_line(texts, operator_flags, snapshot);
 
+#ifndef NIFT_SHELL_DISPATCH_MUTANT_SYNTAX
+    // C3: validate the whole line before any interpolation or dispatch. This
+    // includes segments that &&/|| control flow would otherwise skip.
+    std::string syntax_error;
+    if (!nift::shell::validate_line_syntax(texts, operator_flags, syntax_error)) {
+        if (print_errors) console::error(syntax_error);
+        return 2;
+    }
+#endif
+
 #ifdef NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION
     // Test-only negative control: restore eager interpolation of every
     // segment, including segments that control flow will skip.

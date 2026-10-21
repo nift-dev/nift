@@ -241,6 +241,52 @@ LinePlan classify_line(const std::vector<std::string>& tokens,
     return classify_line(tokens, operator_token, snapshot);
 }
 
+bool validate_line_syntax(const std::vector<std::string>& tokens,
+                          const std::vector<bool>& operator_token,
+                          std::string& error) {
+    const auto is_operator = [&](std::size_t i) {
+        return i < operator_token.size() && operator_token[i];
+    };
+    const auto fail = [&](const std::string& token) {
+        error = "nift: syntax error near '" + token + "'";
+        return false;
+    };
+    const std::size_t n = tokens.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        if (!is_operator(i)) continue;
+        const std::string& token = tokens[i];
+        if (is_connector_text(token)) {
+            if (token == ";" && i + 1 == n) {
+                if (i == 0 || is_operator(i - 1)) return fail(token);
+                continue;  // valid trailing semicolon
+            }
+            if (i == 0) return fail(token);
+            if (is_operator(i - 1)) return fail(token);
+            if (i + 1 >= n) return fail(token);
+            if (is_operator(i + 1)) return fail(token);
+            continue;
+        }
+        if (token == "|") {
+            if (i == 0) return fail(token);
+            if (is_operator(i - 1)) return fail(token);
+            if (i + 1 >= n) return fail(token);
+            if (is_operator(i + 1)) return fail(token);
+            continue;
+        }
+        if (token == "<" || token == ">" || token == ">>" ||
+            token == "2>" || token == "2>>") {
+            if (i + 1 >= n || is_operator(i + 1)) return fail(token);
+            continue;
+        }
+        if (token == "&") {
+            if (i == 0 || i + 1 != n) return fail(token);
+            continue;
+        }
+        // `2>&1` is self-contained and needs no operand.
+    }
+    return true;
+}
+
 const char* command_kind_name(CommandKind kind) {
     switch (kind) {
         case CommandKind::NiftStatement: return "NiftStatement";

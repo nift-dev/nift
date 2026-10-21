@@ -69,6 +69,14 @@ LinePlan classify_line(const std::vector<std::string>& tokens,
                        const std::vector<bool>& operator_token,
                        const ShellSnapshot& snapshot);
 
+// Whole-line syntax validation. Pure; no interpolation or dispatch. Returns
+// false and sets `error` to `nift: syntax error near '<token>'` for a stray
+// connector/pipe/background operator or a redirection without an operand.
+// A trailing `;` is valid; quoted/escaped operator words are ordinary words.
+bool validate_line_syntax(const std::vector<std::string>& tokens,
+                          const std::vector<bool>& operator_token,
+                          std::string& error);
+
 const char* command_kind_name(CommandKind kind);
 
 }  // namespace nift::shell

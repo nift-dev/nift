@@ -182,6 +182,60 @@ void test_lines() {
            "quoted | is not a pipe");
 }
 
+void test_syntax_validation() {
+    const auto valid = [](const std::vector<std::string>& tokens,
+                          const std::vector<bool>& operators) {
+        std::string error;
+        return nift::shell::validate_line_syntax(tokens, operators, error);
+    };
+    const auto invalid_near = [](const std::vector<std::string>& tokens,
+                                 const std::vector<bool>& operators,
+                                 const std::string& token) {
+        std::string error;
+        return !nift::shell::validate_line_syntax(tokens, operators, error) &&
+               error == "nift: syntax error near '" + token + "'";
+    };
+
+    expect(valid({"echo", "a", "&&", "echo", "b"}, {false, false, true, false, false}),
+           "valid && chain");
+    expect(valid({"echo", "a", ";"}, {false, false, true}),
+           "valid trailing ;");
+    expect(valid({"echo", "a", "&"}, {false, false, true}),
+           "valid trailing &");
+    expect(valid({"echo", "&&"}, {false, false}),
+           "quoted && is a word");
+    expect(valid({"echo", "|"}, {false, false}),
+           "quoted | is a word");
+    expect(valid({"echo", ">"}, {false, false}),
+           "quoted > is a word");
+    expect(valid({"echo", "a", ">", "out"}, {false, false, true, false}),
+           "valid redirection");
+
+    expect(invalid_near({"&&", "echo", "b"}, {true, false, false}, "&&"),
+           "leading &&");
+    expect(invalid_near({"|", "cat", "f"}, {true, false, false}, "|"),
+           "leading |");
+    expect(invalid_near({"echo", "hi", ">"}, {false, false, true}, ">"),
+           "dangling >");
+    expect(invalid_near({"echo", "a", "&&"}, {false, false, true}, "&&"),
+           "dangling &&");
+    expect(invalid_near({"echo", "a", "||"}, {false, false, true}, "||"),
+           "dangling ||");
+    expect(invalid_near({"echo", "a", ";" , ";"}, {false, false, true, true}, ";"),
+           "double ;;");
+    expect(invalid_near({"echo", "a", "|", "|", "cat"}, {false, false, true, true, false}, "|"),
+           "double || pipeline");
+    expect(invalid_near({"echo", "a", "&&", "|"}, {false, false, true, true}, "&&"),
+           "connector followed by pipe");
+    expect(invalid_near({"echo", "a", "&", "echo", "b"}, {false, false, true, false, false}, "&"),
+           "& not last");
+    expect(invalid_near({"true", "||", "echo", "x", ">"}, {false, true, false, false, true}, ">"),
+           "dangling redirection in skipped segment");
+    expect(invalid_near({"echo", "$[bump()]", "&&", "|"},
+                        {false, false, true, true}, "&&"),
+           "malformed line before interpolation");
+}
+
 void test_paths() {
     expect(nift::shell::looks_like_path("./x"), "./ path");
     expect(nift::shell::looks_like_path("../x"), "../ path");
@@ -202,6 +256,7 @@ int main() {
     test_segments();
     test_line_detection();
     test_lines();
+    test_syntax_validation();
     test_paths();
     if (failures != 0) {
         std::cerr << failures << " of " << checks << " checks failed\n";
