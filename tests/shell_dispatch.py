@@ -2,9 +2,9 @@
 """CP19 Slice 1 (D-042): exactly-once shell dispatch regressions.
 
 Normal mode checks the approved precedence and exactly-once semantics.
---mutant mode checks the test-only NIFT_SHELL_DISPATCH_MUTANT binary, which
-restores the old call-then-fallback behaviour; the same cases must show the
-old double execution there.
+--mutant-kind runs the same normal suite against a test-only mutant binary and
+requires the failures attributable to that planted defect (M1 fallback,
+M2 quoting/escaping discarded, M3 eager interpolation).
 """
 import argparse
 import os
@@ -24,7 +24,7 @@ if os.name != "posix":
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nift", default=os.environ.get("NIFT", "./nift"))
-parser.add_argument("--mutant", action="store_true")
+parser.add_argument("--mutant-kind", choices=("m1", "m2", "m3"))
 args = parser.parse_args()
 NIFT = str(Path(args.nift).resolve())
 
@@ -168,36 +168,6 @@ def script_and_check(name, script, check_fn, timeout=60):
     return result
 
 
-if args.mutant:
-    # The negative control must restore the observable old defects.
-    clean()
-    (ROOT / "a").write_text("a\n", encoding="utf-8")
-    (ROOT / "d1").mkdir()
-    result = run_shell("rm a d1\nexit\n")
-    combined = result.stdout + result.stderr
-    check("mutant rm a d1 retries externally", "No such file" in combined or combined.count("d1") > 1, combined)
-
-    clean()
-    (ROOT / "marker.txt").write_text("", encoding="utf-8")
-    script = """
-fn(touchy(x)) {
-  run("sh", "-c", "printf x >> marker.txt")
-  missing.value
-}
-touchy arg || echo FAILED
-exit
-"""
-    result = run_shell(script)
-    marker = (ROOT / "marker.txt").read_text(encoding="utf-8")
-    check("mutant user function runs twice", marker == "xx", f"marker={marker!r} stderr={result.stderr!r}")
-    check("mutant user function reaches PATH stub", "touchy" in log_text(), log_text())
-
-    if failures:
-        print("FAILED: " + ", ".join(failures))
-        sys.exit(1)
-    print("PASS shell dispatch mutant negative control")
-    sys.exit(0)
-
 # 1. rm -i must prompt and respect the answer.
 clean()
 (ROOT / "a").write_text("a\n", encoding="utf-8")
@@ -251,6 +221,47 @@ clean()
 (ROOT / "f").write_text("x", encoding="utf-8")
 result = run_shell("ls -l f\nexit\n")
 check("ls -l external", "f" in result.stdout and len(result.stdout.split()) >= 5, result.stdout)
+
+# 5b. Quoted/escaped characters keep their literal meaning.
+clean()
+(ROOT / "f.txt").write_text("hello\nworld\n", encoding="utf-8")
+(ROOT / "a").write_text("", encoding="utf-8")
+(ROOT / "pre*fix-a.txt").write_text("", encoding="utf-8")
+(ROOT / "preXfix-a.txt").write_text("", encoding="utf-8")
+(ROOT / "prefix-a.txt").write_text("", encoding="utf-8")
+(ROOT / "prefix-b.txt").write_text("", encoding="utf-8")
+
+result = run_shell('grep "[a-z]" f.txt\nexit\n')
+check("quoted bracket stays literal", "hello" in result.stdout and "world" in result.stdout,
+      result.stdout + result.stderr)
+
+result = run_shell('/bin/echo \\[a\\]\nexit\n')
+check("escaped bracket stays literal", result.stdout.strip() == "[a]",
+      result.stdout + result.stderr)
+
+result = run_shell('/bin/echo "*"\nexit\n')
+check("quoted star stays literal", result.stdout.strip() == "*",
+      result.stdout + result.stderr)
+
+result = run_shell('/bin/echo "a" "&&" "b"\nexit\n')
+check("quoted operator stays literal",
+      result.stdout.strip() == "a && b" and "command not found" not in (result.stdout + result.stderr),
+      result.stdout + result.stderr)
+
+result = run_shell('find . -name f.txt -exec echo found {} \\;\nexit\n')
+check("escaped semicolon stays literal",
+      "found" in result.stdout and "f.txt" in result.stdout,
+      result.stdout + result.stderr)
+
+result = run_shell('/bin/echo "pre*fix-"*.txt\nexit\n')
+check("mixed quoted/unquoted glob",
+      "pre*fix-a.txt" in result.stdout and "preXfix-a.txt" not in result.stdout,
+      result.stdout)
+
+result = run_shell('/bin/echo "prefix-"*.txt\nexit\n')
+check("quoted prefix with unquoted glob",
+      "prefix-a.txt" in result.stdout and "prefix-b.txt" in result.stdout,
+      result.stdout)
 
 # 6. Pipeline and redirections.
 result = script_and_check(
@@ -335,6 +346,83 @@ bump = (ROOT / "bump.txt").read_text(encoding="utf-8")
 check("$[...] evaluated once", bump == "x", f"bump={bump!r} stderr={result.stderr!r}")
 check("$[...] result dispatched", "value" in result.stdout, result.stdout)
 
+# 11b. Interpolation is deferred until the selected segment dispatches.
+clean()
+skip_script = """
+fn(bump()) {
+  run("sh", "-c", "printf x >> bump.txt")
+  return "hit"
+}
+%s
+exit
+"""
+result = run_shell(skip_script % "false && echo $[bump()]")
+bump_file = ROOT / "bump.txt"
+check("skipped && interpolation",
+      not bump_file.exists() or bump_file.read_text(encoding="utf-8") == "",
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stderr)
+
+clean()
+result = run_shell(skip_script % "true || echo $[bump()]")
+check("skipped || interpolation",
+      not bump_file.exists() or bump_file.read_text(encoding="utf-8") == "",
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stderr)
+
+clean()
+result = run_shell(skip_script % "false || echo $[bump()]")
+check("executed || interpolation once",
+      bump_file.exists() and bump_file.read_text(encoding="utf-8") == "x" and "hit" in result.stdout,
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stdout + result.stderr)
+
+clean()
+result = run_shell("""
+fn(bump()) {
+  run("sh", "-c", "printf x >> bump.txt")
+  return "hit"
+}
+false && echo $[bump()] | cat
+exit
+""")
+check("skipped pipeline interpolation",
+      not bump_file.exists() or bump_file.read_text(encoding="utf-8") == "",
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stderr)
+
+clean()
+result = run_shell(skip_script % "true && echo $[bump()] | cat")
+check("executed pipeline interpolation once",
+      bump_file.exists() and bump_file.read_text(encoding="utf-8") == "x" and "hit" in result.stdout,
+      (bump_file.read_text(encoding="utf-8") if bump_file.exists() else "") + result.stdout + result.stderr)
+
+clean()
+result = run_shell("""
+fn(bump_a()) { run("sh", "-c", "printf a >> order.txt"); return "a" }
+fn(bump_b()) { run("sh", "-c", "printf b >> order.txt"); return "b" }
+echo $[bump_a()] $[bump_b()]
+exit
+""")
+order_file = ROOT / "order.txt"
+check("interpolation left-to-right",
+      order_file.exists() and order_file.read_text(encoding="utf-8") == "ab",
+      (order_file.read_text(encoding="utf-8") if order_file.exists() else "") + result.stderr)
+
+clean()
+otherbin = ROOT / "otherbin"
+otherbin.mkdir()
+(otherbin / "foo").write_text("#!/bin/sh\nprintf 'foo %s\\n' \"$*\" >> \"$STUB_LOG\"\necho stub-foo\n", encoding="utf-8")
+(otherbin / "foo").chmod(0o755)
+state_script = """
+fn(bump()) {
+  setenv("PATH", getenv("PATH") + ":%s")
+  return "arg"
+}
+foo $[bump()]
+exit
+""" % str(otherbin)
+result = run_shell(state_script)
+check("interpolation cannot reclassify",
+      "foo" not in log_text() and "nift: foo: command not found" in (result.stdout + result.stderr),
+      result.stdout + result.stderr + log_text())
+
 # 12. A failed interpolation prevents dispatch.
 clean()
 result = run_shell("echo $[missing.value]\nexit\n")
@@ -351,6 +439,35 @@ check("cd changes shell directory", str(ROOT / "sub") in result.stdout, result.s
 clean()
 result = run_shell("FOO=bar sh -c 'printf %s \"$FOO\"'\nexit\n")
 check("env assignment preserved", "bar" in result.stdout, result.stdout)
+
+if args.mutant_kind:
+    expected = {
+        "m1": {
+            "rm a d1 does not re-run rm externally",
+            "user function side effect once",
+            "failed user function does not reach PATH",
+        },
+        "m2": {
+            "quoted bracket stays literal",
+            "escaped bracket stays literal",
+            "quoted star stays literal",
+            "quoted operator stays literal",
+            "escaped semicolon stays literal",
+            "mixed quoted/unquoted glob",
+        },
+        "m3": {
+            "skipped && interpolation",
+            "skipped || interpolation",
+            "skipped pipeline interpolation",
+        },
+    }[args.mutant_kind]
+    missing = sorted(expected.difference(failures))
+    if missing:
+        print("MUTANT NOT DETECTED: missing expected failures: " + ", ".join(missing))
+        print("FAILED: " + ", ".join(failures))
+        sys.exit(1)
+    print(f"PASS mutant {args.mutant_kind} detected by: " + ", ".join(sorted(expected)))
+    sys.exit(0)
 
 shutil.rmtree(ROOT, ignore_errors=True)
 if failures:

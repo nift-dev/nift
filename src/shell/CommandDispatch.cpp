@@ -38,6 +38,15 @@ bool is_redirection_operator(const std::string& token) {
            token == "2>>" || token == "2>&1";
 }
 
+bool is_connector_text(const std::string& token) {
+    return token == "&&" || token == "||" || token == ";";
+}
+
+bool is_operator_text(const std::string& token) {
+    return is_connector_text(token) || token == "|" || token == "&" ||
+           is_redirection_operator(token);
+}
+
 bool is_path_prefix(const std::string& token) {
     if (token.empty()) return false;
     if (token[0] == '/') return true;
@@ -190,24 +199,31 @@ Decision classify_segment(const std::vector<std::string>& tokens,
 }
 
 LinePlan classify_line(const std::vector<std::string>& tokens,
+                       const std::vector<bool>& operator_token,
                        const ShellSnapshot& snapshot) {
     LinePlan plan;
     std::size_t start = 0;
     std::string connector;
     for (std::size_t i = 0; i <= tokens.size(); ++i) {
         const bool at_end = i == tokens.size();
-        const bool at_connector = !at_end && (tokens[i] == "&&" || tokens[i] == "||" || tokens[i] == ";");
+        const bool at_connector = !at_end && i < operator_token.size() && operator_token[i] &&
+                                  is_connector_text(tokens[i]);
         if (!at_end && !at_connector) continue;
         if (i > start) {
             Segment segment;
+            segment.begin = start;
+            segment.end = i;
             segment.connector = connector;
             segment.tokens.assign(tokens.begin() + static_cast<std::ptrdiff_t>(start),
                                   tokens.begin() + static_cast<std::ptrdiff_t>(i));
-            for (const auto& token : segment.tokens) {
-                if (token == "|") segment.has_pipe = true;
-                if (is_redirection_operator(token)) segment.has_redirection = true;
+            for (std::size_t j = start; j < i; ++j) {
+                if (j < operator_token.size() && operator_token[j]) {
+                    if (tokens[j] == "|") segment.has_pipe = true;
+                    if (is_redirection_operator(tokens[j])) segment.has_redirection = true;
+                }
             }
-            segment.background = !segment.tokens.empty() && segment.tokens.back() == "&";
+            segment.background = i > start && operator_token.size() >= i &&
+                                 operator_token[i - 1] && tokens[i - 1] == "&";
             segment.first = classify_segment(segment.tokens, snapshot, /*command_line=*/true);
             plan.segments.push_back(std::move(segment));
         }
@@ -215,6 +231,14 @@ LinePlan classify_line(const std::vector<std::string>& tokens,
         start = i + 1;
     }
     return plan;
+}
+
+LinePlan classify_line(const std::vector<std::string>& tokens,
+                       const ShellSnapshot& snapshot) {
+    std::vector<bool> operator_token;
+    operator_token.reserve(tokens.size());
+    for (const auto& token : tokens) operator_token.push_back(is_operator_text(token));
+    return classify_line(tokens, operator_token, snapshot);
 }
 
 const char* command_kind_name(CommandKind kind) {

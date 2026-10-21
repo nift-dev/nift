@@ -1712,39 +1712,221 @@ static int run_eval(int argc, char** argv) {
 }
 
 
-static std::vector<std::string> shell_tokens(const std::string& line) {
-    std::vector<std::string> out; std::string cur; bool sq=false,dq=false,esc=false;
-    auto flush=[&](){if(!cur.empty()){out.push_back(cur);cur.clear();}};
-    for(size_t i=0;i<line.size();++i){char c=line[i];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if(!sq&&!dq){std::string op;if(i+3<=line.size()&&line.substr(i,4)=="2>&1")op="2>&1";else if(i+1<line.size()&&(line.substr(i,2)=="&&"||line.substr(i,2)=="||"||line.substr(i,2)==">>"||line.substr(i,2)=="2>"))op=line.substr(i,2);else if(c=='|'||c=='<'||c=='>'||c=='&'||c==';'){if(cur=="2"){if(i+3<=line.size()&&line.substr(i,4)==">&1")op="2>&1";else if(i+1<line.size()&&line.substr(i,2)==">>")op="2>>";else if(c=='>')op="2>";}if(op.empty())op=std::string(1,c);}if(!op.empty()){flush();out.push_back(op);i+=op.size()-1;continue;}if(std::isspace((unsigned char)c)){flush();continue;}}cur+=c;}flush();return out;
+struct ShellWord {
+    std::string text;
+    // One entry per character: 1 when the character was quoted or escaped and
+    // must not act as a glob metacharacter or shell operator.
+    std::vector<unsigned char> quoted;
+    bool operator_token = false;
+};
+
+static std::vector<ShellWord> shell_words(const std::string& line) {
+    std::vector<ShellWord> out;
+    std::string cur;
+    std::vector<unsigned char> mask;
+    bool sq = false, dq = false, esc = false;
+    auto flush = [&]() {
+        if (!cur.empty()) {
+            ShellWord word;
+            word.text = cur;
+            word.quoted = mask;
+            out.push_back(std::move(word));
+        }
+        cur.clear();
+        mask.clear();
+    };
+    auto push_operator = [&](const std::string& op) {
+        flush();
+        ShellWord word;
+        word.text = op;
+        word.quoted.assign(op.size(), 0);
+        word.operator_token = true;
+        out.push_back(std::move(word));
+    };
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char c = line[i];
+        if (esc) {
+            cur += c;
+            mask.push_back(1);
+            esc = false;
+            continue;
+        }
+        if (c == '\\' && !sq) { esc = true; continue; }
+        if (c == '\'' && !dq) { sq = !sq; continue; }
+        if (c == '"' && !sq) { dq = !dq; continue; }
+        if (sq || dq) {
+            cur += c;
+            mask.push_back(1);
+            continue;
+        }
+
+        // `2>`, `2>>` and `2>&1` are fd-redirection operators only when the
+        // leading `2` was unquoted and is the whole current word.
+        if (c == '>' && cur == "2" && !mask.empty() && mask.back() == 0) {
+            if (i + 2 < line.size() && line.compare(i, 3, ">&1") == 0) {
+                cur.clear();
+                mask.clear();
+                push_operator("2>&1");
+                i += 2;
+                continue;
+            }
+            if (i + 1 < line.size() && line[i + 1] == '>') {
+                cur.clear();
+                mask.clear();
+                push_operator("2>>");
+                i += 1;
+                continue;
+            }
+            cur.clear();
+            mask.clear();
+            push_operator("2>");
+            continue;
+        }
+        if (i + 1 < line.size()) {
+            const std::string two = line.substr(i, 2);
+            if (two == "&&" || two == "||" || two == ">>") {
+                push_operator(two);
+                i += 1;
+                continue;
+            }
+        }
+        if (c == '|' || c == '<' || c == '>' || c == '&' || c == ';') {
+            push_operator(std::string(1, c));
+            continue;
+        }
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            flush();
+            continue;
+        }
+        cur += c;
+        mask.push_back(0);
+    }
+    flush();
+
+#ifdef NIFT_SHELL_DISPATCH_MUTANT_QUOTING
+    // Test-only negative control: discard quoting/escaping provenance and
+    // treat every operator-shaped word as an operator, restoring C1's defect.
+    for (auto& word : out) {
+        std::fill(word.quoted.begin(), word.quoted.end(), 0);
+        if (word.text == "&&" || word.text == "||" || word.text == ";" ||
+            word.text == "|" || word.text == "<" || word.text == ">" ||
+            word.text == ">>" || word.text == "2>" || word.text == "2>>" ||
+            word.text == "2>&1" || word.text == "&") {
+            word.operator_token = true;
+        }
+    }
+#endif
+    return out;
 }
-static std::string quote_nift_string(const std::string& x){std::string r="\"";for(char c:x){if(c=='\\'||c=='\"')r+='\\';r+=c;}return r+'"';}
-static bool shell_glob_expand(const std::string& token,std::vector<std::string>& out){
+
+static std::vector<std::string> shell_texts(const std::vector<ShellWord>& words) {
+    std::vector<std::string> texts;
+    texts.reserve(words.size());
+    for (const auto& word : words) texts.push_back(word.text);
+    return texts;
+}
+
+static std::vector<bool> shell_operator_flags(const std::vector<ShellWord>& words) {
+    std::vector<bool> flags;
+    flags.reserve(words.size());
+    for (const auto& word : words) flags.push_back(word.operator_token);
+    return flags;
+}
+
+static std::string quote_nift_string(const std::string& x) {
+    std::string r = "\"";
+    for (char c : x) {
+        if (c == '\\' || c == '\"') r += '\\';
+        r += c;
+    }
+    return r + "\"";
+}
+
+static bool shell_glob_expand_word(const ShellWord& word, std::vector<std::string>& out) {
 #ifndef _WIN32
-    if(token.find_first_of("*?[")==std::string::npos){out.push_back(token);return true;}glob_t g{};int rc=glob(token.c_str(),GLOB_NOCHECK,nullptr,&g);if(rc!=0&&rc!=GLOB_NOMATCH){globfree(&g);return false;}for(size_t i=0;i<g.gl_pathc;++i)out.emplace_back(g.gl_pathv[i]);globfree(&g);return true;
+    bool expand = false;
+    for (std::size_t i = 0; i < word.text.size(); ++i) {
+        const char c = word.text[i];
+        const bool quoted = i < word.quoted.size() && word.quoted[i] != 0;
+        if (!quoted && (c == '*' || c == '?' || c == '[')) {
+            expand = true;
+            break;
+        }
+    }
+    if (!expand) {
+        out.push_back(word.text);
+        return true;
+    }
+    std::string pattern;
+    pattern.reserve(word.text.size() * 2);
+    for (std::size_t i = 0; i < word.text.size(); ++i) {
+        const char c = word.text[i];
+        const bool quoted = i < word.quoted.size() && word.quoted[i] != 0;
+        if (quoted && (c == '*' || c == '?' || c == '[' || c == ']' || c == '\\')) {
+            pattern += '\\';
+        }
+        pattern += c;
+    }
+    glob_t g{};
+    const int rc = glob(pattern.c_str(), 0, nullptr, &g);
+    if (rc == GLOB_NOMATCH) {
+        out.push_back(word.text);
+        return true;
+    }
+    if (rc != 0) {
+        globfree(&g);
+        return false;
+    }
+    for (std::size_t i = 0; i < g.gl_pathc; ++i) out.emplace_back(g.gl_pathv[i]);
+    globfree(&g);
+    return true;
 #else
-    out.push_back(token);return true;
+    out.push_back(word.text);
+    return true;
 #endif
 }
-// Interpolate $[expr] inside a command token using the live parser. Returns
-    // false and sets error on an unterminated bracket or evaluation failure.
-    static const auto command_token_interpolate = [](Parser& p, std::string& token, std::string& err) -> bool {
-        std::size_t i = 0;
-        while ((i = token.find("$[", i)) != std::string::npos) {
-            const std::size_t close = token.find(']', i + 2);
-            if (close == std::string::npos) { err = "unterminated $[...] in command argument: " + token; return false; }
-            const std::string expr = token.substr(i + 2, close - i - 2);
-            nift::RuntimeValue v; std::string ee;
-            if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
-            if (cli_contains_bytes(v)) { err = "command interpolation failed: bytes values must be decoded as UTF-8"; return false; }
-            if (nift::runtime_contains_error(v)) { err = "command interpolation failed: Error values cannot be rendered as text"; return false; }
-            if (nift::runtime_contains_timer(v)) { err = "command interpolation failed: timer values cannot be rendered as text"; return false; }
-            const std::string rendered = p.render_expression_value(v);
-            token.replace(i, close - i + 1, rendered);
-            i += rendered.size();
+
+// Interpolate $[expr] inside one command word using the live parser. The
+// replacement inherits the quote provenance of the `$` that opened it.
+static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std::string& error) {
+    if (word.quoted.size() != word.text.size()) word.quoted.resize(word.text.size(), 0);
+    std::size_t i = 0;
+    while ((i = word.text.find("$[", i)) != std::string::npos) {
+        const std::size_t close = word.text.find(']', i + 2);
+        if (close == std::string::npos) {
+            error = "unterminated $[...] in command argument: " + word.text;
+            return false;
         }
-        return true;
-    };
-    static const auto is_command_operator = [](const std::string& t){ return t=="|"||t=="<"||t==">"||t==">>"||t=="2>"||t=="2>&1"||t=="&&"||t=="||"||t==";"||t=="&"; };
+        const std::string expression = word.text.substr(i + 2, close - i - 2);
+        nift::RuntimeValue value;
+        std::string eval_error;
+        if (!parser.eval_expression(expression, value, eval_error)) {
+            error = "command interpolation failed: $[" + expression + "]: " + eval_error;
+            return false;
+        }
+        if (cli_contains_bytes(value)) {
+            error = "command interpolation failed: bytes values must be decoded as UTF-8";
+            return false;
+        }
+        if (nift::runtime_contains_error(value)) {
+            error = "command interpolation failed: Error values cannot be rendered as text";
+            return false;
+        }
+        if (nift::runtime_contains_timer(value)) {
+            error = "command interpolation failed: timer values cannot be rendered as text";
+            return false;
+        }
+        const bool quoted = i < word.quoted.size() && word.quoted[i] != 0;
+        const std::string rendered = parser.render_expression_value(value);
+        word.text.replace(i, close - i + 1, rendered);
+        word.quoted.erase(word.quoted.begin() + static_cast<std::ptrdiff_t>(i),
+                          word.quoted.begin() + static_cast<std::ptrdiff_t>(close + 1));
+        word.quoted.insert(word.quoted.begin() + static_cast<std::ptrdiff_t>(i),
+                           rendered.size(), quoted ? 1 : 0);
+        i += rendered.size();
+    }
+    return true;
+}
 static void add_shell_words(std::set<std::string>& target, const std::string& words) {
     std::istringstream input(words);
     std::string word;
@@ -1791,14 +1973,6 @@ static std::size_t shell_name_index(const std::vector<std::string>& tokens) {
     while (i < tokens.size() && shell_env_assignment_token(tokens[i])) ++i;
     if (i < tokens.size() && tokens[i] == "command") ++i;
     return i;
-}
-
-static std::vector<std::string> shell_external_tokens(const std::vector<std::string>& tokens) {
-    std::vector<std::string> out = tokens;
-    std::size_t i = 0;
-    while (i < out.size() && shell_env_assignment_token(out[i])) ++i;
-    if (i < out.size() && out[i] == "command") out.erase(out.begin() + static_cast<std::ptrdiff_t>(i));
-    return out;
 }
 
 static std::string shell_nift_call(const std::vector<std::string>& tokens, std::size_t name_index) {
@@ -1953,20 +2127,22 @@ static int run_nift_command(Parser& parser,
     return 1;
 }
 
-static int run_external_tokens(Parser& parser,
-                               const std::vector<std::string>& tokens,
-                               const std::string& line,
-                               bool print_errors,
-                               ShellJobTable* jobs) {
+static int run_external_words(Parser& parser,
+                              const std::vector<ShellWord>& words,
+                              const std::string& line,
+                              bool print_errors,
+                              ShellJobTable* jobs) {
     (void)parser;
     if (std::getenv("NIFT_NO_PROCESS")) {
         if (print_errors) console::error("external process execution disabled");
         return 126;
     }
     bool has_ops = false;
-    for (const auto& token : tokens) {
-        if (token == "|" || token == "<" || token == ">" || token == ">>" ||
-            token == "2>" || token == "2>>" || token == "2>&1" || token == "&") {
+    for (const auto& word : words) {
+        if (!word.operator_token) continue;
+        const std::string& t = word.text;
+        if (t == "|" || t == "<" || t == ">" || t == ">>" || t == "2>" ||
+            t == "2>>" || t == "2>&1" || t == "&") {
             has_ops = true;
         }
     }
@@ -1974,42 +2150,51 @@ static int run_external_tokens(Parser& parser,
     std::vector<ProcessSpec> stages(1);
     std::size_t stage_index = 0;
     bool expect_in = false, expect_out = false, expect_err = false;
-    for (std::size_t i = 0; i < tokens.size(); ++i) {
-        const std::string& token = tokens[i];
-        if (token == "|") { stages.emplace_back(); ++stage_index; continue; }
-        if (token == "<") { expect_in = true; continue; }
-        if (token == ">" || token == ">>") { expect_out = true; stages[stage_index].append_stdout = token == ">>"; continue; }
-        if (token == "2>") { expect_err = true; continue; }
-        if (token == "2>>") { expect_err = true; stages[stage_index].append_stderr = true; continue; }
-        if (token == "2>&1") { stages[stage_index].merge_stderr = true; continue; }
-        if (token == "&") {
-            if (i + 1 != tokens.size()) {
-                if (print_errors) console::error("& must terminate a pipeline");
-                return 2;
+    for (std::size_t i = 0; i < words.size(); ++i) {
+        const ShellWord& word = words[i];
+        const std::string& token = word.text;
+        if (word.operator_token) {
+            if (token == "|") { stages.emplace_back(); ++stage_index; continue; }
+            if (token == "<") { expect_in = true; continue; }
+            if (token == ">" || token == ">>") {
+                expect_out = true;
+                stages[stage_index].append_stdout = token == ">>";
+                continue;
             }
-            continue;
+            if (token == "2>") { expect_err = true; continue; }
+            if (token == "2>>") { expect_err = true; stages[stage_index].append_stderr = true; continue; }
+            if (token == "2>&1") { stages[stage_index].merge_stderr = true; continue; }
+            if (token == "&") {
+                if (i + 1 != words.size()) {
+                    if (print_errors) console::error("& must terminate a pipeline");
+                    return 2;
+                }
+                continue;
+            }
         }
         if (expect_in) { stages[stage_index].stdin_path = token; expect_in = false; continue; }
         if (expect_out) { stages[stage_index].stdout_path = token; expect_out = false; continue; }
         if (expect_err) { stages[stage_index].stderr_path = token; expect_err = false; continue; }
         if (stages[stage_index].program.empty()) {
             const std::size_t eq = token.find('=');
-            if (eq != std::string::npos && eq > 0 && shell_env_assignment_token(token)) {
+            if (!word.operator_token && eq != std::string::npos && eq > 0 &&
+                shell_env_assignment_token(token)) {
                 stages[stage_index].env[token.substr(0, eq)] = token.substr(eq + 1);
                 continue;
             }
             stages[stage_index].program = token;
         } else {
             std::vector<std::string> expanded;
-            if (!shell_glob_expand(token, expanded)) {
+            if (!shell_glob_expand_word(word, expanded)) {
                 if (print_errors) console::error("glob expansion failed: " + token);
                 return 2;
             }
-            stages[stage_index].args.insert(stages[stage_index].args.end(), expanded.begin(), expanded.end());
+            stages[stage_index].args.insert(stages[stage_index].args.end(),
+                                            expanded.begin(), expanded.end());
         }
     }
 
-    const bool background = !tokens.empty() && tokens.back() == "&";
+    const bool background = !words.empty() && words.back().operator_token && words.back().text == "&";
     if (background) {
         if (!jobs) {
             if (print_errors) console::error("background jobs require the interactive shell");
@@ -2048,7 +2233,6 @@ static int run_external_tokens(Parser& parser,
     if (!result.error.empty() && print_errors) console::error(result.error);
     return result.exit_code;
 }
-
 static int execute_shell_command(Parser& parser,
                                  const std::string& line,
                                  bool print_errors,
@@ -2056,55 +2240,91 @@ static int execute_shell_command(Parser& parser,
                                  const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
                                  bool* exit_requested_out = nullptr,
                                  int* exit_code_out = nullptr) {
-    auto tokens = shell_tokens(line);
-    if (tokens.empty()) return 0;
-    const nift::shell::ShellSnapshot snapshot = supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser);
-    nift::shell::LinePlan plan = nift::shell::classify_line(tokens, snapshot);
+    auto words = shell_words(line);
+    if (words.empty()) return 0;
+    const auto texts = shell_texts(words);
+    const auto operator_flags = shell_operator_flags(words);
+    const nift::shell::ShellSnapshot snapshot =
+        supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser);
+    nift::shell::LinePlan plan = nift::shell::classify_line(texts, operator_flags, snapshot);
 
-    // Interpolation runs exactly once, after classification and before any
-    // dispatch. A failure prevents the whole line from executing.
-    for (auto& segment : plan.segments) {
-        for (auto& token : segment.tokens) {
-            if (is_command_operator(token)) continue;
-            std::string error;
-            if (!command_token_interpolate(parser, token, error)) {
-                if (print_errors) console::error(error);
-                return 2;
-            }
+#ifdef NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION
+    // Test-only negative control: restore eager interpolation of every
+    // segment, including segments that control flow will skip.
+    for (auto& word : words) {
+        if (word.operator_token) continue;
+        std::string error;
+        if (!command_token_interpolate_word(parser, word, error)) {
+            if (print_errors) console::error(error);
+            return 2;
         }
     }
+#endif
 
     bool exit_requested = false;
     int exit_code = 0;
     int last = 0;
     for (auto& segment : plan.segments) {
+        const bool should = segment.connector.empty() ||
+            (segment.connector == "&&" ? last == 0 :
+             segment.connector == "||" ? last != 0 : true);
+        if (!should) continue;
+
+        std::vector<ShellWord> segment_words(
+            words.begin() + static_cast<std::ptrdiff_t>(segment.begin),
+            words.begin() + static_cast<std::ptrdiff_t>(segment.end));
+
+        // The explicit `command` escape is removed before interpolation.
+        // `segment.first.command_prefix` came from the raw classification, so
+        // interpolation cannot create or remove this escape.
+        if (segment.first.command_prefix) {
+            std::size_t index = 0;
+            while (index < segment_words.size() && !segment_words[index].operator_token &&
+                   shell_env_assignment_token(segment_words[index].text)) {
+                ++index;
+            }
+            if (index < segment_words.size() && !segment_words[index].operator_token &&
+                segment_words[index].text == "command") {
+                segment_words.erase(segment_words.begin() + static_cast<std::ptrdiff_t>(index));
+            }
+        }
+
+#ifndef NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION
+        bool interpolation_failed = false;
+        for (auto& word : segment_words) {
+            if (word.operator_token) continue;
+            std::string error;
+            if (!command_token_interpolate_word(parser, word, error)) {
+                if (print_errors) console::error(error);
+                interpolation_failed = true;
+                last = 2;
+                break;
+            }
+        }
+        if (interpolation_failed) continue;
+#endif
+
+        const std::vector<std::string> segment_texts = shell_texts(segment_words);
+
 #ifdef NIFT_SHELL_DISPATCH_MUTANT
         // Test-only negative control: restore the old "try a command-style Nift
-        // callable first, then external" behaviour. Normal builds contain none
-        // of this code.
+        // callable first, then external" behaviour.
         if (!(segment.has_pipe || segment.has_redirection || segment.background) &&
             segment.first.kind != nift::shell::CommandKind::ShellBuiltin) {
-            const std::size_t mutant_name_index = shell_name_index(segment.tokens);
-            if (mutant_name_index < segment.tokens.size()) {
+            const std::size_t mutant_name_index = shell_name_index(segment_texts);
+            if (mutant_name_index < segment_texts.size()) {
                 auto mutant_result = parser.run_statement(
-                    shell_nift_call(segment.tokens, mutant_name_index), "<repl>");
+                    shell_nift_call(segment_texts, mutant_name_index), "<repl>");
                 if (mutant_result.ok) {
                     if (!mutant_result.output.empty()) std::cout << mutant_result.output << '\n';
                     last = 0;
                     continue;
                 }
             }
-            // Old fallback: a failed command-style Nift call is retried as an
-            // external command.
-            last = run_external_tokens(parser, shell_external_tokens(segment.tokens),
-                                       line, print_errors, jobs);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 #endif
-        const bool should = segment.connector.empty() ||
-            (segment.connector == "&&" ? last == 0 :
-             segment.connector == "||" ? last != 0 : true);
-        if (!should) continue;
 
         if (segment.has_pipe || segment.has_redirection || segment.background) {
             if (segment.first.kind == nift::shell::CommandKind::NotFound) {
@@ -2121,17 +2341,17 @@ static int execute_shell_command(Parser& parser,
                 last = 2;
                 continue;
             }
-            last = run_external_tokens(parser, shell_external_tokens(segment.tokens), line, print_errors, jobs);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 
         switch (segment.first.kind) {
             case nift::shell::CommandKind::ShellBuiltin: {
-                const std::size_t name_index = shell_name_index(segment.tokens);
+                const std::size_t name_index = shell_name_index(segment_texts);
                 std::vector<std::string> args;
-                if (name_index + 1 < segment.tokens.size()) {
-                    args.assign(segment.tokens.begin() + static_cast<std::ptrdiff_t>(name_index + 1),
-                                segment.tokens.end());
+                if (name_index + 1 < segment_texts.size()) {
+                    args.assign(segment_texts.begin() + static_cast<std::ptrdiff_t>(name_index + 1),
+                                segment_texts.end());
                 }
                 last = dispatch_shell_state(parser, segment.first.name, args, jobs, print_errors,
                                             exit_requested, exit_code);
@@ -2139,19 +2359,16 @@ static int execute_shell_command(Parser& parser,
             }
             case nift::shell::CommandKind::UserFunction:
             case nift::shell::CommandKind::NiftBuiltin:
-                last = run_nift_command(parser, segment.tokens, print_errors);
+                last = run_nift_command(parser, segment_texts, print_errors);
                 break;
             case nift::shell::CommandKind::External:
-                last = run_external_tokens(parser, shell_external_tokens(segment.tokens), line, print_errors, jobs);
+                last = run_external_words(parser, segment_words, line, print_errors, jobs);
                 break;
             case nift::shell::CommandKind::NotFound:
                 if (print_errors) console::error("nift: " + segment.first.name + ": command not found");
                 last = 127;
                 break;
             case nift::shell::CommandKind::NiftStatement:
-                // A command line is classified with command_line=true, so a
-                // NiftStatement segment is not produced. Keep the branch
-                // explicit rather than silently externalising it.
                 if (print_errors) console::error("nift: Nift statement is not valid in a command chain");
                 last = 2;
                 break;
@@ -2330,7 +2547,8 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
         const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);
-        auto toks=shell_tokens(trimmed);
+        auto shell_line_words=shell_words(trimmed);
+        auto toks=shell_texts(shell_line_words);
         const auto snapshot=make_shell_snapshot(parser);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;

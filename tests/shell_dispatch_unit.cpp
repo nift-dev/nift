@@ -145,6 +145,41 @@ void test_lines() {
     LinePlan redirection = nift::shell::classify_line({"echo", "a", ">", "out"}, s);
     expect(redirection.segments.size() == 1 && redirection.segments[0].has_redirection,
            "redirection flag");
+
+    // C1: only unquoted operator tokens split/redirect.
+    LinePlan quoted_connector = nift::shell::classify_line(
+        {"echo", "&&"}, {false, false}, s);
+    expect(quoted_connector.segments.size() == 1 &&
+           quoted_connector.segments[0].connector.empty() &&
+           quoted_connector.segments[0].tokens.size() == 2 &&
+           quoted_connector.segments[0].tokens[1] == "&&",
+           "quoted && remains an argument");
+
+    LinePlan real_connector = nift::shell::classify_line(
+        {"echo", "&&", "echo", "x"}, {false, true, false, false}, s);
+    expect(real_connector.segments.size() == 2 &&
+           real_connector.segments[1].connector == "&&",
+           "unquoted && splits");
+    expect(real_connector.segments.size() == 2 &&
+           real_connector.segments[0].begin == 0 &&
+           real_connector.segments[0].end == 1,
+           "segment begin/end indices");
+
+    LinePlan quoted_semicolon = nift::shell::classify_line(
+        {"echo", "a", ";", "echo", "b"}, {false, false, false, false, false}, s);
+    expect(quoted_semicolon.segments.size() == 1,
+           "quoted ; remains an argument");
+
+    LinePlan real_semicolon = nift::shell::classify_line(
+        {"echo", "a", ";", "echo", "b"}, {false, false, true, false, false}, s);
+    expect(real_semicolon.segments.size() == 2 &&
+           real_semicolon.segments[1].connector == ";",
+           "unquoted ; splits");
+
+    LinePlan quoted_pipe = nift::shell::classify_line(
+        {"echo", "|"}, {false, false}, s);
+    expect(quoted_pipe.segments.size() == 1 && !quoted_pipe.segments[0].has_pipe,
+           "quoted | is not a pipe");
 }
 
 void test_paths() {

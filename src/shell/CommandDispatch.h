@@ -45,6 +45,8 @@ struct Segment {
     bool has_pipe = false;
     bool has_redirection = false;
     bool background = false;
+    std::size_t begin = 0;  // [begin, end) in the original token vector
+    std::size_t end = 0;
 };
 
 struct LinePlan {
@@ -61,6 +63,10 @@ Decision classify_segment(const std::vector<std::string>& tokens,
                           const ShellSnapshot& snapshot,
                           bool command_line = false);
 LinePlan classify_line(const std::vector<std::string>& tokens,
+                       const ShellSnapshot& snapshot);
+// operator_token[i] is true only for an unquoted/unescaped shell operator.
+LinePlan classify_line(const std::vector<std::string>& tokens,
+                       const std::vector<bool>& operator_token,
                        const ShellSnapshot& snapshot);
 
 const char* command_kind_name(CommandKind kind);
