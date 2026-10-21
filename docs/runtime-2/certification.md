@@ -771,3 +771,45 @@ Ranking for CP12C slice 1: closures (`expression:Lambda`, `fn-as-value`,
 `call-binding`) block 182 shared scripts (group-sole 14; 126 without a `for`
 blocker); `for` blocks 142 (sole 11; 86 without closures); overlap 56;
 both slices together fully unblock 28.
+
+## CP19 slice 1 (shell command dispatch) certified on Linode @135f9d1 (2026-10-22)
+
+Candidate `135f9d19` on base `0474377a` (runtime-2 with CP12C slice 0): a
+merge of the CP19 stack `56cbb9ad` with the integrated base (automatic, no
+conflicts), so the exact integration commit is the certified one.
+
+    certify @ 135f9d1: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 180
+
+SKIPPED-ENVIRONMENTAL 3 are the root-only tests, each passing as user
+`tester`. Mutation gate: unmutated accepted, 12 of 12 rejected, 0 RETRY
+lines. `test-cp19-s1-dispatch` ran in the certification with all four
+dispatch mutants detected. Precert PASS on the exact candidate. g6-dedicated-4,
+GCC 13.3. Evidence: `.claude-linode-runs/results/cp19m/`.
+
+Cross-platform (temporary CI-only branch `rt2-ci-cp19`, owner-approved;
+workflows dispatched on that ref, checking out the exact SHA):
+`v4.4/v4.5 cross-platform` run 39674997017 and `Gate 6A-R vendored libffi`
+run 39675002286, all jobs green on `135f9d19`: macOS runs the full CP19 suite
+with all four mutants detected; Windows runs the classifier unit tests
+(the pty/coreutils suites are POSIX-only) and MinGW `warnings-check` reports
+zero first-party warnings, which verifies C4 on Windows.
+
+Commit provenance:
+
+* **CP19 implementation** (DeepSeek, second session; reviewed in three rounds
+  plus C4): `f1664d19` … `a1e3e87c` (12 commits: pure classifier, classify
+  before dispatch, quoting and deferred interpolation, call-form completion,
+  whole-line syntax validation, four negative controls, docs). CI wiring
+  `ee7944f1`. C4 `98bd9bf7` (Claude): POSIX-only completion helpers inside the
+  POSIX guard (MinGW `-Werror` unused-function). C5 `56cbb9ad` (Claude): the
+  m1 oracle matches BSD rm's wording, so macOS detects the mutant.
+* **Cross-platform prerequisites** (Claude, from `rt2-xplat-fixes`; owner
+  approved certifying them inside this candidate): `e0817bcb` (unused
+  `timespec` on macOS failed clang `warnings-check`) and `8ce89259` (the
+  Windows shared library also links Winsock). Both failures exist on runtime-2
+  itself (Gate 6A-R run at `ab059dd4`); without `8ce89259` the Windows wall
+  stops before `warnings-check`.
+
+Known migration quirks recorded in the CP19 checkpoint doc and not changed
+here: empty quoted arguments are dropped; `$[...]` interpolates inside single
+quotes; a leading redirection gives 127.
