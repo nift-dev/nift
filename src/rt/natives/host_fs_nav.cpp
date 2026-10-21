@@ -22,17 +22,33 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
     call.set_listing_key(listing_key(call.target().path, glob));
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
     std::vector<std::string> names;
+    std::size_t accounted = 0;
+    const auto account = [&](std::string_view value) {
+        accounted = size_add(accounted, value.size() + 64);
+        return reserve_result(context, accounted);
+    };
     if (glob) {
         if (has_arg && fs::path(raw).is_absolute()) {
-            for (const fs::path& match : nift::detail::glob_expand(call.target().path))
-                names.push_back(match.generic_string());
+            for (const fs::path& match : nift::detail::glob_expand(call.target().path)) {
+                const std::string name = match.generic_string();
+                if (!account(name))
+                    return fail_host(call, host::HostStatus::Limit,
+                                     host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
+                names.push_back(name);
+            }
         } else {
             const auto matches = nift::detail::glob_expand_shared(call.target().path);
             std::error_code base_error;
             const fs::path canonical_base = matches.empty()
                 ? fs::path()
                 : fs::weakly_canonical(fs::current_path(), base_error);
-            for (const auto& match : matches) names.push_back(display_glob(match, canonical_base, bool(base_error)));
+            for (const auto& match : matches) {
+                const std::string name = display_glob(match, canonical_base, bool(base_error));
+                if (!account(name))
+                    return fail_host(call, host::HostStatus::Limit,
+                                     host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
+                names.push_back(name);
+            }
         }
     } else {
         std::error_code ec;
@@ -43,8 +59,13 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
             return fail_host(call, host::HostStatus::Fatal,
                              host_error("runtime.invalid_operation", "ls: path is not a readable directory"), error);
         }
-        for (fs::directory_iterator it(call.target().path, ec), end; !ec && it != end; it.increment(ec))
-            names.push_back(it->path().filename().generic_string());
+        for (fs::directory_iterator it(call.target().path, ec), end; !ec && it != end; it.increment(ec)) {
+            const std::string name = it->path().filename().generic_string();
+            if (!account(name))
+                return fail_host(call, host::HostStatus::Limit,
+                                 host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
+            names.push_back(name);
+        }
         if (ec)
             return fail_host(call, host::HostStatus::Recoverable,
                              host_error("io.directory_read_failed", "ls: " + ec.message()), error);

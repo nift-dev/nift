@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -42,6 +43,10 @@ Status host_getenv(const Context& context, const Value* args, std::uint32_t argc
     const char* value = std::getenv(name.c_str());
     host::Observation obs;
     if (value) {
+        const std::size_t size = std::strlen(value);
+        if (!reserve_result(context, size))
+            return fail_host(call, host::HostStatus::Limit,
+                             host_error("limit.exceeded", "getenv: value exceeds the memory budget"), error);
         obs.env_value = std::string(value);
         if (finish_host(call, "found", obs, error) != Status::Ok) return Status::Error;
         out = make_string(value);
@@ -65,10 +70,15 @@ Status host_env(const Context& context, const Value* args, std::uint32_t argc, V
     call.set_arg("");
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
     out = make_object();
+    std::size_t accounted = 0;
     for (char** entry = environment_block(); entry && *entry; ++entry) {
         const std::string text(*entry);
         const std::size_t eq = text.find('=');
         if (eq == std::string::npos || eq == 0) continue;
+        accounted = size_add(accounted, text.size() + 64);
+        if (!reserve_result(context, accounted))
+            return fail_host(call, host::HostStatus::Limit,
+                             host_error("limit.exceeded", "env: result exceeds the memory budget"), error);
         object_set(out, atom(text.substr(0, eq)), make_string(text.substr(eq + 1)));
     }
     if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;

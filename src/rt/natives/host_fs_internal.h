@@ -223,6 +223,17 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
                          host_error("runtime.invalid_operation", std::string(name) + ": path is a directory"), error);
     }
     std::string data;
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
+    std::error_code size_error;
+    if (fs::is_regular_file(call.target().path, size_error)) {
+        const auto size = fs::file_size(call.target().path, size_error);
+        if (!size_error && !reserve_result(context, static_cast<std::size_t>(size)))
+            return fail_host(call, host::HostStatus::Limit,
+                             host_error("limit.exceeded",
+                                        std::string(name) + ": file exceeds the memory budget"),
+                             error);
+    }
+#endif
     const ReadOutcome outcome = read_whole(call.target().path, data, name, error);
     if (outcome != ReadOutcome::Ok) return read_failure(call, outcome, name, error, error);
     if (!reserve_result(context, data.size()))

@@ -602,6 +602,10 @@ $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES)
 test-rt-host-mutants: $(TARGET)
 	bash tests/runtime2/host_mutants.sh "$(CURDIR)/$(TARGET)"
 
+.PHONY: test-runtime2-host-memory
+test-runtime2-host-memory: $(TARGET)
+	python3 tests/runtime2/vm_host_memory.py --nift "$(CURDIR)/$(TARGET)"
+
 .PHONY: test-rt-host-sources-list
 test-rt-host-sources-list:
 	@expected="$$(printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort)"; \

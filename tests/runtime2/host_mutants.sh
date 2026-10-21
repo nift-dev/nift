@@ -43,4 +43,21 @@ if "$BUILD/.build/rt/host-native-unit" >"$TMP/test-4.log" 2>&1; then
     exit 1
 fi
 echo "PASS host mutant 4: observer test rejected the mutant"
-echo "PASS host negative controls: 4/4 mutants rejected"
+
+BUILD="$TMP/m6"
+mkdir -p "$BUILD"
+git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
+    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=6" \
+    >"$TMP/build-6.log" 2>&1; then
+    echo "FAIL host mutant 6: build failed (harness failure)" >&2
+    tail -20 "$TMP/build-6.log" >&2
+    exit 1
+fi
+if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-6.log" 2>&1; then
+    echo "FAIL host mutant 6: memory test passed (mutant not caught)" >&2
+    cat "$TMP/test-6.log" >&2
+    exit 1
+fi
+echo "PASS host mutant 6: late open budget check rejected"
+echo "PASS host negative controls: 6/6 mutants rejected"
