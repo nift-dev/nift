@@ -66,8 +66,8 @@ failure is a harness failure, never a detection.
 
 ## Evidence
 
-Before: shared 788 scripts, 80 first-reason mismatches (0 on this test's
-categories after linking was expected). After: shared 0, curated 0, rt-diff
-generated 0, projects 0, generator 0. See
+Before: shared 80 first-reason mismatches (69 curated, 11 rt-diff
+generated) and projects 8. After: shared 0, curated 0, rt-diff generated 0,
+projects 0, generator 0. See
 `.claude-linode-runs/deepseek/cp12c-s0-inventory/REPORT.md` for the full
 analysis and gate logs.
