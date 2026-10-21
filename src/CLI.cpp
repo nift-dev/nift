@@ -2406,6 +2406,7 @@ static const std::vector<std::string>& nift_completion_names(){
     static const std::vector<std::string> names={"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","module_path","move","mv","open","open_bytes","package_path","page","print","warn","pwd","remove","rm","run","secure_random_bytes","setenv","sha256","sha256_file","sleep","timer","platform","touch","unsetenv","which"};
     return names;
 }
+#ifndef _WIN32  // used only by the POSIX line editor below (MinGW -Werror: unused-function)
 static bool shell_identifier_name(const std::string& name){
     if(name.empty())return false;
     if(!(std::isalpha(static_cast<unsigned char>(name[0]))||name[0]=='_'))return false;
@@ -2419,6 +2420,7 @@ static bool nift_call_form_completion_name(const std::string& candidate){
     const auto& names=nift_completion_names();
     return std::find(names.begin(),names.end(),candidate)!=names.end();
 }
+#endif
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
     std::set<std::string> out;for(const auto& b:nift_completion_names())if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
