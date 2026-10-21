@@ -103,6 +103,11 @@ jobs:
           grep -n "DIAG" /tmp/cds_diag.py || echo "diagnostic sed did not apply"
           cp /tmp/cds_diag.py tests/cds_diag.py
           python3 tests/cds_diag.py --nift ./nift.exe --output .build/cds-diag.json || true
+      - name: Build-lock diagnostic and the new lock test
+        shell: msys2 {0}
+        run: |
+          python3 tests/xplat_lock_diag.py ./nift.exe || echo "lock diag FAILED"
+          python3 tests/build_lock_orphan_hook.py --nift ./nift.exe || echo "test-build-lock-orphan FAILED"
       - name: Remaining Windows checks the failure skipped
         shell: msys2 {0}
         env:
