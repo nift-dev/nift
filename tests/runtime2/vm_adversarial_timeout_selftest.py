@@ -9,7 +9,10 @@ Cases (fake `nift`, a shell script that sleeps per engine and per attempt):
   endless     both always slow                  -> no retry, both time out
   slow-once   legacy slow only on attempt 1     -> retry reported, both completed
   divergent   legacy always slow, VM fast       -> retry reported, still asymmetric
-  heavy-lock  two processes holding the heavy lane never overlap
+  heavy-lock  two processes holding the heavy lane never overlap, also when
+              they run with different TMPDIRs (as `make certify` targets do)
+  lock-path   the default lane path does not depend on TMPDIR
+  lock-death  a lane holder killed with SIGKILL releases the lane
 """
 import os
 import sys
@@ -56,11 +59,58 @@ with adv.heavy_lock(True):
 def heavy_lock_case():
     import subprocess
     d = tempfile.mkdtemp(prefix="adv-lock-")
-    env = dict(os.environ, NIFT_ADV_HEAVY_LOCK=os.path.join(d, "heavy.lock"))
-    procs = [subprocess.Popen([sys.executable, "-c", LOCKER, HERE], env=env, stdout=subprocess.PIPE, text=True)
-             for _ in range(2)]
-    spans = sorted(tuple(map(float, p.communicate()[0].split())) for p in procs)
+    lock = os.path.join(d, "heavy.lock")
+    procs = []
+    for k in range(2):
+        tmp = os.path.join(d, "tmp%d" % k)
+        os.makedirs(tmp)
+        env = dict(os.environ, NIFT_ADV_HEAVY_LOCK=lock, TMPDIR=tmp)
+        procs.append(subprocess.Popen([sys.executable, "-c", LOCKER, HERE], env=env, stdout=subprocess.PIPE,
+                                      text=True))
+    outputs = [p.communicate()[0] for p in procs]
+    if any(p.returncode != 0 for p in procs):
+        return False
+    spans = sorted(tuple(map(float, out.split())) for out in outputs)
     return len(spans) == 2 and spans[0][1] <= spans[1][0]
+
+
+HOLDER = """import sys, time
+sys.path.insert(0, sys.argv[1])
+import vm_adversarial as adv
+with adv.heavy_lock(True):
+    print("held", flush=True)
+    time.sleep(60)
+"""
+
+
+def lock_death_case():
+    import signal, subprocess, time
+    d = tempfile.mkdtemp(prefix="adv-lockdeath-")
+    env = dict(os.environ, NIFT_ADV_HEAVY_LOCK=os.path.join(d, "heavy.lock"))
+    holder = subprocess.Popen([sys.executable, "-c", HOLDER, HERE], env=env, stdout=subprocess.PIPE, text=True)
+    if holder.stdout.readline().strip() != "held":
+        return False
+    holder.send_signal(signal.SIGKILL)
+    holder.wait()
+    t0 = time.monotonic()
+    waiter = subprocess.run([sys.executable, "-c", LOCKER, HERE], env=env, capture_output=True, text=True,
+                            timeout=20)
+    return waiter.returncode == 0 and time.monotonic() - t0 < 10
+
+
+def default_lock_path_case():
+    import subprocess
+    paths = set()
+    for tmp in (tempfile.mkdtemp(prefix="adv-t1-"), tempfile.mkdtemp(prefix="adv-t2-")):
+        env = {k: v for k, v in os.environ.items() if k != "NIFT_ADV_HEAVY_LOCK"}
+        env["TMPDIR"] = tmp
+        probe = subprocess.run([sys.executable, "-c", "import sys; sys.path.insert(0, sys.argv[1]); "
+                                "import vm_adversarial as a; print(a.HEAVY_LOCK)", HERE],
+                               env=env, capture_output=True, text=True)
+        if probe.returncode != 0:
+            return False
+        paths.add(probe.stdout.strip())
+    return len(paths) == 1
 
 
 def main():
@@ -82,11 +132,15 @@ def main():
             failures.append(f"divergent: {retry}")
         if not heavy_lock_case():
             failures.append("heavy-lock: two holders overlapped")
+        if not default_lock_path_case():
+            failures.append("heavy-lock: the default lane path depends on TMPDIR")
+        if not lock_death_case():
+            failures.append("lock-death: the lane stayed held after its holder was killed")
     finally:
         adv.RETRY_FACTOR = old
     for f in failures:
         print("FAIL " + f)
-    print(("PASS" if not failures else "FAIL") + " vm adversarial timeout policy: 5 cases")
+    print(("PASS" if not failures else "FAIL") + " vm adversarial timeout policy: 7 cases")
     return 1 if failures else 0
 
 

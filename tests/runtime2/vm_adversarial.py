@@ -97,8 +97,10 @@ HEAVY = {
 }
 VOLUME_TIMEOUTS = HEAVY  # name kept for readers of earlier records
 RETRY_FACTOR = 4
-HEAVY_LOCK = os.environ.get("NIFT_ADV_HEAVY_LOCK",
-                            os.path.join(tempfile.gettempdir(), "nift-vm-adversarial-heavy.lock"))
+# Machine-wide on purpose: NOT under TMPDIR, which `make certify` sets per
+# target, so test-rt-vm and test-rt-vm-mutants (run concurrently) share it.
+HEAVY_LOCK = os.environ.get("NIFT_ADV_HEAVY_LOCK") or os.path.join(
+    "/tmp" if os.path.isdir("/tmp") else tempfile.gettempdir(), "nift-vm-adversarial-heavy.lock")
 
 
 def item_timeout(family, name, timeout):
