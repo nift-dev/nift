@@ -2203,6 +2203,7 @@ SHELL_DISPATCH_UNIT := $(TEST_DIR)/shell-dispatch-unit$(EXEEXT)
 SHELL_DISPATCH_MUTANT := $(TEST_DIR)/nift-shell-dispatch-mutant$(EXEEXT)
 SHELL_DISPATCH_MUTANT_QUOTING := $(TEST_DIR)/nift-shell-dispatch-mutant-quoting$(EXEEXT)
 SHELL_DISPATCH_MUTANT_EAGER := $(TEST_DIR)/nift-shell-dispatch-mutant-eager$(EXEEXT)
+SHELL_DISPATCH_MUTANT_SYNTAX := $(TEST_DIR)/nift-shell-dispatch-mutant-syntax$(EXEEXT)
 SHELL_DISPATCH_MUTANT_DIR := $(TEST_DIR)/shell-dispatch-mutants
 SHELL_DISPATCH_LINK_OBJECTS := $(filter-out src/CLI.o,$(CLI_OBJECTS))
 
@@ -2221,6 +2222,10 @@ $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o: src/CLI.cpp src/shell/CommandDispatch.
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION=1 -MMD -MP -c $< -o $@
 
+$(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT_SYNTAX=1 -MMD -MP -c $< -o $@
+
 $(SHELL_DISPATCH_MUTANT): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LDLIBS) -o $@
 
@@ -2230,16 +2235,20 @@ $(SHELL_DISPATCH_MUTANT_QUOTING): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATC
 $(SHELL_DISPATCH_MUTANT_EAGER): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LDLIBS) -o $@
 
+$(SHELL_DISPATCH_MUTANT_SYNTAX): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o $(LDLIBS) -o $@
+
 test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
 	$(SHELL_DISPATCH_UNIT)
 
-test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT) $(SHELL_DISPATCH_MUTANT_QUOTING) $(SHELL_DISPATCH_MUTANT_EAGER)
+test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT) $(SHELL_DISPATCH_MUTANT_QUOTING) $(SHELL_DISPATCH_MUTANT_EAGER) $(SHELL_DISPATCH_MUTANT_SYNTAX)
 	$(SHELL_DISPATCH_UNIT)
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/cp19_completion.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: completion PTY needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m1; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_QUOTING)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m2; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_EAGER)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m3; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_SYNTAX)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m4; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 
 test: test-cp19-s1-dispatch
 
