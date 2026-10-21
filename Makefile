@@ -38,6 +38,8 @@ ifeq ($(OS),Windows_NT)
 	# Winsock for the `nift serve` port probe (src/Serve.cpp).
 	LDLIBS += -lws2_32
 	SHARED_LIB := libnift_c.so
+	# The shared library contains Serve.o too, so it needs Winsock as well.
+	SHARED_SYS_LIBS := -lws2_32
 	LIBFFI_SHARED_LINK_FLAGS := -Wl,--exclude-libs,ALL
 else
 	EXEEXT :=
@@ -955,7 +957,7 @@ libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
 	rm -rf $@.ffi
 
 libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A)
-	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
 
 # macOS dynamic library: relocatable @rpath install name so a consumer that
 # links it can load it from an installed prefix without absolute paths.
