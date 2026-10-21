@@ -6,3 +6,4 @@ recursive-include native/jsonic *.h *.cpp *.cc
 recursive-include native/third_party/libffi *
 recursive-include native/third_party/bitcoin-sha256 *
 recursive-include native/scripts *.sh *.py
+include native/src/rt/parser-sources.txt native/src/rt/host-sources.txt
