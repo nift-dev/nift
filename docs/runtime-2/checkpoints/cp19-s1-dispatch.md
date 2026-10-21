@@ -62,6 +62,10 @@ non-allow-listed built-in resolve through `PATH` (or report 127).
   literally. Only unquoted `&&`, `||`, `;`, `|`, `<`, `>`, `>>`, `2>`, `2>>`,
   `2>&1` and `&` are operators. POSIX bracket expressions are expanded and an
   unmatched pattern is passed literally.
+- The whole line is syntax-validated before any interpolation or dispatch,
+  including segments that `&&`/`||` would skip. Malformed syntax returns status
+  2 with `nift: syntax error near '<token>'`; nothing runs and no interpolation
+  is evaluated. A trailing `;` is valid.
 
 ## Wiring
 
@@ -72,7 +76,8 @@ non-allow-listed built-in resolve through `PATH` (or report 127).
   `shell_builtins` fallback;
 - execute a simple classified target exactly once;
 - keep chain/pipeline/redirection/background parsing, but classify each
-  segment’s first word before any part of the chain runs;
+  segment’s first word before any part of the chain runs and validate the whole
+  line before any interpolation or execution;
 - reject a Nift/user/shell target used as a pipeline or redirection head with a
   clear status-2 diagnostic rather than silently externalising it (pipelines
   remain external-only in this slice);
@@ -94,10 +99,10 @@ change. No other existing shell expectation changed.
 
 ## Regression suite and negative control
 
-- `tests/shell_dispatch_unit.cpp` — 68 pure-classifier checks: precedence,
+- `tests/shell_dispatch_unit.cpp` — 86 pure-classifier checks: precedence,
   `command`, explicit paths, env assignments, chains, pipes, redirections,
-  background, quoted vs unquoted connectors/pipes, segment indices, Nift-line
-  detection and Windows path spellings.
+  background, quoted vs unquoted connectors/pipes, segment indices, C3 syntax
+  validation, Nift-line detection and Windows path spellings.
 - `tests/shell_dispatch.py` — pty/piped shell regressions:
   - `rm -i` prompt respects `n`;
   - missing/partial `rm` failures, including exactly one `rm a d1` side effect;
@@ -111,19 +116,23 @@ change. No other existing shell expectation changed.
   - quoted/escaped brackets, `*`, `&&`, `;`, and mixed quoted/unquoted glob;
   - explicit paths; `$[expr]` evaluated once; failed interpolation prevents
     dispatch; skipped `&&`/`||`/pipeline interpolation; left-to-right order;
-    interpolation changing `PATH` cannot reclassify; `cd`; env assignment.
-- Negative controls: three test-only binaries, M1 (old call-then-fallback),
-  M2 (quote/escape provenance discarded) and M3 (eager interpolation). Normal
-  builds contain none of their code. The normal suite runs against each with
-  `--mutant-kind`; detection is reported PASS only when the expected failures
-  for that mutant are observed. `make test-cp19-s1-dispatch` builds and runs
-  the unit test, the normal suite, the completion suite and all three mutants.
+    interpolation changing `PATH` cannot reclassify; `cd`; env assignment;
+  - C3 malformed connectors/pipes/background/redirections, whole-line
+    validation of skipped segments, no side effects, no interpolation, valid
+    trailing `;` and quoted operators as words.
+- Negative controls: four test-only binaries, M1 (old call-then-fallback),
+  M2 (quote/escape provenance discarded), M3 (eager interpolation) and M4
+  (syntax validation skipped). Normal builds contain none of their code. The
+  normal suite runs against each with `--mutant-kind`; detection is reported
+  PASS only when the expected failures for that mutant are observed.
+  `make test-cp19-s1-dispatch` builds and runs the unit test, the normal suite,
+  the completion suite and all four mutants.
 
 ## Gates run
 
 | Gate | Result |
 |---|---|
-| `make test-cp19-s1-dispatch` (unit 68 checks + normal + completion + M1/M2/M3) | PASS |
+| `make test-cp19-s1-dispatch` (unit 86 checks + normal + completion + M1/M2/M3/M4) | PASS |
 | `python3 tools/rt-vm/legacy_names.py --check` | PASS (208 names, unchanged) |
 | `make test-v44-execution-shell` | PASS |
 | `make test-v44-shell-restricted` | PASS |
@@ -149,7 +158,7 @@ on a Windows runner. `tests/shell_dispatch.py` and
 `tests/cp19_completion.py` are POSIX-only (pty/coreutils) and exit 77
 elsewhere.
 
-## Correction round (C1, C2, N1, N2, N3, N4)
+## Correction round (C1, C2, C3, N1, N2, N3, N4)
 
 ### C1 — quote/escape provenance
 
@@ -187,19 +196,33 @@ to `exists(`. The general `nift complete` API and argument/file completion keep
 Nift expression names. `tests/cp19_completion.py` covers PATH, user function,
 call form and no-bare-builtin.
 
-### N2 — three negative controls
+### C3 — whole-line syntax validation
 
-Three test-only binaries are built with different CLI definitions:
+`nift::shell::validate_line_syntax` is pure and runs after classification but
+before interpolation or dispatch. It rejects a leading/trailing/doubled
+connector, a leading/trailing/doubled pipe, `&` anywhere except last in its
+segment, and a redirection (`<`, `>`, `>>`, `2>`, `2>>`) with no following word
+or with an operator as its operand. It reports `nift: syntax error near
+'<token>'` and status 2. The check covers the whole line, including segments
+that conditional execution would skip, so `true || echo x >` is an error and
+`/bin/touch marker && echo x >` creates no marker. A trailing `;` remains
+valid; quoted/escaped operators remain ordinary words; validation runs before
+interpolation, so `echo $[bump()] && |` leaves the counter unchanged.
+
+### N2 — four negative controls
+
+Four test-only binaries are built with different CLI definitions:
 `NIFT_SHELL_DISPATCH_MUTANT=1` (M1 fallback),
-`NIFT_SHELL_DISPATCH_MUTANT_QUOTING=1` (M2 quotes discarded) and
-`NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION=1` (M3 eager interpolation).
-Normal builds contain none of their code. `--mutant-kind` runs the normal
-suite against each; detection requires the expected failures for that mutant.
+`NIFT_SHELL_DISPATCH_MUTANT_QUOTING=1` (M2 quotes discarded),
+`NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION=1` (M3 eager interpolation) and
+`NIFT_SHELL_DISPATCH_MUTANT_SYNTAX=1` (M4 syntax validation skipped). Normal
+builds contain none of their code. `--mutant-kind` runs the normal suite
+against each; detection requires the expected failures for that mutant.
 
 ### N3 — Windows
 
 No Windows/MinGW runtime evidence this round. CI must run the classifier unit
-and the three mutant builds plus the existing Windows shell tests.
+and the four mutant builds plus the existing Windows shell tests.
 
 ### N4 — whitespace
 
@@ -227,8 +250,19 @@ Trailing whitespace in this record was removed.
   call the built-in. Use explicit call syntax for the native function.
 - `$[...]` is still supported in command arguments; it is evaluated once after
   classification, and a failed evaluation prevents the command from running.
+- Malformed command syntax is now rejected before execution with `nift: syntax
+  error near '<token>'`, status 2. A trailing `;` is valid.
 - Not-found diagnostics are now `nift: <name>: command not found`, exit 127.
 - Bracket globs (`rm [ab].txt`) are expanded; an unmatched pattern is passed
   literally.
 - Pipelines/redirections with a Nift/user/shell head are not supported in this
   slice and return status 2.
+
+### Recorded compatibility limitations (not changed by CP19)
+
+- **Empty quoted arguments are dropped.** `printf "<%s>" "" x` prints `<x>`
+  (bash prints `<><x>`). This is existing Nift tokenizer behaviour, left for a
+  separate compatibility decision and tests.
+- **`$[...]` inside single quotes is still interpolated.** `echo '$[x]'` prints
+  the value. This is released behaviour; whether single quotes should suppress
+  it is a separate owner decision.
