@@ -62,7 +62,7 @@ jobs:
           install: make diffutils python mingw-w64-ucrt-x86_64-gcc
       - name: Build
         shell: msys2 {0}
-        run: make -j2 nift
+        run: make -j2
       - name: consumer snapshots with the failing assertion's output (copy of the test)
         shell: msys2 {0}
         run: |
