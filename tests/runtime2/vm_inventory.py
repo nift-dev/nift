@@ -23,7 +23,10 @@ CASES = [
     # `to_upper` natives, so the program compiles (no reasons); vm_chain.py
     # runs the same chain on the VM against legacy in every context.
     ("chained", 's := " a "\nprint(s.trim().to_upper())\n', set()),
-    ("chained-member", 'fn(f()) { return {"k": 1} }\nprint(f().k)\n', {"postfix-receiver:member"}),
+    # CP12b: compiled outside loop code (textual wording, L43); refused in loops.
+    ("chained-member", 'fn(f()) { return {"k": 1} }\nprint(f().k)\n', set()),
+    ("chained-member-loop", 'fn(f()) { return {"k": 1} }\ni := 0\nwhile (i < 1) {\n  i += 1\n  print(f().k)\n}\n',
+     {"postfix-receiver:member"}),
     ("lambda-argument", "xs := [1, 2]\ny := xs.map((v) => v + 1)\nprint(y.join(\",\"))\n",
      {"method:map", "expression:Lambda", "method:join"}),
     ("for-and-try", "for (i : [1, 2]) {\n  print(i.zap())\n}\ntry {\n  print(1)\n  nothere()\n} catch (e) {\n"
@@ -37,8 +40,8 @@ CASES = [
     ("dynamic-shadow", "z := 5\nfn(inner()) { return z }\nfn(outer()) { z := 1\nreturn inner() }\n"
      "print(outer())\n", {"free-name:dynamic-shadow"}),
     ("called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", {"fn-called-before-declaration"}),
-    # CP12b: structs compile; a member read on a call result stays refused (L43).
-    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"postfix-receiver:member"}),
+    # CP12b: structs compile; an instance is made only by `p := P()`.
+    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"struct-construction"}),
     ("parse-error", "fn(f()) {\nprint(1)\n", {"parse-error"}),
 ]
 

@@ -42,12 +42,14 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     if (node.kind == NodeKind::Member && ast_.at(node.b).begin != left.end + 1) return fail(node, "postfix-spelling");
     if (node.kind != NodeKind::Call && !is_receiver(left.kind)) return fail(node, "postfix-receiver");
     // A member read (not a method's callee: no `(` follows) on a call result
-    // or literal: legacy's missing-member message depends on the receiver's
-    // shape and on the context ("JSON value 'f()' has no member 'k'" in
-    // textual code, "value has no member: k" in loop code), so it is not
-    // compiled (language-consistency L43).
+    // or literal: legacy's missing-member message depends on the context
+    // ("JSON value 'f()' has no member 'k'" in textual code, "value has no
+    // member: k" in loop code, L43). CP12b: compiled with the textual
+    // wording (member()); in loop code, where legacy words it differently,
+    // refused (no context-dependent wording, owner decision).
     const bool path = left.kind == NodeKind::Ident || left.kind == NodeKind::Member || left.kind == NodeKind::Index;
-    if (node.kind == NodeKind::Member && !path && (node.end >= src.size() || src[node.end] != '('))
+    if (node.kind == NodeKind::Member && !path && (node.end >= src.size() || src[node.end] != '(') &&
+        loop_reachable())
         return fail(node, "postfix-receiver:member");
     return true;
 }

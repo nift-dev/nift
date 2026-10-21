@@ -354,7 +354,10 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     const bool receiver_ok = reg_any(node.a, object);
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
-    if (location.empty() && receiver_text_wording(node, chain)) location = std::string(text(ast_.at(node.a)));
+    const NodeKind r = ast_.at(node.a).kind;  // CP12b: a call result or literal: textual wording (L43)
+    const bool value_receiver = r != NodeKind::Ident && r != NodeKind::Member && r != NodeKind::Index;
+    if (location.empty() && (value_receiver || receiver_text_wording(node, chain)))
+        location = std::string(text(ast_.at(node.a)));
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(site(node));

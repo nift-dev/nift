@@ -40,9 +40,10 @@ SHAPES = [
     # run-time errors, reported by the VM as legacy does
     ("fa(1)[7]", "vm"), ("fa(1)[-1]", "type:print"), ("fo(2)[\"zz\"]", "vm"), ("[1, 2][5]", "vm"),
     ("{\"k\": 1}[\"q\"]", "vm"), ("fa(1)[1][9]", "vm"),
-    # member reads on call results and literals stay refused
-    ("fo(2).n", "postfix-receiver:member"), ("fo(2).k[0]", "postfix-receiver:member"),
-    ("fo(2).zz", "postfix-receiver:member"), ("{\"a\": 1}.a", "postfix-receiver:member"),
+    # member reads on call results and literals (CP12b): compiled with legacy's
+    # textual wording; refused in loop code, where legacy words it otherwise (L43)
+    ("fo(2).n", "vm-textual"), ("fo(2).k[0]", "vm-textual"),
+    ("fo(2).zz", "vm-textual"), ("{\"a\": 1}.a", "vm-textual"),
 ]
 
 CONTEXTS = {
@@ -66,6 +67,8 @@ def run(nift, work, src, env):
 
 def check(args, work, item):
     expr, want, ctx = item
+    if want == "vm-textual":
+        want = "postfix-receiver:member" if ctx in ("loop", "fnloop") else "vm"
     src = CONTEXTS[ctx].format(f=FUNCS, e=expr)
     a = run(args.nift, work, src, {})
     b = run(args.nift, work, src, {"NIFT_VM": "1", "NIFT_VM_STATS": "stats.jsonl"})
