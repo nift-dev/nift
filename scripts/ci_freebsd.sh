@@ -33,6 +33,12 @@ if ! gmake -j"$JOBS" nift > "$OUT/build.log" 2>&1; then
 fi
 echo "- build: PASS ($(( $(date +%s) - start ))s)" >> "$SUMMARY"
 NIFT_BIN="$ROOT/nift"; export NIFT_BIN NIFT="$NIFT_BIN"
+# The Makefile is GNU make syntax, and several scripts run plain `make` to build
+# their unit drivers. FreeBSD's make is bmake, so GNU make is put first on PATH
+# as `make` for the tests (stated in the summary, as a FreeBSD user would do).
+mkdir -p "$OUT/bin" && ln -sf "$(command -v gmake)" "$OUT/bin/make"
+PATH="$OUT/bin:$PATH"; export PATH
+echo "- \`make\` in tests: GNU make ($(make --version 2>/dev/null | sed -n 1p))" >> "$SUMMARY"
 
 pass=0; fail=0; nv=0; failed=""; notverified=""
 LIST="$ROOT/tests/freebsd_ci_scripts.txt"
@@ -53,7 +59,8 @@ else fail=$((fail + 1)); failed="$failed test-source-map"; tail -20 "$OUT/test-s
 
 notrun=""; nr=0
 while IFS= read -r line; do
-  case $line in ''|'#'*) continue ;; esac
+  [ -n "$line" ] || continue
+  [ "${line#\#}" = "$line" ] || continue
   nr=$((nr + 1)); notrun="$notrun
   - \`${line%%	*}\`: ${line#*	}"
 done < "$ROOT/tests/freebsd_ci_excluded.txt"
