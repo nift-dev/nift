@@ -71,7 +71,8 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
-        if (ast_.at(list[k]).kind == NodeKind::FnDecl) continue;  // planned by plan_unit
+        if (ast_.at(list[k]).kind == NodeKind::FnDecl || ast_.at(list[k]).kind == NodeKind::StructDecl)
+            continue;  // planned by plan_unit (CP12b: struct declarations too)
         if (!statement(list[k])) return false;
     }
     fb_->emit(OpCode::Halt);

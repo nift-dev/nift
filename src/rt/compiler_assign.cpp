@@ -30,7 +30,17 @@ bool UnitCompiler::declare(const Node& node) {
     std::uint16_t reg = 0;
     Binding binding;
     if (!new_binding(name, target, reg, binding)) return false;
-    if (!no_alias(node.b, node) || !expr_to(node.b, reg)) return false;
+    // CP12b structs: `p := Name(args)` makes the instance the binding holds.
+    const Node& init = ast_.at(node.b);
+    const auto made = init.kind == NodeKind::Call && ast_.at(init.a).kind == NodeKind::Ident
+                          ? plan_.struct_index.find(text(ast_.at(init.a)))
+                          : plan_.struct_index.end();
+    if (made != plan_.struct_index.end()) {
+        binding.struct_id = static_cast<int>(made->second);
+        if (!struct_construct(node, binding.struct_id, reg)) return false;
+    } else if (!no_alias(node.b, node) || !expr_to(node.b, reg)) {
+        return false;
+    }
     std::uint16_t text_type = 0;
     const TextType& inferred = text_type_at(node.b);
     binding.decl_kinds = kinds(node.b);
@@ -81,7 +91,14 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
 
 bool UnitCompiler::assign(const Node& node) {
     const Node& target = ast_.at(node.a);
-    if (target.kind == NodeKind::Member) return fail(node, "static-error:member-assign");  // plain objects reject it
+    if (target.kind == NodeKind::Member) {
+        bool is_this = false;  // CP12b: a struct field
+        const int s = struct_of_receiver(target.a, is_this);
+        const StructFieldInfo* field = nullptr;
+        if (s >= 0) return field_access_ok(target, s, text(ast_.at(target.b)), is_this, field) &&
+                           field_assign(node, target.a, *field);
+        return fail(node, "static-error:member-assign");  // plain objects reject it
+    }
     if (target.kind == NodeKind::Index) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
@@ -104,7 +121,11 @@ bool UnitCompiler::assign(const Node& node) {
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");
     const Binding* binding = find_binding(text(target));
+    if (!binding)
+        if (const StructFieldInfo* field = own_field(text(target)))  // CP12b: an implicit field
+            return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
     return assign_value(node, b);
@@ -148,9 +169,13 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
 
 bool UnitCompiler::compound_assign(const Node& node) {
     const Node& target = ast_.at(node.a);
+    if (const StructFieldInfo* field = struct_target(target))
+        return field_update(node, target_receiver(target), *field);
+    if (!reason_.empty()) return false;
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     // `+=` on two numbers or two strings, the others on numbers (legacy
     // errors and prepared array concatenation are refused).
@@ -175,9 +200,13 @@ bool UnitCompiler::compound_assign(const Node& node) {
 
 bool UnitCompiler::inc_dec(const Node& node) {
     const Node& target = ast_.at(node.a);
+    if (const StructFieldInfo* field = struct_target(target))
+        return field_update(node, target_receiver(target), *field);
+    if (!reason_.empty()) return false;
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     return compound_op(node, b);

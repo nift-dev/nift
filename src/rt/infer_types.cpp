@@ -54,6 +54,7 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     }
     auto t = std::make_shared<Ty>();
     t->kinds = a->kinds | b->kinds;
+    t->struct_id = a->struct_id == b->struct_id ? a->struct_id : -2;
     if (a->elem || b->elem) t->elem = unite(a->elem, b->elem, depth + 1);
     if (a->tuple && b->tuple && a->items.size() == b->items.size()) {
         t->tuple = true;
@@ -75,6 +76,7 @@ bool same(const TyRef& a, const TyRef& b) {
     const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
     if (a->kinds != b->kinds || a->any != b->any || a->fields.size() != b->fields.size()) return false;
+    if (a->struct_id != b->struct_id) return false;
     if (a->tuple != b->tuple || a->items.size() != b->items.size()) return false;
     for (std::size_t k = 0; k < a->items.size(); ++k)
         if (!same(a->items[k], b->items[k])) return false;

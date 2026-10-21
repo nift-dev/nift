@@ -117,6 +117,7 @@ private:
     bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     bool builtin(const Instr& in, Value* R, Fault& fault);  // CP14 built-ins (rt/natives)
+    bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
     void flush_if_needed(std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);

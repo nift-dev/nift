@@ -131,7 +131,9 @@ private:
     // function (except statements legacy runs textually), or anywhere in a
     // function called from such code.
     bool loop_region() const { return loop_depth_ > 0 && !textual_statement_; }
-    bool loop_reachable() const { return loop_region() || (in_function_ && loop_called_[function_]); }
+    bool loop_reachable() const {  // CP12b: struct methods count as called from loops (conservative)
+        return loop_region() || (in_function_ && (loop_called_[function_] || plan_.is_method(function_)));
+    }
     void update_flags();
     // A binding type legacy derives from `type` may differ from the type of
     // the value (kinds) in scope `scope` (functions 0..n-1, main n).
@@ -184,6 +186,36 @@ private:
     bool global_take(const Binding& b, std::uint16_t& reg);
     void global_put(const Binding& b, std::uint16_t reg) { fb_->emit(OpCode::SetGlobal, b.reg, reg); }
     std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
+    // CP12b structs (compiler_structs.cpp): instances live in bindings and are
+    // used only as receivers of their fields and methods (no copies, so
+    // legacy's references and the VM's values never differ).
+    // Legacy's loop evaluator fails on struct field access (L42) in loop
+    // bodies and in functions called from loops; a method's own body is
+    // canonical unless it has a loop of its own.
+    bool field_in_loop_code() const {
+        return loop_region() || (in_function_ && !plan_.is_method(function_) && loop_called_[function_]);
+    }
+    int current_struct() const { return in_function_ && plan_.is_method(function_) ? plan_.method_of[function_] : -1; }
+    const StructFieldInfo* own_field(std::string_view name) const;
+    int struct_of_receiver(NodeId object, bool& is_this) const;
+    bool receiver_slot(NodeId object, std::uint16_t dst);
+    bool struct_construct(const Node& decl, int s, std::uint16_t reg);
+    bool struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver, int receiver_reg,
+                     std::uint16_t dst);
+    bool struct_member(const Node& node, int s, bool is_this, std::uint16_t dst);
+    bool struct_method(const Node& node, int s, std::uint16_t dst);  // `p.m(args)`, `this.m(args)`
+    // A call by name of a struct (refused: only `p := Name(args)`) or, in a
+    // method, of a method of its struct: 1 compiled, 0 refused, -1 neither.
+    int struct_callee(const Node& node, std::string_view name, std::uint16_t dst);
+    bool field_access_ok(const Node& at, int s, std::string_view name, bool is_this, const StructFieldInfo*& field);
+    bool field_read(const Node& at, NodeId receiver, const StructFieldInfo& field, std::uint16_t dst);
+    bool field_assign(const Node& node, NodeId receiver, const StructFieldInfo& field);
+    bool field_update(const Node& node, NodeId receiver, const StructFieldInfo& field);
+    // The field a compound/increment target names (`x` in a method, `this.x`,
+    // `p.x`), checked (field_access_ok; a refusal sets reason_); nullptr otherwise.
+    const StructFieldInfo* struct_target(const Node& target);
+    NodeId target_receiver(const Node& target) const { return target.kind == NodeKind::Member ? target.a : kNoNode; }
+    std::uint16_t this_reg_ = 0;  // a method's register holding its instance's stack slot
 
     bool fail(const Node& node, std::string reason);
     bool builder_ok();

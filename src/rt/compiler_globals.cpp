@@ -14,6 +14,8 @@ namespace nift::rt::detail {
 const Binding* UnitCompiler::find_binding(std::string_view name) const {
     if (const Binding* local = scopes_.find(name)) return local;
     if (!in_function_ || globals_ == nullptr || function_ >= globals_->free.size()) return nullptr;
+    // CP12b structs: methods run wherever an instance is (not ordered by G3): no globals there.
+    if (plan_.is_method(function_)) return nullptr;
     const auto& free = globals_->free[function_];
     const auto ref = free.find(name);
     if (ref == free.end() || !ref->second.ok) return nullptr;

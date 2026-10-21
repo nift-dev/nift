@@ -63,6 +63,12 @@ namespace nift::rt {
     X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
     X(GetGlobal)  /* R[a] = G[b]: main's register b (a global, CP12b)           */                    \
     X(SetGlobal)  /* G[a] = R[b]                                                */                    \
+    X(SlotOf)     /* R[a] = the absolute stack slot of register b (CP12b structs) */                  \
+    X(NewStruct)  /* R[a] = a new instance of struct (atom b), no fields yet      */                   \
+    X(StructAdd)  /* R[a].(atom b) = RK[c] while constructing                    */                   \
+    X(FieldGet)   /* R[a] = S[R[b]].(atom c): a field of the instance at a slot  */                   \
+    X(FieldSet)   /* S[R[a]].(atom b) = RK[c]                                    */                   \
+    X(CheckField) /* RK[a] assignable to field type RK[b]; c: legacy's wording    */                  \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */
 

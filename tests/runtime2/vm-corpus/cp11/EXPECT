@@ -28,7 +28,8 @@ fallback_parse_error.f prevalidated
 fallback_postfix_space.f fallback opaque:legacy-runtime-error
 fallback_shadow_native.f fallback fn-name-reserved
 fallback_shebang_mid.f fallback shebang-statement
-fallback_struct.f fallback statement:StructDecl
+# CP12b structs compile (instances used only as receivers, compiler_structs.cpp).
+fallback_struct.f vm
 fallback_trailing_comma.f prevalidated
 fallback_try.f fallback statement:Try
 functions.f vm 

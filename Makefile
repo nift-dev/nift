@@ -484,6 +484,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 	python3 tests/runtime2/vm_inventory.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_chain.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_modules.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_MODULES_GEN:-100} --seed $${RT_VM_SEED:-1}
+	python3 tests/runtime2/vm_structs.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_STRUCTS_GEN:-100} --seed $${RT_VM_SEED:-1}
 	python3 tests/runtime2/vm_globals.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GLOBALS_GEN:-200} --seed $${RT_VM_SEED:-1}
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs

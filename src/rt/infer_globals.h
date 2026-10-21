@@ -23,6 +23,8 @@ public:
     // name `name` of function `f` when it resolves to a global; kNone otherwise.
     std::size_t find(int f, std::string_view name, std::vector<std::size_t>& persist, std::vector<TyRef>& vars,
                      std::size_t nodes);
+    // CP12b structs: a struct field's slot is shared by every unit too.
+    void share(std::size_t slot) { slots_.insert(slot); }
     // Whether `var` (an element of `vars`) is a global's shared slot.
     bool shared(const std::vector<TyRef>& vars, const TyRef* var) const {
         return !slots_.empty() && var >= vars.data() && var < vars.data() + vars.size() &&

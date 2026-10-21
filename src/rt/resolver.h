@@ -9,6 +9,7 @@
 // caller's scopes at run time (semantics.md "Free names"); a unit that needs
 // that (GETDYN, CP12) is not compiled.
 #include "rt/ast.h"
+#include "rt/value.h"
 
 #include <cstdint>
 #include <string>
@@ -35,6 +36,8 @@ struct Binding {
     // functions read and write with GetGlobal/SetGlobal (main's frame is at
     // stack base 0).
     bool global = false;
+    // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
+    int struct_id = -1;
 };
 
 class Scopes {
@@ -50,6 +53,35 @@ private:
     std::vector<std::vector<std::pair<std::string_view, Binding>>> scopes_;
 };
 
+// CP12b structs (rt/structs.h): a top-level `struct (Name) { ... }`.
+struct StructFieldInfo {
+    std::string_view name;
+    NodeId node = kNoNode;  // the StructField
+    bool priv = false;
+    Value value;            // the initialiser (a constant)
+    std::int64_t type = 0;  // the field's binding type (legacy's, from the initialiser)
+};
+struct StructMethodInfo {
+    std::string_view name;
+    bool priv = false;
+    std::size_t function = 0;  // index into UnitPlan::functions
+};
+struct StructInfo {
+    std::string_view name;
+    NodeId decl = kNoNode;
+    std::vector<StructFieldInfo> fields;
+    std::vector<StructMethodInfo> methods;
+    int ctor = -1;  // index into methods of the constructor (named like the struct)
+    const StructFieldInfo* field(std::string_view n) const {
+        for (const auto& f : fields) if (f.name == n) return &f;
+        return nullptr;
+    }
+    const StructMethodInfo* method(std::string_view n) const {
+        for (const auto& m : methods) if (m.name == n) return &m;
+        return nullptr;
+    }
+};
+
 struct UnitPlan {
     bool ok = true;
     std::string reason;
@@ -59,6 +91,13 @@ struct UnitPlan {
     // escaping[f][k]: parameter k of functions[f] may be mutated or rebound
     // through (alias.h); filled by plan_unit, empty when no call passes a place.
     std::vector<std::vector<bool>> escaping;
+    // CP12b structs: the unit's structs; their methods are functions too
+    // (after the top-level ones, not in `index`): method_of[f] is the struct
+    // of functions[f], -1 for a top-level function.
+    std::vector<StructInfo> structs;
+    std::unordered_map<std::string_view, std::size_t> struct_index;
+    std::vector<int> method_of;
+    bool is_method(std::size_t f) const { return f < method_of.size() && method_of[f] >= 0; }
 };
 
 // Collects the top-level functions of `root` (a Program) and checks the

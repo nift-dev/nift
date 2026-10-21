@@ -123,7 +123,9 @@ UNSUPPORTED = [
     ("destructuring", "[a, b] := [1, 2]\nprint(a)\n", "declare-pattern"),
     ("for", "for (x : [1, 2]) { print(x) }\n", "statement:For"),
     ("try", "try { print(1) } catch (e) { print(2) }\n", "statement:Try"),
-    ("struct", "struct (P) { x := 1 }\nprint(1)\n", "statement:StructDecl"),
+    # CP12b structs compile (vm_structs.py); a field initialised by a
+    # non-constant is still refused (legacy evaluates it at each construction).
+    ("struct", "struct (P) { x := [1] }\nprint(1)\n", "struct-field-init"),
     ("fn-called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"),
     ("fn-called-before-declaration-transitive", "fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n",
      "fn-called-before-declaration"),

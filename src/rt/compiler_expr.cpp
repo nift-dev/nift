@@ -73,9 +73,14 @@ bool UnitCompiler::temp(std::uint16_t& reg) { return fb_->alloc(reg) || builder_
 bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
     const Binding* binding = find_binding(text(node));
     if (!binding) {
+        if (const StructFieldInfo* field = own_field(text(node))) {  // CP12b: an implicit field
+            if (field_in_loop_code()) return fail(node, "context:struct-field");
+            return temp(reg) && field_read(node, kNoNode, *field, reg);
+        }
         if (plan_.index.count(text(node))) return fail(node, "fn-as-value");
         return fail(node, in_function_ ? "free-name" : "unresolved-name");
     }
+    if (binding->struct_id >= 0) return fail(node, "struct-value");  // CP12b: instances are never copied
     if (binding->global) return global_read(binding->reg, reg);  // CP12b: a copy of main's slot
     reg = binding->reg;
     return true;
@@ -164,10 +169,16 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
     switch (node.kind) {
         case NodeKind::Ident: {
             std::uint16_t reg = 0;
-            if (const Binding* b = find_binding(text(node)); b && b->global) {  // CP12b
+            const Binding* b = find_binding(text(node));
+            if (b && b->global && b->struct_id < 0) {  // CP12b
                 fb_->emit(OpCode::GetGlobal, dst, b->reg);
                 return true;
             }
+            if (!b)
+                if (const StructFieldInfo* field = own_field(text(node))) {  // CP12b: an implicit field
+                    if (field_in_loop_code()) return fail(node, "context:struct-field");
+                    return field_read(node, kNoNode, *field, dst);
+                }
             if (!local_register(node, reg)) return false;
             if (reg != dst) fb_->emit(OpCode::Move, dst, reg);
             return true;

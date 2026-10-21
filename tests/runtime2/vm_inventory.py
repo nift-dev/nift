@@ -37,7 +37,8 @@ CASES = [
     ("dynamic-shadow", "z := 5\nfn(inner()) { return z }\nfn(outer()) { z := 1\nreturn inner() }\n"
      "print(outer())\n", {"free-name:dynamic-shadow"}),
     ("called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", {"fn-called-before-declaration"}),
-    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"statement:StructDecl"}),
+    # CP12b: structs compile; a member read on a call result stays refused (L43).
+    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"postfix-receiver:member"}),
     ("parse-error", "fn(f()) {\nprint(1)\n", {"parse-error"}),
 ]
 

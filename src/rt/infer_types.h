@@ -23,6 +23,9 @@ struct Ty {
     bool tuple = false;
     std::vector<TyRef> items;
     std::map<std::string, TyRef, std::less<>> fields;  // objects: members by key
+    // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none;
+    // -2: instances of different structs, or an instance and other values).
+    int struct_id = -1;
 };
 
 const TyRef& empty_ty();

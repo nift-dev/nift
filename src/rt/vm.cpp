@@ -112,7 +112,6 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
     return proto->note(static_cast<std::size_t>(pc - proto->code.data()));
 }
 } // namespace
-
 #define RK(x) (((x) & kConstantBit) ? K[(x) & 0x7fffu] : R[(x)])
 #if NIFT_RT_COMPUTED_GOTO
 #define OP(name) L_##name:
@@ -290,7 +289,8 @@ VmResult Vm::run(std::string& output) {
     }
     OP(Halt) { goto done; }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
-    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) {
+    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(SlotOf) OP(NewStruct)
+    OP(StructAdd) OP(FieldGet) OP(FieldSet) OP(CheckField) {
         if (!cold(*pc, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();
         NOTE_LARGE NEXT();
@@ -391,7 +391,7 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));
             break;
-        default: return raise(fault, StopReason::Internal, "unexpected opcode");
+        default: return struct_op(in, note, R, K, fault);  // CP12b structs (vm_struct.cpp)
     }
     R[in.a] = std::move(out);
     return true;

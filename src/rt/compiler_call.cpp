@@ -22,6 +22,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
     if (scopes_.find(name)) return fail(callee, "call-binding");
+    if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
     const auto fn = plan_.index.find(name);
     NativeInfo native{};
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
@@ -200,6 +201,8 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
 
 bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
+    bool is_this = false;  // CP12b: a struct method
+    if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
     // `length()`/`size()` keep the CP11/CP12 Length opcode (the fast path,
@@ -339,6 +342,8 @@ bool UnitCompiler::receiver_text_wording(const Node& node, const Node& chain) co
 // known: outside user-call arguments (except an admitted path argument,
 // above) and outside another index's brackets; elsewhere they are refused.
 bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
+    bool is_this = false;  // CP12b: a struct field
+    if (const int s = struct_of_receiver(node.a, is_this); s >= 0) return struct_member(node, s, is_this, dst);
     if (!plain_postfix(node)) return false;
     std::string location;
     if (!argument_path(node, location)) return false;

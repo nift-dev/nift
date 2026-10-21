@@ -220,10 +220,13 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     const Node& node = ast_.at(plan_.functions[f]);
     begin(std::string(text(ast_.at(node.a))), node.b, &assigned_fn_[f]);
     const NodeId* params = ast_.list(node);
+    // CP12b structs: a method's first register holds its instance's stack slot.
+    const bool method = plan_.is_method(f);
+    if (method && !fb_->alloc(this_reg_)) return builder_ok();
     std::vector<std::uint16_t> regs(node.count);
     for (std::uint32_t k = 0; k < node.count; ++k)
         if (!fb_->alloc(regs[k])) return builder_ok();
-    fb_->set_params(static_cast<std::uint16_t>(node.count));
+    fb_->set_params(static_cast<std::uint16_t>(node.count + (method ? 1 : 0)));
     std::vector<std::uint16_t> type_regs(node.count);
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);

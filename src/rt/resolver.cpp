@@ -2,6 +2,7 @@
 
 #include "rt/alias.h"
 #include "rt/native.h"
+#include "rt/structs.h"
 
 namespace nift::rt {
 
@@ -112,6 +113,8 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
     }
     // Declarations after statements: admitted when no call can run first.
     if (late && !check_declaration_order(ast, root, plan, position)) return plan;
+    plan.method_of.assign(plan.functions.size(), -1);
+    if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");
     if (plan.ok) plan_escaping_params(ast, root, plan);
     return plan;
