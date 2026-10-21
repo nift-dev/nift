@@ -2157,14 +2157,6 @@ checkpoint-10-cross-platform: $(TARGET)
 test-v44-execution-shell: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_execution_shell_smoke.sh
 
-# CP19 Slice 1: pure command-dispatch classifier unit test.
-SHELL_DISPATCH_UNIT := $(TEST_DIR)/shell-dispatch-unit$(EXEEXT)
-$(SHELL_DISPATCH_UNIT): tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp src/shell/CommandDispatch.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp -o $@
-
-test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
-	$(SHELL_DISPATCH_UNIT)
-
 
 # Portable Python discovery for the AST fuzz/property target. Windows msys2
 # PATH exposes python (from setup-python) rather than python3.
@@ -2202,6 +2194,33 @@ test-v44-shell-restricted: $(TARGET)
 	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
 	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
+
+# CP19 Slice 1 (D-042): pure classifier unit test and the durable shell
+# dispatch regression suite. The mutant binary is a test-only negative control:
+# it restores the old call-then-fallback path and is never part of normal builds.
+SHELL_DISPATCH_UNIT := $(TEST_DIR)/shell-dispatch-unit$(EXEEXT)
+SHELL_DISPATCH_MUTANT := $(TEST_DIR)/nift-shell-dispatch-mutant$(EXEEXT)
+SHELL_DISPATCH_MUTANT_CLI := $(TEST_DIR)/shell-dispatch-mutant/CLI.o
+
+$(SHELL_DISPATCH_UNIT): tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp src/shell/CommandDispatch.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp -o $@
+
+$(SHELL_DISPATCH_MUTANT_CLI): src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT=1 -MMD -MP -c $< -o $@
+
+$(SHELL_DISPATCH_MUTANT): $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(SHELL_DISPATCH_MUTANT_CLI) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(SHELL_DISPATCH_MUTANT_CLI) $(LDLIBS) -o $@
+
+test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
+	$(SHELL_DISPATCH_UNIT)
+
+test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT)
+	$(SHELL_DISPATCH_UNIT)
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+
+test: test-cp19-s1-dispatch
 
 test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh $(V44_SKIP_77)
