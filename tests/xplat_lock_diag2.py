@@ -20,14 +20,9 @@ while not (p / 'finish').exists():
 
 
 def alive(pid):
-    k = ctypes.windll.kernel32
-    h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
-    if not h:
-        return "no-handle(err %d)" % k.GetLastError()
-    code = ctypes.c_ulong()
-    k.GetExitCodeProcess(h, ctypes.byref(code))
-    k.CloseHandle(h)
-    return "running" if code.value == 259 else "exited(%d)" % code.value
+    # msys2 python has no ctypes.windll: ask Windows via PowerShell (Windows PIDs only).
+    ps = "$p = Get-Process -Id %d -ErrorAction SilentlyContinue; if ($p) { 'running ' + $p.ProcessName } else { 'gone' }" % int(pid)
+    return subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.strip()
 
 
 def tree():
@@ -58,11 +53,14 @@ with tempfile.TemporaryDirectory() as td:
     proc.kill()
     proc.communicate()
     time.sleep(1)
-    print("after kill: nift", alive(proc.pid), "| hook", alive(hook_pid), "| hook parent", alive(hook_ppid),
-          "| recorded", alive(record[0]) if record else "-")
+    # proc.pid and the hook's os.getpid() are msys PIDs under msys2 python; the
+    # record and the process tree carry Windows PIDs.
+    print("after kill: recorded (Windows pid)", alive(record[0]) if record else "-")
     print("process tree after kill:\n" + tree())
     (p / "finish").touch()
     deadline = time.monotonic() + 10
     while not (p / "done").exists() and time.monotonic() < deadline:
         time.sleep(0.1)
     print("hook wrote done after finish:", (p / "done").exists())
+    print("recorded pid 10 s later:", alive(record[0]) if record else "-")
+    print("process tree at end:\n" + tree())
