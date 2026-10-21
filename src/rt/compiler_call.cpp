@@ -1,5 +1,7 @@
 #include "rt/compiler_call.h"
 
+#include <algorithm>
+
 #include "rt/alias.h"
 #include "rt/atom.h"
 #include "rt/builtin_bind.h"
@@ -270,6 +272,14 @@ bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     bool scalar = k != 0 && (k & ~kKindScalar) == 0;
     MUTATE_PATH_SCALAR(scalar);
     if (top && !scalar) return fail(node, "path-in-call-argument");
+    if (module_names_ != nullptr && !module_names_->empty()) {
+        NodeId root = path_arg_;  // records20k: a path rooted at a module's binding is its location
+        while (ast_.at(root).kind == NodeKind::Member || ast_.at(root).kind == NodeKind::Index) root = ast_.at(root).a;
+        const Node& base = ast_.at(root);
+        if (base.kind == NodeKind::Ident &&
+            std::find(module_names_->begin(), module_names_->end(), text(base)) != module_names_->end())
+            return fail(node, "path-in-call-argument:imported");
+    }
     note = std::string(text(ast_.at(path_arg_)));
     path_chain_ = node.a;
     return true;

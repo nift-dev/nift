@@ -59,6 +59,10 @@ struct VmResult {
     StopReason reason = StopReason::None;  // None: the program completed
     std::string message;                   // legacy's message (Error) or the failure (Internal)
     std::uint32_t offset = 0;              // source offset of the failing expression
+    // The source offset of main's instruction active at the stop (its call
+    // when the stop is in a callee): where in the top-level code the program
+    // was (CP12b modules: which module was initialising).
+    std::uint32_t main_offset = 0;
     bool returned = false;                 // the script ended with `return value`
     std::string return_text;               // rendering of that value
     bool beyond_legacy_depth = false;      // the call depth exceeded legacy's 64 frames
@@ -102,6 +106,9 @@ private:
         const Proto* proto = nullptr;
     };
     bool reserve_registers(std::size_t needed);
+    // The source offset of main's active call (vm_frames.cpp); `own` when main
+    // itself stopped.
+    std::uint32_t main_offset(std::uint32_t own) const;
     bool frame_check(const Proto* callee, Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))

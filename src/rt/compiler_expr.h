@@ -46,6 +46,7 @@ public:
     // program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
+    void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 
 private:
     struct Loop {
@@ -190,6 +191,7 @@ private:
 
     bool probe_ = false;
     const GlobalPlan* globals_ = nullptr;
+    const std::vector<std::string_view>* module_names_ = nullptr;  // CompileLimits::module_names
     std::unordered_map<std::string_view, Binding> global_bindings_;  // main's binding of each global
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body

@@ -54,10 +54,27 @@ RETURN_PREFIX = b"return: "
 POLICIES = ("D-001#4 recursion", "D-018c diagnostics")
 
 
+IMPORT_PREFIX = b"import: "
+
+
 def _strip_return(message):
+    # CP12b modules: legacy's `import: ` prefixes (one per active import,
+    # reproduced by the VM) come first; `return: ` ones follow them.
+    imports = b""
+    while message.startswith(IMPORT_PREFIX):
+        imports += IMPORT_PREFIX
+        message = message[len(IMPORT_PREFIX):]
     while message.startswith(RETURN_PREFIX):
         message = message[len(RETURN_PREFIX):]
-    return message
+    return imports + message
+
+
+def _split_imports(message):
+    count = 0
+    while message.startswith(IMPORT_PREFIX):
+        count += 1
+        message = message[len(IMPORT_PREFIX):]
+    return count, message
 
 
 def _source_bytes(source, st):
@@ -114,6 +131,20 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     legacy_pos = (int(lm.group(2)), int(lm.group(3)))
     vm_pos = (int(vm.group(2)), int(vm.group(3)))
     legacy_msg, vm_msg = _strip_return(lm.group(4)), vm.group(4)
+    # CP12b modules: the error is in an imported module's file (the path
+    # both report): its source is the one the positions refer to.
+    reported_file = lm.group(1).decode(errors="replace")
+    if os.path.isabs(reported_file) and os.path.isfile(reported_file):
+        with open(reported_file, "rb") as f:
+            reported = f.read()
+        if reported != _source_bytes(source, st):
+            source = reported
+    # The same number of leading `import: ` prefixes; positions and fields
+    # are checked on the rest.
+    legacy_imports, legacy_msg = _split_imports(legacy_msg)
+    vm_imports, vm_msg = _split_imports(vm_msg)
+    if legacy_imports != vm_imports:
+        return False
     mapped = legacy_msg in (b"invalid index", b"invalid index target")
     if legacy_msg != vm_msg and not mapped:
         return False

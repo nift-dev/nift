@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace nift::rt {
 
@@ -25,6 +27,10 @@ struct CompileResult {
 // Analysis limits (tests lower them to exercise the refusal).
 struct CompileLimits {
     std::size_t kind_walks = 0;  // infer_unit_kinds max_walks (0: automatic)
+    // CP12b modules (rt/module_link.h): names declared outside functions in
+    // imported modules. A user-call argument path rooted at one is refused
+    // (`path-in-call-argument:imported`; records20k's stage 4 lift).
+    std::vector<std::string_view> module_names;
 };
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());

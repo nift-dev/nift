@@ -299,6 +299,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
         return result;
     }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
+    compiler.set_module_names(&limits.module_names);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -308,6 +309,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
             // refusal when the probe finds one (the unit is refused either way).
             detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called, &globals);
             probe.probe_unknown();
+            probe.set_module_names(&limits.module_names);
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
                 result.reason = probe.reason();

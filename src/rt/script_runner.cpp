@@ -1,6 +1,7 @@
 #include "rt/script_runner.h"
 
 #include "rt/compiler.h"
+#include "rt/module_link.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
 #include "rt/unit_check.h"
@@ -236,13 +237,43 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         locate_into(stats, source, ast.at(opaque).begin);
         return not_compiled(stats, mode, source_path, exit_code);
     }
-    CompileResult compiled = compile_unit(ast, parsed.root);
+    // CP12b modules: a unit with imports compiles as its linked text
+    // (rt/module_link.h); positions map back to the module they came from.
+    const LinkedUnit link = link_unit(ast, parsed.root, source, source_path);
+    std::filesystem::path report_path = source_path;
+    const auto locate_linked = [&](std::uint32_t offset) {
+        if (!link.linked) return locate_into(stats, source, offset);
+        const LinkedUnit::Location at = link.locate(offset);
+        report_path = at.module == 0 ? source_path : link.graph.modules[at.module]->path;
+        locate_into(stats, at.module == 0 ? source : link.graph.modules[at.module]->source,
+                    static_cast<std::uint32_t>(at.offset));
+    };
+    if (link.linked && !link.ok) {
+        stats.reason = link.reason;
+        report_path = link.where == 0 ? source_path : link.graph.modules[link.where]->path;
+        locate_into(stats, link.where == 0 ? source : link.graph.modules[link.where]->source, link.offset);
+        return not_compiled(stats, mode, report_path, exit_code);
+    }
+    Ast linked_ast(link.linked ? std::string_view(link.text) : std::string_view());
+    NodeId unit_root = parsed.root;
+    if (link.linked) {
+        const ParseResult relinked = parse_script(linked_ast);
+        if (!relinked.ok || first_opaque_node(linked_ast, relinked.root) != kNoNode) {
+            stats.reason = "import-link";  // every module parsed alone: never expected
+            locate_into(stats, source, 0);
+            return not_compiled(stats, mode, source_path, exit_code);
+        }
+        unit_root = relinked.root;
+    }
+    CompileLimits limits;
+    limits.module_names = link.module_names;
+    CompileResult compiled = compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
         stats.reason = compiled.reason;
-        locate_into(stats, source, compiled.offset);
-        return not_compiled(stats, mode, source_path, exit_code);
+        locate_linked(compiled.offset);
+        return not_compiled(stats, mode, report_path, exit_code);
     }
     stats.protos = compiled.program->protos.size();
     for (const auto& proto : compiled.program->protos) stats.instructions += proto->code.size();
@@ -281,15 +312,19 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         exit_code = 0;
         return true;
     }
-    locate_into(stats, source, result.offset);
+    locate_linked(result.offset);
     if (result.reason == StopReason::Error) {
-        // A program error, in legacy's format, at the failing expression.
+        // A program error, in legacy's format, at the failing expression;
+        // while a module initialises, legacy prefixes `import: ` per level.
+        std::string message = result.message;
+        if (link.linked)
+            for (int k = link.depth[link.locate(result.main_offset).module]; k > 0; --k) message = "import: " + message;
         stats.outcome = "vm-error";
-        stats.reason = result.message;
+        stats.reason = message;
         stats.code = result.code;
         stats.catchable = result.catchable;
         report(stats);
-        error_line(source_path, stats, result.message);
+        error_line(report_path, stats, message);
         exit_code = 1;
         return true;
     }
