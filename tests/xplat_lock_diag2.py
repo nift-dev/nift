@@ -83,7 +83,9 @@ def scenario(label, interpreter, kill_mode):
         print("after kill: recorded (Windows pid)", alive(record[0]) if record else "-")
         print("process tree after kill:\n" + tree())
         r = subprocess.run([binary, "build"], cwd=p, capture_output=True, text=True, timeout=120)
-        print("second build rc", r.returncode, (r.stderr.strip().splitlines() or [""])[0][:160])
+        print("second build rc", r.returncode)
+        print("  second build stdout:", r.stdout[-1200:])
+        print("  second build stderr:", r.stderr[-1500:])
         (p / "finish").touch()
         deadline = time.monotonic() + 10
         while not (p / "done").exists() and time.monotonic() < deadline:
@@ -96,8 +98,7 @@ msys_python = t.python_tool()
 native = os.environ.get("pythonLocation", "").rstrip("\\/") + "\\python.exe"
 native_posix = subprocess.run(["cygpath", "-u", native], capture_output=True, text=True).stdout.strip()
 print("msys python:", msys_python, "| native python:", native, os.path.exists(native_posix))
-scenario("A", msys_python, "msys-kill")
-scenario("B", msys_python, "taskkill")
 if os.path.exists(native_posix):
-    scenario("C", native, "msys-kill")
     scenario("D", native, "taskkill")
+    scenario("D2", native, "taskkill")
+    scenario("C", native, "msys-kill")
