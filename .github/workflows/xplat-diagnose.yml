@@ -71,13 +71,13 @@ jobs:
           python3 - <<'PY'
           import re
           p='/tmp/serve_diag.sh'; s=open(p).read()
-          extra='[ -n "${2:-}" ] && [ -f "${2%.err}.out" ] && sed "s/^/  out: /" "${2%.err}.out"; ps -axo pid,ppid,command | grep -i serve | grep -v grep || true; '
+          extra='[ -n "${2:-}" ] && [ -f "${2%.err}.out" ] && sed "s/^/  out: /" "${2%.err}.out"; ps -axo pid,ppid,command | grep -i serve | grep -v grep || true; lsof -nP -iTCP:"$P" -sTCP:LISTEN || echo "  port $P: nothing listening"; curl -s -m 3 -o /dev/null -w "  http %{http_code}\\n" "http://127.0.0.1:$P/" || echo "  http: no answer"; '
           assert s.count('bad() { fail=1; ')==1
           s=s.replace('bad() { fail=1; ','bad() { fail=1; '+extra,1); open(p,'w').write(s)
           PY
           grep -n "^bad()" /tmp/serve_diag.sh
           cp /tmp/serve_diag.sh tests/serve_diag.sh
-          NIFT_BIN="$PWD/nift" bash tests/serve_diag.sh || echo "serve diag FAILED"
+          for i in 1 2 3 4 5; do echo "--- serve diag run $i"; NIFT_BIN="$PWD/nift" bash tests/serve_diag.sh || echo "serve diag run $i FAILED"; done
 
   windows-recovery:
     runs-on: windows-latest
