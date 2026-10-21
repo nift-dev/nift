@@ -2886,3 +2886,20 @@ test-runtime2-literals-decimal-negative: $(TARGET)
 .PHONY: test-loop-literals-sanitize
 test-loop-literals-sanitize: $(SAN_TARGET)
 	python3 tests/runtime2/loop-literals/run.py --nift "$(SAN_TARGET)"
+
+# CP12c slice 0: the inventory regression and its test-only negative control.
+# The mutant inventories the unlinked source on purpose; normal builds contain
+# none of that code (the macro is only on this object).
+INVENTORY_MUTANT_BIN := $(TEST_DIR)/nift-inventory-mutants$(EXEEXT)
+INVENTORY_MUTANT_OBJECT := $(TEST_DIR)/inventory-mutants/refusal_inventory.o
+$(INVENTORY_MUTANT_OBJECT): src/rt/refusal_inventory.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/inventory-mutants"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_INVENTORY_MUTANT=1 -c $< -o $@
+$(INVENTORY_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_MUTANT_OBJECT) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_MUTANT_OBJECT) \
+		$(LDLIBS) -o $@
+.PHONY: test-runtime2-inventory-links
+test-runtime2-inventory-links: $(TARGET) $(INVENTORY_MUTANT_BIN)
+	python3 tests/runtime2/vm_inventory_links.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_inventory_links.py --nift "$(CURDIR)/$(INVENTORY_MUTANT_BIN)" --mutant
+test-rt-vm: test-runtime2-inventory-links
