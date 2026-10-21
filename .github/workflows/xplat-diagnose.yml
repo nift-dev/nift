@@ -47,6 +47,38 @@ jobs:
         run: |
           make test-ownership-unit 2>&1 | tail -20 || true
 
+  macos-serve-after-contracts:
+    # The serve test failed only after the contract suites in the same job.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build
+        run: make -j2
+      - name: Contract suites as in checkpoint 10
+        run: make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard test-consumer-snapshots test-build-lock-orphan test-dependency-status test-dependency-path-identity test-process-hardening
+      - name: State before serve (processes, ports, env)
+        run: |
+          ps -axo pid,ppid,etime,command | grep -Ei "nift|python|http" | grep -v grep || true
+          lsof -nP -iTCP -sTCP:LISTEN | head -20 || true
+          env | grep -Ei "^PY|^NIFT|TMPDIR" || true
+      - name: serve smoke, copy that also prints each server's stdout on failure
+        run: |
+          cp tests/serve_smoke.sh /tmp/serve_diag.sh
+          python3 - <<'PY'
+          import re
+          p='/tmp/serve_diag.sh'; s=open(p).read()
+          extra='[ -n "${2:-}" ] && [ -f "${2%.err}.out" ] && sed "s/^/  out: /" "${2%.err}.out"; ps -axo pid,ppid,command | grep -i serve | grep -v grep || true; '
+          assert s.count('bad() { fail=1; ')==1
+          s=s.replace('bad() { fail=1; ','bad() { fail=1; '+extra,1); open(p,'w').write(s)
+          PY
+          grep -n "^bad()" /tmp/serve_diag.sh
+          cp /tmp/serve_diag.sh tests/serve_diag.sh
+          NIFT_BIN="$PWD/nift" bash tests/serve_diag.sh || echo "serve diag FAILED"
+
   windows-recovery:
     runs-on: windows-latest
     timeout-minutes: 60
