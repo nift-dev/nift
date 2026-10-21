@@ -698,3 +698,47 @@ these faults catchable on the VM (legacy does not catch them), and if it ever
 catches a fault inside a take/put window it must restore the slot first.
 Evidence: `.claude-linode-runs/results/globals/`.
 
+## CP12B modules + structs (+ adversarial harness policy) certified on Linode @50aae70 (2026-10-22)
+
+Candidate `50aae707` on base `bec7d1d6`: the frozen CP12B stack `39bdda8d`
+(modules by source-level linking, structs as receiver-only values, member
+reads on call results and literals; reviewed, non-docs tree identical to the
+reviewed `b7881a4d`) plus three test-harness commits:
+
+    certify @ 50aae70: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 179
+
+SKIPPED-ENVIRONMENTAL 3 are the root-only tests (`test-dependency-status`,
+`test-unreadable-source`, `test-v43-language`); each passed in its
+unprivileged rerun as user `tester`. Mutation gate passed in the concurrent
+run (unmutated accepted, 12 of 12 mutants rejected, 0 incomplete); `RETRY`
+lines in `test-rt-vm` and `test-rt-vm-mutants`: 0; timeout retries: 0.
+Precert (incl. `warnings-check`, test integrity) PASS on the exact candidate.
+g6-dedicated-4, GCC 13.3. Evidence: `.claude-linode-runs/results/stack3/`.
+
+**Zero-flakiness policy (owner, 2026-10-22) and why two earlier certifications
+were not integrated.** `39bdda8d` certified FLAKY 1 (`test-rt-vm-mutants`:
+the gate rejected the *unmutated* binary in the concurrent run). Diagnosis on
+that instance (six concurrent seed-3 adversarial runs, programs kept; results
+in `results/stack/`): `output-64mib-bail` 6/6 (legacy oracle past the bound;
+~73 MB of output, legacy ~7 s alone) and `recursion-2-99998` 1/6 (VM killed by
+the OOM killer, exit -9: the program legitimately takes the VM to its 1 GiB
+heap budget, ~870 MB RSS; RSS scales with the budget: 83 MB at 100 MB,
+297 MB at 400 MB, so it is the budget, not a leak). Engines agree on both when
+not starved. Harness policy (`vm_adversarial.py`, self-test
+`vm_adversarial_timeout_selftest.py`, 7 cases): both engines always get the
+same bound; HEAVY programs declare their own bound and run in one exclusive
+lane (flock at a fixed path, `/tmp/nift-vm-adversarial-heavy.lock`, shared by
+every harness process including concurrently running certify targets with
+different TMPDIRs; released by the kernel if a holder dies); an asymmetric
+timeout reruns the pair once at 4x, printed as RETRY, and still-asymmetric is
+a difference. `bd3a1d51` (lane under TMPDIR) was superseded before
+certification once the per-target TMPDIR gap was found.
+
+Coverage against the integration parent (`cp12b_inventory.py`, exact
+binaries): shared **123 -> 131** of 788, curated **122 -> 129** of 588.
+The inventory self-check reports 80 first-reason mismatches on this tree: the
+refusal inventory compiles the unlinked source, so module scripts' first
+reason differs from classify's (`import-*`, `statement` …). Runtime behaviour
+is unaffected; fixing it is CP12C slice 0 (assigned 2026-10-22), a
+prerequisite for using the inventory to choose CP12C work.
+
