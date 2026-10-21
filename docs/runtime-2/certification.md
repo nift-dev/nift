@@ -742,3 +742,32 @@ reason differs from classify's (`import-*`, `statement` …). Runtime behaviour
 is unaffected; fixing it is CP12C slice 0 (assigned 2026-10-22), a
 prerequisite for using the inventory to choose CP12C work.
 
+
+## CP12C slice 0 (refusal inventory follows linking) certified on Linode @3c5056e (2026-10-22)
+
+Candidate `3c5056e9` on base `781339c2`: DeepSeek's three commits (`d87eb8c9`,
+tree `f5f3f25` on `e1f03028`, reproduced byte-for-byte), rebased with
+`git rebase --onto 781339c2 e1f03028`; range-diff identical for all three.
+
+    certify @ 3c5056e: FAIL 0, BASELINE-FAILURE 0, UNVERIFIED 0, SKIPPED-ENVIRONMENTAL 3, FLAKY 0, PASS 179
+
+SKIPPED-ENVIRONMENTAL 3 are the root-only tests, each passing as user
+`tester`. Mutation gate: unmutated accepted, 12 of 12 rejected, 0 RETRY lines.
+Precert PASS on the exact candidate (test integrity, rt-lint, warnings-check,
+VM corpus, rt-diff + self-test, test-rt-vm including
+`test-runtime2-inventory-links` and its unlinked-source mutant, which is
+detected in 11/11 cases). ASan/UBSan: the 11 inventory-link cases pass, 0
+reports. g6-dedicated-4, GCC 13.3. Evidence: `.claude-linode-runs/results/s0cert/`.
+
+Independent review: scope is the inventory, `add_inventory` and its call,
+`cp12b_inventory.py`, one test and a doc; compiler, linker and VM semantics
+unchanged; `link_unit` has no tracing or global state, so the inventory's
+extra link in `NIFT_VM=classify-all` has no side effects. Independent
+inventory of the rebased binary: **0 first-reason mismatches** on shared
+(788), curated (588), rt-diff generated (200), projects (86) and generator
+(300); link refusals stay explicitly incomplete (53 shared, 8 projects).
+Coverage is unchanged by this slice (shared 131/788, curated 129/588).
+Ranking for CP12C slice 1: closures (`expression:Lambda`, `fn-as-value`,
+`call-binding`) block 182 shared scripts (group-sole 14; 126 without a `for`
+blocker); `for` blocks 142 (sole 11; 86 without closures); overlap 56;
+both slices together fully unblock 28.

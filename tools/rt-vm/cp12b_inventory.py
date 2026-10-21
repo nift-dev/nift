@@ -23,7 +23,9 @@ CP12b inventory reports: reasons by scripts blocked, sole blockers, number of
 distinct reasons per script, single-feature unlocks, the greedy climb, and the
 checkpoint of every reason. A script counts as unlocked by a feature set S
 when its inventory is complete and every non-consequential reason is in S
-("certain"); "strict" also requires the consequential ones.
+("certain"); "strict" also requires the consequential ones. Inventory items
+from an imported module carry a `path` (CP12c slice 0); the analysis reports
+how many such blockers it saw.
 """
 import argparse
 import collections
@@ -442,6 +444,11 @@ def analyse(rows, lists):
     res["first_mismatch"] = [st.get("id") for st in rows if st.get("outcome") == "fallback" and st.get("reasons")
                              and st["reasons"][0]["reason"].split(":")[0] != st["reason"].split(":")[0]]
     res["incomplete"] = collections.Counter(st.get("inventory_stop") for st, ok, c, e in refused if not ok)
+    # CP12c slice 0: blockers whose source is an imported module (the linked
+    # unit's item carries the module path; the entry's item has none).
+    module_items = [r for st in rows for r in (st.get("reasons") or []) if r.get("path")]
+    res["module_sourced"] = len(module_items)
+    res["module_sourced_paths"] = collections.Counter(r["path"] for r in module_items)
     res["first_reason"] = collections.Counter(st.get("reason") for st, ok, c, e in refused)
     res["blocked_by"] = collections.Counter(r for _, _, c, _ in refused for r in c)
     res["blocked_by_any"] = collections.Counter(r for _, _, _, e in refused for r in e)
@@ -487,7 +494,8 @@ def show(name, res, lists):
     p = lambda n: f"{n} ({100.0 * n / max(1, res['scripts']):.1f} %)"  # noqa: E731
     print(f"== {name}: {res['scripts']} scripts; compile on the VM {p(res['compiled'])}; refused {res['refused']}; "
           f"incomplete inventories {dict(res['incomplete'])}; with consequential reasons {res['with_consequential']}; "
-          f"first-reason mismatches {len(res['first_mismatch'])}")
+          f"first-reason mismatches {len(res['first_mismatch'])}; blocker items in imported modules "
+          f"{res.get('module_sourced', 0)}")
     print("  distinct certain reasons per refused script (4 = 4+):", dict(sorted(res["distinct"].items())))
     print("  reasons by scripts blocked (certain / any; sole blocker; checkpoint):")
     for r, n in res["blocked_by_any"].most_common(40):
