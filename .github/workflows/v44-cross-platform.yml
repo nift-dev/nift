@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/v44-cross-platform.yml'
+      - 'tests/shell_dispatch*'
+      - 'tests/cp19_*'
       - 'Makefile'
       - 'src/**'
       - 'tests/parser_*'
@@ -15,6 +17,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/v44-cross-platform.yml'
+      - 'tests/shell_dispatch*'
+      - 'tests/cp19_*'
       - 'Makefile'
       - 'src/**'
       - 'tests/parser_*'
@@ -135,6 +139,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-shell-restricted
+      - name: CP19 shell dispatch (classifier, regressions, completion, 4 mutants)
+        timeout-minutes: 15
+        if: runner.os != 'Windows'
+        run: make -C nift -j2 test-cp19-s1-dispatch
+      - name: CP19 shell dispatch classifier unit on Windows (pty/coreutils suites are POSIX-only)
+        timeout-minutes: 10
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C nift test-cp19-s1-dispatch-unit
       - name: v4.4 automation + hooks
         timeout-minutes: 6
         if: runner.os != 'Windows'
