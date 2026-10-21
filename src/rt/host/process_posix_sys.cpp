@@ -89,10 +89,10 @@ ssize_t write_no_sigpipe(int fd, const char* data, std::size_t size) {
     do { n = ::write(fd, data, size); } while (n < 0 && errno == EINTR);
     const int error = errno;
     if (n < 0 && error == EPIPE && !was_pending) {
-        const struct timespec zero = {0, 0};
 #ifdef __APPLE__
         int sig = 0; sigset_t pend; sigpending(&pend); if (sigismember(&pend, SIGPIPE)) sigwait(&block, &sig);
 #else
+        const struct timespec zero = {0, 0};
         while (::sigtimedwait(&block, nullptr, &zero) < 0 && errno == EINTR) {}
 #endif
     }
