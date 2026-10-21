@@ -64,3 +64,41 @@ Draft correction (S2): inside a method, a free name resolves to a parameter
 or local first, then to the receiver's fields and methods (private ones
 included), then lexically (D-038); `this` names the receiver explicitly.
 
+## Implementation (2026-10-21; D-040 V9, D-047 #2)
+
+Compiled (`src/rt/structs.{h,cpp}`, `compiler_structs.{h,cpp}`,
+`vm_struct.cpp`, kind inference in `infer_walk.cpp`). Instances are values
+on the VM (copy-on-write `StructObject`); legacy's are references. Both
+agree on every admitted unit because an instance never has two holders:
+
+* it is created only by a declaration `p := Name(args)` (fields from their
+  constant initialisers, then the constructor on the instance) and lives in
+  that binding (a local, or a global used by functions);
+* it is used only as the receiver of its fields (`p.x`, `p.x = v`, compound
+  assignment, `++`/`--`) and its methods (`p.m(args)`); every other use of the
+  binding is refused (`struct-value`: copies, arguments, returns, comparison,
+  printing, `type()`), as is a construction anywhere else
+  (`struct-construction`) and an assignment to the binding (`struct-assign`);
+* a method receives its instance's absolute stack slot as a hidden first
+  argument and reads and writes the instance in place, so `this.x`, implicit
+  fields, `this.m()` and implicit method calls reach the caller's binding;
+* field writes keep the field's binding type, with legacy's three wordings
+  (`cannot change struct field type: x` through a member; `cannot assign A to
+  B struct field 'x'` for an implicit field; `... binding 'x'` for its
+  compound assignment);
+* private members only through `this`; methods resolve no globals (they run
+  wherever an instance is, not ordered by G3).
+
+Legacy's loop evaluator fails on struct field access in loop bodies and in
+functions called from loops ("value has no member", L42): refused there
+(`context:struct-field`); method calls from loops are admitted (identical).
+Not yet: non-constant field initialisers (L49, `struct-field-init`),
+declarations after statements, in blocks or functions, exported structs,
+instances in containers or passed to functions (D-047 #2 migration), the
+`stringify()` rendering, `copy()`.
+
+Evidence (development): `tests/runtime2/vm_structs.py` (in test-rt-vm):
+35 shapes in five contexts, the 26 legacy probes pinned (5 on the VM), 12
+further shapes, random struct programs (seeds 2-5 x 300: all identical to
+legacy, ~80 % on the VM).
+
