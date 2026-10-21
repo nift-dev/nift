@@ -476,6 +476,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 	python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
 		--count $${RT_VM_SUBSET_GEN:-500}
 	python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
@@ -522,6 +523,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 		--seed $${RT_VM_SEED:-2} --count $${RT_VM_SUBSET_GEN:-80} --timeout 120
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
@@ -590,6 +593,15 @@ test: test-rt-host
 # it must name exactly RT_HOST_LINK_SOURCES plus PageObserver and the handle
 # table's src/rt support objects.
 RT_HOST_LIST_EXPECTED := src/PageObserver.cpp src/rt/handle.cpp src/rt/value.cpp src/rt/string.cpp src/rt/heap_account.cpp $(RT_HOST_LINK_SOURCES)
+RT_HOST_NATIVE_UNIT := $(TEST_DIR)/rt/host-native-unit$(EXEEXT)
+$(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+.PHONY: test-rt-host-mutants
+test-rt-host-mutants: $(TARGET)
+	bash tests/runtime2/host_mutants.sh "$(CURDIR)/$(TARGET)"
+
 .PHONY: test-rt-host-sources-list
 test-rt-host-sources-list:
 	@expected="$$(printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort)"; \

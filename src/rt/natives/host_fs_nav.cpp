@@ -48,7 +48,9 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
         if (ec)
             return fail_host(call, host::HostStatus::Recoverable,
                              host_error("io.directory_read_failed", "ls: " + ec.message()), error);
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 3
         std::sort(names.begin(), names.end());
+#endif
     }
     if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
     out = make_array(names.size());
