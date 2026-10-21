@@ -17,7 +17,7 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
     if (has_arg) {
         if (call.resolve(raw) != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
     } else {
-        call.adopt(fs::current_path() / ".");
+        if (call.resolve(".") != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
     }
     call.set_listing_key(listing_key(call.target().path, glob));
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);

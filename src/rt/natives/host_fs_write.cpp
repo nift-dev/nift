@@ -39,18 +39,19 @@ Status host_remove(const Context& context, const Value* args, std::uint32_t argc
     std::vector<fs::path> paths;
     bool globbed = false;
     for (std::uint32_t i = 0; i < argc; ++i) {
-        if (collect_paths(args[i], "remove", paths, globbed, error) != Status::Ok) return Status::Error;
+        if (collect_paths(context, args[i], "remove", paths, globbed, error) != Status::Ok) return Status::Error;
     }
     (void)globbed;
     for (const fs::path& path : paths) {
         HostCall call(context.host, host::HostOp::Remove, "remove");
         call.adopt(path);
-        if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
         std::error_code ec;
-        if (fs::is_directory(path, ec))
-            return fail_host(call, host::HostStatus::Fatal,
-                             host_error("runtime.invalid_operation", "remove: directories are not removed recursively"),
-                             error);
+        if (fs::is_directory(path, ec)) {
+            const host::HostError directory_error =
+                host_error("runtime.invalid_operation", "remove: directories are not removed recursively");
+            return fail_host(call, host::HostStatus::Fatal, directory_error, error);
+        }
+        if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
         fs::remove(path, ec);
         if (ec)
             return fail_host(call, host::HostStatus::Recoverable,
@@ -66,11 +67,14 @@ Status host_cp(const Context& context, const Value* args, std::uint32_t argc, Va
     std::vector<fs::path> sources;
     bool globbed = false;
     for (std::uint32_t i = 0; i + 1 < argc; ++i)
-        if (collect_paths(args[i], "copy", sources, globbed, error) != Status::Ok) return Status::Error;
+        if (collect_paths(context, args[i], "copy", sources, globbed, error) != Status::Ok) return Status::Error;
     std::vector<fs::path> destinations;
     bool destination_glob = false;
-    if (collect_paths(args[argc - 1], "copy", destinations, destination_glob, error) != Status::Ok)
+    if (collect_paths(context, args[argc - 1], "copy", destinations, destination_glob, error) != Status::Ok) {
+        if (error.find("path escapes configured filesystem root") != std::string::npos)
+            error = "copy: destination must be one path";
         return Status::Error;
+    }
     (void)globbed;
     if (sources.empty()) return fail(error, "copy: glob matched no source files");
     if (destinations.size() != 1) return fail(error, "copy: destination must be one path");
@@ -100,11 +104,14 @@ Status host_mv(const Context& context, const Value* args, std::uint32_t argc, Va
     std::vector<fs::path> sources;
     bool globbed = false;
     for (std::uint32_t i = 0; i + 1 < argc; ++i)
-        if (collect_paths(args[i], "move", sources, globbed, error) != Status::Ok) return Status::Error;
+        if (collect_paths(context, args[i], "move", sources, globbed, error) != Status::Ok) return Status::Error;
     std::vector<fs::path> destinations;
     bool destination_glob = false;
-    if (collect_paths(args[argc - 1], "move", destinations, destination_glob, error) != Status::Ok)
+    if (collect_paths(context, args[argc - 1], "move", destinations, destination_glob, error) != Status::Ok) {
+        if (error.find("path escapes configured filesystem root") != std::string::npos)
+            error = "move: destination must be one path";
         return Status::Error;
+    }
     (void)globbed;
     if (sources.empty()) return fail(error, "move: glob matched no source files");
     if (destinations.size() != 1) return fail(error, "move: destination must be one path");

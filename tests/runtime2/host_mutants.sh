@@ -8,7 +8,7 @@ ORACLE=${1:-"$ROOT/nift"}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-for mutant in 1 2 3; do
+for mutant in 1 2 3 5; do
     BUILD="$TMP/m$mutant"
     mkdir -p "$BUILD"
     git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"

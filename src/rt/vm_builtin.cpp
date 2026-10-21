@@ -1,16 +1,51 @@
 #include "rt/vm_builtin.h"
 
+#include "FileSystem.h"
 #include "HostTrace.h"
 
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
 
+#include <cstdlib>
+#include <filesystem>
 #include <utility>
 
 // The VM's call into the CP14 built-in natives (CallNative with an id from
 // kFirstBuiltin on): off the hot path, like every CallNative (Vm::cold).
 
 namespace nift::rt {
+
+namespace {
+namespace fs = std::filesystem;
+
+// B1: the opt-in NIFT_FS_ROOT policy, built once from the same canonical
+// invocation setting legacy's Parser reads. No root means unrestricted.
+const host::PathPolicy& vm_path_policy() {
+    static const host::PathPolicy policy = [] {
+        host::PathPolicy result;
+        const char* configured = std::getenv("NIFT_FS_ROOT");
+        if (!configured || !*configured) return result;
+        std::error_code error;
+        fs::path root = fs::absolute(configured, error).lexically_normal();
+        if (!error) {
+            const fs::path canonical = fs::weakly_canonical(root, error);
+            if (!error) root = canonical.lexically_normal();
+        }
+        const fs::path root_copy = root;
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 5
+        result.allow = [root_copy](const fs::path& candidate, std::string& reason) {
+            if (filesystem::path_within(root_copy, candidate)) return true;
+            reason = "path escapes configured filesystem root: " + candidate.generic_string();
+            return false;
+        };
+#else
+        (void)root_copy;
+#endif
+        return result;
+    }();
+    return policy;
+}
+} // namespace
 
 // CP14: a pure built-in over R[a .. a+c) (receiver first for a method). The
 // natives store `out` last, so the result may replace R[a] directly; the
@@ -22,6 +57,7 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
     natives::Context context;
     context.heap_limit = heap_limit_;
     context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
+    context.host.paths = &vm_path_policy();
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {

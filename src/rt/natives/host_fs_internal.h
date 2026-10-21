@@ -249,9 +249,11 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
     return Status::Ok;
 }
 
-inline Status resolve_plain(const std::string& raw, std::string_view name, host::Resolved& out, std::string& error) {
+inline Status resolve_plain(const Context& context, const std::string& raw, std::string_view name,
+                            host::Resolved& out, std::string& error) {
     host::HostError host_error_value;
-    const host::PathPolicy policy;
+    const host::PathPolicy default_policy;
+    const host::PathPolicy& policy = context.host.paths ? *context.host.paths : default_policy;
     const host::HostStatus status = host::resolve_path(policy, raw, name, out, host_error_value);
     if (status != host::HostStatus::Ok) {
         error = host_error_value.message;
@@ -260,8 +262,8 @@ inline Status resolve_plain(const std::string& raw, std::string_view name, host:
     return Status::Ok;
 }
 
-inline Status collect_paths(const Value& value, std::string_view name, std::vector<fs::path>& paths, bool& globbed,
-                     std::string& error) {
+inline Status collect_paths(const Context& context, const Value& value, std::string_view name,
+                            std::vector<fs::path>& paths, bool& globbed, std::string& error) {
     std::vector<std::string> raws;
     if (value.is(Kind::String)) {
         raws.emplace_back(string_view_of(value));
@@ -279,11 +281,16 @@ inline Status collect_paths(const Value& value, std::string_view name, std::vect
     }
     for (const std::string& raw : raws) {
         host::Resolved resolved;
-        if (resolve_plain(raw, name, resolved, error) != Status::Ok) return Status::Error;
+        if (resolve_plain(context, raw, name, resolved, error) != Status::Ok) return Status::Error;
         if (nift::detail::glob_has_magic(raw)) {
             globbed = true;
-            auto matches = nift::detail::glob_expand(resolved.path);
-            paths.insert(paths.end(), matches.begin(), matches.end());
+            const auto matches = nift::detail::glob_expand(resolved.path);
+            for (const fs::path& match : matches) {
+                host::Resolved checked;
+                if (resolve_plain(context, match.generic_string(), name, checked, error) != Status::Ok)
+                    return Status::Error;
+                paths.push_back(checked.path);
+            }
         } else {
             paths.push_back(resolved.path);
         }

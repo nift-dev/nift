@@ -102,7 +102,7 @@ def normalise(text, root):
     return text.replace(str(root), "<root>")
 
 
-def run_both(nift, source, oracle_root, vm_root):
+def run_both(nift, source, oracle_root, vm_root, extra_env=None):
     for root, vm in ((oracle_root, False), (vm_root, True)):
         (root / "case.f").write_text(source)
         env = dict(os.environ)
@@ -111,6 +111,8 @@ def run_both(nift, source, oracle_root, vm_root):
         stats = root / "stats.jsonl"
         trace = root / "trace.jsonl"
         env["NIFT_TRACE_HOST"] = "3"
+        if extra_env:
+            env.update(extra_env)
         if vm:
             env["NIFT_VM_STATS"] = str(stats)
         def preexec():
@@ -168,6 +170,9 @@ def main():
                 return
             if oracle["trace"] != vm["trace"]:
                 failures.append(f"{name}: Host trace differs")
+                return
+            if oracle["trace"] != vm["trace"]:
+                failures.append(f"{name}: Host trace differs")
                 if args.verbose:
                     print("  legacy trace:", oracle["trace"])
                     print("  vm trace    :", vm["trace"])
@@ -193,6 +198,12 @@ def main():
             tail_v = vm["err"].decode(errors="replace").rsplit(": ", 1)[-1].strip()
             if tail_o != tail_v:
                 failures.append(f"{name}: error text differs ({tail_o!r} vs {tail_v!r})")
+                return
+            if oracle["tree"] != vm["tree"]:
+                failures.append(f"{name}: file tree differs")
+                return
+            if oracle["trace"] != vm["trace"]:
+                failures.append(f"{name}: Host trace differs")
                 return
             passed += 1
         else:
@@ -230,6 +241,68 @@ def main():
                 root.mkdir()
                 setup_files(root)
             oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root)
+            check(name, body, oracle, vm, "error")
+
+    root_cases = [
+        ("root_exists", 'print(exists("../../victim.txt"))'),
+        ("root_is_file", 'print(is_file("../../victim.txt"))'),
+        ("root_is_dir", 'print(is_dir("../../victim.txt"))'),
+        ("root_stat", 's := stat("../../victim.txt"); print(s.exists)'),
+        ("root_open", 'print(open("../../victim.txt"))'),
+        ("root_cat", 'cat("../../victim.txt")'),
+        ("root_sha", 'print(sha256_file("../../victim.txt"))'),
+        ("root_ls_glob", 'l := ls("../../*"); print(l.stringify())'),
+        ("root_cd", 'cd("../../")'),
+        ("root_touch", 'touch("../../escaped.txt")'),
+        ("root_mkdir", 'mkdir("../../escaped-dir")'),
+        ("root_rm", 'rm("../../victim.txt")'),
+        ("root_rm_glob", 'rm("../../*.txt")'),
+        ("root_cp_source", 'cp("../../victim.txt", "copy.txt")'),
+        ("root_cp_dest", 'cp("data.txt", "../../copy.txt")'),
+        ("root_mv_source", 'mv("../../victim.txt", "moved.txt")'),
+        ("root_mv_dest", 'mv("data.txt", "../../moved.txt")'),
+    ]
+    for name, body in root_cases:
+        with tempfile.TemporaryDirectory(prefix="vm-host-root-") as tmp:
+            base = Path(tmp)
+            oracle_base = base / "legacy-base"
+            vm_base = base / "vm-base"
+            oracle_root = oracle_base / "root"
+            vm_root = vm_base / "root"
+            oracle_inside = oracle_root / "inside"
+            vm_inside = vm_root / "inside"
+            for root, inside in ((oracle_root, oracle_inside), (vm_root, vm_inside)):
+                root.mkdir(parents=True)
+                inside.mkdir()
+                (inside / "data.txt").write_text("data\n")
+                (root.parent / "victim.txt").write_text("victim\n")
+
+            def run_engine(root, inside, vm_mode):
+                text = body + "\n"
+                (inside / "case.f").write_text(text)
+                env = dict(os.environ)
+                env["NIFT_VM"] = "require" if vm_mode else "0"
+                env["NIFT_TRACE_HOST"] = "3"
+                env["NIFT_FS_ROOT"] = str(root)
+                trace = inside / "trace.jsonl"
+                stats = inside / "stats.jsonl"
+                if vm_mode:
+                    env["NIFT_VM_STATS"] = str(stats)
+                fd = os.open(trace, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                try:
+                    proc = subprocess.run([nift, "case.f"], cwd=inside, env=env, stdin=subprocess.DEVNULL,
+                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                          preexec_fn=lambda: os.dup2(fd, 3), pass_fds=(fd,))
+                finally:
+                    os.close(fd)
+                return {"out": proc.stdout,
+                        "err": proc.stderr.replace(str(root.parent).encode(), b"<base>").replace(str(root).encode(), b"<root>"),
+                        "rc": proc.returncode,
+                        "trace": trace.read_text(errors="replace").replace(str(root), "<root>"),
+                        "tree": snapshot(root.parent), "stats": stats.read_text() if stats.exists() else ""}
+
+            oracle = run_engine(oracle_root, oracle_inside, False)
+            vm = run_engine(vm_root, vm_inside, True)
             check(name, body, oracle, vm, "error")
 
     for name, body, reason in UNSUPPORTED:
