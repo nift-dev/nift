@@ -2697,6 +2697,13 @@ test-randomized-incremental: $(TARGET)
 
 .PHONY: test-consumer-snapshots
 test: test-consumer-snapshots
+
+# Build lock vs a killed build's still-running hook (owner, 2026-10-21): refused
+# while the hook runs, recovers after it exits, on every platform.
+.PHONY: test-build-lock-orphan
+test-build-lock-orphan: $(TARGET)
+	python3 tests/build_lock_orphan_hook.py --nift ./$(TARGET)
+test: test-build-lock-orphan
 test-consumer-snapshots: $(TARGET)
 	mkdir -p .build
 	python3 tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json

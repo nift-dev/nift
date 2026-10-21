@@ -1,10 +1,12 @@
 #include "ProjectOwnership.h"
+#include "ChildProcessHook.h"
 
 #include <cerrno>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <system_error>
 #include <thread>
 
@@ -19,6 +21,72 @@
 #endif
 
 namespace {
+
+#ifdef _WIN32
+// ---- Windows: the build lock covers the build's still-running children ----
+// POSIX: the marker's flock descriptor is inherited by every process a build
+// launches, so a hook that outlives a killed build keeps the lock and the next
+// build is refused ("another build appears to be running") until the hook
+// exits. Windows releases a byte-range lock when the locking process dies,
+// whatever its children hold. So an owning build records each child the
+// legacy launcher starts (pid + creation time, sidecar `<marker>.children`),
+// and a later acquisition treats a free lock as Live while a recorded child
+// is still running (creation time guards against pid reuse). Only direct
+// children are recorded: on POSIX a grandchild keeps the lock only if its
+// parent passed the descriptor on. One owning build per process at a time
+// (the CLI and watch mode build sequentially).
+std::mutex g_children_mutex;
+std::filesystem::path g_children_path;  // empty when this process owns no build
+
+std::filesystem::path children_path(const std::filesystem::path& marker) {
+    std::filesystem::path p = marker;
+    p += ".children";
+    return p;
+}
+
+void record_child(unsigned long pid, unsigned long long created) {
+    std::lock_guard<std::mutex> lock(g_children_mutex);
+    if (g_children_path.empty()) return;
+    std::ofstream out(g_children_path, std::ios::app | std::ios::binary);
+    out << pid << ' ' << created << '\n';
+    out.flush();
+}
+
+bool recorded_child_running(const std::filesystem::path& marker) {
+    std::ifstream in(children_path(marker), std::ios::binary);
+    unsigned long pid = 0;
+    unsigned long long created = 0;
+    while (in >> pid >> created) {
+        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, pid);
+        if (h == nullptr) continue;  // gone (or not ours to see)
+        FILETIME c{}, e{}, k{}, u{};
+        const bool same = GetProcessTimes(h, &c, &e, &k, &u) &&
+            ((static_cast<unsigned long long>(c.dwHighDateTime) << 32) | c.dwLowDateTime) == created;
+        const bool running = same && WaitForSingleObject(h, 0) == WAIT_TIMEOUT;
+        CloseHandle(h);
+        if (running) return true;
+    }
+    return false;
+}
+
+void start_recording(const std::filesystem::path& marker) {
+    std::lock_guard<std::mutex> lock(g_children_mutex);
+    g_children_path = children_path(marker);
+    std::error_code ignored;
+    std::filesystem::remove(g_children_path, ignored);  // earlier records: none still running
+    nift::child_process_spawned = &record_child;
+}
+
+void stop_recording(bool remove_records) {
+    std::lock_guard<std::mutex> lock(g_children_mutex);
+    nift::child_process_spawned = nullptr;
+    if (remove_records && !g_children_path.empty()) {
+        std::error_code ignored;
+        std::filesystem::remove(g_children_path, ignored);
+    }
+    g_children_path.clear();
+}
+#endif
 
 // Creates the marker with exclusive-create semantics: returns true when this
 // call created a brand-new file, false when the file already existed.
@@ -447,7 +515,11 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         // the flock is free it is genuinely stale (the previous owner crashed
         // or finished); if it is held, a live build owns it.
         if (open_existing(marker_, file_)) {
-            if (try_lock(file_)) {
+            if (try_lock(file_)
+#ifdef _WIN32
+                && !recorded_child_running(marker_)  // a killed build's hook still runs
+#endif
+            ) {
                 durable_sync(file_);
                 (void)durable_sync_parent(marker_);
                 owned_ = true;
@@ -469,6 +541,9 @@ ProjectOwnership::State ProjectOwnership::acquire() {
     // serialization lock is held, or a concurrently starting command would
     // block on it instead of observing a Live refusal (the
     // NIFT_TEST_OWNERSHIP_HOLD contract).
+#ifdef _WIN32
+    if (result == State::Clean || result == State::Stale) start_recording(marker_);
+#endif
     if (result == State::Clean || result == State::Stale) {
         test_hold_after_acquire();
     }
@@ -480,6 +555,9 @@ void ProjectOwnership::finish() {
     // Remove the marker strictly AFTER the final derived-state mutation, then
     // release the lock. A crash between unlink and close leaves no marker and
     // no further writes (the epoch is complete).
+#ifdef _WIN32
+    stop_recording(true);  // the epoch is complete; its children no longer guard it
+#endif
     std::error_code ignored;
     std::filesystem::remove(marker_, ignored);
     close_file(file_);
@@ -491,6 +569,9 @@ bool ProjectOwnership::live_owner_exists(const std::filesystem::path& marker) {
     if (!open_existing(marker, file)) return false; // no marker -> no live owner
     const bool locked = try_lock(file);
     close_file(file);
+#ifdef _WIN32
+    if (locked && recorded_child_running(marker)) return true;
+#endif
     return !locked;
 }
 
@@ -498,5 +579,8 @@ ProjectOwnership::~ProjectOwnership() {
     // Do NOT remove the marker here: a destructor path after an unresolved or
     // interrupted epoch must leave `.unfinished` in place so the next build
     // recovers. finish() is the only path that clears it.
+#ifdef _WIN32
+    if (owned_) stop_recording(false);  // keep the records with the marker
+#endif
     close_file(file_);
 }

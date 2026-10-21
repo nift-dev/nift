@@ -316,6 +316,7 @@ ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream,std:
 // covered by the native Windows process contract and failure matrix.
 #include <windows.h>
 #include <wchar.h>
+#include "ChildProcessHook.h"
 #include <vector>
 #include <string>
 #include <mutex>
@@ -553,6 +554,12 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
         if (!created) break;
         CloseHandle(pi.hThread);
         nift_process_test_child(pi.dwProcessId);
+        if (nift::child_process_spawned) {  // an owning build records it (ProjectOwnership.cpp)
+            FILETIME created_at{}, exited_at{}, kernel{}, user{};
+            if (GetProcessTimes(pi.hProcess, &created_at, &exited_at, &kernel, &user))
+                nift::child_process_spawned(pi.dwProcessId,
+                    (static_cast<unsigned long long>(created_at.dwHighDateTime) << 32) | created_at.dwLowDateTime);
+        }
         procs.push_back(pi.hProcess);
         r.launched = true;
     }
