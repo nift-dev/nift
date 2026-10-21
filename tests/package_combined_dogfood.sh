@@ -5,11 +5,32 @@
 # magick thumbnail -> magick identify, with vips imported simultaneously
 # (client-certified) and postgres/mysql imported for namespace isolation.
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT="${NIFT:-./nift}"
-# The combined dogfood starts a local python HTTP server; skip when python3 is
+# The combined dogfood starts a local python HTTP server; skip when "${PYTHON_CMD[@]}" is
 # unavailable (e.g. the Windows msys2 shell PATH lacks it) rather than fail.
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "SKIP combined dogfood (python3 unavailable)"
+if ! command -v "${PYTHON_CMD[@]}" >/dev/null 2>&1; then
+  echo "SKIP combined dogfood ("${PYTHON_CMD[@]}" unavailable)"
   exit 77
 fi
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
@@ -33,7 +54,7 @@ for p in sqlite curl postgres mysql redis vips imagemagick; do
 done
 
 PORT=$((19000 + RANDOM % 2000))
-python3 - "$PORT" "$t/site/assets/pic.png" <<'PYEOF' &
+"${PYTHON_CMD[@]}" - "$PORT" "$t/site/assets/pic.png" <<'PYEOF' &
 import http.server, sys
 port = int(sys.argv[1]); out = sys.argv[2]
 class H(http.server.BaseHTTPRequestHandler):

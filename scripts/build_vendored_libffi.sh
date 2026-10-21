@@ -12,8 +12,24 @@ elif command -v python >/dev/null 2>&1; then
 elif command -v py >/dev/null 2>&1; then
   PYTHON_CMD=(py -3)
 else
-  printf '%s\n' "error: Python 3 is required to build vendored libffi" >&2
-  exit 1
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to build vendored libffi" >&2
+    exit 1
+  fi
+fi
+if [[ -z "${MAKE_CMD:-}" ]]; then
+    if command -v gmake >/dev/null 2>&1; then
+        MAKE_CMD=gmake
+    else
+        MAKE_CMD=make
+    fi
 fi
 SOURCE_DIGEST="$("${PYTHON_CMD[@]}" "$ROOT/scripts/check_vendored_libffi.py" --print-digest "$ROOT/third_party/libffi")"
 BUILD_LOGIC_DIGEST="$("${PYTHON_CMD[@]}" - "$ROOT/scripts/build_vendored_libffi.sh" "$ROOT/scripts/check_vendored_libffi.py" <<'PY'
@@ -85,10 +101,10 @@ fi
 
 # libffi clears MAKEOVERRIDES, so carry the relative libtool command through both recursive levels.
 LIBFFI_MAKE_FLAGS="LIBTOOL='sh ./libtool' AM_MAKEFLAGS=\"LIBTOOL='sh ./libtool'\""
-if ! make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" -j"${NIFT_BUILD_JOBS:-2}" >"$LOG" 2>&1; then
+if ! "${MAKE_CMD}" -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" -j"${NIFT_BUILD_JOBS:-2}" >"$LOG" 2>&1; then
   fail_build
 fi
-if ! make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" install >>"$LOG" 2>&1; then
+if ! "${MAKE_CMD}" -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" install >>"$LOG" 2>&1; then
   fail_build
 fi
 printf '%s\n' "$FINGERPRINT" > "$BUILD/.nift-fingerprint"

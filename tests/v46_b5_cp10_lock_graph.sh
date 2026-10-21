@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
+
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 NIFT=${NIFT_BIN:-${NIFT:-$ROOT/nift}}
@@ -34,12 +56,12 @@ if [ "$before" != "$after" ]; then
 fi
 
 # ---- 4. existing v1 package transaction recovery remains green ----
-(cd "$ROOT" && python3 tests/package_transaction_smoke.py >/dev/null 2>&1) || {
+(cd "$ROOT" && "${PYTHON_CMD[@]}" tests/package_transaction_smoke.py >/dev/null 2>&1) || {
     echo 'CP10 FAIL: v1 package transaction recovery wall failed' >&2; exit 1
 }
 
 # ---- 5. CP10a: PackageTransaction recovery understands v2 graph lock payloads ----
-(cd "$ROOT" && python3 tests/v46_b5_cp10a_recovery_smoke.py >/dev/null 2>&1) || {
+(cd "$ROOT" && "${PYTHON_CMD[@]}" tests/v46_b5_cp10a_recovery_smoke.py >/dev/null 2>&1) || {
     echo 'CP10 FAIL: v2 journal-payload recovery wall failed' >&2; exit 1
 }
 

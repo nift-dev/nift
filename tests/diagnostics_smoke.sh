@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 P="$(mktemp -d)"
 trap 'rm -rf "$P"' EXIT
@@ -20,7 +41,7 @@ if "$NIFT_BIN" build >out.log 2>err.log; then
 fi
 grep -Fq 'templates/template.html:4:32' err.log
 grep -Fq '@path path must stay inside the Nift project: /assets/css/style.css' err.log
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 from pathlib import Path
 lines = Path('err.log').read_text().splitlines()
 source = next(line for line in lines if '<link rel="stylesheet"' in line)
@@ -44,7 +65,7 @@ TEMPLATE
 # A > 16 KiB one-line page with an error near column ~32000 must render a
 # bounded excerpt, keep the true file:line:column, and never emit the whole
 # line or a caret padded to the original column.
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 from pathlib import Path
 line = ("Lorem ipsum dolor sit amet " * 1200) + '@substr("abc", 100)'
 Path('content/index.html').write_text(line + '\n')
@@ -65,7 +86,7 @@ if [ "$(wc -c < long.err)" -gt 2048 ]; then
     exit 1
 fi
 # Error near the very start of a long line: no leading ellipsis, trailing crop.
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 from pathlib import Path
 line = '@substr("abc", 100)' + ('z' * 20000)
 Path('content/index.html').write_text(line + '\n')
@@ -74,7 +95,7 @@ PY
 grep -q ':1:1' start.err
 grep -q '...' start.err
 # Error at the very end of a long line: leading crop, no trailing content.
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 from pathlib import Path
 line = ('y' * 20000) + '@substr("abc", 100)'
 Path('content/index.html').write_text(line + '\n')

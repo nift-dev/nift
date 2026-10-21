@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-state-concurrency.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -44,7 +65,7 @@ grep -Fq 'GOOD-V2' "$P/public/index.html"
 # Multi-page build: one failed page must not stop independent pages succeeding,
 # and the failed page must retain its old successful output/info.
 P="$TMP/partial"; mkproj "$P" 8
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 items=[]
 for i in range(20):
@@ -79,7 +100,7 @@ grep -Fq 'NEW-7' "$P/public/p7.html"
 # Shared JSON/schema/input caches under concurrency. All pages consume the same
 # sources while page-local metadata remains independent.
 P="$TMP/shared"; mkproj "$P" 12
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 json.dump({"tracked":[{"name":f"page/{i}","title":f"T{i}","template":"templates/template.html"} for i in range(120)]},open(sys.argv[1],"w"))
 PY

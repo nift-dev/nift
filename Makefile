@@ -64,7 +64,7 @@ LIBFFI_INCLUDE := $(LIBFFI_BUILD)/install/include
 # is no upstream configure switch that drops that translation unit. The
 # suppression applies only to the libffi build, never to Nift's own sources.
 LIBFFI_CFLAGS ?= -O2 -fPIC -Wno-deprecated-declarations
-CPPFLAGS += -I$(LIBFFI_INCLUDE)
+override CPPFLAGS += -I$(LIBFFI_INCLUDE)
 # The deep profile permits stack-slot reuse for the broad recursion corpus.
 # The lifetime profile retains use-after-scope checking. Compatibility dispatch
 # uses independent sanitizer frames so expression depth guards remain reachable.
@@ -98,6 +98,12 @@ CP17_BYTES_TEST := $(TEST_DIR)/nift-cp17-bytes$(EXEEXT)
 CP18_BYTES_TEST := $(TEST_DIR)/nift-cp18-bytes$(EXEEXT)
 CP21_BYTES_EMBED_TEST := $(TEST_DIR)/nift-cp21-bytes-embed$(EXEEXT)
 RECOVERY_EPOCH_GUARD := $(TEST_DIR)/nift-recovery-epoch-guard$(EXEEXT)
+
+# FreeBSD keeps system utilities such as sha256sum in /sbin and /usr/sbin, which
+# may be absent from PATH when running tests as a non-privileged user.
+ifeq ($(shell uname -s),FreeBSD)
+export PATH := $(PATH):/sbin:/usr/sbin
+endif
 
 all: $(TARGET)
 
@@ -220,14 +226,14 @@ test-progress-render: $(PROGRESS_RENDER_TEST)
 # candidate staging, complete-set verification, promotion, rollback and
 # fail-closed behaviour. No network access and no Store operations.
 test-snap-contract:
-	python3 tests/snap_release_contract.py
+	"$(PYTHON)" tests/snap_release_contract.py
 
 # Fail-closed version-consistency gate: the executable version in src/CLI.cpp
 # and the Snap metadata version in snap/snapcraft.yaml must agree, and any
 # expected/tag version must match both. No network access.
 test-version-consistency:
-	python3 tests/version_consistency_test.py
-	python3 scripts/check_version_consistency.py
+	"$(PYTHON)" tests/version_consistency_test.py
+	"$(PYTHON)" scripts/check_version_consistency.py
 
 # First-party zero-warning gate. Every Nift-owned translation unit under src/
 # (including src/embed/) must compile clean with the release warning set
@@ -257,7 +263,7 @@ warnings-check: $(LIBFFI_A)
 # Snap edge must never be reported as stable success, and stable/edge/mismatch/
 # install-runtime states are distinguished. No network access.
 test-distribution-summary:
-	python3 tests/distribution_summary_test.py
+	"$(PYTHON)" tests/distribution_summary_test.py
 
 # POSIX PTY end-to-end progress coverage uses `script`; skipped (exit 77) when
 # unavailable, matching the pagination-ordering skip convention. Not part of the
@@ -439,7 +445,7 @@ $(CPP_RUNNER): tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 test-conformance: $(CPP_RUNNER) $(TARGET)
-	CPP_RUNNER="$(CURDIR)/$(TEST_DIR)/cpp-runner" NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/conformance/run_conformance.py
+	CPP_RUNNER="$(CURDIR)/$(TEST_DIR)/cpp-runner" NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/conformance/run_conformance.py
 
 # PA4: atomic immutable snapshot replacement - reload() keeps in-flight renders
 # on their snapshot, retains the last good snapshot on failure, zero writes,
@@ -709,10 +715,10 @@ test-node-binding: node-binding
 	cd bindings/node && node --test test/nift.test.js
 
 test-python-binding: python-binding
-	cd bindings/python && python3 -m unittest tests.test_nift
+	cd bindings/python && "$(PYTHON)" -m unittest tests.test_nift
 
 test-binding-warnings:
-	python3 scripts/check_binding_warnings.py
+	"$(PYTHON)" scripts/check_binding_warnings.py
 
 test-bindings: test-binding-warnings test-go-binding test-csharp-binding test-node-binding test-python-binding
 
@@ -756,7 +762,7 @@ test-ffi-abi: $(FFI_ABI_TEST)
 	$(FFI_ABI_TEST)
 
 test-libffi-source:
-	python3 scripts/check_vendored_libffi.py
+	"$(PYTHON)" scripts/check_vendored_libffi.py
 
 test-gate6ar-ffi: $(TARGET) test-ffi-abi
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
@@ -783,7 +789,7 @@ test-pic-depfiles: $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES))
 	LIBFFI_INCLUDE="$(LIBFFI_INCLUDE)" bash tests/pic_depfiles.sh
 
 test-node-package-licenses:
-	python3 scripts/check_node_package_licenses.py
+	"$(PYTHON)" scripts/check_node_package_licenses.py
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
@@ -906,12 +912,12 @@ test-v48-identifier-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_identifier_parity.sh
 
 test-v48-identifier-guard: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v48_identifier_guard.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v48_identifier_guard.py
 
 .PHONY: test-v48-callback-parity test-v48-callback-guard
 test-v48-callback-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_callback_parity.sh
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v48_callback_numeric_parity.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v48_callback_numeric_parity.py
 
 # Only this object contains counters; ordinary CLI/library/ABI layouts and
 # output have no instrumentation. Reuse the other ordinary CLI objects.
@@ -925,7 +931,7 @@ $(LAMBDA_CACHE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TES
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LDLIBS) -o $@
 
 test-v48-callback-guard: $(LAMBDA_CACHE_GUARD)
-	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v48_callback_guard.py
+	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" "$(PYTHON)" tests/v48_callback_guard.py
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh
@@ -967,7 +973,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp124_json_object_wall.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp117_object_methods_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_final_language_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/hierarchy_scaling.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/hierarchy_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp172_from_entries_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp173_index_by_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp174_pick_omit_smoke.sh
@@ -975,14 +981,14 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp176_cp182_collection_algebra_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp183_collection_composition_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp184_cp186_sort_by_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/typed_content_scaling.py
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/project_dependency_scaling.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/typed_content_scaling.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/project_dependency_scaling.py
 
 # Fail-closed guard: every maintained workflow's official macOS matrix entry
 # (arm64 -> macos-latest, x86-64 -> macos-26-intel) must agree on the runner,
 # so packaging/release/installer/verification matrices cannot drift apart.
 test-macos-runner-policy:
-	python3 tests/macos_runner_policy_test.py
+	"$(PYTHON)" tests/macos_runner_policy_test.py
 
 
 test-collections: $(TARGET)
@@ -993,14 +999,16 @@ test-commands: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/commands_smoke.sh
 
 test-ownership-concurrency: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/ownership_concurrency.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/ownership_concurrency.py
 
 test-zero-mutation: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/zero_mutation_smoke.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/zero_mutation_smoke.py
 
 test-repair-campaign: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/repair_campaign.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/repair_campaign.py
 
+# Fails closed: exit 77 (strace unavailable, so the ordering guarantee cannot be
+# observed) stays a failure, never a pass (v4.1 CP24 certification contract).
 test-pagination-ordering: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_ordering_smoke.sh
 
@@ -1008,40 +1016,40 @@ test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
 
 test-pagination-equivalence: $(TARGET)
-	python3 tests/pagination_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/pagination_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH4: deterministic adversarial incremental state-transition sequence across
 # modified/hash/hybrid modes; asserts exact output set (no stale, no missing)
 # and incremental==clean equivalence.
 test-incremental-state-transitions: $(TARGET)
-	python3 tests/incremental_state_transitions_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/incremental_state_transitions_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH5: parser / value / composition adversarial; each case must resolve to a
 # controlled outcome (success with correct output, or a controlled error) -
 # never a hang, signal, sanitizer finding, or missing output.
 test-parser-value-composition: $(TARGET)
-	python3 tests/parser_value_composition_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/parser_value_composition_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH6: init/starter functional truth; the scaffold must be internally
 # consistent, a clean rebuild must reproduce the init'd output, and builds
 # must be idempotent.
 test-init-functional-truth: $(TARGET)
-	python3 tests/init_scaffold_functional_truth.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/init_scaffold_functional_truth.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH7: persistence/crash/recovery adversarial; SIGKILL mid-build must leave
 # crash-safe metadata, a succeeding next build, and output that converges.
 test-crash-recovery: $(TARGET)
-	python3 tests/crash_recovery_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/crash_recovery_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH8: performance/complexity invariants; a no-op build rewrites nothing and a
 # one-page change rebuilds exactly that page (change-proportional).
 test-complexity-invariants: $(TARGET)
-	python3 tests/complexity_invariants.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/complexity_invariants.py --nift "$(CURDIR)/$(TARGET)"
 
 # BH9: platform/filesystem boundary; build output is contained within the
 # output directory and a read-only output dir fails controlled.
 test-filesystem-boundary: $(TARGET)
-	python3 tests/filesystem_boundary_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/filesystem_boundary_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
 # Config validation guard: unknown .nift/config.json keys (legacy or typo)
 # must be rejected loudly rather than silently ignored.
@@ -1085,13 +1093,13 @@ test-init-migration: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_migration_smoke.sh
 
 test-init-rewrite: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/init_transformation_smoke.py --mode rewrite
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/init_transformation_smoke.py --mode rewrite
 
 test-init-redesign: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/init_transformation_smoke.py --mode redesign
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/init_transformation_smoke.py --mode redesign
 
 test-init-transformations: test-init-rewrite test-init-redesign
-	python3 scripts/gen_migration_content.py --check
+	"$(PYTHON)" scripts/gen_migration_content.py --check
 
 .PHONY: test-init-rewrite test-init-redesign test-init-transformations
 
@@ -1137,24 +1145,24 @@ test-init-lock: $(TARGET)
 
 
 test-guarantee-registry:
-	python3 scripts/check_guarantee_registry.py
+	"$(PYTHON)" scripts/check_guarantee_registry.py
 
 # Single-repository CI variant: asserts everything a Nift-only checkout can
 # prove and PASSes; sibling-dependent public-claim surface audit is deferred,
 # never silently skipped into green.
 test-guarantee-registry-ci:
-	python3 scripts/check_guarantee_registry.py --local
+	"$(PYTHON)" scripts/check_guarantee_registry.py --local
 
 test-test-integrity:
-	python3 scripts/test_integrity_check.py tests scripts --output "$(TEST_DIR)/bh2/test-integrity-report.json"
-	python3 scripts/check_header_name_collisions.py
+	"$(PYTHON)" scripts/test_integrity_check.py tests scripts --output "$(TEST_DIR)/bh2/test-integrity-report.json"
+	"$(PYTHON)" scripts/check_header_name_collisions.py
 
 BH1_WEBSITE_ROOT ?= ../nift-dev.github.io
 BH1_REGRESSION_ROOT ?= ../nift-regression-suite
 
 bh1-guarantee-registry:
-	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
-	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
+	"$(PYTHON)" scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
+	"$(PYTHON)" scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
 bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation test-pathto-404 test-output-permissions test-init-handover
 
@@ -1164,7 +1172,7 @@ bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contract
 # and retains the classification report under docs/evidence/bh3/.
 bh3-mutation-tranche1:
 	mkdir -p docs/evidence/bh3
-	python3 scripts/bh3_guard_mutation.py --nift "$(CURDIR)/$(TARGET)" \
+	"$(PYTHON)" scripts/bh3_guard_mutation.py --nift "$(CURDIR)/$(TARGET)" \
 		--output docs/evidence/bh3/bh3-mutation-tranche1.json
 
 .PHONY: test-guarantee-registry test-guarantee-registry-ci test-test-integrity bh1-guarantee-registry bh2-test-integrity bh3-mutation-tranche1
@@ -1255,12 +1263,12 @@ test-minify-cli:
 
 
 test-tracking-scaling: $(TARGET)
-	python3 tests/tracking_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/tracking_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
 
 test-full-build-scaling: $(TARGET)
-	python3 tests/full_build_scaling_failmodes.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/full_build_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/full_build_scaling_failmodes.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/full_build_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
 
 $(RECOVERY_EPOCH_GUARD): tests/recovery_epoch_guard.cpp src/FileSystem.cpp src/FileSystem.h
@@ -1279,18 +1287,18 @@ test-performance-scaling: test-tracking-scaling test-full-build-scaling test-rec
 
 
 benchmark-10k: $(TARGET)
-	python3 benchmarks/performance_10k.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" benchmarks/performance_10k.py --nift "$(CURDIR)/$(TARGET)"
 
 
 benchmark-memory-10k: $(TARGET)
-	python3 tests/memory_10k_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/memory_10k_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
 # CP28 v4.2 performance/memory certification: per-workload build timings and
 # peak RSS (baseline/current interleaved for v4.1-only workloads) plus the
 # 10k-page ordinary-project A/B audit. Requires --baseline and --current.
 benchmark-cp28: $(TARGET)
-	python3 benchmarks/cp28_bench.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --samples "$(CP28_SAMPLES:%=%)"
-	python3 benchmarks/perf_regression_audit.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --pages 10000 --samples 20
+	"$(PYTHON)" benchmarks/cp28_bench.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --samples "$(CP28_SAMPLES:%=%)"
+	"$(PYTHON)" benchmarks/perf_regression_audit.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --pages 10000 --samples 20
 
 
 $(TEST_DIR)/san/%.o: %.cpp
@@ -1425,28 +1433,28 @@ $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 
 memory-safety-smoke: $(MEMORY_SMOKE)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	env -u LD_PRELOAD python3 scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
+	env -u LD_PRELOAD "$(PYTHON)" scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
 
 # Maintained memory/resource-safety campaign gates.
 memory-safety-checkpoint-3: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	env -u LD_PRELOAD python3 scripts/checkpoint3_core_memory.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 4 --output "$(TEST_DIR)/memory-safety/checkpoint-3-core.json"
+	env -u LD_PRELOAD "$(PYTHON)" scripts/checkpoint3_core_memory.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 4 --output "$(TEST_DIR)/memory-safety/checkpoint-3-core.json"
 
 memory-safety-checkpoint-4-watch: $(TARGET)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(TARGET)" --cycles 180 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-rss.json"
+	"$(PYTHON)" scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(TARGET)" --cycles 180 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-rss.json"
 
 memory-safety-checkpoint-4-watch-sanitize: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	env -u LD_PRELOAD python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(SAN_TARGET)" --cycles 100 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-sanitizer.json"
+	env -u LD_PRELOAD "$(PYTHON)" scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(SAN_TARGET)" --cycles 100 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-sanitizer.json"
 
 memory-safety-checkpoint-4-large: $(TARGET)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	python3 scripts/checkpoint4_large_project.py --nift "$(CURDIR)/$(TARGET)" --pages 10000 --output "$(TEST_DIR)/memory-safety/checkpoint-4-large-project.json"
+	"$(PYTHON)" scripts/checkpoint4_large_project.py --nift "$(CURDIR)/$(TARGET)" --pages 10000 --output "$(TEST_DIR)/memory-safety/checkpoint-4-large-project.json"
 
 valgrind-memory-safety-checkpoint-4: $(TARGET)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/scripts/valgrind_nift.sh" --cycles 30 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-valgrind.json"
+	"$(PYTHON)" scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/scripts/valgrind_nift.sh" --cycles 30 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-valgrind.json"
 
 .PHONY: memory-safety-checkpoint-3 memory-safety-checkpoint-4-watch memory-safety-checkpoint-4-watch-sanitize memory-safety-checkpoint-4-large valgrind-memory-safety-checkpoint-4
 
@@ -1458,41 +1466,41 @@ memory-safety-checkpoint-6-sync:
 
 memory-safety-checkpoint-6-run: $(TARGET)
 	mkdir -p .build/memory-safety
-	python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 60 --pages 90 --output .build/memory-safety/checkpoint-6-integration.json
+	"$(PYTHON)" scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 60 --pages 90 --output .build/memory-safety/checkpoint-6-integration.json
 
 memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6-run
 
 memory-safety-checkpoint-6-sanitize: memory-safety-checkpoint-6-sync $(SAN_TARGET)
 	mkdir -p .build/memory-safety
-	env -u LD_PRELOAD python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 12 --pages 30 --output .build/memory-safety/checkpoint-6-integration-sanitizer.json
+	env -u LD_PRELOAD "$(PYTHON)" scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 12 --pages 30 --output .build/memory-safety/checkpoint-6-integration-sanitizer.json
 
 valgrind-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
 	mkdir -p .build/memory-safety
-	python3 scripts/checkpoint6_integration.py --valgrind --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind.json
+	"$(PYTHON)" scripts/checkpoint6_integration.py --valgrind --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind.json
 
 .PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6-run memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6
 
 checkpoint-7-incremental-equivalence: $(TARGET)
 	mkdir -p .build/checkpoint-7
-	python3 scripts/checkpoint7_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)" --seeds 8 --steps 30 --output .build/checkpoint-7/incremental-equivalence.json
+	"$(PYTHON)" scripts/checkpoint7_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)" --seeds 8 --steps 30 --output .build/checkpoint-7/incremental-equivalence.json
 
 .PHONY: checkpoint-7-incremental-equivalence
 
 checkpoint-8-filesystem-transaction: $(TARGET)
 	mkdir -p .build/checkpoint-8
-	python3 scripts/checkpoint8_filesystem_transaction.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-8/filesystem-transaction.json
+	"$(PYTHON)" scripts/checkpoint8_filesystem_transaction.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-8/filesystem-transaction.json
 
 .PHONY: checkpoint-8-filesystem-transaction
 
 checkpoint-9-parser-fuzz: $(SAN_TARGET)
 	mkdir -p .build/checkpoint-9
-	env -u LD_PRELOAD python3 scripts/checkpoint9_parser_fuzz.py --nift "$(CURDIR)/$(SAN_TARGET)" --cases 400 --seeds 9001,17713,424242 --output .build/checkpoint-9/parser-fuzz.json
+	env -u LD_PRELOAD "$(PYTHON)" scripts/checkpoint9_parser_fuzz.py --nift "$(CURDIR)/$(SAN_TARGET)" --cases 400 --seeds 9001,17713,424242 --output .build/checkpoint-9/parser-fuzz.json
 
 .PHONY: checkpoint-9-parser-fuzz
 
 checkpoint-10-cross-platform: $(TARGET)
 	mkdir -p .build/checkpoint-10
-	python3 scripts/checkpoint10_cross_platform.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-10/$(if $(filter Windows_NT,$(OS)),windows,local).json --runner-os $(if $(filter Windows_NT,$(OS)),Windows,Local)
+	"$(PYTHON)" scripts/checkpoint10_cross_platform.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-10/$(if $(filter Windows_NT,$(OS)),windows,local).json --runner-os $(if $(filter Windows_NT,$(OS)),Windows,Local)
 
 .PHONY: checkpoint-10-cross-platform
 
@@ -1503,7 +1511,11 @@ test-v44-execution-shell: $(TARGET)
 
 # Portable Python discovery for the AST fuzz/property target. Windows msys2
 # PATH exposes python (from setup-python) rather than python3.
+ifneq ($(shell uname -s),FreeBSD)
 PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
+else
+PYTHON ?= $(firstword $(wildcard /usr/local/bin/python3.[0-9] /usr/local/bin/python3.[0-9][0-9]))
+endif
 test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 	$(PARSER_STATEMENT_STATE_TEST)
 	tests/v44_ast_expression_smoke.sh
@@ -1528,14 +1540,14 @@ test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 # autoconf exit 77 (platform skip) from a v44 test is an acknowledged skip,
 # not a failure: POSIX-only tests report it on platforms without the facility.
 V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
-PORTABLE_TIMEOUT ?= python3 -c "import subprocess,sys; subprocess.call(sys.argv[1:], timeout=120)"
+PORTABLE_TIMEOUT ?= "$(PYTHON)" -c "import subprocess,sys; subprocess.call(sys.argv[1:], timeout=120)"
 
 test-v44-shell-restricted: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_shell_glob.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp21_history_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
+	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
+	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 test-v44-packages: $(TARGET)
@@ -1772,7 +1784,7 @@ $(TEST_DIR)/source-map-probe$(EXEEXT): tests/source_map_probe.cpp $(filter-out s
 
 .PHONY: test-source-map
 test-source-map: $(TEST_DIR)/source-map-probe$(EXEEXT)
-	python3 tests/source_map_matrix.py $(TEST_DIR)/source-map-probe$(EXEEXT)
+	"$(PYTHON)" tests/source_map_matrix.py $(TEST_DIR)/source-map-probe$(EXEEXT)
 
 test: test-source-map
 
@@ -1780,11 +1792,11 @@ test: test-source-map
 
 .PHONY: test-v49-selector-parity
 test-v49-selector-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_selector_parity.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v49_selector_parity.py
 
 .PHONY: test-v49-glob-order
 test-v49-glob-order: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_glob_order.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v49_glob_order.py
 
 # Dedicated test-only path conversion instrumentation.
 $(TEST_DIR)/glob-keys/ParserHelpers.o: src/ParserHelpers.cpp
@@ -1796,7 +1808,7 @@ $(GLOB_KEY_GUARD): $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHelpers.o $(LDLIBS) -o $@
 .PHONY: test-v49-glob-key-guard
 test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
-	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py
+	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" "$(PYTHON)" tests/v49_glob_key_guard.py
 
 JSON_PREFLIGHT_GUARD := $(TEST_DIR)/nift-json-preflight-guard$(EXEEXT)
 $(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp src/RuntimeValue.h src/RuntimeJson.h
@@ -1804,11 +1816,11 @@ $(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_JSON_PREFLIGHT_STATS tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp -o "$@"
 .PHONY: test-v49-json-preflight-guard
 test-v49-json-preflight-guard: $(JSON_PREFLIGHT_GUARD)
-	NIFT_JSON_GUARD="$(CURDIR)/$(JSON_PREFLIGHT_GUARD)" python3 tests/v49_json_preflight_guard.py
+	NIFT_JSON_GUARD="$(CURDIR)/$(JSON_PREFLIGHT_GUARD)" "$(PYTHON)" tests/v49_json_preflight_guard.py
 
 .PHONY: test-v49-group-scaling
 test-v49-group-scaling: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_group_scaling.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v49_group_scaling.py
 
 $(TEST_DIR)/v49-call-outcome-unit$(EXEEXT): tests/v49_call_outcome_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p $(TEST_DIR)
@@ -1823,14 +1835,14 @@ test: test-v49-call-outcome
 # Explicit Valgrind allocation guard; no wall-clock threshold.
 .PHONY: test-v410-allocation-guard
 test-v410-allocation-guard: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_allocation_guard.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v410_allocation_guard.py
 
 .PHONY: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit
 test-v410-sort-factory-parity: $(TARGET)
-	python3 tests/v410_sort_factory_parity.py --nift ./$(TARGET)
+	"$(PYTHON)" tests/v410_sort_factory_parity.py --nift ./$(TARGET)
 
 test-v410-object-member-parity: $(TARGET)
-	python3 tests/v410_object_member_parity.py --nift ./$(TARGET)
+	"$(PYTHON)" tests/v410_object_member_parity.py --nift ./$(TARGET)
 
 test-v410-object-member-unit:
 	mkdir -p .build
@@ -1848,13 +1860,13 @@ $(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_D
 
 .PHONY: test-v410-object-member-guard
 test-v410-object-member-guard: $(OBJECT_LOOKUP_GUARD)
-	python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
+	"$(PYTHON)" tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
 
 test: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
 
 .PHONY: test-v410-oracle-paths
 test-v410-oracle-paths:
-	python3 tests/v410_oracle_paths_test.py
+	"$(PYTHON)" tests/v410_oracle_paths_test.py
 
 test-v410-sort-factory-parity test-v410-object-member-parity: test-v410-oracle-paths
 
@@ -1868,30 +1880,30 @@ $(GLOB_RELATIVE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TE
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-relative-guard test-v410-glob-parity
 test-v410-glob-relative-guard: $(GLOB_RELATIVE_GUARD)
-	NIFT="$(CURDIR)/$(GLOB_RELATIVE_GUARD)" python3 tests/v410_glob_relative_guard.py
+	NIFT="$(CURDIR)/$(GLOB_RELATIVE_GUARD)" "$(PYTHON)" tests/v410_glob_relative_guard.py
 test-v410-glob-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_glob_parity.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v410_glob_parity.py
 test: test-v410-glob-relative-guard test-v410-glob-parity
 
 .PHONY: test-v410-native-dispatch-parity
 test-v410-native-dispatch-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_native_dispatch_parity.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v410_native_dispatch_parity.py
 test: test-v410-native-dispatch-parity
 
 .PHONY: test-v410-string-replace-parity
 test-v410-string-replace-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_string_replace_parity.py
+	NIFT="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/v410_string_replace_parity.py
 test: test-v410-string-replace-parity
 
 .PHONY: test-v410-callback-overlay-parity
 test-v410-callback-overlay-parity: $(TARGET)
-	python3 tests/v410_callback_overlay_parity.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v410_callback_overlay_parity.py --nift "$(CURDIR)/$(TARGET)"
 
 test: test-v410-callback-overlay-parity
 
 .PHONY: test-v410-callback-overlay-guard
 test-v410-callback-overlay-guard: $(LAMBDA_CACHE_GUARD)
-	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v410_callback_overlay_guard.py
+	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" "$(PYTHON)" tests/v410_callback_overlay_guard.py
 
 test: test-v410-callback-overlay-guard
 
@@ -1965,7 +1977,7 @@ test-sanitize-lifetime: test-v410-file-buffer-lifetime
 
 .PHONY: test-v410-build-pipeline
 test-v410-build-pipeline: $(TARGET)
-	python3 tests/v410_build_pipeline.py --nift "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v410_build_pipeline.py --nift "$(CURDIR)/$(TARGET)"
 test: test-v410-build-pipeline
 
 .PHONY: test-v410-build-pipeline-lifetime
@@ -1986,20 +1998,20 @@ $(PROCESS_CONTRACT_TEST): tests/process_contract.cpp src/Process.cpp src/Proc.h 
 	@mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_contract.cpp src/Process.cpp -o $@
 test-process-hardening: $(PROCESS_FAILURE_TEST) $(PROCESS_CONTRACT_TEST)
-	python3 tests/process_hardening.py --failure $(PROCESS_FAILURE_TEST) --contract $(PROCESS_CONTRACT_TEST) --output $(TEST_DIR)/process-hardening.json
+	"$(PYTHON)" tests/process_hardening.py --failure $(PROCESS_FAILURE_TEST) --contract $(PROCESS_CONTRACT_TEST) --output $(TEST_DIR)/process-hardening.json
 test: test-process-hardening
 .PHONY: test-process-hardening
 
 test-randomized-incremental: $(TARGET)
-	python3 tests/randomized_incremental_differential.py --nift $(TARGET)
+	"$(PYTHON)" tests/randomized_incremental_differential.py --nift $(TARGET)
 .PHONY: test-randomized-incremental
 
 .PHONY: test-consumer-snapshots
 test: test-consumer-snapshots
 test-consumer-snapshots: $(TARGET)
 	mkdir -p .build
-	python3 tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json
-	python3 tests/consumer_dependency_snapshots.py --nift ./$(TARGET) --output .build/consumer-snapshot-contracts.json
+	"$(PYTHON)" tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json
+	"$(PYTHON)" tests/consumer_dependency_snapshots.py --nift ./$(TARGET) --output .build/consumer-snapshot-contracts.json
 
 # One-comparison following status: native precision, errors and mutation boundaries.
 .PHONY: test-dependency-status
@@ -2019,8 +2031,8 @@ test-dependency-path-identity: $(TARGET)
 .PHONY: test-sort-number-compact
 test: test-sort-number-compact
 test-sort-number-compact: $(TARGET)
-	python3 tests/sort_number_compact.py --nift ./$(TARGET)
-	python3 tests/sort_number_compact_oracle.py
+	"$(PYTHON)" tests/sort_number_compact.py --nift ./$(TARGET)
+	"$(PYTHON)" tests/sort_number_compact_oracle.py
 
 .PHONY: test-evaluated-operand
 $(TEST_DIR)/evaluated-operand-unit$(EXEEXT): tests/evaluated_operand_unit.cpp src/EvaluatedOperand.h src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h src/SourceView.h
@@ -2028,22 +2040,22 @@ $(TEST_DIR)/evaluated-operand-unit$(EXEEXT): tests/evaluated_operand_unit.cpp sr
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/evaluated_operand_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
 test-evaluated-operand: $(TEST_DIR)/evaluated-operand-unit$(EXEEXT) $(TARGET)
 	$(TEST_DIR)/evaluated-operand-unit$(EXEEXT)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/evaluated_operand_smoke.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/evaluated_operand_smoke.py
 test: test-evaluated-operand
 .PHONY: test-evaluated-operand-differential
 test-evaluated-operand-differential: $(TARGET)
 	@test -n "$(NIFT_BASELINE_BIN)" || { echo "NIFT_BASELINE_BIN is required" >&2; exit 1; }
-	python3 tests/evaluated_operand_differential.py --baseline "$(NIFT_BASELINE_BIN)" --candidate "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/evaluated_operand_differential.py --baseline "$(NIFT_BASELINE_BIN)" --candidate "$(CURDIR)/$(TARGET)"
 
 # v4.12 function-call semantic certification (permanent).
 .PHONY: test-call-semantics
 test-call-semantics: $(TARGET)
-	python3 tests/v412_nested_index_oracle.py "$(CURDIR)/$(TARGET)"
-	python3 tests/v412_method_error_oracle.py --negative-control "$(CURDIR)/$(TARGET)"
-	python3 tests/v412_call_semantic_contract.py --candidate "$(CURDIR)/$(TARGET)"
-	python3 tests/v412_method_error_oracle.py "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v412_nested_index_oracle.py "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v412_method_error_oracle.py --negative-control "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v412_call_semantic_contract.py --candidate "$(CURDIR)/$(TARGET)"
+	"$(PYTHON)" tests/v412_method_error_oracle.py "$(CURDIR)/$(TARGET)"
 .PHONY: test-release-cert
 test-release-cert: $(TARGET)
-	python3 scripts/release_certify.py --root "$(CURDIR)" --jobs "$(shell nproc)"
+	"$(PYTHON)" scripts/release_certify.py --root "$(CURDIR)" --jobs "$(shell nproc)"
 
 test: test-call-semantics

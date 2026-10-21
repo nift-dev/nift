@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) BIN="$NIFT";; *) BIN="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
@@ -72,7 +93,7 @@ if printf 'break\n' | "$BIN" - >"$t/stdin-bad.out" 2>"$t/stdin-bad.err"; then
 fi
 grep -q '<stdin>:1:' "$t/stdin-bad.err"
 # Binary/NUL input is rejected rather than silently truncated or reinterpreted.
-python3 - "$BIN" <<'PY_NUL'
+"${PYTHON_CMD[@]}" - "$BIN" <<'PY_NUL'
 import subprocess, sys
 p=subprocess.run([sys.argv[1], '-'], input=b'print("before")\x00print("after")\n', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 assert p.returncode != 0
@@ -80,7 +101,7 @@ assert b'NUL byte' in p.stderr
 assert b'before' not in p.stdout and b'after' not in p.stdout
 PY_NUL
 # A reasonably large piped source is consumed through EOF without truncation.
-python3 - <<'PY_LARGE' | "$BIN" - > "$t/large.out"
+"${PYTHON_CMD[@]}" - <<'PY_LARGE' | "$BIN" - > "$t/large.out"
 for _ in range(5000): print('// padding')
 print('print("large-ok")')
 PY_LARGE

@@ -4,6 +4,27 @@
 # fingerprint, must NOT rebuild on unrelated edits, no-change must stay clean,
 # and incremental output must equal a clean build.
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 NIFT="${NIFT_BIN:-$ROOT/nift}"
 TMP=$(mktemp -d); trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP"' EXIT
@@ -49,7 +70,7 @@ echo "PASS  unrelated-edit-scope"
 
 # add a child under docs -> docs (and its children's sibling counts) rebuild
 sleep 0.01
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 import json
 tr=json.load(open('.nift/tracked.json'))
 tr['tracked'].append({'name':'docs/newchild','title':'New','template':'templates/template.html'})
@@ -64,7 +85,7 @@ echo "PASS  add-child"
 
 # remove the new child
 sleep 0.01
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 import json
 tr=json.load(open('.nift/tracked.json'))
 tr['tracked']=[t for t in tr['tracked'] if t['name']!='docs/newchild']
@@ -78,7 +99,7 @@ echo "PASS  remove-child"
 
 # rename docs/basics -> docs/getting-started
 sleep 0.01
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 import json
 tr=json.load(open('.nift/tracked.json'))
 tr['tracked']=[({'name':'docs/getting-started','title':'Getting Started','template':'templates/template.html'} if t['name']=='docs/basics' else t) for t in tr['tracked']]
@@ -91,7 +112,7 @@ echo "PASS  rename"
 
 # reparent getting-started under docs/advanced
 sleep 0.01
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 import json
 tr=json.load(open('.nift/tracked.json'))
 tr['tracked']=[({'name':'docs/advanced/getting-started','title':'Getting Started','template':'templates/template.html'} if t['name']=='docs/getting-started' else t) for t in tr['tracked']]
@@ -112,7 +133,7 @@ clean_state2=$(clean_state)
 echo "PASS  clean-vs-incremental-parity"
 
 # ordinary pages carry no hierarchy dependency
-python3 - <<'PY'
+"${PYTHON_CMD[@]}" - <<'PY'
 import json
 d=json.load(open('.nift/public/index.info.json'))
 assert '.nift/hierarchy.fingerprint' not in d['dependencies'], 'ordinary page should not depend on hierarchy'

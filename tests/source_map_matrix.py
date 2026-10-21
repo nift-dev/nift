@@ -80,6 +80,12 @@ def normalized_frames(frames):
 for c in results:
  a=c['actual'];contract=contracts[c['name']]
  for key in ('ok','stdout','message','code','disposition'):
+  # The dynamic loader's wording is platform text. The contract records the
+  # glibc message; only on FreeBSD (rtld words it differently) is the check
+  # reduced to the Nift-owned prefix plus the library name.
+  if c['name']=='recoverable' and key=='message' and sys.platform.startswith('freebsd'):
+   assert a.get(key, '').startswith('ffi_open: ') and 'missing-library-cpf.so' in a[key], (c['name'],key,a,contract)
+   continue
   assert a.get(key)==contract.get(key),(c['name'],key,a,contract)
  assert normalized_frames(a.get('frames',[]))==contract.get('frames',[]),c
  if c['name']=='try-catch':continue

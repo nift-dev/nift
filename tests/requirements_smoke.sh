@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-reqs-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -29,7 +50,7 @@ cat >"$P/content/index.html" <<'EOF'
 EOF
 printf '{"items":[1,2,3]}\n' >"$P/data.json"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1]))
 assert d["reqs"] == ["public/assets/a.txt"], d["reqs"]
@@ -41,7 +62,7 @@ rm "$P/public/assets/a.txt"
 grep -Fq 'required path missing: public/assets/a.txt' "$P/status.log"
 printf '<p>repaired</p>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build >/dev/null)
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1]))
 assert d["reqs"] == [], d["reqs"]
@@ -51,7 +72,7 @@ PY
 P="$TMP/malformed"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]
 os.chmod(p,0o644)
@@ -65,7 +86,7 @@ grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
 # build state. A missing tracked output must not make the referring page stale or
 # emit a misleading "required path missing" reason. The target itself is selected.
 P="$TMP/tracked"; mkproj "$P"
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["tracked"].append({"name":"about","title":"About","template":"templates/template.html"}); json.dump(d,open(p,"w"))
 PY
@@ -104,7 +125,7 @@ P="$TMP/poisoned"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 printf 'outside\n' >"$TMP/outside.txt"
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["reqs"]=["../outside.txt"]; json.dump(d,open(p,"w"))
@@ -113,7 +134,7 @@ PY
 grep -Fq 'page build metadata has an invalid requirement' "$P/poison-req.log"
 
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644)
 d=json.load(open(p)); d["dependencies"]=["../outside.txt"]; json.dump(d,open(p,"w"))
