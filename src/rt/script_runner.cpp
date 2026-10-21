@@ -4,6 +4,9 @@
 #include "rt/compiler.h"
 #include "rt/heap_account.h"
 #include "rt/module_link.h"
+#include "rt/native.h"
+#include "rt/natives/builtin.h"
+#include "rt/opcodes.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
 #include "rt/unit_check.h"
@@ -280,6 +283,27 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         locate_linked(compiled.offset);
         return not_compiled(stats, mode, report_path, exit_code);
     }
+    // R1 (owner, 2026-10-21): a linked unit reads every module before it
+    // runs, so a host operation that legacy runs before (or between) imports
+    // would see different files and trace in a different order (a copy over
+    // a module before its import imports the old text). Until imports run at
+    // their position, a linked unit that can call any host built-in, in the
+    // main unit or a module, anywhere (any function, any path), is refused
+    // before it runs. The scan is over the compiled code of every proto, so
+    // it does not depend on where the call sits in the source.
+#if !defined(NIFT_R1_MUTANT)  // test-only negative control (tests/runtime2/module_host_order_mutant.sh)
+    if (link.linked)
+        for (const auto& proto : compiled.program->protos)
+            for (std::size_t pc = 0; pc < proto->code.size(); ++pc) {
+                const Instr& in = proto->code[pc];
+                if (in.op != OpCode::CallNative || in.b < kFirstBuiltin) continue;
+                const auto id = static_cast<natives::BuiltinId>(in.b - kFirstBuiltin);
+                if (!natives::host_builtin(id)) continue;
+                stats.reason = "module-host-op:" + std::string(natives::builtin_spec(id).name);
+                locate_linked(pc < proto->offsets.size() ? proto->offsets[pc] : 0);
+                return not_compiled(stats, mode, report_path, exit_code);
+            }
+#endif
     stats.protos = compiled.program->protos.size();
     for (const auto& proto : compiled.program->protos) stats.instructions += proto->code.size();
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {

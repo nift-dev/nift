@@ -113,6 +113,17 @@ struct BuiltinSpec {
 
 inline constexpr std::uint8_t kVariadic = 255;
 
+// CP16 host built-ins: the contiguous block HostOpen .. HostSecureRandomBytes,
+// last in builtin_list.inc. Used by the R1 refusal of linked units
+// (script_runner.cpp). A built-in appended after the block must be added here
+// deliberately (the assert fails until it is).
+static_assert(static_cast<std::uint16_t>(BuiltinId::HostSecureRandomBytes) + 1 ==
+                  static_cast<std::uint16_t>(BuiltinId::Count),
+              "host_builtin(): review the host block when appending built-ins");
+inline constexpr bool host_builtin(BuiltinId id) {
+    return id >= BuiltinId::HostOpen && id <= BuiltinId::HostSecureRandomBytes;
+}
+
 // The whole table, indexed by BuiltinId.
 const BuiltinSpec& builtin_spec(BuiltinId id);
 std::size_t builtin_count();
