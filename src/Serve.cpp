@@ -528,17 +528,48 @@ int run_serve(int argc, char** argv) {
     //      variables and user site-packages are ignored;
     //  -B  write no __pycache__ anywhere;
     //  -u  unbuffered, so the request log is visible through pipes.
-    // `--opt=value` keeps a host or path beginning with '-' from being read as
-    // an option by argparse.
+    // The server is http.server's own (ThreadingHTTPServer +
+    // SimpleHTTPRequestHandler, address family from the first
+    // getaddrinfo(AI_PASSIVE) result and dual-stack IPv6, as `python -m
+    // http.server --bind` does), with two differences:
+    //  * the banner is printed by Python only once the socket is listening,
+    //    so "URL:" never appears before the server accepts connections (a
+    //    port lost after the probe gives Python's bind error and no banner);
+    //  * no reverse DNS: HTTPServer.server_bind calls socket.getfqdn() between
+    //    bind and listen (35 s on CI macOS runners, 2026-10-21); the name is
+    //    only used for CGI, so the bound host is used as is.
+    // Values travel as separate arguments (sys.argv), never in the code.
+    static const char* const kServer =
+        "import functools,socket,socketserver,sys\n"
+        "import http.server as h\n"
+        "port,host,root,heading,url=int(sys.argv[1]),sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5]\n"
+        "info=socket.getaddrinfo(host,port,type=socket.SOCK_STREAM,flags=socket.AI_PASSIVE)[0]\n"
+        "class Server(h.ThreadingHTTPServer):\n"
+        "    address_family=info[0]\n"
+        "    def server_bind(self):\n"
+        "        if self.address_family==socket.AF_INET6:\n"
+        "            try:\n"
+        "                self.socket.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,0)\n"
+        "            except Exception:\n"
+        "                pass\n"
+        "        socketserver.TCPServer.server_bind(self)\n"
+        "        self.server_name=host\n"
+        "        self.server_port=self.server_address[1]\n"
+        "with Server(info[4],functools.partial(h.SimpleHTTPRequestHandler,directory=root)) as server:\n"
+        "    a=server.socket.getsockname()\n"
+        "    u='['+a[0]+']' if ':' in a[0] else a[0]\n"
+        "    print(heading+'\\n\\nServing: '+root+'\\nURL:     '+url+'\\n\\nPress Ctrl+C to stop.')\n"
+        "    print('Serving HTTP on %s port %d (http://%s:%d/) ...'%(a[0],a[1],u,a[1]),flush=True)\n"
+        "    try:\n"
+        "        server.serve_forever()\n"
+        "    except KeyboardInterrupt:\n"
+        "        print('\\nKeyboard interrupt received, exiting.')\n"
+        "        sys.exit(0)\n";
     std::vector<std::string> args = python.prefix;
-    args.insert(args.end(), {"-I", "-B", "-u", "-m", "http.server", std::to_string(options.port),
-                             "--bind=" + options.host, "--directory=" + dir.u8string()});
-
-    std::cout << console::heading("Nift development server") << "\n\n"
-              << "Serving: " << dir.u8string() << '\n'
-              << "URL:     http://" << url_host(options.host) << ':' << options.port << "/\n\n"
-              << "Press Ctrl+C to stop.\n"
-              << std::flush;
+    args.insert(args.end(), {"-I", "-B", "-u", "-c", kServer, std::to_string(options.port), options.host,
+                             dir.u8string(), console::heading("Nift development server"),
+                             "http://" + url_host(options.host) + ':' + std::to_string(options.port) + "/"});
+    std::fflush(nullptr);
 
 #ifndef _WIN32
     std::vector<char*> exec_argv;

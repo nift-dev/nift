@@ -93,7 +93,15 @@ start() {
     local name=$1; shift
     (cd "$RUN_CWD" && exec env ${START_ENV[@]+"${START_ENV[@]}"} "$NIFT_BIN" serve "$@") >"$WORK/$name.out" 2>"$WORK/$name.err" &
     SPID=$!; PIDS+=("$SPID")
+    READY_LISTENING=
     for _ in $(seq 100); do
+        # Readiness contract (2026-10-21): when the "URL:" line is visible the
+        # server already accepts connections. One connect, no retry.
+        if [ -z "$READY_LISTENING" ] && grep -q "^URL:" "$WORK/$name.out" 2>/dev/null; then
+            url=$(sed -n 's/^URL: *//p' "$WORK/$name.out" | head -1)
+            if "$PY" -c 'import socket,sys,urllib.parse as u;p=u.urlsplit(sys.argv[1]);socket.create_connection((p.hostname,p.port),timeout=2).close()' "$url" 2>/dev/null
+            then READY_LISTENING=yes; else READY_LISTENING=no; fi
+        fi
         grep -q "Serving HTTP" "$WORK/$name.out" 2>/dev/null && return 0
         kill -0 "$SPID" 2>/dev/null || return 1
         sleep 0.1
@@ -152,6 +160,8 @@ P=$(free_port)
 if start default --port "$P"; then
     grep -qx "Serving: $PROJ/public" "$WORK/default.out" && grep -qx "URL:     http://127.0.0.1:$P/" "$WORK/default.out" \
         && grep -q "^Press Ctrl+C to stop.$" "$WORK/default.out" && ok "banner (default dir, custom port)" || bad "banner" "$WORK/default.out"
+    [ "$READY_LISTENING" = yes ] && ok "banner printed only once the server accepts connections" \
+        || bad "URL: printed before the server listened (connect at banner: ${READY_LISTENING:-not seen})" "$WORK/default.out"
     if [ "$FULL" = 1 ]; then
         # Ignore descriptors the test shell itself inherited (fds 0-2, a
         # `flock` lock file, a harness socket): only what Nift/Python opened
@@ -361,8 +371,10 @@ exec "$PY" "\$@"
 EOF
 chmod +x "$RACE/python3"
 run_path race "$RACE:/usr/bin:/bin" --port "$P"
-[ "$STATUS" != 0 ] && [ "$STATUS" != 124 ] && grep -q "Address already in use" "$WORK/race.err" && grep -q "Nift development server" "$WORK/race.out" \
-    && ok "port lost after probe: Python's bind error visible, status $STATUS" || bad "race $STATUS" "$WORK/race.err"
+# The banner is printed only once the server listens (2026-10-21): a port lost
+# after the probe gives Python's bind error and no "URL:" line.
+[ "$STATUS" != 0 ] && [ "$STATUS" != 124 ] && grep -q "Address already in use" "$WORK/race.err" && ! grep -q "^URL:" "$WORK/race.out" \
+    && ok "port lost after probe: Python's bind error visible, no banner, status $STATUS" || bad "race $STATUS" "$WORK/race.err"
 [ -f "$WORK/holder.pid" ] && kill "$(cat "$WORK/holder.pid")" 2>/dev/null; rm -f "$WORK/holder.pid"
 
 # 13. served directory disappears while running: 404, server stays up
