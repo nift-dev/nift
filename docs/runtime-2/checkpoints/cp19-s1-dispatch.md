@@ -1,8 +1,8 @@
 # CP19 Slice 1 — classify-before-execute shell dispatch (D-042)
 
-**Owner:** approved 2026-10-21 (P1-b command-form resolution)  
-**Base:** `runtime-2` @ `846da5c16ff0dc669f6e16bcbf3cedf406b77494`  
-**Branch:** `cp19-s1-dispatch` (local only; not pushed or integrated)  
+**Owner:** approved 2026-10-21 (P1-b command-form resolution)
+**Base:** `runtime-2` @ `846da5c16ff0dc669f6e16bcbf3cedf406b77494`
+**Branch:** `cp19-s1-dispatch` (local only; not pushed or integrated)
 **Reviewer/certifier:** Claude
 
 ## Scope
@@ -51,13 +51,17 @@ non-allow-listed built-in resolve through `PATH` (or report 127).
 - Classification is final; a failed user function or allow-listed built-in is
   never retried externally.
 - A failed external command is never retried through the Nift evaluator.
-- `$[expr]` in command arguments is evaluated exactly once, **after**
-  classification and before dispatch. If interpolation fails, the command does
-  not execute; interpolation can change argument text but not the selected
-  dispatch mechanism.
-- Globbing is applied once to external arguments. POSIX `[ab]`, `[a-z]` and
-  `[!x]` bracket expressions are expanded (`glob(3)`), and an unmatched pattern
-  is passed literally.
+- Classification happens once, up front. `$[expr]` is evaluated only when its
+  segment is actually selected, immediately before that segment dispatches.
+  Skipped segments are never interpolated. Executed segments evaluate each
+  interpolation exactly once, left to right. Failure sets status 2 and does not
+  dispatch; it never reclassifies or falls back. An interpolation that changes
+  `PATH`, `cwd` or other state cannot change the mechanism chosen up front.
+- Quoting and escaping are preserved through tokenization. Only unquoted `*`,
+  `?` and `[` trigger globbing; quoted/escaped metacharacters are passed
+  literally. Only unquoted `&&`, `||`, `;`, `|`, `<`, `>`, `>>`, `2>`, `2>>`,
+  `2>&1` and `&` are operators. POSIX bracket expressions are expanded and an
+  unmatched pattern is passed literally.
 
 ## Wiring
 
@@ -72,9 +76,10 @@ non-allow-listed built-in resolve through `PATH` (or report 127).
 - reject a Nift/user/shell target used as a pipeline or redirection head with a
   clear status-2 diagnostic rather than silently externalising it (pipelines
   remain external-only in this slice);
-- advertise only `print`, `pwd`, the shell-state commands, parser-visible user
-  names and PATH executables in command position; the general `nift complete`
-  list and argument/file completion keep Nift expression names.
+- advertise shell-state commands, `print`, `pwd`, parser-visible user names and
+  PATH executables in command position; Nift built-ins outside the allow-list
+  are offered only in call form (`open(`, `file(`, `exists(`, ...). The general
+  `nift complete` list and argument/file completion keep Nift expression names.
 
 The completion lists were also kept out of the generated
 `src/rt/legacy_names.cpp` extraction so this slice does **not** modify
@@ -89,10 +94,10 @@ change. No other existing shell expectation changed.
 
 ## Regression suite and negative control
 
-- `tests/shell_dispatch_unit.cpp` — 62 pure-classifier checks: precedence,
+- `tests/shell_dispatch_unit.cpp` — 68 pure-classifier checks: precedence,
   `command`, explicit paths, env assignments, chains, pipes, redirections,
-  background, quoting-adjacent tokens, Nift-line detection and Windows path
-  spellings.
+  background, quoted vs unquoted connectors/pipes, segment indices, Nift-line
+  detection and Windows path spellings.
 - `tests/shell_dispatch.py` — pty/piped shell regressions:
   - `rm -i` prompt respects `n`;
   - missing/partial `rm` failures, including exactly one `rm a d1` side effect;
@@ -103,20 +108,23 @@ change. No other existing shell expectation changed.
   - user-function side effect exactly once with no PATH fallback;
   - `mkdir`/`touch` command form reaching PATH stubs, never the native built-in;
   - function-over-PATH precedence, `command` escape, `print`, `pwd`;
+  - quoted/escaped brackets, `*`, `&&`, `;`, and mixed quoted/unquoted glob;
   - explicit paths; `$[expr]` evaluated once; failed interpolation prevents
-    dispatch; `cd`; env assignment.
-- Negative control: a separate binary built with
-  `-DNIFT_SHELL_DISPATCH_MUTANT=1` restores the old call-then-fallback path.
-  Normal builds contain none of that code. The same suite in `--mutant` mode
-  observes the old double execution (`rm a d1` retries; the user function’s
-  file gets two appends and the PATH stub runs).
-  `make test-cp19-s1-dispatch` builds and runs both.
+    dispatch; skipped `&&`/`||`/pipeline interpolation; left-to-right order;
+    interpolation changing `PATH` cannot reclassify; `cd`; env assignment.
+- Negative controls: three test-only binaries, M1 (old call-then-fallback),
+  M2 (quote/escape provenance discarded) and M3 (eager interpolation). Normal
+  builds contain none of their code. The normal suite runs against each with
+  `--mutant-kind`; detection is reported PASS only when the expected failures
+  for that mutant are observed. `make test-cp19-s1-dispatch` builds and runs
+  the unit test, the normal suite, the completion suite and all three mutants.
 
 ## Gates run
 
 | Gate | Result |
 |---|---|
-| `make test-cp19-s1-dispatch` (unit + normal + mutant) | PASS |
+| `make test-cp19-s1-dispatch` (unit 68 checks + normal + completion + M1/M2/M3) | PASS |
+| `python3 tools/rt-vm/legacy_names.py --check` | PASS (208 names, unchanged) |
 | `make test-v44-execution-shell` | PASS |
 | `make test-v44-shell-restricted` | PASS |
 | `v43_cp85_repl_multiline_smoke.sh`, `v43_cp88_repl_lifetime_smoke.sh` | PASS |
@@ -127,20 +135,75 @@ change. No other existing shell expectation changed.
 | `make test-rt-vm` | PASS |
 | `make test-runtime2-rt-diff` | PASS (819 entries, 0 differing) |
 | ASan/UBSan classifier unit test | PASS |
-| MinGW classifier + unit test compile | PASS |
+| MinGW classifier/mutant build | **NOT RUN this round** (no local MinGW; infrastructure provisioning prohibited; see N3) |
 
-MinGW was verified on a temporary Linode `108765003`
-(`g6-dedicated-4`, Ubuntu 24.04, `ap-southeast`): created
-2026-10-21T10:25:41Z, deleted and API-verified absent
-2026-10-21T10:36:15Z. List price US$0.108/hour; approximately US$0.02 for the
-10.5-minute lifetime (at most US$0.108 if the provider rounds to an hour).
-The instance used the `nift-rt2-campaign`, `purpose-cp19-s1-mingw` and
-`ttl-1792592736` tags, pinned SSH host-key verification, and no credentials
-were transferred to it. MinGW binary sha256:
-`7c0535920562fcb16acb413ff0d0fe144d365d16302d9a05efc45cf7e69975b7`.
+Historical note: the earlier slice compiled the classifier and its unit test
+under MinGW on temporary Linode `108765003` (`g6-dedicated-4`, Ubuntu 24.04,
+`ap-southeast`; created 2026-10-21T10:25:41Z, deleted and API-verified absent
+2026-10-21T10:36:15Z; approximately US$0.02). That build predates C1/C2/N1/N2.
+**This correction round did not provision infrastructure** (the handover
+prohibits it) and no local MinGW toolchain is installed, so the three mutant
+CLI builds were not MinGW-compiled. Certification CI must compile the
+classifier unit and all three mutants and run the existing Windows shell tests
+on a Windows runner. `tests/shell_dispatch.py` and
+`tests/cp19_completion.py` are POSIX-only (pty/coreutils) and exit 77
+elsewhere.
 
-Windows runtime execution of the Python regression suite was not run (no
-Windows host); the classifier and unit test compile under MinGW.
+## Correction round (C1, C2, N1, N2, N3, N4)
+
+### C1 — quote/escape provenance
+
+`shell_tokens` was replaced by `shell_words`, which records each word's text,
+a per-character quoted/escaped mask, and whether the word is an unquoted
+operator. `CommandDispatch::classify_line` accepts the operator flags, so only
+unquoted connectors, pipes and redirections split. `shell_glob_expand_word`
+expands only unquoted `*?[` and escapes quoted metacharacters for `glob(3)`;
+an unmatched pattern is the original text. Quoted/escaped operators remain
+ordinary argument text.
+
+All review cases match bash: `grep "[a-z]" f.txt`, `echo \[a\]`,
+`echo "*"`, `echo "a" "&&" "b"`, `find ... \;`, mixed
+`"pre*fix-"*.txt`, and a quoted prefix with an unquoted tail. The tests use
+`/bin/echo` for exact output so the PATH `echo` stub does not prefix it.
+
+### C2 — interpolation only in executed segments
+
+Classification remains upfront and fixed. Interpolation now runs on the
+selected segment's words immediately before dispatch; skipped segments are
+never interpolated. Each interpolation runs once, left to right. Failure sets
+status 2, does not dispatch, and leaves earlier segment effects intact. An
+interpolation that changes `PATH`/`cwd` cannot reclassify the selected
+mechanism. Regressions cover skipped `&&`, skipped `||`, skipped pipeline,
+executed `||`, executed pipeline, left-to-right order, failed interpolation and
+state-changing interpolation.
+
+### N1 — line-start completion
+
+Command position offers shell-state commands, `print`, `pwd`, user names and
+PATH executables. Nift built-ins outside the allow-list are offered in call
+form only; bare built-ins are suppressed even when a PATH command has the same
+name. `ope<TAB>` completes to `open(`, never bare `open`; `exist<TAB>` completes
+to `exists(`. The general `nift complete` API and argument/file completion keep
+Nift expression names. `tests/cp19_completion.py` covers PATH, user function,
+call form and no-bare-builtin.
+
+### N2 — three negative controls
+
+Three test-only binaries are built with different CLI definitions:
+`NIFT_SHELL_DISPATCH_MUTANT=1` (M1 fallback),
+`NIFT_SHELL_DISPATCH_MUTANT_QUOTING=1` (M2 quotes discarded) and
+`NIFT_SHELL_DISPATCH_MUTANT_EAGER_INTERPOLATION=1` (M3 eager interpolation).
+Normal builds contain none of their code. `--mutant-kind` runs the normal
+suite against each; detection requires the expected failures for that mutant.
+
+### N3 — Windows
+
+No Windows/MinGW runtime evidence this round. CI must run the classifier unit
+and the three mutant builds plus the existing Windows shell tests.
+
+### N4 — whitespace
+
+Trailing whitespace in this record was removed.
 
 ## Remaining unsupported / deferred
 
