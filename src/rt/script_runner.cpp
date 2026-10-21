@@ -200,17 +200,18 @@ std::string line_text(const std::string& source, std::uint32_t offset) {
 }
 
 // NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
-void add_inventory(const std::string& source, Stats& stats) {
-    const RefusalInventory inventory = inventory_refusals(source);
+void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats) {
+    const RefusalInventory inventory = inventory_refusals(source, source_path);
     std::string out = ",\"reasons\":[";
     for (std::size_t k = 0; k < inventory.items.size(); ++k) {
         const InventoryItem& item = inventory.items[k];
-        const Location where = locate(source, item.offset);
+        const std::string text = item.text.empty() ? line_text(source, item.offset) : item.text;
         out += (k ? ",{" : "{") + std::string("\"reason\":\"") + json_escape(item.reason) +
-               "\",\"line\":" + std::to_string(where.line) + ",\"column\":" + std::to_string(where.column) +
+               "\",\"line\":" + std::to_string(item.line) + ",\"column\":" + std::to_string(item.column) +
                ",\"consequential\":" + (item.consequential ? "true" : "false") +
+               (item.path.empty() ? std::string() : ",\"path\":\"" + json_escape(item.path) + "\"") +
                (item.detail.empty() ? std::string() : ",\"detail\":\"" + json_escape(item.detail) + "\"" +
-                                                         ",\"text\":\"" + json_escape(line_text(source, item.offset)) +
+                                                         ",\"text\":\"" + json_escape(text) +
                                                          "\"") + "}";
     }
     out += "],\"inventory_complete\":" + std::string(inventory.complete ? "true" : "false") +
@@ -221,7 +222,7 @@ void add_inventory(const std::string& source, Stats& stats) {
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code) {
-    if (mode == VmMode::ClassifyAll) add_inventory(source, stats);
+    if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats);
     const auto t0 = Clock::now();
     Ast ast(source);
     const ParseResult parsed = parse_script(ast);

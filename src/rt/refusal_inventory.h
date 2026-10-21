@@ -25,6 +25,7 @@
 // header's iterable, are not seen (the inventory is a lower bound on them).
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,9 +34,14 @@ namespace nift::rt {
 
 struct InventoryItem {
     std::string reason;  // as NIFT_VM_STATS reports it (`opaque:*`, compiler reasons)
-    std::uint32_t offset = 0;
+    std::uint32_t offset = 0;  // in `path`'s source (or the entry source when path is empty)
     bool consequential = false;
     std::string detail;  // postfix-receiver: the refused access's shape (refusal_mask.h)
+    // CP12c slice 0: source provenance for a linked unit. Empty path means
+    // the entry unit; otherwise the imported module that owns `offset`.
+    std::string path;
+    std::uint32_t line = 0, column = 0;
+    std::string text;  // the containing source line (at most 160 bytes)
 };
 
 struct RefusalInventory {
@@ -45,6 +51,8 @@ struct RefusalInventory {
     std::size_t rounds = 0;            // compilations run
 };
 
-RefusalInventory inventory_refusals(std::string_view source, std::size_t max_rounds = 2048);
+RefusalInventory inventory_refusals(std::string_view source,
+                                   const std::filesystem::path& source_path = {},
+                                   std::size_t max_rounds = 2048);
 
 } // namespace nift::rt
