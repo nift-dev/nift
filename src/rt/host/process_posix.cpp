@@ -59,6 +59,7 @@ ProcessGroup::~ProcessGroup() {
     close_fd(s.out_file);
     close_fd(s.err_file);
     runtime::index_remove(this);
+    runtime::forget_managed_pgid(s.pgid);
 }
 
 const char* output_mode_name(OutputMode mode) {

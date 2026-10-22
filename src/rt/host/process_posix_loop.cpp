@@ -324,7 +324,6 @@ void finish(State& s, const void* key) {
     s.err = Buffer();
     s.finished = true;
     runtime::test_event(&s, "finish", s.pgid, static_cast<long>(r.state), 0, group_state_name(r.state));
-    runtime::forget_managed_pgid(s.pgid);
     runtime::index_remove(key);
 }
 
