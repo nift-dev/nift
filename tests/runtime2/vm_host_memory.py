@@ -7,6 +7,7 @@ checked for each case so a late check is visible even when it errors.
 """
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -135,17 +136,19 @@ def main():
                      subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err), failures):
                 passed += 1
 
-        # R1 successful stream reads: 50 MiB with a 60 MB budget.
+        # R5a: unknown-size streams are capped at 9/17 of the headroom, so
+        # 50 MiB under 60 MB is refused cleanly (deliberate contract change).
         large = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
         (root / "case.f").write_text('print(open("/dev/stdin").length())\n')
-        peak, out, err = timed(nift, root, large, input_bytes=b"x" * (50 << 20))
-        if check_success("stdin-success", peak,
-                         subprocess.CompletedProcess([], 0 if out.strip() == b"52428800" else 1, out, err),
-                         b"52428800", failures):
+        peak, _, err = timed(nift, root, large, input_bytes=b"x" * (50 << 20))
+        if b"memory budget" in err and peak is not None and peak <= 72 * 1024:
+            print(f"PEAK stdin-50m-refused {peak} KiB")
             passed += 1
+        else:
+            failures.append(f"stdin-50m-refused: expected refusal, peak={peak} err={err!r}")
 
         if hasattr(os, "mkfifo"):
-            fifo2 = root / "success.fifo"
+            fifo2 = root / "refuse.fifo"
             os.mkfifo(fifo2)
             def writer2():
                 try:
@@ -155,13 +158,26 @@ def main():
                     pass
             thread2 = threading.Thread(target=writer2, daemon=True)
             thread2.start()
-            (root / "case.f").write_text('print(open("success.fifo").length())\n')
-            peak, out, err = timed(nift, root, large)
+            (root / "case.f").write_text('print(open("refuse.fifo").length())\n')
+            peak, _, err = timed(nift, root, large)
             thread2.join(timeout=5)
-            if check_success("fifo-success", peak,
-                             subprocess.CompletedProcess([], 0 if out.strip() == b"52428800" else 1, out, err),
-                             b"52428800", failures):
+            if b"memory budget" in err and peak is not None and peak <= 72 * 1024:
+                print(f"PEAK fifo-50m-refused {peak} KiB")
                 passed += 1
+            else:
+                failures.append(f"fifo-50m-refused: expected refusal, peak={peak} err={err!r}")
+
+        # R5a: a known-size regular file keeps the single exact allocation
+        # path, so a 50 MiB file still succeeds under the same 60 MB budget.
+        with open(root / "known50.bin", "wb") as handle:
+            handle.truncate(50 << 20)
+        (root / "case.f").write_text('print(open("known50.bin").length())\n')
+        peak, out, err = timed(nift, root, large)
+        if out.strip() == b"52428800" and peak is not None and peak <= 72 * 1024:
+            print(f"PEAK known50-success {peak} KiB")
+            passed += 1
+        else:
+            failures.append(f"known50-success: out={out!r} peak={peak} err={err!r}")
 
         # R4a: small unknown-size stream then a 20 MiB regular read, 60 MB
         # budget. The small result must not retain the whole budget headroom.
@@ -176,18 +192,29 @@ def main():
                           f"{kib << 10}\n20971520", failures):
                 passed += 1
 
-        # R4a capacity: a 3 MiB stream result must finalise to a bounded
+        # R5a capacity: a 10 MiB stream result must finalise to a bounded
         # retained size. NIFT_VM_STATS reports the live heap after execution.
         (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
         cap_stats = root / "cap-stats.jsonl"
         cap_env = dict(large, NIFT_VM_STATS=str(cap_stats))
-        peak, out, err = timed(nift, root, cap_env, input_bytes=b"x" * (3 << 20))
+        peak, out, err = timed(nift, root, cap_env, input_bytes=b"x" * (10 << 20))
         stats = last_stats(cap_stats)
-        if out.strip() == b"3145728" and stats and stats.get("heap_bytes", 1 << 60) <= (4 << 20):
-            print(f"PEAK stream-3m-capacity {peak} KiB heap={stats.get('heap_bytes')}")
+        if out.strip() == b"10485760" and stats and stats.get("heap_bytes", 1 << 60) <= (12 << 20):
+            print(f"PEAK stream-10m-capacity {peak} KiB heap={stats.get('heap_bytes')}")
             passed += 1
         else:
-            failures.append(f"stream-3m-capacity: output={out!r} stats={stats}")
+            failures.append(f"stream-10m-capacity: output={out!r} stats={stats}")
+
+        # R5a trim charge: the finalisation charge is capacity + size, not
+        # 2 * size (mutant 10 restores the undercharge and is caught here).
+        (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
+        probe_env = dict(large, NIFT_HOST_TRIM_PROBE="1")
+        _, out, err = timed(nift, root, probe_env, input_bytes=b"x" * (6 << 20))
+        match = re.search(rb"NIFT_TRIM charge=(\d+) capacity=(\d+) size=(\d+)", err)
+        if match and int(match.group(1)) == int(match.group(2)) + int(match.group(3)) and out.strip() == b"6291456":
+            passed += 1
+        else:
+            failures.append(f"stream-trim-charge: out={out!r} probe={match.group(0) if match else None}")
 
         # R4a: a 1 KiB stream under a 1 GiB budget still succeeds.
         huge = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="1000000000")
@@ -197,6 +224,54 @@ def main():
             passed += 1
         else:
             failures.append(f"stream-1k-1g: output={out!r} err={err!r}")
+
+        # R5a monotonicity: successes increase with size until the 9/17 cap,
+        # then every larger unknown-size stream is refused under the same
+        # budget. 32 MiB is the measured boundary here; 33/40/50 refuse.
+        (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
+        for mib in (2, 6, 10, 20, 25, 30):
+            peak, out, err = timed(nift, root, large, input_bytes=b"x" * (mib << 20))
+            if out.strip() == str(mib << 20).encode():
+                print(f"PEAK stream-monotonic-{mib}m {peak} KiB")
+                passed += 1
+            else:
+                failures.append(f"stream-monotonic-{mib}m: expected success, out={out!r} err={err!r}")
+        for mib in (33, 40, 50):
+            peak, out, err = timed(nift, root, large, input_bytes=b"x" * (mib << 20))
+            if b"memory budget" in err and not out.strip():
+                passed += 1
+            else:
+                failures.append(f"stream-monotonic-{mib}m: expected refusal, out={out!r} err={err!r}")
+
+        # R5a peak tracker: native large-block peak must stay within the
+        # budget plus 96 KiB. The control (`print(1)`) establishes the
+        # interpreter's own large-block baseline.
+        peak_src = Path(__file__).with_name("cp16_peak.c")
+        peak_so = root / "peak.so"
+        cc = shutil.which("cc") or shutil.which("gcc")
+        if cc and peak_src.exists():
+            build = subprocess.run([cc, "-shared", "-fPIC", "-O2", "-o", str(peak_so), str(peak_src), "-ldl"],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if build.returncode == 0:
+                def peak_run(body, input_bytes=None):
+                    (root / "case.f").write_text(body)
+                    env = dict(large, LD_PRELOAD=str(peak_so))
+                    _, _, err = timed(nift, root, env, input_bytes=input_bytes)
+                    match = re.search(rb"PEAK_LARGE_BYTES (\d+)", err)
+                    return int(match.group(1)) if match else None
+                baseline_peak = peak_run('print(1)\n')
+                for mib in (6, 10, 20, 30):
+                    got = peak_run('s := open("/dev/stdin"); print(s.length())\n', b"x" * (mib << 20))
+                    limit = 60000000 + (96 << 10)
+                    if got is not None and got <= limit:
+                        print(f"PEAK stream-tracker-{mib}m {got} <= {limit}")
+                        passed += 1
+                    else:
+                        failures.append(f"stream-tracker-{mib}m: peak={got} baseline={baseline_peak} limit={limit}")
+            else:
+                print("SKIP peak tracker: build failed")
+        else:
+            print("SKIP peak tracker: cc unavailable")
 
         # ls: 20,000 names, 1 MB budget.
         names = root / "names"
@@ -275,7 +350,7 @@ def main():
         if check("glob-duplicate-low", peak,
                  subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err), failures):
             passed += 1
-        dup_ok = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="700000")
+        dup_ok = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="2000000")
         peak, out, err = timed(nift, root, dup_ok)
         if check_success("glob-duplicate-ok", peak,
                          subprocess.CompletedProcess([], 0 if out.strip() == b"1005" else 1, out, err),

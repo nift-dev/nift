@@ -17,6 +17,17 @@ import tempfile
 from pathlib import Path
 
 # (name, setup function relative to root, body)
+def setup_symlinks(root):
+    (root / "a").mkdir()
+    (root / "a" / "x").write_text("x\n")
+    (root / "a" / "y").write_text("y\n")
+    os.symlink("a", root / "b")
+    (root / "c").mkdir()
+    os.symlink("../a/x", root / "c" / "lx")
+    (root / "nested").mkdir()
+    os.symlink("../a", root / "nested" / "linkdir")
+
+
 def setup_files(root):
     (root / "text.txt").write_text("one\ntwo\n")
     (root / "bin.dat").write_bytes(b"a\x00b\xff")
@@ -55,6 +66,14 @@ SUPPORTED = [
     ("os_arch", 'print(os()); print(arch())'),
     ("platform_hw", 'print(platform()); print(hardware_concurrency() >= 1)'),
     ("time", 'print(epoch() > 0); sleep(1); print("slept")'),
+]
+
+SYMLINK = [
+    ("symlink_star_x", 'l := ls("*/x"); print(l.stringify())'),
+    ("symlink_star_star", 'k := ls("*/*"); print(k.stringify())'),
+    ("symlink_nested_file", 'n := ls("c/*"); print(n.stringify())'),
+    ("symlink_nested_dir", 'd := ls("nested/linkdir/*"); print(d.stringify())'),
+    ("symlink_overlap", 'a := ls("a/*"); print(a.stringify()); b := ls("*/y"); print(b.stringify())'),
 ]
 
 ERRORS = [
@@ -231,6 +250,24 @@ def main():
                     setup_files(root)
                 oracle, vm = run_both(nift, source, oracle_root, vm_root)
                 check(f"{name}@{context}", source, oracle, vm, "supported")
+
+    symlink_ok = True
+    for name, body in SYMLINK:
+        with tempfile.TemporaryDirectory(prefix="vm-host-link-") as tmp:
+            base = Path(tmp)
+            oracle_root = base / "legacy"
+            vm_root = base / "vm"
+            try:
+                for root in (oracle_root, vm_root):
+                    root.mkdir()
+                    setup_symlinks(root)
+            except (OSError, NotImplementedError):
+                symlink_ok = False
+                break
+            oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root)
+            check(f"{name}", body, oracle, vm, "supported")
+    if not symlink_ok:
+        print("SKIP symlink fixtures: symlinks unavailable")
 
     for name, body in ERRORS:
         with tempfile.TemporaryDirectory(prefix="vm-host-err-") as tmp:

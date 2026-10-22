@@ -78,7 +78,7 @@ if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP
 fi
 echo "PASS host mutant 7: unbounded glob traversal rejected"
 
-for mutant in 8 9; do
+for mutant in 8 9 10; do
     BUILD="$TMP/m$mutant"
     mkdir -p "$BUILD"
     git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
@@ -96,4 +96,20 @@ for mutant in 8 9; do
     fi
     echo "PASS host mutant $mutant: memory test rejected the mutant"
 done
-echo "PASS host negative controls: 9/9 mutants rejected"
+BUILD="$TMP/m11"
+mkdir -p "$BUILD"
+git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
+    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=11" \
+    >"$TMP/build-11.log" 2>&1; then
+    echo "FAIL host mutant 11: build failed (harness failure)" >&2
+    tail -20 "$TMP/build-11.log" >&2
+    exit 1
+fi
+if python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-11.log" 2>&1; then
+    echo "FAIL host mutant 11: vm_host tests passed (mutant not caught)" >&2
+    cat "$TMP/test-11.log" >&2
+    exit 1
+fi
+echo "PASS host mutant 11: symlink parity tests rejected the mutant"
+echo "PASS host negative controls: 11/11 mutants rejected"

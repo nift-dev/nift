@@ -890,3 +890,38 @@ resource-accounting defects in the R1-R3 candidate.
   (`NIFT_VM_STATS` `heap_bytes`) and peak RSS separately for the stream and
   glob cases. The R1-R3 report and this R4 round are in
   `.claude-linode-runs/deepseek/cp16-vm-host-s1/`.
+
+## CP16 R5 — stream cap and symlink-glob parity
+
+R5 corrects the two defects found in independent review of R4.
+
+- **R5a — unknown-size stream accounting.** Unknown-size reads no longer
+  reserve a tail of the headroom. They grow geometrically, charging the old and
+  replacement capacities, and cap capacity at `C_max = 9/17 × available`
+  (`available` = entry headroom). A final trim is performed only when
+  `capacity - size > max(64 KiB, size/8)` and is charged `capacity + size`; with
+  the cap, a trim always fits the entry headroom. The largest unknown-size read
+  is therefore about 53% of the headroom; under a 60 MB budget, 2/6/10/20/25/30
+  MiB succeed and 33/40/50 MiB are refused cleanly. Known-size regular files
+  keep their single exact-size allocation and can use almost the full budget
+  (50 MiB file under 60 MB succeeds). The bytes path follows the same rules.
+  `NIFT_HOST_TRIM_PROBE` is a test-only stderr charge report used to reject the
+  mutant that undercharges the trim as `2 × size`.
+- **Zero-copy investigation (owner request).** The final `make_string(std::move)`
+  is already copy-free. The remaining copies are growth and the final trim.
+  Removing them needs a buffer that grows/shrinks in place and a
+  `StringObject`/`BytesObject` able to adopt it. Those objects currently hold
+  `std::string`/`std::vector`, so adoption would change the heap representation,
+  ownership/destruction, `unshare` copy-on-write, heap accounting, FFI/embedding
+  exposure and cross-platform allocation behaviour. This is not a contained
+  CP16 change; R5 uses the approved 9/17 cap and records adoptable-buffer
+  finalisation as future optimisation work.
+- **R5b — symlink glob parity.** Glob matches are again sorted and de-duplicated
+  by absolute generic spelling before relative display conversion. Distinct
+  full paths that render to the same relative string are preserved, matching
+  legacy, including `*/x`, `*/*`, nested symlink and overlapping-pattern cases.
+- **Controls.** M8 skips the trim (caught by retained-capacity accounting), M9
+  restores the fixed per-match allowance, M10 undercharges the trim as
+  `2 × size` (caught by `NIFT_HOST_TRIM_PROBE`), and M11 deduplicates rendered
+  paths (caught by the symlink fixtures). Existing host and VM mutants remain
+  rejected.

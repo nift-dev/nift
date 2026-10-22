@@ -262,6 +262,12 @@ inline Status collect_glob_paths(const Context& context, const fs::path& path, s
     std::vector<std::string> matches;
     std::size_t accounted = 0;
     bool policy_failure = false;
+    const auto render = [&](const fs::path& match) {
+        if (!display_relative) return match.generic_string();
+        std::error_code ec;
+        const fs::path canonical = fs::weakly_canonical(match, ec);
+        return (ec ? match : canonical.lexically_relative(canonical_base)).generic_string();
+    };
     const bool completed = nift::detail::glob_visit(path, [&](const fs::path& match) {
         std::string spelling = match.generic_string();
         if (context.host.paths) {
@@ -274,11 +280,10 @@ inline Status collect_glob_paths(const Context& context, const fs::path& path, s
                 return false;
             }
         }
-        if (display_relative) {
-            std::error_code ec;
-            const fs::path canonical = fs::weakly_canonical(match, ec);
-            spelling = (ec ? match : canonical.lexically_relative(canonical_base)).generic_string();
-        }
+        const fs::path full = match;
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 11
+        if (display_relative) spelling = render(full);
+#endif
 #if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 9
         accounted = size_add(accounted, spelling.size() + sizeof(fs::path) + 128);
 #else
@@ -307,6 +312,19 @@ inline Status collect_glob_paths(const Context& context, const fs::path& path, s
     if (!completed) return policy_failure ? Status::Error : Status::Limit;
     std::sort(matches.begin(), matches.end());
     matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 11
+    if (display_relative) {
+        for (std::string& full : matches) {
+            std::string shown = render(fs::path(full));
+            accounted = size_add(accounted, string_storage(shown));
+            if (enforce_budget && !reserve_result(context, accounted)) {
+                error = std::string(name) + ": result exceeds the memory budget";
+                return Status::Limit;
+            }
+            full = std::move(shown);
+        }
+    }
+#endif
     out = std::move(matches);
     return Status::Ok;
 }
