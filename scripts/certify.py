@@ -64,6 +64,7 @@ LOAD_SENSITIVE = {
     "test-scripting-perf": "tests/scripting_perf_guard.sh: wall-clock budgets",
     "test-runtime2-process-capture": "process_capture.sh: background descendant must not block (<280 ms)",
     "test-load-sensitive": "the four wall-clock scripts above, serially (CI's exclusive step)",
+    "test-v43-language": "benchmarks/*_scaling.py: wall-clock scaling ratios (hierarchy, typed content, project dependencies) after the v4.3 smokes",
 }
 for _t, _why in LOAD_SENSITIVE.items():
     EXCLUSIVE.setdefault(_t, "load-sensitive: " + _why)
