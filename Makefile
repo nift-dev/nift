@@ -1656,7 +1656,8 @@ CERTIFY_CI_TARGETS := bh2-test-integrity test-build-boundary-nondestructive test
 	test-crash-recovery test-filesystem-boundary test-filesystem-type test-guarantee-registry-ci \
 	test-incremental-state-transitions test-init-functional-truth test-ownership-unit \
 	test-pagination-equivalence test-parser-value-composition test-v44-automation test-v44-hooks \
-	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform test-load-sensitive
+	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform test-load-sensitive \
+	test-cp19-s1-dispatch-unit
 # Runtime 2.0 gates outside `make test`: the CP14 builtins suites, the
 # sanitizer builds and the CP16 Host negative controls (owner, 2026-10-23:
 # certification must include every required target, mutation check and

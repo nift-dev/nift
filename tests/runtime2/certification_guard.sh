@@ -62,6 +62,11 @@ print(f'PASS certification guard: certify-targets reaches {len(required)} requir
       f'{len(ci_scripts) - len([s for s in ci_scripts if s in CI_ONLY])} directly-run CI scripts covered, '
       f'{len([s for s in ci_scripts if s in CI_ONLY])} CI-only: ' + ', '.join(f'{k} ({v})' for k, v in CI_ONLY.items() if k in ci_scripts))
 PY
+# Without set -e the script's status was the later self-test's, so an
+# incomplete certify-targets printed FAIL and still exited 0 (found 2026-10-23:
+# test-cp19-s1-dispatch-unit was not reached).
+inventory_status=$?
+[ "$inventory_status" -eq 0 ] || exit "$inventory_status"
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an
