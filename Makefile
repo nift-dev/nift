@@ -1657,9 +1657,17 @@ CERTIFY_CI_TARGETS := bh2-test-integrity test-build-boundary-nondestructive test
 	test-incremental-state-transitions test-init-functional-truth test-ownership-unit \
 	test-pagination-equivalence test-parser-value-composition test-v44-automation test-v44-hooks \
 	test-v44-packages test-v45-native-runtime checkpoint-10-cross-platform test-load-sensitive
+# Runtime 2.0 gates outside `make test`: the CP14 builtins suites, the
+# sanitizer builds and the CP16 Host negative controls (owner, 2026-10-23:
+# certification must include every required target, mutation check and
+# sanitizer; the local precert checks this list against the plan).
+CERTIFY_RUNTIME2_GATES := test-rt-builtins test-rt-builtins-sanitize test-rt-host-mutants test-rt-host-sanitize \
+	test-rt-value-sanitize test-rt-vm-sanitize test-runtime2-host-memory test-runtime2-inventory-host-mutant \
+	test-runtime2-module-host-order-mutant
 .PHONY: certify certify-targets
-# The certified set: test-all plus every suite the CI workflows run.
-certify-targets: test-all $(CERTIFY_CI_TARGETS)
+# The certified set: test-all plus every suite the CI workflows run, plus the
+# Runtime 2.0 gates above.
+certify-targets: test-all $(CERTIFY_CI_TARGETS) $(CERTIFY_RUNTIME2_GATES)
 # Isolated, classified run of that set (docs/runtime-2/certification.md).
 certify:
 	python3 scripts/certify.py --jobs "$(or $(CERTIFY_JOBS),$(shell nproc))"

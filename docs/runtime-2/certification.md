@@ -485,6 +485,29 @@ longest targets were `test-rt-vm-mutants` 1840 s, then
 `test-build-boundary-nondestructive` (exclusive, about 22 min) and
 `test-runtime2-rt-diff-selftest` (about 11 min).
 
+### Precertification runs the certification inventory (owner, 2026-10-23)
+
+CP16 twice reached a paid certification before ordinary local tests exposed a
+defect (the second time, `@3c1859df`: the builtins binaries no longer linked
+and one engine-parity case differed; neither suite was in `precert.sh`, and the
+builtins suites were not in `certify-targets` at all). From now on:
+
+* `certify-targets` includes `CERTIFY_RUNTIME2_GATES`: the CP14 builtins suites
+  and their sanitizer build, the Host/value/VM sanitizer builds and the CP16
+  Host negative controls, so the Linode run covers every required target,
+  mutation check and sanitizer.
+* `precert.sh` stage 1 (fail-fast, about an hour) adds the builtins, Host,
+  random-budget, engine-parity and Host-memory gates to the previous minimum;
+  stage 2 runs `scripts/certify.py` over the same `certify-targets` plan the
+  Linode runs. Every target must PASS; root-only targets count only when
+  certify.py verified them as the unprivileged user; UNVERIFIED is allowed only
+  for targets in the precert environment-exclusion list (today:
+  `test-csharp-binding`, no .NET SDK in the local workspace; the Linode
+  preflight requires it). FAIL, FLAKY and BASELINE-FAILURE fail precert.
+* An inventory guard checks that a fixed list of required gates is in the
+  certify plan, so removing one from `certify-targets` fails precert.
+* The same exact SHA must pass both stages before a Linode instance is created.
+
 ## records20k (stage 4) certified on Linode @527b692 (2026-10-20)
 
 Base `5394557d`, tip `527b6924`:

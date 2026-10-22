@@ -957,3 +957,43 @@ be rejected by that sweep (the harness checks the failing case is
 equivalent**. It stays as an **accounting-formula unit control**, detected
 only through the `NIFT_TRIM` probe line, and is not counted among the
 behaviourally rejected mutants (1–9, 11, 12).
+
+## Certification fixes after the failed Linode run of 3c1859df (owner-approved 2026-10-23, Option A)
+
+The Linode certification of `3c1859df` found FAIL 3 (FLAKY 0, UNVERIFIED 0);
+all three reproduced locally and were real CP16 defects.
+
+- **`ls()` of a directory: Host trace result.** The VM finished the List call
+  with an empty result (trace `res: "ok"`); legacy records the entry count.
+  Caught by `test-runtime2-cp16-engine-parity` (`ls_dir/script`). Globs keep
+  `"ok"`, as in legacy.
+- **Builtins binaries no longer linked** (`test-rt-case-conversion`, its
+  negative control, and by the same cause `test-rt-builtins` unit/diff/isolation
+  and `test-rt-builtins-sanitize`, which certification did not run). The native
+  table now includes the Host built-ins, which need the Host layer and four
+  legacy helpers, and `host_time.cpp` used `nift::RuntimeValue` for random bytes,
+  breaking the CP14 rule that natives never touch the legacy value model.
+  **Fix (Option A):** the epoch, CSPRNG and glob helpers moved verbatim from
+  `ParserHelpers.cpp` into `ParserHostHelpers.{h,cpp}`, with ordinary C++ types
+  only (`nift_secure_random_fill(unsigned char*, size_t, string&)` is the CSPRNG
+  core; the legacy `nift_secure_random_bytes(count, RuntimeValue&, …)` wrapper
+  keeps its behaviour and calls it). The builtins targets link the Host layer
+  and `ParserHostHelpers.cpp`; the isolated bench (no `RuntimeValue.cpp`,
+  `legacy_bridge.cpp`, `render.cpp`) still links, so the link-level isolation
+  proof is unchanged in strength. The glob statistics guards compile
+  `ParserHostHelpers.cpp` with their flags.
+- **Random bytes: budget before allocation.** `secure_random_bytes` used to fill
+  a legacy buffer (up to 10 MB), check the budget afterwards and copy it. It now
+  checks the budget first, fills one buffer in place and hands it over as the
+  result. `tests/rt/host_random_budget.cpp` (allocation-tracking `operator new`,
+  linked against the isolated core) requires an 8,000,000-byte request under a
+  1 MiB budget to fail with no allocation of 64 KiB or more, and a 10,000,000-
+  byte result to use a single result-sized buffer. **Mutant M13** checks the
+  budget only after allocating; the `random-budget-before-alloc` regression must
+  reject it. Host negative controls: 12 behavioural mutants (1–9, 11–13) plus
+  the M10 accounting-formula control.
+- **Certification inventory.** `certify-targets` now includes
+  `CERTIFY_RUNTIME2_GATES` (builtins and their sanitizer build, the Host/value/VM
+  sanitizer builds, the Host mutants, Host memory, the inventory and module
+  host-order mutants), so the Linode run covers every required gate, and the
+  local precertification runs the same plan (see `certification.md`).
