@@ -7,6 +7,7 @@ on:
       - '.github/workflows/v44-cross-platform.yml'
       - 'tests/shell_dispatch*'
       - 'tests/cp19_*'
+      - 'tests/runtime2/vm_host*'
       - 'Makefile'
       - 'src/**'
       - 'tests/parser_*'
@@ -19,6 +20,7 @@ on:
       - '.github/workflows/v44-cross-platform.yml'
       - 'tests/shell_dispatch*'
       - 'tests/cp19_*'
+      - 'tests/runtime2/vm_host*'
       - 'Makefile'
       - 'src/**'
       - 'tests/parser_*'
@@ -148,6 +150,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-cp19-s1-dispatch-unit
+      - name: CP16 VM host natives differential (legacy vs VM, POSIX)
+        timeout-minutes: 15
+        if: runner.os != 'Windows'
+        run: |
+          make -C nift -j2 nift
+          python3 nift/tests/runtime2/vm_host.py --nift "$PWD/nift/nift"
       - name: v4.4 automation + hooks
         timeout-minutes: 6
         if: runner.os != 'Windows'
