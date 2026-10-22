@@ -193,12 +193,6 @@ bool parse_runtime_json(const std::string& text, nift::RuntimeValue& value,
     return true;
 }
 
-bool call_runtime_host(const RenderHost& host, const std::string& name,
-                       const std::vector<nift::RuntimeValue>& args,
-                       nift::RuntimeValue& out, std::string& error) {
-    return host.call_host_callable(name, args, out, error);
-}
-
 std::string runtime_scalar_key(const nift::RuntimeValue& value) {
     if (value.is_bool()) return std::string("b") + (value.boolean ? "1" : "0");
     if (value.is_number()) return "n" + nift::runtime_numeric_fingerprint(value);

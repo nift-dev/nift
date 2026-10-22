@@ -6,6 +6,7 @@
 #include "HostTrace.h"
 #include "ReadLimit.h"
 #include "ParserAsyncPool.h"
+#include "ParserHelpers.h"
 #include "ParserHost.h"
 
 #include <fstream>
@@ -279,3 +280,15 @@ std::shared_ptr<Parser::WorkerObservations> Parser::export_worker_observations()
     observed->observed = result_.observed;
     return observed;
 }
+
+// Defined here, beside RenderHost's key function (listing_fingerprint), not in
+// ParserHelpers.cpp: the VM natives link ParserHelpers.cpp into the RT unit
+// builds (RT_VALUE_SOURCES), and under UBSan's vptr check this virtual call
+// would require RenderHost's typeinfo, which only this file emits.
+namespace nift::detail {
+bool call_runtime_host(const RenderHost& host, const std::string& name,
+                       const std::vector<nift::RuntimeValue>& args,
+                       nift::RuntimeValue& out, std::string& error) {
+    return host.call_host_callable(name, args, out, error);
+}
+} // namespace nift::detail
