@@ -88,7 +88,8 @@ void table() {
     CHECK(find_builtin(Receiver::String, "size") == nullptr);   // legacy: unsupported for strings
     CHECK(find_builtin(Receiver::Array, "index_of") == nullptr);  // arrays spell it indexOf
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
-    CHECK(builtin_count() == 89);
+    // 89 CP14/CP15 built-ins plus the 31 CP16 Host built-ins (builtin_list.inc).
+    CHECK(builtin_count() == 120);
     CHECK(find_builtin(Receiver::Number, "to_string") && find_builtin(Receiver::Any, "stringify"));
     CHECK(find_builtin(Receiver::Number, "to_double") == nullptr);  // Q4: context-dependent in legacy
 }

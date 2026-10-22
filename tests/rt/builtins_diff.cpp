@@ -478,10 +478,19 @@ int main(int argc, char** argv) {
     const char* dir = mkdtemp(dir_template);
     if (!dir) { std::perror("mkdtemp"); return 2; }
 
+    // The CP16 Host built-ins (open ... secure_random_bytes, last in
+    // builtin_list.inc) read and change the process environment (cwd, files,
+    // variables, clock, CSPRNG): random calls to them are neither deterministic
+    // nor safe to run here. tests/runtime2/vm_host.py and the CP16 engine-parity
+    // suite compare them with legacy in controlled sandboxes instead.
+    const std::size_t pure_builtins = static_cast<std::size_t>(BuiltinId::HostOpen);
+    static_assert(static_cast<std::size_t>(BuiltinId::HostSecureRandomBytes) + 1 ==
+                      static_cast<std::size_t>(BuiltinId::Count),
+                  "the Host built-ins must stay last in builtin_list.inc");
     std::vector<Case> cases;
     for (std::size_t n = 0; n < count; ++n) {
         // One case in eight is a json_parse case (CP15).
-        Case c{n % 8 == 7 ? BuiltinId::Count : static_cast<BuiltinId>((n - n / 8) % builtin_count()), {}, false, {}, {}, {}};
+        Case c{n % 8 == 7 ? BuiltinId::Count : static_cast<BuiltinId>((n - n / 8) % pure_builtins), {}, false, {}, {}, {}};
         if (c.id == BuiltinId::Count) {
             c.json = random_json(0, true);
             if (chance(30)) { c.json = corrupt_json(c.json); c.isolated = true; }
