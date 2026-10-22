@@ -18,7 +18,7 @@ using nift::rt::host::ProcessGroup;
 using nift::rt::host::SpawnRequest;
 using nift::rt::host::SpawnStage;
 
-SpawnStage convert_stage(const ProcessSpec& spec) {
+[[maybe_unused]] SpawnStage convert_stage(const ProcessSpec& spec) {
     SpawnStage stage;
     stage.program = spec.program;
     stage.args = spec.args;
@@ -50,7 +50,7 @@ SpawnStage convert_stage(const ProcessSpec& spec) {
     return stage;
 }
 
-ProcessResult convert_result(const nift::rt::host::ProcessResult& host) {
+[[maybe_unused]] ProcessResult convert_result(const nift::rt::host::ProcessResult& host) {
     ProcessResult out;
     out.exit_code = host.exit_code;
     out.out = host.out;
@@ -73,14 +73,14 @@ ProcessResult convert_result(const nift::rt::host::ProcessResult& host) {
     return out;
 }
 
-ProcessResult failure(const HostError& error, HostStatus status) {
+[[maybe_unused]] ProcessResult failure(const HostError& error, HostStatus status) {
     ProcessResult out;
     out.error = error.message;
     out.exit_code = status == HostStatus::Limit ? 1 : -1;
     return out;
 }
 
-ProcessResult run_host(const std::vector<ProcessSpec>& specs, const std::string& command) {
+[[maybe_unused]] ProcessResult run_host(const std::vector<ProcessSpec>& specs, const std::string& command) {
     ProcessResult out;
     if (specs.empty()) {
         out.error = "empty pipeline";

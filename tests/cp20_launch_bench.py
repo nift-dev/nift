@@ -28,8 +28,10 @@ def batch(cmd, script, repetitions):
     samples = []
     for _ in range(repetitions):
         start = time.perf_counter()
-        subprocess.run(cmd, input=script, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       cwd="/tmp", check=False)
+        completed = subprocess.run(cmd, input=script, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, cwd="/tmp", check=False)
+        if completed.returncode != 0:
+            raise SystemExit(f"launch batch failed with status {completed.returncode}")
         samples.append((time.perf_counter() - start) * 1000.0 / args.commands)
     return statistics.median(samples), samples
 
