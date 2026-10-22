@@ -73,6 +73,15 @@ inline bool finalize_bytes(const Context& context, Buffer& data) {
     return true;
 }
 
+// Growth of a read buffer: BudgetedText charges and sizes itself exactly
+// (support.cpp); a byte vector's reserve() allocates the request.
+inline bool reserve_buffer(BudgetedText& data, std::size_t bytes) { return data.reserve(bytes); }
+template <class Buffer>
+inline bool reserve_buffer(Buffer& data, std::size_t bytes) {
+    data.reserve(bytes);
+    return true;
+}
+
 template <class Buffer>
 inline bool grow_unknown(const Context& context, Buffer& data, std::size_t needed, std::size_t cap,
                          bool& tail_reserved, std::size_t& reserved) {
@@ -85,7 +94,11 @@ inline bool grow_unknown(const Context& context, Buffer& data, std::size_t neede
     if (target > cap) target = cap;
     if (target < needed) target = needed;
     if (!reserve_result(context, size_add(target, old))) return false;
-    data.reserve(target);
+    if (!reserve_buffer(data, target)) return false;
+    // CP16 R6: the trim proof needs the bound on the capacity actually
+    // allocated, not the one requested; a library that rounds past the cap
+    // is refused here rather than allowed to break monotonicity later.
+    if (data.capacity() > cap) return false;
     return true;
 }
 

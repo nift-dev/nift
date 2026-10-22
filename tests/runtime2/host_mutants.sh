@@ -78,7 +78,7 @@ if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP
 fi
 echo "PASS host mutant 7: unbounded glob traversal rejected"
 
-for mutant in 8 9 10; do
+for mutant in 8 9 10 12; do
     BUILD="$TMP/m$mutant"
     mkdir -p "$BUILD"
     git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
@@ -94,7 +94,22 @@ for mutant in 8 9 10; do
         cat "$TMP/test-$mutant.log" >&2
         exit 1
     fi
-    echo "PASS host mutant $mutant: memory test rejected the mutant"
+    # Rejected for the intended defect, not for something else.
+    case $mutant in
+        10) want="stream-trim-charge" ;;
+        12) want="stream-monotonic-" ;;
+        *) want="" ;;
+    esac
+    if [ -n "$want" ] && ! grep -q "$want" "$TMP/test-$mutant.log"; then
+        echo "FAIL host mutant $mutant: rejected, but not by the $want regression" >&2
+        cat "$TMP/test-$mutant.log" >&2
+        exit 1
+    fi
+    if [ "$mutant" = 10 ]; then
+        echo "PASS host mutant 10: accounting-formula control (NIFT_TRIM probe); behaviourally equivalent under the 9/17 cap"
+    else
+        echo "PASS host mutant $mutant: memory test rejected the mutant"
+    fi
 done
 BUILD="$TMP/m11"
 mkdir -p "$BUILD"
@@ -112,4 +127,4 @@ if python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-1
     exit 1
 fi
 echo "PASS host mutant 11: symlink parity tests rejected the mutant"
-echo "PASS host negative controls: 11/11 mutants rejected"
+echo "PASS host negative controls: 11 behavioural mutants rejected (1-9, 11, 12); M10 accounting-formula control detected by the NIFT_TRIM probe"

@@ -925,3 +925,35 @@ R5 corrects the two defects found in independent review of R4.
   `2 × size` (caught by `NIFT_HOST_TRIM_PROBE`), and M11 deduplicates rendered
   paths (caught by the symlink fixtures). Existing host and VM mutants remain
   rejected.
+
+## R6 — exact buffer growth (Claude, integration commit, owner-approved 2026-10-22)
+
+R5's monotonicity points (2, 6, 10, 20, 25, 30 MiB) missed a gap. Under a
+60 MB budget, unknown-size stdin of 26–28 MiB was refused while 29–32 MiB
+succeeded. Cause: `grow_unknown` requested capacity `cap` (9/17 of the
+headroom), but `std::string::reserve(n)` on a non-empty libstdc++ string
+allocates `2 × old` when `old < n < 2·old`, so the 16 MiB buffer became
+32 MiB. That is above the cap, so the trim (capacity + size) no longer fit.
+The same rounding meant `BudgetedText::reserve` could hold more than it
+charged for every caller.
+
+Fix: `BudgetedText::reserve` grows into a fresh string reserved to exactly
+the request (an empty string's `reserve` is exact up to allocator
+granularity on libstdc++, libc++ and MSVC) and swaps it in. If the library
+still returns more, the actual `capacity + old` is charged before the copy.
+`grow_unknown` refuses when the capacity actually allocated exceeds the cap.
+Measured under 60 MB: 1–30 MiB succeed, 31–34 MiB refused, peak native
+large-block bytes ≤ 59.03 MB.
+
+Tests: `vm_host_memory.py` sweeps 1–34 MiB in 1 MiB steps (1–30 succeed,
+31–34 refuse cleanly, no success after a refusal, tracker peak ≤ budget +
+96 KiB at every size). Mutant **M12** restores `text_.reserve(bytes)` and must
+be rejected by that sweep (the harness checks the failing case is
+`stream-monotonic-*`).
+
+**M10 classification.** Once the cap holds, the real trim cost
+(capacity + size ≤ 17/9 · capacity ≤ headroom) always fits, so charging
+`2 × size` instead cannot change any outcome: M10 is **behaviourally
+equivalent**. It stays as an **accounting-formula unit control**, detected
+only through the `NIFT_TRIM` probe line, and is not counted among the
+behaviourally rejected mutants (1–9, 11, 12).

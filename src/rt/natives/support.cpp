@@ -154,7 +154,25 @@ bool BudgetedText::reserve(std::size_t bytes) {
     // The old storage (if any) is freed by the reallocation but held during it.
     const std::size_t held = size_add(bytes, text_.capacity());
     if (held > kUncheckedBytes && !reserve_result(context_, held)) return false;
-    text_.reserve(bytes);
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 12
+    text_.reserve(bytes);  // mutant 12: the library may round the request up (uncharged)
+#else
+    // CP16 R6: grow into a fresh buffer sized to the request. reserve() on a
+    // non-empty std::string may round up (libstdc++ allocates twice the old
+    // capacity when old < bytes < 2 * old; MSVC applies its 1.5x growth), so
+    // the buffer could exceed what `held` charged and the 9/17 stream cap.
+    // An empty string's reserve allocates the request, up to allocator
+    // granularity; if the library still returns more, the actual capacity is
+    // charged before anything is copied.
+    std::string fresh;
+    fresh.reserve(bytes);
+    if (fresh.capacity() > bytes) {
+        const std::size_t actual = size_add(fresh.capacity(), text_.capacity());
+        if (actual > kUncheckedBytes && !reserve_result(context_, actual)) return false;
+    }
+    fresh.append(text_);
+    text_.swap(fresh);
+#endif
     return true;
 }
 

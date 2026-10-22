@@ -225,23 +225,42 @@ def main():
         else:
             failures.append(f"stream-1k-1g: output={out!r} err={err!r}")
 
-        # R5a monotonicity: successes increase with size until the 9/17 cap,
-        # then every larger unknown-size stream is refused under the same
-        # budget. 32 MiB is the measured boundary here; 33/40/50 refuse.
+        # R5a/R6 monotonicity, in 1 MiB steps (R5 tested 2/6/10/20/25/30 and
+        # missed a 26-28 MiB refusal gap caused by std::string::reserve
+        # rounding past the 9/17 cap). Under 60 MB, 1-30 MiB must succeed and
+        # 31-34 MiB must refuse cleanly; any success after a refusal fails.
+        # Each run also records the native large-block peak when the tracker
+        # builds (it must stay within the budget plus 96 KiB).
+        sweep_tracker = None
+        sweep_src = Path(__file__).with_name("cp16_peak.c")
+        sweep_cc = shutil.which("cc") or shutil.which("gcc")
+        if sweep_cc and sweep_src.exists():
+            sweep_so = root / "sweep-peak.so"
+            if subprocess.run([sweep_cc, "-shared", "-fPIC", "-O2", "-o", str(sweep_so), str(sweep_src), "-ldl"],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+                sweep_tracker = str(sweep_so)
         (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
-        for mib in (2, 6, 10, 20, 25, 30):
-            peak, out, err = timed(nift, root, large, input_bytes=b"x" * (mib << 20))
-            if out.strip() == str(mib << 20).encode():
-                print(f"PEAK stream-monotonic-{mib}m {peak} KiB")
-                passed += 1
+        sweep_env = dict(large, LD_PRELOAD=sweep_tracker) if sweep_tracker else large
+        refused_at = None
+        for mib in range(1, 35):
+            _, out, err = timed(nift, root, sweep_env, input_bytes=b"x" * (mib << 20))
+            ok = out.strip() == str(mib << 20).encode()
+            refused = (not out.strip()) and b"memory budget" in err
+            match = re.search(rb"PEAK_LARGE_BYTES (\d+)", err)
+            peak_large = int(match.group(1)) if match else None
+            if peak_large is not None and peak_large > 60000000 + (96 << 10):
+                failures.append(f"stream-monotonic-{mib}m: native peak {peak_large} exceeds the budget")
+            if ok and refused_at is not None:
+                failures.append(f"stream-monotonic-{mib}m: succeeds after a refusal at {refused_at} MiB")
+            elif mib <= 30 and not ok:
+                failures.append(f"stream-monotonic-{mib}m: expected success, out={out[:60]!r} err={err[-200:]!r}")
+            elif mib > 30 and not refused:
+                failures.append(f"stream-monotonic-{mib}m: expected a clean refusal, out={out[:60]!r} err={err[-200:]!r}")
             else:
-                failures.append(f"stream-monotonic-{mib}m: expected success, out={out!r} err={err!r}")
-        for mib in (33, 40, 50):
-            peak, out, err = timed(nift, root, large, input_bytes=b"x" * (mib << 20))
-            if b"memory budget" in err and not out.strip():
                 passed += 1
-            else:
-                failures.append(f"stream-monotonic-{mib}m: expected refusal, out={out!r} err={err!r}")
+            if refused and refused_at is None:
+                refused_at = mib
+        print(f"PEAK stream-monotonic first refusal at {refused_at} MiB (tracker {'on' if sweep_tracker else 'off'})")
 
         # R5a peak tracker: native large-block peak must stay within the
         # budget plus 96 KiB. The control (`print(1)`) establishes the
