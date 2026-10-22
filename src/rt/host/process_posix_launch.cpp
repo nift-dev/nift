@@ -95,7 +95,9 @@ std::string pipe_error() { return std::string("cannot create pipe: ") + std::str
         child_open_onto(rep, "/dev/null", O_WRONLY, STDOUT_FILENO, SetupStdout);
     }
     // stderr
-    if (!p.stderr_path.empty()) {
+    if (s.req.stages[i].stderr_to_stdout) {
+        if (!child_dup2(STDOUT_FILENO, STDERR_FILENO)) child_fail(rep, ExecSetup, errno, 126, SetupRedirect);
+    } else if (!p.stderr_path.empty()) {
         const int flags = O_WRONLY | O_CREAT | (p.stderr_append ? O_APPEND : O_TRUNC);
         child_open_onto(rep, p.stderr_path, flags, STDERR_FILENO, SetupStderr);
     } else if (l.err_child >= 0) {

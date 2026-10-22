@@ -23,6 +23,8 @@ MARKUP_C_NAMES := blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e 
 MARKUP_C_SOURCES := $(addprefix markuppp/vendor/cmark/,$(addsuffix .c,$(MARKUP_C_NAMES)))
 MARKUP_C_OBJECTS := $(MARKUP_C_SOURCES:.c=.o)
 OBJECTS := $(SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
+CORE_SOURCES += src/shell/Spawn.cpp
+SOURCES += src/shell/Spawn.cpp
 CLI_OBJECTS := $(CORE_SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
 PARSER_OBJECTS := $(PARSER_SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
@@ -3053,3 +3055,30 @@ $(INVENTORY_HOST_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJE
 test-runtime2-inventory-host-mutant: $(TARGET) $(INVENTORY_HOST_MUTANT_BIN)
 	bash tests/runtime2/inventory_host_mutant.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(INVENTORY_HOST_MUTANT_BIN)"
 test-rt-vm: test-runtime2-inventory-host-mutant
+# --- CP20 shell spawn: focused suite and compiling negative controls ---------
+CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
+$(TEST_DIR)/cp20-mutants/%/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/Spawn.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=$* -MMD -MP -c src/CLI.cpp -o "$@"
+$(TEST_DIR)/cp20-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
+$(TEST_DIR)/cp20-mutants/%/nift$(EXEEXT): $(filter-out src/CLI.o src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp20-mutants/%/CLI.o $(TEST_DIR)/cp20-mutants/%/Spawn.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp20-mutants/$*/CLI.o $(TEST_DIR)/cp20-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
+.PHONY: test-cp20-shell-spawn test-cp20-shell-spawn-mutants
+test-cp20-shell-spawn: $(TARGET)
+	python3 tests/cp20_shell_spawn.py --nift "$(CURDIR)/$(TARGET)"
+test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
+	@for m in 1 2 3 4 5 6; do \
+	  bin="$(CURDIR)/$(TEST_DIR)/cp20-mutants/$$m/nift$(EXEEXT)"; \
+	  python3 tests/cp20_shell_spawn.py --nift "$$bin" --mutant-kind "m$$m" > ".build/cp20-mutants/$$m.log" 2>&1; \
+	  rc=$$?; \
+	  if [ "$$m" = "1" ]; then pattern="FAIL streaming-plain"; else pattern="FAIL mutant-m$$m"; fi; \
+	  if [ $$rc -eq 0 ] || ! grep -q "$$pattern" ".build/cp20-mutants/$$m.log"; then \
+	    echo "FAIL CP20 mutant $$m: not detected"; tail -20 ".build/cp20-mutants/$$m.log"; exit 1; \
+	  fi; \
+	  echo "PASS CP20 mutant $$m: rejected"; \
+	done
+.PHONY: test-cp20-launch-bench
+test-cp20-launch-bench: $(TARGET)
+	python3 tests/cp20_launch_bench.py --nift "$(CURDIR)/$(TARGET)"

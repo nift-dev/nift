@@ -58,6 +58,7 @@ struct SpawnStage {
     bool stdout_append = false;
     std::string stderr_path;
     bool stderr_append = false;
+    bool stderr_to_stdout = false;  // CP20: 2>&1, after stdout is set up
     std::vector<std::string> argv() const;
 };
 

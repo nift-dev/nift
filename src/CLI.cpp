@@ -32,6 +32,7 @@
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
 #include "shell/CommandDispatch.h"
+#include "shell/Spawn.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1986,7 +1987,7 @@ static std::string shell_nift_call(const std::vector<std::string>& tokens, std::
 
 static int run_shell_job_builtin(const std::string& builtin,
                                  const std::vector<std::string>& args,
-                                 ShellJobTable* jobs,
+                                 nift::shell::JobTable* jobs,
                                  bool print_errors) {
     if (builtin == "jobs") {
         if (!args.empty()) {
@@ -2061,7 +2062,7 @@ static int run_shell_job_builtin(const std::string& builtin,
 static int dispatch_shell_state(Parser& parser,
                                 const std::string& builtin,
                                 const std::vector<std::string>& args,
-                                ShellJobTable* jobs,
+                                nift::shell::JobTable* jobs,
                                 bool print_errors,
                                 bool& exit_requested,
                                 int& exit_code) {
@@ -2130,7 +2131,7 @@ static int run_external_words(Parser& parser,
                               const std::vector<ShellWord>& words,
                               const std::string& line,
                               bool print_errors,
-                              ShellJobTable* jobs) {
+                              nift::shell::JobTable* jobs) {
     (void)parser;
     if (std::getenv("NIFT_NO_PROCESS")) {
         if (print_errors) console::error("external process execution disabled");
@@ -2227,7 +2228,7 @@ static int run_external_words(Parser& parser,
         result = jobs->launch(stages, line, true);
     } else {
         if (direct) stages[0].foreground_terminal = true;
-        result = nift_run_pipeline(stages, !direct, !direct);
+        result = nift::shell::run_pipeline(stages, line);
     }
     if (!result.error.empty() && print_errors) console::error(result.error);
     return result.exit_code;
@@ -2235,7 +2236,7 @@ static int run_external_words(Parser& parser,
 static int execute_shell_command(Parser& parser,
                                  const std::string& line,
                                  bool print_errors,
-                                 ShellJobTable* jobs,
+                                 nift::shell::JobTable* jobs,
                                  const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
                                  bool* exit_requested_out = nullptr,
                                  int* exit_code_out = nullptr) {
@@ -2596,7 +2597,7 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 #endif
 static int run_script_shell_loop(Parser& parser, bool load_rc) {
-    std::string pending; ShellJobTable jobs;
+    std::string pending; nift::shell::JobTable jobs;
     auto history=load_nift_history();
 #ifndef _WIN32
     size_t hist_pos=history.size();

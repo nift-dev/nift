@@ -355,6 +355,12 @@ void capture_basic() {
     in.stages[0].stdin_path = path;
     r = run_ok(in);
     CHECK(r.out == "to-file\nto-file\n");
+    // CP20: 2>&1 (stderr duplicates stdout in the child)
+    auto merge = req({"sh", "-c", "echo out; echo err >&2"}, OutputMode::FileCapture, tag);
+    merge.stages[0].stderr_to_stdout = true;
+    r = run_ok(merge);
+    CHECK(r.out == "out\nerr\n");
+    CHECK(r.err.empty());
     std::remove(path);
     // environment overrides
     auto env = req({"sh", "-c", "printf %s \"$CP16_X\""}, OutputMode::PipeCapture, tag);

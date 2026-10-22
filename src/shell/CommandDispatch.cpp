@@ -255,20 +255,21 @@ bool validate_line_syntax(const std::vector<std::string>& tokens,
     for (std::size_t i = 0; i < n; ++i) {
         if (!is_operator(i)) continue;
         const std::string& token = tokens[i];
+        const auto previous_is_attached = i > 0 && i <= n && tokens[i - 1] == "2>&1";
         if (is_connector_text(token)) {
             if (token == ";" && i + 1 == n) {
-                if (i == 0 || is_operator(i - 1)) return fail(token);
+                if (i == 0 || (is_operator(i - 1) && !previous_is_attached)) return fail(token);
                 continue;  // valid trailing semicolon
             }
             if (i == 0) return fail(token);
-            if (is_operator(i - 1)) return fail(token);
+            if (is_operator(i - 1) && !previous_is_attached) return fail(token);
             if (i + 1 >= n) return fail(token);
             if (is_operator(i + 1)) return fail(token);
             continue;
         }
         if (token == "|") {
             if (i == 0) return fail(token);
-            if (is_operator(i - 1)) return fail(token);
+            if (is_operator(i - 1) && !previous_is_attached) return fail(token);
             if (i + 1 >= n) return fail(token);
             if (is_operator(i + 1)) return fail(token);
             continue;
