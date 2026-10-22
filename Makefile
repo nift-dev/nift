@@ -2905,6 +2905,20 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
+# CP16 certification fix: secure_random_bytes checks the budget before its
+# buffer exists and keeps one result-sized buffer. Linked with the isolated core
+# (no RuntimeValue/legacy_bridge/render): a Host native that needs the legacy
+# value model fails this link. NIFT_HOST_MUTANT=13 must fail the run.
+RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
+$(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+
+.PHONY: test-rt-host-random-budget
+test-rt-host-random-budget: $(RT_HOST_RANDOM_BUDGET)
+	"$(RT_HOST_RANDOM_BUDGET)"
+test: test-rt-host-random-budget
+
 .PHONY: test-rt-builtins-isolation test-rt-builtins-guards
 test-rt-builtins-isolation: $(RT_BUILTINS_BENCH)
 	@if grep -nE '#include .*(RuntimeValue|legacy_bridge|rt/render)|nift::RuntimeValue|(to|from)_legacy\(|append_rendered' \
@@ -2921,7 +2935,7 @@ test-rt-builtins-guards: $(RT_BUILTINS_BENCH)
 
 .PHONY: test-rt-builtins test-rt-builtins-sanitize test-rt-builtins-probe
 # RT_BUILTINS_SEED / RT_BUILTINS_CASES vary the differential test.
-test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative
+test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative test-rt-host-random-budget
 	@test -x "$(RT_BUILTINS_LEGACY)" || { echo "legacy oracle $(RT_BUILTINS_LEGACY) missing (set RT_BUILTINS_LEGACY)" >&2; exit 1; }
 	"$(RT_BUILTINS_UNIT)"
 	"$(RT_BUILTINS_DIFF)" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_CASES:-5000}

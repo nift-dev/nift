@@ -127,4 +127,26 @@ if python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-1
     exit 1
 fi
 echo "PASS host mutant 11: symlink parity tests rejected the mutant"
-echo "PASS host negative controls: 11 behavioural mutants rejected (1-9, 11, 12); M10 accounting-formula control detected by the NIFT_TRIM probe"
+# M13: secure_random_bytes checks the budget only after allocating its buffer.
+BUILD="$TMP/m13"
+mkdir -p "$BUILD"
+git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+if ! make -C "$BUILD" .build/rt/host-random-budget \
+    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=13" \
+    >"$TMP/build-13.log" 2>&1; then
+    echo "FAIL host mutant 13: build failed (harness failure)" >&2
+    tail -20 "$TMP/build-13.log" >&2
+    exit 1
+fi
+if "$BUILD/.build/rt/host-random-budget" >"$TMP/test-13.log" 2>&1; then
+    echo "FAIL host mutant 13: random budget test passed (mutant not caught)" >&2
+    cat "$TMP/test-13.log" >&2
+    exit 1
+fi
+if ! grep -q "random-budget-before-alloc" "$TMP/test-13.log"; then
+    echo "FAIL host mutant 13: rejected, but not by the random-budget-before-alloc regression" >&2
+    cat "$TMP/test-13.log" >&2
+    exit 1
+fi
+echo "PASS host mutant 13: allocation before the random-bytes budget check rejected"
+echo "PASS host negative controls: 12 behavioural mutants rejected (1-9, 11-13); M10 accounting-formula control detected by the NIFT_TRIM probe"
