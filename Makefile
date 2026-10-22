@@ -2987,3 +2987,19 @@ test-runtime2-inventory-links: $(TARGET) $(INVENTORY_MUTANT_BIN)
 	python3 tests/runtime2/vm_inventory_links.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/vm_inventory_links.py --nift "$(CURDIR)/$(INVENTORY_MUTANT_BIN)" --mutant
 test-rt-vm: test-runtime2-inventory-links
+
+# Negative control for the shared module-host-op refusal (rt/module_host_op.h):
+# a build whose inventory alone skips the check must fail the inventory-link
+# suite on exactly the module-callable case (runner and inventory disagree).
+INVENTORY_HOST_MUTANT_BIN := $(TEST_DIR)/nift-inventory-host-mutant$(EXEEXT)
+INVENTORY_HOST_MUTANT_OBJECT := $(TEST_DIR)/inventory-host-mutant/refusal_inventory.o
+$(INVENTORY_HOST_MUTANT_OBJECT): src/rt/refusal_inventory.cpp src/rt/module_host_op.h $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/inventory-host-mutant"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_INVENTORY_HOST_MUTANT=1 -c $< -o $@
+$(INVENTORY_HOST_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_HOST_MUTANT_OBJECT) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_HOST_MUTANT_OBJECT) \
+		$(LDLIBS) -o $@
+.PHONY: test-runtime2-inventory-host-mutant
+test-runtime2-inventory-host-mutant: $(TARGET) $(INVENTORY_HOST_MUTANT_BIN)
+	bash tests/runtime2/inventory_host_mutant.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(INVENTORY_HOST_MUTANT_BIN)"
+test-rt-vm: test-runtime2-inventory-host-mutant

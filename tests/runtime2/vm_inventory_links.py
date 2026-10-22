@@ -106,8 +106,11 @@ CASES = [
             "main.f": 'import("m.nft")\nprint(mf())\n',
             "m.nft": 'fn(mf()) {\n  return getenv("X")\n}\nexport(mf)\n',
         },
-        "first": "callable:getenv",
-        "certain": {"callable:getenv"},
+        # CP16 compiles getenv as a host native; R1 then refuses the linked
+        # unit (rt/module_host_op.h). The case still checks that item 0 is the
+        # module's call, with module provenance, not the module function name.
+        "first": "module-host-op:getenv",
+        "certain": {"module-host-op:getenv"},
         "complete": True,
         "item0_path": "m.nft",
         "item0_line": 2,

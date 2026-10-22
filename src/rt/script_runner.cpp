@@ -3,6 +3,7 @@
 #include "HostTrace.h"
 #include "rt/compiler.h"
 #include "rt/heap_account.h"
+#include "rt/module_host_op.h"
 #include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
@@ -292,17 +293,15 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     // before it runs. The scan is over the compiled code of every proto, so
     // it does not depend on where the call sits in the source.
 #if !defined(NIFT_R1_MUTANT)  // test-only negative control (tests/runtime2/module_host_order_mutant.sh)
-    if (link.linked)
-        for (const auto& proto : compiled.program->protos)
-            for (std::size_t pc = 0; pc < proto->code.size(); ++pc) {
-                const Instr& in = proto->code[pc];
-                if (in.op != OpCode::CallNative || in.b < kFirstBuiltin) continue;
-                const auto id = static_cast<natives::BuiltinId>(in.b - kFirstBuiltin);
-                if (!natives::host_builtin(id)) continue;
-                stats.reason = "module-host-op:" + std::string(natives::builtin_spec(id).name);
-                locate_linked(pc < proto->offsets.size() ? proto->offsets[pc] : 0);
-                return not_compiled(stats, mode, report_path, exit_code);
-            }
+    if (link.linked) {
+        std::string host_reason;
+        std::uint32_t host_offset = 0;
+        if (first_module_host_op(*compiled.program, host_reason, host_offset)) {
+            stats.reason = host_reason;
+            locate_linked(host_offset);
+            return not_compiled(stats, mode, report_path, exit_code);
+        }
+    }
 #endif
     stats.protos = compiled.program->protos.size();
     for (const auto& proto : compiled.program->protos) stats.instructions += proto->code.size();

@@ -3,6 +3,7 @@
 #include "rt/compiler.h"
 #include "rt/globals.h"
 #include "rt/legacy_names.h"
+#include "rt/module_host_op.h"
 #include "rt/module_link.h"
 #include "rt/parser.h"
 #include "rt/refusal_mask.h"
@@ -205,7 +206,19 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
         }
         const CompileResult compiled = compile_unit(ast, unit_root, limits);
         ++inventory.rounds;
-        if (compiled.program) break;
+        if (compiled.program) {
+            // R1: run_unit refuses a linked unit that can call a host
+            // built-in after it compiles (rt/module_host_op.h); the inventory
+            // reports the same first reason. The unit compiled, so there are
+            // no later compile blockers: the inventory stays complete.
+#if !defined(NIFT_R1_MUTANT) && !defined(NIFT_INVENTORY_HOST_MUTANT)  // the latter: test-only control
+            std::string host_reason;
+            std::uint32_t host_offset = 0;
+            if (link.linked && first_module_host_op(*compiled.program, host_reason, host_offset))
+                record_linked(std::move(host_reason), host_offset, false, {});
+#endif
+            break;
+        }
         const bool consequential = masker.consequential(compiled.offset, compiled.reason);
         record_linked(free_names.refine(compiled.reason, compiled.offset), compiled.offset, consequential, {});
         if (terminal(compiled.reason)) {
