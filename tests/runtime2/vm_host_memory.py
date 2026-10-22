@@ -236,9 +236,12 @@ def main():
         sweep_cc = shutil.which("cc") or shutil.which("gcc")
         if sweep_cc and sweep_src.exists():
             sweep_so = root / "sweep-peak.so"
-            if subprocess.run([sweep_cc, "-shared", "-fPIC", "-O2", "-o", str(sweep_so), str(sweep_src), "-ldl"],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+            sweep_build = subprocess.run([sweep_cc, "-shared", "-fPIC", "-O2", "-o", str(sweep_so), str(sweep_src),
+                                          "-ldl"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if sweep_build.returncode == 0:
                 sweep_tracker = str(sweep_so)
+            else:
+                failures.append(f"sweep tracker build failed: {sweep_build.stderr[-300:]!r}")
         (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
         sweep_env = dict(large, LD_PRELOAD=sweep_tracker) if sweep_tracker else large
         refused_at = None
