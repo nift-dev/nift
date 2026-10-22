@@ -78,7 +78,8 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
         std::sort(names.begin(), names.end());
 #endif
     }
-    if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
+    // Legacy records a directory listing's result as its entry count.
+    if (finish_host(call, std::to_string(names.size()), host::Observation{}, error) != Status::Ok) return Status::Error;
     out = make_array(names.size());
     for (const std::string& name : names) array_push(out, make_string(name));
     return Status::Ok;
