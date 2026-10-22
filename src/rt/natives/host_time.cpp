@@ -3,8 +3,7 @@
 
 #include "rt/natives/host_util.h"
 
-#include "ParserHelpers.h"
-#include "RuntimeValue.h"
+#include "ParserHostHelpers.h"
 #include "rt/number.h"
 #include "rt/string.h"
 
@@ -70,15 +69,31 @@ Status host_secure_random_bytes(const Context& context, const Value* args, std::
     host::HostCall call(context.host, host::HostOp::Random, "secure_random_bytes");
     call.set_arg("");
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
-    nift::RuntimeValue random_value;
-    if (!nift::detail::nift_secure_random_bytes(count, random_value, error))
-        return fail_host(call, host::HostStatus::Fatal, host_error("host.service_failed", error), error);
-    const auto& bytes = *random_value.bytes;
-    if (!reserve_result(context, bytes.size()))
+    // The budget is checked before the result buffer exists, and the buffer
+    // is filled in place and becomes the result: one allocation of `count`
+    // bytes, never a second copy (CP16 certification fix).
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 13
+    if (!reserve_result(context, count))
         return fail_host(call, host::HostStatus::Limit,
                          host_error("limit.exceeded", "secure_random_bytes: result exceeds the memory budget"), error);
-    if (finish_host(call, std::to_string(bytes.size()), host::Observation{}, error) != Status::Ok) return Status::Error;
-    out = make_bytes(std::vector<std::uint8_t>(bytes.begin(), bytes.end()));
+#endif
+    std::vector<std::uint8_t> bytes;
+    try {
+        bytes.resize(count);
+    } catch (const std::exception&) {
+        error = "secure_random_bytes: cannot allocate result";
+        return fail_host(call, host::HostStatus::Fatal, host_error("host.service_failed", error), error);
+    }
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 13
+    // mutant 13: the budget is checked only after the buffer was allocated.
+    if (!reserve_result(context, count))
+        return fail_host(call, host::HostStatus::Limit,
+                         host_error("limit.exceeded", "secure_random_bytes: result exceeds the memory budget"), error);
+#endif
+    if (!nift::detail::nift_secure_random_fill(bytes.data(), count, error))
+        return fail_host(call, host::HostStatus::Fatal, host_error("host.service_failed", error), error);
+    if (finish_host(call, std::to_string(count), host::Observation{}, error) != Status::Ok) return Status::Error;
+    out = make_bytes(std::move(bytes));
     return Status::Ok;
 }
 

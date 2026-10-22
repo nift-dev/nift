@@ -208,7 +208,7 @@ RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.in
 # CP16 host built-ins: VM natives call HostCall, and the shared helpers they
 # reuse live outside src/rt. Added here so every RT unit that links the native
 # table has the same symbols as nift itself.
-RT_VALUE_SOURCES += $(sort $(wildcard src/rt/host/*.cpp) $(wildcard src/rt/handles/*.cpp)) src/ParserHelpers.cpp src/Process.cpp src/FileSystem.cpp
+RT_VALUE_SOURCES += $(sort $(wildcard src/rt/host/*.cpp) $(wildcard src/rt/handles/*.cpp)) src/ParserHelpers.cpp src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp
 RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
 RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
 RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
@@ -2574,13 +2574,13 @@ test-v49-glob-order: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_glob_order.py
 
 # Dedicated test-only path conversion instrumentation.
-$(TEST_DIR)/glob-keys/ParserHelpers.o: src/ParserHelpers.cpp
+$(TEST_DIR)/glob-keys/ParserHostHelpers.o: src/ParserHostHelpers.cpp
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_KEY_STATS -MMD -MP -c $< -o $@
--include $(TEST_DIR)/glob-keys/ParserHelpers.d
+-include $(TEST_DIR)/glob-keys/ParserHostHelpers.d
 GLOB_KEY_GUARD := $(TEST_DIR)/nift-glob-key-guard$(EXEEXT)
-$(GLOB_KEY_GUARD): $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHelpers.o $(LIBFFI_A)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHelpers.o $(LDLIBS) -o $@
+$(GLOB_KEY_GUARD): $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHostHelpers.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHostHelpers.o $(LDLIBS) -o $@
 .PHONY: test-v49-glob-key-guard
 test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
 	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py
@@ -2683,16 +2683,16 @@ test-v410-callback-overlay-guard: $(LAMBDA_CACHE_GUARD)
 test: test-v410-callback-overlay-guard
 
 # Operation-local glob prefix and terminal materialization scaling.
-$(TEST_DIR)/glob-prefix/ParserHelpers.o: src/ParserHelpers.cpp
+$(TEST_DIR)/glob-prefix/ParserHostHelpers.o: src/ParserHostHelpers.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c $< -o $@
 $(TEST_DIR)/glob-prefix/ParserExpression.o: src/ParserExpression.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c $< -o $@
--include $(TEST_DIR)/glob-prefix/ParserHelpers.d $(TEST_DIR)/glob-prefix/ParserExpression.d
+-include $(TEST_DIR)/glob-prefix/ParserHostHelpers.d $(TEST_DIR)/glob-prefix/ParserExpression.d
 GLOB_PREFIX_GUARD := $(TEST_DIR)/nift-glob-prefix-guard$(EXEEXT)
-$(GLOB_PREFIX_GUARD): $(filter-out src/ParserHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LIBFFI_A)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LDLIBS) -o $@
+$(GLOB_PREFIX_GUARD): $(filter-out src/ParserHostHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHostHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHostHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-prefix-guard test-v410-glob-prefix-parity
 test-v410-glob-prefix-guard: $(GLOB_PREFIX_GUARD)
 	NIFT_PREFIX_STATS=$(abspath $(GLOB_PREFIX_GUARD)) $(PYTHON) tests/v410_glob_prefix_guard.py
@@ -2844,7 +2844,14 @@ RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
+# CP16: the native table includes the Host built-ins, which call the Host layer
+# and the RuntimeValue-free helpers in ParserHostHelpers.cpp (never
+# ParserHelpers.cpp, which needs the legacy value model). Every builtins binary,
+# including the isolated bench below, links them.
+RT_BUILTINS_HOST := $(RT_HOST_LINK_SOURCES) src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp
+RT_BUILTINS_CORE += $(RT_BUILTINS_HOST)
 RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/natives/*.inc) \
+	$(RT_BUILTINS_HOST) src/ParserHostHelpers.h \
 	$(RT_BUILTINS_CORE) $(wildcard src/rt/*.h) src/RuntimeValue.h tests/rt/rt_test.h tests/rt/builtins_support.h
 RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
 RT_BUILTINS_DIFF := $(TEST_DIR)/rt/builtins-diff$(EXEEXT)
@@ -2891,7 +2898,7 @@ bench-rt-case-conversion: $(RT_CASE_BENCH)
 # and render.cpp (a call into them fails the link), and the sources must not
 # include their headers.
 RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp \
-	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp
+	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp $(RT_BUILTINS_HOST)
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)

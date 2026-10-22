@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SourceView.h"
+#include "ParserHostHelpers.h"
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
@@ -13,11 +14,7 @@
 namespace nift { class RuntimeValue; }
 class RenderHost;
 
-#if !defined(_WIN32) && (defined(__GNUC__) || defined(__clang__))
-#define NIFT_PARSER_HELPER_HIDDEN __attribute__((visibility("hidden")))
-#else
-#define NIFT_PARSER_HELPER_HIDDEN
-#endif
+// NIFT_PARSER_HELPER_HIDDEN is defined by ParserHostHelpers.h.
 
 namespace nift::detail {
 
@@ -39,49 +36,17 @@ NIFT_PARSER_HELPER_HIDDEN std::string runtime_bytes_string(const nift::RuntimeVa
 NIFT_PARSER_HELPER_HIDDEN bool nift_atomic_add_sub_checked(
     std::atomic<std::int64_t>& value, std::int64_t operand, bool subtract,
     std::int64_t& before, std::int64_t& after);
-NIFT_PARSER_HELPER_HIDDEN bool nift_unix_epoch_milliseconds(
-    std::int64_t& value, std::string& error);
 NIFT_PARSER_HELPER_HIDDEN bool nift_secure_random_bytes(
     std::size_t count, nift::RuntimeValue& value, std::string& error);
 
 NIFT_PARSER_HELPER_HIDDEN bool numeric_exponent_sign(const std::string& text, std::size_t sign);
 
-NIFT_PARSER_HELPER_HIDDEN bool glob_has_magic(const std::string& value);
-NIFT_PARSER_HELPER_HIDDEN bool glob_component_match(const std::string& pattern, const std::string& name);
 enum class FilesystemPlanEvent { Prepare, Recipe, Backend, Operand, Pure, Reject, Fallback };
 #ifdef NIFT_TEST_FS_RECIPE_STATS
 NIFT_PARSER_HELPER_HIDDEN void record_filesystem_plan_event(FilesystemPlanEvent event);
 #else
 inline void record_filesystem_plan_event(FilesystemPlanEvent) {}
 #endif
-enum class GlobPrefixEvent { TerminalPath, PrefixNode, PrefixResolve, FullDisplayPath, FinalValue };
-#ifdef NIFT_TEST_GLOB_PREFIX_STATS
-NIFT_PARSER_HELPER_HIDDEN void record_glob_prefix_event(GlobPrefixEvent event);
-#else
-inline void record_glob_prefix_event(GlobPrefixEvent) {}
-#endif
-struct GlobPrefix {
-    std::filesystem::path original;
-    std::filesystem::path resolved;
-    std::error_code error;
-    bool ready = false;
-    bool requires_leaf_resolution = false;
-    std::string relative_display;
-    bool relative_fallback = false;
-};
-struct GlobMatch {
-    std::filesystem::path absolute;
-    std::shared_ptr<GlobPrefix> prefix;
-    bool resolve_leaf = true;
-};
-NIFT_PARSER_HELPER_HIDDEN std::vector<GlobMatch> glob_expand_shared(const std::filesystem::path& resolved_pattern);
-NIFT_PARSER_HELPER_HIDDEN std::vector<std::filesystem::path> glob_expand(const std::filesystem::path& resolved_pattern);
-// Additive streaming visitor: traversal order, no collection or sorting. The
-// callback returns false to stop the walk immediately. Existing callers keep
-// the sorted vector interfaces above.
-using GlobVisitor = std::function<bool(const std::filesystem::path&)>;
-NIFT_PARSER_HELPER_HIDDEN bool glob_visit(const std::filesystem::path& resolved_pattern,
-                                          const GlobVisitor& visitor);
 
 NIFT_PARSER_HELPER_HIDDEN bool strip_presentation_chain(const std::string& text, std::string& base,
                                                         bool& pretty, bool& highlight);

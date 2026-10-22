@@ -5,7 +5,7 @@
 #include "rt/natives/host_util.h"
 #include "rt/natives/host_fs_stream.h"
 #include "FileSystem.h"
-#include "ParserHelpers.h"
+#include "ParserHostHelpers.h"
 #include "Proc.h"
 #include "ReadLimit.h"
 #include "Sha256.h"
