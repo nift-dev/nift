@@ -18,7 +18,7 @@ bool host_shell_supported();
 
 // Foreground run, including pipelines and redirections. Returns the legacy
 // ProcessResult shape the shell already consumes.
-ProcessResult run_pipeline(const std::vector<ProcessSpec>& specs, const std::string& command);
+ProcessResult run_pipeline(const std::vector<ProcessSpec>& specs, const std::string& command, bool direct = false);
 
 class JobTable {
 public:

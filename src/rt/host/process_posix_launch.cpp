@@ -217,6 +217,7 @@ void open_endpoints(Launch& l) {
     const bool blocking = mode == OutputMode::FileCapture || mode == OutputMode::PipeCapture ||
                           mode == OutputMode::Stream || mode == OutputMode::Inherit;
     l.want_handoff = !l.detached && s.req.own_group && blocking && !l.stdin_pipe && !l.null_stdin &&
+                     s.req.terminal != TerminalPolicy::Never &&
                      s.req.stages.front().stdin_path.empty() && terminal_foreground();
 }
 

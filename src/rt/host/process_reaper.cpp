@@ -188,6 +188,17 @@ void note_managed_pgid(long pgid) {
     managed_pgids().insert(pgid);
 }
 
+void forget_managed_pgid(long pgid) {
+    if (pgid <= 0) return;
+    std::lock_guard<std::mutex> lock(managed_mutex());
+    managed_pgids().erase(pgid);
+}
+
+std::size_t managed_pgid_count() {
+    std::lock_guard<std::mutex> lock(managed_mutex());
+    return managed_pgids().size();
+}
+
 std::size_t reap_adopted_orphans() {
 #ifdef __linux__
     // A stage that exits between fork() and its registration in the index

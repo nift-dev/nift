@@ -101,6 +101,14 @@ def main():
         check("background-wait", (root / "bg-done").exists(), n.stdout + n.stderr)
         check("background-jobs", "Done (0)" in n.stdout, n.stdout + n.stderr)
 
+    # A background wait must actually reap the group before the next command.
+    with tempfile.TemporaryDirectory(prefix="cp20-bg-left-") as tmp:
+        root = Path(tmp)
+        n = shell("/bin/sh -c 'sleep 0.4; touch bg-marker' &\nwait\n"
+                  "/bin/sh -c 'test -f bg-marker && echo WAITED || echo EARLY'\n", root, timeout=20)
+        check("background-leftover", "WAITED" in n.stdout and "EARLY" not in n.stdout,
+              n.stdout + n.stderr)
+
     # Pipeline status uses the last stage; the middle failure must not win.
     one("pipeline-last-status", "/bin/sh -c 'exit 7' | /usr/bin/true && echo LAST_OK", "LAST_OK\n")
     one("pipeline-last-status-fail", "/usr/bin/true | /usr/bin/false && echo BAD || echo LAST_FAIL",

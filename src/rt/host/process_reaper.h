@@ -39,6 +39,8 @@ std::vector<long> detached_sessions_snapshot();
 // Every process group the Host layer creates is noted, so adopted orphans
 // can be told apart from children launched by other code.
 void note_managed_pgid(long pgid);
+void forget_managed_pgid(long pgid);
+std::size_t managed_pgid_count();
 // Reaps zombie children that are adopted orphans (under the subreaper): a
 // process group Nift created, or a session other than Nift's (escapees,
 // detached sessions). Never an unreaped stage of a live group, never a

@@ -1366,6 +1366,24 @@ void cleanup_failures_reported() {
 
 } // namespace
 
+void terminal_never_option() {
+    const std::string tag = new_tag();
+    auto r = req({"sh", "-c", "exit 0"}, OutputMode::Inherit, tag);
+    r.terminal = TerminalPolicy::Never;
+    r.own_group = true;
+    auto result = run_ok(std::move(r));
+    CHECK(result.launched && result.exit_code == 0);
+}
+
+void managed_pgid_cleanup() {
+    const std::string tag = new_tag();
+    for (int i = 0; i < 10000; ++i) {
+        auto g = start_ok(req({"/bin/true"}, OutputMode::Inherit, tag));
+        g->wait();
+    }
+    CHECK(runtime::managed_pgid_count() == 0);
+}
+
 int main(int argc, char** argv) {
     kSelf = argv[0];
     runtime::test_hooks().record = true;  // diagnostics: event trace (printed on failure)
@@ -1403,6 +1421,8 @@ int main(int argc, char** argv) {
         {"sigkill_pdeathsig_linux", sigkill_pdeathsig_linux},
         {"escapees_subreaper", escapees_subreaper},  // enables the subreaper for the rest of the process
         {"subreaper_reaps_orphans", subreaper_reaps_orphans},
+        {"terminal_never_option", terminal_never_option},
+        {"managed_pgid_cleanup", managed_pgid_cleanup},
     };
     // Stress: CP16_REPEAT=N runs the selection N times (the signal log is reset per round).
     const char* repeat_env = std::getenv("CP16_REPEAT");

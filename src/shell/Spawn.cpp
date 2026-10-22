@@ -89,6 +89,7 @@ using nift::rt::host::SpawnStage;
     SpawnRequest request;
     request.builtin = command.empty() ? "shell" : command;
     request.mode = OutputMode::Inherit;
+    request.exec_report_optional = true;  // CP07 low-fd shell contract
     // Legacy shell semantics: only a simple foreground command gets its own
     // terminal/process group. Pipeline stages stay in Nift's group, so a
     // SIGINT to that group still reaches every stage (CP07/CP20 contract).
@@ -124,11 +125,12 @@ bool host_shell_supported() {
 #endif
 }
 
-ProcessResult run_pipeline(const std::vector<ProcessSpec>& specs, const std::string& command) {
+ProcessResult run_pipeline(const std::vector<ProcessSpec>& specs, const std::string& command, bool direct) {
 #ifdef _WIN32
     (void)command;
-    return nift_run_pipeline(specs, false, false);
+    return nift_run_pipeline(specs, !direct, !direct);
 #else
+    (void)direct;
     return run_host(specs, command);
 #endif
 }
@@ -171,12 +173,14 @@ JobTable::~JobTable() {
 bool JobTable::supported() const { return host_shell_supported(); }
 
 ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std::string& command, bool foreground) {
-    if (foreground || !supported()) return run_pipeline(specs, command);
+    if (foreground || !supported()) return run_pipeline(specs, command, true);
 #ifndef _WIN32
     if (specs.empty()) { ProcessResult out; out.error = "empty pipeline"; return out; }
     SpawnRequest request;
     request.builtin = command.empty() ? "shell" : command;
     request.mode = OutputMode::Inherit;
+    request.exec_report_optional = true;
+    request.terminal = nift::rt::host::TerminalPolicy::Never;
     for (const auto& spec : specs) request.stages.push_back(convert_stage(spec));
     HostStatus status = HostStatus::Ok;
     HostError error;

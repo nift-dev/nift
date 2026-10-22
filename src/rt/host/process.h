@@ -65,6 +65,8 @@ struct SpawnStage {
 using Millis = std::chrono::milliseconds;
 using Clock = std::chrono::steady_clock;
 
+enum class TerminalPolicy : std::uint8_t { Auto, Never };
+
 struct SpawnRequest {
     std::vector<SpawnStage> stages;
     OutputMode mode = OutputMode::FileCapture;
@@ -83,6 +85,7 @@ struct SpawnRequest {
     // Nift's group (a supervisor's killpg, Ctrl-C) reaches them; Nift
     // signals them by pid; no leftover tracking (C1) and no terminal handoff.
     bool own_group = true;
+    TerminalPolicy terminal = TerminalPolicy::Auto;  // CP20/H1: background jobs never take the terminal
     // Legacy compatibility only (the legacy run() exception, cp16-host-ops-impl.md
     // §9.3): when no descriptor is left for the exec-failure report pipe,
     // launch anyway (an exec failure is then only its 127/126 status, as the

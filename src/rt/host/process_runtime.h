@@ -67,6 +67,8 @@ int host_kill(long target, int sig, const char* site, const void* group);
 
 // ---- /proc helpers (Linux; empty elsewhere) ----
 struct ProcInfo { long pid = 0; char state = '?'; long ppid = 0; long pgrp = 0; long session = 0; };
+// Test/evidence: number of managed process-group ids currently remembered.
+std::size_t managed_pgid_count();
 std::vector<ProcInfo> proc_scan();
 bool proc_read(long pid, ProcInfo& out);
 // Descendants of `roots` by parent links (excluding the roots).

@@ -3071,9 +3071,16 @@ test-cp20-shell-spawn: $(TARGET)
 test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 	@for m in 1 2 3 4 5 6; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp20-mutants/$$m/nift$(EXEEXT)"; \
-	  python3 tests/cp20_shell_spawn.py --nift "$$bin" --mutant-kind "m$$m" > ".build/cp20-mutants/$$m.log" 2>&1; \
+	  python3 tests/cp20_shell_spawn.py --nift "$$bin" > ".build/cp20-mutants/$$m.log" 2>&1; \
 	  rc=$$?; \
-	  if [ "$$m" = "1" ]; then pattern="FAIL streaming-plain"; else pattern="FAIL mutant-m$$m"; fi; \
+	  case "$$m" in \
+	    1) pattern="FAIL streaming-plain" ;; \
+	    2) pattern="FAIL stdout-append" ;; \
+	    3) pattern="FAIL merge-pipe" ;; \
+	    4) pattern="FAIL env-scope" ;; \
+	    5) pattern="FAIL background-leftover" ;; \
+	    6) pattern="FAIL pipeline-last-status" ;; \
+	  esac; \
 	  if [ $$rc -eq 0 ] || ! grep -q "$$pattern" ".build/cp20-mutants/$$m.log"; then \
 	    echo "FAIL CP20 mutant $$m: not detected"; tail -20 ".build/cp20-mutants/$$m.log"; exit 1; \
 	  fi; \
@@ -3082,3 +3089,13 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 .PHONY: test-cp20-launch-bench
 test-cp20-launch-bench: $(TARGET)
 	python3 tests/cp20_launch_bench.py --nift "$(CURDIR)/$(TARGET)"
+.PHONY: test-cp20-r1 test-cp20-r1-flake test-cp20-r1-windows
+test-cp20-r1: $(TARGET)
+	python3 tests/cp20_shell_spawn.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/cp20_r1.py --nift "$(CURDIR)/$(TARGET)"
+test-cp20-r1-flake: $(TARGET)
+	@for i in $$(seq 1 20); do \
+	  python3 tests/cp20_r1.py --nift "$(CURDIR)/$(TARGET)" > "$(TEST_DIR)/cp20-r1-pty-$$i.log" 2>&1 || { echo "FAIL PTY round $$i"; cat "$(TEST_DIR)/cp20-r1-pty-$$i.log"; exit 1; }; \
+	done; echo "PASS CP20 PTY suite 20/20"
+test-cp20-r1-windows: $(TARGET)
+	python3 tests/cp20_windows_pipeline.py "$(CURDIR)/$(TARGET)"
