@@ -94,3 +94,25 @@ warning and may be tracked as external dependencies; they are not refused.
 `link/..` is normalised lexically before the OS sees it (pre-existing).
 Embedders that relied on default confinement must opt in with
 `--fs-root`/the host policy.
+
+## CP03 review corrections (2026-10-23)
+
+- **Cached requirements under an explicit restriction:** when `NIFT_FS_ROOT`
+  is set, `build_reasons` revalidates each saved requirement against that
+  root before treating a page as up to date. A symlink retargeted outside the
+  root (leaf or parent, `@path` or `@pathto`) therefore rebuilds and fails
+  with `path escapes configured filesystem root` instead of silently using
+  the cached requirement. The check is behind the environment flag and is
+  skipped entirely for unrestricted builds.
+- **Project build hooks:** `run_script(..., project_build=true)` no longer
+  resets `enforce_filesystem_root`; it follows the configured root exactly as
+  embedded scripts and standalone script paths do. Per-item and global
+  pre/post build hooks now enforce `NIFT_FS_ROOT` for reads and writes.
+- **Tracing gate:** the shared CP01 syscall helper fails on tracer/workload
+  failure, empty or malformed traces, and exits 77 only when `strace` is
+  unavailable. CP03's target runs the shared tracer controls.
+- Tests: `tests/runtime2/cp03_restricted.py` covers leaf/parent symlink
+  retargeting, both `@path`/`@pathto`, policy transitions, unrestricted
+  controls, and global/per-item inside/outside hooks.
+- Unrestricted no-op syscall counts and readlink counts are unchanged
+  (5,944 / 0 at 200×10).
