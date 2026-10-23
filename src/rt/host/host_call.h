@@ -34,6 +34,9 @@ struct HostCallEnv {
     TraceChannel* trace = nullptr;  // null: no tracing
     Observer* observer = nullptr;   // null: standalone script (no recording)
     const PathPolicy* paths = nullptr;
+    // N1: the per-call error code, propagated to the native/VM error path.
+    // Null in callers that do not need it (legacy, unit tests).
+    std::string* error_code = nullptr;
 };
 
 class HostCall {

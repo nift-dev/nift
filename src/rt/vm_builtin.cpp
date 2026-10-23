@@ -58,16 +58,25 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
     context.heap_limit = heap_limit_;
     context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
     context.host.paths = &vm_path_policy();
+    context.host.error_code = &context.host_error_code;  // N1: per-call Host code
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {
         case natives::Status::Ok: break;
         case natives::Status::Error: return raise(fault, StopReason::Error, std::move(message));
         case natives::Status::Recoverable:
-            // CP15: legacy raises a catchable Error (validate: schema.rejected).
-            // No try/catch on the VM yet (CP13 T4): uncaught, it is the same
-            // program error as legacy's, reported with its code.
+            // CP15: legacy raises a catchable Error. N1: the HostCall's own
+            // code (io.open_failed / io.read_failed / ...) wins over the
+            // per-built-in fallback; validate has no HostCall and keeps
+            // schema.rejected.
+#if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 14
+            // N1 negative control: restore the old per-built-in mapping.
             fault.code = std::string(natives::recoverable_code(spec.id));
+#else
+            fault.code = context.host_error_code.empty()
+                             ? std::string(natives::recoverable_code(spec.id))
+                             : context.host_error_code;
+#endif
             fault.catchable = true;
             return raise(fault, StopReason::Error, std::move(message));
         case natives::Status::Limit:

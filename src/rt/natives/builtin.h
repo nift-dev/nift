@@ -48,6 +48,9 @@ struct Context {
     static constexpr std::size_t kNoHeapLimit = static_cast<std::size_t>(-1);
     std::size_t heap_limit = kNoHeapLimit;
     host::HostCallEnv host;  // trace/path policy; no observer for standalone scripts
+    // N1: the code of the failing HostCall in this call (empty when the native
+    // has no HostCall, e.g. validate's schema.rejected).
+    std::string host_error_code;
     // Natives that build results proportional to more than their inputs check
     // the budget every kBudgetStride items.
     static constexpr std::size_t kBudgetStride = 1024;

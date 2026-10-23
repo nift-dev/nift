@@ -6,7 +6,9 @@
 namespace nift::rt::host {
 
 HostCall::HostCall(const HostCallEnv& env, HostOp op, std::string_view builtin)
-    : env_(env), op_(op), builtin_(builtin) {}
+    : env_(env), op_(op), builtin_(builtin) {
+    if (env_.error_code) env_.error_code->clear();
+}
 
 HostCall::~HostCall() {
     if (finished_) return;
@@ -127,6 +129,7 @@ HostStatus HostCall::fail(HostStatus status, const HostError& error, std::string
     const auto& info = op_info(op_);
     if (env_.trace && begun_ && !refused_ && info.v1_point == TracePoint::PostAlways)
         env_.trace->emit_v1(info.v1_name, trace_arg(), v1_res);
+    if (env_.error_code) *env_.error_code = error_.code;  // N1: per-call code
     emit_v2("error", error_.code);
     // Fatal/limit: the run ends and legacy records no read. A listing is the
     // exception: legacy records its fingerprint before the attempt, whatever follows.
