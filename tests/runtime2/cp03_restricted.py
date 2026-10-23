@@ -51,41 +51,53 @@ def expect(ok, label, detail=""):
 
 def retarget(kind, form):
     p = site(f"retarget-{kind}-{form}")
-    inside = p / "public/inside.txt"
-    inside.parent.mkdir(exist_ok=True)
-    inside.write_text("IN")
     outside = ROOT / f"outside-{kind}-{form}.txt"
     outside.write_text("OUT")
-    body = f'@{form}("public/link.txt")'
-    (p / "content/index.html").write_text(body)
-    target = p / "public/link.txt"
-    target.symlink_to(inside)
-    rc, out = run(p, f"restricted {form} initial", "build", "--all")
-    expect(rc == 0, f"restricted {form} initial build", out[-300:])
-    target.unlink()
     if kind == "leaf":
-        target.symlink_to(outside)
+        inside = p / "public/inside.txt"; inside.write_text("IN")
+        body = f'@{form}("public/link.txt")'
+        target = p / "public/link.txt"
+        link = target
+        initial = inside
+        final = outside
     else:
-        target.symlink_to(outside.parent)
-    rc, out = run(p, f"restricted {form} retarget no-op", "build")
+        inside_dir = p / "public/inside-dir"; inside_dir.mkdir(exist_ok=True)
+        (inside_dir / "file.txt").write_text("IN")
+        outside_dir = ROOT / f"outside-dir-{form}"; outside_dir.mkdir(exist_ok=True)
+        (outside_dir / "file.txt").write_text("OUT")
+        body = f'@{form}("public/alias/file.txt")'
+        link = p / "public/alias"
+        initial = inside_dir
+        final = outside_dir
+    (p / "content/index.html").write_text(body)
+    link.symlink_to(initial)
+    rc, out = run(p, f"restricted {form} {kind} initial", "build", "--all")
+    expect(rc == 0, f"restricted {form} {kind} initial build", out[-300:])
+    link.unlink(); link.symlink_to(final)
+    rc, out = run(p, f"restricted {form} {kind} retarget no-op", "build")
     expect(rc != 0 and "path escapes configured filesystem root" in out,
-           f"restricted {form} retarget rejected", out[-400:])
-    rc, out = run(p, f"restricted {form} retarget forced", "build", "--all")
+           f"restricted {form} {kind} retarget rejected", out[-400:])
+    rc, out = run(p, f"restricted {form} {kind} retarget forced", "build", "--all")
     expect(rc != 0 and "path escapes configured filesystem root" in out,
-           f"restricted {form} forced retarget rejected", out[-400:])
+           f"restricted {form} {kind} forced retarget rejected", out[-400:])
     # Unrestricted control on a separate project.
     q = site(f"free-{kind}-{form}")
-    (q / "public/inside.txt").write_text("IN")
     (q / "content/index.html").write_text(body)
-    (q / "public/link.txt").symlink_to(q / "public/inside.txt")
-    rc, out = run(q, f"free {form} initial", "build", "--all", restricted=False)
-    expect(rc == 0, f"free {form} initial build", out[-300:])
-    (q / "public/link.txt").unlink()
-    (q / "public/link.txt").symlink_to(outside)
-    rc, out = run(q, f"free {form} retarget", "build", restricted=False)
+    if kind == "leaf":
+        (q / "public/inside.txt").write_text("IN")
+        qlink = q / "public/link.txt"
+        qinitial = q / "public/inside.txt"
+    else:
+        qdir = q / "public/inside-dir"; qdir.mkdir(exist_ok=True); (qdir / "file.txt").write_text("IN")
+        qlink = q / "public/alias"
+        qinitial = qdir
+    qlink.symlink_to(qinitial)
+    rc, out = run(q, f"free {form} {kind} initial", "build", "--all", restricted=False)
+    expect(rc == 0, f"free {form} {kind} initial build", out[-300:])
+    qlink.unlink(); qlink.symlink_to(final)
+    rc, out = run(q, f"free {form} {kind} retarget", "build", restricted=False)
     expect(rc == 0 and "path escapes configured filesystem root" not in out,
-           f"free {form} retarget stays fast", out[-400:])
-
+           f"free {form} {kind} retarget stays fast", out[-400:])
 
 def transition():
     p = site("transition")
