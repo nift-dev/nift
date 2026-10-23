@@ -38,8 +38,9 @@ rm "$TMP/outside-required.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'required path missing: ../../outside-required.txt' "$P/status.log"
 
-# A req symlink that was safe at build time but is later retargeted outside the
-# project must stop satisfying the project-local @path invariant.
+# CP03 R2: @path targets are ordinary filesystem paths. Retargeting a leaf or
+# directory symlink outside the project is allowed (the deployment warning may
+# be recorded, but it is not a containment failure or a rebuild loop).
 P="$TMP/retarget"; mkproj "$P"
 printf 'inside\n' >"$P/public/assets/inside.txt"
 printf 'outside\n' >"$TMP/outside-target.txt"
@@ -49,14 +50,10 @@ printf '<a href="@path('"'"'public/assets/link.txt'"'"')">x</a>\n' >"$P/content/
 rm "$P/public/assets/link.txt"
 ln -s "$TMP/outside-target.txt" "$P/public/assets/link.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'required output path now resolves outside the project' "$P/status.log"
-if (cd "$P" && "$NIFT_BIN" build >build.log 2>&1); then echo "retargeted @path rebuilt without error" >&2; exit 1; fi
-grep -Fq 'path must stay inside the Nift project' "$P/build.log"
+grep -Fq 'up to date' "$P/status.log"
+(cd "$P" && "$NIFT_BIN" build >/dev/null 2>&1)
 
-
-# The optimized metadata containment cache is parent-directory based. Retargeting
-# a directory symlink outside the project between invocations must still be
-# rejected, not just retargeting the final leaf symlink.
+# Directory symlink retargeting is likewise an ordinary path now.
 P="$TMP/retarget-parent"; mkproj "$P"
 mkdir -p "$P/public/inside-dir" "$TMP/outside-dir"
 printf 'inside\n' >"$P/public/inside-dir/file.txt"
@@ -67,6 +64,6 @@ printf '<a href="@path('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content
 rm "$P/public/linkdir"
 ln -s "$TMP/outside-dir" "$P/public/linkdir"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'required output path now resolves outside the project' "$P/status.log"
+grep -Fq 'up to date' "$P/status.log"
 
 echo "Metadata safety smoke test passed"
