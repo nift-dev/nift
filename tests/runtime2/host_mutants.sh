@@ -150,6 +150,14 @@ if ! grep -q "random-budget-before-alloc" "$TMP/test-13.log"; then
 fi
 echo "PASS host mutant 13: allocation before the random-bytes budget check rejected"
 # M14 (CP16 N1): restore the per-built-in recoverable code.
+# Require a passing unmutated baseline first, then the structured predicate:
+# exactly the three supported read-code mismatches, all other assertions
+# correct, and no harness/legacy failure.
+if ! python3 "$ROOT/tests/runtime2/cp16_n1.py" --nift "$ORACLE" >"$TMP/n1-baseline.log" 2>&1; then
+    echo "FAIL host mutant 14: unmutated N1 baseline does not pass" >&2
+    cat "$TMP/n1-baseline.log" >&2
+    exit 1
+fi
 BUILD="$TMP/m14"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
@@ -161,18 +169,23 @@ if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     exit 1
 fi
 set +e
-python3 "$BUILD/tests/runtime2/cp16_n1.py" --nift "$BUILD/nift" >"$TMP/test-14.log" 2>&1
+python3 "$BUILD/tests/runtime2/cp16_n1.py" --nift "$BUILD/nift" --expect-mutant >"$TMP/test-14.log" 2>&1
 status=$?
 set -e
-if [ "$status" -eq 0 ]; then
-    echo "FAIL host mutant 14: N1 per-call code test passed (per-built-in mapping not caught)" >&2
+if [ "$status" -ne 0 ]; then
+    echo "FAIL host mutant 14: structured M14 predicate rejected the mutant" >&2
     cat "$TMP/test-14.log" >&2
     exit 1
 fi
-if ! grep -q "N1 read-failure code mismatch" "$TMP/test-14.log"; then
-    echo "FAIL host mutant 14: rejected, but not by the read-failure code assertion" >&2
+if ! grep -q "PASS N1 mutant predicate: exactly open/cat/sha256_file read-code mismatches" "$TMP/test-14.log"; then
+    echo "FAIL host mutant 14: not rejected by the exact intended read-code predicate" >&2
     cat "$TMP/test-14.log" >&2
     exit 1
 fi
-echo "PASS host mutant 14: per-built-in mapping rejected by the read-failure code assertion"
+if ! grep -q 'MUTANT-RESULT' "$TMP/test-14.log"; then
+    echo "FAIL host mutant 14: no structured result" >&2
+    cat "$TMP/test-14.log" >&2
+    exit 1
+fi
+echo "PASS host mutant 14: per-built-in mapping rejected by the exact structured read-code predicate"
 echo "PASS host negative controls: 13 behavioural mutants rejected (1-9, 11-14); M10 accounting-formula control detected by the NIFT_TRIM probe"
