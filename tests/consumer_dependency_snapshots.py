@@ -51,8 +51,13 @@ def versions(binary,base):
   elif defect=='bad-type':value['dependency-hashes'][key]=17
   elif defect=='bad-string':value['dependency-hashes'][key]='nan'
   else:value['dependency-hashes']['unused']='123'
-  writable_json(metadata(p,'a'),value);old=metadata(p,'a').stat().st_mtime_ns;run(binary,p,'build')
-  assert (metadata(p,'a').stat().st_mtime_ns!=old)==(defect!='extra')
+  writable_json(metadata(p,'a'),value);corrupted=metadata(p,'a').read_bytes();out=run(binary,p,'build')
+  # Rebuild-or-not is checked by the state transition, not by mtime inequality
+  # (distinct writes can share a timestamp; see fingerprint_migration).
+  if defect=='extra':assert 'built' not in out and metadata(p,'a').read_bytes()==corrupted,(defect,out)
+  else:
+   assert 'built' in out and metadata(p,'a').read_bytes()!=corrupted,(defect,out)
+   assert hashes(p,'a').get(key)==history['h3'],(defect,'snapshot not repaired')
   old=metadata(p,'a').stat().st_mtime_ns;run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns==old
  # Renamed/removed consumers do not own shared history.
  run(binary,p,'mv','a','renamed');run(binary,p,'build');run(binary,p,'untrack','b');d.write_text('h4\n@content');run(binary,p,'build');assert hashes(p,'c')[key]==hash_bytes(d.read_bytes())
@@ -118,20 +123,49 @@ def declared_filevalue_hook(binary,base):
   if proc.poll() is None:proc.kill();proc.communicate()
  return True
 
-def fingerprint_migration(binary,base):
- p=base/'fingerprints';p.mkdir();setup(p,'hash','template')
+def fingerprint_migration(binary,base,runner=None,name='fingerprints'):
+ # A missing or invalid project-fingerprint snapshot must make the next build
+ # rebuild the page and repair the snapshot; the build after that is a no-op.
+ # The repair is checked by the state transition (rebuild reported, snapshot
+ # restored to the correct value, page-info rewritten), never by mtime
+ # inequality: two distinct writes can receive identical mtime/ctime (observed
+ # 2026-10-23 on a 6.18 kernel, also with pre-CP16 binaries), so a genuine
+ # rewrite need not change the timestamp.
+ runner=runner or run
+ p=base/name;p.mkdir();setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='templates/shared.html')])
  (p/'templates/shared.html').write_text('$[project.files[0].name]@content')
  run(binary,p,'build','--all');key='.nift/project.fingerprint'
- assert key in hashes(p,'a')
+ good=hashes(p,'a').get(key);assert isinstance(good,str) and good not in ('','invalid','0'),good
  for value in [None,'invalid','0']:
   obj=json.loads(metadata(p,'a').read_text())
   if value is None:obj['dependency-hashes'].pop(key)
   else:obj['dependency-hashes'][key]=value
-  writable_json(metadata(p,'a'),obj);old=metadata(p,'a').stat().st_mtime_ns
-  run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns!=old
-  old=metadata(p,'a').stat().st_mtime_ns;run(binary,p,'build');assert metadata(p,'a').stat().st_mtime_ns==old
+  writable_json(metadata(p,'a'),obj);corrupted=metadata(p,'a').read_bytes()
+  out=runner(binary,p,'build')
+  assert 'built' in out and 'dependency snapshot changed or invalid: '+key in out,('no rebuild reported',value,out)
+  repaired=metadata(p,'a').read_bytes()
+  assert repaired!=corrupted,('page-info not rewritten',value)
+  assert json.loads(repaired)['dependency-hashes'].get(key)==good,('snapshot not repaired',value)
+  out=runner(binary,p,'build')
+  assert 'up to date' in out and 'built' not in out,('second build is not a no-op',value,out)
+  assert metadata(p,'a').read_bytes()==repaired,('no-op build changed page-info',value)
  return True
+
+def fingerprint_migration_selftest(binary,base):
+ # Negative control: a build that leaves the corrupted snapshot in place must
+ # fail the check. Same-timestamp regression: a genuine repair whose page-info
+ # keeps its previous mtime must pass (the old mtime check rejected it).
+ def no_repair(binary,root,*args):
+  info=metadata(root,'a');before=info.read_bytes();out=run(binary,root,*args);writable_json(info,json.loads(before));return out
+ def same_mtime(binary,root,*args):
+  info=metadata(root,'a');st=info.stat();out=run(binary,root,*args);os.utime(info,ns=(st.st_atime_ns,st.st_mtime_ns));return out
+ try:fingerprint_migration(binary,base,no_repair,'fingerprints-negative')
+ except AssertionError:negative=True
+ else:negative=False
+ assert negative,'negative control: a build that does not repair the snapshot was accepted'
+ assert fingerprint_migration(binary,base,same_mtime,'fingerprints-same-mtime')
+ return {'negative_control_rejected':True,'same_timestamp_repair_accepted':True}
 
 def post_hook_output_validation(binary,base):
  p=base/'post-removes-output';p.mkdir();dep,_,_=setup(p,'hash','template')
@@ -202,5 +236,5 @@ def json_and_hooks(binary,base):
 if __name__=='__main__':
  ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--output',required=True);ap.add_argument('--scaling',action='store_true');a=ap.parse_args();binary=str(pathlib.Path(a.nift).resolve());started=time.monotonic()
  with tempfile.TemporaryDirectory(prefix='nift-consumer-snapshots-') as td:
-  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'declared_filevalue_hook':declared_filevalue_hook(binary,base),'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'declared_filevalue_hook':declared_filevalue_hook(binary,base),'fingerprint_migration':fingerprint_migration(binary,base),'fingerprint_migration_selftest':fingerprint_migration_selftest(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
  result.update(passed=True,elapsed_seconds=round(time.monotonic()-started,3));pathlib.Path(a.output).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))
