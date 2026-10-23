@@ -117,8 +117,10 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
       timer_clock_(timer_clock ? std::move(timer_clock) : [] { return std::chrono::steady_clock::now(); }),
       timer_owner_id_(allocate_timer_owner_id()) {
     if (!host_.root().empty()) resource_path_authority_.project_root = canonical_authority_path(host_.root());
-    if (const char* configured_root = std::getenv("NIFT_FS_ROOT"); configured_root && *configured_root)
+    if (const char* configured_root = std::getenv("NIFT_FS_ROOT"); configured_root && *configured_root) {
         resource_path_authority_.filesystem_root = canonical_authority_path(configured_root);
+        resource_path_authority_.enforce_filesystem_root = !resource_path_authority_.filesystem_root.empty();
+    }
     variable_scopes_.emplace_back();
     // CP05: a host may change the environment between renders; re-read the
     // cached NIFT_P4_* switches for this parser.

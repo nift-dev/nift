@@ -363,7 +363,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic) {
-    result_=RenderResult{};active_diagnostic_.reset();active_recoverable_.reset();variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
+    result_=RenderResult{};active_diagnostic_.reset();active_recoverable_.reset();variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=false;resource_path_authority_.enforce_filesystem_root=!resource_path_authority_.filesystem_root.empty();strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
     auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory,false);function_call_depth_=0;strict_script_mode_=false;
     if(!rr.ok){error=rr.error.message;if(diagnostic&&rr.diagnostic)*diagnostic=*rr.diagnostic;pending_control_={};std::string ignored_resource_error;finalize_script_resources(ignored_resource_error);finish_timer_operation(timer_checkpoint);return false;}
@@ -382,7 +382,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         }
     } timer_operation{*this,begin_timer_operation()};
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
-    active_diagnostic_.reset();active_recoverable_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    active_diagnostic_.reset();active_recoverable_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!resource_path_authority_.filesystem_root.empty()||true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so

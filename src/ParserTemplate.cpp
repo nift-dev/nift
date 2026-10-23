@@ -447,9 +447,10 @@ std::string Parser::path_to(const std::string& argument, const std::string& dire
         index_page = target->index_page;
     } else {
         destination = (host_.root() / argument).lexically_normal();
-        if (!filesystem::path_within(host_.root(), destination)) {
+        if (resource_path_authority_.enforce_filesystem_root && !resource_path_authority_.filesystem_root.empty() &&
+            !filesystem::path_within(resource_path_authority_.filesystem_root, destination)) {
             result_.ok = false;
-            result_.error = {tracked_info_.name, {}, 0, directive + ": path must stay inside the Nift project: " + argument};
+            result_.error = {tracked_info_.name, {}, 0, directive + ": path escapes configured filesystem root: " + argument};
             return {};
         }
         if (!host_.source_exists(destination)) {
@@ -2900,8 +2901,9 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                 const auto tracked_target = host_.tracked_output_path(parameters[0]);
                 if (!tracked_target) {
                     const fs::path target_path = (host_.root() / parameters[0]).lexically_normal();
-                    if (!filesystem::path_within(host_.root(), target_path)) {
-                        fail(source_path, source, i, "@" + function + " path must stay inside the Nift project: " + parameters[0]);
+                    if (resource_path_authority_.enforce_filesystem_root && !resource_path_authority_.filesystem_root.empty() &&
+                        !filesystem::path_within(resource_path_authority_.filesystem_root, target_path)) {
+                        fail(source_path, source, i, "@" + function + " path escapes configured filesystem root: " + parameters[0]);
                         break;
                     }
                 }
