@@ -1,34 +1,18 @@
 # Incremental build state (Runtime 2.0)
 
-Two kinds of per-page state live under `.nift/` (plus the project-level
-failed-page list, below):
+Per-page state under `.nift/`:
 
 | State | Path | Contract |
 | --- | --- | --- |
-| Page build metadata (page-info) | `.nift/<output>.info.json` | **Reproducible**: identical inputs give identical bytes (a clean rebuild reproduces it exactly; BH6). Holds dependencies, requirements, observed dynamic reads (CP02), snapshots, sidecar certificate. |
-| Modified-mode timing record | `.nift/clock/<same path>` | **Correctness state, not reproducible.** Holds `racy-dependencies` (dependencies stamped after the page's render clock) and `tick-hashes` (content hashes of dependencies stamped in the render clock's own tick). Contents depend on timing by design. |
+| Page build metadata (page-info) | `.nift/<output>.info.json` | **Reproducible**: identical inputs give identical bytes (a clean rebuild reproduces it exactly; BH6). Holds dependencies, requirements, observed dynamic reads (CP02), snapshots and the sidecar certificate. |
+| Modified-mode build time | page-info mtime | v4.12 rule: a dependency whose mtime is `>=` page-info's mtime rebuilds the page. Page-info is stamped from the filesystem clock (`utimensat(..., NULL)`), so immediate and atomic saves are caught. No timing records, hashes or render locks are written. |
 
-Rules for the timing record (CP01; `tests/runtime2/clock_lifecycle.sh`):
-
-- Written for every page rebuilt in `modified` mode, even when empty; removed
-  when a page is rebuilt in `hash`/`hybrid` mode.
-- **Missing, unreadable or malformed** (deleted `.nift/clock`, interrupted
-  write, metadata from before the record existed, switching back to
-  `modified` mode): status rebuilds the page ("page timing record is missing or
-  invalid"). It is never treated as "nothing racy".
-- A stale racy entry only causes one extra rebuild, after which it is gone.
-- Removed with its page (`rm`, untrack, watch-list removal) and pruned for
-  pages no longer tracked on the next build that has work to do (never on a
-  no-op build), so the directory is bounded by the tracked set.
-- A build killed mid-render leaves `.nift/.unfinished`; the next build
-  recovers automatically (the repair epoch, D-020), after which state is
-  consistent. A page whose build fails keeps its record untouched (the
-  failed-page list makes it dirty instead).
-- Timestamp granularity: the render clock is read back from the filesystem,
-  so comparisons use the filesystem's own granularity (coarse clocks such as
-  FAT's 2 s make same-tick cases more common; those are resolved by tick
-  hashes). Residual risk: an edit after the read within the render clock's
-  tick is not detected in `modified` mode; `hash` mode has no such window.
+Equal timestamps rebuild conservatively. On coarse filesystems a
+back-to-back build may rebuild until the next timestamp tick; v4.12 has the
+same behaviour. Modified mode does not promise to catch edits made during a
+running build, metadata-preserving replacements, multiple writes in one tick,
+backdated mtimes, or backwards clock steps. Hash mode remains the opt-in for
+content-change detection.
 
 ## Failed-page list (D-020, feature-build-recovery)
 

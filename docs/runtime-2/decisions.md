@@ -1200,3 +1200,17 @@ developing VM now, and certified finally against the release candidate. No
 package pushes are authorised yet. This is not a new package-certification
 project; existing package tests run against the new runtime as part of normal
 development.
+
+## D-050 — Modified mode returns to v4.12 semantics (owner, 2026-10-23)
+
+Modified mode uses the v4.12 timestamp rule: rebuild when a dependency is
+missing or its mtime is `>=` the page-info mtime. Page-info is stamped with the
+filesystem's own clock (`refresh_modified_time_now`), which is retained because
+v4.12's user-space stamp permanently missed 999/1,000 immediate edits. The
+CP01 timing records, tick hashes, `.nift/clock` lifecycle, render-clock mutex
+and repeated checks are removed. Edits during a running build, metadata-
+preserving replacements, multiple writes in one timestamp tick, backdated
+mtimes and backwards clock steps are explicitly outside the modified-mode
+contract; hash mode remains the reliable opt-in. The `platform()` invalidation
+and D-020 recovery are retained. No replacement detection machinery may be
+added under this decision.

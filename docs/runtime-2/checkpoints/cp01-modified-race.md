@@ -1,114 +1,81 @@
-# CP01 — Modified-mode timestamp races (review defect D1)
+# CP01 — modified mode restored to v4.12 semantics (simplification)
 
-Status: see `../progress.md`.
+**Status:** implemented locally; pending independent review. Owner decision
+2026-10-23: remove the CP01 clock machinery, keep only the kernel-clock
+page-info refresh.
 
-## Objective
-An edit must never be silently missed by a `modified`-mode incremental build,
-whether it happens just after a build or while the page that reads it renders.
+## Contract
 
-## Root causes (reproduced on v4.12.0)
-1. `write_readonly_file` skips rewriting byte-identical page metadata and
-   refreshes its mtime with `fs::last_write_time(path, clock::now())`. That
-   user-space clock runs up to one kernel tick ahead of the coarse clock the
-   kernel uses to stamp ordinary writes, so a source edited within that tick
-   gets an *older* mtime than the metadata and `mtime >= page-info mtime` is
-   false. Reproduced: 98/200 rapid edit→build cycles missed.
-2. A dependency edited after the page read it but before page-info was written
-   is older than page-info, so the next build trusts stale output (classic
-   make race).
+Modified mode (the default):
 
-## Implementation
-- `filesystem::refresh_modified_time_now` stamps with `utimensat(…, UTIME_NOW)`
-  on POSIX, i.e. the same clock and granularity as ordinary writes. On Windows
-  it stamps with `GetSystemTimeAsFileTime` + `SetFileTime` (the coarse clock
-  NTFS uses for writes) instead of the precise `file_clock::now()`; this path
-  is not compiled here (D-004: pending Windows CI).
-- `ProjectInfo::stamp_render_clock` (modified mode only) touches `.nift/.lock`
-  and reads its mtime back, per page, immediately before the page renders:
-  after that page's pre-build hooks and after every prerequisite (`depends`)
-  page has been built. A failed stamp warns once and disables only this
-  check.
-- `classify_render_dependencies`, called after rendering and before outputs
-  and post-build hooks are written, sorts each dependency:
-  - stamped strictly later than the render clock → `"racy-dependencies"`;
-    the next build re-renders ("dependency was modified while the page was
-    being built: …");
-  - stamped in the render clock's own tick → content hash recorded under
-    `"tick-hashes"`. When such a dependency later looks "changed" by the
-    `mtime >= page-info mtime` rule, the hash decides. This removes the
-    rebuild loops caused when Nift itself wrote a dependency (hook output,
-    prerequisite output) in the same tick as the page-info write.
+- rebuild when a dependency is missing, or when its mtime is `>=` the
+  page-info mtime;
+- page-info is stamped from the filesystem's own clock
+  (`refresh_modified_time_now`, `utimensat(path, NULL)` on POSIX);
+- catches ordinary changes made after a build completes, including immediate
+  edits and atomic (rename-over) saves;
+- does **not** promise to catch: edits during a running build (including a
+  shared template saved mid-build), metadata-preserving replacements, several
+  writes in one timestamp tick, backdated mtimes, or a backwards clock;
+- equal timestamps rebuild conservatively;
+- no hashing, clock records, global render locks or repeated checks.
 
-## Compatibility
-- Page-info gains one optional field, written only when non-empty. Older
-  metadata is read unchanged.
-- No behaviour change for hash/hybrid modes (content snapshots already cover
-  the race).
-- `tests/dependency_status.py`'s intentional "older mtime is not detected in
-  modified mode" contract is unchanged.
+Hash mode is unchanged and remains the opt-in for reliable content-change
+detection.
+
+## Removed
+
+`src/ProjectInfo.{cpp,h}`: `tick_hash_value`, `tick_hash_matches`,
+`stamp_render_clock`, `classify_render_dependencies`, `render_clock_path`,
+`prune_render_clock_records`, `write_render_clock_record`, the render-clock
+mutex/warned flag/observation struct, the `.nift/clock` read in
+`build_reasons`, "missing timing record ⇒ rebuild", and all render-clock call
+sites. `write_page_info` now ends after the page-info write and its crash
+point. Clock-record removals were deleted from `CLI.cpp`, `Automation.cpp` and
+`WatchList.cpp`. `tests/runtime2/clock_lifecycle.sh` and its make and
+certification-guard entries are gone.
+
+## Kept
+
+- `refresh_modified_time_now` (POSIX/Windows): v4.12's user-space clock missed
+  999/1,000 immediate edits permanently; the kernel clock passes 0/1,000.
+- `platform()` invalidation (bundled with CP01 in `804ad627`; no `git revert`).
+- D-020 crash/interrupted-build recovery (the failed-page list).
+- CP02, CP03, shared-source cache, dependency fingerprints/snapshots,
+  temp+rename page-info writes and all hash-mode code.
 
 ## Tests
-- `tests/runtime2/modified_race.sh` (new; `make test-runtime2-modified-race`):
-  (a) immediate edit→build cycles (1,000 standalone, 300 in `make test`),
-  (b) a dependency edited while its page sleeps in `@script`, (c) a pre-build
-  hook regenerating an input causes no follow-up rebuilds, (d) prerequisite
-  outputs are never flagged racy and the dependant is never stale.
-- Previously failing on this host and now passing:
-  `test-incremental-modified-immediate`, `test-consumer-snapshots`.
-- Full `make -k test` compared with the CP00 run (see Evidence).
 
-## Performance
-One `utimensat` + `stat` per rebuilt page (under a mutex); one `stat` per
-dependency per rebuilt page, plus a hash of dependencies stamped in the render
-clock's tick. Nothing extra on no-op checks except a hash for a tick-hashed
-dependency whose mtime is not older than page-info. Gate: no-op build instructions within +5% of baseline.
+- `tests/runtime2/modified_race.sh`: immediate plain edits and atomic saves
+  (1,000 cycles each, 0 missed), no concurrent-edit promise, paced pre-build
+  hook follow-up, prerequisite-output stability.
+- `tests/runtime2/cp01_simplify.sh` (new): ordinary dependency edits/add/
+  remove/delete, no-ops, targeted/full rebuilds, mode switches, crash points,
+  settle, hash/hybrid shared-template repair, and the deterministic syscall
+  guard. Run by `test-runtime2-cp01-simplify`, which is part of `make test`.
+- `tests/runtime2/dynamic_reads_review.sh`: the platform-independent follow-up
+  is paced past a timestamp tick.
+- `tests/build_recovery_random.py`: in modified mode, page-info comparisons
+  ignore `dependency-hashes`; outputs are still byte-identical to a clean
+  build.
 
-## Review (same-model adversarial pass; not independent)
-Findings and resolution:
+## Syscall result (1,000 pages, one thread)
 
-| # | Finding | Resolution |
-| --- | --- | --- |
-| F1 High | Build-wide clock flagged pre-build hook output as racy → endless rebuilds | Fixed: per-page clock after pre-build hooks; same-tick writes resolved by tick hashes. Hook scenario: 1/10 follow-up builds rebuild (baseline 1–2/10); test (c) |
-| F2 Medium | `depends` prerequisite outputs flagged racy → no-op builds not no-ops | Fixed: per-page clock taken after prerequisites build. 0/45 spurious (baseline 0/45); test (d) |
-| F3 Medium | Windows still used the precise clock | Fixed in code (coarse clock); unverified until Windows CI |
-| F4 Low | Edit within the render clock's tick after the read is missed; comment said "at or after" | Documented residual; comments corrected |
-| F5 Low | Build-wide stamp over-flags long builds | Fixed by per-page clock |
-| F6 Low | `const` method writing a `mutable` member | Removed: the clock is a local per page |
-| F7 Low | Failed touch disabled detection silently | Warns once |
-| — | Race test not wired into `make test` | `test-runtime2-modified-race` (300 cycles by default) |
+| Phase | CP01 candidate | This simplification | v4.12 |
+|---|---:|---:|---:|
+| no-op | 31,146 | **19,146** | 21,161 |
+| full | 52,226 | **41,211** | 41,212 |
+| one-page edit | 31,279 | **19,243** | 21,258 |
+| shared-template edit | 94,277 | **71,251** | 73,267 |
 
-## Residual risk (documented, not fixed)
-An edit made after the page read a file but within the same timestamp tick as
-the page's render start (one kernel tick, 4 ms at HZ=250; up to 2 s on
-FAT/HFS+/ext3) is not detected. Hash mode has no such window. Hash mode has no such window. A
-strict `>=` comparison was tried first with a 2-second backwards margin; it made
-`nift status` report stale pages immediately after every build of recently
-written files (broke `test-dependency-path-identity`), so it was rejected.
+`.nift`: 1,003 files (was 2,003). No `.nift/clock` access; `.nift/.lock` is
+one ownership access, as in v4.12. Counts are deterministic `strace -f -c`
+on the local kernel.
 
-## Commit strategy
-1. Failing test. 2. Fix + this record. 3. Evidence/progress update.
+## Residual v4.12 behaviour (documented)
 
-## Post-certification fix (CI @084f09f): reproducible page-info
-`racy-dependencies` and `tick-hashes` depend on timing, and writing them into
-page-info made its bytes nondeterministic: BH6 (`test-init-functional-truth`,
-"clean rebuild does not reproduce init'd page metadata") failed 4/5 locally
-and in CI on Linux (and plausibly the Windows v4.9/v4.10 contracts). They now
-live in `.nift/clock/<page-info path>` (written only when non-empty, removed
-otherwise); page-info is byte-reproducible again (BH6 6/6). The miss was not
-caught locally because BH6 is not in `make test-all`; D-010's certification
-target is now `make certify` (test-all plus every suite the CI workflows run),
-kept complete by `tests/runtime2/certification_guard.sh`.
-
-## Owner review follow-up: timing-record lifecycle and touch semantics
-- The timing record is correctness state (`docs/runtime-2/incremental-state.md`):
-  always written in modified mode; missing/malformed → conservative rebuild;
-  removed with its page; pruned for untracked pages on non-no-op builds;
-  removed in hash/hybrid mode. `tests/runtime2/clock_lifecycle.sh` (22 checks:
-  clean/unchanged/rebuild, missing, truncated, stale racy entry, SIGKILL
-  mid-build + repair, rm, untrack pruning, bounded count, mode switches,
-  external symlinked dependency).
-- Tick hashes are bound to the dependency's exact mtime
-  (`"<sec>.<nsec>:<hash>"`): any later write — including rewriting identical
-  bytes (a touch) — counts as a change again, as in v4.12.0. Found while
-  investigating `v45_target_smoke`, which tick-hashing made fail more often.
-
+- A build immediately after an edit in the same timestamp tick may rebuild
+  once; on coarse (1–2 s) filesystems back-to-back builds rebuild until the
+  next tick. This is v4.12 semantics, not missed output.
+- A shared template saved during a build can leave pages stale until the next
+  edit (modified mode); hash mode repairs it on the next build.
