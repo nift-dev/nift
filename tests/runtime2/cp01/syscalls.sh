@@ -5,7 +5,7 @@
 # prior overhead.sh (template + @input head + 1 content file per page); with
 # nav-links > 0 the head also holds that many @pathto links (CP03 attribution).
 # Output: one line per (binary, phase) with totals and per-syscall/per-path counts.
-set -u
+set -u -o pipefail
 N="$1"; NAV="$2"; shift 2
 HERE="$(mktemp -d)"
 trap 'rm -rf "$HERE"' EXIT

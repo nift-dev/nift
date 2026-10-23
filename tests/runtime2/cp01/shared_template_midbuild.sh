@@ -5,7 +5,7 @@
 # Then 3 ordinary builds with no edits. Reports pages still lacking the new
 # template text after each build, plus `nift status`. Derived from the prior
 # shared_cache_probe.sh, parameterised by incremental mode.
-set -u; NIFT="$1"; LABEL="$2"; MODE="$3"; N="$4"; shift 4
+set -u -o pipefail; NIFT="$1"; LABEL="$2"; MODE="$3"; N="$4"; shift 4
 BASE="$(mktemp -d)"
 trap 'rm -rf "$BASE"' EXIT
 for DELAY in "$@"; do

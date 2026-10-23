@@ -3,7 +3,7 @@
 # Immediate edit -> build cycles (as modified_race.sh (a)); for every miss,
 # run up to <followups> further ordinary builds WITHOUT edits and record which
 # (if any) repairs it. Logs ns mtimes of the content file, page-info and output.
-set -u
+set -u -o pipefail
 NIFT="$1"; CYCLES="$2"; FOLLOW="$3"; LABEL="$4"
 OUT="$(mktemp)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT

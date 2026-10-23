@@ -3,7 +3,7 @@
 # Like classify.sh, but each edit is an editor-style atomic save (write a temp
 # file, rename it over the source: a NEW inode), made right after the previous
 # build returned. Counts misses and whether 3 more ordinary builds repair them.
-set -u; NIFT="$1"; CYCLES="$2"; LABEL="$3"
+set -u -o pipefail; NIFT="$1"; CYCLES="$2"; LABEL="$3"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 cd "$T" && "$NIFT" init >/dev/null 2>&1 && "$NIFT" build >/dev/null 2>&1 || { echo setup failed; exit 2; }
 miss=0; persistent=0; ex=""

@@ -566,7 +566,9 @@ def pagination_without_failed_list(scratch):
         if variant == "deleted":
             (root / ".nift/failed.json").unlink()
         elif variant == "damaged":
-            (root / ".nift/failed.json").write_text("{torn")
+            damaged = root / ".nift/failed.json"
+            damaged.chmod(0o600)  # failed.json is read-only; local non-root test runs must damage it too
+            damaged.write_text("{torn")
         write(root, "scripts/lpost.f", 'print("ok")\n')
         write(root, "data/items.json", json.dumps({"items": ["a"]}))
         rc, out = run(root, *(("build", "--repair") if variant == "repair" else ("build",)))

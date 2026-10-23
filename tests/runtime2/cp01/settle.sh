@@ -2,7 +2,7 @@
 # settle.sh <base-dir> <label=nift>...: 20-page site; full build, then edit every
 # content file and run 12 back-to-back ordinary builds (no pacing). Prints pages
 # rebuilt per build and whether outputs carry the edit.
-set -u; BASE="$1"; shift
+set -u -o pipefail; BASE="$1"; shift
 for spec in "$@"; do L=${spec%%=*}; B=${spec#*=}
   T=$(mktemp -d -p "$BASE"); cd "$T"
   python3 -I -c "
