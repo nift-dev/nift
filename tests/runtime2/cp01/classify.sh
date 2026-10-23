@@ -10,11 +10,11 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 cd "$T" && "$NIFT" init >/dev/null 2>&1 && "$NIFT" build >/dev/null 2>&1 || { echo setup failed; exit 2; }
 st() { stat -c '%.9Y' "$1" 2>/dev/null || echo none; }
 : > "$OUT"
-miss=0; same=0; persistent=0
+miss=0; same=0; persistent=0; build_fail=0
 for i in $(seq 1 "$CYCLES"); do
   printf 'MARK-%s\n' "$i" > content/index.html
   c_m=$(st content/index.html)
-  "$NIFT" build >/dev/null 2>&1
+  "$NIFT" build >/dev/null 2>&1 || build_fail=$((build_fail+1))
   if grep -q "MARK-$i" public/index.html; then continue; fi
   miss=$((miss+1))
   pi_m=$(st .nift/public/index.info.json); o_m=$(st public/index.html)
@@ -30,5 +30,5 @@ for i in $(seq 1 "$CYCLES"); do
   # repair so the next cycle starts clean (an edit: new content)
   if [ "$fixed" -eq 0 ]; then printf 'MARK-%s-repair\n' "$i" > content/index.html; sleep 0.02; "$NIFT" build >/dev/null 2>&1; fi
 done
-echo "label=$LABEL cycles=$CYCLES misses=$miss repaired_next=$same persistent=$persistent" | tee -a "$OUT"
-[ "$persistent" -eq 0 ]
+echo "label=$LABEL cycles=$CYCLES misses=$miss repaired_next=$same persistent=$persistent build_fail=$build_fail" | tee -a "$OUT"
+[ "$miss" -eq 0 ] && [ "$persistent" -eq 0 ] && [ "$build_fail" -eq 0 ]

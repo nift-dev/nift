@@ -170,14 +170,18 @@ def scen_interrupt(c, delays):
         if killed: os.kill(p.pid, signal.SIGKILL)
         p.wait()
         state = "killed" if killed else "finished-before-kill"
+        if not killed:
+            c.fails.append(f"K kill@{d}s: interruption did not happen (build finished before SIGKILL)")
         stale_now = sum(1 for f in os.listdir(f"{r}/public") if "TPL-K" not in open(f"{r}/public/{f}").read() and f.startswith("p") and int(f[1:-5]) >= 10)
         rc, out = run(c.nift, r, "build"); nb1 = len(built(out)); first = out.strip().splitlines()[:2]
-        ok1 = tree(f"{r}/public") == clean_oracle(c.nift, r)
-        if not ok1 and rc != 0:
-            rc2, out2 = run(c.nift, r, "build", "--repair"); c.notes.append(f"K{d}: plain build rc={rc} ({first}); needed --repair rc={rc2}")
-        ok = c.check(r, f"K kill@{d}s ({state}, {stale_now} stale outputs before recovery) -> next build", None, None)
+        ok1 = rc == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r)
+        if rc != 0:
+            c.fails.append(f"K kill@{d}s: plain recovery failed rc={rc}: {first}")
+        if not ok1 and rc == 0:
+            c.fails.append(f"K kill@{d}s: recovered output differs from clean oracle")
         nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(3)]
-        c.notes.append(f"K kill@{d}s {state}: recovery build rc={rc} rebuilt {nb1}, then {nb}; ok_after_plain_build={ok1}")
+        if any(nb): c.fails.append(f"K kill@{d}s: recovery did not settle: {nb}")
+        c.notes.append(f"K kill@{d}s {state}: recovery build rc={rc} rebuilt {nb1}, then {nb}; oracle_ok={ok1}")
         shutil.rmtree(r)
 
 def scen_crashpoints(c):
@@ -187,10 +191,17 @@ def scen_crashpoints(c):
         run(c.nift, r, "build", "--all")
         c.edit(r, "templates/template.html", '<html><head>@input("templates/head.html")</head><body>TPL-C @content</body></html>\n')
         rc, out = run(c.nift, r, "build", env={"NIFT_TEST_CRASH_AT": point})
+        if rc not in (-9, 137):
+            c.fails.append(f"C {point}: injected crash did not terminate by SIGKILL (rc={rc})")
         rc2, out2 = run(c.nift, r, "build")
-        c.check(r, f"C crash at {point} (rc={rc}) -> next build", None, None)
+        ok = rc2 == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r)
+        if rc2 != 0:
+            c.fails.append(f"C {point}: plain recovery failed rc={rc2}")
+        elif not ok:
+            c.fails.append(f"C {point}: recovered output differs from clean oracle")
         nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(3)]
-        c.notes.append(f"C {point}: crash rc={rc}, recovery rebuilt {len(built(out2))}, then {nb}")
+        if any(nb): c.fails.append(f"C {point}: recovery did not settle: {nb}")
+        c.notes.append(f"C {point}: crash rc={rc}, recovery rebuilt {len(built(out2))}, then {nb}, oracle_ok={ok}")
         shutil.rmtree(r)
 
 def scen_immediate(c, cycles):
@@ -208,7 +219,8 @@ def scen_immediate(c, cycles):
                 persistent += 1
                 time.sleep(TICK); write(f"{r}/content/p1.html", f"REPAIR-{i}\n"); run(c.nift, r, "build")
     c.notes.append(f"I immediate edit->build {cycles} cycles: missed {miss}, persistent after 3 more builds {persistent}")
-    if persistent: c.fails.append(f"I immediate edits: {persistent}/{cycles} PERSISTENTLY stale (edit made after the previous build returned)")
+    if miss: c.fails.append(f"I immediate edits: {miss}/{cycles} missed on the first post-edit build")
+    if persistent: c.fails.append(f"I immediate edits: {persistent}/{cycles} PERSISTENTLY stale")
 
 if __name__ == "__main__":
     which = os.environ.get("ONLY", "basic,interrupt,crash,immediate").split(",")
@@ -217,7 +229,7 @@ if __name__ == "__main__":
         label, nift = spec.split("=", 1)
         c = Ctx(label, nift)
         if "basic" in which: scen_basic(c)
-        if "interrupt" in which: scen_interrupt(c, [0.05, 0.12, 0.25])
+        if "interrupt" in which: scen_interrupt(c, [0.01, 0.03, 0.06])
         if "crash" in which and label != "v412": scen_crashpoints(c)
         if "immediate" in which: scen_immediate(c, int(os.environ.get("CYCLES", "300")))
         print(f"=== {label} ({nift})\nFAILS ({len(c.fails)}):")
