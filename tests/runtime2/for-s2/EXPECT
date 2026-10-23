@@ -53,3 +53,5 @@ g9_million vm budget=24000000
 g9_million_write vm budget=24000000
 t16_same_iter_modify vm
 t26_read_after_shrink_first_iter vm-error
+t21_lambda_not_called fallback:for-capture-vanishing
+t27_assign_toplevel_after_shrink fallback:for-missing-write

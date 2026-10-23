@@ -1,0 +1,4 @@
+fn(mshrink()) {
+  return 0
+}
+export(mshrink)

@@ -3238,6 +3238,11 @@ $(FOR_MUTANT_BIN): $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
 		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
 		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LDLIBS) -o $@
+.PHONY: test-runtime2-cp12c-probes
+test-runtime2-cp12c-probes: $(TARGET)
+	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src .build/cp12c-probes-src
+	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src2 .build/cp12c-probes-src2
+test: test-runtime2-cp12c-probes
 test-runtime2-for-s2-mutants: $(TARGET)
 	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
 	for n in 1 2 3 4 5 6 7; do \
