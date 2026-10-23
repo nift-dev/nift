@@ -73,7 +73,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     state.first_used = state.reads_first || first_writes || first_captured;
     state.second_used = state.pair && (state.reads_second || second_writes || second_captured);
     if (!state.pair && !first_writes && !first_captured && state.live && !state.source_name.empty() &&
-        !state.first_binding.cell) {
+        !state.snapshot_mutant && !state.first_binding.cell) {
         Binding lazy = state.first_binding;
         lazy.lazy_for = true;
         lazy.lazy_source_name = state.source_name;
@@ -91,7 +91,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))
         return fail(node, "for-missing-write");
     if (state.pair && shrink && !second_writes && !second_captured && state.live && !state.source_name.empty() &&
-        !state.second_binding.cell) {
+        !state.snapshot_mutant && !state.second_binding.cell) {
         Binding lazy = state.second_binding;
         lazy.lazy_for = true;
         lazy.lazy_pair = true;

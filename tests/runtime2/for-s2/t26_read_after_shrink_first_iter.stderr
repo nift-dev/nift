@@ -1,0 +1,1 @@
+error: $ROOT/t26_read_after_shrink_first_iter.f:2:30: reference target no longer exists: x

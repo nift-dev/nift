@@ -22,7 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "for-s2")
 
 MUTANT_CASES = {
-    1: ["g6_element_modify.f", "g6_element_modify_late.f", "g6_object_values.f"],
+    1: ["t26_read_after_shrink_first_iter.f"],
     2: ["g6_push_once.f"],
     3: ["g7_closure_loop_var.f"],
     4: ["g3_continue.f"],
