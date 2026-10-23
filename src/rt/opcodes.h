@@ -82,6 +82,14 @@ namespace nift::rt {
     X(FieldGet)   /* R[a] = S[R[b]].(atom c): a field of the instance at a slot  */                   \
     X(FieldSet)   /* S[R[a]].(atom b) = RK[c]                                    */                   \
     X(CheckField) /* RK[a] assignable to field type RK[b]; c: legacy's wording    */                  \
+    X(IterCheck)  /* R[a] is the iterable; b: 0 single-array, 1 pair-object,       */                    \
+                  /* 2 force non-iterable, 3 force array-pair, 4 force object-single*/                 \
+    X(ArrayElem)  /* R[a] = R[b][R[c]] (array); R[a+1] = found (CP12C slice 2)   */                    \
+    X(ArrayElemValue) /* R[a] = R[b][R[c]] (array), no found flag (safe lengths) */                    \
+    X(ObjectKeys) /* R[a] = insertion-ordered key array of object R[b]          */                     \
+    X(ObjectLookup) /* R[a] = R[b][R[c]] (object); R[a+1] = found               */                     \
+    X(ObjectLookupValue) /* R[a] = R[b][R[c]] (object), no found flag           */                     \
+    X(IterMissing) /* raise "reference target no longer exists: <note>"         */                     \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */
 

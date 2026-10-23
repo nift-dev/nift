@@ -146,7 +146,7 @@ bool Vm::op_call(const Instr& in, Value*& R, const Value*& K, const Proto*& prot
     if ((frames_.size() >= next_frame_check_ || callee_base + callee->nregs + 1u > stack_.size()) &&
         !call_slow(callee, callee->name.c_str(), callee_base, fault))
         return false;
-    frames_.push_back(Frame{pc + 1, base, proto, closure_});
+    frames_.push_back(Frame{pc + 1, base, proto, closure_, (in.flags & kInstrReturnCall) != 0});
     closure_ = nullptr;
     base = callee_base;
     proto = callee;
@@ -195,7 +195,7 @@ bool Vm::op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*
     if ((frames_.size() >= next_frame_check_ || callee_base + code->nregs + 1u > stack_.size()) &&
         !call_slow(code, error_name, callee_base, fault))
         return false;
-    frames_.push_back(Frame{pc + 1, base, proto, closure_});
+    frames_.push_back(Frame{pc + 1, base, proto, closure_, (in.flags & kInstrReturnCall) != 0});
     closure_ = f;
     base = callee_base;
     proto = code;

@@ -1,0 +1,1 @@
+error: $ROOT/g1_single_object.f:2:1: object @for syntax is @for((key, val) : object){...}

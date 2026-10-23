@@ -349,9 +349,10 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     std::uint16_t object = 0;
     const Node& chain = chain_enter(node);
     const std::string_view saved_note = global_note_;
-    global_note_ = text(node);
+    const bool note_set = global_note_.empty() && ast_.at(node.a).kind != NodeKind::Array;
+    if (note_set) global_note_ = text(node);
     const bool receiver_ok = reg_any(node.a, object);
-    global_note_ = saved_note;
+    if (note_set) global_note_ = saved_note;
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
     const NodeKind r = ast_.at(node.a).kind;  // CP12b: a call result or literal: textual wording (L43)
@@ -381,9 +382,13 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     std::uint16_t object_reg = 0, key = 0;
     const Node& chain = chain_enter(node);
     const std::string_view saved_note = global_note_;
-    global_note_ = text(node);
+    const bool note_set = global_note_.empty() && ast_.at(node.a).kind != NodeKind::Array;
+    const bool offset_set = global_offset_set_;
+    if (ast_.at(node.a).kind == NodeKind::Array) { global_offset_set_ = true; global_offset_ = node.begin; }
+    if (note_set) global_note_ = text(node);
     const bool receiver_ok = reg_any(node.a, object_reg);
-    global_note_ = saved_note;
+    if (note_set) global_note_ = saved_note;
+    global_offset_set_ = offset_set;
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
     ++index_depth_;

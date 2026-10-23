@@ -67,7 +67,10 @@ bool UnitCompiler::global_read(std::uint16_t slot, std::uint16_t& reg) {
 
 bool UnitCompiler::global_read_value(std::uint16_t slot, std::uint16_t& reg, std::string_view name) {
     if (!temp(reg)) return false;
+    const std::uint32_t saved_offset = fb_->offset();
+    if (global_offset_set_) fb_->set_offset(global_offset_);
     const std::size_t at = fb_->emit(OpCode::GetGlobalChecked, reg, slot);
+    if (global_offset_set_) fb_->set_offset(saved_offset);
     fb_->note(at, std::string(name));
     return true;
 }

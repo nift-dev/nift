@@ -141,14 +141,16 @@ CASES = [
         "module_paths": {"m.nft"},
     },
     {
+        # CP12C slice 2: `for` now compiles, so this used to lose its first
+        # blocker. `try` remains unimplemented and still has a later blocker.
         "name": "later-main-blocker",
         "files": {
-            "main.f": 'import("m.nft")\nfor (i : [1]) { print(i) }\n',
+            "main.f": 'import("m.nft")\ntry { print(1) } catch(e) { print(e) }\n',
             "m.nft": "x := 1\nexport(x)\n",
         },
-        "first": "statement:For",
-        "certain": {"statement:For"},
-        "later": ["prepared-unpreparable"],
+        "first": "statement:Try",
+        "certain": {"statement:Try"},
+        "later": ["unresolved-name"],
         "complete": True,
         "item0_line": 2,
         "item0_column": 1,

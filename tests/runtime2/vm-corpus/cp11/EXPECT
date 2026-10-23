@@ -16,7 +16,7 @@ fallback_const.f fallback declare-const
 fallback_escape.f vm
 fallback_fn_after.f vm 
 fallback_fn_called_early.f fallback fn-called-before-declaration
-fallback_for.f fallback statement:For
+fallback_for.f vm
 # CP12b globals: `n` is a top-level binding declared before the call (rt/globals.h G1-G3).
 fallback_free_name.f vm
 fallback_index_assign_call.f fallback index-target

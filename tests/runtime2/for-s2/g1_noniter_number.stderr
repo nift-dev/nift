@@ -1,0 +1,1 @@
+error: $ROOT/g1_noniter_number.f:1:1: @for can only iterate over JSON arrays or objects

@@ -3207,3 +3207,47 @@ test-runtime2-closures-s1-mutants: $(TARGET)
 	done
 	python3 tests/runtime2/closures_s1_mutant_harness.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-kind-bits test-runtime2-closures-s1 test-runtime2-closures-s1-stress test-runtime2-closures-s1-mutants
+
+# CP12C slice 2: default `for` differential fixtures, mutants and the
+# memory/performance measurement (compiler_loops.cpp + vm_iter.cpp mutants).
+.PHONY: test-runtime2-for-s2 test-runtime2-for-s2-mutants test-runtime2-for-s2-sanitize
+test-runtime2-for-s2: $(TARGET)
+	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-for-s2-sanitize: $(SAN_TARGET)
+	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(SAN_TARGET)" --skip-million
+
+FOR_MUTANT ?= 0
+FOR_MUTANT_BIN := $(TEST_DIR)/for-mutants/nift-$(FOR_MUTANT)
+FOR_MUTANT_DIR := $(TEST_DIR)/for-mutants/$(FOR_MUTANT)
+$(FOR_MUTANT_DIR)/compiler_loops.o: src/rt/compiler_loops.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(FOR_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_FOR_MUTANT=$(FOR_MUTANT) -c $< -o $@
+$(FOR_MUTANT_DIR)/compiler_loops_step.o: src/rt/compiler_loops_step.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(FOR_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_FOR_MUTANT=$(FOR_MUTANT) -c $< -o $@
+$(FOR_MUTANT_DIR)/compiler_loops_bind.o: src/rt/compiler_loops_bind.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(FOR_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_FOR_MUTANT=$(FOR_MUTANT) -c $< -o $@
+$(FOR_MUTANT_DIR)/vm_iter.o: src/rt/vm_iter.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(FOR_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_FOR_MUTANT=$(FOR_MUTANT) -c $< -o $@
+FOR_MUTANT_OBJECTS := src/rt/compiler_loops.o src/rt/compiler_loops_step.o src/rt/compiler_loops_bind.o src/rt/vm_iter.o
+$(FOR_MUTANT_BIN): $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
+		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
+		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
+		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
+		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LDLIBS) -o $@
+test-runtime2-for-s2-mutants: $(TARGET)
+	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
+	for n in 1 2 3 4 5 6 7; do \
+		$(MAKE) FOR_MUTANT=$$n "$(TEST_DIR)/for-mutants/nift-$$n" >/dev/null || exit 1; \
+		python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TEST_DIR)/for-mutants/nift-$$n" \
+			--normal "$(CURDIR)/$(TARGET)" --mutant $$n || exit 1; \
+	done
+test-rt-vm: test-runtime2-for-s2 test-runtime2-for-s2-mutants
+test-runtime2-for-s2-bench: $(TARGET)
+	python3 tests/runtime2/for_s2_bench.py --nift "$(CURDIR)/$(TARGET)"
+.PHONY: test-runtime2-for-s2-known-deps
+test-runtime2-for-s2-known-deps: $(TARGET)
+	python3 tests/runtime2/for_s2_known_deps.py --nift "$(CURDIR)/$(TARGET)"

@@ -14,6 +14,13 @@ bool Scopes::declare(std::string_view name, const Binding& binding) {
     return true;
 }
 
+bool Scopes::update(std::string_view name, const Binding& binding) {
+    for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope)
+        for (auto& entry : *scope)
+            if (entry.first == name) { entry.second = binding; return true; }
+    return false;
+}
+
 const Binding* Scopes::find(std::string_view name) const {
     for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope)
         for (auto entry = scope->rbegin(); entry != scope->rend(); ++entry)

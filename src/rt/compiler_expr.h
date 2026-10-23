@@ -52,6 +52,7 @@ private:
     struct Loop {
         std::size_t start = 0;
         std::vector<std::size_t> breaks;
+        std::vector<std::size_t> continues;  // patched after the body (For) or to start (While)
     };
 
 public:
@@ -86,6 +87,27 @@ private:
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
     bool while_loop(const Node& node);
+    // CP12C slice 2: the default `for` (compiler_loops*.cpp).
+    struct ForState;
+    bool for_loop(const Node& node);
+    bool for_setup(ForState& state, const Node& node);
+    bool for_prepare_bindings(ForState& state, const Node& node);
+    bool for_step(ForState& state);
+    bool for_emit_body(ForState& state);
+    bool for_finish(ForState& state);
+    bool for_read_source(const Binding& b, std::uint16_t& reg, bool& temp_owned);
+    bool for_lazy_read(const Binding& b, std::uint16_t& reg);
+    bool for_source_binding(const Node& iterable, const Binding*& binding) const;
+    bool for_body_reads(const Node& body, std::string_view name, std::uint32_t& first_offset) const;
+    bool for_body_writes(const Node& body, std::string_view name) const;
+    bool for_body_captures(const Node& body, std::string_view name) const;
+    bool for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const;
+    bool for_declare_binding(std::string_view name, const Node& at, bool captured, KindSet decl_kinds,
+                             Binding& binding);
+    bool for_bind_value(const Binding& binding, std::uint16_t value, std::uint16_t type_reg, bool first,
+                        std::uint16_t flag);
+    bool for_emit_loop_metadata(const Binding& binding, std::uint16_t index, std::uint16_t count);
+    bool for_clear_register(std::uint16_t reg);
     bool return_statement(const Node& node);
     bool assign_value(const Node& node, const Binding& b);
     bool compound_op(const Node& node, const Binding& b);
@@ -296,6 +318,8 @@ private:
     const Node* chain_next_ = nullptr;  // its next receiver
     const Node* print_arg_ = nullptr;   // the native call argument being compiled
     std::string_view global_note_;      // the full place text for a checked global read
+    bool global_offset_set_ = false;
+    std::uint32_t global_offset_ = 0;
     int index_depth_ = 0;             // inside index brackets
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;

@@ -1,0 +1,1 @@
+error: $ROOT/a5_binding_type_name.f:4:3: cannot assign string to int binding 'g'

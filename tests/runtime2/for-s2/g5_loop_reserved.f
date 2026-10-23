@@ -1,0 +1,2 @@
+loop := "outer"
+print(loop)

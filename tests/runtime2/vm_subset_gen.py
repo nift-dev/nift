@@ -869,7 +869,6 @@ def former_program(seed, index):
 INJECT = [
     ("const", "", "const zc := 1\nprint(zc)", "any", "declare-const"),
     ("pattern", "", "[za, zb] := [1, 2]\nprint(za)", "any", "declare-pattern"),
-    ("for", "", "for (zx : [1, 2]) { print(zx) }", "any", "statement:For"),
     ("try", "", "try { print(1) } catch (ze) { print(2) }", "any", "statement:Try"),
     ("bare-expression", "", "zx := 1\nzx", "any", "expression-statement"),
     ("native", "", "print(stringify(1))", "any", "callable:stringify"),

@@ -34,6 +34,7 @@ enum : std::uint8_t {
     kInstrLoopPath = 1u << 0,  // code legacy runs on its prepared (loop) evaluator: VM stats only
     kInstrCallMember = 1u << 1,  // CallValue through an object field: legacy member diagnostics
     kInstrLambdaExprBody = 1u << 2,  // Closure whose body is an expression (diagnostic prefix)
+    kInstrReturnCall = 1u << 3,  // a call evaluated inside a return expression (legacy return: prefix)
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's

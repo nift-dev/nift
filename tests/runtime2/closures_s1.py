@@ -102,8 +102,10 @@ def check(nift, work, name, want, prepare):
     vm, st = run(nift, work, name, "1" if want.startswith("fallback:") else "require")
     if st is None:
         return ["no NIFT_VM=1 statistics"], None, None
-    if vm[2] < 0 or vm[2] >= 128:
-        return ["harness: VM process crashed"], st.get("outcome"), st
+    if vm[2] in (124, 125) or vm[2] < 0 or vm[2] >= 128:
+        return [f"harness: VM process exit {vm[2]}"], st.get("outcome"), st
+    if "outcome" not in st or "vm_executions" not in st:
+        return ["harness: statistics missing outcome or vm_executions"], st.get("outcome"), st
     outcome = st.get("outcome")
     if want == "cycle":
         if (outcome != "vm-error" or st.get("code") != "runtime.reference_cycle" or

@@ -1,0 +1,2 @@
+fn(sum_to(n)) { s := 0; for (e : [1,2,3]) { s += e }; return s }
+export(sum_to)

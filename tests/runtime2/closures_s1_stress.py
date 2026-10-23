@@ -66,6 +66,8 @@ def main():
             problems = []
             if st is None:
                 problems.append("no statistics")
+            elif "outcome" not in st or "vm_executions" not in st:
+                problems.append("harness: statistics missing outcome or vm_executions")
             else:
                 if st.get("outcome") != "vm" or st.get("vm_executions") != 1:
                     problems.append(f"outcome {st.get('outcome')}/{st.get('reason')}")
@@ -102,6 +104,8 @@ def main():
                 problems.append("accounted budget did not refuse the retained closures")
             if st is None:
                 problems.append("no statistics")
+            elif "outcome" not in st or "vm_executions" not in st:
+                problems.append("harness: statistics missing outcome or vm_executions")
             elif st.get("heap_peak", 0) < 7_000_000:
                 problems.append(f"heap_peak {st.get('heap_peak')} did not charge the closures")
             if b"memory budget" not in err.lower():

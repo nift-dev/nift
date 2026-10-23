@@ -20,8 +20,16 @@ void UnitCompiler::prepare_captures() {
         stack.pop_back();
         if (id == kNoNode) continue;
         const Node& n = ast_.at(id);
-        if (n.kind == NodeKind::Declare && n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident)
-            declared_names_.insert(text(ast_.at(n.a)));
+        if (n.kind == NodeKind::Declare && n.a != kNoNode) {
+            const Node& target = ast_.at(n.a);
+            if (target.kind == NodeKind::Ident) declared_names_.insert(text(target));
+            for (std::uint32_t k = 0; target.kind == NodeKind::Pattern && k < target.count; ++k)
+                declared_names_.insert(text(ast_.at(ast_.list(target)[k])));
+        } else if (n.kind == NodeKind::Param || (n.kind == NodeKind::Try && n.b != kNoNode)) {
+            declared_names_.insert(text(ast_.at(n.kind == NodeKind::Param ? id : n.b)));
+        } else if (n.kind == NodeKind::ForBinding) {
+            for (std::uint32_t k = 0; k < n.count; ++k) declared_names_.insert(text(ast_.at(ast_.list(n)[k])));
+        }
         for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
         const NodeId* list = ast_.list(n);
         for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);

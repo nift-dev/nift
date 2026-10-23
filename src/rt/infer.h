@@ -30,6 +30,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace nift::rt {
@@ -70,6 +71,10 @@ static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKin
 
 struct UnitKinds {
     std::vector<KindSet> kinds;  // per NodeId (expressions)
+    // CP12C slice 2: for an iterable expression node, the kinds of the values
+    // the default `for` binds (array elements, or object values for the pair
+    // form). The compiler does not otherwise keep structural element types.
+    std::unordered_map<NodeId, KindSet> elements;
     // False when the fixpoint ran out of its walk budget: the kinds are then
     // not sound and the compiler refuses the unit (`analysis-limit:kinds`),
     // never compiles it with weakened checks (review CP12 round 1, D1).

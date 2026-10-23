@@ -30,7 +30,7 @@ CASES = [
     ("lambda-argument", "xs := [1, 2]\ny := xs.map((v) => v + 1)\nprint(y.join(\",\"))\n",
      {"method:map", "method:join"}),
     ("for-and-try", "for (i : [1, 2]) {\n  print(i.zap())\n}\ntry {\n  print(1)\n  nothere()\n} catch (e) {\n"
-     "  print(e)\n}\n", {"statement:For", "method:zap", "statement:Try", "callable:nothere"}),
+     "  print(e)\n}\n", {"method:zap", "statement:Try", "callable:nothere"}),
     ("fn-after-global", "g := 10\nfn(f(x)) {\n  return x + g\n}\nprint(f(1))\n",
      set()),  # CP12b: a declaration after statements and a resolved global compile
     ("global-before-declaration", "fn(f(x)) {\n  g = g + 1\n  return x + g\n}\nprint(f(1))\ng := 10\n",

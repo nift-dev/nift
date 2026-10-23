@@ -1,0 +1,1 @@
+error: $ROOT/g8_index_error.f:2:23: JSON array index 2 is out of range in 'a[2]'

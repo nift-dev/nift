@@ -114,6 +114,9 @@ def supported():
     out.append(("deep-equality", "fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
                                  "while (i < 500) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n"))
     out.append(("lambda", "f := (x) => x + 1\nprint(f(1))\n"))
+    out.append(("for-top", "for (x : [1, 2]) { print(x) }\n"))
+    out.append(("for-in-loop", "i0 := 0\nwhile (i0 < 2) {\n  i0 += 1\n  for (x : [1, 2]) { print(x) }\n}\n"))
+    out.append(("for-in-function", "fn(w0()) {\n  for (x : [1, 2]) { print(x) }\n  return 0\n}\nprint(w0())\n"))
     return out
 
 
@@ -122,7 +125,6 @@ UNSUPPORTED = [
     # Statements and declarations outside the subset.
     ("const", "const c := 1\nprint(c)\n", "declare-const"),
     ("destructuring", "[a, b] := [1, 2]\nprint(a)\n", "declare-pattern"),
-    ("for", "for (x : [1, 2]) { print(x) }\n", "statement:For"),
     ("try", "try { print(1) } catch (e) { print(2) }\n", "statement:Try"),
     # CP12b structs compile (vm_structs.py); a field initialised by a
     # non-constant is still refused (legacy evaluates it at each construction).

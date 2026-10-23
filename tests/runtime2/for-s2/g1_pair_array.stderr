@@ -1,0 +1,1 @@
+error: $ROOT/g1_pair_array.f:1:1: array @for syntax is @for(item : array){...}

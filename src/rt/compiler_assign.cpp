@@ -174,7 +174,9 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     if (rhs != nullptr && !immediate && !expr_any(node.b, value)) return false;
     if (indirect) {
         if (!read_binding(b, reg)) return false;
-    } else if (b.global && (!global_take(b, reg, text(target)) || !global_read(b.type_reg, binding_type))) {
+    } else if (b.global && ((loop_reachable() &&
+                             (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) ||
+                            !global_take(b, reg, text(target)) || !global_read(b.type_reg, binding_type))) {
         return false;
     }
     fb_->set_offset(node.begin);
@@ -264,6 +266,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     std::uint16_t work = 0;
     if (!temp(work)) return false;
     if (b.global) {
+        if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) return false;
         if (!global_read_value(b.reg, work, text(target))) return false;
     } else if (!read_binding(b, work)) {
         return false;

@@ -128,6 +128,7 @@ bool UnitCompiler::statement(NodeId id) {
         case NodeKind::IncDec: ok = inc_dec(node); break;
         case NodeKind::If: ok = if_chain(node); break;
         case NodeKind::While: ok = while_loop(node); break;
+        case NodeKind::For: ok = for_loop(node); break;
         case NodeKind::Return: ok = return_statement(node); break;
         case NodeKind::Break: case NodeKind::Continue: ok = loop_jump(node); break;
         default: ok = fail(node, std::string("statement:") + node_kind_name(node.kind)); break;
@@ -190,6 +191,7 @@ bool UnitCompiler::while_loop(const Node& node) {
         scopes_.pop();
     }
     if (ok) {
+        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);
         fb_->set_offset(node.begin);
         const std::size_t back = fb_->emit(OpCode::Jmp);
         fb_->patch(back, loops_.back().start);
@@ -214,7 +216,11 @@ bool UnitCompiler::return_statement(const Node& node) {
     // Errors in the expression are reported where they occur, without
     // legacy's "return: " prefixes (approved changes D-009#5, D-018).
     std::uint16_t value = 0;
-    if (!temp(value) || !expr_to(node.a, value)) return false;
+    const std::uint8_t saved_flags = fb_->flags();
+    fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrReturnCall));
+    const bool value_ok = temp(value) && expr_to(node.a, value);
+    fb_->set_flags(saved_flags);
+    if (!value_ok) return false;
     fb_->set_offset(node.begin);
     fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
     return true;
@@ -224,7 +230,7 @@ bool UnitCompiler::loop_jump(const Node& node) {
     if (loops_.empty()) return fail(node, "jump-outside-loop");
     const std::size_t at = fb_->emit(OpCode::Jmp);
     if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
-    else fb_->patch(at, loops_.back().start);
+    else loops_.back().continues.push_back(at);
     return builder_ok();
 }
 
@@ -256,7 +262,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             if (global && !global_take(held, reg, text(receiver))) return false;
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
-            if (!global) fb_->note(at, std::string(text(expr)));
+            fb_->note(at, std::string(text(expr)));
             if (global) global_put(held, reg);
             else if (indirect) {
                 std::uint16_t untyped = 0;

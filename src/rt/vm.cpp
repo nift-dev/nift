@@ -188,7 +188,6 @@ VmResult Vm::run(std::string& output) {
 #define NIFT_RT_LABEL(name) &&L_##name,
     static const void* const kLabels[] = {NIFT_RT_OPCODES(NIFT_RT_LABEL)};
 #undef NIFT_RT_LABEL
-    // The checked table: integer arithmetic on its slow paths (see NOTE_LARGE).
     const void* checked_labels[std::size(kLabels)];
     std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
     for (const auto& [op, label] : {std::pair{OpCode::Add, &&LC_Add}, {OpCode::Sub, &&LC_Sub},
@@ -210,8 +209,6 @@ VmResult Vm::run(std::string& output) {
     ARITH(Mul, __builtin_mul_overflow, && (v != 0 || (l.as_int() >= 0 && r.as_int() >= 0)))
     OP(Mod) {
         const Value& l = RK(pc->b); const Value& r = RK(pc->c);
-        // r == -1 takes the slow path: INT64_MIN % -1 traps in C++ (SIGFPE);
-        // integer_arithmetic gives 0 (review CP12 round 1, D2).
         if (UNCHECKED && both_int(l, r) && r.as_int() != 0 && r.as_int() != -1) {
             const std::int64_t v = MUTATE_MOD(l.as_int() % r.as_int());
             if (v != 0 || l.as_int() >= 0) { R[pc->a] = Value::integer(v); NEXT(); }
@@ -222,7 +219,6 @@ VmResult Vm::run(std::string& output) {
     NOTE_LARGE NEXT();
     OP(AddI) {
         const Value& x = R[pc->b];
-        // safe_integer(x) first: x + offset must not overflow (UB; review D2 audit).
         if (UNCHECKED && x.is(Kind::Int) && safe_integer(x.as_int()) && safe_integer(x.as_int() + jump_offset(pc->c))) {
             MUTATE_ADDI(x, jump_offset(pc->c))
             R[pc->a] = Value::integer(x.as_int() + jump_offset(pc->c)); NEXT();
@@ -281,6 +277,10 @@ VmResult Vm::run(std::string& output) {
     OP(GetUpvalueCell) { if (!op_get_upvalue_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(SetUpvalue) { if (!op_set_upvalue(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Undefined) { if (!op_undefined(*pc, fault, proto)) FAIL(); NEXT(); }
+    OP(IterCheck) OP(ArrayElem) OP(ArrayElemValue) OP(ObjectKeys) OP(ObjectLookup)
+    OP(ObjectLookupValue) OP(IterMissing) {
+        if (!op_iter(*pc, R, proto, fault)) FAIL();
+        NEXT(); }
     OP(Return) {
         if (pc->a != 0) R[0] = R[pc->a];
         RETURN_TO_CALLER

@@ -109,6 +109,7 @@ private:
         std::size_t base = 0;
         const Proto* proto = nullptr;
         const FunctionObject* closure = nullptr;
+        bool return_call = false;
     };
     bool reserve_registers(std::size_t needed);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
@@ -137,6 +138,15 @@ private:
     bool op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     void op_mark_global(const Instr& in);
     bool op_check_global(const Instr& in, Fault& fault, const Proto* proto);
+    // CP12C slice 2 default `for` opcodes (vm_iter.cpp).
+    bool op_iter_check(const Instr& in, Value* R, Fault& fault);
+    bool op_array_elem(const Instr& in, Value* R, Fault& fault);
+    bool op_array_elem_value(const Instr& in, Value* R, Fault& fault);
+    bool op_object_keys(const Instr& in, Value* R, Fault& fault);
+    bool op_object_lookup(const Instr& in, Value* R, Fault& fault);
+    bool op_object_lookup_value(const Instr& in, Value* R, Fault& fault);
+    bool op_iter_missing(const Instr& in, Fault& fault, const Proto* proto);
+    bool op_iter(const Instr& in, Value* R, const Proto* proto, Fault& fault);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     bool builtin(const Instr& in, Value* R, Fault& fault);  // CP14 built-ins (rt/natives)
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
