@@ -916,6 +916,12 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             reasons.push_back("required path missing: " + value.string);
             continue;
         }
+        // CP03 B1: only an explicit filesystem-root policy revalidates cached
+        // requirements. Unrestricted builds pay nothing for this check.
+        if (const char* configured_root = std::getenv("NIFT_FS_ROOT"); configured_root && *configured_root &&
+            !filesystem::path_within(fs::path(configured_root), requirement)) {
+            reasons.push_back("required path escapes configured filesystem root: " + value.string);
+        }
     }
 
     // A user .deps.json file can itself be added or become invalid between builds.

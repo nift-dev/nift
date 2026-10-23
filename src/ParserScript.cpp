@@ -342,7 +342,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     active_module_env_.reset(); loading_module_env_.reset(); saved_lexical_scopes_.clear(); module_envs_.clear(); next_module_identity_=1;
-    in_import_program_=false; standalone_script_host_=!project_build; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!project_build; strict_script_mode_=true; function_call_depth_=1;
+    in_import_program_=false; standalone_script_host_=!project_build; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!resource_path_authority_.filesystem_root.empty(); strict_script_mode_=true; function_call_depth_=1;
     const std::string identity=source_path.generic_string();
     const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')
         ? SourceProvenance::FileBacked : SourceProvenance::InMemory;
