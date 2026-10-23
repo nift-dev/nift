@@ -162,6 +162,24 @@ def pty_f4_jobs():
     finish(pid2, fd2, home2)
 
 
+def zombie_check():
+    script = b"/bin/true &\nwait\n/bin/sleep 0.5\nexit\n"
+    proc = subprocess.Popen([NIFT], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, cwd="/tmp")
+    proc.stdin.write(script); proc.stdin.close()
+    time.sleep(0.25)
+    zombies = []
+    for stat_path in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            fields = stat_path.read_text().split()
+            if len(fields) > 3 and int(fields[3]) == proc.pid and fields[2] == "Z":
+                zombies.append(int(fields[0]))
+        except (OSError, ValueError):
+            pass
+    proc.wait(timeout=5)
+    check("background-zombie", not zombies, f"zombies={zombies}")
+
+
 def fd_limits():
     def limit(n):
         def apply():
@@ -242,13 +260,14 @@ def main():
     pty_bg()
     pty_host_bg_never()
     pty_f4_jobs()
+    zombie_check()
     fd_limits()
     leftover()
     fs_root()
     io_messages()
     fd_leak_pty()
     missing_interpreter()
-    print(f"PASS {19 - len(failures)}, FAIL {len(failures)}")
+    print(f"PASS {20 - len(failures)}, FAIL {len(failures)}")
     return 1 if failures else 0
 
 
