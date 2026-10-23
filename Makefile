@@ -599,6 +599,14 @@ $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# CP16 N1: the positive per-call Host-code tests and their harness controls.
+.PHONY: test-runtime2-cp16-n1
+test-runtime2-cp16-n1: $(TARGET) $(RT_HOST_NATIVE_UNIT)
+	"$(RT_HOST_NATIVE_UNIT)"
+	$(PYTHON) tests/runtime2/cp16_n1.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp16_n1_controls.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-cp16-n1
+
 .PHONY: test-rt-host-mutants
 test-rt-host-mutants: $(TARGET)
 	bash tests/runtime2/host_mutants.sh "$(CURDIR)/$(TARGET)"

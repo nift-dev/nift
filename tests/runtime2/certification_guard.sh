@@ -12,7 +12,7 @@ cd "$ROOT"
 REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
           test-rt-parser test-sha256 test-site-dx
-          test-rt-vm test-build-recovery)
+          test-rt-vm test-runtime2-cp16-n1 test-build-recovery)
 WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys
@@ -67,6 +67,31 @@ PY
 # test-cp19-s1-dispatch-unit was not reached).
 inventory_status=$?
 [ "$inventory_status" -eq 0 ] || exit "$inventory_status"
+
+# Removal control for the N1 positive target: it must be reached through
+# test-rt-vm; removing that edge must make the guard's reachability check fail.
+python3 - <<'PYCONTROL'
+import sys
+sys.path.insert(0, 'scripts')
+import certify
+deps, _ = certify.make_db(certify.ROOT, 'certify-targets')
+def reachable(graph):
+    seen, stack = set(), ['certify-targets']
+    while stack:
+        t = stack.pop()
+        if t in seen: continue
+        seen.add(t); stack.extend(graph.get(t, ()))
+    return seen
+if 'test-runtime2-cp16-n1' not in reachable(deps):
+    print('FAIL certification guard removal control: test-runtime2-cp16-n1 is not reached')
+    sys.exit(1)
+reduced = {k: [d for d in v if not (k == 'test-rt-vm' and d == 'test-runtime2-cp16-n1')]
+           for k, v in deps.items()}
+if 'test-runtime2-cp16-n1' in reachable(reduced):
+    print('FAIL certification guard removal control: target is still reached without its edge')
+    sys.exit(1)
+print('PASS certification guard removal control: removing the test-rt-vm edge loses test-runtime2-cp16-n1')
+PYCONTROL
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an
