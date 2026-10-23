@@ -146,6 +146,17 @@ def main():
         check("script-bg-state", not stopped, f"stopped_children={stopped}")
         proc.kill(); proc.wait(timeout=5)
 
+    # Externally resumed script job (B0/R2): SIGCONT from another process
+    # must return a live job to Running without consuming its status.
+    with tempfile.TemporaryDirectory(prefix="cp20-cont-") as tmp:
+        root = Path(tmp)
+        script = ("/bin/sh -c 'echo $$ > child.pid; kill -STOP $$; sleep 2' &\n"
+                  "/bin/sleep 0.15\njobs\n"
+                  "/bin/sh -c 'kill -CONT \"$(cat child.pid)\"'\n/bin/sleep 0.1\njobs\nwait 1\nexit\n")
+        n = shell(script, root)
+        check("script-external-continue", "[1] Stopped" in n.stdout and "[1] Running" in n.stdout
+              and "unknown job" not in n.stderr, n.stdout + n.stderr)
+
     # Genuine zombie/never-reaped check (scripted Host background path).
     with tempfile.TemporaryDirectory(prefix="cp20-zombie-") as tmp:
         proc = subprocess.Popen([NIFT], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,

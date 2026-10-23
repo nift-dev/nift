@@ -164,8 +164,9 @@ struct JobTable::Impl {
         } else {
             entry.info.state = ShellJobState::Running;
 #else
-        } else if (entry.group->has_stopped_members()) {
-            entry.info.state = ShellJobState::Stopped;
+        } else {
+            entry.info.state = entry.group->has_stopped_members() ? ShellJobState::Stopped
+                                                                   : ShellJobState::Running;
 #endif
         }
     }
@@ -305,8 +306,10 @@ bool JobTable::background(int job_id, std::string& error) {
     if (!entry) { error = "unknown job"; return false; }
     if (!entry->group) { error = "job is already complete"; return false; }
     if (entry->group->finished()) { error = "job is already complete"; return false; }
+#ifndef _WIN32
 #if !defined(NIFT_CP20_MUTANT) || NIFT_CP20_MUTANT != 8
     if (entry->group->pgid() > 0) ::kill(-static_cast<pid_t>(entry->group->pgid()), SIGCONT);
+#endif
 #endif
     entry->info.state = ShellJobState::Running;
     return true;

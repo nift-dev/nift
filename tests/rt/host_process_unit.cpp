@@ -1460,6 +1460,15 @@ void exec_report_closed_early() {
 #endif
 }
 
+void stopped_query_concurrent() {
+    const std::string tag = new_tag();
+    auto g = start_ok(req({"sh", "-c", "sleep 0.05"}, OutputMode::Inherit, tag));
+    std::thread query([&] { for (int i = 0; i < 2000; ++i) (void)g->has_stopped_members(); });
+    g->wait();
+    query.join();
+    CHECK(g->finished() && !g->has_stopped_members());
+}
+
 void terminal_never_option() {
     const std::string tag = new_tag();
     auto r = req({"sh", "-c", "exit 0"}, OutputMode::Inherit, tag);
@@ -1538,6 +1547,7 @@ int main(int argc, char** argv) {
         {"exec_report_closed_early", exec_report_closed_early},
         {"orphan_zombie_at_destroy", orphan_zombie_at_destroy},
         {"terminal_never_option", terminal_never_option},
+        {"stopped_query_concurrent", stopped_query_concurrent},
         {"orphan_after_group_destroy", orphan_after_group_destroy},
         {"managed_pgid_cleanup", managed_pgid_cleanup},
     };

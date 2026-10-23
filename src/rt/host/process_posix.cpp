@@ -291,6 +291,7 @@ std::vector<StageResult> ProcessGroup::stages() const {
 bool ProcessGroup::has_live_members() const { return group_has_members(*s_); }
 
 bool ProcessGroup::has_stopped_members() const {
+    std::lock_guard<std::mutex> lock(s_->mu);
     for (const auto& stage : s_->st) {
         if (stage.pid <= 0 || stage.reaped) continue;
         siginfo_t info{};
