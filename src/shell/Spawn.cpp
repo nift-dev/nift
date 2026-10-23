@@ -186,6 +186,12 @@ JobTable::~JobTable() {
 bool JobTable::supported() const { return host_shell_supported(); }
 
 ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std::string& command, bool foreground) {
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 11
+    // Deliberate negative control: deferred report fds are never closed.
+    static std::vector<int> leaked_fds;
+    int leak[2] = {-1, -1};
+    if (::pipe(leak) == 0) { leaked_fds.push_back(leak[0]); leaked_fds.push_back(leak[1]); }
+#endif
     if (!supported()) {
         if (!foreground) {
             ProcessResult out;

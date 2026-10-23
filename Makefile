@@ -3115,3 +3115,4 @@ test-cp20-r1-windows: $(TARGET)
 # POSIX run exits 77 and is skipped by $(V44_SKIP_77).
 CERTIFY_RUNTIME2_GATES += test-cp20-shell-spawn test-cp20-shell-spawn-mutants test-cp20-r1 test-v45-native-runtime
 CERTIFY_CI_TARGETS += test-cp20-r1-windows
+CERTIFY_RUNTIME2_GATES += test-cp20-fd-leak
