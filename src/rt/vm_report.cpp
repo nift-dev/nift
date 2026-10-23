@@ -57,8 +57,12 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
                 (frame.closure != nullptr && frame.closure->is_lambda && frame.closure->expression_body);
         if (in_expression_lambda) result.message = "lambda body error: " + result.message;
         bool return_call = false;
-        for (const Frame& frame : frames_) return_call = return_call || frame.return_call;
-        if (return_call && result.message.rfind("return: ", 0) != 0)
+        bool in_lambda = closure_ != nullptr && closure_->is_lambda;
+        for (const Frame& frame : frames_) {
+            return_call = return_call || frame.return_call;
+            in_lambda = in_lambda || (frame.closure != nullptr && frame.closure->is_lambda);
+        }
+        if (return_call && in_lambda && result.message.rfind("return: ", 0) != 0)
             result.message = "return: " + result.message;
     }
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];

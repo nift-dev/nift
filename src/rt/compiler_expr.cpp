@@ -23,7 +23,6 @@ OpCode binary_opcode(Op op) {
         default: return OpCode::Nop;
     }
 }
-
 OpCode fused_not_jump(Op op) {
     switch (op) {
         case Op::Lt: return OpCode::JmpNotLt;

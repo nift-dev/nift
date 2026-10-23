@@ -190,7 +190,6 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
     fb_->release_to(mark);
     return builder_ok();
 }
-
 bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     bool is_this = false;  // CP12b: a struct method
@@ -246,7 +245,6 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     fb_->release_to(mark);
     return true;
 }
-
 // A member or index path inside user-call arguments (coordinator ruling,
 // VM subset, records20k): legacy binds the parameter to the path as a
 // location. For a scalar value that is observably a copy (writes and
@@ -284,7 +282,6 @@ bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     path_chain_ = node.a;
     return true;
 }
-
 // Argument k written without parentheses of its own: legacy quotes the
 // argument's text, `(o.k)` included, which is not the path's.
 bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
@@ -297,7 +294,6 @@ bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
     while (open < src.size() && src[open] != '(') ++open;
     return at - 1 == open;
 }
-
 // The outermost member/index chain `node` belongs to (D1, path wording):
 // legacy resolves a postfix path operand as one text and quotes all of it in
 // an index message (`a[5].y`: 'a[5].y'); a method call or parentheses end the
@@ -312,7 +308,6 @@ const Node& UnitCompiler::chain_enter(const Node& node) {
     chain_next_ = at < src.size() && src[at] == joint ? &ast_.at(node.a) : nullptr;
     return top;
 }
-
 // D3 (path wording): legacy's textual evaluator resolves a path whose
 // receiver has an index other than plain digits (`a[j].k`, `w["y"].k`,
 // `a[ 1 ].k`) as one text, and a missing member is reported as `JSON value
@@ -333,7 +328,6 @@ bool UnitCompiler::receiver_text_wording(const Node& node, const Node& chain) co
     }
     return false;
 }
-
 // Member and index reads can fail at run time (missing member or key, index
 // out of range). Their legacy diagnostics are reproduced where the shape is
 // known: outside user-call arguments (except an admitted path argument,
@@ -367,7 +361,6 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     fb_->release_to(mark);
     return true;
 }
-
 bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node)) return false;
     std::string location;
@@ -404,5 +397,4 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     fb_->release_to(mark);
     return true;
 }
-
 } // namespace nift::rt::detail
