@@ -1214,3 +1214,16 @@ mtimes and backwards clock steps are explicitly outside the modified-mode
 contract; hash mode remains the reliable opt-in. The `platform()` invalidation
 and D-020 recovery are retained. No replacement detection machinery may be
 added under this decision.
+
+## D-051 — Default filesystem containment is removed (owner, 2026-10-23)
+
+Ordinary Nift programs are unrestricted by default. The default project-root
+containment on `@path`/`@pathto` targets and the requirement canonicalisation
+in `ProjectInfo::build_reasons` are removed; they added two `weakly_canonical`
+resolutions per requirement on every no-op build without enforcing a user
+policy. Package and metadata integrity checks, custom-output safety, watch-list
+scoping and path resolution remain. `--fs-root`/`NIFT_FS_ROOT` is the explicit
+opt-in restriction and is enforced for `@path`/`@pathto` and expression-level
+filesystem operations. No caching or replacement containment machinery may be
+added. `@path` targets outside the output tree keep the existing deployment
+warning and dependency tracking.

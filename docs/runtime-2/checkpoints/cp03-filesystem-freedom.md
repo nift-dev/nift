@@ -28,16 +28,12 @@ Nift-owned state stays protected. Restrictions are opt-in only.
 
 ## What is retained
 - `--fs-root` (and the embedding API's equivalent) remains an explicit,
-  opt-in restriction. It is a policy, not a security sandbox.
-- `@path`/`@pathto` URL containment: generated URLs must name files inside
-  the project. Because those targets are recorded as requirements under the
-  output tree, `build_reasons` now flags a requirement under the output tree
-  that resolves outside both the project and the (resolved) output root
-  ("required output path now resolves outside the project: …"); the rebuild
-  then reports the `@path` error. An output directory that itself lives
-  outside the project (`"output-dir": "../site/"`, or a symlinked deploy
-  directory) is therefore not flagged. This
-  replaces the old blanket "invalid requirement" rejection for that case.
+  opt-in restriction. It is a policy, not a security sandbox. The parser
+  checks the flag before any filesystem call; unrestricted builds pay only a
+  boolean test.
+- Package and metadata integrity: package entries must not escape their
+  package; `.nift` metadata, custom build output and watch-list scoping keep
+  their checks.
 - Nift-owned state: `.nift/` metadata writes, managed outputs, `rm`/untrack
   cleanup only touch Nift-managed paths (checked in `fs_freedom.sh`).
 
@@ -47,7 +43,7 @@ behaviour. Each change keeps a test of the same scenario:
 
 | Test | Old assertion | New assertion |
 | --- | --- | --- |
-| `path_safety_smoke.sh` | `@json`, schema, `@dep` via symlink to outside refused | build succeeds, external JSON value rendered; `@path` symlink check unchanged |
+| `path_safety_smoke.sh` | `@json`, schema, `@dep` via symlink to outside refused | build succeeds, external JSON value rendered; `@path` to an external symlink is an ordinary target (CP03 R2) |
 | `json_schema_integration_smoke.sh` | `../outside.json` data/schema refused | both build |
 | `markup_json_directives_smoke.sh` | `@markup "../outside.md"` refused | external file renders; missing external file still fails |
 | `contracts_smoke.sh` | contract via `..`/symlink refused | project opens and builds (fixture gained a template) |
@@ -62,16 +58,39 @@ behaviour. Each change keeps a test of the same scenario:
   external files alone.
 - Full `make -k test`: see Evidence in `../progress.md`.
 
-## Residual risk
-- `exists()` on a symlink under the output tree that points outside both the
-  project and the output root triggers a rebuild on every status check. This
-  is the price of keeping the `@path` invariant without a separate record of
-  `@path` targets; CP16 (Host ops) will record `@path` targets distinctly.
-- `link/..` is normalised lexically before the OS sees it (pre-existing);
-  CP16.
-- Embedders that relied on the default confinement must opt in with
-  `--fs-root`/the host policy. Release notes must say so.
+## CP03 R2 — remove default containment overhead (2026-10-23)
 
-## Performance
-No new filesystem calls on the no-op path except one `lexically_relative` per
-requirement and one `path_within` for requirements under the output tree.
+The remaining default checks were removed:
+
+- `ProjectInfo::build_reasons` no longer canonicalises every requirement under
+  the output tree (`path_within` twice per requirement). A concrete missing
+  requirement still rebuilds; a tracked producer still owns its state.
+- `ParserTemplate::path_to` and the `@pathto` target check no longer reject a
+  target outside the project. The target is still existence-checked and
+  dependency-recorded; an outside target produces the existing
+  `path-outside-output` deployment warning, not a build failure.
+- Embedded page scripts no longer set `enforce_project_root`; ordinary Nift
+  code is unconfined. `NIFT_FS_ROOT`/`--fs-root` sets the explicit filesystem
+  root and is enforced for `@path`/`@pathto` and expression-level operations.
+- Package escapes, `.nift` metadata, custom build output and watch-list
+  scoping are unchanged.
+
+Tests: `fs_freedom.sh` now also covers an outside `@pathto` target and a
+project build restricted by `NIFT_FS_ROOT`; `path_safety_smoke.sh` records the
+new `@path` target policy. `tests/runtime2/cp03_simplify.sh`
+(`test-runtime2-cp03-simplify`, in `make test`) adds the 200×10 and 20×20
+syscall guard.
+
+Performance (one thread, `strace -f`):
+
+| Probe | Before | After |
+|---|---:|---:|
+| 200 pages × 10 links, no-op | 25,944 | **5,944** |
+| 20 pages × 20 links, no-op | 9,158 (audit candidate) | **919** |
+| readlink calls attributable to containment (200×10 no-op) | 16,000 | **0** |
+
+Residual: `@path`/`@pathto` targets outside `public/` still emit the deployment
+warning and may be tracked as external dependencies; they are not refused.
+`link/..` is normalised lexically before the OS sees it (pre-existing).
+Embedders that relied on default confinement must opt in with
+`--fs-root`/the host policy.
