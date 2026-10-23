@@ -1583,6 +1583,8 @@ test-runtime2-fs-freedom: $(TARGET)
 
 .PHONY: test-runtime2-cp03-simplify
 test-runtime2-cp03-simplify: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/cp01/missing_tracer_caller.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/cp03_missing_tracer.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/cp03_simplify.sh
 test: test-runtime2-cp03-simplify
 
