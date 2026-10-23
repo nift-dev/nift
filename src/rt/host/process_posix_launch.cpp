@@ -183,7 +183,6 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     // forked (H2: no per-stage mutex work in the pipeline launch path).
 }
 } // namespace
-
 void open_endpoints(Launch& l) {
     State& s = l.s;
     const OutputMode mode = l.mode;
@@ -233,7 +232,6 @@ void open_endpoints(Launch& l) {
                      s.req.terminal != TerminalPolicy::Never &&
                      s.req.stages.front().stdin_path.empty() && terminal_foreground();
 }
-
 void prepare_stages(Launch& l) {
     State& s = l.s;
     // Environment snapshot once per launch.
@@ -258,7 +256,6 @@ void prepare_stages(Launch& l) {
         s.handoff = true;
     }
 }
-
 bool launch_stage(Launch& l, std::size_t i) {
     State& s = l.s;
     const bool last = i + 1 == s.req.stages.size();
@@ -335,7 +332,6 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     status = validate(req, error);
     if (status != HostStatus::Ok) return nullptr;
     const bool detached = req.mode == OutputMode::Detached;
-
     auto state = std::make_unique<State>();
     State& s = *state;
     s.req = std::move(req);
@@ -345,10 +341,8 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     std::shared_ptr<ProcessGroup> group(new ProcessGroup(std::move(state)));
     s.self = group;
     const void* key = group.get();
-
     if (s.req.mode == OutputMode::Stream && s.req.flush_output) s.req.flush_output();
     std::fflush(nullptr);  // no duplicated stdio buffers in children
-
     Launch l(s);
     l.key = key;
     l.detached = detached;
@@ -363,7 +357,6 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     runtime::index_add(key, runtime::IndexedGroup{s.pgid, s.unreaped_pids(), detached});
     runtime::note_managed_pgid(s.pgid);
     launch_lock.unlock();
-
     if (s.launch_failed) {
         // Parent-side failure: stages that did start are killed and reaped
         // (bounded); every stage that never started carries the parent-side
@@ -404,6 +397,5 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     if (arm) rearm(s);
     return group;
 }
-
 } // namespace nift::rt::host
 #endif  // !_WIN32
