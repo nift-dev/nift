@@ -3,6 +3,7 @@
 #include "rt/ast.h"
 #include "rt/infer.h"
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -15,7 +16,7 @@ struct Ty;
 using TyRef = std::shared_ptr<const Ty>;
 
 struct Ty {
-    std::uint8_t kinds = 0;
+    KindSet kinds = 0;
     bool any = false;  // every kind at every depth
     TyRef elem;        // arrays: the elements
     // Arrays that are all literals of one length never changed in place:
@@ -23,6 +24,9 @@ struct Ty {
     bool tuple = false;
     std::vector<TyRef> items;
     std::map<std::string, TyRef, std::less<>> fields;  // objects: members by key
+    // CP12C: callable units this value may be (named functions and lambdas).
+    // A Function kind with no units is an untracked callable (Unknown).
+    std::vector<std::uint32_t> callables;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none;
     // -2: instances of different structs, or an instance and other values).
     int struct_id = -1;
@@ -33,7 +37,7 @@ const TyRef& empty_ty();
 const TyRef& top_ty();
 // The value of something the compiler refuses anyway (kKindUnknown).
 const TyRef& any_ty();
-TyRef kinds_ty(std::uint8_t kinds);
+TyRef kinds_ty(KindSet kinds);
 TyRef unite(const TyRef& a, const TyRef& b, int depth = 0);
 bool same(const TyRef& a, const TyRef& b);
 // The type of `value[key]` (key: a literal string, or null when unknown;
@@ -46,13 +50,13 @@ long literal_position(std::string_view digits);
 // Folded literal arithmetic per node (doubles: only the kind is used).
 struct Constants {
     std::vector<double> values;  // NaN: not constant
-    std::uint8_t set(std::size_t nodes, NodeId id, double v);  // returns the kind (Int / Frac)
+    KindSet set(std::size_t nodes, NodeId id, double v);  // returns the kind (Int / Frac)
     bool has(NodeId id) const;
     double at(NodeId id) const { return values[id]; }
 };
 // `l op r` on literal values (finite result, no division or modulo by zero).
 bool fold_constant(Op op, double l, double r, double& out);
 // Result kinds of `l op r` for an arithmetic operator.
-std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r);
+KindSet arithmetic_kinds(Op op, KindSet l, KindSet r);
 
 } // namespace nift::rt::infer_detail

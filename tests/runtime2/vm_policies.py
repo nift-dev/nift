@@ -51,7 +51,7 @@ RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceede
 DIAGNOSTIC = re.compile(rb"^error: (.*):(\d+):(\d+): ([^\n]*)\n\Z")
 RETURN_PREFIX = b"return: "
 
-POLICIES = ("D-001#4 recursion", "D-018c diagnostics")
+POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix")
 
 
 IMPORT_PREFIX = b"import: "
@@ -169,6 +169,38 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     return not mapped or _fields_ok(source, root, legacy_msg, vm_msg, site)
 
 
+def _return_prefix(legacy, vm, st, source):
+    """D-009#5: the VM reports the same diagnostic at the same position; the
+    only difference is one or more legacy `return: ` prefixes."""
+    if st.get("outcome") != "vm-error" or legacy[0] != vm[0] or legacy[2] != 1 or vm[2] != 1:
+        return False
+    lm, vmm = DIAGNOSTIC.match(legacy[1]), DIAGNOSTIC.match(vm[1])
+    if not lm or not vmm or lm.group(1) != vmm.group(1) or lm.group(2) != vmm.group(2) or lm.group(3) != vmm.group(3):
+        return False
+    if not lm.group(4).startswith(RETURN_PREFIX):
+        return False
+    msg = vmm.group(4)
+    # Only two exact legacy-prefix families are approved: the print failure
+    # (the position must be the call) and the binding-type assignment error
+    # (the position must be the assignment target). Other return-prefixed
+    # diagnostics still need D-018c's source proof.
+    if not (msg.startswith(b"print: ") or msg.startswith(b"cannot assign ")):
+        return False
+    src = _source_bytes(source, st)
+    if not src:
+        return False
+    lines = src.splitlines()
+    line, col = int(vmm.group(2)), int(vmm.group(3))
+    if line < 1 or line > len(lines) or col < 1:
+        return False
+    rest = lines[line - 1][col - 1:]
+    if msg.startswith(b"print: ") and not rest.startswith(b"print("):
+        return False
+    if msg.startswith(b"cannot assign ") and not rest[:1].isalpha() and rest[:1] != b"_":
+        return False
+    return _strip_return(lm.group(4)) == msg
+
+
 def _recursion(legacy, vm, st):
     return (st.get("beyond_legacy_depth") and legacy[2] == 1 and RECURSION_ERROR.match(legacy[1])
             and vm[0].startswith(legacy[0])
@@ -214,6 +246,8 @@ def _classify(legacy, vm, st, source=None):
         return "diff", None
     if _recursion(legacy, vm, st):
         return "approved", "D-001#4 recursion"
+    if _return_prefix(legacy, vm, st, source):
+        return "approved", "D-009#5 return prefix"
     if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
             and diagnostics_match(legacy[1], vm[1], st, source)):
         return "approved", "D-018c diagnostics"

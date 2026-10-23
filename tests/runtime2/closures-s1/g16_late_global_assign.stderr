@@ -1,0 +1,1 @@
+error: $ROOT/g16_late_global_assign.f:1:14: assignment to undefined binding: later

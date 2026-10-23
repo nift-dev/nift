@@ -91,6 +91,7 @@ bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint1
         return fb_->constant(Value::integer(type.known), operand) || builder_ok();
     if (type.kind == TextType::Kind::Binding) {
         if (const Binding* b = find_binding(type.binding)) {
+            if (b->cell || b->upvalue) return fb_->constant(Value::integer(-1), operand) || builder_ok();
             if (b->global) return global_read(b->type_reg, operand);  // CP12b
             operand = b->type_reg;
             return true;
@@ -249,7 +250,16 @@ bool UnitCompiler::statement_preparable(const Node& node) const {
     }
 }
 
-bool UnitCompiler::kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason) {
+bool UnitCompiler::print_argument_ok(NodeId id, const Node& arg) {
+    // Unknown/empty kinds are not assumed scalar and are not a licence to
+    // admit blindly: they defer to the VM's checked native print, which now
+    // raises legacy's ordinary print Error (never an internal failure).
+    const KindSet k = kinds(id);
+    if (k & kKindUnknown) return true;
+    return kinds_within(id, kKindScalar, arg, "type:print");
+}
+
+bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason) {
     if ((kinds(id) & ~allowed) == 0 || unknown_defers(kinds(id))) return true;  // Unknown: never within (D1)
     return fail(at, reason);
 }

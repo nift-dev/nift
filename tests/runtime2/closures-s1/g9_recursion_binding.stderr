@@ -1,0 +1,1 @@
+error: $ROOT/g9_recursion_binding.f:3:3: callable recursion depth exceeded: k

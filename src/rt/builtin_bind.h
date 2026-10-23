@@ -21,20 +21,20 @@ namespace nift::rt {
 static_assert(natives::kNull == kKindNull && natives::kBool == kKindBool && natives::kInt == kKindInt &&
                   natives::kFrac == kKindFrac && natives::kString == kKindString &&
                   natives::kArray == kKindArray && natives::kObject == kKindObject &&
-                  (natives::kAny & 0x7f) == kKindAll,
+                  (natives::kAny & 0xff) == (kKindAll & 0xff),
               "CP14 KindSet and CP12 kind bits must agree");
-// CP15 W8: bytes have a KindSet bit (0x80) CP12's 8-bit kind set does not
-// (its 0x80 is Unknown). CP12's inference is not widened here (frozen in
-// certification): every built-in that produces or takes bytes is refused
-// (`builtin-bytes:<name>`), and no inferred kind set is ever Bytes.
-static_assert(natives::kBytes == 0x80 && natives::kBytes == kKindUnknown,
-              "the bytes bit is the bit CP12 uses for Unknown: never pass a KindSet with it to CP12");
+// CP15 W8: CP12 now has a distinct Bytes bit, equal to natives::kBytes; the
+// old alias with Unknown is gone. Function and Error are outside CP14's
+// 8-bit family set and are refused where a native family is required.
+static_assert(natives::kBytes == kKindBytes, "the bytes bit must match CP12's Bytes kind");
+static_assert((kKindFunction & natives::kAny) == 0 && (kKindError & natives::kAny) == 0,
+              "Function/Error are not CP14 native families");
 static_assert(static_cast<std::size_t>(natives::BuiltinId::Count) + kFirstBuiltin <= 0x10000,
               "built-in ids fit the CallNative operand");
 
 // The receiver family of `kinds`, or Receiver::None when the kinds are empty,
 // mixed or include Unknown.
-natives::Receiver receiver_family(std::uint8_t kinds);
+natives::Receiver receiver_family(KindSet kinds);
 
 enum class MethodBinding : std::uint8_t {
     Bound,        // `spec` is the native
@@ -45,7 +45,7 @@ enum class MethodBinding : std::uint8_t {
 
 // Binds `.name(...)` on a receiver of `kinds`. `length`/`size` without
 // arguments on strings and arrays stay the Length opcode (compiler).
-MethodBinding bind_method(std::uint8_t kinds, std::string_view name, const natives::BuiltinSpec*& spec);
+MethodBinding bind_method(KindSet kinds, std::string_view name, const natives::BuiltinSpec*& spec);
 
 // A free built-in function (`range`, `min`, `html_escape`, `type`, ...), or null.
 const natives::BuiltinSpec* bind_function(std::string_view name);

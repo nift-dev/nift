@@ -1,0 +1,1 @@
+error: $ROOT/g18_return_prefix.f:4:16: return: cannot assign string to int binding 'g'

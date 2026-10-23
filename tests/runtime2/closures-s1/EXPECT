@@ -1,0 +1,57 @@
+# CP12C Slice 1 differential fixtures.  <file> <expected NIFT_VM=1 outcome>
+# vm: must run on the VM; vm-error: must stop with the VM's error and match
+# legacy through the approved D-001/D-018c policies; fallback:<reason>: a
+# documented D-038 difference (legacy runs, VM refuses before execution);
+# recursion: D-001#4 policy (legacy stops at 64 frames, VM may complete).
+g1_shared_escape.f vm
+g2_isolation.f vm
+g3_nested_shadow.f vm
+g4_late_binding.f vm
+g5_escape_calls.f vm
+g6_identity.f vm
+g7_lambda_too_few.f vm-error
+g7_named_too_many.f vm-error
+g7_noncallable.f vm-error
+g8_value_semantics.f vm
+g9_recursion_binding.f recursion
+g10_d038_caller_local.f fallback:free-name  # D-038: legacy 5; VM free-name (inventory free-name:dynamic-caller)
+g11_module_lambda.f vm
+g7_member_lambda_too_many.f vm-error
+g7_member_noncallable.f vm-error
+g7_lambda_body_error.f vm-error  # unresolved lambda name refused before execution
+g1_self_cycle.f cycle  # D-040 approved difference: legacy true; VM runtime.reference_cycle
+g1_mutual_cycles.f cycle  # D-040 approved difference: legacy false; VM runtime.reference_cycle
+g7_member_named_too_many.f vm-error
+g12_cell_not_observable.f vm
+g4_closure_restore.f vm
+g1_aggregate_cycle.f cycle  # D-040 approved difference: cycle through a captured array
+g13_lambda_variadic.f fallback:lambda-variadic
+g13_spread_callable.f fallback:spread
+g14_binding_function_type.f vm-error
+g15_shadow_toplevel_block.f vm
+g15_late_global.f vm-error
+g15_lambda_array_print.f fallback:type:print
+g16_late_local.f fallback:free-name
+g16_lambda_late.f fallback:free-name
+g17_push_unknown.f vm-error
+g1_object_cycle.f cycle
+g1_index_cycle.f cycle
+g1_push_upvalue_cycle.f cycle
+g1_nested_setupvalue_cycle.f cycle
+g14_object_lambda_param.f vm
+g4_global_reassign.f vm
+g2_cell_isolation.f vm
+g15_print_unknown_call.f vm-error
+g15_print_struct_method.f vm-error
+g15_print_param.f vm-error
+g15_print_upvalue.f vm-error
+g15_print_string_binding_fn.f vm-error
+g16_late_global_assign.f vm-error
+g16_late_global_compound.f vm-error
+g16_late_global_incr.f vm-error
+g16_late_global_push.f vm-error
+g16_late_global_index_read.f vm-error
+g16_late_global_elem_assign.f vm-error
+g16_late_global_member_read.f vm-error
+g16_unreached_missing.f vm
+g18_return_prefix.f vm-error

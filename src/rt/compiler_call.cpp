@@ -1,7 +1,5 @@
 #include "rt/compiler_call.h"
-
 #include <algorithm>
-
 #include "rt/alias.h"
 #include "rt/atom.h"
 #include "rt/builtin_bind.h"
@@ -9,19 +7,16 @@
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
-
 // Calls (user functions, natives), methods, member and index reads (CP11,
 // CP12). Errors are reported at the failing expression (D-018c).
-
 namespace nift::rt::detail {
-
 bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     if (callee.kind == NodeKind::Member) return method_call(node, dst);
     if (callee.kind != NodeKind::Ident) return fail(callee, "callee");
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
-    if (scopes_.find(name)) return fail(callee, "call-binding");
+    if (const Binding* binding = find_binding(name); binding != nullptr) return call_value(node, node.a, false, dst);
     if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
     const auto fn = plan_.index.find(name);
     NativeInfo native{};
@@ -77,7 +72,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!is_native && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
             k < plan_.escaping[f].size() && plan_.escaping[f][k])
             return fail(ast_.at(args[k]), "alias-argument");
-        if (is_native && !kinds_within(args[k], kKindScalar, ast_.at(args[k]), "type:print")) return false;
+        if (is_native && !print_argument_ok(args[k], ast_.at(args[k]))) return false;
         if (!(in_place && k == 0) && !temp(reg)) return false;
         if (!expr_to(args[k], reg)) return false;
     }
@@ -110,7 +105,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
-
 // Can evaluating `id` stop the program: a member or index read, a division
 // or modulo, a call (D2 ruling).
 bool UnitCompiler::may_fault(NodeId id) const {
@@ -124,7 +118,6 @@ bool UnitCompiler::may_fault(NodeId id) const {
         if (may_fault(list[k])) return true;
     return false;
 }
-
 // CP14 (W2, W4): an argument legacy may skip (lazy validation, Q11) must be
 // one whose evaluation cannot be observed: a literal or a local read.
 bool UnitCompiler::unobservable_argument(NodeId id) {
@@ -134,7 +127,6 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
     bool is_constant = false;
     return constant_of(node, value, is_constant) && is_constant;
 }
-
 // CP14: a call of a pure built-in (rt/natives) over a fresh register window:
 // the receiver (methods), then the arguments, evaluated once, left to right
 // (D-018). The native's result replaces the window's first register.
@@ -151,7 +143,7 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
             if (spec.id == natives::BuiltinId::FnValidate && arg.kind == NodeKind::String)
                 return fail(arg, "builtin-literal-arg:validate");
             // CP15 W11: provably plain values only (until CP17's structs).
-            const std::uint8_t k_arg = kinds(args[k]);
+            const KindSet k_arg = kinds(args[k]);
             if ((k_arg & kKindUnknown) && !unknown_defers(k_arg))
                 return fail(arg, "builtin-plain-arg:" + std::string(spec.name));
         }
@@ -211,11 +203,16 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         (name == "length" || name == "size") && node.count == 0;  // rt-lint: allow-string-compare compile time
     if (!length_opcode) {
         // CP14: every other method is a built-in native or refused.
-        const std::uint8_t k = kinds(callee.a);
+        const KindSet k = kinds(callee.a);
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
             case MethodBinding::Bound: case MethodBinding::Dead: break;
-            case MethodBinding::NotBuiltin: return fail(callee, "method:" + std::string(name));
+            case MethodBinding::NotBuiltin: {
+                const KindSet receiver_kinds = kinds(callee.a);
+                if (receiver_kinds == kKindObject || (receiver_kinds & kKindUnknown))
+                    return call_value(node, node.a, true, dst);
+                return fail(callee, "method:" + std::string(name));
+            }
             case MethodBinding::Receiver:
                 // Probe mode only: Unknown defers to the underlying refusal.
                 if (!unknown_defers(k) || bind_method(0, name, spec) != MethodBinding::Dead)
@@ -233,7 +230,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         return builtin_call(node, *spec, callee.a, dst);
     }
     const bool size = name == "size";  // rt-lint: allow-string-compare compile time
-    if (!kinds_within(callee.a, size ? kKindAggregate : static_cast<std::uint8_t>(kKindAggregate | kKindString), node,
+    if (!kinds_within(callee.a, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
                       "type:length"))
         return false;
     // Legacy's prepared `length()` counts an object's members; the canonical
@@ -271,7 +268,7 @@ bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     const bool top = path_arg_ != kNoNode && &node == &ast_.at(path_arg_);
     if (!top && (path_chain_ == kNoNode || &node != &ast_.at(path_chain_)))
         return fail(node, "path-in-call-argument");
-    const std::uint8_t k = kinds(path_arg_);
+    const KindSet k = kinds(path_arg_);
     bool scalar = k != 0 && (k & ~kKindScalar) == 0;
     MUTATE_PATH_SCALAR(scalar);
     if (top && !scalar) return fail(node, "path-in-call-argument");
@@ -351,7 +348,10 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
     const Node& chain = chain_enter(node);
+    const std::string_view saved_note = global_note_;
+    global_note_ = text(node);
     const bool receiver_ok = reg_any(node.a, object);
+    global_note_ = saved_note;
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
     const NodeKind r = ast_.at(node.a).kind;  // CP12b: a call result or literal: textual wording (L43)
@@ -372,7 +372,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     std::string location;
     if (!argument_path(node, location)) return false;
     if (index_depth_ > 0) return fail(node, "path-in-index");
-    const std::uint8_t object_kinds = kinds(node.a), key_kinds = kinds(node.b);
+    const KindSet object_kinds = kinds(node.a), key_kinds = kinds(node.b);
     const bool array = (object_kinds & ~kKindArray) == 0 && (key_kinds & ~kKindNumber) == 0;
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
     if (!array && !object && !unknown_defers(object_kinds | key_kinds))  // Unknown is neither (review D1)
@@ -380,7 +380,10 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
     const Node& chain = chain_enter(node);
+    const std::string_view saved_note = global_note_;
+    global_note_ = text(node);
     const bool receiver_ok = reg_any(node.a, object_reg);
+    global_note_ = saved_note;
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
     ++index_depth_;

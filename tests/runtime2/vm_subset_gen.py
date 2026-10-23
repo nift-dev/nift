@@ -871,7 +871,6 @@ INJECT = [
     ("pattern", "", "[za, zb] := [1, 2]\nprint(za)", "any", "declare-pattern"),
     ("for", "", "for (zx : [1, 2]) { print(zx) }", "any", "statement:For"),
     ("try", "", "try { print(1) } catch (ze) { print(2) }", "any", "statement:Try"),
-    ("lambda", "", "zf := (y) => y\nprint(1)", "any", "expression:Lambda"),
     ("bare-expression", "", "zx := 1\nzx", "any", "expression-statement"),
     ("native", "", "print(stringify(1))", "any", "callable:stringify"),
     # CP14 wiring: split is a bound built-in; replace_once is batch C (CP16).

@@ -82,9 +82,9 @@ Unit analyse(const std::string& source, std::string& keep) {
 }
 
 // Kinds of every Ident `name` inside function `f` (or main when f < 0), OR-ed.
-std::uint8_t ident_kinds(const Unit& u, const UnitKinds& kinds, std::string_view name, int f) {
+KindSet ident_kinds(const Unit& u, const UnitKinds& kinds, std::string_view name, int f) {
     const Node& fn = f >= 0 ? u.ast->at(u.plan.functions[static_cast<std::size_t>(f)]) : u.ast->at(u.root);
-    std::uint8_t out = 0;
+    KindSet out = 0;
     for (NodeId id = 0; id < u.ast->size(); ++id) {
         const Node& n = u.ast->at(id);
         if (n.kind != NodeKind::Ident || u.ast->text(n) != name || n.begin < fn.begin || n.end > fn.end) continue;

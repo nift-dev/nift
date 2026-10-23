@@ -62,7 +62,20 @@ namespace nift::rt {
     X(Push)       /* R[a].push(RK[b])                                           */                    \
     X(Length)     /* R[a] = R[b].length() (c = 0) or R[b].size() (c = 1)        */                    \
     X(GetGlobal)  /* R[a] = G[b]: main's register b (a global, CP12b)           */                    \
+    X(GetGlobalChecked) /* R[a] = G[b], but only after its declaration ran    */                    \
     X(SetGlobal)  /* G[a] = R[b]                                                */                    \
+    X(MarkGlobal) /* G[a] is now initialised                                    */                    \
+    X(CheckGlobal) /* fail unless G[a] is initialised                            */                    \
+    X(LoadFunction) /* R[a] = the named function of protos[b] (identity)          */                    \
+    X(NewCell)    /* R[a] = cell(R[b]); binding type R[c]                       */                    \
+    X(CellLoad)   /* R[a] = cell(R[b]).value                                   */                    \
+    X(CellStore)  /* check/cell-store R[b] into cell R[a]; text type RK[c]      */                    \
+    X(Closure)    /* R[a] = closure(protos[b], cells R[a+1 .. a+c])             */                    \
+    X(CallValue)  /* R[a] = R[b](R[a] .. R[a+c-1]); callee frame base = a       */                    \
+    X(GetUpvalue) /* R[a] = value of closure cell b                            */                    \
+    X(GetUpvalueCell) /* R[a] = the cell Value of closure upvalue b            */                    \
+    X(SetUpvalue) /* check/store R[b] into closure cell a; text type RK[c]      */                    \
+    X(Undefined)  /* raise "unknown value or malformed expression" (lambda free name) */                \
     X(SlotOf)     /* R[a] = the absolute stack slot of register b (CP12b structs) */                  \
     X(NewStruct)  /* R[a] = a new instance of struct (atom b), no fields yet      */                   \
     X(StructAdd)  /* R[a].(atom b) = RK[c] while constructing                    */                   \

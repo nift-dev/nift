@@ -7,7 +7,7 @@ namespace nift::rt {
 using natives::BuiltinSpec;
 using natives::Receiver;
 
-Receiver receiver_family(std::uint8_t kinds) {
+Receiver receiver_family(KindSet kinds) {
     if (kinds == 0 || (kinds & kKindUnknown)) return Receiver::None;
     if (kinds == kKindString) return Receiver::String;
     if (kinds == kKindArray) return Receiver::Array;
@@ -30,7 +30,7 @@ const BuiltinSpec* first_method(std::string_view name) {
 
 } // namespace
 
-MethodBinding bind_method(std::uint8_t kinds, std::string_view name, const BuiltinSpec*& spec) {
+MethodBinding bind_method(KindSet kinds, std::string_view name, const BuiltinSpec*& spec) {
     spec = nullptr;
     const BuiltinSpec* any_name = first_method(name);
     if (!any_name) return MethodBinding::NotBuiltin;

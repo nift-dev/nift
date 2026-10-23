@@ -11,6 +11,7 @@
 #include <deque>
 #include <set>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -32,10 +33,22 @@ private:
 
     using Scope = std::vector<std::pair<std::string_view, std::size_t>>;
 
+    // CP12C: a lambda is a callable unit after main in the worklist. Its
+    // parameter/return slots are separate from the named functions' vectors.
+    struct LambdaInfo {
+        NodeId node = kNoNode;
+        int owner_function = -1;  // enclosing named function for global lookup
+        std::vector<TyRef> params;
+        TyRef returns;
+        std::set<std::size_t> callers;
+        std::vector<Scope> scopes;  // lexical scopes at the lambda expression
+    };
+
     // Unions `value` into `into`; true if it grew (the caller re-queues).
     bool merge(TyRef& into, const TyRef& value);
     void merge_local(TyRef& into, const TyRef& value);
     void merge_return(const TyRef& value);
+    void merge_lambda_return(std::size_t lambda, const TyRef& value);
 
     void declare(std::string_view name, NodeId at, const TyRef& value);
 
@@ -46,7 +59,7 @@ private:
     int current_struct() const;
     // A field's one slot, shared by every unit (like a global's).
     std::size_t field_slot(const StructFieldInfo& field);
-    static std::uint8_t value_kinds(const Value& v);
+    static KindSet value_kinds(const Value& v);
     void seed_struct_fields();
     // The struct of the receiver `object` of a member access or method call
     // (`this` in a method, or an instance), or -1.
@@ -54,6 +67,12 @@ private:
     TyRef* struct_field(int s, std::string_view name);
     // A call of method `f` (a function index) with `n`'s arguments.
     TyRef method_call(std::size_t f, const Node& n);
+    // CP12C: merge call arguments into every callable unit a callee value may
+    // be, enqueue the ones that grew, and return the union of their returns.
+    TyRef call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew);
+    // The unit of a lambda expression, creating it on first sight.
+    std::size_t lambda_unit(NodeId node);
+    void walk_lambda(std::size_t id);
 
     // Constant-folded literal arithmetic (doubles; only the kind is used).
     TyRef constant(NodeId id, double v);
@@ -77,6 +96,7 @@ private:
     void walk_main();
 
     void walk_function(std::size_t f);
+    void walk_unit(std::size_t unit);
 
     const Ast& ast_;
     NodeId root_;
@@ -90,6 +110,11 @@ private:
     Constants constants_;
     std::vector<Scope> scopes_;
     std::vector<std::set<std::size_t>> callers_;  // per function: the units reading its return
+    std::vector<LambdaInfo> lambdas_;
+    std::unordered_map<NodeId, std::size_t> lambda_unit_;
+    std::unordered_set<NodeId> top_level_decls_;
+    std::unordered_map<std::string_view, std::size_t> top_level_slots_;
+    int owner_function_ = -1;  // for a lambda unit: its enclosing named function
     std::deque<std::size_t> queue_;
     std::vector<bool> queued_;
     int current_ = -1;

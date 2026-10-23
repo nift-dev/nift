@@ -12,7 +12,7 @@ namespace {
 
 // A container of `kinds` whose elements or members are unknown: every
 // kind at every depth below it.
-TyRef open_ty(std::uint8_t kinds) {
+TyRef open_ty(KindSet kinds) {
     auto t = std::make_shared<Ty>();
     t->kinds = kinds;
     t->any = true;

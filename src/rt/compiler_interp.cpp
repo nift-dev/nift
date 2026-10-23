@@ -29,18 +29,18 @@ namespace nift::rt::detail {
 
 namespace {
 
-std::uint8_t native_result_kinds(const natives::BuiltinSpec& spec) {
+KindSet native_result_kinds(const natives::BuiltinSpec& spec) {
     if (spec.rule != natives::ResultRule::Fixed) return kKindUnknown;
-    const std::uint8_t result = static_cast<std::uint8_t>(spec.result);
-    if (result == static_cast<std::uint8_t>(natives::kAny)) return kKindUnknown;
+    const KindSet result = static_cast<KindSet>(spec.result);
+    if (result == static_cast<KindSet>(natives::kAny)) return kKindUnknown;
     return result;
 }
 
-std::uint8_t scalar_only(std::uint8_t kinds) {
+KindSet scalar_only(KindSet kinds) {
     if (kinds & kKindUnknown) return kKindUnknown;
     if (kinds & kKindAggregate) return kKindAggregate;
     if (!(kinds & kKindScalar)) return kKindUnknown;
-    return static_cast<std::uint8_t>(kinds & kKindScalar);
+    return static_cast<KindSet>(kinds & kKindScalar);
 }
 
 bool literal_scalar(const Ast& ast, NodeId id) {
@@ -89,16 +89,16 @@ void UnitCompiler::collect_returns(NodeId id, std::vector<NodeId>& out) const {
     for (std::uint32_t k = 0; k < node.count; ++k) collect_returns(list[k], out);
 }
 
-std::uint8_t UnitCompiler::interpolation_function_kind(std::size_t f,
+KindSet UnitCompiler::interpolation_function_kind(std::size_t f,
                                                        std::unordered_set<std::size_t>& active) const {
     if (!active.insert(f).second) return kKindUnknown;
     const Node& fn = ast_.at(plan_.functions[f]);
     std::vector<NodeId> returns;
     collect_returns(fn.b, returns);
-    std::uint8_t result = 0;
+    KindSet result = 0;
     for (NodeId id : returns) {
         const Node& ret = ast_.at(id);
-        const std::uint8_t kind = (ret.flags & kFlagBare) || ret.a == kNoNode
+        const KindSet kind = (ret.flags & kFlagBare) || ret.a == kNoNode
                                       ? kKindNull
 #if defined(NIFT_INTERP_MUTANT) && NIFT_INTERP_MUTANT == 4
                                       : interpolation_kind(ret.a, active);
@@ -113,16 +113,16 @@ std::uint8_t UnitCompiler::interpolation_function_kind(std::size_t f,
     return result == 0 ? kKindUnknown : result;
 }
 
-std::uint8_t UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const {
+KindSet UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const {
     return interpolation_kind_impl(id, active, false);
 }
 
-std::uint8_t UnitCompiler::interpolation_literal_kind(NodeId id) const {
+KindSet UnitCompiler::interpolation_literal_kind(NodeId id) const {
     std::unordered_set<std::size_t> active;
     return interpolation_kind_impl(id, active, true);
 }
 
-std::uint8_t UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
+KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
                                                    bool literal_only) const {
     if (id == kNoNode) return kKindUnknown;
     const Node& node = ast_.at(id);
@@ -139,13 +139,13 @@ std::uint8_t UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set
         }
         case NodeKind::Unary: {
             if (node.op == Op::Not) return kKindBool;
-            const std::uint8_t operand = interpolation_kind_impl(node.a, active, literal_only);
+            const KindSet operand = interpolation_kind_impl(node.a, active, literal_only);
             if (operand == kKindNumber) return kKindNumber;
             return (operand & kKindAggregate) ? kKindAggregate : kKindUnknown;
         }
         case NodeKind::Binary: {
-            const std::uint8_t left = interpolation_kind_impl(node.a, active, literal_only);
-            const std::uint8_t right = interpolation_kind_impl(node.b, active, literal_only);
+            const KindSet left = interpolation_kind_impl(node.a, active, literal_only);
+            const KindSet right = interpolation_kind_impl(node.b, active, literal_only);
             if ((left | right) & kKindUnknown) return kKindUnknown;
             if ((left | right) & kKindAggregate) return kKindAggregate;
             switch (node.op) {
@@ -169,13 +169,13 @@ std::uint8_t UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set
         case NodeKind::Coalesce:
         case NodeKind::Ternary: {
             if (node.kind == NodeKind::Coalesce) {
-                const std::uint8_t left = interpolation_kind_impl(node.a, active, literal_only);
-                const std::uint8_t right = interpolation_kind_impl(node.b, active, literal_only);
-                return scalar_only(static_cast<std::uint8_t>(left | right));
+                const KindSet left = interpolation_kind_impl(node.a, active, literal_only);
+                const KindSet right = interpolation_kind_impl(node.b, active, literal_only);
+                return scalar_only(static_cast<KindSet>(left | right));
             }
-            const std::uint8_t left = interpolation_kind_impl(node.b, active, literal_only);
-            const std::uint8_t right = interpolation_kind_impl(node.c, active, literal_only);
-            return scalar_only(static_cast<std::uint8_t>(left | right));
+            const KindSet left = interpolation_kind_impl(node.b, active, literal_only);
+            const KindSet right = interpolation_kind_impl(node.c, active, literal_only);
+            return scalar_only(static_cast<KindSet>(left | right));
         }
         case NodeKind::Index: {
             if (literal_only) return kKindUnknown;
@@ -205,7 +205,7 @@ std::uint8_t UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set
                 return kKindUnknown;  // print, user callable value, unknown
             }
             if (callee.kind == NodeKind::Member) {
-                const std::uint8_t receiver = interpolation_kind(callee.a, active);
+                const KindSet receiver = interpolation_kind(callee.a, active);
                 if (receiver & kKindUnknown) return kKindUnknown;
                 const natives::BuiltinSpec* spec = nullptr;
                 const std::string_view name = text(ast_.at(callee.b));
@@ -245,10 +245,10 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
         if (literal_index_item(ast_, part_id, resolved)) part_id = resolved;
 
         std::unordered_set<std::size_t> active;
-        const std::uint8_t kinds_here = interpolation_kind(part_id, active);
+        const KindSet kinds_here = interpolation_kind(part_id, active);
         if (kinds_here & kKindUnknown) return fail(part, "interpolation:unknown-type");
         if (kinds_here & kKindAggregate) return fail(part, "interpolation:non-scalar");
-        const std::uint8_t scalar = scalar_only(kinds_here);
+        const KindSet scalar = scalar_only(kinds_here);
         if (scalar == kKindUnknown) return fail(part, "interpolation:unknown-type");
         const bool number = (scalar & ~kKindNumber) == 0;
         const bool string = scalar == kKindString;

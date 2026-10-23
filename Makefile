@@ -3140,3 +3140,70 @@ test-cp20-host-fd-mutant: $(TARGET) $(CP20_HOST_FD_MUTANT)
 	  fi; echo "PASS CP20 host fd mutant: descriptor leak detected"
 CERTIFY_RUNTIME2_GATES += test-cp20-host-fd-mutant
 certify-targets: test-cp20-shell-spawn test-cp20-shell-spawn-mutants test-cp20-r1 test-v45-native-runtime test-cp20-fd-leak test-cp20-r1-windows test-cp20-host-fd-mutant
+# CP12C Slice 1: closure fixtures.  Phase A runs --prepare (legacy oracle +
+# current refusal); Phase B runs the differential mode and the mutant gate.
+.PHONY: test-runtime2-closures-s1-prepare test-runtime2-closures-s1
+test-runtime2-closures-s1-prepare: $(TARGET)
+	python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TARGET)" --prepare
+test-runtime2-closures-s1: $(TARGET)
+	python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TARGET)"
+.PHONY: test-runtime2-closures-s1-stress-prepare test-runtime2-closures-s1-stress
+test-runtime2-closures-s1-stress-prepare: $(TARGET)
+	python3 tests/runtime2/closures_s1_stress.py --nift "$(CURDIR)/$(TARGET)" --prepare
+test-runtime2-closures-s1-stress: $(TARGET)
+	python3 tests/runtime2/closures_s1_stress.py --nift "$(CURDIR)/$(TARGET)"
+
+# CP12C Slice 1 R6: widened kind-set bits and their compiling alias mutant.
+KIND_BITS_UNIT := $(TEST_DIR)/rt/kind-bits$(EXEEXT)
+$(KIND_BITS_UNIT): tests/rt/kind_bits.cpp src/rt/infer.h
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/kind_bits.cpp -o "$@"
+KIND_BITS_MUTANT := $(TEST_DIR)/rt/kind-bits-mutant$(EXEEXT)
+$(KIND_BITS_MUTANT): tests/rt/kind_bits.cpp src/rt/infer.h
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_KIND_MUTANT=1 tests/rt/kind_bits.cpp -o "$@"
+.PHONY: test-runtime2-kind-bits
+test-runtime2-kind-bits: $(KIND_BITS_UNIT) $(KIND_BITS_MUTANT)
+	"$(KIND_BITS_UNIT)"
+	! "$(KIND_BITS_MUTANT)"
+
+# CP12C Slice 1 C1-A: rejected cyclic cell stores, atomicity and no leak.
+CLOSURE_CYCLE_STRESS := $(TEST_DIR)/rt/closure-cycle-stress$(EXEEXT)
+$(CLOSURE_CYCLE_STRESS): tests/rt/closure_cycle_stress.cpp $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/closure_cycle_stress.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+.PHONY: test-runtime2-closure-cycle-stress
+test-runtime2-closure-cycle-stress: $(CLOSURE_CYCLE_STRESS)
+	"$(CLOSURE_CYCLE_STRESS)"
+test-runtime2-closures-s1-stress: test-runtime2-closure-cycle-stress
+
+# CP12C Slice 1 negative controls: one compiling binary per deliberate defect.
+CLOSURE_MUTANT ?= 0
+CLOSURE_MUTANT_BIN := $(TEST_DIR)/closure-mutants/nift-$(CLOSURE_MUTANT)
+CLOSURE_MUTANT_DIR := $(TEST_DIR)/closure-mutants/$(CLOSURE_MUTANT)
+$(CLOSURE_MUTANT_DIR)/vm.o: src/rt/vm.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(CLOSURE_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CLOSURE_MUTANT=$(CLOSURE_MUTANT) -c $< -o $@
+$(CLOSURE_MUTANT_DIR)/value.o: src/rt/value.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(CLOSURE_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CLOSURE_MUTANT=$(CLOSURE_MUTANT) -c $< -o $@
+$(CLOSURE_MUTANT_DIR)/vm_closure.o: src/rt/vm_closure.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(CLOSURE_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CLOSURE_MUTANT=$(CLOSURE_MUTANT) -c $< -o $@
+$(CLOSURE_MUTANT_BIN): $(filter-out src/rt/vm.o src/rt/value.o src/rt/vm_closure.o,$(CLI_OBJECTS)) \
+		$(CLOSURE_MUTANT_DIR)/vm.o $(CLOSURE_MUTANT_DIR)/value.o $(CLOSURE_MUTANT_DIR)/vm_closure.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/vm.o src/rt/value.o src/rt/vm_closure.o,$(CLI_OBJECTS)) \
+		$(CLOSURE_MUTANT_DIR)/vm.o $(CLOSURE_MUTANT_DIR)/value.o $(CLOSURE_MUTANT_DIR)/vm_closure.o $(LDLIBS) -o $@
+.PHONY: test-runtime2-closures-s1-mutants
+test-runtime2-closures-s1-mutants: $(TARGET)
+	python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TARGET)"
+	for n in 1 2 3 4 5 6; do \
+		$(MAKE) CLOSURE_MUTANT=$$n "$(TEST_DIR)/closure-mutants/nift-$$n" >/dev/null || exit 1; \
+		python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" --mutant $$n || exit 1; \
+	done
+	for n in 7 8; do \
+		$(MAKE) CLOSURE_MUTANT=$$n "$(TEST_DIR)/closure-mutants/nift-$$n" >/dev/null || exit 1; \
+		python3 tests/runtime2/closures_s1_stress.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" --mutant || exit 1; \
+	done
+	python3 tests/runtime2/closures_s1_mutant_harness.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-kind-bits test-runtime2-closures-s1 test-runtime2-closures-s1-stress test-runtime2-closures-s1-mutants

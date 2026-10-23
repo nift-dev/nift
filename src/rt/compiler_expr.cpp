@@ -1,16 +1,12 @@
 #include "rt/compiler_expr.h"
-
 #include "rt/alias.h"
 #include "rt/atom.h"
 #include "rt/literal.h"
 #include "rt/native.h"
 #include "rt/natives/json_methods.h"
 #include "rt/prepared_parse.h"
-
 namespace nift::rt::detail {
-
 namespace {
-
 OpCode binary_opcode(Op op) {
     switch (op) {
         case Op::Add: return OpCode::Add;
@@ -43,15 +39,15 @@ OpCode fused_not_jump(Op op) {
 
 // Kinds an arithmetic operator accepts without a legacy type error (or a
 // prepared-path rendering of aggregates in `+`).
-bool arithmetic_kinds_ok(Op op, std::uint8_t l, std::uint8_t r) {
+bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1); probe: caller
-    const auto only = [](std::uint8_t k, std::uint8_t allowed) { return (k & ~allowed) == 0; };
+    const auto only = [](KindSet k, KindSet allowed) { return (k & ~allowed) == 0; };
     if (op == Op::Add) {
         if (only(l, kKindNumber) && only(r, kKindNumber)) return true;
         // Concatenation: one side is a string, the other a scalar.
         if (only(l, kKindScalar) && only(r, kKindScalar)) {
-            for (std::uint8_t a = 1; a < 0x80; a <<= 1)
-                for (std::uint8_t b = 1; b < 0x80; b <<= 1)
+            for (KindSet a = 1; a <= kKindObject; a <<= 1)
+                for (KindSet b = 1; b <= kKindObject; b <<= 1)
                     if ((l & a) && (r & b) && !((a | b) & kKindString) && !((a & kKindNumber) && (b & kKindNumber)))
                         return false;
             return true;
@@ -61,7 +57,7 @@ bool arithmetic_kinds_ok(Op op, std::uint8_t l, std::uint8_t r) {
     return only(l, kKindNumber) && only(r, kKindNumber);
 }
 
-bool ordering_kinds_ok(std::uint8_t l, std::uint8_t r) {
+bool ordering_kinds_ok(KindSet l, KindSet r) {
     if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1)
     return ((l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0) || ((l & ~kKindString) == 0 && (r & ~kKindString) == 0);
 }
@@ -77,13 +73,23 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
             if (field_in_loop_code()) return fail(node, "context:struct-field");
             return temp(reg) && field_read(node, kNoNode, *field, reg);
         }
-        if (plan_.index.count(text(node))) return fail(node, "fn-as-value");
+        const auto fn = plan_.index.find(text(node));
+        if (fn != plan_.index.end()) {
+            if (!temp(reg)) return false;
+            fb_->emit(OpCode::LoadFunction, reg, fn->second);
+            return true;
+        }
+        if (in_lambda_ && !declared_names_.count(text(node))) {
+            if (!temp(reg)) return false;
+            fb_->note(fb_->emit(OpCode::Undefined, reg), std::string(text(node)));
+            return true;
+        }
         return fail(node, in_function_ ? "free-name" : "unresolved-name");
     }
     if (binding->struct_id >= 0) return fail(node, "struct-value");  // CP12b: instances are never copied
-    if (binding->global) return global_read(binding->reg, reg);  // CP12b: a copy of main's slot
-    reg = binding->reg;
-    return true;
+    if (binding->global)
+        return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);
+    return read_binding(*binding, reg);
 }
 
 bool UnitCompiler::has_call(NodeId id) const {
@@ -169,25 +175,17 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
     switch (node.kind) {
         case NodeKind::Ident: {
             std::uint16_t reg = 0;
-            const Binding* b = find_binding(text(node));
-            if (b && b->global && b->struct_id < 0) {  // CP12b
-                fb_->emit(OpCode::GetGlobal, dst, b->reg);
-                return true;
-            }
-            if (!b)
-                if (const StructFieldInfo* field = own_field(text(node))) {  // CP12b: an implicit field
-                    if (field_in_loop_code()) return fail(node, "context:struct-field");
-                    return field_read(node, kNoNode, *field, dst);
-                }
             if (!local_register(node, reg)) return false;
             if (reg != dst) fb_->emit(OpCode::Move, dst, reg);
             return true;
         }
+        case NodeKind::Lambda: return lambda_value(node, dst);
         case NodeKind::Binary: return binary(node, dst);
         case NodeKind::Logical: return logical(node, dst);
         case NodeKind::Coalesce: return coalesce(node, dst);
         case NodeKind::Ternary: return ternary(node, dst);
         case NodeKind::Unary: return unary(node, dst);
+        case NodeKind::IncDec: return inc_dec_expr(node, dst);
         case NodeKind::Call: return call(node, dst);
         case NodeKind::Member: return member(node, dst);
         case NodeKind::Index: return index(node, dst);
@@ -202,9 +200,14 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
-    const std::uint8_t l = kinds(node.a), r = kinds(node.b);
+    const KindSet l = kinds(node.a), r = kinds(node.b);
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
+            // Legacy's string + callable is a run-time error with a fixed
+            // message; compile it and let concatenate report it (handles_lambda_string).
+            if (op == OpCode::Add && ((l & kKindFunction) || (r & kKindFunction)) &&
+                ((l & kKindString) || (r & kKindString)))
+                break;
             if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r))
                 return fail(node, std::string("type:") + op_name(node.op));
             break;

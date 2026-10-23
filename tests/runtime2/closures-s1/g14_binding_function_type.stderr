@@ -1,0 +1,1 @@
+error: $ROOT/g14_binding_function_type.f:4:3: cannot assign string to int binding 'g'

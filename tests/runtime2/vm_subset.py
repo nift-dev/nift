@@ -113,6 +113,7 @@ def supported():
                                   "i := 0\nwhile(i < 1) { print(fib(18)); i += 1 }\n"))
     out.append(("deep-equality", "fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
                                  "while (i < 500) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n"))
+    out.append(("lambda", "f := (x) => x + 1\nprint(f(1))\n"))
     return out
 
 
@@ -130,7 +131,6 @@ UNSUPPORTED = [
     ("fn-called-before-declaration-transitive", "fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n",
      "fn-called-before-declaration"),
     ("async-fn", "fn[async](f()) { return 1 }\nprint(1)\n", "fn-flags"),
-    ("lambda", "f := (x) => x\nprint(1)\n", "expression:Lambda"),
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),
     ("jump-outside-loop", "break\n", "jump-outside-loop"),

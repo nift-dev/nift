@@ -13,6 +13,10 @@ namespace nift::rt::detail {
 
 const Binding* UnitCompiler::find_binding(std::string_view name) const {
     if (const Binding* local = scopes_.find(name)) return local;
+    if (in_lambda_) {
+        const auto top = top_level_bindings_.find(name);
+        return top == top_level_bindings_.end() ? nullptr : &top->second;
+    }
     if (!in_function_ || globals_ == nullptr || function_ >= globals_->free.size()) return nullptr;
     // CP12b structs: methods run wherever an instance is (not ordered by G3): no globals there.
     if (plan_.is_method(function_)) return nullptr;
@@ -26,14 +30,18 @@ const Binding* UnitCompiler::find_binding(std::string_view name) const {
 // Main's declaration of a global: remembered for the functions (compiled
 // after main) and its binding type kept for them (FunctionBuilder::keep_type).
 void UnitCompiler::note_global_declaration(const Node& node, const Binding& binding) {
-    if (in_function_ || globals_ == nullptr) return;
+    if (in_function_) return;
     const std::string_view name = text(ast_.at(node.a));
-    const auto decl = globals_->globals.find(name);
-    if (decl == globals_->globals.end() || &ast_.at(decl->second) != &node) return;
+    if (!top_level_decl_ids_.count(node_id(node))) return;
     Binding global = binding;
     global.global = true;
-    global_bindings_[name] = global;
+    top_level_bindings_[name] = global;
     fb_->keep_type(binding.type_reg);
+    fb_->emit(OpCode::MarkGlobal, binding.reg);
+    if (globals_ == nullptr) return;
+    const auto decl = globals_->globals.find(name);
+    if (decl == globals_->globals.end() || &ast_.at(decl->second) != &node) return;
+    global_bindings_[name] = global;
 }
 
 // The binding-type analyses of a global are main's: a function that reads
@@ -57,14 +65,28 @@ bool UnitCompiler::global_read(std::uint16_t slot, std::uint16_t& reg) {
     return true;
 }
 
+bool UnitCompiler::global_read_value(std::uint16_t slot, std::uint16_t& reg, std::string_view name) {
+    if (!temp(reg)) return false;
+    const std::size_t at = fb_->emit(OpCode::GetGlobalChecked, reg, slot);
+    fb_->note(at, std::string(name));
+    return true;
+}
+
+bool UnitCompiler::global_check_defined(std::uint16_t slot, std::string_view name) {
+    const std::size_t at = fb_->emit(OpCode::CheckGlobal, slot);
+    fb_->note(at, std::string(name));
+    return true;
+}
+
 // HAZARD (CP13 phase B requirement): between global_take and global_put the
 // global's slot holds null. Today a fault there (SetIndex, Push) ends the
 // program, so it is never observed; once the VM catches errors (try/catch),
 // a caught fault would leave the global null, unlike legacy. CP13B must
 // restore the slot on unwind, or update the global in place without taking.
-bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg) {
+bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg, std::string_view name) {
     std::uint16_t empty = 0;
-    if (!global_read(b.reg, reg) || !temp(empty)) return false;
+    if (name.empty() ? !global_read(b.reg, reg) : !global_read_value(b.reg, reg, name)) return false;
+    if (!temp(empty)) return false;
     fb_->emit(OpCode::LoadNull, empty);
     fb_->emit(OpCode::SetGlobal, b.reg, empty);
     return true;

@@ -20,7 +20,7 @@ std::size_t Inference::field_slot(const StructFieldInfo& field) {
     return slot;
 }
 
-std::uint8_t Inference::value_kinds(const Value& v) {
+KindSet Inference::value_kinds(const Value& v) {
     if (v.is_null()) return kKindNull;
     if (v.is(Kind::Bool)) return kKindBool;
     if (v.is(Kind::String)) return kKindString;
@@ -131,7 +131,7 @@ void Inference::statement(NodeId id) {
                 case Op::ModAssign: op = Op::Mod; break;
                 default: break;
             }
-            std::uint8_t out = arithmetic_kinds(op, (*var)->kinds, v->kinds);
+            KindSet out = arithmetic_kinds(op, (*var)->kinds, v->kinds);
             if (op == Op::Add && ((*var)->kinds & kKindString) && (v->kinds & kKindString)) out |= kKindString;
             merge_local(*var, kinds_ty(out));
             record(n.a, *var);
@@ -182,8 +182,33 @@ void Inference::statement(NodeId id) {
     }
 }
 
+void Inference::walk_unit(std::size_t unit) {
+    if (unit == plan_.functions.size()) walk_main();
+    else if (unit < plan_.functions.size()) walk_function(unit);
+    else walk_lambda(unit - plan_.functions.size() - 1);
+}
+
+void Inference::walk_lambda(std::size_t id) {
+    LambdaInfo& info = lambdas_[id];
+    const Node& lambda = ast_.at(info.node);
+    current_ = static_cast<int>(plan_.functions.size() + 1 + id);
+    owner_function_ = info.owner_function;
+    scopes_ = info.scopes;
+    scopes_.emplace_back();  // parameters and the body share this scope
+    const NodeId* params = ast_.list(lambda);
+    for (std::uint32_t k = 0; k < lambda.count; ++k)
+        declare(ast_.text(ast_.at(params[k])), params[k], record(params[k], info.params[k]));
+    if (lambda.flags & kFlagBlockBody) {
+        statements(ast_.at(lambda.b));
+        if (block_falls_through(ast_, lambda.b)) merge_lambda_return(id, kinds_ty(kKindNull));
+    } else {
+        merge_lambda_return(id, expr(lambda.b));
+    }
+}
+
 void Inference::walk_main() {
     current_ = -1;
+    owner_function_ = -1;
     scopes_.assign(1, Scope());
     const Node& program = ast_.at(root_);
     const NodeId* list = ast_.list(program);

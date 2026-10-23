@@ -250,6 +250,7 @@ def rt_diff(args, work):
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
+           "--timeout", str(max(60, args.timeout)),
            "--b-vm-stats",
            "--report", os.path.join(work, "rt-diff-report.json")]
     for c in corpora:

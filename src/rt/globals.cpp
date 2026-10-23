@@ -1,6 +1,8 @@
 #include "rt/globals.h"
 
+#include "rt/builtin_bind.h"
 #include "rt/legacy_names.h"
+#include "rt/native.h"
 
 #include <algorithm>
 #include <limits>
@@ -55,7 +57,7 @@ void declared_names(const Ast& ast, NodeId root, NameSet& out) {
 // Identifiers read or written as bindings in a subtree: not declared names,
 // member names, object keys, callees of direct calls, or names that are part
 // of a declaration's shape.
-void binding_uses(const Ast& ast, NodeId root, NameSet& reads, NameSet& writes) {
+void binding_uses(const Ast& ast, NodeId root, const UnitPlan& plan, NameSet& reads, NameSet& writes) {
     std::unordered_set<NodeId> skip;
     walk(ast, root, [&](NodeId id, const Node& n) {
         switch (n.kind) {
@@ -67,7 +69,14 @@ void binding_uses(const Ast& ast, NodeId root, NameSet& reads, NameSet& writes) 
                 if (n.b != kNoNode) skip.insert(n.b);
                 break;
             case NodeKind::Call:
-                if (n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident) skip.insert(n.a);
+                if (n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident) {
+                    const std::string_view callee = ast.text(ast.at(n.a));
+                    NativeInfo native{};
+                    const bool direct = plan.index.count(callee) || plan.struct_index.count(callee) ||
+                                        lookup_native(callee, native) || bind_function(callee) != nullptr;
+                    if (direct) skip.insert(n.a);
+                    else reads.insert(callee);  // a callable binding: a free-name read when not local
+                }
                 break;
             case NodeKind::Assign: case NodeKind::CompoundAssign: case NodeKind::IncDec:
                 if (n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident) {
@@ -143,7 +152,7 @@ GlobalPlan plan_globals(const Ast& ast, NodeId root, const UnitPlan& plan) {
     }
     for (std::size_t f = 0; f < nf; ++f) {
         NameSet reads, writes;
-        binding_uses(ast, ast.at(plan.functions[f]).b, reads, writes);
+        binding_uses(ast, ast.at(plan.functions[f]).b, plan, reads, writes);
         NameSet used = reads;
         used.insert(writes.begin(), writes.end());
         std::vector<char> active(nf, 0);

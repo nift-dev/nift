@@ -1,6 +1,7 @@
 #include "rt/value_cycle.h"
 
 #include "rt/aggregate.h"
+#include "rt/cell.h"
 #include "rt/compare.h"
 
 #include <algorithm>
@@ -9,7 +10,10 @@
 namespace nift::rt {
 
 void CycleGraph::captured(const FunctionObject& function, CaptureVisitor& visitor) const {
-    for (const Value& slot : function.upvalues) visitor.cell(&slot, slot);
+    for (const Value& slot : function.upvalues) {
+        if (const CellObject* cell = cell_of(slot)) visitor.cell(cell, cell->value);
+        else visitor.cell(&slot, slot);  // test/legacy graph without dedicated cells
+    }
 }
 
 const Value* CycleGraph::payload(const Value&) const { return nullptr; }
@@ -96,6 +100,12 @@ private:
             case Kind::Function: {
                 const auto* f = v.heap_as<FunctionObject>();
                 if (b_.seen.insert(address_key(f))) graph_.captured(*f, *this);
+                return;
+            }
+            case Kind::Cell: {
+                const auto* c = v.heap_as<CellObject>();
+                if (target_.kind == CycleTarget::Kind::Cell && target_.cell == c) { found_ = true; return; }
+                if (may_contain_identity(c->value) && b_.seen.insert(address_key(c))) b_.work.push_back(&c->value);
                 return;
             }
             case Kind::Handle: visit_handle(v); return;

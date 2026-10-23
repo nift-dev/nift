@@ -17,7 +17,13 @@ namespace infer_detail {
 
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals)
     : ast_(ast), root_(root), plan_(plan), globals_(globals) {
-    result_.kinds.assign(ast.size(), static_cast<std::uint8_t>(kKindAll | kKindUnknown));
+    result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));
+    const Node& program = ast.at(root);
+    const NodeId* top = ast.list(program);
+    for (std::uint32_t k = 0; k < program.count; ++k)
+        if (ast.at(top[k]).kind == NodeKind::Declare && ast.at(top[k]).a != kNoNode &&
+            ast.at(ast.at(top[k]).a).kind == NodeKind::Ident)
+            top_level_decls_.insert(top[k]);
     const std::size_t n = plan.functions.size();
     params_.resize(n);
     returns_.assign(n, empty_ty());
@@ -36,8 +42,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         const std::size_t unit = queue_.front();
         queue_.pop_front();
         queued_[unit] = self_changed_ = false;
-        if (unit == n) walk_main();
-        else walk_function(unit);
+        walk_unit(unit);
         ++result_.walks;
         if (self_changed_) enqueue(unit);
     }
@@ -46,6 +51,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
 }
 
 void Inference::enqueue(std::size_t unit) {
+    if (unit >= queued_.size()) queued_.resize(unit + 1, false);
     if (!queued_[unit]) queue_.push_back(unit);
     queued_[unit] = true;
 }
@@ -68,14 +74,25 @@ void Inference::merge_local(TyRef& into, const TyRef& value) {
 }
 
 void Inference::merge_return(const TyRef& value) {  // the callers read the return
-    if (current_ >= 0 && merge(returns_[static_cast<std::size_t>(current_)], value))
-        for (std::size_t caller : callers_[static_cast<std::size_t>(current_)]) enqueue(caller);
+    if (current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()) {
+        if (merge(returns_[static_cast<std::size_t>(current_)], value))
+            for (std::size_t caller : callers_[static_cast<std::size_t>(current_)]) enqueue(caller);
+    } else if (current_ > 0 && static_cast<std::size_t>(current_) > plan_.functions.size()) {
+        merge_lambda_return(static_cast<std::size_t>(current_) - plan_.functions.size() - 1, value);
+    }
+}
+
+void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
+    LambdaInfo& info = lambdas_[lambda];
+    if (!merge(info.returns, value)) return;
+    for (std::size_t caller : info.callers) enqueue(caller);
 }
 
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     merge_local(vars_[slot], value);
     scopes_.back().emplace_back(name, slot);
+    if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }
 
 TyRef* Inference::find(std::string_view name) {
@@ -83,8 +100,15 @@ TyRef* Inference::find(std::string_view name) {
         for (auto entry = scope->rbegin(); entry != scope->rend(); ++entry)
             if (entry->first == name) return &vars_[entry->second];
     // A function's free name resolved to a top-level binding (rt/globals.h).
-    const std::size_t slot = globals_.find(current_, name, persist_index_, vars_, ast_.size());
-    return slot == GlobalSlots::kNone ? nullptr : &vars_[slot];
+    // A lambda uses its enclosing named function's free-name map.
+    const int owner = current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()
+                          ? current_
+                          : owner_function_;
+    const std::size_t slot = globals_.find(owner, name, persist_index_, vars_, ast_.size());
+    if (slot != GlobalSlots::kNone) return &vars_[slot];
+    if (current_ < 0 || static_cast<std::size_t>(current_) <= plan_.functions.size()) return nullptr;
+    const auto top = top_level_slots_.find(name);
+    return top == top_level_slots_.end() ? nullptr : &vars_[top->second];
 }
 
 TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
@@ -114,13 +138,32 @@ TyRef Inference::expr(NodeId id) {
         case NodeKind::Null: t = kinds_ty(kKindNull); break;
         case NodeKind::Ident: {
             const TyRef* v = find(ast_.text(n));
-            t = v ? *v : any_ty();
+            if (v) {
+                t = *v;
+            } else {
+                const int f = function_index(n);
+                if (f < 0) {
+                    t = any_ty();
+                } else {
+                    auto fn = std::make_shared<Ty>();
+                    fn->kinds = kKindFunction;
+                    fn->callables.push_back(static_cast<std::uint32_t>(f));
+                    t = fn;
+                }
+            }
+            break;
+        }
+        case NodeKind::Lambda: {
+            auto fn = std::make_shared<Ty>();
+            fn->kinds = kKindFunction;
+            fn->callables.push_back(static_cast<std::uint32_t>(lambda_unit(id)));
+            t = fn;
             break;
         }
         case NodeKind::Unary: {
             const TyRef o = expr(n.a);
             t = kinds_ty(n.op == Op::Not ? kKindBool
-                                         : static_cast<std::uint8_t>(o->kinds & (kKindNumber | kKindUnknown)));
+                                         : static_cast<KindSet>(o->kinds & (kKindNumber | kKindUnknown)));
             if (n.op == Op::Neg && constants_.has(n.a)) t = constant(id, -constants_.at(n.a));
             break;
         }
@@ -142,7 +185,7 @@ TyRef Inference::expr(NodeId id) {
             const TyRef l = expr(n.a), r = expr(n.b);
             if (l->kinds & kKindNull) {
                 auto without = std::make_shared<Ty>(*l);
-                without->kinds = static_cast<std::uint8_t>(l->kinds & ~kKindNull);
+                without->kinds = static_cast<KindSet>(l->kinds & ~kKindNull);
                 t = unite(TyRef(without), r);
             } else {
                 t = l;
@@ -209,10 +252,52 @@ TyRef Inference::expr(NodeId id) {
             if (!t) t = o;
             break;
         }
+        case NodeKind::IncDec: { expr(n.a); t = kinds_ty(kKindNumber); break; }
         case NodeKind::Call: t = call(n); break;
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)
     }
     return record(id, t ? t : empty_ty());
+}
+
+std::size_t Inference::lambda_unit(NodeId node) {
+    const auto found = lambda_unit_.find(node);
+    if (found != lambda_unit_.end()) return found->second;
+    const std::size_t id = lambdas_.size();
+    const std::size_t unit = plan_.functions.size() + 1 + id;
+    LambdaInfo info;
+    info.node = node;
+    info.owner_function = current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()
+                              ? current_
+                              : owner_function_;
+    info.params.assign(ast_.at(node).count, empty_ty());
+    info.returns = empty_ty();
+    info.scopes = scopes_;
+    lambdas_.push_back(std::move(info));
+    lambda_unit_.emplace(node, unit);
+    enqueue(unit);
+    return unit;
+}
+
+TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew) {
+    TyRef out = empty_ty();
+    for (std::uint32_t unit : callee->callables) {
+        if (static_cast<std::size_t>(unit) < plan_.functions.size()) {
+            auto& params = params_[unit];
+            for (std::size_t k = 0; k < values.size() && k < params.size(); ++k)
+                grew = merge(params[k], values[k]) || grew;
+            callers_[unit].insert(current_unit());
+            out = unite(out, returns_[unit]);
+        } else if (static_cast<std::size_t>(unit) > plan_.functions.size()) {
+            const std::size_t id = static_cast<std::size_t>(unit) - plan_.functions.size() - 1;
+            LambdaInfo& info = lambdas_[id];
+            for (std::size_t k = 0; k < values.size() && k < info.params.size(); ++k)
+                grew = merge(info.params[k], values[k]) || grew;
+            info.callers.insert(current_unit());
+            out = unite(out, info.returns);
+        }
+        if (grew) enqueue(unit);
+    }
+    return out;
 }
 
 TyRef Inference::call(const Node& n) {
@@ -243,26 +328,29 @@ TyRef Inference::call(const Node& n) {
             if (const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(own)].method(ast_.text(callee)))
                 return method_call(m->function, n);
     }
-    if (callee.kind == NodeKind::Member) {  // length()/size() and CP14 methods (infer_builtins.cpp)
+    if (callee.kind == NodeKind::Member) {  // length()/size(), CP14 methods, or a callable field
         const TyRef recv = expr(callee.a);
+        const std::string key(ast_.text(ast_.at(callee.b)));
+        const TyRef field = element_of(recv, &key, true);
+        record(n.a, field);
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
+        if (!field->callables.empty()) {
+            bool grew = false;
+            const TyRef result = call_callables(field, values, grew);
+            return result;
+        }
         return method_result(ast_, n, recv, values);
     }
-    const int f = function_index(callee);
+    const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
     for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
-    if (f < 0) {
-        // print, a CP14 free built-in, or something the compiler refuses
-        return callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
+    if (!callee_ty->callables.empty()) {
+        bool grew = false;
+        return call_callables(callee_ty, values, grew);
     }
-    const auto fn_index = static_cast<std::size_t>(f);
-    auto& params = params_[fn_index];
-    bool grew = false;
-    for (std::uint32_t k = 0; k < n.count && k < params.size(); ++k) grew = merge(params[k], values[k]) || grew;
-    if (grew) enqueue(fn_index);
-    callers_[fn_index].insert(current_unit());  // re-walked when the return grows
-    return returns_[fn_index];
+    // print, a CP14 free built-in, or something the compiler refuses
+    return callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
 }
 
 } // namespace infer_detail

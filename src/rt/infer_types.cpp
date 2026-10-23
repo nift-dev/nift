@@ -1,5 +1,6 @@
 #include "rt/infer_types.h"
 
+#include <algorithm>
 #include <cmath>
 
 // rt-lint: cold-file compile-time analysis, once per unit
@@ -35,7 +36,7 @@ const TyRef& any_ty() {
     return a;
 }
 
-TyRef kinds_ty(std::uint8_t kinds) {
+TyRef kinds_ty(KindSet kinds) {
     auto t = std::make_shared<Ty>();
     t->kinds = kinds;
     return t;
@@ -61,6 +62,9 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
         for (std::size_t k = 0; k < a->items.size(); ++k)
             t->items.push_back(unite(a->items[k], b->items[k], depth + 1));
     }
+    t->callables = a->callables;
+    for (std::uint32_t u : b->callables)
+        if (std::find(t->callables.begin(), t->callables.end(), u) == t->callables.end()) t->callables.push_back(u);
     t->fields = a->fields;
     for (const auto& [key, ty] : b->fields) {
         auto it = t->fields.find(key);
@@ -76,7 +80,7 @@ bool same(const TyRef& a, const TyRef& b) {
     const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
     if (a->kinds != b->kinds || a->any != b->any || a->fields.size() != b->fields.size()) return false;
-    if (a->struct_id != b->struct_id) return false;
+    if (a->struct_id != b->struct_id || a->callables != b->callables) return false;
     if (a->tuple != b->tuple || a->items.size() != b->items.size()) return false;
     for (std::size_t k = 0; k < a->items.size(); ++k)
         if (!same(a->items[k], b->items[k])) return false;
@@ -136,7 +140,7 @@ long literal_position(std::string_view digits) {
     return std::stol(std::string(digits));
 }
 
-std::uint8_t Constants::set(std::size_t nodes, NodeId id, double v) {
+KindSet Constants::set(std::size_t nodes, NodeId id, double v) {
     if (values.empty()) values.assign(nodes, std::nan(""));
     values[id] = v;
     return std::trunc(v) == v ? kKindInt : kKindFrac;
@@ -159,8 +163,8 @@ bool fold_constant(Op op, double l, double r, double& out) {
     return std::isfinite(out);
 }
 
-std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r) {
-    std::uint8_t out = 0;
+KindSet arithmetic_kinds(Op op, KindSet l, KindSet r) {
+    KindSet out = 0;
     if (op == Op::Add && ((l & kKindString) || (r & kKindString))) out |= kKindString;
     if ((l & kKindNumber) && (r & kKindNumber)) {
         const bool frac = (l & kKindFrac) || (r & kKindFrac);
@@ -179,7 +183,7 @@ std::uint8_t arithmetic_kinds(Op op, std::uint8_t l, std::uint8_t r) {
             default: out |= frac ? kKindNumber : kKindInt; break;
         }
     }
-    return static_cast<std::uint8_t>(out | ((l | r) & kKindUnknown));
+    return static_cast<KindSet>(out | ((l | r) & kKindUnknown));
 }
 
 } // namespace nift::rt::infer_detail

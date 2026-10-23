@@ -111,6 +111,7 @@ void FunctionBuilder::drop_unread_types() {
                 mark_register(read, in.c);
                 break;
             case OpCode::BindType: mark_register(read, in.c); break;
+            case OpCode::NewCell: case OpCode::CellStore: case OpCode::SetUpvalue: mark_register(read, in.c); break;
             case OpCode::Move: mark_register(read, in.b); break;  // a textual call passing a binding's type
             default: break;
         }

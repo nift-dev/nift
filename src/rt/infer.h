@@ -34,32 +34,49 @@
 
 namespace nift::rt {
 
-inline constexpr std::uint8_t kKindNull = 1u << 0;
-inline constexpr std::uint8_t kKindBool = 1u << 1;
-inline constexpr std::uint8_t kKindInt = 1u << 2;   // an integral number
-inline constexpr std::uint8_t kKindFrac = 1u << 3;  // a non-integral number
-inline constexpr std::uint8_t kKindString = 1u << 4;
-inline constexpr std::uint8_t kKindArray = 1u << 5;
-inline constexpr std::uint8_t kKindObject = 1u << 6;
-inline constexpr std::uint8_t kKindNumber = kKindInt | kKindFrac;
-inline constexpr std::uint8_t kKindAggregate = kKindArray | kKindObject;
-inline constexpr std::uint8_t kKindScalar = kKindNull | kKindBool | kKindNumber | kKindString;
-inline constexpr std::uint8_t kKindAll = 0x7f;
+using KindSet = std::uint16_t;
+inline constexpr KindSet kKindNull = 1u << 0;
+inline constexpr KindSet kKindBool = 1u << 1;
+inline constexpr KindSet kKindInt = 1u << 2;   // an integral number
+inline constexpr KindSet kKindFrac = 1u << 3;  // a non-integral number
+inline constexpr KindSet kKindString = 1u << 4;
+inline constexpr KindSet kKindArray = 1u << 5;
+inline constexpr KindSet kKindObject = 1u << 6;
+inline constexpr KindSet kKindBytes = 1u << 7;     // equal to natives::kBytes (CP15)
+#ifdef NIFT_KIND_MUTANT
+// Test-only deliberate defect: two new kinds share one bit.
+inline constexpr KindSet kKindFunction = kKindBytes;
+#else
+inline constexpr KindSet kKindFunction = 1u << 8;  // a first-class callable (CP12C)
+#endif
+inline constexpr KindSet kKindError = 1u << 9;     // reserved for CP13B
+inline constexpr KindSet kKindNumber = kKindInt | kKindFrac;
+inline constexpr KindSet kKindAggregate = kKindArray | kKindObject;
+inline constexpr KindSet kKindScalar = kKindNull | kKindBool | kKindNumber | kKindString;
+inline constexpr KindSet kKindAll = kKindNull | kKindBool | kKindInt | kKindFrac | kKindString | kKindArray |
+                                   kKindObject | kKindBytes | kKindFunction | kKindError;
 // Derived from something the compiler refuses anyway (an unresolved name, an
 // unsupported expression). Never permissive: every check treats it as "may be
 // anything" and refuses (review CP12 round 1, D1); the unit is refused either
 // way, at most for another reason.
-inline constexpr std::uint8_t kKindUnknown = 0x80;
+inline constexpr KindSet kKindUnknown = 1u << 10;
+static_assert(kKindBytes == (1u << 7));
+#ifndef NIFT_KIND_MUTANT
+static_assert(kKindFunction == (1u << 8));
+#endif
+static_assert(kKindError == (1u << 9));
+static_assert(kKindUnknown == (1u << 10));
+static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 
 struct UnitKinds {
-    std::vector<std::uint8_t> kinds;  // per NodeId (expressions)
+    std::vector<KindSet> kinds;  // per NodeId (expressions)
     // False when the fixpoint ran out of its walk budget: the kinds are then
     // not sound and the compiler refuses the unit (`analysis-limit:kinds`),
     // never compiles it with weakened checks (review CP12 round 1, D1).
     bool converged = false;
     std::size_t walks = 0;  // unit walks the worklist needed (statistics, tests)
-    std::uint8_t of(NodeId id) const {
-        return id < kinds.size() ? kinds[id] : static_cast<std::uint8_t>(kKindAll | kKindUnknown);
+    KindSet of(NodeId id) const {
+        return id < kinds.size() ? kinds[id] : static_cast<KindSet>(kKindAll | kKindUnknown);
     }
 };
 

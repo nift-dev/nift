@@ -51,6 +51,7 @@ bool UnitCompiler::finish(std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     in_function_ = false;
+    in_lambda_ = false;
     // collect_assigned over the whole program, reusing the function bodies'
     // sets (a declaration's name and parameters are never assigned).
     std::unordered_set<std::string_view> assigned;
@@ -237,7 +238,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
             std::uint16_t reg = 0, value = 0;
             const Binding* holder = receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
             const bool global = holder != nullptr && holder->global;  // CP12b: taken, pushed, put back
-            const Binding held = global ? *holder : Binding();
+            const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
+            const Binding held = (global || indirect) ? *holder : Binding();
             if (receiver.kind != NodeKind::Ident || (!global && !local_register(receiver, reg)))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) return fail(node, "static-error:push-arity");
@@ -246,13 +248,21 @@ bool UnitCompiler::expression_statement(const Node& node) {
             // from a place as a location reference (refused: no_alias); a
             // fresh value (call result, literal, operator result) is a value
             // in both engines.
-            if (!kinds_within(callee.a, kKindArray, receiver, "type:push") || !no_alias(arg, ast_.at(arg)))
+            if (!no_alias(arg, ast_.at(arg)) ||
+                (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
+                 !kinds_within(callee.a, kKindArray, receiver, "type:push")))
                 return false;
             if (!expr_any(arg, value)) return false;
-            if (global && !global_take(held, reg)) return false;
+            if (global && !global_take(held, reg, text(receiver))) return false;
             fb_->set_offset(expr.begin);
-            fb_->emit(OpCode::Push, reg, value);
+            const std::size_t at = fb_->emit(OpCode::Push, reg, value);
+            if (!global) fb_->note(at, std::string(text(expr)));
             if (global) global_put(held, reg);
+            else if (indirect) {
+                std::uint16_t untyped = 0;
+                if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+                if (!store_binding(held, reg, untyped)) return false;
+            }
             return true;
         }
     }

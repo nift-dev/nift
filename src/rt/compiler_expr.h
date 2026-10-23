@@ -54,6 +54,21 @@ private:
         std::vector<std::size_t> breaks;
     };
 
+public:
+    struct Capture {
+        enum class Source : std::uint8_t { LocalCell, OuterUpvalue };
+        Source source = Source::LocalCell;
+        std::uint16_t index = 0;
+    };
+    struct LambdaTask {
+        NodeId lambda = kNoNode;
+        std::uint16_t proto_slot = 0;
+        std::vector<std::string_view> upvalue_names;
+        std::vector<Capture> captures;
+    };
+
+private:
+
     // compiler.cpp: statements
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
@@ -77,6 +92,8 @@ private:
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
+    bool read_binding(const Binding& b, std::uint16_t& reg);
+    bool store_binding(const Binding& b, std::uint16_t value, std::uint16_t text_type);
 
     // compiler_expr.cpp: expressions
     bool expr_to(NodeId id, std::uint16_t dst);
@@ -90,21 +107,23 @@ private:
     // inference does not visit String children (infer*.cpp is not ours), so
     // this uses bindings, literals, operators, native result rules and simple
     // user-function returns. kKindUnknown means "not proven".
-    std::uint8_t interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
+    KindSet interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
                                          bool literal_only) const;
-    std::uint8_t interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
+    KindSet interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
     // Literal/operator-only kinds for a callee return expression: never
     // resolves an identifier through the caller's scopes and never follows a
     // call. Used only by interpolation_function_kind (F1).
-    std::uint8_t interpolation_literal_kind(NodeId id) const;
-    std::uint8_t interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
+    KindSet interpolation_literal_kind(NodeId id) const;
+    KindSet interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
     bool binary(const Node& node, std::uint16_t dst);
     bool logical(const Node& node, std::uint16_t dst);
     bool coalesce(const Node& node, std::uint16_t dst);
     bool ternary(const Node& node, std::uint16_t dst);
     bool unary(const Node& node, std::uint16_t dst);
+    bool inc_dec_expr(const Node& node, std::uint16_t dst);
     bool call(const Node& node, std::uint16_t dst);
+    bool call_value(const Node& node, NodeId callee, bool member, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);
     // CP14: a pure built-in over a fresh window (receiver: kNoNode for a free
     // function); W1, W2/W4 refusals.
@@ -115,6 +134,14 @@ private:
     bool member(const Node& node, std::uint16_t dst);
     bool index(const Node& node, std::uint16_t dst);
     bool local_register(const Node& node, std::uint16_t& reg);
+    // CP12C closures: lambda construction, deferred Proto compilation and
+    // the static capture pass that decides which bindings need cells.
+    bool lambda_value(const Node& node, std::uint16_t dst);
+    bool compile_lambda_task(const struct LambdaTask& task, std::unique_ptr<Proto>& out);
+    void prepare_captures();
+    bool captured_binding(NodeId id) const { return captured_bindings_.count(id) != 0; }
+    void collect_lambda_names(NodeId id, std::vector<std::string_view>& out) const;
+    NodeId node_id(const Node& node) const { return static_cast<NodeId>(&node - &ast_.at(0)); }
     bool false_jump(NodeId cond, std::vector<std::size_t>& jumps);
     bool has_call(NodeId id) const;
     bool plain_postfix(const Node& node);
@@ -132,25 +159,26 @@ private:
     // function called from such code.
     bool loop_region() const { return loop_depth_ > 0 && !textual_statement_; }
     bool loop_reachable() const {  // CP12b: struct methods count as called from loops (conservative)
-        return loop_region() || (in_function_ && (loop_called_[function_] || plan_.is_method(function_)));
+        return loop_region() || (!in_lambda_ && in_function_ &&
+                                 (loop_called_[function_] || plan_.is_method(function_)));
     }
     void update_flags();
     // A binding type legacy derives from `type` may differ from the type of
     // the value (kinds) in scope `scope` (functions 0..n-1, main n).
     bool may_double(const TextType& type, std::size_t scope) const;
-    bool type_mismatch_possible(const TextType& type, std::uint8_t kinds, std::size_t scope) const;
+    bool type_mismatch_possible(const TextType& type, KindSet kinds, std::size_t scope) const;
     // Can the binding-type check of an assignment of a value of kinds
     // `value` to binding `b` fail? Legacy words that error differently in
     // loop code (D-018c), so such loop code is refused
     // (context:assignment-error, review round 2).
-    bool binding_error_possible(const Binding& b, std::uint8_t value) const;
+    bool binding_error_possible(const Binding& b, KindSet value) const;
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
     // Where an error raised by `node` is reported: its own start (D-018c).
     std::uint32_t site(const Node& node) const { return node.begin; }
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
-    bool kinds_within(NodeId id, std::uint8_t allowed, const Node& at, const char* reason);
+    bool kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason);
     // compiler_call.cpp: a member or index path in user-call arguments.
     bool argument_path(const Node& node, std::string& note);
     bool bare_argument(const Node& call, std::uint32_t k) const;
@@ -160,13 +188,16 @@ private:
     bool no_alias(NodeId value, const Node& at);
     // kKindUnknown always comes with every kind, so a "may be X" test is
     // conservative for it too (review CP12 round 1, D1).
-    std::uint8_t kinds(NodeId id) const {
-        const std::uint8_t k = kinds_.of(id);
-        return (k & kKindUnknown) && !probe_ ? static_cast<std::uint8_t>(kKindAll | kKindUnknown) : k;
+    KindSet kinds(NodeId id) const {
+        const KindSet k = kinds_.of(id);
+        // A4/B3: an empty kind set inside a lambda is unresolved, not "any";
+        // treat it as Unknown so no check treats it as satisfying every kind.
+        if (k == 0 && in_lambda_) return static_cast<KindSet>(kKindAll | kKindUnknown);
+        return (k & kKindUnknown) && !probe_ ? static_cast<KindSet>(kKindAll | kKindUnknown) : k;
     }
     // True when kinds `k` include kKindUnknown and the check must pass (probe
     // mode only); outside the probe it records that Unknown decided a refusal.
-    bool unknown_defers(std::uint8_t k) const {
+    bool unknown_defers(KindSet k) const {
         if (!(k & kKindUnknown)) return false;
         if (!probe_) unknown_hit_ = true;
         return probe_;
@@ -177,13 +208,17 @@ private:
     // being compiled: a local, or (in a function) the top-level binding a
     // resolved free name denotes (Binding::global); nullptr otherwise.
     const Binding* find_binding(std::string_view name) const;
+    const Binding* find_lambda_binding(std::string_view name) const;
     void note_global_declaration(const Node& node, const Binding& binding);
     bool propagate_global_doubles();
     // Reads a global's value (or type) slot into a fresh temporary.
     bool global_read(std::uint16_t slot, std::uint16_t& reg);
+    bool global_read_value(std::uint16_t slot, std::uint16_t& reg, std::string_view name);
+    bool global_check_defined(std::uint16_t slot, std::string_view name);
+    bool print_argument_ok(NodeId id, const Node& arg);
     // A global aggregate taken out of its slot for an in-place update (so the
     // update does not copy it), and put back after.
-    bool global_take(const Binding& b, std::uint16_t& reg);
+    bool global_take(const Binding& b, std::uint16_t& reg, std::string_view name = {});
     void global_put(const Binding& b, std::uint16_t reg) { fb_->emit(OpCode::SetGlobal, b.reg, reg); }
     std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
     // CP12b structs (compiler_structs.cpp): instances live in bindings and are
@@ -225,6 +260,12 @@ private:
     const GlobalPlan* globals_ = nullptr;
     const std::vector<std::string_view>* module_names_ = nullptr;  // CompileLimits::module_names
     std::unordered_map<std::string_view, Binding> global_bindings_;  // main's binding of each global
+    std::unordered_map<std::string_view, Binding> top_level_bindings_;  // every direct top-level declaration
+    std::unordered_set<NodeId> top_level_decl_ids_;
+    std::unordered_set<NodeId> captured_bindings_;
+    std::unordered_set<std::string_view> declared_names_;
+    std::vector<LambdaTask> lambda_tasks_;
+    Program* program_ = nullptr;
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;
@@ -254,11 +295,14 @@ private:
     const Node* chain_top_ = nullptr;   // the outermost member/index chain (chain_enter)
     const Node* chain_next_ = nullptr;  // its next receiver
     const Node* print_arg_ = nullptr;   // the native call argument being compiled
+    std::string_view global_note_;      // the full place text for a checked global read
     int index_depth_ = 0;             // inside index brackets
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;
+
     bool in_function_ = false;
+    bool in_lambda_ = false;
     int depth_ = 0;
     static constexpr int kMaxExpressionNesting = 48;
     std::string reason_;

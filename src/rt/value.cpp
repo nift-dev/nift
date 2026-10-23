@@ -22,6 +22,7 @@ const char* kind_name(Kind kind) {
         case Kind::Struct: return "struct";
         case Kind::Handle: return "handle";
         case Kind::Error: return "error";
+        case Kind::Cell: return "cell";  // internal only
     }
     return "unknown";
 }
@@ -29,6 +30,9 @@ const char* kind_name(Kind kind) {
 namespace {
 
 void delete_object(HeapObject* object) noexcept {
+#if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 7
+    if (object->kind() == Kind::Cell || object->kind() == Kind::Function) return;  // M7: leak
+#endif
     heap_untally(object);
     switch (object->kind()) {
         case Kind::String: delete static_cast<StringObject*>(object); return;
@@ -39,13 +43,14 @@ void delete_object(HeapObject* object) noexcept {
         case Kind::Function: delete static_cast<FunctionObject*>(object); return;
         case Kind::Struct: delete static_cast<StructObject*>(object); return;
         case Kind::Error: delete static_cast<ErrorObject*>(object); return;
+        case Kind::Cell: delete static_cast<CellObject*>(object); return;
         default: return;  // immediate kinds never reach the heap
     }
 }
 
 bool has_children(Kind kind) noexcept {
     return kind == Kind::Array || kind == Kind::Object || kind == Kind::Function || kind == Kind::Struct ||
-           kind == Kind::Error;
+           kind == Kind::Error || kind == Kind::Cell;
 }
 
 std::size_t child_count(const HeapObject* o) noexcept {
@@ -55,6 +60,7 @@ std::size_t child_count(const HeapObject* o) noexcept {
         case Kind::Function: return static_cast<const FunctionObject*>(o)->upvalues.size();
         case Kind::Struct: return static_cast<const StructObject*>(o)->fields.size();
         case Kind::Error: return 1;
+        case Kind::Cell: return 1;
         default: return 0;
     }
 }
@@ -65,6 +71,7 @@ Value& child_at(HeapObject* o, std::size_t i) noexcept {
         case Kind::Object: return static_cast<ObjectObject*>(o)->entries[i].second;
         case Kind::Function: return static_cast<FunctionObject*>(o)->upvalues[i];
         case Kind::Struct: return static_cast<StructObject*>(o)->fields[i].second;
+        case Kind::Cell: return static_cast<CellObject*>(o)->value;
         default: return static_cast<ErrorObject*>(o)->cause;
     }
 }
@@ -172,6 +179,7 @@ struct Worklist {
                 for (auto& f : static_cast<StructObject*>(o)->fields) if (f.second.is_heap()) take(f.second);
                 break;
             case Kind::Error: take(static_cast<ErrorObject*>(o)->cause); break;
+            case Kind::Cell: take(static_cast<CellObject*>(o)->value); break;
             default: break;
         }
         delete_object(o);

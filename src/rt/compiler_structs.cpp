@@ -104,12 +104,12 @@ bool UnitCompiler::field_assign(const Node& node, NodeId receiver, const StructF
 
 // `x += e`, `x++` (and through `this.` or an instance).
 bool UnitCompiler::field_update(const Node& node, NodeId receiver, const StructFieldInfo& field) {
-    const std::uint8_t l = kinds(node.a);
+    const KindSet l = kinds(node.a);
     std::uint16_t value = 0, current = 0, type = 0, slot = 0;
     if (node.kind == NodeKind::IncDec) {
         if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     } else {
-        const std::uint8_t r = kinds(node.b);
+        const KindSet r = kinds(node.b);
         const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
         const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
         if (!numbers && !strings && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");

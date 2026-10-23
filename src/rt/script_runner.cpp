@@ -47,6 +47,7 @@ struct Stats {
     bool error_in_loop_path = false;
     std::vector<std::uint64_t> large_lines, derived_lines;
     bool evidence_truncated = false;
+    std::size_t heap_peak = 0, heap_live = 0;
     std::string path;
     std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
     bool catchable = false;  // vm-error: legacy raises it as a catchable Error
@@ -85,7 +86,8 @@ void report(const Stats& s) {
     };
     list("large_lines", s.large_lines);
     list("derived_lines", s.derived_lines);
-    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false") << s.inventory_json
+    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false")
+         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json
          << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
@@ -339,6 +341,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.large_lines = result.large_lines;
     stats.derived_lines = result.derived_lines;
     stats.evidence_truncated = result.evidence_truncated;
+    stats.heap_peak = result.heap_peak;
+    stats.heap_live = result.heap_live;
     write_stdout(output, nullptr);
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {

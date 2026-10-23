@@ -32,6 +32,8 @@ const char* stop_reason_name(StopReason reason);
 // instruction computes (CP12, D-018: one meaning in every context).
 enum : std::uint8_t {
     kInstrLoopPath = 1u << 0,  // code legacy runs on its prepared (loop) evaluator: VM stats only
+    kInstrCallMember = 1u << 1,  // CallValue through an object field: legacy member diagnostics
+    kInstrLambdaExprBody = 1u << 2,  // Closure whose body is an expression (diagnostic prefix)
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's

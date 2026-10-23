@@ -118,17 +118,12 @@ CASES = [
         "module_paths": {"m.nft"},
     },
     {
-        "name": "call-binding-later",
+        "name": "call-binding-later-compiled",
         "files": {
             "main.f": 'import("m.nft")\nf := 1\nprint(f())\ng := () => 2\nprint(g())\n',
             "m.nft": "fn(mf()) {\n  return 1\n}\nexport(mf)\n",
         },
-        "first": "call-binding",
-        "certain": {"call-binding", "expression:Lambda"},
-        "later": ["expression:Lambda"],
-        "complete": True,
-        "item0_line": 3,
-        "item0_column": 7,
+        "compiled": True,
     },
     {
         "name": "fn-flags-module",
@@ -196,6 +191,12 @@ def check_case(nift, work, case):
     problems = []
     if classify is None or every is None:
         return [f"no statistics (classify {classify_proc.returncode}, every {every_proc.returncode})"]
+    if case.get("compiled"):
+        if classify.get("outcome") != "compiled":
+            return [f"expected compiled, got {classify.get('outcome')}/{classify.get('reason')}"]
+        if every.get("outcome") != "compiled" or every.get("reasons"):
+            return [f"classify-all expected compiled with no blockers, got {every.get('outcome')}/{every.get('reasons')}"]
+        return []
     if classify.get("outcome") != "fallback":
         problems.append(f"classify unexpectedly {classify.get('outcome')}/{classify.get('reason')}")
     if every_proc.returncode != 0 or every_proc.stdout:

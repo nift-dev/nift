@@ -72,8 +72,19 @@ struct FunctionObject : HeapObject {
     std::string name;
     const void* code = nullptr;
     std::uint32_t native_id = 0;
+    bool is_lambda = false;
+    bool expression_body = false;
     std::vector<Value> upvalues;
     FunctionObject() : HeapObject(Kind::Function) {}
+};
+
+// CP12C: a captured binding. Internal only: never reachable from script values,
+// natives or Host; the VM's cell opcodes and the D-040 cycle graph are its only
+// users. `binding_type` is the legacy binding tag fixed at declaration.
+struct CellObject : HeapObject {
+    Value value;
+    std::int64_t binding_type = -1;
+    CellObject() : HeapObject(Kind::Cell) {}
 };
 
 // Struct instances are values (D-040 V9): copies share the object until one

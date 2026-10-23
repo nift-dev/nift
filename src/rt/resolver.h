@@ -28,7 +28,7 @@ struct Binding {
     // CP12 review round 2: the inferred kinds of the declaring value (or the
     // parameter's arguments) and whether the declaring text may give the
     // binding type double; 0xff = unknown.
-    std::uint8_t decl_kinds = 0xff;
+    std::uint16_t decl_kinds = 0x7ff;  // CP12 KindSet (widened in R6)
     bool decl_text_double = false;  // the declaring text is always typed double
     bool decl_may_double = false;   // ... or may be (a binding it names may be double)
     // CP12b globals: a top-level binding a function reaches as a free name
@@ -36,6 +36,12 @@ struct Binding {
     // functions read and write with GetGlobal/SetGlobal (main's frame is at
     // stack base 0).
     bool global = false;
+    // CP12C closures: a captured local/parameter lives in a Cell; a lambda
+    // binding is an upvalue (index into the running closure's cells).
+    bool cell = false;
+    bool upvalue = false;
+    std::uint16_t cell_reg = 0;
+    std::uint16_t upvalue_index = 0;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

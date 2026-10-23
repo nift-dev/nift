@@ -96,15 +96,15 @@ const TextType& UnitCompiler::text_type_at(NodeId id) const {
     return *slot;
 }
 
-bool UnitCompiler::binding_error_possible(const Binding& b, std::uint8_t value) const {
+bool UnitCompiler::binding_error_possible(const Binding& b, KindSet value) const {
     if ((b.decl_kinds | value) & kKindUnknown) return true;
     // Binding types (tags) the declaration can give, and value tags: an int
     // value is accepted by a double binding; any other pair must be equal.
-    std::uint8_t tags = static_cast<std::uint8_t>(b.decl_kinds & ~kKindInt);
+    KindSet tags = static_cast<KindSet>(b.decl_kinds & ~kKindInt);
     if (b.decl_kinds & kKindInt) tags |= b.decl_text_double ? kKindFrac : kKindInt;
     if (b.decl_may_double) tags |= kKindFrac;  // "double" is the Frac bit here
-    for (std::uint8_t binding = 1; binding < 0x80; binding <<= 1)
-        for (std::uint8_t v = 1; v < 0x80; v <<= 1)
+    for (KindSet binding = 1; binding <= kKindObject; binding <<= 1)
+        for (KindSet v = 1; v <= kKindObject; v <<= 1)
             if ((tags & binding) && (value & v) && binding != v && !(v == kKindInt && binding == kKindFrac))
                 return true;
     return false;
@@ -122,10 +122,10 @@ bool UnitCompiler::may_double(const TextType& type, std::size_t scope) const {
 // prepared path from the value: the two differ only when the text gives a
 // double type (or another binding's type that may be double) while the
 // value is not a non-integral number.
-bool UnitCompiler::type_mismatch_possible(const TextType& type, std::uint8_t kinds, std::size_t scope) const {
+bool UnitCompiler::type_mismatch_possible(const TextType& type, KindSet kinds, std::size_t scope) const {
     if (unknown_defers(kinds)) return false;
     if (kinds & kKindUnknown) kinds = kKindAll;  // may be anything (review D1)
-    return may_double(type, scope) && (kinds & static_cast<std::uint8_t>(kKindAll & ~kKindFrac)) != 0;
+    return may_double(type, scope) && (kinds & static_cast<KindSet>(kKindAll & ~kKindFrac)) != 0;
 }
 
 // Names (per scope) whose binding type may be double: declared from a text
@@ -206,16 +206,35 @@ void UnitCompiler::compute_may_double() {
 }
 
 bool UnitCompiler::compile_program(NodeId root, Program& program) {
+    program_ = &program;
+    lambda_tasks_.clear();
+    prepare_captures();
     program.protos.clear();
     program.protos.resize(plan_.functions.size() + 1);
-    if (!compile_main(root, program.protos[0])) return false;
-    for (std::size_t f = 0; f < plan_.functions.size(); ++f)
-        if (!compile_function(f, program.protos[f + 1])) return false;
+    // Lambda tasks append Protos while a main/function Proto is being built;
+    // compile into a local first so a vector reallocation cannot invalidate
+    // the output reference.
+    std::unique_ptr<Proto> main_proto;
+    if (!compile_main(root, main_proto)) return false;
+    program.protos[0] = std::move(main_proto);
+    for (std::size_t f = 0; f < plan_.functions.size(); ++f) {
+        std::unique_ptr<Proto> proto;
+        if (!compile_function(f, proto)) return false;
+        program.protos[f + 1] = std::move(proto);
+    }
+    for (std::size_t i = 0; i < lambda_tasks_.size(); ++i) {
+        const LambdaTask task = lambda_tasks_[i];
+        std::unique_ptr<Proto> proto;
+        if (!compile_lambda_task(task, proto)) return false;
+        program.protos[task.proto_slot] = std::move(proto);
+    }
+    program_ = nullptr;
     return true;
 }
 
 bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) {
     in_function_ = true;
+    in_lambda_ = false;
     function_ = f;
     const Node& node = ast_.at(plan_.functions[f]);
     begin(std::string(text(ast_.at(node.a))), node.b, &assigned_fn_[f]);
@@ -249,6 +268,12 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         if (observable_[f][k]) text_type = binding.type_reg;
         else if (!fb_->constant(Value::integer(-1), text_type)) return builder_ok();
         fb_->emit(OpCode::BindType, binding.type_reg, binding.reg, text_type);
+        if (captured_binding(node_id(param))) {
+            if (!fb_->alloc(binding.cell_reg)) return builder_ok();
+            fb_->emit(OpCode::NewCell, binding.cell_reg, binding.reg, binding.type_reg);
+            binding.cell = true;
+            binding.reg = binding.cell_reg;
+        }
         if (!scopes_.declare(name, binding)) return fail(param, "param-duplicate");
     }
     // The body shares the parameters' scope: `p := ...` redeclares a parameter.
@@ -260,7 +285,8 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     // would not be passed by the callers: refuse instead.
     for (const Instr& in : out->code)
         for (std::uint32_t k = 0; k < node.count; ++k)
-            if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k])
+            if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k] &&
+                !captured_binding(node_id(ast_.at(params[k]))))
                 return fail(ast_.at(params[k]), "param-type-unpredicted");
     return true;
 }

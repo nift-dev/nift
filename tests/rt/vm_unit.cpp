@@ -102,7 +102,7 @@ void check_fallbacks() {
         {"a := [1,]\n", "opaque:legacy-runtime-error"},
         {"o := {\"a\": 1, \"a\": 2}\n", "opaque:legacy-runtime-error"},
         {"x := 1\nx\n", "expression-statement"},
-        {"f := (x) => x\n", "expression:Lambda"},
+        {"f := (x) => x\n", ""},
         {"if(1 { }\n", "parse-error"},
         {"x := 2\nprint(!x + 1)\n", "opaque:irregular-legacy-parse"},
         {"x := 2\ny := 1\nprint(y && !x || true)\n", "prefix-not-precedence"},

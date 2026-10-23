@@ -29,7 +29,9 @@
 // deeper than legacy's 64 frames is the recursion error above; at a depth
 // legacy also reaches it is an Internal failure (exit 70). Either way the
 // process stops before the host runs out of memory.
+#include "rt/heap_account.h"
 #include "rt/proto.h"
+#include "rt/value_cycle.h"
 #include "rt/vm_ops.h"
 
 #include <cstddef>
@@ -82,6 +84,8 @@ struct VmResult {
     std::vector<std::uint64_t> derived_lines;
     bool evidence_truncated = false;
     std::uint64_t output_lines = 0;  // newlines printed by the program
+    std::size_t heap_peak = 0;       // peak live rt heap seen by budget checks (test evidence)
+    std::size_t heap_live = 0;       // live rt heap when the run stopped
     std::string code;        // the stop's diagnostic code when it has a specific one (Fault::code)
     bool catchable = false;  // legacy raises it as a catchable Error (no try/catch on the VM yet)
 };
@@ -104,17 +108,35 @@ private:
         const Instr* ret = nullptr;
         std::size_t base = 0;
         const Proto* proto = nullptr;
+        const FunctionObject* closure = nullptr;
     };
     bool reserve_registers(std::size_t needed);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
     std::uint32_t main_offset(std::uint32_t own) const;
-    bool frame_check(const Proto* callee, Fault& fault);
+    bool frame_check(const Proto* callee, const char* error_name, Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))
 #endif
-    bool call_slow(const Proto* callee, std::size_t callee_base, Fault& fault);
+    bool call_slow(const Proto* callee, const char* error_name, std::size_t callee_base, Fault& fault);
     bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
+    // CP12C closure opcodes (vm_closure.cpp).
+    bool op_load_function(const Instr& in, Value* R, Fault& fault);
+    bool op_new_cell(const Instr& in, Value* R, Fault& fault);
+    bool op_cell_load(const Instr& in, Value* R, Fault& fault);
+    bool op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
+    bool op_closure(const Instr& in, Value* R, Fault& fault);
+    bool op_get_upvalue(const Instr& in, Value* R, Fault& fault);
+    bool op_get_upvalue_cell(const Instr& in, Value* R, Fault& fault);
+    bool op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
+    bool op_call(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                 const Instr*& pc, Fault& fault);
+    bool op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                       const Instr*& pc, Fault& fault);
+    bool op_undefined(const Instr& in, Fault& fault, const Proto* proto);
+    bool op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto);
+    void op_mark_global(const Instr& in);
+    bool op_check_global(const Instr& in, Fault& fault, const Proto* proto);
     bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
     bool builtin(const Instr& in, Value* R, Fault& fault);  // CP14 built-ins (rt/natives)
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
@@ -122,7 +144,11 @@ private:
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
-    bool memory_ok(Fault& fault);
+    bool memory_ok(Fault& fault) {
+        const std::size_t live = live_heap_bytes();
+        if (live > heap_peak_) heap_peak_ = live;
+        return live <= heap_limit_ || memory_exceeded(fault);
+    }
 #if defined(__GNUC__)
     __attribute__((noinline, cold))
 #endif
@@ -132,11 +158,16 @@ private:
     const Program& program_;
     VmOptions options_;
     std::vector<Value> stack_;
+    std::vector<std::uint8_t> global_ready_;
     std::vector<Frame> frames_;
     std::vector<const Proto*> protos_;
+    std::vector<Value> named_functions_;  // canonical named-function values (LoadFunction)
+    const FunctionObject* closure_ = nullptr;  // the running closure
+    CycleGraph cycle_graph_;
     std::uint64_t large_numbers_ = 0;
     std::uint64_t large_in_loop_path_ = 0;
     std::uint64_t lines_ = 0;  // newlines printed so far (evidence attribution)
+    std::size_t heap_peak_ = 0;
     std::vector<std::uint64_t> large_lines_, derived_lines_;
     bool evidence_truncated_ = false;
     bool beyond_legacy_depth_ = false;

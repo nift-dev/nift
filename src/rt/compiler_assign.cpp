@@ -19,6 +19,11 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     binding.typed = true;  // every binding: assignments check it, bare references propagate it
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
     binding.reg = reg;
+    if (captured_binding(node_id(at))) {
+        if (!fb_->alloc(binding.cell_reg)) return builder_ok();
+        binding.cell = true;
+        binding.reg = binding.cell_reg;
+    }
     return true;
 }
 
@@ -49,6 +54,7 @@ bool UnitCompiler::declare(const Node& node) {
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
+    if (binding.cell) fb_->emit(OpCode::NewCell, binding.cell_reg, reg, binding.type_reg);
     // A declaration in loop code whose binding type legacy's prepared path
     // would derive differently was refused (rt/prepared.h, prepared-decl-type).
     if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
@@ -67,7 +73,7 @@ bool UnitCompiler::declare(const Node& node) {
 bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const TextType& type = text_type_at(node.b);
     const std::string_view target = text(ast_.at(node.a));
-    const bool numeric = (kinds(node.b) & static_cast<std::uint8_t>(~kKindNumber)) == 0;
+    const bool numeric = (kinds(node.b) & static_cast<KindSet>(~kKindNumber)) == 0;
     const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;
     const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target));
     if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
@@ -77,8 +83,21 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
     if (!text_type_of(type, ast_.at(node.b), text_type)) return false;
+    if (b.cell || b.upvalue) {
+        fb_->set_offset(node.begin);
+        const std::uint16_t mark = fb_->top();
+        if (!store_binding(b, value, text_type)) return false;
+        fb_->note(fb_->here() - 1u, std::string(text(ast_.at(node.a))));
+        fb_->release_to(mark);
+        return builder_ok();
+    }
     std::uint16_t binding_type = b.type_reg;
-    if (b.global && !global_read(b.type_reg, binding_type)) return false;  // CP12b
+    if (b.global) {
+        // D2: every global write is guarded, not only plain reads.
+        fb_->set_offset(node.begin);
+        if (!global_check_defined(b.reg, target)) return false;
+        if (!global_read(b.type_reg, binding_type)) return false;  // CP12b
+    }
     fb_->set_offset(node.begin);
     const std::size_t check = fb_->is_untyped_constant(text_type)
                                   ? fb_->emit(OpCode::CheckType, value, binding_type)
@@ -104,7 +123,8 @@ bool UnitCompiler::assign(const Node& node) {
         std::uint16_t reg = 0, key = 0, value = 0;
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
         const bool global = holder != nullptr && holder->global;
-        const Binding held = global ? *holder : Binding();
+        const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
+        const Binding held = (global || indirect) ? *holder : Binding();
         if (object.kind != NodeKind::Ident || (!global && !local_register(object, reg)))
             return fail(target, "index-assign-target");
         if (!element_target_ok(target)) return false;
@@ -112,11 +132,20 @@ bool UnitCompiler::assign(const Node& node) {
             !kinds_within(target.b, kKindNumber, target, "type:element-assignment") || !no_alias(node.b, node))
             return false;
         if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
-        if (global && !global_take(held, reg)) return false;  // CP12b: in place, after the operands
+        if (global) {
+            fb_->set_offset(target.begin);
+            if (!global_check_defined(held.reg, text(object))) return false;
+        }
+        if (global && !global_take(held, reg, text(object))) return false;  // CP12b: in place, after the operands
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
         if (global) global_put(held, reg);
+        else if (indirect) {
+            std::uint16_t untyped = 0;
+            if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+            if (!store_binding(held, reg, untyped)) return false;
+        }
         return true;
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");
@@ -137,12 +166,17 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     // CP12b: a global is updated in a register taken from main's slot (after
     // the right-hand side, which may read it) and stored back.
     std::uint16_t reg = b.reg, binding_type = b.type_reg, value = 0;
+    const bool indirect = b.cell || b.upvalue;
     Value small;
     const Node* rhs = node.kind == NodeKind::IncDec ? nullptr : &ast_.at(node.b);
     const bool immediate = rhs != nullptr && node.op == Op::AddAssign && rhs->kind == NodeKind::Number &&
                            decode_number_literal(text(*rhs), small) && small.is(Kind::Int) && small.as_int() <= 32767;
     if (rhs != nullptr && !immediate && !expr_any(node.b, value)) return false;
-    if (b.global && (!global_take(b, reg) || !global_read(b.type_reg, binding_type))) return false;
+    if (indirect) {
+        if (!read_binding(b, reg)) return false;
+    } else if (b.global && (!global_take(b, reg, text(target)) || !global_read(b.type_reg, binding_type))) {
+        return false;
+    }
     fb_->set_offset(node.begin);
     if (node.kind == NodeKind::IncDec) {
         const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
@@ -160,9 +194,16 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
         }
     }
     if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
-    const std::size_t check = fb_->emit(OpCode::CheckType, reg, binding_type);
-    fb_->note(check, std::string(text(target)));
-    if (b.global) global_put(b, reg);
+    if (indirect) {
+        std::uint16_t untyped = 0;
+        if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+        if (!store_binding(b, reg, untyped)) return false;
+        fb_->note(fb_->here() - 1u, std::string(text(target)));
+    } else {
+        const std::size_t check = fb_->emit(OpCode::CheckType, reg, binding_type);
+        fb_->note(check, std::string(text(target)));
+        if (b.global) global_put(b, reg);
+    }
     fb_->release_to(mark);
     return builder_ok();
 }
@@ -179,7 +220,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const Binding b = *binding;
     // `+=` on two numbers or two strings, the others on numbers (legacy
     // errors and prepared array concatenation are refused).
-    const std::uint8_t l = kinds(node.a), r = kinds(node.b);
+    const KindSet l = kinds(node.a), r = kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
     if (!numbers && !strings && !unknown_defers(l | r))  // Unknown is neither (review D1)
@@ -210,6 +251,49 @@ bool UnitCompiler::inc_dec(const Node& node) {
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     return compound_op(node, b);
+}
+
+bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
+    const Node& target = ast_.at(node.a);
+    if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
+    const Binding* found = find_binding(text(target));
+    if (!found) return fail(target, "assign-free-name");
+    const Binding b = *found;
+    if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
+    const std::uint16_t mark = fb_->top();
+    std::uint16_t work = 0;
+    if (!temp(work)) return false;
+    if (b.global) {
+        if (!global_read_value(b.reg, work, text(target))) return false;
+    } else if (!read_binding(b, work)) {
+        return false;
+    }
+    if (work == b.reg) {
+        std::uint16_t copy = 0;
+        if (!temp(copy)) return false;
+        fb_->emit(OpCode::Move, copy, work);
+        work = copy;
+    }
+    const bool post = node.op == Op::PostInc || node.op == Op::PostDec;
+    if (post) fb_->emit(OpCode::Move, dst, work);
+    const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
+    fb_->emit(OpCode::AddI, work, work, jump_operand(up ? 1 : -1));
+    std::uint16_t untyped = 0;
+    if (!fb_->constant(Value::integer(-1), untyped)) return false;
+    if (b.cell || b.upvalue) {
+        if (!store_binding(b, work, untyped)) return false;
+        fb_->note(fb_->here() - 1u, std::string(text(target)));
+    } else {
+        std::uint16_t binding_type = b.type_reg;
+        if (b.global && !global_read(b.type_reg, binding_type)) return false;
+        const std::size_t check = fb_->emit(OpCode::CheckType, work, binding_type);
+        fb_->note(check, std::string(text(target)));
+        if (b.global) global_put(b, work);
+        else if (work != b.reg) fb_->emit(OpCode::Move, b.reg, work);
+    }
+    if (!post) fb_->emit(OpCode::Move, dst, work);
+    fb_->release_to(mark);
+    return builder_ok();
 }
 
 } // namespace nift::rt::detail

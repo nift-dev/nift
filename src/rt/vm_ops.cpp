@@ -55,7 +55,8 @@ ArithOp arith_op(OpCode op) {
 
 bool concatenate(const Value& left, const Value& right, Value& out, Fault& fault) {
     std::string text;
-    if (!append_rendered(left, text) || !append_rendered(right, text)) return internal(fault, "concatenation");
+    if (!append_rendered(left, text) || !append_rendered(right, text))
+        return raise(fault, StopReason::Error, "string concatenation requires renderable scalar values");
     out = make_string(std::move(text));
     return true;
 }
@@ -152,6 +153,7 @@ std::int64_t binding_tag(const Value& value) {
         case Kind::Int: return 2;
         case Kind::Double: case Kind::Decimal: return number_is_integer(value) ? 2 : 3;
         case Kind::String: return 4;
+        case Kind::Function: return 4;  // legacy callables are tagged strings
         case Kind::Array: return 5;
         case Kind::Object: return 6;
         case Kind::Bytes: return 7;
@@ -254,8 +256,11 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
     return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
 }
 
-bool push_value(Value& array, const Value& value, Fault& fault) {
-    if (!array.is(Kind::Array)) return internal(fault, "push");
+bool push_value(Value& array, const Value& value, Fault& fault, const Note* note) {
+    if (!array.is(Kind::Array)) {
+        return raise(fault, StopReason::Error,
+                     "unknown value or malformed expression: " + std::string(note ? note->text : ""));
+    }
     array_push(array, value);
     return true;
 }

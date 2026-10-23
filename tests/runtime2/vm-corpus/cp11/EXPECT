@@ -21,7 +21,7 @@ fallback_for.f fallback statement:For
 fallback_free_name.f vm
 fallback_index_assign_call.f fallback index-target
 fallback_interpolation.f vm
-fallback_lambda.f fallback expression:Lambda
+fallback_lambda.f vm
 fallback_large_literal.f vm
 # CP13 integration (D-022 #3): syntax errors are rejected before engine selection (same output).
 fallback_parse_error.f prevalidated
