@@ -589,6 +589,7 @@ $(RT_HOST_PROCESS_UNIT): tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) $(RT_
 test-rt-host: $(RT_HOST_LAYER_UNIT) $(RT_HOST_PROCESS_UNIT)
 	"$(RT_HOST_LAYER_UNIT)"
 	tests/runtime2/cp16/run_contained.sh "$(RT_HOST_PROCESS_UNIT)"
+	tests/runtime2/cp16/run_contained.sh "$(RT_HOST_PROCESS_UNIT)" managed_pgid_cleanup
 # Contained and fast (~20 s); part of `make test` (D-034).
 test: test-rt-host
 
@@ -649,6 +650,8 @@ test-rt-host-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-process-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		tests/runtime2/cp16/run_contained.sh --sanitized "$(TEST_DIR)/rt-san/host-process-unit"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		tests/runtime2/cp16/run_contained.sh --sanitized "$(TEST_DIR)/rt-san/host-process-unit" managed_pgid_cleanup
 
 # CP11 comparison: v4.12 baseline vs legacy vs VM vs CPython (needs valgrind).
 bench-rt-vm: $(TARGET) $(RT_VM_RUN)

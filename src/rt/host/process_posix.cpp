@@ -66,7 +66,9 @@ ProcessGroup::~ProcessGroup() {
     for (const auto& process : runtime::proc_scan()) {
         if (process.pgrp == s.pgid) { any_member = true; break; }
     }
+#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 10
     if (!any_member && !group_has_members(s)) runtime::forget_managed_pgid(s.pgid);
+#endif
 }
 
 const char* output_mode_name(OutputMode mode) {

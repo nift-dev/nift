@@ -1496,15 +1496,8 @@ void orphan_after_group_destroy() {
 
 void managed_pgid_cleanup() {
     const std::string tag = new_tag();
-    std::size_t before = runtime::managed_pgid_count();
-    // Let asynchronous pruning from preceding tests settle before taking the
-    // baseline; this performs no sweep and keeps the no-forget sensitivity.
-    for (int i = 0; i < 20; ++i) {
-        std::this_thread::sleep_for(milliseconds(50));
-        const std::size_t now = runtime::managed_pgid_count();
-        if (now == before) break;
-        before = now;
-    }
+    const std::size_t before = runtime::managed_pgid_count();
+    CHECK(before == 0);  // fresh-process isolation: no inherited registry
     for (int i = 0; i < 10000; ++i) {
         auto g = start_ok(req({"/bin/true"}, OutputMode::Inherit, tag));
         g->wait();
@@ -1568,6 +1561,7 @@ int main(int argc, char** argv) {
     bool first = true;
     for (const auto& t : tests) {
         if (!only.empty() && only != t.name) continue;
+        if (only.empty() && std::string(t.name) == "managed_pgid_cleanup") continue;  // fresh-process isolation
         if (rounds > 1 && first) {
             auto& h = runtime::test_hooks();
             std::lock_guard<std::mutex> lock(h.log_mutex);
