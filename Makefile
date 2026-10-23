@@ -605,6 +605,8 @@ test-runtime2-cp16-n1: $(TARGET) $(RT_HOST_NATIVE_UNIT)
 	"$(RT_HOST_NATIVE_UNIT)"
 	$(PYTHON) tests/runtime2/cp16_n1.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp16_n1_controls.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp16_n1_consumer_controls.py
+	bash tests/runtime2/certification_guard_selftest.sh
 test-rt-vm: test-runtime2-cp16-n1
 
 .PHONY: test-rt-host-mutants

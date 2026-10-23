@@ -69,12 +69,14 @@ inventory_status=$?
 [ "$inventory_status" -eq 0 ] || exit "$inventory_status"
 
 # Removal control for the N1 positive target: it must be reached through
-# test-rt-vm; removing that edge must make the guard's reachability check fail.
+# test-rt-vm, and removing that specific edge must make the guard fail even if
+# another path keeps the target reachable.
 python3 - <<'PYCONTROL'
 import sys
 sys.path.insert(0, 'scripts')
 import certify
 deps, _ = certify.make_db(certify.ROOT, 'certify-targets')
+
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
     while stack:
@@ -82,16 +84,42 @@ def reachable(graph):
         if t in seen: continue
         seen.add(t); stack.extend(graph.get(t, ()))
     return seen
+
+def remove_edge(graph):
+    return {k: [d for d in v if not (k == 'test-rt-vm' and d == 'test-runtime2-cp16-n1')]
+            for k, v in graph.items()}
+
+def removal_ok(graph):
+    if 'test-runtime2-cp16-n1' not in graph.get('test-rt-vm', []):
+        return False
+    return 'test-runtime2-cp16-n1' not in reachable(remove_edge(graph))
+
 if 'test-runtime2-cp16-n1' not in reachable(deps):
     print('FAIL certification guard removal control: test-runtime2-cp16-n1 is not reached')
     sys.exit(1)
-reduced = {k: [d for d in v if not (k == 'test-rt-vm' and d == 'test-runtime2-cp16-n1')]
-           for k, v in deps.items()}
-if 'test-runtime2-cp16-n1' in reachable(reduced):
+if 'test-runtime2-cp16-n1' not in deps.get('test-rt-vm', []):
+    print('FAIL certification guard removal control: the test-rt-vm edge is absent')
+    sys.exit(1)
+if not removal_ok(deps):
     print('FAIL certification guard removal control: target is still reached without its edge')
     sys.exit(1)
-print('PASS certification guard removal control: removing the test-rt-vm edge loses test-runtime2-cp16-n1')
+
+# Alternate-edge control: a direct certify-targets -> N1 edge must not be
+# accepted by the removal predicate merely because the target stays reachable.
+alt = {k: list(v) for k, v in deps.items()}
+alt.setdefault('certify-targets', []).append('test-runtime2-cp16-n1')
+alt_reduced = remove_edge(alt)
+if 'test-runtime2-cp16-n1' not in reachable(alt_reduced):
+    print('FAIL certification guard alternate-edge control: the synthetic edge did not reach N1')
+    sys.exit(1)
+if removal_ok(alt_reduced):
+    print('FAIL certification guard alternate-edge control: an alternate edge satisfied the removal predicate')
+    sys.exit(1)
+print('PASS certification guard removal control: the test-rt-vm edge is required')
+print('PASS certification guard alternate-edge control: a direct certify-targets edge is rejected')
 PYCONTROL
+removal_status=$?
+[ "$removal_status" -eq 0 ] || exit "$removal_status"
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an
