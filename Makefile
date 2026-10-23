@@ -1581,6 +1581,11 @@ test-runtime2-dynamic-reads: $(TARGET)
 test-runtime2-fs-freedom: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/fs_freedom.sh
 
+.PHONY: test-runtime2-cp03-simplify
+test-runtime2-cp03-simplify: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/cp03_simplify.sh
+test: test-runtime2-cp03-simplify
+
 # feature-sha256: native SHA-256 (src/Sha256.*, vendored subset in
 # third_party/bitcoin-sha256). Vendored-block check, module unit tests (normal
 # and ASan+UBSan, each against the portable and, when the CPU has it, the

@@ -27,9 +27,10 @@ MD:@markup("md", "../neighbour/data/doc.md")
 EXISTS:@script { return exists("$W/neighbour/data/note.txt") }
 LS:@script { return ls("../neighbour/data/*.txt").length() }
 WRITE:@script { f := file("$W/elsewhere/out.txt"); f.open("w"); f.write("written"); f.save(); f.close(); return "ok" }
+OUTLINK:<a href="@pathto("../neighbour/data/note.txt")">n</a>
 EOF
 if "$NIFT" build --all >/dev/null 2>"$W/err"; then pass "build reading/writing outside the project"; else bad "build failed: $(head -3 "$W/err")"; fi
-for want in "ABS:NEIGHBOUR-1" "REL:NEIGHBOUR-1" "LINK:NEIGHBOUR-1" "JSON:external json" "External markdown" "EXISTS:true" "LS:1" "WRITE:ok"; do
+for want in "ABS:NEIGHBOUR-1" "REL:NEIGHBOUR-1" "LINK:NEIGHBOUR-1" "JSON:external json" "External markdown" "EXISTS:true" "LS:1" "WRITE:ok" 'OUTLINK:<a href="../../neighbour/data/note.txt">'; do
   grep -q -- "$want" public/index.html && pass "output has $want" || bad "missing $want"
 done
 [ "$(cat "$W/elsewhere/out.txt" 2>/dev/null)" = written ] && pass "script wrote outside the project" || bad "external write missing"
@@ -54,4 +55,14 @@ if echo "$out" | grep -q "path escapes configured filesystem root"; then pass "-
 # Nift-owned state stays protected: untracking/removing never touches external files.
 "$NIFT" rm index >/dev/null 2>&1 || "$NIFT" rm / >/dev/null 2>&1
 [ -f "$W/neighbour/data/note.txt" ] && [ -f "$W/elsewhere/out.txt" ] && pass "rm leaves external files alone" || bad "rm removed external files"
+
+# --fs-root remains an explicit restriction for a project build as well.
+if NIFT_FS_ROOT="$W/project" "$NIFT" build --all >/dev/null 2>"$W/restricted-err"; then
+  bad "restricted project build admitted an outside path"
+elif grep -q "path escapes configured filesystem root" "$W/restricted-err"; then
+  pass "restricted project build refuses outside @path/@input reads"
+else
+  bad "restricted project build failed without the fs-root diagnostic: $(head -3 "$W/restricted-err")"
+fi
+
 exit $fail

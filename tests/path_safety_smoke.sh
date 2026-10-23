@@ -62,7 +62,8 @@ printf '{}\n' >"$P/data/local.json"
 ok_build schema-symlink '' '@json(x, "schemas/link.json", "data/local.json")'
 
 ok_build dep-symlink '' '@dep("data/dep-link.txt")'
-# Generated-URL containment is retained: @path must not point outside output.
-fail_build pathto-symlink 'path must stay inside the Nift project' '@path("public/link.txt")'
+# CP03 default filesystem freedom: a symlink target outside the project is an
+# ordinary path (the output warning, if any, is not a build failure).
+ok_build pathto-symlink '' '@path("public/link.txt")'
 
 echo "Path safety smoke test passed"
