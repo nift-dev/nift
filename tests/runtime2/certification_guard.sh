@@ -83,6 +83,12 @@ LATER = ('NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nPASS\n'
          'make: *** [Makefile:1160: test-v43-language] Error 1\n')
 base = dict(target='t', rc=1, load_sensitive=False, rerun_rc=1, user='tester')
 def case(**kw): return decide({**base, **kw})[0]
+reach = certify.reached_timing
+TIMING_FAIL = ('NIFT_BIN=x tests/v43_cp112_filevalue_wall_smoke.sh\nPASS\n'
+               'NIFT_BIN=x python3 benchmarks/hierarchy_scaling.py\nratio 4.9 > 4.0\n'
+               'make: *** [Makefile:1429: test-v43-language] Error 1\n')
+ls_base = dict(load_sensitive=True, root_steps=(sig(ROOT_ONLY), sig(ROOT_ONLY)), root_reached_timing=False)
+def ls(**kw): return case(**{**ls_base, **kw})
 checks = [
     ('signature root-only step', sig(ROOT_ONLY), 'tests/v43_cp112_filevalue_wall_smoke.sh'),
     ('signature later step', sig(LATER), 'tests/v43_final_language_smoke.sh'),
@@ -104,6 +110,26 @@ checks = [
     ('unidentified steps never excuse', case(base_rc=1, base_has_target=True, cand_step=None, base_step=None), 'FAIL'),
     ('target absent from baseline', case(base_rc=2, base_has_target=False), 'FAIL'),
     ('no baseline available', case(), 'FAIL'),
+    # Run-alone (load-sensitive) root-only exception (owner, 2026-10-23, CP16 c94bb6dd
+    # Linode): privilege-related functional failure before any timing step, same
+    # step in both root runs, complete target incl. timing passes unprivileged.
+    ('timing reached: benchmark line', reach(TIMING_FAIL), True),
+    ('timing not reached: root-only smoke', reach(ROOT_ONLY), False),
+    ('run-alone root-only, complete tester pass', ls(unpriv_rc=0), 'SKIPPED-ENVIRONMENTAL'),
+    ('run-alone root-only, tester functional fail', ls(unpriv_rc=1), 'FAIL'),
+    ('run-alone root-only, tester timing fail', ls(unpriv_rc=2), 'FAIL'),
+    ('run-alone tester timeout (incomplete)', ls(unpriv_rc=124), 'FAIL'),
+    ('run-alone no unprivileged evidence', ls(), 'FAIL'),
+    ('run-alone root failure at a timing step, tester pass', ls(root_reached_timing=True, unpriv_rc=0), 'FAIL'),
+    ('run-alone timing-reach unknown, tester pass', ls(root_reached_timing=None, unpriv_rc=0), 'FAIL'),
+    ('run-alone unrelated root failure (steps differ), tester pass',
+        ls(root_steps=(sig(ROOT_ONLY), sig(LATER)), unpriv_rc=0), 'FAIL'),
+    ('run-alone unidentified root step, tester pass', ls(root_steps=(None, None), unpriv_rc=0), 'FAIL'),
+    ('run-alone root rerun passed: never resolved', ls(rerun_rc=0, unpriv_rc=0), 'FAIL'),
+    ('run-alone passes as root', ls(rc=0), 'PASS'),
+    ('ordinary target, same root-only facts', case(root_steps=(sig(ROOT_ONLY),)*2, root_reached_timing=False, unpriv_rc=0),
+        'SKIPPED-ENVIRONMENTAL'),
+    ('root-only reported distinctly, never PASS', ls(unpriv_rc=0) != 'PASS', True),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:

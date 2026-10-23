@@ -274,6 +274,17 @@ def failure_signature(text):
     return None
 
 
+# Wall-clock performance components inside a recipe (owner, 2026-10-23: the same
+# patterns precert uses). make echoes each recipe line before running it, so a
+# log that contains one of these reached a timing step.
+PERF_COMPONENT = re.compile(r"benchmarks/[A-Za-z0-9_]+\.py|_perf_scaling_smoke\.sh|_scaling_guard\.sh|scripting_perf_guard\.sh")
+
+
+def reached_timing(text):
+    """True if the log shows any performance component was started."""
+    return any(PERF_COMPONENT.search(l) for l in text.splitlines())
+
+
 def decide(f):
     """The whole classification policy, as a pure function of observed facts.
 
@@ -288,6 +299,18 @@ def decide(f):
     if f["load_sensitive"]:
         # Already ran with no competing target: a later pass does not resolve
         # the failure (owner review, D-012). Thresholds unchanged.
+        # Root-only exception (owner, 2026-10-23, CP16): only when the failure is
+        # shown to be privilege-related and before any timing step: both root runs
+        # failed at the same identified step, neither root log reached a
+        # performance component, and the complete target (every timing step
+        # included) then passed as the unprivileged user. Anything else, including
+        # missing or incomplete unprivileged evidence, stays FAIL.
+        steps = f.get("root_steps") or (None, None)
+        if (f["rerun_rc"] != 0 and steps[0] is not None and steps[0] == steps[1]
+                and f.get("root_reached_timing") is False and f.get("unpriv_rc") == 0):
+            return "SKIPPED-ENVIRONMENTAL", (f"fails only as root at functional step {steps[0]} (before any timing "
+                                             f"step, both root runs); complete target incl. timing passes as "
+                                             f"unprivileged user '{f['user']}'")
         return "FAIL", (f"load-sensitive guard failed under exclusive execution "
                         f"(re-run alone: {'passed' if f['rerun_rc'] == 0 else 'failed'}); see .build/certify/{t}.log")
     if f["rerun_rc"] == 0:
@@ -397,6 +420,17 @@ def main():
         f = {"target": t, "rc": r["rc"], "load_sensitive": t in LOAD_SENSITIVE, "user": user}
         if r["rc"] != 0:
             f["rerun_rc"], _ = run_target(ROOT, t, logdir / f"{t}.rerun.log", a.timeout)
+        if r["rc"] != 0 and f["rerun_rc"] != 0 and f["load_sensitive"] and os.geteuid() == 0 and user:
+            # Root evidence is kept as is ({t}.log, {t}.rerun.log); the unprivileged
+            # run is the complete target, timing steps included.
+            texts = [(logdir / f"{t}.log").read_text(errors="replace"), (logdir / f"{t}.rerun.log").read_text(errors="replace")]
+            f["root_steps"] = tuple(failure_signature(x) for x in texts)
+            f["root_reached_timing"] = any(reached_timing(x) for x in texts)
+            if f["root_steps"][0] is not None and f["root_steps"][0] == f["root_steps"][1] and not f["root_reached_timing"]:
+                if user_copy is None:
+                    user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                    prepare_copy(ROOT, user_copy, user)
+                f["unpriv_rc"], _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user=user)
         if r["rc"] != 0 and f["rerun_rc"] != 0 and not f["load_sensitive"]:
             text = (logdir / f"{t}.log").read_text(errors="replace") + (logdir / f"{t}.rerun.log").read_text(errors="replace")
             f["unverified"] = detect_unverified(text)
