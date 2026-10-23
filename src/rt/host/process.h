@@ -264,6 +264,7 @@ public:
     // live (non-zombie) member. Linux checks /proc and requires Nift's session
     // for managed groups (guards against pgid reuse); elsewhere kill(-pgid, 0).
     bool has_live_members() const;
+    bool has_stopped_members() const;  // CP20 B0: WNOWAIT query, does not reap
 
 private:
     explicit ProcessGroup(std::unique_ptr<State> state);

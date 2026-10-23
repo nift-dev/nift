@@ -267,7 +267,7 @@ def main():
     io_messages()
     fd_leak_pty()
     missing_interpreter()
-    print(f"PASS {20 - len(failures)}, FAIL {len(failures)}")
+    print(f"PASS {22 - len(failures)}, FAIL {len(failures)}")
     return 1 if failures else 0
 
 

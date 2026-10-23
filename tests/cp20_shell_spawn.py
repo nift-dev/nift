@@ -2,8 +2,9 @@
 """CP20: shell external commands on Host ProcessGroup, streaming and parity.
 
 Runs each fixture through Nift's non-interactive shell and through bash -c
-where a direct comparison is meaningful, checking stdout, stderr, exit status
-and files. Streaming measurements use a three-stage external pipeline and
+where a direct comparison is meaningful, checking stdout, expected files and
+selected exit statuses. The separate parity probe compares stderr/status with
+a pre-CP20 binary; approved D5 message differences are recorded there. Streaming measurements use a three-stage external pipeline and
 require the first line within 300 ms, 20 times.
 """
 import argparse
@@ -43,14 +44,13 @@ def bash(script, cwd, timeout=30):
                           text=True, timeout=timeout, check=False)
 
 
-def one(name, script, expected_stdout=None, expected_rc=None, files=None, compare_bash=False):
+def one(name, script, expected_stdout=None, expected_rc=None, files=None, inputs=None, compare_bash=False):
     with tempfile.TemporaryDirectory(prefix="cp20-") as tmp:
         root = Path(tmp)
-        if files:
-            for rel, data in files.items():
-                path = root / rel
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(data)
+        for rel, data in (inputs or {}).items():
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(data)
         n = shell(script + "\nexit\n", root)
         b = bash(script, root) if compare_bash else None
         ok = True
@@ -83,7 +83,7 @@ def main():
         files={"err.txt": "e1\ne2\n"})
     one("merge-file", "/bin/sh -c 'echo out; echo err >&2' > all.txt 2>&1", files={"all.txt": "out\nerr\n"})
     one("merge-pipe", "/bin/sh -c 'echo out; echo err >&2' 2>&1 | /usr/bin/tr a-z A-Z", "OUT\nERR\n")
-    one("input", "/bin/cat < in.txt", "input\n", files={"in.txt": "input\n"})
+    one("input", "/bin/cat < in.txt", "input\n", inputs={"in.txt": "input\n"})
 
     # Environment assignment scope.
     one("env-child", "FOO=bar /bin/sh -c 'printf %s \"$FOO\"'", "bar", compare_bash=True)
@@ -108,6 +108,42 @@ def main():
                   "/bin/sh -c 'test -f bg-marker && echo WAITED || echo EARLY'\n", root, timeout=20)
         check("background-leftover", "WAITED" in n.stdout and "EARLY" not in n.stdout,
               n.stdout + n.stderr)
+
+    # Script job control (B0): foreground IDs, jobs, bg/fg and stopped state.
+    with tempfile.TemporaryDirectory(prefix="cp20-jobs-") as tmp:
+        root = Path(tmp)
+        n = shell("printf dogfood | cat\nsleep 0.03 &\nwait 2\njobs\nexit\n", root)
+        check("script-job-ids", "error:" not in n.stderr and "[1] Done (0)" in n.stdout
+              and "[2] Done (0)" in n.stdout, n.stdout + n.stderr)
+        n = shell("sh -c 'kill -STOP $$; sleep 0.03' &\nsleep 0.03\nbg 1\nwait 1\njobs\nexit\n", root)
+        check("script-bg-resume", "[1] Done (0)" in n.stdout and "unknown job" not in n.stderr,
+              n.stdout + n.stderr)
+        n = shell("sh -c 'kill -STOP $$; sleep 0.03' &\nsleep 0.05\njobs\nbg 1\nwait 1\njobs\nexit\n", root)
+        check("script-stopped", "Stopped" in n.stdout and "[1] Done (0)" in n.stdout,
+              n.stdout + n.stderr)
+        n = shell("sh -c 'kill -STOP $$; sleep 0.03' &\nsleep 0.03\nfg 1\njobs\nexit\n", root)
+        check("script-fg-resume", "[1] Done (0)" in n.stdout and "unknown job" not in n.stderr,
+              n.stdout + n.stderr)
+
+    # B0 M8: bg must actually SIGCONT the stopped script job. Observe the
+    # child state instead of waiting on a group that may remain stopped.
+    with tempfile.TemporaryDirectory(prefix="cp20-bgstate-") as tmp:
+        proc = subprocess.Popen([NIFT], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, cwd=tmp)
+        proc.stdin.write(b"sh -c 'kill -STOP $$; sleep 2' &\nsleep 0.2\nbg 1\nsleep 0.2\n")
+        proc.stdin.flush()
+        time.sleep(0.7)
+        stopped = []
+        for stat_path in Path("/proc").glob("[0-9]*/stat"):
+            try:
+                fields = stat_path.read_text().split()
+                if len(fields) > 3 and int(fields[3]) == proc.pid and fields[2] == "T":
+                    stopped.append(int(fields[0]))
+            except (OSError, ValueError):
+                pass
+        check("script-bg-state", not stopped, f"stopped_children={stopped}")
+        subprocess.run(["/bin/true"], check=False)
+        proc.kill(); proc.wait(timeout=5)
 
     # Genuine zombie/never-reaped check (scripted Host background path).
     with tempfile.TemporaryDirectory(prefix="cp20-zombie-") as tmp:

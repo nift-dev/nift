@@ -55,6 +55,7 @@ struct TestHooks {
     // the stages and closing their stdin (pins that order: r2 TSan `deadlines`).
     std::atomic<int> cancel_gap_us{0};
     std::atomic<bool> close_exec_report{false};  // H2 test: parent drops the report read end
+    std::atomic<int> drop_exec_report_stage{-1};  // H2 test: drop one chosen stage report
     std::mutex log_mutex;
     std::vector<EventRecord> log;
 };

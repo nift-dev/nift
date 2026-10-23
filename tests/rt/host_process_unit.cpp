@@ -15,6 +15,7 @@
 #include "rt/host/process_call.h"
 #include "rt/host/process_cleanup.h"
 #include "rt/host/process_runtime.h"
+#include "ProcessPOSIX.h"
 #include "rt/host/run_request.h"
 #include "rt_test.h"
 
@@ -1366,6 +1367,68 @@ void cleanup_failures_reported() {
 
 } // namespace
 
+void h2_stage_attribution() {
+#ifdef NIFT_HOST_TEST_HOOKS
+    const std::string tag = new_tag();
+    runtime::test_hooks().drop_exec_report_stage.store(1);
+    auto r = req({"true"}, OutputMode::PipeCapture, tag);
+    add_stage(r, {"true"}, tag);
+    add_stage(r, {"/definitely-missing-review-stage"}, tag);
+    auto result = run_ok(std::move(r));
+    runtime::test_hooks().drop_exec_report_stage.store(-1);
+    CHECK(result.stages.size() == 3);
+    CHECK(result.stages[0].launched && result.stages[0].error.empty());
+    CHECK(result.stages[1].launched && result.stages[1].error.empty());
+    CHECK(!result.stages[2].launched && result.stages[2].exit_code == 127);
+    CHECK(result.stages[2].error.find("executable not found") != std::string::npos);
+#endif
+}
+
+void exec_report_closed_early_failure() {
+#ifdef NIFT_HOST_TEST_HOOKS
+    const std::string tag = new_tag();
+    runtime::test_hooks().close_exec_report.store(true);
+    auto r = req({"true"}, OutputMode::PipeCapture, tag);
+    add_stage(r, {"/definitely-missing-review-stage"}, tag);
+    add_stage(r, {"cat"}, tag);
+    auto result = run_ok(std::move(r));
+    runtime::test_hooks().close_exec_report.store(false);
+    CHECK(result.stages.size() == 3);
+    CHECK(result.stages[1].exit_code == 127);
+    CHECK(result.stages[1].signal == 0);
+#endif
+}
+
+void orphan_zombie_at_destroy() {
+#ifndef _WIN32
+    if (!runtime::enable_subreaper()) { std::printf("orphan_zombie_at_destroy: SKIPPED\n"); return; }
+    const std::string tag = new_tag();
+    long orphan = -1;
+    {
+        auto g = start_ok(req({"sh", "-c", "sleep 1.2 &"}, OutputMode::Inherit, tag));
+        g->wait();
+        const bool adopted = wait_until([&] {
+            auto pids = tagged(tag);
+            if (pids.size() != 1) return false;
+            runtime::ProcInfo info;
+            if (!runtime::proc_read(pids[0], info) || info.ppid != ::getpid()) return false;
+            orphan = pids[0];
+            return true;
+        }, milliseconds(3000));
+        CHECK(adopted);
+        std::unique_lock<std::mutex> hold(nift_process_launch_mutex());
+        const bool zombie = wait_until([&] { runtime::ProcInfo i; return runtime::proc_read(orphan, i) && i.state == 'Z'; },
+                                       milliseconds(3000));
+        CHECK(zombie);
+        g.reset();
+    }
+    const bool reaped = wait_until([&] { runtime::reap_adopted_orphans(); runtime::ProcInfo i; return !runtime::proc_read(orphan, i); },
+                                   milliseconds(3000));
+    CHECK(reaped);
+    if (!reaped) { int st = 0; ::waitpid(static_cast<pid_t>(orphan), &st, 0); }
+#endif
+}
+
 void pipeline_exec_failures() {
     const std::string tag = new_tag();
     const char* missing = "/definitely-missing-cp20-stage";
@@ -1424,12 +1487,12 @@ void orphan_after_group_destroy() {
 
 void managed_pgid_cleanup() {
     const std::string tag = new_tag();
+    const std::size_t before = runtime::managed_pgid_count();
     for (int i = 0; i < 10000; ++i) {
         auto g = start_ok(req({"/bin/true"}, OutputMode::Inherit, tag));
         g->wait();
     }
-    runtime::reap_adopted_orphans();
-    CHECK(runtime::managed_pgid_count() == 0);
+    CHECK(runtime::managed_pgid_count() == before);
 }
 
 int main(int argc, char** argv) {
@@ -1469,8 +1532,11 @@ int main(int argc, char** argv) {
         {"sigkill_pdeathsig_linux", sigkill_pdeathsig_linux},
         {"escapees_subreaper", escapees_subreaper},  // enables the subreaper for the rest of the process
         {"subreaper_reaps_orphans", subreaper_reaps_orphans},
+        {"h2_stage_attribution", h2_stage_attribution},
+        {"exec_report_closed_early_failure", exec_report_closed_early_failure},
         {"pipeline_exec_failures", pipeline_exec_failures},
         {"exec_report_closed_early", exec_report_closed_early},
+        {"orphan_zombie_at_destroy", orphan_zombie_at_destroy},
         {"terminal_never_option", terminal_never_option},
         {"orphan_after_group_destroy", orphan_after_group_destroy},
         {"managed_pgid_cleanup", managed_pgid_cleanup},

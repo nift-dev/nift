@@ -6,4 +6,8 @@
   timeout-minutes: 6
   if: runner.os == 'Windows'
   shell: msys2 {0}
-  run: make -C nift test-cp20-r1-windows
+  env:
+    PYTHON: python
+  run: |
+    export PATH="$pythonLocation:$PATH"
+    make -C nift test-cp20-r1-windows

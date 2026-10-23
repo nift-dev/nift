@@ -25,7 +25,7 @@ struct Launch {
     std::vector<PreparedExec> prepared;
     pid_t parent_pid = -1;
     int prev_read = -1;
-    std::vector<int> reports;  // deferred exec-report read ends (H2)
+    std::vector<std::pair<std::size_t, int>> reports;  // H2: stage index + report read end
     explicit Launch(State& state) : s(state) {}
     void fail(std::string message) {
         s.launch_failed = true;
@@ -42,6 +42,7 @@ void prepare_stages(Launch& l);
 bool launch_stage(Launch& l, std::size_t i);
 // Closes the parent's copies of the child ends.
 void close_child_ends(Launch& l);
+void read_stage_reports(Launch& l);
 
 } // namespace nift::rt::host::posix
 #endif  // !_WIN32

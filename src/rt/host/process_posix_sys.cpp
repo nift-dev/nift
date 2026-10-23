@@ -121,8 +121,13 @@ ssize_t write_no_sigpipe(int fd, const char* data, std::size_t size) {
 [[noreturn]] void child_fail(int report_fd, int kind, int error, int code, int detail) {
     if (report_fd >= 0) {
         int payload[3] = {kind, error, detail};
+        struct sigaction ign {}, old {};
+        ign.sa_handler = SIG_IGN;
+        sigemptyset(&ign.sa_mask);
+        ::sigaction(SIGPIPE, &ign, &old);
         ssize_t ignored = ::write(report_fd, payload, sizeof payload);
         (void)ignored;
+        ::sigaction(SIGPIPE, &old, nullptr);
     }
     ::_exit(code);
 }

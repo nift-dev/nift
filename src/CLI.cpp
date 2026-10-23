@@ -2248,7 +2248,11 @@ static int run_external_words(Parser& parser,
 
     const bool direct = !has_ops && stages.size() == 1;
     ProcessResult result;
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 10
+    if (interactive && legacy_jobs) {
+#else
     if (interactive && legacy_jobs && legacy_jobs->supported()) {
+#endif
         // J1(a): the complete legacy foreground job-control path stays until
         // CP21 adds Host stop/continue. This preserves Ctrl-C/Ctrl-Z/fg/bg.
         result = legacy_jobs->launch(stages, line, true);

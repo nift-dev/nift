@@ -62,7 +62,11 @@ ProcessGroup::~ProcessGroup() {
     runtime::index_remove(this);
     // Keep attribution while any descendant outlives this object; the orphan
     // sweep prunes the pgid once the group is truly gone (F6).
-    if (!group_has_members(s)) runtime::forget_managed_pgid(s.pgid);
+    bool any_member = false;
+    for (const auto& process : runtime::proc_scan()) {
+        if (process.pgrp == s.pgid) { any_member = true; break; }
+    }
+    if (!any_member && !group_has_members(s)) runtime::forget_managed_pgid(s.pgid);
 }
 
 const char* output_mode_name(OutputMode mode) {
@@ -285,6 +289,17 @@ std::vector<StageResult> ProcessGroup::stages() const {
     return out;
 }
 bool ProcessGroup::has_live_members() const { return group_has_members(*s_); }
+
+bool ProcessGroup::has_stopped_members() const {
+    for (const auto& stage : s_->st) {
+        if (stage.pid <= 0 || stage.reaped) continue;
+        siginfo_t info{};
+        if (::waitid(P_PID, static_cast<id_t>(stage.pid), &info, WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT) == 0 &&
+            info.si_pid == stage.pid && info.si_code == CLD_STOPPED)
+            return true;
+    }
+    return false;
+}
 
 ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason reason) {
     State& s = *s_;

@@ -150,6 +150,9 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     stage.result.launched = stage_pid > 0;
     stage.result.state = stage_pid > 0 ? StageState::Running : StageState::LaunchFailed;
 #ifdef NIFT_HOST_TEST_HOOKS
+    if (runtime::test_hooks().drop_exec_report_stage.load() == static_cast<int>(i) && report[0] >= 0) {
+        ::close(report[0]); report[0] = -1;
+    }
     if (runtime::test_hooks().close_exec_report.load()) {
         if (report[0] >= 0) { ::close(report[0]); report[0] = -1; }
     }
@@ -167,7 +170,7 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
             stage.result.state = StageState::LaunchFailed;
         }
     } else if (report[0] >= 0) {
-        l.reports.push_back(report[0]);
+        l.reports.emplace_back(i, report[0]);
     }
     if (!l.detached && stage_pid > 0 && s.pidfds_ok) {
         stage.pidfd = open_pidfd(stage_pid);
@@ -260,7 +263,13 @@ bool launch_stage(Launch& l, std::size_t i) {
     State& s = l.s;
     const bool last = i + 1 == s.req.stages.size();
     int link[2] = {-1, -1};
-    if (!last && !make_pipe(link)) { l.fail(pipe_error()); return false; }
+    if (!last && !make_pipe(link)) {
+        // Under descriptor pressure, drain already-forked stages' reports
+        // before giving up: deferring them must not turn a runnable pipeline
+        // into a parent-side launch failure (B1).
+        read_stage_reports(l);
+        if (!make_pipe(link)) { l.fail(pipe_error()); return false; }
+    }
     int report[2] = {-1, -1};
     if (!make_pipe(report)) {
         if (!l.detached && s.req.exec_report_optional && (errno == EMFILE || errno == ENFILE)) {
@@ -293,12 +302,13 @@ bool launch_stage(Launch& l, std::size_t i) {
     return true;
 }
 void read_stage_reports(Launch& l) {
-    for (std::size_t i = 0; i < l.reports.size() && i < l.s.st.size(); ++i) {
-        const int fd = l.reports[i];
+    for (const auto& [i, fd] : l.reports) {
         int payload[3] = {0, 0, 0};
         const std::size_t got = read_payload(fd, payload, sizeof payload);
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT != 11
         ::close(fd);
-        if (got != sizeof payload) continue;
+#endif
+        if (got != sizeof payload || i >= l.s.st.size()) continue;
         auto& stage = l.s.st[i];
         stage.exec_failed = true;
         stage.result.launched = false;

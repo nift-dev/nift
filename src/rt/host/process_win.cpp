@@ -139,6 +139,7 @@ std::vector<StageResult> ProcessGroup::stages() const { return s_->result.stages
 ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason) { return TerminateOutcome(); }
 ProcessGroup::TerminateOutcome ProcessGroup::terminate(CancelReason) { return TerminateOutcome(); }
 bool ProcessGroup::has_live_members() const { return false; }
+bool ProcessGroup::has_stopped_members() const { return false; }
 bool ProcessGroup::cleanup_failed() const { return false; }
 bool ProcessGroup::settled() const { return true; }
 OsOutcome ProcessGroup::os_outcome() const { return OsOutcome(); }

@@ -3056,7 +3056,7 @@ test-runtime2-inventory-host-mutant: $(TARGET) $(INVENTORY_HOST_MUTANT_BIN)
 	bash tests/runtime2/inventory_host_mutant.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(INVENTORY_HOST_MUTANT_BIN)"
 test-rt-vm: test-runtime2-inventory-host-mutant
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
-CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
+CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
 $(TEST_DIR)/cp20-mutants/%/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=$* -MMD -MP -c src/CLI.cpp -o "$@"
@@ -3069,10 +3069,13 @@ $(TEST_DIR)/cp20-mutants/%/nift$(EXEEXT): $(filter-out src/CLI.o src/shell/Spawn
 test-cp20-shell-spawn: $(TARGET)
 	python3 tests/cp20_shell_spawn.py --nift "$(CURDIR)/$(TARGET)"
 test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
-	@for m in 1 2 3 4 5 6 7; do \
+	@for m in 1 2 3 4 5 6 7 8 9 11 12; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp20-mutants/$$m/nift$(EXEEXT)"; \
-	  python3 tests/cp20_shell_spawn.py --nift "$$bin" > ".build/cp20-mutants/$$m.log" 2>&1; \
-	  rc=$$?; \
+	  if [ "$$m" = "11" ]; then \
+	    python3 tests/cp20_fd_leak.py "$$bin" 10 > ".build/cp20-mutants/$$m.log" 2>&1; rc=$$?; \
+	  else \
+	    python3 tests/cp20_shell_spawn.py --nift "$$bin" > ".build/cp20-mutants/$$m.log" 2>&1; rc=$$?; \
+	  fi; \
 	  case "$$m" in \
 	    1) pattern="FAIL streaming-plain" ;; \
 	    2) pattern="FAIL stdout-append" ;; \
@@ -3081,12 +3084,19 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 	    5) pattern="FAIL background-leftover" ;; \
 	    6) pattern="FAIL pipeline-last-status" ;; \
 	    7) pattern="FAIL background-zombie" ;; \
+	    8) pattern="FAIL script-bg-state" ;; \
+	    9) pattern="FAIL script-stopped" ;; \
+	    11) pattern="RESULT LEAK" ;; \
+	    12) pattern="FAIL stderr-file" ;; \
 	  esac; \
 	  if [ $$rc -eq 0 ] || ! grep -q "$$pattern" ".build/cp20-mutants/$$m.log"; then \
 	    echo "FAIL CP20 mutant $$m: not detected"; tail -20 ".build/cp20-mutants/$$m.log"; exit 1; \
 	  fi; \
 	  echo "PASS CP20 mutant $$m: rejected"; \
 	done
+.PHONY: test-cp20-fd-leak
+test-cp20-fd-leak: $(TARGET)
+	$(PYTHON) tests/cp20_fd_leak.py "$(CURDIR)/$(TARGET)" 20
 .PHONY: test-cp20-launch-bench
 test-cp20-launch-bench: $(TARGET)
 	python3 tests/cp20_launch_bench.py --nift "$(CURDIR)/$(TARGET)"
@@ -3099,4 +3109,4 @@ test-cp20-r1-flake: $(TARGET)
 	  python3 tests/cp20_r1.py --nift "$(CURDIR)/$(TARGET)" > "$(TEST_DIR)/cp20-r1-pty-$$i.log" 2>&1 || { echo "FAIL PTY round $$i"; cat "$(TEST_DIR)/cp20-r1-pty-$$i.log"; exit 1; }; \
 	done; echo "PASS CP20 PTY suite 20/20"
 test-cp20-r1-windows: $(TARGET)
-	python3 tests/cp20_windows_pipeline.py "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/cp20_windows_pipeline.py "$(CURDIR)/$(TARGET)" $(V44_SKIP_77)

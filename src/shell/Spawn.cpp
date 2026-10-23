@@ -3,6 +3,7 @@
 #include "rt/host/host_error.h"
 #include "rt/host/process.h"
 
+#include <csignal>
 #include <cstdlib>
 #include <iostream>
 #include <utility>
@@ -31,7 +32,11 @@ using nift::rt::host::SpawnStage;
 #else
     stage.stdout_append = spec.append_stdout;
 #endif
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 12
+    stage.stderr_path.clear();
+#else
     stage.stderr_path = spec.stderr_path;
+#endif
     stage.stderr_append = spec.append_stderr;
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 3
     stage.stderr_to_stdout = false;
@@ -154,6 +159,13 @@ struct JobTable::Impl {
         if (entry.group->finished()) {
             entry.info.state = ShellJobState::Done;
             entry.info.exit_code = entry.group->result().exit_code;
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 9
+        } else {
+            entry.info.state = ShellJobState::Running;
+#else
+        } else if (entry.group->has_stopped_members()) {
+            entry.info.state = ShellJobState::Stopped;
+#endif
         }
     }
 };
@@ -173,14 +185,27 @@ JobTable::~JobTable() {
 bool JobTable::supported() const { return host_shell_supported(); }
 
 ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std::string& command, bool foreground) {
-    if (foreground || !supported()) return run_pipeline(specs, command, true);
+    if (!supported()) {
+        if (!foreground) {
+            ProcessResult out;
+            out.error = "interactive job control is not supported on Windows";
+            out.exit_code = 2;
+            return out;
+        }
+        return run_pipeline(specs, command, true);
+    }
 #ifndef _WIN32
     if (specs.empty()) { ProcessResult out; out.error = "empty pipeline"; return out; }
     SpawnRequest request;
     request.builtin = command.empty() ? "shell" : command;
     request.mode = OutputMode::Inherit;
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 1
+    if (specs.size() > 1) request.mode = OutputMode::FileCapture;
+#endif
     request.exec_report_optional = true;
-    request.terminal = nift::rt::host::TerminalPolicy::Never;
+    request.own_group = true;
+    request.terminal = foreground ? nift::rt::host::TerminalPolicy::Auto
+                                  : nift::rt::host::TerminalPolicy::Never;
     for (const auto& spec : specs) request.stages.push_back(convert_stage(spec));
     HostStatus status = HostStatus::Ok;
     HostError error;
@@ -196,11 +221,26 @@ ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std:
     entry.info.id = entry.id;
     entry.info.process_group = entry.group->pgid();
     entry.info.command = command;
+    for (const auto& stage : entry.group->stages()) entry.info.process_ids.push_back(stage.pid);
     entry.info.state = entry.group->finished() ? ShellJobState::Done : ShellJobState::Running;
     if (entry.info.state == ShellJobState::Done) entry.info.exit_code = entry.group->result().exit_code;
     ProcessResult out;
     out.launched = true;
     out.exit_code = 0;
+    if (foreground) {
+        const auto& result = entry.group->wait();
+        entry.info.state = ShellJobState::Done;
+        entry.info.exit_code = result.exit_code;
+        out = convert_result(result);
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 1
+        if (specs.size() > 1) {
+            if (!out.out.empty()) std::cout << out.out;
+            if (!out.err.empty()) std::cerr << out.err;
+            std::cout.flush();
+            std::cerr.flush();
+        }
+#endif
+    }
     impl_->entries.push_back(std::move(entry));
     return out;
 #else
@@ -228,6 +268,15 @@ ProcessResult JobTable::foreground(int job_id) {
     auto* entry = impl_->find(job_id);
     if (!entry) { out.error = "unknown job"; return out; }
     if (!entry->group) { out.error = "unknown job"; return out; }
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 8
+    if (entry->group->has_stopped_members()) {
+        out.launched = true;
+        out.exit_code = 130;
+        return out;
+    }
+#else
+    if (entry->group->pgid() > 0) ::kill(-static_cast<pid_t>(entry->group->pgid()), SIGCONT);
+#endif
     const auto& result = entry->group->wait();
     entry->info.state = ShellJobState::Done;
     entry->info.exit_code = result.exit_code;
@@ -239,6 +288,10 @@ bool JobTable::background(int job_id, std::string& error) {
     auto* entry = impl_->find(job_id);
     if (!entry || !entry->group) { error = "unknown job"; return false; }
     if (entry->group->finished()) { error = "job is already complete"; return false; }
+#if !defined(NIFT_CP20_MUTANT) || NIFT_CP20_MUTANT != 8
+    if (entry->group->pgid() > 0) ::kill(-static_cast<pid_t>(entry->group->pgid()), SIGCONT);
+#endif
+    entry->info.state = ShellJobState::Running;
     return true;
 }
 
@@ -250,12 +303,17 @@ ProcessResult JobTable::wait(int job_id) {
     out.launched = true;
     out.exit_code = 0;
     return out;
-#else
+#elif defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 8
+    if (entry->group->has_stopped_members()) {
+        out.launched = true;
+        out.exit_code = 130;
+        return out;
+    }
+#endif
     const auto& result = entry->group->wait();
     entry->info.state = ShellJobState::Done;
     entry->info.exit_code = result.exit_code;
     return convert_result(result);
-#endif
 }
 
 ProcessResult JobTable::wait_all() {

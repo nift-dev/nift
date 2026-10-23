@@ -35,6 +35,13 @@ def main():
     else:
         print("PASS console-pipeline-bytes")
 
+    redirected = run('cmd /c "echo two" 2> err.txt\nexit\n')
+    if redirected.stdout != b"two\n":
+        ok = False
+        print("FAIL redirected-console-bytes", redirected.stdout)
+    else:
+        print("PASS redirected-console-bytes")
+
     interactive = run('cmd /c echo hello\nexit\n', {"NIFT_CP20_FORCE_INTERACTIVE": "1"})
     if interactive.stdout.replace(b"\r\n", b"\n") != b"hello\n":
         ok = False
