@@ -55,8 +55,8 @@ def main():
         return fail("checks is not an integer")
     if data["checks"] != args.expected_checks:
         return fail(f"checks {data['checks']}, want {args.expected_checks}")
-    if data["skipped_read_cases"] != 0:
-        return fail(f"skipped_read_cases {data['skipped_read_cases']}, want 0")
+    if type(data["skipped_read_cases"]) is not int or data["skipped_read_cases"] != 0:
+        return fail(f"skipped_read_cases {data['skipped_read_cases']!r}, want integer 0")
     for key in ("open_failure_codes", "harness_failures", "legacy_failures", "other_failures"):
         if not isinstance(data[key], list) or data[key]:
             return fail(f"{key} is not an empty list: {data[key]!r}")

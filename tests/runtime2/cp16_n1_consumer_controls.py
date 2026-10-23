@@ -43,6 +43,8 @@ def main():
                                           "expected": "io.read_failed"}
                                          for n in ("open", "cat", "sha256_file")])) + "\n",
         "wrong-types": "MUTANT-RESULT " + json.dumps(dict(VALID, checks="16")) + "\n",
+        "skipped-bool": "MUTANT-RESULT " + json.dumps(dict(VALID, skipped_read_cases=False)) + "\n",
+        "skipped-float": "MUTANT-RESULT " + json.dumps(dict(VALID, skipped_read_cases=0.0)) + "\n",
         "pass-phrase-with-invalid": "PASS N1 mutant predicate: exact\nMUTANT-RESULT {}\n",
     }
     failures = 0
@@ -60,7 +62,35 @@ def main():
                 failures += 1
             else:
                 print(f"ok   consumer control {name}: {'accepted' if should_pass else 'rejected'}")
-    print(f"{'PASS' if failures == 0 else 'FAIL'} N1 consumer controls: {len(cases)} checks, "
+    with tempfile.TemporaryDirectory(prefix="cp16-n1-boundary-") as folder:
+        folder = Path(folder)
+        valid_log = folder / "valid.log"
+        invalid_log = folder / "invalid.log"
+        valid_log.write_text("MUTANT-RESULT " + json.dumps(VALID) + "\n")
+        invalid_log.write_text("MUTANT-RESULT {}\n")
+
+        def boundary(status, log):
+            # Same gate as host_mutants M14: producer status must be zero, then
+            # the validator must accept the record.
+            script = f'[ "{status}" -eq 0 ] || exit 1; exec "{sys.executable}" "{VALIDATOR}" --log "{log}" --require-mutant'
+            return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+
+        boundary_cases = [
+            ("status-0-valid", 0, valid_log, True),
+            ("status-1-valid-record", 1, valid_log, False),
+            ("status-137-valid-record", 137, valid_log, False),
+            ("status-0-invalid-record", 0, invalid_log, False),
+        ]
+        for name, status, log, should_pass in boundary_cases:
+            result = boundary(status, log)
+            passed = result.returncode == 0
+            if passed != should_pass:
+                print(f"FAIL boundary control {name}: rc={result.returncode}\n{result.stdout[-1000:]}")
+                failures += 1
+            else:
+                print(f"ok   boundary control {name}: {'accepted' if should_pass else 'rejected'}")
+        checks = len(cases) + len(boundary_cases)
+    print(f"{'PASS' if failures == 0 else 'FAIL'} N1 consumer controls: {checks} checks, "
           f"{failures} failure(s)")
     return 1 if failures else 0
 
