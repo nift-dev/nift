@@ -61,13 +61,18 @@ def tree(d):
             p = os.path.join(dp, f); out[os.path.relpath(p, d)] = open(p, "rb").read()
     return out
 
-def clean_oracle(nift, root):
+def clean_oracle(nift, root, errors=None):
     t = tempfile.mkdtemp(dir=BASE)
     for d in ("content", "templates"): shutil.copytree(f"{root}/{d}", f"{t}/{d}")
     os.makedirs(f"{t}/.nift"); os.makedirs(f"{t}/public")
     for f in ("config.json", "tracked.json"): shutil.copy(f"{root}/.nift/{f}", f"{t}/.nift/{f}")
     rc, out = run(nift, t, "build", "--all")
-    r = tree(f"{t}/public"); shutil.rmtree(t); return r
+    if rc != 0:
+        if errors is not None: errors.append(f"clean-oracle build failed rc={rc}: {out.strip().splitlines()[:2]}")
+        r = {}
+    else:
+        r = tree(f"{t}/public")
+    shutil.rmtree(t); return r
 
 def pageinfo_max_mtime(root):
     m = 0
@@ -80,17 +85,26 @@ def pageinfo_max_mtime(root):
 class Ctx:
     def __init__(self, label, nift):
         self.label, self.nift, self.fails, self.notes = label, nift, [], []
-    def check(self, root, what, expect_built=None, out=None):
-        ok = tree(f"{root}/public") == clean_oracle(self.nift, root)
+    def check(self, root, what, expect_built=None, out=None, rc=0):
+        want = clean_oracle(self.nift, root, self.fails)
+        ok = tree(f"{root}/public") == want
+        if rc != 0:
+            self.fails.append(f"{what}: build failed rc={rc}")
         b = built(out) if out is not None else None
         if not ok: self.fails.append(f"{what}: output differs from clean build")
         if expect_built is not None and b is not None and (sorted(expect_built) != b if b[:1] != ["?"] else len(expect_built) != len(b)):
             self.fails.append(f"{what}: rebuilt {b} expected {sorted(expect_built)}")
         rc, st = run(self.nift, root, "status")
+        if rc != 0: self.fails.append(f"{what}: status failed rc={rc}")
         honest = ("up to date" in st) == ok
         if ok and "up to date" not in st: self.notes.append(f"{what}: status not clean after correct build (extra rebuild pending): {st.strip().splitlines()[-2:] }")
         if not ok and "up to date" in st: self.fails.append(f"{what}: STALE and status reports up to date")
         return ok
+    def built_count(self, root, label):
+        rc, out = run(self.nift, root, "build")
+        if rc != 0: self.fails.append(f"{label}: build failed rc={rc}")
+        return len(built(out))
+
     def edit(self, root, rel, text, append=False):
         time.sleep(TICK)
         if append: open(f"{root}/{rel}", "a").write(text)
@@ -100,70 +114,72 @@ class Ctx:
 
 def scen_basic(c):
     r = tempfile.mkdtemp(dir=BASE); mksite(r, 30)
-    rc, out = run(c.nift, r, "build", "--all"); c.check(r, "S0 initial", None, out)
+    rc, out = run(c.nift, r, "build", "--all"); c.check(r, "S0 initial", None, out, rc)
     time.sleep(TICK)
     # S5 repeated no-op builds, nothing rewritten
     snap = {p: os.stat(os.path.join(dp, p)).st_mtime_ns for dp, _, fs in os.walk(r) for p in fs if not dp.endswith("/.nift") or True}
     before = {os.path.join(dp, f): os.stat(os.path.join(dp, f)).st_mtime_ns for dp, _, fs in os.walk(r) for f in fs}
-    nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(10)]
+    nb = [c.built_count(r, "S5 no-op") for _ in range(10)]
     after = {os.path.join(dp, f): os.stat(os.path.join(dp, f)).st_mtime_ns for dp, _, fs in os.walk(r) for f in fs}
     changed = [k for k in after if before.get(k) != after[k] and not k.endswith(".lock")]
     c.notes.append(f"S5 rebuilds per no-op build: {nb}; files rewritten: {len(changed)}")
     if any(nb) or changed: c.fails.append(f"S5 no-op not a no-op: {nb} {changed[:3]}")
     # S1 one source edit
     c.edit(r, "content/p12.html", "<p>page 12 EDIT</p>\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S1 one content edit", ["p12"], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S1 one content edit", ["p12"], out, rc)
     # S2 shared template edit (template.html: p10..p29 + index)
     c.edit(r, "templates/template.html", '<html><head>@input("templates/head.html")</head><body>TPL2 @content</body></html>\n')
-    rc, out = run(c.nift, r, "build"); c.check(r, "S2 shared template edit", [f"p{i}" for i in range(10, 30)] + ["index"], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S2 shared template edit", [f"p{i}" for i in range(10, 30)] + ["index"], out, rc)
     # S2b shared partial used by both templates
     c.edit(r, "templates/head.html", "<title>H2 $[title]</title>\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S2b shared partial (head) edit", [f"p{i}" for i in range(30)] + ["index"], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S2b shared partial (head) edit", [f"p{i}" for i in range(30)] + ["index"], out, rc)
     # S3 multiple dependent pages
     c.edit(r, "templates/part.html", "PART2\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S3a partial used by p0..p9", [f"p{i}" for i in range(10)], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S3a partial used by p0..p9", [f"p{i}" for i in range(10)], out, rc)
     c.edit(r, "content/p1.html", "<p>page 1 EDIT</p>\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S3b content consumed by two pages", ["p1", "index"], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S3b content consumed by two pages", ["p1", "index"], out, rc)
     # S4 dependency addition and removal
     c.edit(r, "templates/new.html", "NEW1\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4a create unreferenced file", [], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4a create unreferenced file", [], out, rc)
     c.edit(r, "templates/t2.html", '<html><head>@input("templates/head.html")</head><body>T2 @input("templates/part.html") @input("templates/new.html") @content</body></html>\n')
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4b add dependency", [f"p{i}" for i in range(10)], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4b add dependency", [f"p{i}" for i in range(10)], out, rc)
     c.edit(r, "templates/new.html", "NEW2\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4c edit added dependency", [f"p{i}" for i in range(10)], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4c edit added dependency", [f"p{i}" for i in range(10)], out, rc)
     c.edit(r, "templates/t2.html", '<html><head>@input("templates/head.html")</head><body>T2 @input("templates/part.html") @content</body></html>\n')
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4d remove dependency", [f"p{i}" for i in range(10)], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4d remove dependency", [f"p{i}" for i in range(10)], out, rc)
     c.edit(r, "templates/new.html", "NEW3\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4e edit removed dependency (no rebuild)", [], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4e edit removed dependency (no rebuild)", [], out, rc)
     time.sleep(TICK); os.remove(f"{r}/templates/new.html")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S4f delete removed dependency (no rebuild)", [], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S4f delete removed dependency (no rebuild)", [], out, rc)
     # S6 targeted one-page and full rebuilds
     c.edit(r, "content/p20.html", "<p>p20 E</p>\n"); c.edit(r, "content/p21.html", "<p>p21 E</p>\n")
     rc, out = run(c.nift, r, "build", "p20")
+    if rc != 0: c.fails.append(f"S6a targeted build failed rc={rc}")
     if built(out) != ["p20"] and "specified files built successfully" not in out:
         c.fails.append(f"S6a targeted build output was neither p20 nor the targeted summary: {out[-200:]}")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S6b remaining edit after targeted build", ["p21"], out)
-    rc, out = run(c.nift, r, "build", "--all"); c.check(r, "S6c build --all", [f"p{i}" for i in range(30)] + ["index"], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S6b remaining edit after targeted build", ["p21"], out, rc)
+    rc, out = run(c.nift, r, "build", "--all"); c.check(r, "S6c build --all", [f"p{i}" for i in range(30)] + ["index"], out, rc)
     time.sleep(TICK)
-    nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(5)]
+    nb = [c.built_count(r, "S6d no-op") for _ in range(5)]
     if any(nb): c.fails.append(f"S6d no-op after --all rebuilt {nb}")
     # S8 mode switching modified -> hash -> modified, with edits
-    set_mode(r, "hash"); rc, out = run(c.nift, r, "build"); c.check(r, "S8a switch to hash", None, out)
+    set_mode(r, "hash"); rc, out = run(c.nift, r, "build"); c.check(r, "S8a switch to hash", None, out, rc)
     c.notes.append(f"S8a switch modified->hash rebuilt {len(built(out))}")
     c.edit(r, "content/p3.html", "<p>p3 hash edit</p>\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S8b edit in hash mode", ["p3"], out)
-    set_mode(r, "modified"); time.sleep(TICK); rc, out = run(c.nift, r, "build"); c.check(r, "S8c switch back to modified", None, out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S8b edit in hash mode", ["p3"], out, rc)
+    set_mode(r, "modified"); time.sleep(TICK); rc, out = run(c.nift, r, "build"); c.check(r, "S8c switch back to modified", None, out, rc)
     c.notes.append(f"S8c switch hash->modified rebuilt {len(built(out))}")
     c.edit(r, "templates/part.html", "PART3\n")
-    rc, out = run(c.nift, r, "build"); c.check(r, "S8d edit after switching back", [f"p{i}" for i in range(10)], out)
+    rc, out = run(c.nift, r, "build"); c.check(r, "S8d edit after switching back", [f"p{i}" for i in range(10)], out, rc)
     time.sleep(TICK)
-    nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(5)]
+    nb = [c.built_count(r, "S6d no-op") for _ in range(5)]
     if any(nb): c.fails.append(f"S8e no-op after mode switches rebuilt {nb}")
 
 def scen_interrupt(c, delays):
     for d in delays:
         r = tempfile.mkdtemp(dir=BASE); mksite(r, 1500, pad=3000)
-        run(c.nift, r, "build", "--all")
+        rc0, out0 = run(c.nift, r, "build", "--all")
+        if rc0 != 0: c.fails.append(f"K setup build failed rc={rc0}")
         c.edit(r, "templates/template.html", '<html><head>@input("templates/head.html")</head><body>TPL-K @content</body></html>\n')
         p = subprocess.Popen([c.nift, "build"], cwd=r, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(d); killed = p.poll() is None
@@ -174,12 +190,12 @@ def scen_interrupt(c, delays):
             c.fails.append(f"K kill@{d}s: interruption did not happen (build finished before SIGKILL)")
         stale_now = sum(1 for f in os.listdir(f"{r}/public") if "TPL-K" not in open(f"{r}/public/{f}").read() and f.startswith("p") and int(f[1:-5]) >= 10)
         rc, out = run(c.nift, r, "build"); nb1 = len(built(out)); first = out.strip().splitlines()[:2]
-        ok1 = rc == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r)
+        ok1 = rc == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r, c.fails)
         if rc != 0:
             c.fails.append(f"K kill@{d}s: plain recovery failed rc={rc}: {first}")
         if not ok1 and rc == 0:
             c.fails.append(f"K kill@{d}s: recovered output differs from clean oracle")
-        nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(3)]
+        nb = [c.built_count(r, "K settle") for _ in range(3)]
         if any(nb): c.fails.append(f"K kill@{d}s: recovery did not settle: {nb}")
         c.notes.append(f"K kill@{d}s {state}: recovery build rc={rc} rebuilt {nb1}, then {nb}; oracle_ok={ok1}")
         shutil.rmtree(r)
@@ -188,18 +204,19 @@ def scen_crashpoints(c):
     # NIFT_TEST_CRASH_AT points exist in Runtime 2.0 binaries only.
     for point in ("page-rendered:p12", "page-output:p12", "page-info:p12", "page-post:p12", "page-done:p12"):
         r = tempfile.mkdtemp(dir=BASE); mksite(r, 30)
-        run(c.nift, r, "build", "--all")
+        rc0, out0 = run(c.nift, r, "build", "--all")
+        if rc0 != 0: c.fails.append(f"C setup build failed rc={rc0}")
         c.edit(r, "templates/template.html", '<html><head>@input("templates/head.html")</head><body>TPL-C @content</body></html>\n')
         rc, out = run(c.nift, r, "build", env={"NIFT_TEST_CRASH_AT": point})
         if rc not in (-9, 137):
             c.fails.append(f"C {point}: injected crash did not terminate by SIGKILL (rc={rc})")
         rc2, out2 = run(c.nift, r, "build")
-        ok = rc2 == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r)
+        ok = rc2 == 0 and tree(f"{r}/public") == clean_oracle(c.nift, r, c.fails)
         if rc2 != 0:
             c.fails.append(f"C {point}: plain recovery failed rc={rc2}")
         elif not ok:
             c.fails.append(f"C {point}: recovered output differs from clean oracle")
-        nb = [len(built(run(c.nift, r, "build")[1])) for _ in range(3)]
+        nb = [c.built_count(r, "K settle") for _ in range(3)]
         if any(nb): c.fails.append(f"C {point}: recovery did not settle: {nb}")
         c.notes.append(f"C {point}: crash rc={rc}, recovery rebuilt {len(built(out2))}, then {nb}, oracle_ok={ok}")
         shutil.rmtree(r)
@@ -207,17 +224,23 @@ def scen_crashpoints(c):
 def scen_immediate(c, cycles):
     # IMMEDIATE (outside "ordinary": no sleep). Edit right AFTER a build returns.
     r = tempfile.mkdtemp(dir=BASE); mksite(r, 3)
-    run(c.nift, r, "build", "--all")
+    rc0, out0 = run(c.nift, r, "build", "--all")
+    if rc0 != 0: c.fails.append(f"I setup build failed rc={rc0}")
     miss = persistent = 0
     for i in range(cycles):
         write(f"{r}/content/p12.html" if False else f"{r}/content/p1.html", f"MARK-{i}\n")
-        run(c.nift, r, "build")
+        rc, _ = run(c.nift, r, "build")
+        if rc != 0: c.fails.append(f"I immediate build failed rc={rc} at cycle {i}")
         if f"MARK-{i}" not in open(f"{r}/public/p1.html").read():
             miss += 1
-            for _ in range(3): run(c.nift, r, "build")
+            for _ in range(3):
+                rc, _ = run(c.nift, r, "build")
+                if rc != 0: c.fails.append(f"I follow-up build failed rc={rc} at cycle {i}")
             if f"MARK-{i}" not in open(f"{r}/public/p1.html").read():
                 persistent += 1
-                time.sleep(TICK); write(f"{r}/content/p1.html", f"REPAIR-{i}\n"); run(c.nift, r, "build")
+                time.sleep(TICK); write(f"{r}/content/p1.html", f"REPAIR-{i}\n")
+                rc, _ = run(c.nift, r, "build")
+                if rc != 0: c.fails.append(f"I repair build failed rc={rc} at cycle {i}")
     c.notes.append(f"I immediate edit->build {cycles} cycles: missed {miss}, persistent after 3 more builds {persistent}")
     if miss: c.fails.append(f"I immediate edits: {miss}/{cycles} missed on the first post-edit build")
     if persistent: c.fails.append(f"I immediate edits: {persistent}/{cycles} PERSISTENTLY stale")

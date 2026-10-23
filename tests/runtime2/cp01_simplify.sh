@@ -6,10 +6,15 @@ NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 HERE="$(cd "$(dirname "$0")" && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+SYSCALLS_ONLY=0
+[ "${1:-}" = "--syscalls-only" ] && SYSCALLS_ONLY=1
+if [ "$SYSCALLS_ONLY" -eq 0 ]; then
 run_optional77() { "$@" >/dev/null 2>&1; local rc=$?; if [ "$rc" -eq 77 ]; then echo "SKIP $*"; elif [ "$rc" -ne 0 ]; then "$@"; fail=1; fi; }
 run_optional77 bash "$HERE/cp01/syscall_harness_negative.sh"
 run_optional77 bash "$HERE/cp01/classifier_negative.sh"
 run_optional77 bash "$HERE/cp01/crash_harness_negative.sh"
+run_optional77 bash "$HERE/cp01/failed_status_controls.sh"
+run_optional77 bash "$HERE/cp01/missing_tracer_caller.sh"
 
 ONLY=basic,interrupt,crash CYCLES=0 python3 "$HERE/cp01/ordinary.py" ours="$NIFT" || fail=1
 bash "$HERE/cp01/classify.sh" "$NIFT" 1000 3 ours || fail=1
@@ -20,11 +25,18 @@ for mode in hash hybrid; do
 done
 bash "$HERE/cp01/settle.sh" "$T" ours="$NIFT" >"$T/settle.log" 2>&1 || fail=1
 grep -q 'after-edit-all:\[ 20 0 0 0 0 0 0 0 0 0 0 0 \] outputs-with-edit=20/20' "$T/settle.log" || { echo "FAIL settle: $(cat "$T/settle.log")"; fail=1; }
+fi
 
+unmeasured=0
 bash "$HERE/cp01/syscalls.sh" 1000 0 ours="$NIFT" >"$T/sys1000.log" 2>&1; rc=$?
-if [ "$rc" -eq 77 ]; then echo "SKIP syscalls (strace unavailable)"; else [ "$rc" -eq 0 ] || fail=1; fi
+if [ "$rc" -eq 77 ]; then unmeasured=1; else [ "$rc" -eq 0 ] || fail=1; fi
 bash "$HERE/cp01/syscalls.sh" 200 10 ours="$NIFT" >"$T/sys200.log" 2>&1; rc=$?
-if [ "$rc" -eq 77 ]; then echo "SKIP syscalls (strace unavailable)"; else [ "$rc" -eq 0 ] || fail=1; fi
+if [ "$rc" -eq 77 ]; then unmeasured=1; else [ "$rc" -eq 0 ] || fail=1; fi
+if [ "$unmeasured" -eq 1 ]; then
+  if [ "$fail" -ne 0 ]; then exit 1; fi
+  echo "SKIP CP01 syscall measurements: tracer unavailable; performance unmeasured"
+  exit 77
+fi
 check_line() {
   local file=$1 phase=$2 limit=$3
   local line; line=$(grep " $phase total=" "$file" | head -1)
