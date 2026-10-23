@@ -47,6 +47,23 @@ if MODE == "timeout" and missing_open_bytes:
 if MODE == "mismatch_then_harness" and not vm and "x := open(" in source and "missing-n1-file" in source:
     print("malformed-oracle-output")
     sys.exit(0)
+if vm and MODE in ("wrong_code", "bad_diag") and "/proc/self/mem" in source:
+    proc = subprocess.run([REAL] + sys.argv[1:], capture_output=True)
+    stats = os.environ.get("NIFT_VM_STATS")
+    if stats and os.path.exists(stats):
+        rows = [line for line in open(stats).read().splitlines() if line.strip()]
+        if rows:
+            data = json.loads(rows[-1])
+            data["code"] = "totally.wrong" if MODE == "wrong_code" else "io.open_failed"
+            if MODE == "bad_diag":
+                data["reason"] = "WRONG DIAGNOSTIC"
+            with open(stats, "w") as fh: fh.write(json.dumps(data) + "\n")
+    sys.stdout.buffer.write(proc.stdout)
+    if MODE == "bad_diag":
+        sys.stderr.write("WRONG DIAGNOSTIC\n")
+    else:
+        sys.stderr.buffer.write(proc.stderr)
+    sys.exit(proc.returncode)
 proc = subprocess.run([REAL] + sys.argv[1:])
 if vm and MODE in ("mutant", "mismatch_then_harness") and "/proc/self/mem" in source:
     stats = os.environ.get("NIFT_VM_STATS")
@@ -80,7 +97,7 @@ def main():
         folder = Path(folder)
         fakes = {mode: make(folder, mode, real)
                  for mode in ("stale", "nostats", "malformed", "crash", "timeout",
-                              "mutant", "mismatch_then_harness")}
+                              "mutant", "wrong_code", "bad_diag", "mismatch_then_harness")}
 
         expected_reason = {
             "stale": "missing NIFT_VM_STATS",
@@ -120,6 +137,10 @@ def main():
                 bad = not data.get("harness_failures")
             if not bad and needs == "legacy_or_harness":
                 bad = not (data.get("harness_failures") or data.get("legacy_failures"))
+            if not bad and needs == "other":
+                bad = not data.get("other_failures")
+            if not bad and needs == "mismatch":
+                bad = not data.get("read_code_mismatches")
             if bad:
                 print(f"FAIL control {name}: mutant predicate not rejected for {needs or 'no mismatch'}\n"
                       f"{result.stdout[-1500:]}")
@@ -136,9 +157,12 @@ def main():
         else:
             print("ok   control baseline: unmutated N1 test PASS")
 
-        for mode in ("stale", "nostats", "malformed", "crash", "timeout"):
+        for mode in ("stale", "nostats", "malformed", "crash", "timeout",
+                     "wrong_code", "bad_diag"):
             normal_rejected(mode, fakes[mode], extra_timeout=(mode == "timeout"))
-            mutant_rejected(mode, fakes[mode], extra_timeout=(mode == "timeout"), needs="harness")
+            needs = "harness" if mode in ("stale", "nostats", "malformed", "crash", "timeout") else (
+                "mismatch" if mode == "wrong_code" else "other")
+            mutant_rejected(mode, fakes[mode], extra_timeout=(mode == "timeout"), needs=needs)
         normal_rejected("false", "/bin/false")
         mutant_rejected("false", "/bin/false", needs="legacy_or_harness")
         mutant_rejected("real-no-mismatch", real)
@@ -147,15 +171,22 @@ def main():
         if LINUX_READ:
             normal_rejected("simulated-mutant", fakes["mutant"])
             checks += 1
-            expected = {"open", "cat", "sha256_file"}
+            expected = {
+                ("open", "io.open_failed", "io.read_failed"),
+                ("cat", "io.open_failed", "io.read_failed"),
+                ("sha256_file", "io.open_failed", "io.read_failed"),
+            }
             result = invoke(fakes["mutant"], "--expect-mutant")
             line = next((l for l in result.stdout.splitlines() if l.startswith("MUTANT-RESULT ")), "")
             try:
                 data = json.loads(line[len("MUTANT-RESULT "):]) if line else {}
             except ValueError:
                 data = {}
-            if result.returncode != 0 or set(data.get("read_code_mismatches", [])) != expected or \
-                    data.get("harness_failures") or data.get("legacy_failures") or \
+            got = {(m.get("native"), m.get("actual"), m.get("expected"))
+                   for m in data.get("read_code_mismatches", []) if isinstance(m, dict)}
+            if result.returncode != 0 or data.get("schema") != "cp16-n1-mutant-result/v1" or \
+                    data.get("checks") != 16 or data.get("skipped_read_cases") != 0 or \
+                    got != expected or data.get("harness_failures") or data.get("legacy_failures") or \
                     data.get("open_failure_codes") or data.get("other_failures"):
                 print(f"FAIL control simulated-mutant: wrong structured result\n{result.stdout[-1500:]}")
                 failures += 1

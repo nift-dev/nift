@@ -177,15 +177,10 @@ if [ "$status" -ne 0 ]; then
     cat "$TMP/test-14.log" >&2
     exit 1
 fi
-if ! grep -q "PASS N1 mutant predicate: exactly open/cat/sha256_file read-code mismatches" "$TMP/test-14.log"; then
-    echo "FAIL host mutant 14: not rejected by the exact intended read-code predicate" >&2
+if ! python3 "$ROOT/tests/runtime2/cp16_n1_result.py" --log "$TMP/test-14.log" --require-mutant; then
+    echo "FAIL host mutant 14: structured result validation rejected the intended M14 record" >&2
     cat "$TMP/test-14.log" >&2
     exit 1
 fi
-if ! grep -q 'MUTANT-RESULT' "$TMP/test-14.log"; then
-    echo "FAIL host mutant 14: no structured result" >&2
-    cat "$TMP/test-14.log" >&2
-    exit 1
-fi
-echo "PASS host mutant 14: per-built-in mapping rejected by the exact structured read-code predicate"
+echo "PASS host mutant 14: per-built-in mapping rejected by the validated structured record"
 echo "PASS host negative controls: 13 behavioural mutants rejected (1-9, 11-14); M10 accounting-formula control detected by the NIFT_TRIM probe"

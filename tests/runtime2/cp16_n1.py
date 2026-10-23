@@ -149,31 +149,44 @@ def main():
                     f.add("other", f"{name}/{kind}: VM statistics {st}")
                     continue
                 got_code = st.get("code", "")
-                if got_code != want_code:
+                mismatch = got_code != want_code
+                if mismatch:
                     if kind == "read-failure":
-                        f.read_mismatches.append(f"{name}: {got_code!r} != {want_code!r}")
+                        f.read_mismatches.append({"native": name, "actual": got_code,
+                                                  "expected": want_code})
                     else:
                         f.open_codes.append(f"{name}: {got_code!r} != {want_code!r}")
-                    continue
+                # Diagnostic/status assertions are independent of the code: an
+                # altered code must not hide a corrupted reason or stderr.
                 if st.get("reason") != message or want_text not in proc.stderr:
                     f.add("other", f"{name}/{kind}: VM message/exit differ: {st.get('reason')!r} "
                                    f"{proc.stderr!r}")
                     continue
-                print(f"ok   {name}/{kind}: {want_code}")
+                if mismatch:
+                    print(f"MISMATCH {name}/{kind}: {got_code!r} != {want_code!r}")
+                else:
+                    print(f"ok   {name}/{kind}: {want_code}")
         if not LINUX_READ:
             skipped = len(CASES)
             print(f"SKIP {skipped} post-open read-failure cases: /proc/self/mem is unavailable "
                   "on this platform (Linux-only coverage)")
     if args.expect_mutant:
-        exact = {"open", "cat", "sha256_file"}
-        got = {m.split(":", 1)[0] for m in f.read_mismatches}
+        exact = {
+            ("open", "io.open_failed", "io.read_failed"),
+            ("cat", "io.open_failed", "io.read_failed"),
+            ("sha256_file", "io.open_failed", "io.read_failed"),
+        }
+        got = {(m["native"], m["actual"], m["expected"]) for m in f.read_mismatches}
         result = {
-            "read_code_mismatches": sorted(got),
+            "schema": "cp16-n1-mutant-result/v1",
+            "checks": checks,
+            "read_code_mismatches": sorted(f.read_mismatches,
+                                            key=lambda m: (m["native"], m["actual"], m["expected"])),
             "open_failure_codes": f.open_codes,
             "harness_failures": f.harness,
             "legacy_failures": f.legacy,
             "other_failures": f.other,
-            "checks": checks,
+            "skipped_read_cases": skipped,
         }
         print("MUTANT-RESULT " + json.dumps(result, sort_keys=True))
         if not LINUX_READ:
@@ -183,15 +196,19 @@ def main():
             print(f"FAIL N1 mutant predicate: {len(f.harness)} harness, {len(f.legacy)} legacy, "
                   f"{len(f.open_codes)} open-code, {len(f.other)} other failure(s)")
             return 1
-        if got != exact or len(f.read_mismatches) != 3:
-            print(f"FAIL N1 mutant predicate: read-code mismatches {sorted(got)}, want {sorted(exact)}")
+        if len(f.read_mismatches) != 3 or got != exact:
+            print(f"FAIL N1 mutant predicate: read-code transitions {sorted(got)}, "
+                  f"want exactly {sorted(exact)}")
             return 1
-        print("PASS N1 mutant predicate: exactly open/cat/sha256_file read-code mismatches")
+        print("PASS N1 mutant predicate: exactly io.read_failed -> io.open_failed for "
+              "open/cat/sha256_file")
         return 0
     for bucket, items in (("harness", f.harness), ("legacy", f.legacy),
                           ("open-code", f.open_codes), ("read-code", f.read_mismatches),
                           ("other", f.other)):
         for item in items:
+            if isinstance(item, dict):
+                item = f"{item['native']}: {item['actual']!r} != {item['expected']!r}"
             print(f"FAIL {bucket}: {item}")
     failures = len(f.harness) + len(f.legacy) + len(f.open_codes) + len(f.read_mismatches) + len(f.other)
     print(f"{'PASS' if failures == 0 else 'FAIL'} N1 per-call codes: {checks} checks, "
