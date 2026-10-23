@@ -184,7 +184,11 @@ ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std:
     for (const auto& spec : specs) request.stages.push_back(convert_stage(spec));
     HostStatus status = HostStatus::Ok;
     HostError error;
+#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 7
+    auto group = ProcessGroup::start_for_wait(std::move(request), status, error);
+#else
     auto group = ProcessGroup::start(std::move(request), status, error);
+#endif
     if (status != HostStatus::Ok) return failure(error, status);
     Impl::Entry entry;
     entry.id = impl_->next_id++;
@@ -242,7 +246,7 @@ ProcessResult JobTable::wait(int job_id) {
     ProcessResult out;
     auto* entry = impl_->find(job_id);
     if (!entry || !entry->group) { out.error = "unknown job"; return out; }
-#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 5
+#if defined(NIFT_CP20_MUTANT) && (NIFT_CP20_MUTANT == 5 || NIFT_CP20_MUTANT == 7)
     out.launched = true;
     out.exit_code = 0;
     return out;

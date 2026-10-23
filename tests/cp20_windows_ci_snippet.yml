@@ -1,0 +1,9 @@
+# Apply in .github/workflows/v44-cross-platform.yml, in the Windows job after
+# the existing "Build Nift on Windows" step. Local snippet only: no workflow
+# change or temporary branch was pushed (standing rule: only runtime-2 is a
+# permitted remote ref).
+- name: CP20 Windows console pipeline and interactive routing
+  timeout-minutes: 6
+  if: runner.os == 'Windows'
+  shell: msys2 {0}
+  run: make -C nift test-cp20-r1-windows

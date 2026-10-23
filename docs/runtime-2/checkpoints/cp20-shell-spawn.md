@@ -12,17 +12,17 @@ of `ProcessSpec`/`nift_run_pipeline`:
 - `src/shell/Spawn.{h,cpp}` converts the shell's existing `ProcessSpec` stages
   to `host::SpawnStage`, selects `OutputMode::Inherit` for the shell, and runs
   foreground pipelines via `ProcessGroup::start_for_wait`/`wait`.
-- `src/shell/Spawn.cpp` owns a shell `JobTable` for background `&`: each group
-  is a Host `ProcessGroup`, `wait`/`wait_all` reap it, `jobs` reports its
-  state, and the table terminates live groups on shell teardown. The legacy
-  `ShellJobTable` remains in `JobControl.cpp` for non-shell callers.
+- Scripted/non-interactive `&` uses the Host `JobTable`: each group is a Host
+  `ProcessGroup`, `wait`/`wait_all` reap it, `jobs` reports its state, and the
+  table terminates live groups on shell teardown. Interactive foreground and
+  background jobs stay on the legacy `ShellJobTable` until CP21 (J1/R2).
 - `SpawnStage` gained `stderr_to_stdout`; the POSIX child applies it after
   stdout setup, so `2>&1` works in any stage (including a middle pipeline
   stage) and merges into the stage's actual stdout destination.
-- Shell process-group semantics are preserved: a simple foreground command
-  gets its own process/terminal group; pipeline stages stay in Nift's group so
-  SIGINT to that group still reaches every stage. Background jobs get their
-  own group and are cleaned up through the job table.
+- Interactive foreground and background commands use the complete legacy
+  job-control path (process group, terminal hand-off, Ctrl-C/Ctrl-Z, `fg`,
+  `bg`, `jobs`) until CP21. Scripted commands use Host; pipeline stages have
+  no terminal ownership and SIGINT semantics remain as before.
 - Windows keeps the legacy launcher because the Host `ProcessGroup` Windows
   slice is explicitly unsupported. The new Host field and the `src/CLI.cpp` /
   `src/shell/*.cpp` files cross-compile on MinGW with `-Werror`; the POSIX
@@ -60,31 +60,29 @@ delivery is ~10 ms.
 ## Launch cost
 
 `tests/cp20_launch_bench.py` executes 200 real `/usr/bin/true` launches per
-batch, five batches, median per launch; it verifies that the external binary
-exists and never substitutes a shell built-in. On the certification Linode
-(`g6-dedicated-4`, Ubuntu 24.04, GCC 13.3, instance 108854855, created
-2026-10-22T05:15:46Z, deleted and API-verified absent 2026-10-22T05:31:46Z,
-~16 min, about US$0.03):
+batch. The R2 correction defers exec-report reads until all pipeline stages
+are forked (H2); the final interleaved 40-round Linode run (GCC 13.3,
+`g6-dedicated-4`, temporary HOME) is:
 
-| Case | Nift | Bash | Delta |
-|---|---:|---:|---:|
-| single `/usr/bin/true` | 0.996 ms/launch | 0.897 ms/launch | **+11.0%** |
-| 3-stage `true | true | true` | 2.101 ms/launch | 1.458 ms/launch | **+44.1%** |
+| Workload | CP20 R2 / pre-CP20 |
+|---|---:|
+| single | **1.011×** |
+| 3-stage | **1.015×** |
 
-The +10% target is missed. The profile points at per-stage Host bookkeeping:
-each stage adds an exec-report pipe, a pidfd (when available), process-group
-setup and event-loop polling, while Bash's `fork`/`exec` path does not. No
-benchmark tuning or Host redesign was done; this is reported for the owner and
-Claude's certification decision. Local GCC 15 numbers are noisy and higher
-(single ~20%, 3-stage ~164%), so the Linode numbers are the reported target.
+Both are within the P2 ≤1.03 gate. The earlier R1 candidate was 1.36–1.63× on
+3-stage because it blocked on each stage's exec report before forking the
+next. Interactive (PTY, legacy path) is at parity with pre-CP20. Bash is not
+claimed as matched: the final Linode single/3-stage ratios to Bash are about
+1.16–1.23 and 1.09–1.15 respectively.
 
 ## Mutants
 
-`NIFT_CP20_MUTANT=1..6` compile in `src/CLI.cpp`/`src/shell/Spawn.cpp`:
+`NIFT_CP20_MUTANT=1..7` compile in `src/CLI.cpp`/`src/shell/Spawn.cpp`:
 M1 buffers pipelines (streaming), M2 treats `>>` as `>`, M3 ignores `2>&1`,
-M4 leaks env assignments, M5 never reaps a background group, M6 reports a
-middle-stage failure as the pipeline status. `make test-cp20-shell-spawn-mutants`
-builds each and requires the intended failing test; all six are rejected.
+M4 leaks env assignments, M5 makes `wait` return immediately, M6 reports a
+middle-stage failure as the pipeline status, and M7 is a genuine never-reaped
+background group caught by the `/proc` zombie check. All seven are rejected by
+the ordinary CP20 suite.
 
 ## Gates
 
@@ -105,8 +103,9 @@ builds each and requires the intended failing test; all six are rejected.
 ## Limitations
 
 - Windows Host process execution remains unsupported; the shell keeps its
-  legacy launcher there. The new Host field compiles, but Windows streaming/job
-  CP20 tests are deferred to the Windows Host slice.
-- The launch-cost target is not met (see above).
+  legacy launcher for every context on Windows (W1). Interactive Windows now
+  falls back to that launcher (F1); the Windows CI fixture covers console
+  pipeline bytes and forced-interactive routing, but was not run locally.
+- H2 is implemented and met the P2 gate on the final 40-round Linode run.
 - The leading-redirection quirk remains a reported legacy/Bash difference, not
   an independent Nift change.

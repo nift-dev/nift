@@ -109,6 +109,24 @@ def main():
         check("background-leftover", "WAITED" in n.stdout and "EARLY" not in n.stdout,
               n.stdout + n.stderr)
 
+    # Genuine zombie/never-reaped check (scripted Host background path).
+    with tempfile.TemporaryDirectory(prefix="cp20-zombie-") as tmp:
+        proc = subprocess.Popen([NIFT], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, cwd=tmp)
+        proc.stdin.write(b"/bin/true &\nwait\n/bin/sleep 0.5\nexit\n")
+        proc.stdin.close()
+        time.sleep(0.25)
+        zombies = []
+        for stat_path in Path("/proc").glob("[0-9]*/stat"):
+            try:
+                fields = stat_path.read_text().split()
+                if len(fields) > 3 and int(fields[3]) == proc.pid and fields[2] == "Z":
+                    zombies.append(int(fields[0]))
+            except (OSError, ValueError):
+                pass
+        proc.wait(timeout=5)
+        check("background-zombie", not zombies, f"zombies={zombies}")
+
     # Pipeline status uses the last stage; the middle failure must not win.
     one("pipeline-last-status", "/bin/sh -c 'exit 7' | /usr/bin/true && echo LAST_OK", "LAST_OK\n")
     one("pipeline-last-status-fail", "/usr/bin/true | /usr/bin/false && echo BAD || echo LAST_FAIL",

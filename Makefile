@@ -3056,7 +3056,7 @@ test-runtime2-inventory-host-mutant: $(TARGET) $(INVENTORY_HOST_MUTANT_BIN)
 	bash tests/runtime2/inventory_host_mutant.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(INVENTORY_HOST_MUTANT_BIN)"
 test-rt-vm: test-runtime2-inventory-host-mutant
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
-CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
+CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
 $(TEST_DIR)/cp20-mutants/%/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=$* -MMD -MP -c src/CLI.cpp -o "$@"
@@ -3069,7 +3069,7 @@ $(TEST_DIR)/cp20-mutants/%/nift$(EXEEXT): $(filter-out src/CLI.o src/shell/Spawn
 test-cp20-shell-spawn: $(TARGET)
 	python3 tests/cp20_shell_spawn.py --nift "$(CURDIR)/$(TARGET)"
 test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
-	@for m in 1 2 3 4 5 6; do \
+	@for m in 1 2 3 4 5 6 7; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp20-mutants/$$m/nift$(EXEEXT)"; \
 	  python3 tests/cp20_shell_spawn.py --nift "$$bin" > ".build/cp20-mutants/$$m.log" 2>&1; \
 	  rc=$$?; \
@@ -3080,6 +3080,7 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 	    4) pattern="FAIL env-scope" ;; \
 	    5) pattern="FAIL background-leftover" ;; \
 	    6) pattern="FAIL pipeline-last-status" ;; \
+	    7) pattern="FAIL background-zombie" ;; \
 	  esac; \
 	  if [ $$rc -eq 0 ] || ! grep -q "$$pattern" ".build/cp20-mutants/$$m.log"; then \
 	    echo "FAIL CP20 mutant $$m: not detected"; tail -20 ".build/cp20-mutants/$$m.log"; exit 1; \
