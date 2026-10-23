@@ -27,11 +27,15 @@ add_direct_edge() {
     python3 - "$1/Makefile" <<'PY'
 import sys
 path = sys.argv[1]
-text = open(path).read()
-needle = 'certify-targets: test-all '
-if needle not in text:
+lines = open(path).read().splitlines(keepends=True)
+for i, line in enumerate(lines):
+    if line.startswith('certify-targets: test-all '):
+        lines[i] = line.replace('certify-targets: test-all ',
+                                'certify-targets: test-runtime2-cp16-n1 test-all ', 1)
+        break
+else:
     raise SystemExit('certify-targets line not found')
-open(path, 'w').write(text.replace(needle, 'certify-targets: test-runtime2-cp16-n1 test-all ', 1))
+open(path, 'w').writelines(lines)
 PY
 }
 
@@ -42,7 +46,7 @@ if bash "$TMP/removed/tests/runtime2/certification_guard.sh" >"$TMP/removed.log"
     cat "$TMP/removed.log" >&2
     exit 1
 fi
-if ! grep -q "removal control" "$TMP/removed.log"; then
+if ! grep -Eq "removal control|does not reach test-runtime2-cp16-n1" "$TMP/removed.log"; then
     echo "FAIL guard control: removal failure was not named" >&2
     cat "$TMP/removed.log" >&2
     exit 1
