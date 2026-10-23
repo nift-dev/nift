@@ -149,4 +149,30 @@ if ! grep -q "random-budget-before-alloc" "$TMP/test-13.log"; then
     exit 1
 fi
 echo "PASS host mutant 13: allocation before the random-bytes budget check rejected"
-echo "PASS host negative controls: 12 behavioural mutants rejected (1-9, 11-13); M10 accounting-formula control detected by the NIFT_TRIM probe"
+# M14 (CP16 N1): restore the per-built-in recoverable code.
+BUILD="$TMP/m14"
+mkdir -p "$BUILD"
+git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
+    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=14" \
+    >"$TMP/build-14.log" 2>&1; then
+    echo "FAIL host mutant 14: build failed (harness failure)" >&2
+    tail -20 "$TMP/build-14.log" >&2
+    exit 1
+fi
+set +e
+python3 "$BUILD/tests/runtime2/cp16_n1.py" --nift "$BUILD/nift" >"$TMP/test-14.log" 2>&1
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+    echo "FAIL host mutant 14: N1 per-call code test passed (per-built-in mapping not caught)" >&2
+    cat "$TMP/test-14.log" >&2
+    exit 1
+fi
+if ! grep -q "N1 read-failure code mismatch" "$TMP/test-14.log"; then
+    echo "FAIL host mutant 14: rejected, but not by the read-failure code assertion" >&2
+    cat "$TMP/test-14.log" >&2
+    exit 1
+fi
+echo "PASS host mutant 14: per-built-in mapping rejected by the read-failure code assertion"
+echo "PASS host negative controls: 13 behavioural mutants rejected (1-9, 11-14); M10 accounting-formula control detected by the NIFT_TRIM probe"
