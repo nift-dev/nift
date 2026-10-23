@@ -57,6 +57,12 @@ struct ReadScan {
             case NodeKind::Lambda:
                 node(n.b, false);
                 return;
+            case NodeKind::For: {
+                const Node& h = ast.at(n.a);
+                node(h.a, false);
+                node(n.b, false);
+                return;
+            }
             default: break;
         }
         node(n.a, false);
