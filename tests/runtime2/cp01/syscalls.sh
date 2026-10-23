@@ -5,12 +5,20 @@
 # empty or malformed trace is a hard failure, never a zero-count PASS.
 set -u -o pipefail
 N="$1"; NAV="$2"; shift 2
-HERE="$(mktemp -d)"; trap 'rm -rf "$HERE"' EXIT
 TRACE="${STRACE:-strace}"
 if ! command -v "$TRACE" >/dev/null 2>&1; then
   echo "SKIP syscalls: tracer '$TRACE' is unavailable"
   exit 77
 fi
+# The measurement fixture has a fixed depth. The certifier deliberately gives
+# each target a private nested TMPDIR; CP01 still canonicalises requirements,
+# so inheriting that depth would change syscall counts. Keep the fixture in a
+# uniquely named directory directly under an explicit, stable temporary root.
+FIXTURE_ROOT="${NIFT_SYSCALL_FIXTURE_ROOT:-/tmp}"
+[ -d "$FIXTURE_ROOT" ] || { echo "FAIL syscalls: fixture root '$FIXTURE_ROOT' is unavailable" >&2; exit 1; }
+HERE="$(mktemp -d "$FIXTURE_ROOT/nift-cp01-sys.XXXXXX")" || { echo "FAIL syscalls: cannot create fixture" >&2; exit 1; }
+trap 'rm -rf "$HERE"' EXIT
+echo "syscall fixture root: $HERE"
 mk() {
 python3 -I - "$1" "$N" "$NAV" <<'PY'
 import json, os, sys

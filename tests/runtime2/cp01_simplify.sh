@@ -15,6 +15,7 @@ run_optional77 bash "$HERE/cp01/classifier_negative.sh"
 run_optional77 bash "$HERE/cp01/crash_harness_negative.sh"
 run_optional77 bash "$HERE/cp01/failed_status_controls.sh"
 run_optional77 bash "$HERE/cp01/missing_tracer_caller.sh"
+run_optional77 bash "$HERE/cp01/syscall_depth_control.sh"
 
 ONLY=basic,interrupt,crash CYCLES=0 python3 "$HERE/cp01/ordinary.py" ours="$NIFT" || fail=1
 bash "$HERE/cp01/classify.sh" "$NIFT" 1000 3 ours || fail=1
