@@ -179,8 +179,6 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     if (l.prev_read >= 0) ::close(l.prev_read);
     if (link[1] >= 0) ::close(link[1]);
     l.prev_read = link[0];
-    // The index and managed-pgid set are published once after all stages are
-    // forked (H2: no per-stage mutex work in the pipeline launch path).
 }
 } // namespace
 void open_endpoints(Launch& l) {
