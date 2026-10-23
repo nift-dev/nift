@@ -377,7 +377,7 @@ printf '<p>$[title]</p>\n' > content/clean.html
 grep -q '"site-unknown-values": 0' .nift/public/clean.info.json && pass "B1: a clean page records 0" || fail "B1: 0 not recorded: $(grep site-unknown .nift/public/clean.info.json)"
 edit_field() { # page mode(remove|text)
   python3 - "$1" "$2" <<'PY'
-import json,sys; p='.nift/public/%s.info.json' % sys.argv[1]; d=json.load(open(p))
+import json,sys,os; p='.nift/public/%s.info.json' % sys.argv[1]; d=json.load(open(p)); os.chmod(p,0o600)
 if sys.argv[2]=='remove': d.pop('site-unknown-values',None)
 else: d['site-unknown-values']='zero'
 json.dump(d,open(p,'w'),indent=2)

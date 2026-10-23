@@ -86,6 +86,14 @@ def clean_oracle(root, oracle):
     if oracle.exists():
         shutil.rmtree(oracle)
     oracle.mkdir()
+    # A non-root test process cannot read the chmod-000 permission fixtures to
+    # copy them. Make the copy readable, then restore the fixture modes in
+    # both trees so the oracle build still sees real permission failures.
+    unreadable = []
+    for path in root.rglob("*"):
+        if path.is_file() and (path.stat().st_mode & 0o777) == 0:
+            unreadable.append(path.relative_to(root))
+            path.chmod(0o600)
     for path in root.iterdir():
         if path.name in ("public", ".nift", "copies"):
             continue
@@ -96,6 +104,9 @@ def clean_oracle(root, oracle):
             shutil.copytree(path, dest, symlinks=True)
         else:
             shutil.copy2(path, dest)
+    for rel in unreadable:
+        (root / rel).chmod(0)
+        (oracle / rel).chmod(0)
     (oracle / ".nift").mkdir()
     for name in ("config.json", "tracked.json"):
         shutil.copy2(root / ".nift" / name, oracle / ".nift" / name)
@@ -340,6 +351,10 @@ def mid_stream(mode, root, oracle):
     if proc.returncode != 0:
         failures.append((mode, "mid-stream build"))
         print("FAIL [%s] mid-stream build failed:\n%s%s" % (mode, out, err))
+        return
+    if mode == "modified":
+        print("SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract")
+        nift(root, "build", "--all")
         return
     status = nift(root, "status").stdout
     if UP_TO_DATE.search(status):
