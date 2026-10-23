@@ -143,11 +143,14 @@ def run_target(cwd, target, log, timeout, user=None):
     tmp.mkdir(parents=True)
     env = clean_env()
     env["TMPDIR"] = str(tmp)
+    # The target's own log may sit inside the checkout (.build/certify). Tests
+    # that snapshot the checkout exclude exactly this one file (and nothing else).
+    env["NIFT_CERTIFY_TARGET_LOG"] = str(Path(log).resolve())
     cmd = ["make", target]
     if user:
         shutil.chown(tmp, user=user)
         os.chmod(tmp.parent, 0o755)
-        cmd = ["su", user, "-s", "/bin/sh", "-c", f"cd '{cwd}' && TMPDIR='{tmp}' make {target}"]
+        cmd = ["su", user, "-s", "/bin/sh", "-c", f"cd '{cwd}' && TMPDIR='{tmp}' NIFT_CERTIFY_TARGET_LOG='{Path(log).resolve()}' make {target}"]
     t0 = time.time()
     with open(log, "w") as f:
         f.write(f"$ {' '.join(cmd)}  (cwd={cwd}, TMPDIR={tmp})\n")

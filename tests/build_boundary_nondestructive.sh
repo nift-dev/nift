@@ -18,12 +18,40 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [ -e .git ] || { echo "FAIL: must run inside a Nift git checkout"; exit 1; }
 
+# A certifier may write this target's own log inside the checkout
+# (.build/certify/<target>.log) while the proof runs. Exclude exactly that one
+# file, never a directory or pattern; every other file, ignored or not, counts.
+OWN_LOG=""
+if [ -n "${NIFT_CERTIFY_TARGET_LOG:-}" ] && [ -f "$NIFT_CERTIFY_TARGET_LOG" ]; then
+  own_abs="$(cd "$(dirname "$NIFT_CERTIFY_TARGET_LOG")" && pwd -P)/$(basename "$NIFT_CERTIFY_TARGET_LOG")"
+  case "$own_abs" in "$(pwd -P)"/*) OWN_LOG="./${own_abs#"$(pwd -P)"/}";; esac
+fi
+
 snapshot() {
   git status --porcelain | sort
   find . -path ./.git -prune -o -type f -print | sort | while read -r f; do
+    [ -n "$OWN_LOG" ] && [ "$f" = "$OWN_LOG" ] && continue
     echo "$(md5sum "$f" | cut -d' ' -f1)  $f"
   done
 }
+
+# Exclusion self-check (negative control): exactly one file is excluded and a
+# change to any other ignored file is still detected. It runs before every
+# certified proof that uses the exclusion, and alone with --selftest.
+exclusion_selftest() {
+  b="$(snapshot)"; echo "own-log line" >> "$OWN_LOG"
+  [ "$b" = "$(snapshot)" ] || { echo "FAIL selftest: own log change was not excluded"; exit 1; }
+  other="$(dirname "$OWN_LOG")/selftest-other-$$.log"; : > "$other"
+  [ "$b" != "$(snapshot)" ] || { rm -f "$other"; echo "FAIL selftest: a new sibling ignored file was not detected"; exit 1; }
+  rm -f "$other"
+  [ "$b" = "$(snapshot)" ] || { echo "FAIL selftest: snapshot not stable"; exit 1; }
+  echo "PASS nondestructive snapshot selftest: own log excluded; sibling ignored file detected"
+}
+if [ "${1:-}" = "--selftest" ]; then
+  [ -n "$OWN_LOG" ] || { echo "FAIL selftest: NIFT_CERTIFY_TARGET_LOG must name a file inside the checkout"; exit 1; }
+  exclusion_selftest; exit 0
+fi
+[ -z "$OWN_LOG" ] || exclusion_selftest
 
 CALLER_BEFORE="$(snapshot)"
 
