@@ -161,7 +161,8 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
         if (got == sizeof payload) {
             stage.exec_failed = true;
             stage.result.launched = false;
-            stage.result.error = exec_failure_message(s.req.stages[i], l.prepared[i], payload[0], payload[1], payload[2]);
+            stage.result.error =
+                exec_failure_message(s.req.stages[i], l.prepared[i], payload[0], payload[1], payload[2]);
             stage.result.exit_code = payload[0] == ExecNotFound || payload[0] == ExecInterpreter ? 127 : 126;
             stage.result.state = StageState::LaunchFailed;
         }
@@ -291,7 +292,6 @@ bool launch_stage(Launch& l, std::size_t i) {
     record_stage(l, i, pid, link, report, pid_pipe);
     return true;
 }
-
 void read_stage_reports(Launch& l) {
     for (std::size_t i = 0; i < l.reports.size() && i < l.s.st.size(); ++i) {
         const int fd = l.reports[i];
@@ -307,7 +307,6 @@ void read_stage_reports(Launch& l) {
     }
     l.reports.clear();
 }
-
 void close_child_ends(Launch& l) {
     if (l.prev_read >= 0) ::close(l.prev_read);
     // The child ends live only in the children now (capture files stay: they are read back).
@@ -317,13 +316,9 @@ void close_child_ends(Launch& l) {
     }
     if (l.in_child >= 0) ::close(l.in_child);
 }
-
 } // namespace nift::rt::host::posix
-
 namespace nift::rt::host {
-
 using namespace posix;
-
 std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostStatus& status, HostError& error,
                                                        bool arm) {
     status = HostStatus::Ok;
