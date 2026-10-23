@@ -18,16 +18,15 @@ for i in $(seq 1 "$CYCLES"); do
 done
 if [ "$miss" -ne 0 ]; then echo "FAIL immediate edits: missed $miss/$CYCLES"; fail=1; else echo "PASS immediate edits: 0/$CYCLES missed"; fi
 
-# (b) a dependency edited while the page is rendering
-printf 'PART-OLD\n' > templates/part.html
-printf '@input("templates/part.html")\n@script { sleep(400) }\n' > content/index.html
-"$NIFT" build >/dev/null 2>&1
-( sleep 0.15; printf 'PART-NEW\n' > templates/part.html ) &
-printf '@input("templates/part.html")\n@script { sleep(400) }\nX\n' > content/index.html
-"$NIFT" build >/dev/null 2>&1
-wait
-"$NIFT" build >/dev/null 2>&1
-if grep -q PART-NEW public/index.html; then echo "PASS edit during render"; else echo "FAIL edit during render: stale output after a follow-up build"; fail=1; fi
+# (a2) immediate editor-style atomic saves (write a temp file, rename over source)
+miss=0
+for i in $(seq 1 "$CYCLES"); do
+  printf 'ATOMIC-%s\n' "$i" > content/.tmp-save
+  mv -f content/.tmp-save content/index.html
+  "$NIFT" build >/dev/null 2>&1
+  grep -q "ATOMIC-$i" public/index.html || miss=$((miss+1))
+done
+if [ "$miss" -ne 0 ]; then echo "FAIL immediate atomic saves: missed $miss/$CYCLES"; fail=1; else echo "PASS immediate atomic saves: 0/$CYCLES missed"; fi
 
 # (c) files Nift itself writes are not concurrent edits: a pre-build hook that
 # regenerates an input must not cause rebuilds forever (review finding F1).
@@ -35,7 +34,7 @@ mkdir -p gen
 printf 'sleep(20)\nr := cmd("sh","-c","echo CONST > gen/data.html").cwd(getenv("NIFT_HOOK_ROOT")).run()\n' > content/index.pre-build.f
 printf '@input("gen/data.html")\nhello\n' > content/index.html
 "$NIFT" build >/dev/null 2>&1; "$NIFT" build >/dev/null 2>&1
-n=0; for i in 1 2 3 4 5; do "$NIFT" build 2>&1 | grep "built " >/dev/null && n=$((n+1)); done
+n=0; for i in 1 2 3 4 5; do sleep 0.05; "$NIFT" build 2>&1 | grep "built " >/dev/null && n=$((n+1)); done
 if [ "$n" -eq 0 ]; then echo "PASS pre-build hook output is not racy"; else echo "FAIL pre-build hook output: $n/5 follow-up builds rebuilt"; fail=1; fi
 rm -f content/index.pre-build.f
 

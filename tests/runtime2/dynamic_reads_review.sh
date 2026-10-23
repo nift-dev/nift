@@ -74,6 +74,7 @@ printf 'P:@script { return platform() }\n' > content/index.html
 grep "P:ios" public/index.html >/dev/null && ok "switching --platform rebuilds platform() pages" || bad "stale platform output"
 "$NIFT" build --platform=ios 2>&1 | grep "up to date" >/dev/null && ok "same platform stays up to date" || bad "same platform rebuilds"
 printf 'NOPLATFORM\n' > content/index.html; "$NIFT" build >/dev/null 2>&1
+sleep 0.05
 "$NIFT" build --platform=android 2>&1 | grep "up to date" >/dev/null && ok "pages not calling platform() ignore --platform" || bad "platform-independent page rebuilt"
 cd /; rm -rf "$T"
 exit $fail

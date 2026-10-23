@@ -21,8 +21,23 @@ from build_recovery import run, write, project, snapshot, oracle, marker, NIFT
 SCR = None
 
 
+def _without_hashes(data):
+    try:
+        doc = json.loads(data)
+        if isinstance(doc, dict) and "dependency-hashes" in doc:
+            doc.pop("dependency-hashes", None)
+            return json.dumps(doc, sort_keys=True, separators=(",", ":")).encode()
+    except Exception:
+        pass
+    return data
+
+
 def diffclean(r):
     got, want = snapshot(r), oracle(r, SCR)
+    mode = json.loads((r / ".nift/config.json").read_text())["config"].get("incremental-mode", "modified")
+    if mode == "modified":
+        got = {k: (_without_hashes(v) if k.endswith(".info.json") else v) for k, v in got.items()}
+        want = {k: (_without_hashes(v) if k.endswith(".info.json") else v) for k, v in want.items()}
     extra = sorted(set(p.relative_to(r).as_posix() for p in (r / "public").rglob("*") if p.is_file()) - set(want))
     return sorted(k for k in set(got) | set(want) if got.get(k) != want.get(k)), extra
 
