@@ -81,7 +81,7 @@ def main():
             if out != want_out or code != 0:
                 problems.append(f"output {out!r} exit {code} stderr {err[-160:]!r}")
             if args.mutant:
-                if code < 0 or code >= 128:
+                if code in (124, 125) or code < 0 or code >= 128:
                     failures += 1
                     print(f"FAIL mutant {name}: harness: VM process crashed (exit {code})")
                 elif any("no statistics" in p for p in problems):
@@ -111,7 +111,7 @@ def main():
             if b"memory budget" not in err.lower():
                 problems.append(f"not a clean memory-budget refusal: {err[-160:]!r}")
             if args.mutant:
-                if code < 0 or code >= 128:
+                if code in (124, 125) or code < 0 or code >= 128:
                     failures += 1
                     print(f"FAIL mutant {name}: harness: VM process crashed (exit {code})")
                 elif any("no statistics" in p for p in problems):

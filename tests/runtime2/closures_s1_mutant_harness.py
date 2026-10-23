@@ -64,6 +64,23 @@ def main():
                 print(f"FAIL mutant harness: {label} fake was credited")
                 print(out[-2000:])
                 return 1
+        cases = [
+            ("exit124", "printf '%s\\n' '{\"outcome\":\"vm\",\"reason\":\"\",\"vm_executions\":1}' > \"$NIFT_VM_STATS\"; echo WRONG; exit 124"),
+            ("exit125", "printf '%s\\n' '{\"outcome\":\"vm\",\"reason\":\"\",\"vm_executions\":1}' > \"$NIFT_VM_STATS\"; echo WRONG; exit 125"),
+            ("malformed", "printf '{}\\n' > \"$NIFT_VM_STATS\"; echo WRONG; exit 0"),
+            ("crash-after-stats", "printf '%s\\n' '{\"outcome\":\"vm\",\"reason\":\"\",\"vm_executions\":1}' > \"$NIFT_VM_STATS\"; echo WRONG; exit 139"),
+        ]
+        for label, body in cases:
+            with open(fake, "w") as f:
+                f.write("#!/bin/sh\n")
+                f.write('case "${NIFT_VM:-}" in 1|require|classify|classify-all) ' + body + ';; esac\n')
+                f.write('exec "$NIFT_REAL" "$@"\n')
+            os.chmod(fake, 0o755)
+            p, out = run(fake)
+            if p.returncode == 0 or "harness" not in out:
+                print(f"FAIL mutant harness: {label} fake was credited")
+                print(out[-2000:])
+                return 1
         print("PASS mutant harness: crash/no-statistics is a harness failure, not a detection")
         return 0
 

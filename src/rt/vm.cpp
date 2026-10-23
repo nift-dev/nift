@@ -331,6 +331,7 @@ bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Pr
         const Note* note = note_at(proto, &in);
         raise(fault, StopReason::Error,
               "unknown value or malformed expression: " + std::string(note ? note->text : ""));
+        if (in.flags & kInstrIndexKey) fault.use_call_site = true;
         return false;
     }
     R[in.a] = stack_[in.b];

@@ -35,6 +35,7 @@ enum : std::uint8_t {
     kInstrCallMember = 1u << 1,  // CallValue through an object field: legacy member diagnostics
     kInstrLambdaExprBody = 1u << 2,  // Closure whose body is an expression (diagnostic prefix)
     kInstrReturnCall = 1u << 3,  // a call evaluated inside a return expression (legacy return: prefix)
+    kInstrIndexKey = 1u << 4,  // an expression evaluated as an index key (legacy call-site diagnostics)
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's

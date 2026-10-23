@@ -392,7 +392,10 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     chain_next_ = nullptr;
     if (!receiver_ok) return false;
     ++index_depth_;
+    const std::uint8_t saved_flags = fb_->flags();
+    fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrIndexKey));
     const bool key_ok = expr_any(node.b, key);
+    fb_->set_flags(saved_flags);
     --index_depth_;
     if (!key_ok) return false;
     fb_->set_offset(site(node));

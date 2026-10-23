@@ -62,6 +62,7 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             result.message = "return: " + result.message;
     }
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
+    if (fault.use_call_site) result.offset = main_offset(result.offset);
     MUTATE_ERROR_OFFSET(result.offset)
     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)
     result.error_in_loop_path = in_loop_path(pc);

@@ -41,6 +41,7 @@ struct Fault {
     // (the VM diagnostic record, CP13 T2, assigns the rest).
     std::string code;
     bool catchable = false;
+    bool use_call_site = false;  // diagnostic position belongs to the active call site
 };
 
 inline constexpr std::int64_t kSafeInteger = std::int64_t(1) << 53;
