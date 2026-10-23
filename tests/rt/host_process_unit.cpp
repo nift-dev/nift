@@ -1496,12 +1496,22 @@ void orphan_after_group_destroy() {
 
 void managed_pgid_cleanup() {
     const std::string tag = new_tag();
-    const std::size_t before = runtime::managed_pgid_count();
+    std::size_t before = runtime::managed_pgid_count();
+    // Let asynchronous pruning from preceding tests settle before taking the
+    // baseline; this performs no sweep and keeps the no-forget sensitivity.
+    for (int i = 0; i < 20; ++i) {
+        std::this_thread::sleep_for(milliseconds(50));
+        const std::size_t now = runtime::managed_pgid_count();
+        if (now == before) break;
+        before = now;
+    }
     for (int i = 0; i < 10000; ++i) {
         auto g = start_ok(req({"/bin/true"}, OutputMode::Inherit, tag));
         g->wait();
     }
-    CHECK(runtime::managed_pgid_count() == before);
+    const std::size_t after = runtime::managed_pgid_count();
+    std::printf("managed_pgid_cleanup: before=%zu after=%zu\n", before, after);
+    CHECK(after == before);
 }
 
 int main(int argc, char** argv) {

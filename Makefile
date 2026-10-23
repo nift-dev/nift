@@ -3121,13 +3121,19 @@ CP20_HOST_FD_MUTANT := $(TEST_DIR)/cp20-mutants/host11/nift$(EXEEXT)
 $(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o: src/rt/host/process_posix_launch.cpp src/rt/host/process_posix_launch.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=11 -MMD -MP -c $< -o "$@"
-$(CP20_HOST_FD_MUTANT): $(filter-out src/CLI.o src/shell/Spawn.o src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
-	$(TEST_DIR)/cp20-mutants/11/CLI.o $(TEST_DIR)/cp20-mutants/11/Spawn.o $(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o src/shell/Spawn.o src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
-		$(TEST_DIR)/cp20-mutants/11/CLI.o $(TEST_DIR)/cp20-mutants/11/Spawn.o \
+$(CP20_HOST_FD_MUTANT): $(filter-out src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
+	$(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
 		$(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o $(LDLIBS) -o "$@"
 .PHONY: test-cp20-host-fd-mutant
-test-cp20-host-fd-mutant: $(CP20_HOST_FD_MUTANT)
-	@if $(PYTHON) tests/cp20_fd_leak.py "$(CP20_HOST_FD_MUTANT)" 10 >/tmp/cp20-host-fd-mutant.log 2>&1; then \
-	  echo "FAIL CP20 host fd mutant not detected"; cat /tmp/cp20-host-fd-mutant.log; exit 1; \
-	else echo "PASS CP20 host fd mutant rejected"; fi
+test-cp20-host-fd-mutant: $(TARGET) $(CP20_HOST_FD_MUTANT)
+	$(PYTHON) tests/cp20_fd_leak.py "$(CURDIR)/$(TARGET)" 20
+	@log="$(TEST_DIR)/cp20-mutants/host11/fd-leak.log"; \
+	  $(PYTHON) tests/cp20_fd_leak.py "$(CURDIR)/$(CP20_HOST_FD_MUTANT)" 10 >"$$log" 2>&1; rc=$$?; \
+	  if [ "$$rc" -ne 1 ] || ! grep -qx 'RESULT LEAK' "$$log" || \
+	     ! grep -Eq '^fds before=[0-9]+ after=[0-9]+ delta=[1-9][0-9]* .*zombies_after=0$$' "$$log" || \
+	     grep -Eq 'Traceback|AssertionError|TimeoutExpired' "$$log"; then \
+	    echo "FAIL CP20 host fd mutant: expected descriptor-leak assertion (rc=$$rc)"; cat "$$log"; exit 1; \
+	  fi; echo "PASS CP20 host fd mutant: descriptor leak detected"
+CERTIFY_RUNTIME2_GATES += test-cp20-host-fd-mutant
+certify-targets: test-cp20-shell-spawn test-cp20-shell-spawn-mutants test-cp20-r1 test-v45-native-runtime test-cp20-fd-leak test-cp20-r1-windows test-cp20-host-fd-mutant

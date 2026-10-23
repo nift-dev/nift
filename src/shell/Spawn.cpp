@@ -292,7 +292,9 @@ ProcessResult JobTable::foreground(int job_id) {
         return out;
     }
 #else
+#ifndef _WIN32
     if (entry->group->pgid() > 0) ::kill(-static_cast<pid_t>(entry->group->pgid()), SIGCONT);
+#endif
 #endif
     const auto& result = entry->group->wait();
     entry->info.state = ShellJobState::Done;
