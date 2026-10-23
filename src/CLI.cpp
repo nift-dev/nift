@@ -2066,18 +2066,8 @@ static int run_shell_job_builtin(const std::string& builtin,
                                  ShellJobTable* legacy_jobs,
                                  bool interactive,
                                  bool print_errors) {
-    if (!interactive) return run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
-    if (builtin == "jobs") {
-        run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
-        return run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
-    }
-    if (builtin == "wait" && args.empty()) {
-        const int legacy = run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
-        const int host = run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
-        return host != 0 ? host : legacy;
-    }
-    const int legacy = run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
-    if (builtin != "wait" || legacy != 1) return legacy;
+    if (interactive && legacy_jobs && legacy_jobs->supported())
+        return run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
     return run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
 }
 
@@ -2234,13 +2224,21 @@ static int run_external_words(Parser& parser,
         }
     }
     if (background) {
-        auto result = jobs->launch(stages, line, false);
+        ProcessResult result;
+        if (interactive && legacy_jobs && legacy_jobs->supported()) {
+            result = legacy_jobs->launch(stages, line, false);
+        } else if (!interactive && jobs && jobs->supported()) {
+            result = jobs->launch(stages, line, false);
+        } else {
+            if (print_errors) console::error("interactive job control is not supported on Windows");
+            return 2;
+        }
         int status = result.exit_code;
         if (!result.error.empty()) {
             if (print_errors) console::error(result.error);
             return status < 0 ? 2 : status;
         }
-        auto list = jobs->jobs(false);
+        auto list = (interactive && legacy_jobs) ? legacy_jobs->jobs(false) : jobs->jobs(false);
         if (!list.empty()) {
             const auto& job = list.back();
             std::cout << "[" << job.id << "] " << job.process_group << '\n';
@@ -2250,7 +2248,7 @@ static int run_external_words(Parser& parser,
 
     const bool direct = !has_ops && stages.size() == 1;
     ProcessResult result;
-    if (interactive) {
+    if (interactive && legacy_jobs && legacy_jobs->supported()) {
         // J1(a): the complete legacy foreground job-control path stays until
         // CP21 adds Host stop/continue. This preserves Ctrl-C/Ctrl-Z/fg/bg.
         result = legacy_jobs->launch(stages, line, true);
@@ -2664,11 +2662,12 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         const auto snapshot=make_shell_snapshot(parser);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
-            const bool interactive_shell =
 #ifndef _WIN32
-                interactive;
+            const bool forced_scripted = std::getenv("NIFT_CP20_FORCE_SCRIPTED") != nullptr;
+            const bool interactive_shell = interactive && !forced_scripted;
 #else
-                _isatty(_fileno(stdin)) != 0;
+            const bool forced_interactive = std::getenv("NIFT_CP20_FORCE_INTERACTIVE") != nullptr;
+            const bool interactive_shell = _isatty(_fileno(stdin)) != 0 || forced_interactive;
 #endif
             execute_shell_command(parser,trimmed,true,&jobs,&legacy_jobs,interactive_shell,&snapshot,&exit_requested,&exit_code);
             pending.clear();

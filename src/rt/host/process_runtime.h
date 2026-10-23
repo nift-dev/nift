@@ -54,6 +54,7 @@ struct TestHooks {
     // Microseconds to pause inside the cancellation start, between signalling
     // the stages and closing their stdin (pins that order: r2 TSan `deadlines`).
     std::atomic<int> cancel_gap_us{0};
+    std::atomic<bool> close_exec_report{false};  // H2 test: parent drops the report read end
     std::mutex log_mutex;
     std::vector<EventRecord> log;
 };

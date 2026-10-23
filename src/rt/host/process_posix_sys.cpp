@@ -27,16 +27,30 @@ int fd_above_stdio_cloexec(int fd) {
     return fd;
 }
 
+int fd_above_stdio_keep_cloexec(int fd) {
+    if (fd < 0) return fd;
+    if (fd <= 2) {
+        const int high = ::fcntl(fd, F_DUPFD_CLOEXEC, 3);
+        const int error = errno;
+        ::close(fd);
+        errno = error;
+        return high;
+    }
+    return fd;  // pipe2(O_CLOEXEC) already set it
+}
+
 bool make_pipe(int ends[2]) {
     ends[0] = ends[1] = -1;
     int raw[2];
 #ifdef __linux__
     if (::pipe2(raw, O_CLOEXEC) != 0) return false;
+    ends[0] = fd_above_stdio_keep_cloexec(raw[0]);
+    ends[1] = fd_above_stdio_keep_cloexec(raw[1]);
 #else
     if (::pipe(raw) != 0) return false;
-#endif
     ends[0] = fd_above_stdio_cloexec(raw[0]);
     ends[1] = fd_above_stdio_cloexec(raw[1]);
+#endif
     if (ends[0] >= 0 && ends[1] >= 0) return true;
     const int e = errno;
     if (ends[0] >= 0) ::close(ends[0]);

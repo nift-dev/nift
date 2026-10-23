@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""CP20 Windows CI probe: pipeline/redirection output keeps the legacy CRLF
-normalisation. POSIX hosts skip (exit 77)."""
+"""CP20 R2 Windows CI probe (POSIX hosts skip).
+
+F1: with the interactive branch forced, an external command must still run
+(F1 regression on R1).
+F2: a console pipeline must expose the pre-CP20 captured/normalised LF bytes;
+the original CP20 `(false,false)` path emits raw CRLF.
+"""
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 if os.name != "nt":
@@ -12,22 +16,33 @@ if os.name != "nt":
     sys.exit(77)
 
 nift = str(Path(sys.argv[1] if len(sys.argv) > 1 else "./nift").resolve())
-with tempfile.TemporaryDirectory(prefix="cp20-win-") as tmp:
-    root = Path(tmp)
-    script = (
-        'cmd /c "echo one & echo two" | findstr one > out.txt\n'
-        'cmd /c "echo three" >> out.txt\n'
-        'type out.txt\n'
-        "exit\n"
-    )
-    proc = subprocess.run([nift], input=script.encode(), cwd=root,
+
+
+def run(script, extra_env=None):
+    env = dict(os.environ)
+    if extra_env:
+        env.update(extra_env)
+    return subprocess.run([nift], input=script.encode(), env=env,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
-    out = proc.stdout.replace(b"\r\n", b"\n")
-    data = (root / "out.txt").read_bytes().replace(b"\r\n", b"\n")
-    ok = proc.returncode == 0 and b"one" in out and b"three" in out and b"one\nthree\n" in data
-    print(("PASS" if ok else "FAIL") + " cp20-windows-pipeline")
-    if not ok:
-        print("stdout:", proc.stdout)
-        print("stderr:", proc.stderr)
-        print("file:", data)
-        sys.exit(1)
+
+
+def main():
+    ok = True
+    pipeline = run('cmd /c "echo one" | findstr one\nexit\n')
+    if pipeline.stdout != b"one\n":
+        ok = False
+        print("FAIL console-pipeline-bytes", pipeline.stdout)
+    else:
+        print("PASS console-pipeline-bytes")
+
+    interactive = run('cmd /c echo hello\nexit\n', {"NIFT_CP20_FORCE_INTERACTIVE": "1"})
+    if interactive.stdout != b"hello\n":
+        ok = False
+        print("FAIL forced-interactive-external", interactive.stdout, interactive.stderr)
+    else:
+        print("PASS forced-interactive-external")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

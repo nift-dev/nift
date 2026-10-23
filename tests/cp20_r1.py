@@ -26,12 +26,14 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
-def pty_session(lines, waits=0.35, timeout=8):
+def pty_session(lines, waits=0.35, timeout=8, extra_env=None):
     home = tempfile.mkdtemp(prefix="cp20-pty-home-")
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["HOME"] = home
         os.environ["TERM"] = "dumb"
+        if extra_env:
+            os.environ.update(extra_env)
         os.chdir(home)
         os.execv(NIFT, [NIFT])
     out = b""
@@ -128,6 +130,38 @@ def pty_bg():
     finish(pid, fd, home)
 
 
+def pty_host_bg_never():
+    # Force the scripted Host path while keeping a real controlling terminal;
+    # H1 must prevent the Host background job from taking it.
+    pid, fd, out, home = pty_session([(b"/bin/sleep 2 &\r", 0.3),
+                                      (b"/bin/echo HOST-FG\r", 1.2)],
+                                     extra_env={"NIFT_CP20_FORCE_SCRIPTED": "1"})
+    text = out.decode(errors="replace").replace("\r", "")
+    st = Path(f"/proc/{pid}/stat").read_text().split(")")[1].split()
+    check("pty-host-bg-never", "HOST-FG" in text and st[2] == st[5],
+          f"out={text[-200:]!r} pgrp={st[2]} tpgid={st[5]}")
+    finish(pid, fd, home)
+
+
+def pty_f4_jobs():
+    pid, fd, out, home = pty_session([(b"/bin/sleep 0.6 &\r", 0.3), (b"jobs\r", 0.5)])
+    text = out.decode(errors="replace").replace("\r", "")
+    check("pty-f4-one-job-id", text.count("[1] Running") == 1, text[-300:])
+    os.write(fd, b"wait 1\r")
+    time.sleep(0.9)
+    os.write(fd, b"jobs\r")
+    time.sleep(0.5)
+    try: extra = os.read(fd, 4096).decode(errors="replace").replace("\r", "")
+    except OSError: extra = ""
+    check("pty-f4-wait-identity", "unknown job" not in extra and "Done (0)" in extra, extra[-300:])
+    finish(pid, fd, home)
+
+    pid2, fd2, out2, home2 = pty_session([(b"/bin/sleep 0.5 &\r", 0.3), (b"fg\r", 1.0)])
+    text2 = out2.decode(errors="replace").replace("\r", "")
+    check("pty-f4-fg-current", "no current job" not in text2, text2[-300:])
+    finish(pid2, fd2, home2)
+
+
 def fd_limits():
     def limit(n):
         def apply():
@@ -206,13 +240,15 @@ def main():
     pty_sigint()
     pty_tstp()
     pty_bg()
+    pty_host_bg_never()
+    pty_f4_jobs()
     fd_limits()
     leftover()
     fs_root()
     io_messages()
     fd_leak_pty()
     missing_interpreter()
-    print(f"PASS {16 - len(failures)}, FAIL {len(failures)}")
+    print(f"PASS {19 - len(failures)}, FAIL {len(failures)}")
     return 1 if failures else 0
 
 

@@ -1366,6 +1366,37 @@ void cleanup_failures_reported() {
 
 } // namespace
 
+void pipeline_exec_failures() {
+    const std::string tag = new_tag();
+    const char* missing = "/definitely-missing-cp20-stage";
+    auto run_stages = [&](std::vector<std::vector<std::string>> stages) {
+        auto r = req(stages[0], OutputMode::PipeCapture, tag);
+        for (std::size_t i = 1; i < stages.size(); ++i) add_stage(r, stages[i], tag);
+        return run_ok(std::move(r));
+    };
+    auto first = run_stages({{missing}, {"cat"}});
+    CHECK(first.stages.size() == 2 && first.stages[0].exit_code == 127);
+    CHECK(first.stages[0].error.find("executable not found") != std::string::npos);
+    auto middle = run_stages({{"cat"}, {missing}, {"cat"}});
+    CHECK(middle.stages.size() == 3 && middle.stages[1].exit_code == 127);
+    CHECK(middle.stages[1].error.find("executable not found") != std::string::npos);
+    auto last = run_stages({{"cat"}, {"cat"}, {missing}});
+    CHECK(last.stages.size() == 3 && last.stages[2].exit_code == 127);
+    CHECK(last.stages[2].error.find("executable not found") != std::string::npos);
+    auto all = run_stages({{missing}, {missing}, {missing}});
+    for (const auto& stage : all.stages) CHECK(stage.exit_code == 127 && !stage.launched);
+}
+
+void exec_report_closed_early() {
+#ifdef NIFT_HOST_TEST_HOOKS
+    const std::string tag = new_tag();
+    runtime::test_hooks().close_exec_report.store(true);
+    auto r = run_ok(req({"sh", "-c", "exit 0"}, OutputMode::PipeCapture, tag));
+    runtime::test_hooks().close_exec_report.store(false);
+    CHECK(r.exit_code == 0);
+#endif
+}
+
 void terminal_never_option() {
     const std::string tag = new_tag();
     auto r = req({"sh", "-c", "exit 0"}, OutputMode::Inherit, tag);
@@ -1373,6 +1404,21 @@ void terminal_never_option() {
     r.own_group = true;
     auto result = run_ok(std::move(r));
     CHECK(result.launched && result.exit_code == 0);
+}
+
+void orphan_after_group_destroy() {
+    if (!runtime::enable_subreaper()) { std::printf("orphan_after_group_destroy: SKIPPED\n"); return; }
+    const std::string tag = new_tag();
+    {
+        auto g = start_ok(req({"sh", "-c", "sleep 0.5 &"}, OutputMode::Inherit, tag));
+        g->wait();
+    }
+    const bool gone = wait_until([&] {
+        runtime::reap_adopted_orphans();
+        return tagged(tag).empty();
+    }, milliseconds(4000));
+    CHECK(gone);
+    CHECK(no_zombies());
 }
 
 void managed_pgid_cleanup() {
@@ -1421,7 +1467,10 @@ int main(int argc, char** argv) {
         {"sigkill_pdeathsig_linux", sigkill_pdeathsig_linux},
         {"escapees_subreaper", escapees_subreaper},  // enables the subreaper for the rest of the process
         {"subreaper_reaps_orphans", subreaper_reaps_orphans},
+        {"pipeline_exec_failures", pipeline_exec_failures},
+        {"exec_report_closed_early", exec_report_closed_early},
         {"terminal_never_option", terminal_never_option},
+        {"orphan_after_group_destroy", orphan_after_group_destroy},
         {"managed_pgid_cleanup", managed_pgid_cleanup},
     };
     // Stress: CP16_REPEAT=N runs the selection N times (the signal log is reset per round).

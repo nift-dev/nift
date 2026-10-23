@@ -149,15 +149,24 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     stage.result.pid = stage_pid;
     stage.result.launched = stage_pid > 0;
     stage.result.state = stage_pid > 0 ? StageState::Running : StageState::LaunchFailed;
-    int payload[3] = {0, 0, 0};
-    const std::size_t got = read_payload(report[0], payload, sizeof payload);
-    if (report[0] >= 0) ::close(report[0]);
-    if (got == sizeof payload) {
-        stage.exec_failed = true;
-        stage.result.launched = false;
-        stage.result.error = exec_failure_message(s.req.stages[i], l.prepared[i], payload[0], payload[1], payload[2]);
-        stage.result.exit_code = payload[0] == ExecNotFound || payload[0] == ExecInterpreter ? 127 : 126;
-        if (l.detached) stage.result.state = StageState::LaunchFailed;
+#ifdef NIFT_HOST_TEST_HOOKS
+    if (runtime::test_hooks().close_exec_report.load()) {
+        if (report[0] >= 0) { ::close(report[0]); report[0] = -1; }
+    }
+#endif
+    if (l.detached) {
+        int payload[3] = {0, 0, 0};
+        const std::size_t got = read_payload(report[0], payload, sizeof payload);
+        if (report[0] >= 0) ::close(report[0]);
+        if (got == sizeof payload) {
+            stage.exec_failed = true;
+            stage.result.launched = false;
+            stage.result.error = exec_failure_message(s.req.stages[i], l.prepared[i], payload[0], payload[1], payload[2]);
+            stage.result.exit_code = payload[0] == ExecNotFound || payload[0] == ExecInterpreter ? 127 : 126;
+            stage.result.state = StageState::LaunchFailed;
+        }
+    } else if (report[0] >= 0) {
+        l.reports.push_back(report[0]);
     }
     if (!l.detached && stage_pid > 0 && s.pidfds_ok) {
         stage.pidfd = open_pidfd(stage_pid);
@@ -166,8 +175,8 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     if (l.prev_read >= 0) ::close(l.prev_read);
     if (link[1] >= 0) ::close(link[1]);
     l.prev_read = link[0];
-    runtime::index_add(l.key, runtime::IndexedGroup{s.pgid, s.unreaped_pids(), l.detached});
-    runtime::note_managed_pgid(s.pgid);
+    // The index and managed-pgid set are published once after all stages are
+    // forked (H2: no per-stage mutex work in the pipeline launch path).
 }
 } // namespace
 
@@ -283,6 +292,22 @@ bool launch_stage(Launch& l, std::size_t i) {
     return true;
 }
 
+void read_stage_reports(Launch& l) {
+    for (std::size_t i = 0; i < l.reports.size() && i < l.s.st.size(); ++i) {
+        const int fd = l.reports[i];
+        int payload[3] = {0, 0, 0};
+        const std::size_t got = read_payload(fd, payload, sizeof payload);
+        ::close(fd);
+        if (got != sizeof payload) continue;
+        auto& stage = l.s.st[i];
+        stage.exec_failed = true;
+        stage.result.launched = false;
+        stage.result.error = exec_failure_message(l.s.req.stages[i], l.prepared[i], payload[0], payload[1], payload[2]);
+        stage.result.exit_code = payload[0] == ExecNotFound || payload[0] == ExecInterpreter ? 127 : 126;
+    }
+    l.reports.clear();
+}
+
 void close_child_ends(Launch& l) {
     if (l.prev_read >= 0) ::close(l.prev_read);
     // The child ends live only in the children now (capture files stay: they are read back).
@@ -328,7 +353,10 @@ std::shared_ptr<ProcessGroup> ProcessGroup::start_impl(SpawnRequest req, HostSta
     prepare_stages(l);
     for (std::size_t i = 0; i < s.req.stages.size() && !s.launch_failed; ++i)
         if (!launch_stage(l, i)) break;
+    read_stage_reports(l);
     close_child_ends(l);
+    runtime::index_add(key, runtime::IndexedGroup{s.pgid, s.unreaped_pids(), detached});
+    runtime::note_managed_pgid(s.pgid);
     launch_lock.unlock();
 
     if (s.launch_failed) {

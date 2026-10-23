@@ -16,6 +16,7 @@
 #include <cerrno>
 #include <csignal>
 #include <cstring>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace nift::rt::host {
@@ -59,7 +60,9 @@ ProcessGroup::~ProcessGroup() {
     close_fd(s.out_file);
     close_fd(s.err_file);
     runtime::index_remove(this);
-    runtime::forget_managed_pgid(s.pgid);
+    // Keep attribution while any descendant outlives this object; the orphan
+    // sweep prunes the pgid once the group is truly gone (F6).
+    if (!group_has_members(s)) runtime::forget_managed_pgid(s.pgid);
 }
 
 const char* output_mode_name(OutputMode mode) {

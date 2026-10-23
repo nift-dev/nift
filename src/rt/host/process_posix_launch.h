@@ -25,6 +25,7 @@ struct Launch {
     std::vector<PreparedExec> prepared;
     pid_t parent_pid = -1;
     int prev_read = -1;
+    std::vector<int> reports;  // deferred exec-report read ends (H2)
     explicit Launch(State& state) : s(state) {}
     void fail(std::string message) {
         s.launch_failed = true;
