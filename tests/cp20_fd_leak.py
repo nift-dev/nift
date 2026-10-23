@@ -83,6 +83,12 @@ time.sleep(0.3)
 sync()
 after = fds()
 kids_after = kids()
+for _ in range(3):  # allow the host loop's asynchronous closure to settle
+    if len(after) <= len(before) and not any(k.startswith("Z") for k in kids_after):
+        break
+    time.sleep(0.3)
+    after = fds()
+    kids_after = kids()
 print(f"fds before={len(before)} after={len(after)} delta={len(after) - len(before)} "
       f"children before={kids_before} after={kids_after} zombies_after={sum(k.startswith('Z') for k in kids_after)}")
 extra = [fd for fd in after if fd not in before]

@@ -44,7 +44,7 @@ def bash(script, cwd, timeout=30):
                           text=True, timeout=timeout, check=False)
 
 
-def one(name, script, expected_stdout=None, expected_rc=None, files=None, inputs=None, compare_bash=False):
+def one(name, script, expected_stdout=None, expected_stderr=None, expected_rc=None, files=None, inputs=None, compare_bash=False):
     with tempfile.TemporaryDirectory(prefix="cp20-") as tmp:
         root = Path(tmp)
         for rel, data in (inputs or {}).items():
@@ -57,6 +57,8 @@ def one(name, script, expected_stdout=None, expected_rc=None, files=None, inputs
         why = []
         if expected_stdout is not None and n.stdout != expected_stdout:
             ok = False; why.append(f"stdout={n.stdout!r}")
+        if expected_stderr is not None and n.stderr != expected_stderr:
+            ok = False; why.append(f"stderr={n.stderr!r}")
         if expected_rc is not None and n.returncode != expected_rc:
             ok = False; why.append(f"rc={n.returncode}")
         if b is not None and n.stdout != b.stdout:
@@ -76,14 +78,14 @@ def main():
     one("pipe3", "/bin/echo hi | /bin/cat | /bin/cat", "hi\n", compare_bash=True)
 
     # Redirection forms.
-    one("stdout-truncate", "/bin/echo one > out.txt", files={"out.txt": "one\n"})
-    one("stdout-append", "/bin/echo one > out.txt\n/bin/echo two >> out.txt", files={"out.txt": "one\ntwo\n"})
-    one("stderr-file", "/bin/sh -c 'echo out; echo err >&2' 2> err.txt", "out\n", files={"err.txt": "err\n"})
+    one("stdout-truncate", "/bin/echo one > out.txt", expected_stderr="", files={"out.txt": "one\n"})
+    one("stdout-append", "/bin/echo one > out.txt\n/bin/echo two >> out.txt", expected_stderr="", files={"out.txt": "one\ntwo\n"})
+    one("stderr-file", "/bin/sh -c 'echo out; echo err >&2' 2> err.txt", "out\n", expected_stderr="", files={"err.txt": "err\n"})
     one("stderr-append", "/bin/sh -c 'echo e1 >&2' 2> err.txt\n/bin/sh -c 'echo e2 >&2' 2>> err.txt",
-        files={"err.txt": "e1\ne2\n"})
-    one("merge-file", "/bin/sh -c 'echo out; echo err >&2' > all.txt 2>&1", files={"all.txt": "out\nerr\n"})
-    one("merge-pipe", "/bin/sh -c 'echo out; echo err >&2' 2>&1 | /usr/bin/tr a-z A-Z", "OUT\nERR\n")
-    one("input", "/bin/cat < in.txt", "input\n", inputs={"in.txt": "input\n"})
+        expected_stderr="", files={"err.txt": "e1\ne2\n"})
+    one("merge-file", "/bin/sh -c 'echo out; echo err >&2' > all.txt 2>&1", expected_stderr="", files={"all.txt": "out\nerr\n"})
+    one("merge-pipe", "/bin/sh -c 'echo out; echo err >&2' 2>&1 | /usr/bin/tr a-z A-Z", "OUT\nERR\n", expected_stderr="")
+    one("input", "/bin/cat < in.txt", "input\n", expected_stderr="", inputs={"in.txt": "input\n"})
 
     # Environment assignment scope.
     one("env-child", "FOO=bar /bin/sh -c 'printf %s \"$FOO\"'", "bar", compare_bash=True)

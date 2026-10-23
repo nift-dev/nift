@@ -34,7 +34,7 @@ as measured in CP00.
 | CP17 | M5 Runtime | Typed handles end-to-end; registry reclamation (removes D3) | CP16 | No `\x1fnift:` strings in VM paths; handle-forgery tests fail closed |
 | CP18 | M5 Runtime | Embedding: C ABI 1.4 program API; bindings | CP13 | ABI 1.3 tests unchanged; new API tested in C and Python |
 | CP19 | M6 Shell | Command-mode front end on the shared compiler | CP12 | Shell corpus parity; mode rules specified |
-| CP20 | M6 Shell | Spawn + streaming pipelines + redirection on Host ops | CP19, CP07 | Launch ≤ Bash + 10%; 3-stage pipeline streams |
+| CP20 | M6 Shell | Spawn + streaming pipelines + redirection on Host ops | CP19, CP07 | Launch ≤ 1.03× pre-CP20 (D-050); 3-stage pipeline streams. Bash +10% deferred, not passed |
 | CP21 | M6 Shell | Interactive layer: completion, history, rc compile, job control | CP20 | Prompt ≤ 3 ms; job-control tests green on Linux/macOS |
 | CP22 | M7 Concurrency | VM coroutines + work-stealing scheduler + event loop | CP12 | 10k sleeps of 10 ms in < 0.2 s; linear spawn scaling to 100k |
 | CP23 | M7 Concurrency | Capture-only isolates, channels, cancellation | CP22 | Labs concurrency suite; no data races under TSan |

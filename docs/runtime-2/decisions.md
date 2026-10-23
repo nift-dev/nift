@@ -1227,3 +1227,15 @@ opt-in restriction and is enforced for `@path`/`@pathto` and expression-level
 filesystem operations. No caching or replacement containment machinery may be
 added. `@path` targets outside the output tree keep the existing deployment
 warning and dependency tracking.
+
+## D-052 — CP20 launch gate: no regression against pre-CP20 (owner, 2026-10-23)
+
+1. CP20's binding launch-performance gate is **≤ 1.03 × pre-CP20** (`e1f2f59f`)
+   for a single external command, `true|true|true` and `true|cat|cat`, measured
+   with the approved interleaved/paired-round method on four dedicated vCPUs
+   with GCC 13.3.
+2. The earlier roadmap objective "Launch ≤ Bash + 10%" is **deferred, not
+   passed**. It is carried to the separate Host performance checkpoint
+   (P1/vfork) and remains visible for CP27 reporting. CP20 does not optimise
+   for it and must not claim Bash parity.
+3. The Bash comparison is reported for information only.
