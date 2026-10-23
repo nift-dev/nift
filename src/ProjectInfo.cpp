@@ -697,39 +697,12 @@ bool ProjectInfo::metadata_path_is_safe(const fs::path& normalized, const fs::pa
     return !normalized.empty();
 }
 
-// Modified mode, CP01: a dependency stamped in the same tick as its page's
-// render start carries a content hash in page-info ("tick-hashes"); when its
-// mtime is not older than page-info, the hash decides (see
-// classify_render_dependencies).
-// The record stores "<mtime seconds>.<nanoseconds>:<hash>". The hash only
-// decides while the dependency still carries that exact mtime: any later
-// write (even of identical bytes, i.e. a touch) moves the mtime and counts
-// as a change, as in v4.12.0 (review of v45_target_smoke).
-static std::string tick_hash_value(const filesystem::DependencyTime& mtime, std::uint64_t hash) {
-    return std::to_string(mtime.seconds) + "." + std::to_string(mtime.nanoseconds) + ":" + std::to_string(hash);
-}
-static bool tick_hash_matches(const json::Document* tick_hashes, const std::string& name, const fs::path& dependency,
-                              const filesystem::DependencyTime& mtime) {
-    if (!tick_hashes || !tick_hashes->has(name) || !(*tick_hashes)[name].is_string()) return false;
-    const std::string& recorded = (*tick_hashes)[name].string;
-    const std::string prefix = std::to_string(mtime.seconds) + "." + std::to_string(mtime.nanoseconds) + ":";
-    if (recorded.compare(0, prefix.size(), prefix) != 0) return false;
-    return recorded == tick_hash_value(mtime, filesystem::hash_path(dependency));
-}
-
-bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name, const json::Document* tick_hashes) const {
+bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {
     if (!status.exists || status.error || !page_info_status.exists || page_info_status.error) return true;
-    // Strictly-greater comparison misses edits whose mtime lands in the same
-    // filesystem timestamp quantum as the page-info write (equal timestamps
-    // are common on coarse-resolution or batched-update filesystems). An equal
-    // timestamp is indistinguishable from "edited right at the last build", so
-    // modified mode treats it as potentially stale and rebuilds: a build must
-    // never report success while a source change went unnoticed. Hash mode is
-    // unaffected (content hashing, no timestamps); hybrid keeps both signals.
-    if (config.incremental_mode == "modified") {
-        if (!(status.mtime >= page_info_status.mtime)) return false;
-        return !tick_hash_matches(tick_hashes, name, dependency, status.mtime);
-    }
+    // v4.12 modified-mode rule: a dependency that is not older than the
+    // page-info may have changed in the same timestamp tick, so rebuild
+    // conservatively. Content hashes remain the hash/hybrid rule.
+    if (config.incremental_mode == "modified") return status.mtime >= page_info_status.mtime;
     if (!snapshots.is_object() || !snapshots.has(name) || !snapshots[name].is_string()) return true;
     const auto& value = snapshots[name].string;
     if (value.empty() || value.size() > 20 || value.find_first_not_of("0123456789") != std::string::npos) return true;
@@ -793,24 +766,6 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         if (!recorded.empty()) { std::lock_guard<std::mutex> lock(outstanding_warning_mutex_); outstanding_warnings_[info.name] = std::move(recorded); }
     }
 
-    json::Document clock_record;
-    bool have_clock_record = false;
-    if (config.incremental_mode == "modified") {
-        const fs::path clock_path = render_clock_path(info);
-        std::string clock_error;
-        have_clock_record = filesystem::path_exists(clock_path) &&
-                            load_json_file(clock_path, clock_record, clock_error) && clock_record.is_object() &&
-                            clock_record.has("racy-dependencies") && clock_record["racy-dependencies"].is_array() &&
-                            clock_record.has("tick-hashes") && clock_record["tick-hashes"].is_object();
-        // Missing, unreadable or malformed (interrupted write, deleted .nift/clock,
-        // metadata from before this record existed): rebuild conservatively.
-        if (!have_clock_record) reasons.push_back("page timing record is missing or invalid");
-    }
-    if (have_clock_record && clock_record.has("racy-dependencies") && clock_record["racy-dependencies"].is_array()) {
-        for (const auto& value : clock_record["racy-dependencies"].array)
-            if (value.is_string())
-                reasons.push_back("dependency was modified while the page was being built: " + value.string);
-    }
     read_observation_reasons(document, reasons);
     const std::string current_hooks = build_script_signature(info);
     const std::string old_hooks=document.has("build-hooks")&&document["build-hooks"].is_string()?document["build-hooks"].string:std::string{};
@@ -874,7 +829,6 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
 
     bool saved_edges_clean=true;
     const fs::path normalized_root = root.lexically_normal();
-    const json::Document* tick_hashes = have_clock_record && clock_record.has("tick-hashes") && clock_record["tick-hashes"].is_object() ? &clock_record["tick-hashes"] : nullptr;
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
             saved_edges_clean=false;
@@ -888,7 +842,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
                 if(!metadata_path_is_safe_prepared(id)) {saved_edges_clean=false;reasons.push_back("page build metadata has an invalid dependency");continue;}
                 const auto status=filesystem::dependency_status_native(identity_catalogue_->path(id));
                 if(!status.exists || status.error) {saved_edges_clean=false;reasons.push_back("dependency removed: "+value.string);}
-                else if(!page_info_status.exists || page_info_status.error || (status.mtime>=page_info_status.mtime && !tick_hash_matches(tick_hashes, value.string, identity_catalogue_->path(id), status.mtime))) {saved_edges_clean=false;reasons.push_back("dependency changed: "+value.string);}
+                else if(!page_info_status.exists || page_info_status.error || status.mtime>=page_info_status.mtime) {saved_edges_clean=false;reasons.push_back("dependency changed: "+value.string);}
                 continue;
             }
         }
@@ -936,7 +890,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         const auto status = filesystem::dependency_status(dependency);
         if (!status.exists || status.error) {
             saved_edges_clean=false;reasons.push_back("dependency removed: " + value.string);
-        } else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string, tick_hashes)) {
+        } else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string)) {
             saved_edges_clean=false;reasons.push_back("dependency changed: " + value.string);
         }
     }
@@ -991,7 +945,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             const auto status = filesystem::dependency_status(dependency);
             if (!status.exists || status.error)
                 reasons.push_back(removed);
-            else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], dependency_name, tick_hashes))
+            else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], dependency_name))
                 reasons.push_back(reason);
         }
     }
@@ -1089,55 +1043,6 @@ void ProjectInfo::report_build_error(const BuildError& error, std::optional<Buil
         return;
     }
     print_build_error(error);
-}
-
-// Record "now" as the filesystem would stamp it, by touching the persistent
-// build lock and reading its mtime back. Comparing dependency mtimes with this
-// value (rather than with a user-space clock) keeps both sides in one clock
-// domain and one timestamp granularity (Runtime 2.0 CP01). Taken per page,
-// after that page's pre-build hooks and after every page it depends on has
-// been built, so files written by Nift itself earlier in the build are not
-// mistaken for concurrent edits.
-std::optional<filesystem::DependencyTime> ProjectInfo::stamp_render_clock() const {
-    if (config.incremental_mode != "modified") return std::nullopt;
-    const fs::path lock = root / ".nift/.lock";
-    std::lock_guard<std::mutex> guard(render_clock_mutex_);
-    if (filesystem::refresh_modified_time_now(lock)) {
-        const auto status = filesystem::dependency_status(lock);
-        if (status.exists && !status.error) return status.mtime;
-    }
-    if (!render_clock_warned_) {
-        render_clock_warned_ = true;
-        std::cerr << "warning: could not stamp " << lock.generic_string()
-                  << "; edits made while a page renders may be missed by the next modified-mode build" << std::endl;
-    }
-    return std::nullopt;
-}
-
-ProjectInfo::RenderClockObservation ProjectInfo::classify_render_dependencies(
-        const std::set<std::string>& dependencies, const filesystem::DependencyTime& render_started) const {
-    // `render_started` is read back from the filesystem, so it shares the
-    // clock domain and granularity of dependency mtimes. Called once the page
-    // has rendered, before its outputs and post-build hooks are written:
-    // - stamped strictly later: modified while the page rendered; it may not
-    //   be what the page read, so the next build re-renders once (racy);
-    // - stamped in the same tick: ambiguous. It was either written before the
-    //   render started (e.g. by a pre-build hook or a prerequisite page) or
-    //   edited after it; a later edit in that tick is indistinguishable by
-    //   time from the page-info write, so its content hash is recorded and
-    //   decides instead of "mtime >= page-info mtime".
-    // Residual: an edit after the page read the file but within render
-    // start's tick, hashed here after the edit, is not detected.
-    RenderClockObservation observation;
-    for (const auto& dependency : dependencies) {
-        if (dependency == ".nift/project.fingerprint" || dependency == ".nift/hierarchy.fingerprint") continue;
-        const auto status = filesystem::dependency_status(root / dependency);
-        if (!status.exists || status.error) continue;
-        if (!(render_started >= status.mtime)) observation.racy.push_back(dependency);
-        else if (status.mtime >= render_started)
-            observation.tick_hashes[dependency] = tick_hash_value(status.mtime, filesystem::hash_path(root / dependency));
-    }
-    return observation;
 }
 
 // Runtime 2.0 CP02: dynamic reads observed while rendering. Each section is
@@ -1267,67 +1172,7 @@ void ProjectInfo::read_observation_reasons(const json::Document& document, std::
         reasons.push_back("environment changed");
 }
 
-// Runtime 2.0 CP01: modified-mode race records ("racy-dependencies" and
-// "tick-hashes") depend on timing, so they are kept out of page-info, whose
-// bytes must be reproducible (a clean rebuild reproduces init'd metadata;
-// BH6). They live in .nift/clock/<page-info path>, written only when
-// non-empty and removed otherwise.
-fs::path ProjectInfo::render_clock_path(const TrackedInfo& info) const {
-    const fs::path page_info = info_path(info).lexically_normal();
-    const fs::path meta = (root / ".nift").lexically_normal();
-    const fs::path below = page_info.lexically_relative(meta);
-    return meta / "clock" / below;
-}
-
-// Drop timing records of pages that are no longer tracked (manual edits of
-// tracked.json, renamed outputs), so .nift/clock stays bounded by the tracked
-// set. Runs only when a build has work to do, never on a no-op build.
-void ProjectInfo::prune_render_clock_records() const {
-    const fs::path clock_root = (root / ".nift" / "clock").lexically_normal();
-    std::error_code error;
-    if (!fs::is_directory(clock_root, error)) return;
-    std::unordered_set<std::string> keep;
-    keep.reserve(tracked.size());
-    for (const auto& info : tracked) keep.insert(render_clock_path(info).lexically_normal().generic_string());
-    std::vector<fs::path> stale;
-    for (fs::recursive_directory_iterator it(clock_root, fs::directory_options::skip_permission_denied, error), end;
-         !error && it != end; it.increment(error)) {
-        if (it->is_regular_file(error) && !keep.count(it->path().lexically_normal().generic_string()))
-            stale.push_back(it->path());
-    }
-    for (const auto& path : stale) filesystem::remove_owned_file(path);
-}
-
-bool ProjectInfo::write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const {
-    const fs::path path = render_clock_path(info);
-    std::error_code error;
-    // Outside modified mode the record has no meaning: remove any leftover.
-    if (config.incremental_mode != "modified") { fs::remove(path, error); return true; }
-    // In modified mode the record is always written, even when empty: its
-    // absence then means "lost or never written" and status rebuilds
-    // conservatively instead of trusting the page (it is correctness state).
-    static const RenderClockObservation none;
-    if (!render_clock) render_clock = &none;
-    std::string output = "{\n  \"racy-dependencies\": [";
-    for (std::size_t i = 0; i < render_clock->racy.size(); ++i) {
-        output += i ? ", \"" : "\"";
-        json::Document::append_escaped_string(output, render_clock->racy[i]);
-        output += "\"";
-    }
-    output += "],\n  \"tick-hashes\": {";
-    std::size_t i = 0;
-    for (const auto& [dependency, hash] : render_clock->tick_hashes) {
-        output += i++ ? ", \"" : "\"";
-        json::Document::append_escaped_string(output, dependency);
-        output += "\": \"" + hash + "\"";
-    }
-    output += "}\n}\n";
-    fs::create_directories(path.parent_path(), error);
-    return filesystem::write_file(path, output);
-}
-
 bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation,
-                                  const RenderClockObservation* render_clock,
                                   const ReadObservations* observed,
                                   const PageSiteRecord* site) const {
     const std::string content_name = relative(content_path(info));
@@ -1463,7 +1308,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     // Certification metadata uses the existing atomic readonly replacement.
     if (!filesystem::write_readonly_file(info_path(info), output)) return false;
     test_crash_point("page-info", info.name);
-    return write_render_clock_record(info, render_clock);
+    return true;
 }
 
 // D-020 per-page failure transaction. What one attempt did, so a failure can
@@ -1721,7 +1566,6 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     }
 
     const bool custom=info.build_hooks.count("build")||info.pipeline().discovered_hooks.count("build");
-    const std::optional<filesystem::DependencyTime> render_clock = stamp_render_clock();
     RenderResult result;
     PageSiteRecord site_record;
     if(custom){attempt.written_pages=1;if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
@@ -1741,7 +1585,6 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     if (!load_user_dependencies(info, result.dependencies, &result.error, &authoritative_sidecar)) { report_build_error(result.error, out_error); return false; }
     // Decide raciness now, before outputs and post-build hooks are written:
     // files Nift writes after rendering are not edits the render could miss.
-    const RenderClockObservation clock_observation = render_clock ? classify_render_dependencies(result.dependencies, *render_clock) : RenderClockObservation{};
 
     const fs::path output = output_path(info);
     const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -1875,7 +1718,7 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
         certificate_valid=current&&*current==authoritative_sidecar.bytes;
     }else certificate_valid=!filesystem::path_exists(sidecar_path);
     // Later hook changes suppress only the new certificate, preserving E2 behavior.
-    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, render_clock ? &clock_observation : nullptr, &result.observed, &site_record)) {
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr, &result.observed, &site_record)) {
         attempt.io_failure = true;
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
@@ -1924,8 +1767,6 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
         }
         return 0;
     }
-    prune_render_clock_records();
-
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
     std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-static_cast<long long>(config.build_threads)) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
     thread_count = std::max<std::size_t>(1, std::min(thread_count, jobs.size()));

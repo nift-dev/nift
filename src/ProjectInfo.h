@@ -63,9 +63,6 @@ public:
     std::filesystem::path output_path(const TrackedInfo& info) const;
     std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t page) const;
     std::filesystem::path info_path(const TrackedInfo& info) const;
-    // Runtime 2.0 CP01: per-page modified-mode timing record (correctness
-    // state, not reproducible metadata); see docs/runtime-2/incremental-state.md.
-    std::filesystem::path render_clock_path(const TrackedInfo& info) const;
     std::string relative(const std::filesystem::path& path) const;
     const std::string* read_shared_source(const std::filesystem::path& path) const;
     std::uint64_t observed_source_hash(const std::string* bytes) const;
@@ -218,26 +215,14 @@ private:
     struct SidecarObservation;
     bool cached_user_dependencies_match(const TrackedInfo& info, const json::Document& document) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr, SidecarObservation* observation = nullptr) const;
-    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name, const json::Document* tick_hashes = nullptr) const;
+    bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
     // Inputs are lexically normalized within one consumer dirty-check.
     bool metadata_path_is_safe(const std::filesystem::path& normalized, const std::filesystem::path& normalized_root) const;
     std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
     void invalidate_output_caches(const std::filesystem::path& path);
     void refresh_hash_once(const std::filesystem::path& dependency);
-    // Runtime 2.0 CP01: "now" in the filesystem's clock domain, taken just
-    // before each page renders (modified mode only).
-    std::optional<filesystem::DependencyTime> stamp_render_clock() const;
-    mutable std::mutex render_clock_mutex_;
-    mutable bool render_clock_warned_ = false;
-    struct RenderClockObservation {
-        std::vector<std::string> racy;                 // stamped after render start
-        std::map<std::string, std::string> tick_hashes; // stamped in render start's tick
-    };
-    RenderClockObservation classify_render_dependencies(const std::set<std::string>& dependencies,
-                                                        const filesystem::DependencyTime& render_started) const;
     bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr,
-                         const RenderClockObservation* render_clock = nullptr,
                          const ReadObservations* observed = nullptr,
                          const struct PageSiteRecord* site = nullptr) const;
     // feature-site-dx (review R1): warnings recorded in page metadata for
@@ -251,8 +236,6 @@ public:
     void print_outstanding_warning_summary(const std::set<std::string>& rebuilt) const;
 private:
     void append_read_observations(std::string& output, const ReadObservations& observed) const;
-    void prune_render_clock_records() const;
-    bool write_render_clock_record(const TrackedInfo& info, const RenderClockObservation* render_clock) const;
     void read_observation_reasons(const json::Document& document, std::vector<std::string>& reasons) const;
     mutable std::mutex listing_cache_mutex_;
     mutable std::unordered_map<std::string, std::string> listing_cache_;

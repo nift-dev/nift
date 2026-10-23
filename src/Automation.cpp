@@ -79,7 +79,6 @@ NiftOperationResult automation_untrack(ProjectInfo& project, const std::vector<s
             filesystem::remove_owned_file(project.content_path(value));
             filesystem::remove_owned_file(project.output_path(value));
             filesystem::remove_owned_file(project.info_path(value));
-            filesystem::remove_owned_file(project.render_clock_path(value));
             filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(value)));
         }
         project.tracked.erase(it);
