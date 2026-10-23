@@ -19,7 +19,7 @@ if "$NIFT_BIN" build >out.log 2>err.log; then
     exit 1
 fi
 grep -Fq 'templates/template.html:4:32' err.log
-grep -Fq '@path path must stay inside the Nift project: /assets/css/style.css' err.log
+grep -Fq "'/assets/css/style.css' is neither a tracked name nor a file that exists" err.log
 python3 - <<'PY'
 from pathlib import Path
 lines = Path('err.log').read_text().splitlines()
