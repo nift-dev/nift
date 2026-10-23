@@ -1418,6 +1418,7 @@ void orphan_after_group_destroy() {
         return tagged(tag).empty();
     }, milliseconds(4000));
     CHECK(gone);
+    runtime::reap_adopted_orphans();
     CHECK(no_zombies());
 }
 
@@ -1427,6 +1428,7 @@ void managed_pgid_cleanup() {
         auto g = start_ok(req({"/bin/true"}, OutputMode::Inherit, tag));
         g->wait();
     }
+    runtime::reap_adopted_orphans();
     CHECK(runtime::managed_pgid_count() == 0);
 }
 
