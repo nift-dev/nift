@@ -3110,3 +3110,8 @@ test-cp20-r1-flake: $(TARGET)
 	done; echo "PASS CP20 PTY suite 20/20"
 test-cp20-r1-windows: $(TARGET)
 	$(PYTHON) tests/cp20_windows_pipeline.py "$(CURDIR)/$(TARGET)" $(V44_SKIP_77)
+# CP20 R3 certification integration (after the CP16 rebase): required CP20
+# suites/mutants are Runtime 2.0 gates; the Windows probe is a CI target whose
+# POSIX run exits 77 and is skipped by $(V44_SKIP_77).
+CERTIFY_RUNTIME2_GATES += test-cp20-shell-spawn test-cp20-shell-spawn-mutants test-cp20-r1 test-v45-native-runtime
+CERTIFY_CI_TARGETS += test-cp20-r1-windows

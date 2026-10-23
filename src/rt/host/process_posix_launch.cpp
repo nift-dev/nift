@@ -305,7 +305,7 @@ void read_stage_reports(Launch& l) {
     for (const auto& [i, fd] : l.reports) {
         int payload[3] = {0, 0, 0};
         const std::size_t got = read_payload(fd, payload, sizeof payload);
-#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT != 11
+#if !defined(NIFT_CP20_MUTANT) || NIFT_CP20_MUTANT != 11
         ::close(fd);
 #endif
         if (got != sizeof payload || i >= l.s.st.size()) continue;
