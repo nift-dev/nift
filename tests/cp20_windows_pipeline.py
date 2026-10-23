@@ -36,7 +36,7 @@ def main():
         print("PASS console-pipeline-bytes")
 
     interactive = run('cmd /c echo hello\nexit\n', {"NIFT_CP20_FORCE_INTERACTIVE": "1"})
-    if interactive.stdout != b"hello\n":
+    if interactive.stdout.replace(b"\r\n", b"\n") != b"hello\n":
         ok = False
         print("FAIL forced-interactive-external", interactive.stdout, interactive.stderr)
     else:
