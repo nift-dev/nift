@@ -382,7 +382,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         }
     } timer_operation{*this,begin_timer_operation()};
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
-    active_diagnostic_.reset();active_recoverable_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!resource_path_authority_.filesystem_root.empty()||true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    active_diagnostic_.reset();active_recoverable_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=!resource_path_authority_.filesystem_root.empty(); strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so
