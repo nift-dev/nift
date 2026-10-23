@@ -144,7 +144,6 @@ def main():
             except (OSError, ValueError):
                 pass
         check("script-bg-state", not stopped, f"stopped_children={stopped}")
-        subprocess.run(["/bin/true"], check=False)
         proc.kill(); proc.wait(timeout=5)
 
     # Genuine zombie/never-reaped check (scripted Host background path).
