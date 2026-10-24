@@ -308,16 +308,11 @@ VmResult Vm::run(std::string& output) {
     OP(ObjectLookupValue) OP(IterMissing) {
         if (!op_iter(*pc, R, proto, fault)) FAIL();
         NEXT(); }
-    OP(Return) {
-        if (pc->a != 0) R[0] = R[pc->a];
-        RETURN_TO_CALLER
-    }
+    OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
-        if (!op_top_return(*pc, R, result, fault)) FAIL();
-        if (!pop_handlers_for_frame(0, fault)) FAIL();
-        goto done;
-    }
+        if (!op_top_return(*pc, R, result, fault) || !pop_handlers_for_frame(0, fault)) FAIL();
+        goto done; }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
     OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }
