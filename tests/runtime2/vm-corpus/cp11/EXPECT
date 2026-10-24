@@ -31,7 +31,7 @@ fallback_shebang_mid.f fallback shebang-statement
 # CP12b structs compile (instances used only as receivers, compiler_structs.cpp).
 fallback_struct.f vm
 fallback_trailing_comma.f prevalidated
-fallback_try.f fallback statement:Try
+fallback_try.f vm 
 functions.f vm 
 kernels.f vm 
 logic.f vm 

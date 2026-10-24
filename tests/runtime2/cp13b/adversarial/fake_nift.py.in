@@ -40,7 +40,7 @@ stats_path = os.environ.get("NIFT_VM_STATS")
 r = row(); outcome = r[0]
 st = {"nift_vm": 1, "outcome": outcome, "reason": "", "vm_executions": 1,
       "legacy_executions": 0, "catchable": False, "heap_peak": 1000,
-      "heap_live": 100, "code": ""}
+      "heap_live": 100, "code": "", "error_origin": False}
 if outcome.startswith("fallback:"):
     st.update(outcome="fallback", reason=outcome.split(":", 1)[1],
               vm_executions=0, legacy_executions=1)

@@ -140,21 +140,6 @@ CASES = [
         "item0_column": 1,
         "module_paths": {"m.nft"},
     },
-    {
-        # CP12C slice 2: `for` now compiles, so this used to lose its first
-        # blocker. `try` remains unimplemented and still has a later blocker.
-        "name": "later-main-blocker",
-        "files": {
-            "main.f": 'import("m.nft")\ntry { print(1) } catch(e) { print(e) }\n',
-            "m.nft": "x := 1\nexport(x)\n",
-        },
-        "first": "statement:Try",
-        "certain": {"statement:Try"},
-        "later": ["unresolved-name"],
-        "complete": True,
-        "item0_line": 2,
-        "item0_column": 1,
-    },
 ]
 
 

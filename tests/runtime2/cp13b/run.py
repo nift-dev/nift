@@ -287,6 +287,10 @@ def evaluate_future(legacy, vm, name, outcome, policy_ids, checks, env):
     st = vm.stats
     actual = st.get("outcome")
     problems = []
+    if "error_origin" not in st:
+        problems.append("statistics missing error_origin")
+    elif not isinstance(st["error_origin"], bool):
+        problems.append(f"error_origin {st['error_origin']!r} is not a bool")
     checks = {c.strip() for c in (checks or "").split(",") if c.strip()}
     if outcome.startswith("fallback:"):
         expected_reason = outcome.split(":", 1)[1]
@@ -448,7 +452,7 @@ def selftest():
     legacy = Result("start\n", recursion.decode(), 1, None, [], [])
     vm_stats = {"outcome": "vm", "vm_executions": 1, "legacy_executions": 0,
                 "beyond_legacy_depth": True, "catchable": False,
-                "heap_peak": 0, "heap_live": 0}
+                "heap_peak": 0, "heap_live": 0, "error_origin": False}
     vm = Result("start\n", "", 0, vm_stats, [], [])
     ev = evaluate_future(legacy, vm, "nested_rethrow", "vm", "D-001#4", "", {})
     assert ev.executed and not ev.problems, (ev.problems, ev.executed)
@@ -480,7 +484,8 @@ def selftest():
 
     def limit_stats(outcome):
         return {"outcome": outcome, "vm_executions": 1, "legacy_executions": 0,
-                "catchable": False, "heap_peak": 7999000, "heap_live": 1000}
+                "catchable": False, "heap_peak": 7999000, "heap_live": 1000,
+                "error_origin": False}
 
     limit_cases = [
         ("E1-style fault fabricated catchable, caught",
