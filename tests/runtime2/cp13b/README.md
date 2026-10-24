@@ -14,6 +14,7 @@ python3 tests/runtime2/cp13b/run.py --nift ./nift --oracle ./nift --mutant N
 python3 tests/runtime2/cp13b/run.py --nift ./nift --oracle ./nift --checked-mutant N
 python3 tests/runtime2/cp13b/run.py --nift ./nift --oracle ./nift --asan-mutant N
 bash   tests/runtime2/cp13b/harness_selftest.sh ./nift
+python3 tests/runtime2/cp13b/nullable_error_presentation.py --nift ./nift --switch-nift ./.build/nift-switch
 python3 tests/runtime2/cp13b/stress/stress.py --nift ./nift --prepare
 bash   tests/runtime2/cp13b/stress/run_error_lifecycle.sh
 python3 tests/runtime2/cp13b/mutant_build.py --root . --dry-run

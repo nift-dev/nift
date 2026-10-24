@@ -45,6 +45,24 @@ included), `test-rt-vm`, Host/CP16 N1 and read-limit tests, `rt-diff` 820
 entries, warnings, lint and test integrity. See the evidence package for the
 exact logs and identities.
 
+## R1 focused corrections
+
+Codex's independent review found three bounded defects; R1 fixes only these:
+
+- `ErrorJson` now renders a null receiver as `null`, covering nullable
+  `Error.cause` for `stringify`/`prettify`/`highlight` while keeping the
+  Error-only contract for other kinds.
+- `SourceMap` builds all module tables in local storage and publishes them by
+  move only after the whole build succeeds; a failed `call_once` initialization
+  can retry without duplicated or shifted tables.
+- `make_system_error` and `clone_error_with_origin` hold each `ErrorObject` in
+  a `unique_ptr` until all throwing initialization and heap accounting are
+  complete, then transfer ownership through `Value::adopt`. OOM remains fatal.
+
+Regressions: `tests/runtime2/cp13b/nullable_error_presentation.py`,
+`tests/rt/source_map_retry_unit.cpp` and `tests/rt/error_oom_unit.cpp`
+(including ASan/LSan/UBSan and concurrent retry readers).
+
 ## Outstanding
 
 CP22 must supply the integration test that an awaited Error equals the
