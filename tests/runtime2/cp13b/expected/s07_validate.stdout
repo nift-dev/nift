@@ -1,0 +1,4 @@
+schema.rejected
+schema
+validate: at $: expected string, received number
+2:8

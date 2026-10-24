@@ -1,0 +1,6 @@
+outer reason
+user.app.failed
+user
+inner reason
+user.raised
+{"message":"outer reason","code":"user.app.failed","category":"user","source":"","line":0,"column":0,"cause":{"message":"inner reason","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}}

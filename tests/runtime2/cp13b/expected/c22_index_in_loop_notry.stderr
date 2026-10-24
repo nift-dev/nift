@@ -1,0 +1,1 @@
+error: $ROOT/c22_index_in_loop_notry.f:4:9: JSON array index 1 is out of range in 'a[i]'

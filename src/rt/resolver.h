@@ -46,6 +46,7 @@ struct Binding {
     // binding is an upvalue (index into the running closure's cells).
     bool cell = false;
     bool upvalue = false;
+    bool readonly = false;  // CP13B: a catch binding (body-scoped, never assigned)
     std::uint16_t cell_reg = 0;
     std::uint16_t upvalue_index = 0;
     // CP12C slice 2 lazy `for` read binding (array single form).

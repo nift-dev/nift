@@ -26,6 +26,7 @@ namespace nift::rt {
 
 struct Fault {
     StopReason reason = StopReason::None;
+    Value error;  // Kind::Error payload iff reason == Error && catchable (C1)
     std::string message;
     // Set by an arithmetic slow path that met a number legacy calls large
     // (or a result out of range); the VM counts it and clears it (evidence

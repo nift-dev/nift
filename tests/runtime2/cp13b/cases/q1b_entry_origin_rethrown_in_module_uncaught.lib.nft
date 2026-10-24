@@ -1,0 +1,9 @@
+fn(rethrow(value)) {
+  throw value
+}
+fn(make_and_throw(msg)) {
+  e := error(msg)
+  throw e
+}
+export(rethrow)
+export(make_and_throw)

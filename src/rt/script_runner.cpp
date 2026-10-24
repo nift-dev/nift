@@ -10,6 +10,7 @@
 #include "rt/opcodes.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
+#include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
 
@@ -51,6 +52,7 @@ struct Stats {
     std::string path;
     std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
     bool catchable = false;  // vm-error: legacy raises it as a catchable Error
+    bool error_origin = false;  // vm-error: the stop carries an Error origin
     std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
     std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
 };
@@ -78,6 +80,7 @@ void report(const Stats& s) {
          << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
          << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false")
          << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false")
+         << ",\"error_origin\":" << (s.error_origin ? "true" : "false")
          << ",\"heap_bytes\":" << s.heap_bytes;
     const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
         line << ",\"" << name << "\":[";
@@ -319,6 +322,12 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     VmOptions options;
     limits_from_environment(options);
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
+    // CP13B: own the source positions beside the linked unit; the map is
+    // destroyed before its borrowed link (declaration order below).
+    const SourceMap source_map = link.linked
+        ? SourceMap::linked(link, source_path.generic_string(), source)
+        : SourceMap::single(source_path.generic_string(), source);
+    options.source_map = &source_map;
     // From here on the unit runs on the VM and only on the VM: whatever
     // happens, the legacy engine never runs it (engine selection is final).
     stats.executions = 1;
@@ -353,7 +362,13 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         exit_code = 0;
         return true;
     }
-    locate_linked(result.offset);
+    if (result.error_origin) {
+        report_path = result.origin_source;
+        stats.line = result.origin_line;
+        stats.column = result.origin_column;
+    } else {
+        locate_linked(result.offset);
+    }
     if (result.reason == StopReason::Error) {
         // A program error, in legacy's format, at the failing expression;
         // while a module initialises, legacy prefixes `import: ` per level.

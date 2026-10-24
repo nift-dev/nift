@@ -1,0 +1,1 @@
+error: $ROOT/uncatchable_frame_budget.f:3:5: callable recursion depth exceeded: recurse

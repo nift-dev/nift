@@ -32,7 +32,9 @@ bool UnitCompiler::begin(std::string name, NodeId body, const std::unordered_set
     scopes_ = Scopes();
     scopes_.push();
     loops_.clear();
+    try_scopes_.clear();
     loop_depth_ = 0;
+    error_call_offset_ = kNoNode;
     textual_statement_ = false;
     call_args_ = 0;
     index_depth_ = 0;
@@ -131,6 +133,8 @@ bool UnitCompiler::statement(NodeId id) {
         case NodeKind::For: ok = for_loop(node); break;
         case NodeKind::Return: ok = return_statement(node); break;
         case NodeKind::Break: case NodeKind::Continue: ok = loop_jump(node); break;
+        case NodeKind::Try: ok = try_statement(node); break;
+        case NodeKind::Throw: ok = throw_statement(node); break;
         default: ok = fail(node, std::string("statement:") + node_kind_name(node.kind)); break;
     }
     if (ok && unpreparable) ok = fail(node, "prepared-unpreparable");
@@ -180,6 +184,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     update_flags();
     Loop loop;
     loop.start = fb_->here();
+    loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
     bool ok = false_jump(node.a, exits);
@@ -207,7 +212,12 @@ bool UnitCompiler::while_loop(const Node& node) {
 }
 
 bool UnitCompiler::return_statement(const Node& node) {
+    const auto end_tries = [this, &node] {
+        fb_->set_offset(node.begin);
+        for (std::size_t k = 0; k < try_scopes_.size(); ++k) fb_->emit(OpCode::TryEnd);
+    };
     if (node.flags & kFlagBare || node.a == kNoNode) {
+        end_tries();
         fb_->emit(in_function_ ? OpCode::ReturnNull : OpCode::Halt);
         return true;
     }
@@ -224,6 +234,7 @@ bool UnitCompiler::return_statement(const Node& node) {
     return_read_offset_ = saved_return_offset;
     fb_->set_flags(saved_flags);
     if (!value_ok) return false;
+    end_tries();
     fb_->set_offset(node.begin);
     fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
     return true;
@@ -231,6 +242,9 @@ bool UnitCompiler::return_statement(const Node& node) {
 
 bool UnitCompiler::loop_jump(const Node& node) {
     if (loops_.empty()) return fail(node, "jump-outside-loop");
+    fb_->set_offset(node.begin);
+    const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
+    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd);
     const std::size_t at = fb_->emit(OpCode::Jmp);
     if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
     else loops_.back().continues.push_back(at);

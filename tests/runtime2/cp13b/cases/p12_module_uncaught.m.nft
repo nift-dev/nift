@@ -1,0 +1,12 @@
+fn(mk(msg)) {
+  return error(msg)
+}
+fn(boom(msg)) {
+    throw error(msg)
+}
+fn(rethrow(value)) {
+  throw value
+}
+export(mk)
+export(boom)
+export(rethrow)

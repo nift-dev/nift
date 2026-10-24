@@ -129,7 +129,7 @@ bool block_falls_through(const Ast& ast, NodeId block) {
     const Node& b = ast.at(block);
     if (b.count == 0) return true;
     const Node& last = ast.at(ast.list(b)[b.count - 1]);
-    if (last.kind == NodeKind::Return) return false;
+    if (last.kind == NodeKind::Return || last.kind == NodeKind::Throw) return false;
     if (last.kind == NodeKind::If) return if_falls(ast, ast.list(b)[b.count - 1]);
     return true;
 }

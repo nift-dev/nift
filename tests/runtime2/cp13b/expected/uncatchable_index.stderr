@@ -1,0 +1,1 @@
+error: $ROOT/uncatchable_index.f:3:9: JSON array index 3 is out of range in 'a[3]'

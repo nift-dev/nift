@@ -1,0 +1,124 @@
+{
+  "1": {
+    "id": "E1",
+    "mutant": "turns a non-catchable fault into a fabricated catchable Error (single catch point)",
+    "decision": "C1/D7",
+    "status": "PENDING-PHASE-B",
+    "cases": [
+      "uncatchable_index.f",
+      "throw_non_error.f",
+      "s13_global_take_index.f",
+      "host_fatal_uncatchable.f",
+      "c24_sha_dir_fatal.f"
+    ],
+    "why": {
+      "uncatchable_index.f": "array index fault inside try must stay fatal",
+      "throw_non_error.f": "non-Error throw is a malformed-program fault, never caught",
+      "s13_global_take_index.f": "index fault inside a taken global must not be caught; the null-global hazard",
+      "host_fatal_uncatchable.f": "fatal Host argument error (CP16)",
+      "c24_sha_dir_fatal.f": "genuine HostStatus::Fatal (CP16)"
+    },
+    "controls": [
+      "s07_validate.f",
+      "validate_uncaught.f",
+      "s13_global_push_throw.f"
+    ]
+  },
+  "2": {
+    "id": "E2",
+    "mutant": "leaves a stale handler after break/return (TryEnd does not pop)",
+    "decision": "D4/C5",
+    "status": "PENDING-PHASE-B",
+    "cases": ["s08_stale_break_release.f"],
+    "why": {
+      "s08_stale_break_release.f": "a break out of a try in a function leaves a stale handler that would catch the caller's unprotected throw"
+    },
+    "checked_cases": ["stale_handler_after_return.f", "return_through_nested_try.f"],
+    "controls": ["s06_break_in_catch.f"]
+  },
+  "3": {
+    "id": "E3",
+    "mutant": "lets the catch binding escape its lexical scope",
+    "decision": "CP13B catch scope/H5",
+    "status": "PENDING-PHASE-B",
+    "cases": ["catch_binding_scope.f"],
+    "why": {
+      "catch_binding_scope.f": "the VM must refuse (unresolved-name); the mutant executes the use after catch"
+    },
+    "fallback_reason": "unresolved-name"
+  },
+  "4": {
+    "id": "E4",
+    "mutant": "restamps the throw site on rethrow (loses the first origin)",
+    "decision": "D5/D2",
+    "status": "PENDING-PHASE-B",
+    "cases": [
+      "rethrow_origin.f",
+      "rethrow_origin_cause.f"
+    ],
+    "why": {
+      "rethrow_origin.f": "rethrows an already-stamped Error; the mutant prints the rethrow location",
+      "rethrow_origin_cause.f": "rethrows a stamped Error with a cause; origin and cause must survive"
+    }
+  },
+  "5": {
+    "id": "E5",
+    "mutant": "catches fatal Host errors (ignores the CP16 fatal/recoverable split)",
+    "decision": "C3/D7/Q8",
+    "status": "PENDING-PHASE-B",
+    "requires_cp16": true,
+    "cases": [
+      "c24_sha_dir_fatal.f",
+      "host_fatal_uncatchable.f"
+    ],
+    "why": {
+      "c24_sha_dir_fatal.f": "sha256_file(directory) is HostStatus::Fatal and must not be caught",
+      "host_fatal_uncatchable.f": "sleep argument error is fatal and must not be caught"
+    }
+  },
+  "6": {
+    "id": "E6",
+    "mutant": "selects the wrong handler (outside-in search)",
+    "decision": "D4/D6",
+    "status": "PENDING-PHASE-B",
+    "cases": [
+      "nested_rethrow.f",
+      "s22_two_live_handlers.f"
+    ],
+    "why": {
+      "nested_rethrow.f": "inner and outer catches print different messages; inside-out selects inner",
+      "s22_two_live_handlers.f": "two handlers are live at the first throw and their catches print different text"
+    }
+  },
+  "7": {
+    "id": "E7",
+    "mutant": "does not restore closure_ after unwinding",
+    "decision": "R3/C4",
+    "status": "PENDING-PHASE-B",
+    "cases": [
+      "closure_throw_restore.f",
+      "closure_throw_restore_callvalue.f"
+    ],
+    "why": {
+      "closure_throw_restore.f": "bad captures tag at upvalue 0 and the catcher lists msg at upvalue 0; a stale closure prints after WRONG",
+      "closure_throw_restore_callvalue.f": "the catching frame is a closure reached through CallValue; same wrong-value signal"
+    },
+    "asan_cases": ["closure_throw_restore_temp.f"]
+  },
+  "8": {
+    "id": "E8",
+    "mutant": "stamps a shared Error in place (mutates the binding or another reference)",
+    "decision": "D5/D2",
+    "status": "PENDING-PHASE-B",
+    "cases": [
+      "p04_same_thrown_twice.f",
+      "p05_shared.f",
+      "p14_equality.f"
+    ],
+    "why": {
+      "p04_same_thrown_twice.f": "two throws of the same unoriginated binding must stamp two sites while the binding stays 0:0",
+      "p05_shared.f": "the caught copy has an origin, the shared binding still has 0",
+      "p14_equality.f": "value equality includes the origin; in-place mutation changes comparisons"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+a [] 0:0
+boom [$ROOT/m.nft] 5:5
+rethrow-unoriginated [$ROOT/m.nft] 8:3
+rethrow-originated [$ROOT/p11_module.f] 11:7

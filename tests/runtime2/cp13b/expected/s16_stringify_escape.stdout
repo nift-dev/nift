@@ -1,0 +1,10 @@
+{"message":"quote \" backslash \\ tab \t nl \n uni é ctl u0001","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}
+{
+  "message": "quote \" backslash \\ tab \t nl \n uni é ctl u0001",
+  "code": "user.raised",
+  "category": "user",
+  "source": "",
+  "line": 0,
+  "column": 0,
+  "cause": null
+}

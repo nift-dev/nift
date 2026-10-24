@@ -29,6 +29,7 @@ bool UnitCompiler::for_loop(const Node& node) {
     if (!for_prepare_bindings(state, node)) return false;
     Loop loop;
     loop.start = state.loop_start;
+    loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     if (!for_step(state)) return false;
     if (!for_emit_body(state)) return false;

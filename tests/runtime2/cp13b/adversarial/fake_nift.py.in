@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+# Fake nift for adversarial harness tests. MODE, TESTDIR and MUTANT are baked
+# in by selftest.py. Legacy mode replays the goldens; VM mode emulates a
+# correct implementation according to EXPECT_FUTURE.tsv, then injects MODE.
+import json, os, signal, sys, time
+MODE = "__MODE__"
+T = "__TESTDIR__"
+MUTANT = int("__MUTANT__")
+name = sys.argv[1][:-2] if sys.argv[1].endswith(".f") else sys.argv[1]
+
+def golden(stream):
+    p = f"{T}/expected/{name}.{stream}"
+    return open(p).read() if os.path.exists(p) else ""
+
+def row():
+    for line in open(f"{T}/EXPECT_FUTURE.tsv"):
+        if line.startswith("#") or not line.strip():
+            continue
+        parts = line.rstrip("\n").split("\t")
+        if parts[0] == name:
+            return parts[1:]
+    return ["vm"]
+
+def spec():
+    return json.load(open(f"{T}/MUTANTS.json")).get(str(MUTANT), {})
+
+def stems(key):
+    return {c[:-2] if c.endswith(".f") else c for c in spec().get(key, [])}
+
+def emit(out, err, rc):
+    sys.stdout.write(out); sys.stderr.write(err)
+    sys.stdout.flush(); sys.stderr.flush()
+    sys.exit(rc)
+
+out, err, rc = golden("stdout"), golden("stderr"), int(golden("exit").strip() or 0)
+vm = os.environ.get("NIFT_VM", "0")
+if vm == "0":
+    emit(out, err, rc)
+stats_path = os.environ.get("NIFT_VM_STATS")
+r = row(); outcome = r[0]
+st = {"nift_vm": 1, "outcome": outcome, "reason": "", "vm_executions": 1,
+      "legacy_executions": 0, "catchable": False, "heap_peak": 1000,
+      "heap_live": 100, "code": ""}
+if outcome.startswith("fallback:"):
+    st.update(outcome="fallback", reason=outcome.split(":", 1)[1],
+              vm_executions=0, legacy_executions=1)
+elif outcome == "limit":
+    st.update(outcome="internal-error", reason="memory budget exceeded",
+              heap_peak=8000000 - 100)
+    out, err, rc = "", "error: x: memory budget exceeded\n", 70
+
+required = stems("cases")
+controls = stems("controls")
+checked = stems("checked_cases")
+asan = stems("asan_cases")
+nonreq = "try_in_loop"
+
+if MODE == "detect_req":
+    if name in required:
+        out += "mutated\n"
+elif MODE.startswith("fallback_exec_") and name == "catch_binding_scope":
+    # R2-1: the designated fallback case unexpectedly executes and exits with a
+    # status in 2..69 while carrying valid VM evidence.
+    st.update(outcome="vm", vm_executions=1, legacy_executions=0)
+    out += "mutated\n"
+    rc = int(MODE.rsplit("_", 1)[1])
+elif MODE == "detect_control":
+    if name in controls:
+        out += "mutated-control\n"
+elif MODE == "fallback_all":
+    st.update(outcome="fallback", reason="statement:Try", vm_executions=0, legacy_executions=1)
+elif MODE == "refuse_all":
+    st.update(outcome="require-error", reason="statement:Try", vm_executions=0, legacy_executions=0)
+    out, err, rc = "", "error: refused\n", 1
+elif MODE == "nostats":
+    stats_path = None
+elif MODE == "malformed":
+    with open(stats_path, "a") as f: f.write("{not json\n")
+    emit(out, err, rc)
+elif MODE == "missing_exec_field":
+    del st["vm_executions"]; out += "mutated\n"
+elif MODE == "both_engines":
+    st["legacy_executions"] = 1; out += "mutated\n"
+elif MODE in ("crash_after", "asan_after"):
+    if name in required:
+        if stats_path:
+            with open(stats_path, "a") as f: f.write(json.dumps(st) + "\n")
+        if MODE == "crash_after":
+            sys.stdout.write(out); sys.stdout.flush()
+            os.kill(os.getpid(), signal.SIGSEGV)
+        err += "==1==ERROR: AddressSanitizer: heap-use-after-free on address 0x1\n"
+        rc = 1
+    else:
+        if stats_path:
+            with open(stats_path, "a") as f: f.write(json.dumps(st) + "\n")
+        emit(out, err, rc)
+elif MODE == "exit70_after" and name in required:
+    if stats_path:
+        with open(stats_path, "a") as f: f.write(json.dumps(st) + "\n")
+    err += "NIFT_VM internal failure: bytes\n"
+    rc = 70
+elif MODE == "nonreq_harness" and name == nonreq:
+    stats_path = None
+elif MODE == "nonreq_fallback" and name == nonreq:
+    st.update(outcome="fallback", reason="statement:Try", vm_executions=0, legacy_executions=1)
+elif MODE == "timeout" and name == nonreq:
+    time.sleep(30)
+elif MODE == "checked_stale" and name in checked:
+    st.update(outcome="internal-error", reason="stale exception handler")
+    rc = 70
+elif MODE == "checked_wrong" and name in checked:
+    st.update(outcome="internal-error", reason="some other internal error")
+    rc = 70
+elif MODE == "asan_uaf" and name in asan:
+    err += "==1==ERROR: AddressSanitizer: heap-use-after-free in op_get_upvalue\n"
+    rc = 1
+elif MODE == "asan_clean" and name in asan:
+    rc = 0
+
+if stats_path:
+    with open(stats_path, "a") as f: f.write(json.dumps(st) + "\n")
+emit(out, err, rc)

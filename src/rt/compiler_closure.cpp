@@ -86,6 +86,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     std::vector<std::string_view> upvalue_names;
     std::vector<NodeId> upvalue_decls;
     std::vector<bool> upvalue_loop;
+    std::vector<bool> upvalue_readonly;
     for (std::string_view name : names) {
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
@@ -105,12 +106,14 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         upvalue_names.push_back(name);
         upvalue_decls.push_back(binding->decl_node);
         upvalue_loop.push_back(binding->loop_binding);
+        upvalue_readonly.push_back(binding->readonly);
     }
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
     lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(upvalue_decls),
-                                       std::move(upvalue_loop), std::move(captures)});
+                                       std::move(upvalue_loop), std::move(upvalue_readonly),
+                                       std::move(captures)});
     const LambdaTask& task = lambda_tasks_.back();
     const std::uint16_t mark = fb_->top();
     std::uint16_t base = 0;
@@ -167,6 +170,7 @@ bool UnitCompiler::lambda_upvalues(const LambdaTask& task) {
         binding.upvalue_index = k;
         binding.decl_node = task.upvalue_decls[k];
         binding.loop_binding = task.upvalue_loop[k];
+        binding.readonly = task.upvalue_readonly[k];
         binding.typed = true;
         binding.decl_kinds = static_cast<KindSet>(kKindAll | kKindUnknown);
         if (binding.loop_binding) {
@@ -187,6 +191,8 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     auto saved_fb = std::move(fb_);
     const Scopes saved_scopes = scopes_;
     const std::vector<Loop> saved_loops = loops_;
+    const std::vector<int> saved_try_scopes = try_scopes_;
+    const std::uint32_t saved_error_call_offset = error_call_offset_;
     const std::unordered_set<std::string_view> saved_assigned = assigned_;
     const bool saved_in_function = in_function_;
     const bool saved_in_lambda = in_lambda_;
@@ -305,6 +311,8 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     fb_ = std::move(saved_fb);
     scopes_ = saved_scopes;
     loops_ = saved_loops;
+    try_scopes_ = saved_try_scopes;
+    error_call_offset_ = saved_error_call_offset;
     assigned_ = saved_assigned;
     in_function_ = saved_in_function;
     in_lambda_ = saved_in_lambda;

@@ -2,6 +2,8 @@
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
+#include "rt/error.h"
+#include "rt/heap.h"
 #include "rt/cell.h"
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
@@ -45,10 +47,22 @@ void Vm::note_large(const Instr* pc, Fault& fault) {
     if (operand) record(derived_lines_);
 }
 
+std::uint32_t Vm::report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const {
+    std::uint32_t offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
+    if ((pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
+        fault.message.rfind("reference target no longer exists: ", 0) == 0)
+        offset = selector_offset(offset);
+    if (fault.use_call_site) offset = main_offset(offset);
+    MUTATE_ERROR_OFFSET(offset)
+    return offset;
+}
+
 void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const {
     fault_into(result, fault);
     constexpr char kRecursion[] = "callable recursion depth exceeded";
     const bool recursion = result.message.rfind(kRecursion, 0) == 0;
+    const bool uncaught_error = fault.reason == StopReason::Error && fault.catchable && fault.error.is(Kind::Error);
+    if (uncaught_error) result.message = fault.error.heap_as<ErrorObject>()->message;
     if (fault.reason == StopReason::Error && !recursion) {
         bool in_expression_lambda = closure_ != nullptr && closure_->is_lambda && closure_->expression_body;
         for (const Frame& frame : frames_)
@@ -62,24 +76,31 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
                            (pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
                            fault.message.rfind("reference target no longer exists: ", 0) == 0;
         bool in_lambda = closure_ != nullptr && closure_->is_lambda;
+        std::size_t error_returns = 0;
         for (const Frame& frame : frames_) {
             return_call = return_call || frame.return_call;
             in_lambda = in_lambda || (frame.closure != nullptr && frame.closure->is_lambda);
+            if (frame.return_call) ++error_returns;
         }
-        if (return_call && in_lambda && result.message.rfind("return: ", 0) != 0)
+        if (uncaught_error) {
+            for (std::size_t k = 0; k < error_returns; ++k) result.message = "return: " + result.message;
+        } else if (return_call && in_lambda && result.message.rfind("return: ", 0) != 0) {
             result.message = "return: " + result.message;
+        }
     }
-    result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
-    if ((pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
-        fault.message.rfind("reference target no longer exists: ", 0) == 0)
-        result.offset = selector_offset(result.offset);
-    if (fault.use_call_site) result.offset = main_offset(result.offset);
-    MUTATE_ERROR_OFFSET(result.offset)
+    if (uncaught_error) {
+        const auto* error = fault.error.heap_as<ErrorObject>();
+        result.error_origin = !error->source.empty() && error->line != 0 && error->column != 0;
+        result.origin_source = result.error_origin ? error->source : std::string();
+        result.origin_line = result.error_origin ? static_cast<std::uint32_t>(error->line) : 0;
+        result.origin_column = result.error_origin ? static_cast<std::uint32_t>(error->column) : 0;
+    }
+    result.offset = report_offset(fault, proto, pc);
     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)
     result.error_in_loop_path = in_loop_path(pc);
 }
 
-bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
+bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& output, Fault& fault) {
     for (std::uint16_t k = 0; k < in.c; ++k)
         if (is_cell(R[in.a + k])) return internal(fault, "cell reached a native");
     switch (static_cast<NativeId>(in.b)) {
@@ -93,10 +114,11 @@ bool Vm::native(const Instr& in, Value* R, std::string& output, Fault& fault) {
             return true;
         }
     }
-    return builtin(in, R, fault);  // CP14 built-ins (vm_builtin.cpp); reports an unknown id
+    return builtin(in, proto, R, fault);  // CP14 built-ins; reports an unknown id
 }
 
-bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault) {
+bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, const Value* K,
+              std::string& output, Fault& fault) {
     Value out;
     switch (in.op) {
         case OpCode::Nop: return true;
@@ -105,7 +127,7 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
         case OpCode::Truth: out = Value::boolean(truth(R[in.b])); break;
         case OpCode::Neg: if (!negate_slow(in, R[in.b], out, fault)) return false; break;
         case OpCode::Pos: if (!positive_slow(R[in.b], out, fault)) return false; break;
-        case OpCode::CallNative: return native(in, R, output, fault);
+        case OpCode::CallNative: return native(in, proto, R, output, fault);
         case OpCode::NewArray:
             out = make_array(in.c);
             for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);

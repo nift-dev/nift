@@ -53,6 +53,7 @@ private:
         std::size_t start = 0;
         std::vector<std::size_t> breaks;
         std::vector<std::size_t> continues;  // patched after the body (For) or to start (While)
+        std::size_t try_depth = 0;           // CP13B: try scopes active at loop entry
     };
 
 public:
@@ -68,6 +69,7 @@ public:
         std::vector<std::string_view> upvalue_names;
         std::vector<NodeId> upvalue_decls;
         std::vector<bool> upvalue_loop;
+        std::vector<bool> upvalue_readonly;
         std::vector<Capture> captures;
     };
 
@@ -90,6 +92,9 @@ private:
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
     bool while_loop(const Node& node);
+    bool try_statement(const Node& node);
+    bool throw_statement(const Node& node);
+    bool error_new(const Node& node, std::uint16_t dst);
     // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
     bool for_loop(const Node& node);
@@ -335,6 +340,9 @@ private:
     Scopes scopes_;
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;
+    std::vector<int> try_scopes_;  // CP13B: loop depth at each active try entry
+    std::uint32_t error_call_offset_ = kNoNode;  // `throw error(...)`: report the throw
+    std::uint32_t error_call_offset_saved_ = kNoNode;
 
     bool in_function_ = false;
     bool in_lambda_ = false;

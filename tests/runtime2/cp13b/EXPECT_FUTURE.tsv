@@ -1,0 +1,104 @@
+# CP13B future-mode expectations on the integrated runtime-2 baseline.
+#
+# outcome:
+#   vm                genuine VM execution (vm_executions = 1), program completes
+#   vm-error          genuine VM execution, program error (exit 1)
+#   fallback:<reason> the VM refuses the unit statically while legacy EXECUTES
+#                     it (a run-time or compile diagnostic in legacy). The exact
+#                     VM refusal reason is pinned; vm_executions = 0 and the
+#                     output must equal legacy. `statement:Try`,
+#                     `statement:Throw` and `callable:error` are never accepted.
+#   limit             an uncatchable resource-limit stop (D7), proved from the
+#                     outcome, exit, diagnostic and heap statistics.
+#
+# policies: comma-separated short ids mapped to vm_policies.POLICIES:
+#   D-001#4  -> "D-001#4 recursion"
+#   D-018c   -> "D-018c diagnostics"
+#   -        exact match with legacy.
+# Nothing else is an approved difference.
+#
+# env: optional `NAME=VALUE;NAME=VALUE` applied only to the VM run.
+# checks: `uncatchable` requires catchable=false; `cp16` marks a fixture that
+#   needs CP16 integration (expected incomplete before then).
+#
+# case	outcome	policies	env	checks
+break_continue_nested_try	vm	-
+break_through_try	vm	-
+c24_sha_dir_fatal	vm-error	D-018c		uncatchable,cp16
+c25_sha_missing	vm	-		cp16
+catch_binding_escapes	vm	-
+catch_binding_scope	fallback:unresolved-name	-
+closure_throw_restore	vm	-
+closure_throw_restore_callvalue	vm	-
+closure_throw_restore_temp	vm	-
+error_fields_cause	vm	-
+error_in_catch	fallback:unresolved-name	-
+error_in_catch_throw	vm	-
+error_invalid_code	vm-error	D-018c		uncatchable
+error_invalid_code_in_throw	vm-error	D-018c		uncatchable
+error_origin_created	vm	-
+error_stringify	vm	-
+host_fatal_uncatchable	vm-error	D-018c		uncatchable,cp16
+host_io_catchable	vm	-		cp16
+import_in_try	fallback:import-nested	-
+module_function_try	vm	-
+nested_catch_same_binding	vm	-
+nested_rethrow	vm	-
+origin_nested_calls	vm	-
+p04_same_thrown_twice	vm	-
+p05_shared	vm	-
+p06_closure	vm	-
+p07_function	vm	-
+p08_cause_chain	vm	-
+p09_uncaught_rethrow	vm-error	D-018c
+p10_uncaught_unthrown_origin	vm-error	D-018c
+p11_module	vm	-
+p12_module_uncaught	vm-error	D-018c
+p13_throw_error_args_span	vm	-
+p14_equality	vm	-
+propagate_function	vm	-
+q1a_module_init_throw	vm-error	D-018c
+q1b_entry_origin_rethrown_in_module_uncaught	vm-error	D-018c
+q1c_unoriginated_thrown_in_module_uncaught	vm-error	D-018c
+q1d_module_made_caught_in_entry	vm	-
+rethrow_origin	vm	-
+rethrow_origin_cause	vm	-
+return_through_nested_try	vm	-
+return_through_try	vm	-
+s01_output_in_try	vm	-
+s02_assign_persists	vm	-
+s03_binding_readonly	fallback:assign-catch-binding	-
+s04_shadow_outer	vm	-
+s04_shadow_outer_closure	vm	-
+s05_return_in_catch	vm	-
+s06_break_in_catch	vm	-
+s07_validate	vm	-
+s08_stale_break_release	vm-error	D-018c
+s09_print_error	vm-error	D-018c		uncatchable
+s10_error_tostring	fallback:builtin-receiver:to_string	-
+s11_catch_closure_capture_mut	vm	-
+s12_throw_in_func_arg	vm	-
+s13_global_push_throw	vm	-
+s14_nested_fn_catch_restore	vm	-
+s15_typed_catch_name	fallback:method:type	-
+s16_stringify_escape	vm	-
+s17_member_kinds	vm	-
+s18_expr_lambda_throw	vm-error	D-018c
+s19_return_prefix_uncaught	vm-error	D-018c
+s20_lambda_expr_error_member	vm	-
+stale_handler_after_return	vm	-
+throw_non_error	vm-error	D-018c		uncatchable
+throw_nonerror_uncaught	vm-error	D-018c		uncatchable
+throw_through_call_value	vm	-
+throw_uncaught	vm-error	D-018c
+throw_with_d038_fallback	fallback:free-name	-
+try_in_loop	vm	-
+uncatchable_frame_budget	vm-error	D-001#4		uncatchable
+uncatchable_heap_budget	limit	-	NIFT_VM_HEAP_BUDGET=8000000
+uncatchable_index	vm-error	D-018c		uncatchable
+c21_index_in_loop_try	vm-error	D-018c		uncatchable
+c22_index_in_loop_notry	vm-error	D-018c		uncatchable
+validate_uncaught	vm-error	D-018c
+s21_highlight_error	vm	-
+s13_global_take_index	vm-error	D-018c		uncatchable
+s22_two_live_handlers	vm	-

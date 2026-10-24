@@ -1,0 +1,7 @@
+m 7:5
+m.cause 3:3 root
+{"message":"top","code":"user.app.top","category":"user","source":"","line":0,"column":0,"cause":{"message":"mid","code":"user.app.mid","category":"user","source":"$ROOT/p08_cause_chain.f","line":7,"column":5,"cause":{"message":"root","code":"user.raised","category":"user","source":"$ROOT/p08_cause_chain.f","line":3,"column":3,"cause":null}}}
+t 13:11
+t.cause 7:5
+t.cause.cause 3:3
+w 22:7 cause 0:0

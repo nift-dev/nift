@@ -99,7 +99,12 @@ namespace nift::rt {
     X(CellTake) /* move a source slot's Value out during checked mutation */                          \
     X(NewSourceSlot) /* boxed slot owning a replaceable value cell */                                  \
     X(CellAnchor) /* R[a] = the current value owner of slot R[b] */                                     \
-    X(CellSlot) /* R[a] = the descriptor's own lexical slot */
+    X(CellSlot) /* R[a] = the descriptor's own lexical slot */                                        \
+    X(TryBegin)  /* push handler: a=catch reg, b=protected reg top, c=catch offset            */         \
+    X(TryEnd)    /* pop the current frame's innermost handler                                  */         \
+    X(Throw)     /* throw R[a] (an Error); scene origin is the throw statement                 */         \
+    X(ErrorNew)  /* R[a] = error(R[b] .. R[b+c-1])                                            */         \
+    X(ErrorJson) /* R[a] = JSON text of Error R[b] (c: 0 compact / 1 pretty)                   */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,

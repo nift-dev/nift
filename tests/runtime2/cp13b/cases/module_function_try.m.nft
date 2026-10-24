@@ -1,0 +1,9 @@
+fn(must_fail(m)) {
+  try {
+    throw error(m)
+  } catch(e) {
+    print("module saw " + e.message)
+    throw e
+  }
+}
+export(must_fail)

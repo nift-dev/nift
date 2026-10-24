@@ -324,6 +324,28 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_NATIVE_BUDGET)"
 	"$(RT_HEAP_LIMIT_ZERO)"
 
+SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
+$(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread \
+		tests/rt/source_map_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+.PHONY: test-rt-source-map test-rt-source-map-sanitize test-rt-source-map-tsan
+test-rt-source-map: $(SOURCE_MAP_UNIT)
+	"$(SOURCE_MAP_UNIT)"
+
+test-rt-source-map-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread \
+		tests/rt/source_map_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/source-map"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/source-map"
+
+test-rt-source-map-tsan:
+	mkdir -p "$(TEST_DIR)/rt-tsan"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) -DNIFT_SOURCEMAP_COUNTER \
+		tests/rt/source_map_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-tsan/source-map"
+	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/source-map"
+
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test
 	python3 tools/rt-lint.py src/rt

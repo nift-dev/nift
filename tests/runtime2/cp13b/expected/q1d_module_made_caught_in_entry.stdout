@@ -1,0 +1,3 @@
+$ROOT/lib.nft
+6:3
+{"message":"m","code":"user.raised","category":"user","source":"$ROOT/lib.nft","line":6,"column":3,"cause":null}

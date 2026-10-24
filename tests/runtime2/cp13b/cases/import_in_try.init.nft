@@ -1,0 +1,2 @@
+x := 1
+throw error("thrown while initialising")

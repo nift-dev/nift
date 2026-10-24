@@ -2,6 +2,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
+#include "rt/error.h"
 #include "rt/heap.h"
 #include "rt/number.h"
 #include "rt/render.h"
@@ -242,6 +243,10 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
 // A noted member read is a path argument of a user call (compiler_call.cpp
 // argument_path): legacy's location wording, quoting the whole path.
 bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fault& fault) {
+    if (object.is(Kind::Error)) {
+        if (error_member(object, atom_text(key), out)) return true;
+        return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
+    }
     if (!object.is(Kind::Object)) return internal(fault, "member");
     if (const Value* member = object_get(object, key)) {
         out = *member;

@@ -3,9 +3,12 @@
 #include "rt/aggregate.h"
 #include "rt/cell.h"
 #include "rt/compare.h"
+#include "rt/error.h"
+#include "rt/heap.h"
 #include "rt/heap_account.h"
 #include "rt/native.h"
 #include "rt/render.h"
+#include "rt/string.h"
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
 
@@ -52,7 +55,8 @@ Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(
 }
 
 void Vm::update_heap_limit() {
-    const std::size_t stacks = stack_.capacity() * sizeof(Value) + frames_.capacity() * sizeof(Frame);
+    const std::size_t stacks = stack_.capacity() * sizeof(Value) + frames_.capacity() * sizeof(Frame) +
+                               handlers_.capacity() * sizeof(Handler);
     heap_limit_ = stacks < options_.heap_budget ? options_.heap_budget - stacks : 0;
 }
 
@@ -169,6 +173,7 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 #define RESTORE_CLOSURE(f) (closure_ = (f).closure)
 #endif
 #define RETURN_TO_CALLER                                                                             \
+    if (!pop_handlers_for_frame(frames_.size(), fault)) FAIL();                                      \
     for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) R[k] = Value();             \
     { const Frame f = frames_.back(); frames_.pop_back(); base = f.base; proto = f.proto;            \
       RESTORE_CLOSURE(f);                                                                            \
@@ -300,27 +305,72 @@ VmResult Vm::run(std::string& output) {
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
         if (!op_top_return(*pc, R, result, fault)) FAIL();
+        if (!pop_handlers_for_frame(0, fault)) FAIL();
         goto done;
     }
-    OP(Halt) { goto done; }
+    OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
+    OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
+    OP(TryEnd) { if (!op_try_end(fault)) FAIL(); NEXT(); }
+    OP(Throw) { if (!op_throw(*pc, R, proto, pc, fault)) FAIL(); NEXT(); }
+    OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
+    OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
     OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(SlotOf) OP(NewStruct)
     OP(StructAdd) OP(FieldGet) OP(FieldSet) OP(CheckField) {
-        if (!cold(*pc, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
+        if (!cold(*pc, proto, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();
         NOTE_LARGE NEXT();
     }
     OP(GetGlobal) { R[pc->a] = stack_[pc->b]; NEXT(); }
     OP(GetGlobalChecked) { if (!op_get_global_checked(*pc, R, fault, proto)) FAIL(); NEXT(); }
-    OP(SetGlobal) { stack_[pc->a] = R[pc->b]; NEXT(); } OP(MarkGlobal) { op_mark_global(*pc); NEXT(); }
+    OP(SetGlobal) {
+        if (pc->flags & kInstrGlobalTake) ++global_taken_;
+        else if (pc->flags & kInstrGlobalPut) { if (global_taken_ != 0) --global_taken_; }
+        stack_[pc->a] = R[pc->b];
+        NEXT();
+    }
+    OP(MarkGlobal) { op_mark_global(*pc); NEXT(); }
     OP(CheckGlobal) { if (!op_check_global(*pc, fault, proto)) FAIL(); NEXT(); }
 #if !NIFT_RT_COMPUTED_GOTO
     default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
-#endif
 bail:
+#endif
+#if NIFT_RT_COMPUTED_GOTO
+bail:
+#endif
     if (fault.large) note_large(pc, fault);
+#if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)
+    if (fault.reason == StopReason::Error && !fault.catchable) {
+        SourceOrigin origin;
+        if (origin_at(report_offset(fault, proto, pc), origin, fault)) {
+            fault.error = make_user_error(fault.message);
+            fault.catchable = true;
+        }
+    }
+#endif
+    if (fault.reason == StopReason::Error && fault.catchable) {
+        if (!fault.error.is(Kind::Error)) {
+            fault.catchable = false;
+            fault.error = Value();
+            internal(fault, "catchable fault without Error payload");
+        }
+#if !defined(NIFT_EXC_MUTANT) || NIFT_EXC_MUTANT != 1
+        else if (global_taken_ != 0) {
+            fault.catchable = false;
+            fault.error = Value();
+            internal(fault, "global taken during an exception");
+        }
+#endif
+        else if (unwind(fault, R, K, proto, base, pc)) {
+            DISPATCH();
+        }
+    }
     error_result(result, fault, proto, pc);
+    goto done;
+#if !NIFT_RT_COMPUTED_GOTO
+    }
+#endif
 done:
     result_stats(result);
     return result;

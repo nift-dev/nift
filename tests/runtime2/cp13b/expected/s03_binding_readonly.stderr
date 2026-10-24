@@ -1,0 +1,1 @@
+error: $ROOT/s03_binding_readonly.f:2:3: cannot assign to const binding: e

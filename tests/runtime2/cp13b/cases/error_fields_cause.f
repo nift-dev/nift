@@ -1,0 +1,8 @@
+inner := error("inner reason")
+e := error("outer reason", "user.app.failed", inner)
+print(e.message)
+print(e.code)
+print(e.category)
+print(e.cause.message)
+print(e.cause.code)
+print(e.stringify())

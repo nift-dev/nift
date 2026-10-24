@@ -1,0 +1,1 @@
+error: $ROOT/c24_sha_dir_fatal.f:2:8: sha256_file: path is a directory

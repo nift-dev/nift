@@ -88,7 +88,8 @@ bool is_jump(OpCode op) {
     switch (op) {
         case OpCode::Jmp: case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull:
         case OpCode::JmpNotLt: case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe:
-        case OpCode::JmpNotEq: case OpCode::JmpNotNe: case OpCode::JmpIncLt: return true;
+        case OpCode::JmpNotEq: case OpCode::JmpNotNe: case OpCode::JmpIncLt:
+        case OpCode::TryBegin: return true;
         default: return false;
     }
 }

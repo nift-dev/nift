@@ -256,7 +256,7 @@ bool UnitCompiler::print_argument_ok(NodeId id, const Node& arg) {
     // raises legacy's ordinary print Error (never an internal failure).
     const KindSet k = kinds(id);
     if (k & kKindUnknown) return true;
-    return kinds_within(id, kKindScalar, arg, "type:print");
+    return kinds_within(id, static_cast<KindSet>(kKindScalar | kKindError), arg, "type:print");
 }
 
 bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason) {

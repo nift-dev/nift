@@ -198,6 +198,16 @@ void Inference::statement(NodeId id) {
             scopes_.pop_back();
             break;
         }
+        case NodeKind::Try:
+            block(n.a);
+            scopes_.emplace_back();
+            if (n.b != kNoNode) declare(ast_.text(ast_.at(n.b)), n.b, kinds_ty(kKindError));
+            block(n.c);
+            scopes_.pop_back();
+            break;
+        case NodeKind::Throw:
+            if (n.a != kNoNode) expr(n.a);
+            break;
         case NodeKind::Return:
             if (!(n.flags & kFlagBare) && n.a != kNoNode) merge_return(expr(n.a));
             else merge_return(kinds_ty(kKindNull));

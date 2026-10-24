@@ -1,0 +1,9 @@
+i := 0
+while (i < @COUNT@) {
+  try {
+    throw error("x")
+  } catch(e) {
+    i += 1
+  }
+}
+print("ok")

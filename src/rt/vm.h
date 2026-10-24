@@ -31,6 +31,7 @@
 // process stops before the host runs out of memory.
 #include "rt/heap_account.h"
 #include "rt/proto.h"
+#include "rt/source_map.h"
 #include "rt/value_cycle.h"
 #include "rt/vm_ops.h"
 
@@ -55,6 +56,9 @@ struct VmOptions {
     // by the caller at the end). Null: everything stays in the buffer.
     void (*flush)(std::string& output, void* context) = nullptr;
     void* flush_context = nullptr;
+    // CP13B: origins for Error values. Null is allowed for runs that cannot
+    // raise an Error; an origin requested without a map is an internal stop.
+    const SourceMap* source_map = nullptr;
 };
 
 struct VmResult {
@@ -87,7 +91,11 @@ struct VmResult {
     std::size_t heap_peak = 0;       // peak live rt heap seen by budget checks (test evidence)
     std::size_t heap_live = 0;       // live rt heap when the run stopped
     std::string code;        // the stop's diagnostic code when it has a specific one (Fault::code)
-    bool catchable = false;  // legacy raises it as a catchable Error (no try/catch on the VM yet)
+    bool catchable = false;  // legacy raises it as a catchable Error
+    // CP13B Q5: origin of an uncaught Error, copied out for lifetime safety.
+    bool error_origin = false;
+    std::string origin_source;
+    std::uint32_t origin_line = 0, origin_column = 0;
 };
 
 // The stop's reason, message, code and catchability.
@@ -111,6 +119,14 @@ private:
         const FunctionObject* closure = nullptr;
         bool return_call = false;
     };
+    struct Handler {
+        std::size_t frame_depth = 0;
+        std::size_t base = 0;
+        const Proto* proto = nullptr;
+        std::uint32_t catch_pc = 0;
+        std::uint16_t catch_reg = 0;
+        std::uint16_t reg_top = 0;
+    };
     bool reserve_registers(std::size_t needed);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
@@ -121,7 +137,8 @@ private:
     __attribute__((noinline, cold))
 #endif
     bool call_slow(const Proto* callee, const char* error_name, std::size_t callee_base, Fault& fault);
-    bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
+    bool cold(const Instr& in, const Proto* proto, const Note* note, Value* R, const Value* K,
+              std::string& output, Fault& fault);
     // CP12C closure opcodes (vm_closure.cpp).
     bool op_load_function(const Instr& in, Value* R, Fault& fault);
     bool op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault);
@@ -142,6 +159,15 @@ private:
     bool op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     void op_mark_global(const Instr& in);
     bool op_check_global(const Instr& in, Fault& fault, const Proto* proto);
+    // CP13B: exception dispatch (vm_exception.cpp).
+    bool unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc);
+    bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
+    bool origin_at(std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
+    bool op_try_begin(const Instr& in, std::size_t base, const Proto* proto, const Instr* pc, Fault& fault);
+    bool op_try_end(Fault& fault);
+    bool op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc, Fault& fault);
+    bool op_error_new(const Instr& in, Value* R, Fault& fault);
+    bool op_error_json(const Instr& in, Value* R, Fault& fault);
     // CP12C slice 2 default `for` opcodes (vm_iter.cpp).
     bool op_iter_check(const Instr& in, Value* R, Fault& fault);
     bool op_array_elem(const Instr& in, Value* R, Fault& fault);
@@ -151,13 +177,14 @@ private:
     bool op_object_lookup_value(const Instr& in, Value* R, Fault& fault);
     bool op_iter_missing(const Instr& in, Fault& fault, const Proto* proto);
     bool op_iter(const Instr& in, Value* R, const Proto* proto, Fault& fault);
-    bool native(const Instr& in, Value* R, std::string& output, Fault& fault);
-    bool builtin(const Instr& in, Value* R, Fault& fault);  // CP14 built-ins (rt/natives)
+    bool native(const Instr& in, const Proto* proto, Value* R, std::string& output, Fault& fault);
+    bool builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault);  // CP14 built-ins
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
     void flush_if_needed(std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
+    std::uint32_t report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const;
     bool memory_ok(Fault& fault) {
         const std::size_t live = live_heap_bytes();
         if (live > heap_peak_) heap_peak_ = live;
@@ -174,6 +201,7 @@ private:
     std::vector<Value> stack_;
     std::vector<std::uint8_t> global_ready_;
     std::vector<Frame> frames_;
+    std::vector<Handler> handlers_;
     std::vector<const Proto*> protos_;
     std::vector<Value> named_functions_;  // canonical named-function values (LoadFunction)
     const FunctionObject* closure_ = nullptr;  // the running closure
@@ -187,6 +215,7 @@ private:
     bool beyond_legacy_depth_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
+    std::size_t global_taken_ = 0;  // C6: globals nulled by global_take and not yet put back
 };
 
 } // namespace nift::rt

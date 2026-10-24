@@ -199,6 +199,19 @@ TyRef Inference::expr(NodeId id) {
             break;
         }
         case NodeKind::Member: {
+            const TyRef error_receiver = expr(n.a);
+            if (error_receiver->kinds & kKindError) {
+                const std::string_view member = ast_.text(ast_.at(n.b));
+                if (member == "message" || member == "code" || member == "category" || member == "source")
+                    t = kinds_ty(kKindString);
+                else if (member == "line" || member == "column")
+                    t = kinds_ty(kKindInt);
+                else if (member == "cause")
+                    t = kinds_ty(static_cast<KindSet>(kKindError | kKindNull));
+                else
+                    t = any_ty();
+                break;
+            }
             if (!plan_.structs.empty()) {  // CP12b: a struct field
                 const int s = receiver_struct(n.a);
                 if (s >= 0) {
@@ -303,6 +316,20 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
 TyRef Inference::call(const Node& n) {
     const Node& callee = ast_.at(n.a);
     const NodeId* args = ast_.list(n);
+    // CP13B: the reserved Error constructor.
+    if (callee.kind == NodeKind::Ident && ast_.text(callee) == "error" && find(ast_.text(callee)) == nullptr &&
+        plan_.index.find(ast_.text(callee)) == plan_.index.end()) {
+        for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
+        return kinds_ty(kKindError);
+    }
+    // CP13B: Error JSON presentation methods (ErrorJson), not natives.
+    if (callee.kind == NodeKind::Member) {
+        const TyRef recv = expr(callee.a);
+        const std::string_view name = ast_.text(ast_.at(callee.b));
+        if ((recv->kinds & kKindError) && (name == "stringify" || name == "prettify" || name == "highlight") &&
+            n.count == 0)
+            return kinds_ty(kKindString);
+    }
     if (callee.kind == NodeKind::Member && !plan_.structs.empty()) {  // CP12b: a struct method
         const int s = receiver_struct(callee.a);
         if (s >= 0) {

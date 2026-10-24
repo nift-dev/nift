@@ -176,6 +176,7 @@ bool UnitCompiler::assign(const Node& node) {
         if (const StructFieldInfo* field = own_field(text(target)))  // CP12b: an implicit field
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
@@ -257,6 +258,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     // `+=` on two numbers or two strings, the others on numbers (legacy
@@ -288,6 +290,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
@@ -299,6 +302,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* found = find_binding(text(target));
     if (!found) return fail(target, "assign-free-name");
+    if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     const std::uint16_t mark = fb_->top();

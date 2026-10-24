@@ -1,0 +1,1 @@
+error: $ROOT/s10_error_tostring.f:3:7: to_string: expected int, double, bool, null or string

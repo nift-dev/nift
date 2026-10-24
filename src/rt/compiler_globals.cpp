@@ -100,7 +100,10 @@ bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg, std::string
     if (name.empty() ? !global_read(b.reg, reg) : !global_read_value(b.reg, reg, name)) return false;
     if (!temp(empty)) return false;
     fb_->emit(OpCode::LoadNull, empty);
+    const std::uint8_t saved = fb_->flags();
+    fb_->set_flags(static_cast<std::uint8_t>(saved | kInstrGlobalTake));
     fb_->emit(OpCode::SetGlobal, b.reg, empty);
+    fb_->set_flags(saved);
     return true;
 }
 
@@ -109,7 +112,12 @@ void UnitCompiler::global_put(const Binding& b, std::uint16_t reg) {
         std::uint16_t cell = 0, untyped = 0;
         if (!global_read(b.reg, cell) || !fb_->constant(Value::integer(-1), untyped)) return;
         fb_->emit(OpCode::CellStoreCached, cell, reg);
-    } else fb_->emit(OpCode::SetGlobal, b.reg, reg);
+    } else {
+        const std::uint8_t saved = fb_->flags();
+        fb_->set_flags(static_cast<std::uint8_t>(saved | kInstrGlobalPut));
+        fb_->emit(OpCode::SetGlobal, b.reg, reg);
+        fb_->set_flags(saved);
+    }
 }
 
 } // namespace nift::rt::detail

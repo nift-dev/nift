@@ -1,0 +1,4 @@
+printed inside try before throw
+caught
+printed in callee before throw
+caught2

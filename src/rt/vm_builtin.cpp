@@ -4,6 +4,7 @@
 #include "HostTrace.h"
 
 #include "rt/native.h"
+#include "rt/error.h"
 #include "rt/natives/builtin.h"
 
 #include <cstdlib>
@@ -50,7 +51,7 @@ const host::PathPolicy& vm_path_policy() {
 // CP14: a pure built-in over R[a .. a+c) (receiver first for a method). The
 // natives store `out` last, so the result may replace R[a] directly; the
 // argument registers are temporaries of this call and are cleared.
-bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
+bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     const std::size_t id = static_cast<std::size_t>(in.b - kFirstBuiltin);
     if (id >= natives::builtin_count()) return raise(fault, StopReason::Internal, "unknown built-in");
     const natives::BuiltinSpec& spec = natives::builtin_spec(static_cast<natives::BuiltinId>(id));
@@ -64,7 +65,7 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {
         case natives::Status::Ok: break;
         case natives::Status::Error: return raise(fault, StopReason::Error, std::move(message));
-        case natives::Status::Recoverable:
+        case natives::Status::Recoverable: {
             // CP15: legacy raises a catchable Error. N1: the HostCall's own
             // code (io.open_failed / io.read_failed / ...) wins over the
             // per-built-in fallback; validate has no HostCall and keeps
@@ -78,7 +79,23 @@ bool Vm::builtin(const Instr& in, Value* R, Fault& fault) {
                              : context.host_error_code;
 #endif
             fault.catchable = true;
-            return raise(fault, StopReason::Error, std::move(message));
+            raise(fault, StopReason::Error, std::move(message));
+            SourceOrigin origin;
+            if (!origin_at(report_offset(fault, proto, &in), origin, fault)) {
+                fault.catchable = false;
+                fault.error = Value();
+                return false;
+            }
+            Value error;
+            std::string why;
+            if (!make_system_error(fault.code, fault.message, origin, error, why)) {
+                fault.catchable = false;
+                fault.error = Value();
+                return raise(fault, StopReason::Internal, "catchable Error construction: " + why);
+            }
+            fault.error = std::move(error);
+            return false;
+        }
         case natives::Status::Limit:
             // CP15 review R2: a fatal, uncatchable resource limit.
             fault.code = "limit.exceeded";

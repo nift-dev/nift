@@ -37,6 +37,8 @@ enum : std::uint8_t {
     kInstrReturnCall = 1u << 3,  // a call evaluated inside a return expression (legacy return: prefix)
     kInstrLambdaReturnOrigin = 1u << 5,  // expression lambda constructed by a textual return
     kInstrIndexKey = 1u << 4,  // an expression evaluated as an index key (legacy call-site diagnostics)
+    kInstrGlobalTake = 1u << 6,  // SetGlobal that nulls a slot for an in-place update (C6)
+    kInstrGlobalPut = 1u << 7,   // the paired put-back SetGlobal
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's

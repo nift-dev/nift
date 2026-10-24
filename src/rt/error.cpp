@@ -5,6 +5,8 @@
 
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/host/host_error.h"
+#include "rt/natives/builtin.h"
 #include "rt/string.h"
 
 namespace nift::rt {
@@ -51,6 +53,120 @@ Value make_user_error(std::string message) {
     Value out;
     std::string ignored;
     make_error(std::move(message), "user.raised", Value(), {}, 0, 0, out, ignored);
+    return out;
+}
+
+bool make_system_error(std::string code, std::string message, const SourceOrigin& origin, Value& out,
+                       std::string& error) {
+    if (!host::catchable(code) && !natives::is_recoverable_code(code)) {
+        error = "code is not catchable";
+        return false;
+    }
+    auto* object = new ErrorObject();
+    object->category = code.substr(0, code.find('.'));
+    object->message = std::move(message);
+    object->code = std::move(code);
+    object->source = origin.path;
+    object->line = origin.line;
+    object->column = origin.column;
+    if (object->source.empty() || object->line == 0 || object->column == 0) {
+        object->source.clear();
+        object->line = 0;
+        object->column = 0;
+    }
+    heap_retally(object);
+    out = Value::adopt(object);
+    return true;
+}
+
+Value clone_error_with_origin(const Value& error, const SourceOrigin& origin) {
+    if (!error.is(Kind::Error)) return error;
+    const auto* source = error.heap_as<ErrorObject>();
+    auto* copy = new ErrorObject();
+    copy->message = source->message;
+    copy->code = source->code;
+    copy->category = source->category;
+    copy->source = origin.path;
+    copy->line = origin.line;
+    copy->column = origin.column;
+    copy->cause = source->cause;
+    heap_retally(copy);
+    return Value::adopt(copy);
+}
+
+namespace {
+
+void append_json_string(std::string_view text, std::string& out) {
+    static constexpr char hex[] = "0123456789abcdef";
+    out += '"';
+    for (unsigned char c : text) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    out += "\\u00";
+                    out += hex[(c >> 4) & 0x0f];
+                    out += hex[c & 0x0f];
+                } else {
+                    out += static_cast<char>(c);
+                }
+        }
+    }
+    out += '"';
+}
+
+void append_number(std::string& out, std::size_t value) { out += std::to_string(value); }
+
+void append_error_json(const ErrorObject& error, bool pretty, int depth, std::string& out) {
+    const auto indent = [&](int level) { if (pretty) out.append(static_cast<std::size_t>(level * 2), ' '); };
+    out += '{';
+    if (pretty) out += '\n';
+    const auto field = [&](const char* name, int level) {
+        indent(level);
+        out += '"';
+        out += name;
+        out += pretty ? "\": " : "\":";
+    };
+    field("message", depth + 1);
+    append_json_string(error.message, out);
+    out += pretty ? ",\n" : ",";
+    field("code", depth + 1);
+    append_json_string(error.code, out);
+    out += pretty ? ",\n" : ",";
+    field("category", depth + 1);
+    append_json_string(error.category, out);
+    out += pretty ? ",\n" : ",";
+    field("source", depth + 1);
+    append_json_string(error.source, out);
+    out += pretty ? ",\n" : ",";
+    field("line", depth + 1);
+    append_number(out, error.line);
+    out += pretty ? ",\n" : ",";
+    field("column", depth + 1);
+    append_number(out, error.column);
+    out += pretty ? ",\n" : ",";
+    field("cause", depth + 1);
+    if (error.cause.is(Kind::Error)) {
+        append_error_json(*error.cause.heap_as<ErrorObject>(), pretty, depth + 1, out);
+    } else {
+        out += "null";
+    }
+    if (pretty) out += '\n';
+    indent(depth);
+    out += '}';
+}
+
+} // namespace
+
+std::string error_to_json(const Value& error, bool pretty) {
+    std::string out;
+    if (error.is(Kind::Error)) append_error_json(*error.heap_as<ErrorObject>(), pretty, 0, out);
     return out;
 }
 

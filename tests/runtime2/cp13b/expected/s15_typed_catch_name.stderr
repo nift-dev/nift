@@ -1,0 +1,1 @@
+error: $ROOT/s15_typed_catch_name.f:2:9: unknown value or malformed expression: e.type()
