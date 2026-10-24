@@ -138,10 +138,10 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
                               (binding->decl_kinds & (kKindAggregate | kKindUnknown)) == 0;
         if (binding->cell) {
             captures.push_back({Capture::Source::LocalCell, binding->reg, binding->type_reg,
-                                snapshot, snapshot ? *binding : Binding()});
+                                snapshot, binding->loop_binding ? *binding : Binding()});
         } else if (binding->upvalue) {
             captures.push_back({Capture::Source::OuterUpvalue, binding->upvalue_index, binding->type_reg,
-                                snapshot, snapshot ? *binding : Binding()});
+                                snapshot, binding->loop_binding ? *binding : Binding()});
         } else {
             return fail(node, "lambda-capture");
         }
@@ -158,10 +158,26 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t base = 0;
     if (!temp(base)) return false;
+    // Closure reads its captured cells from R[base+1 .. base+c]; reserve those
+    // contiguous registers before scratch registers used by live refreshes.
+    std::vector<std::uint16_t> capture_regs(task.captures.size());
+    for (std::uint16_t k = 0; k < task.captures.size(); ++k)
+        if (!temp(capture_regs[k])) return false;
     for (std::uint16_t k = 0; k < task.captures.size(); ++k) {
         const Capture& capture = task.captures[k];
-        std::uint16_t reg = 0;
-        if (!temp(reg)) return false;
+        // A shared loop cell must reflect the live source at capture time.
+        // Expression-lambda scalars are snapshotted below; block lambdas and
+        // aggregate/unknown captures share this refreshed cell.
+        if (!capture.snapshot_loop_cell && capture.loop_binding.loop_binding &&
+            capture.loop_binding.cell && !capture.loop_binding.upvalue) {
+            std::uint16_t live = 0, untyped = 0;
+            bool owned = false;
+            if (!for_read_source(capture.loop_binding, live, owned)) return false;
+            if (!fb_->constant(Value::integer(-1), untyped)) return false;
+            fb_->emit(OpCode::CellStore, capture.index, live, untyped);
+            if (owned) fb_->emit(OpCode::LoadNull, live);
+        }
+        const std::uint16_t reg = capture_regs[k];
         if (capture.source == Capture::Source::LocalCell) {
             if (capture.snapshot_loop_cell) {
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 3
