@@ -27,14 +27,15 @@ else
     if [ "$rc" -eq 77 ]; then unmeasured=1; elif [ "$rc" -ne 0 ]; then fail=1; fi
   fi
   if [ "$unmeasured" -eq 0 ]; then
-    for spec in "sys200.log 5944" "sys20.log 919"; do
-      set -- $spec; file=$1; limit=$2
+    # Pinned filesystem categories plus a bounded non-filesystem remainder
+    # (cp03_syscall_budget.py; owner-approved recalibration 2026-10-24).
+    python3 "$HERE/cp03_syscall_budget.py" --selftest || fail=1
+    for spec in "sys200.log 200x10" "sys20.log 20x20"; do
+      set -- $spec; file=$1; probe=$2
       line=$(grep ' noop total=' "$T/$file" | head -1)
       [ -n "$line" ] || { echo "FAIL CP03 syscalls: no no-op line in $file"; fail=1; continue; }
-      total=$(sed -n 's/.* total=\([0-9]*\).*/\1/p' <<<"$line")
-      [ "$total" -le "$limit" ] || { echo "FAIL CP03 syscalls: $file total=$total > $limit"; fail=1; }
-      grep -q 'readlink=0' <<<"$line" || { echo "FAIL CP03 syscalls: $file readlink is not zero"; fail=1; }
-      grep -q 'path.clock=0' <<<"$line" || { echo "FAIL CP03 syscalls: $file touched .nift/clock"; fail=1; }
+      echo "$line"
+      python3 "$HERE/cp03_syscall_budget.py" "$probe" "$line" || fail=1
     done
   fi
 fi

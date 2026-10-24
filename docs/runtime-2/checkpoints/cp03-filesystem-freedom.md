@@ -89,6 +89,18 @@ Performance (one thread, `strace -f`):
 | 20 pages × 20 links, no-op | 9,158 (audit candidate) | **919** |
 | readlink calls attributable to containment (200×10 no-op) | 16,000 | **0** |
 
+**Guard recalibration (owner-approved 2026-10-24).** The 20×20 total of 919 was
+one host's measurement plus one (918). The same binary measures 921 on the
+Linode reference host and on the review host, and so does the commit that
+recorded 919 (`df96d53a`). All filesystem categories are identical on every
+host (openat 53, stat 643, read 27, close 53, getdents 2, readlink 0, clock 0).
+The 2–3 call spread is in process-start/allocator syscalls. The guard
+(`tests/runtime2/cp03_syscall_budget.py`) therefore pins every filesystem and
+path category exactly, and bounds the non-filesystem remainder by the largest
+measurement + 5 (20×20: 138 + 5; 200×10: 681 + 5). Reintroduced containment
+(readlink/stat) fails even if the total stays under the old limit; the
+self-test proves both directions.
+
 Residual: `@path`/`@pathto` targets outside `public/` still emit the deployment
 warning and may be tracked as external dependencies; they are not refused.
 `link/..` is normalised lexically before the OS sees it (pre-existing).
