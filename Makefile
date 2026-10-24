@@ -462,6 +462,7 @@ RT_HANDLE_UNIT := $(TEST_DIR)/rt/handle-unit$(EXEEXT)
 RT_HANDLE_STRESS := $(TEST_DIR)/rt/handle-stress$(EXEEXT)
 RT_HANDLE_LIFECYCLE := $(TEST_DIR)/rt/handle-lifecycle$(EXEEXT)
 RT_HANDLE_BENCH := $(TEST_DIR)/rt/handle-bench$(EXEEXT)
+RT_HANDLE_BOX_UNIT := $(TEST_DIR)/rt/handle-box-unit$(EXEEXT)
 RT_HANDLE_TSAN_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread
 
 $(RT_HANDLE_UNIT): $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_DEPS)
@@ -480,10 +481,16 @@ $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/handle_table_bench.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
+$(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
+
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
-test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE)
+test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE) $(RT_HANDLE_BOX_UNIT)
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_UNIT)"
+	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_BOX_UNIT)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_LIFECYCLE)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_STRESS)" $${RT_HANDLE_STRESS_MS:-2000} $${RT_HANDLE_RACE_ROUNDS:-500}
 	python3 tests/runtime2/cp17/no_handle_strings.py --self-test
@@ -500,7 +507,11 @@ test-rt-handles-sanitize:
 		-o "$(TEST_DIR)/rt-san/handle-stress"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
+		-o "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-lifecycle"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-stress" $${RT_HANDLE_STRESS_MS:-2000} \
 		$${RT_HANDLE_RACE_ROUNDS:-300}
@@ -708,6 +719,30 @@ RT_HOST_NATIVE_UNIT := $(TEST_DIR)/rt/host-native-unit$(EXEEXT)
 $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+# CP17 N2: Host-level observer parity (real PageObserver over a test RenderHost).
+RT_N2_PARITY_UNIT := $(TEST_DIR)/rt/n2-observer-parity$(EXEEXT)
+$(RT_N2_PARITY_UNIT): tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp -o "$@"
+
+RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
+$(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+.PHONY: test-runtime2-cp17-sanitize
+test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT)
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
+
+.PHONY: test-runtime2-cp17-handles
+test-runtime2-cp17-handles: $(TARGET)
+	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
+
+.PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
+test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT)
+	"$(RT_N2_PARITY_UNIT)"
+test-runtime2-cp17-tripwire: $(TARGET)
+	python3 tests/runtime2/cp17/build_vm_tripwire.py --nift "$(CURDIR)/$(TARGET)"
 
 # CP16 N1: the positive per-call Host-code tests and their harness controls.
 .PHONY: test-runtime2-cp16-n1
@@ -2985,6 +3020,11 @@ RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
+# CP17 file/stream handle natives render scalar values (legacy file.write) and
+# are Host natives, not part of the pure-builtin isolation contract.
+RT_HOST_HANDLE_SOURCES := src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_ops.cpp \
+	src/rt/natives/host_stream_handles.cpp
+RT_ISOLATION_SOURCES := $(filter-out $(RT_HOST_HANDLE_SOURCES),$(RT_BUILTINS_SOURCES))
 # CP16: the native table includes the Host built-ins, which call the Host layer
 # and the RuntimeValue-free helpers in ParserHostHelpers.cpp (never
 # ParserHelpers.cpp, which needs the legacy value model). Every builtins binary,
@@ -3044,7 +3084,7 @@ RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 # CP16 certification fix: secure_random_bytes checks the budget before its
 # buffer exists and keeps one result-sized buffer. Linked with the isolated core
@@ -3053,7 +3093,7 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
 $(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 .PHONY: test-rt-host-random-budget
 test-rt-host-random-budget: $(RT_HOST_RANDOM_BUDGET)
@@ -3063,7 +3103,7 @@ test: test-rt-host-random-budget
 .PHONY: test-rt-builtins-isolation test-rt-builtins-guards
 test-rt-builtins-isolation: $(RT_BUILTINS_BENCH)
 	@if grep -nE '#include .*(RuntimeValue|legacy_bridge|rt/render)|nift::RuntimeValue|(to|from)_legacy\(|append_rendered' \
-		src/rt/natives/*; then \
+		$(RT_ISOLATION_SOURCES); then \
 		echo "FAIL: a native refers to the legacy value bridge" >&2; exit 1; fi
 	@echo "PASS natives link without RuntimeValue/legacy_bridge/render and do not include them"
 
@@ -3522,3 +3562,6 @@ test-runtime2-cp18-cow: $(CP18_COW) $(CP18_COW_SWITCH) $(SHARED_LIB) $(CP18_SWIT
 	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(abspath $(CP18_SWITCH_LIB))"
 	$(PYTHON) tests/runtime2/cp18/cow_negative.py --out "$(CURDIR)/$(TEST_DIR)/cp18/cow-negative" --libffi "$(CURDIR)/$(LIBFFI_A)"
 test-runtime2-cp18: test-runtime2-cp18-cow
+
+test-rt-host: test-runtime2-cp17-n2
+test-rt-vm: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
