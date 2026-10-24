@@ -1,0 +1,75 @@
+--- a/src/rt/vm.h
++++ b/src/rt/vm.h
+@@ -30,6 +30,7 @@
+ // legacy also reaches it is an Internal failure (exit 70). Either way the
+ // process stops before the host runs out of memory.
+ #include "rt/heap_account.h"
++#include "Diagnostic.h"
+ #include "rt/proto.h"
+ #include "rt/source_map.h"
+ #include "rt/value_cycle.h"
+@@ -62,6 +63,8 @@
+ };
+ 
+ struct VmResult {
++    // Cold uncaught-report context; never applied to a caught Error.
++    std::vector<nift::detail::DiagnosticFrame> diagnostic_frames;
+     StopReason reason = StopReason::None;  // None: the program completed
+     std::string message;                   // legacy's message (Error) or the failure (Internal)
+     std::uint32_t offset = 0;              // source offset of the failing expression
+@@ -190,6 +193,7 @@
+     void flush_if_needed(std::string& output);
+     bool in_loop_path(const Instr* pc) const;
+     void note_large(const Instr* pc, Fault& fault);
++    void collection_error_context(VmResult&, const Proto*, const Instr*) const;
+     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
+     std::uint32_t report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const;
+     bool memory_ok(Fault& fault) {
+--- a/src/rt/vm_report.cpp
++++ b/src/rt/vm_report.cpp
+@@ -96,6 +96,7 @@
+         result.origin_column = result.error_origin ? static_cast<std::uint32_t>(error->column) : 0;
+     }
+     result.offset = report_offset(fault, proto, pc);
++    collection_error_context(result, proto, pc);
+     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)
+     result.error_in_loop_path = in_loop_path(pc);
+ }
+--- /dev/null
++++ b/src/rt/vm_collection_report.cpp
+@@ -0,0 +1,29 @@
++#include "rt/vm_collection_report.h"
++
++// rt-lint: cold-file final uncaught collection diagnostic projection
++namespace nift::rt {
++void Vm::collection_error_context(VmResult& result, const Proto* proto, const Instr*) const {
++    bool expression_view = proto->collection_expression_view;
++    for (const Frame& frame : frames_)
++        expression_view = expression_view || frame.proto->collection_expression_view;
++    constexpr char recursion[] = "callable recursion depth exceeded";
++    if (expression_view && result.reason == StopReason::Error &&
++        result.message.rfind(recursion, 0) != 0 && result.message.rfind("lambda body error: ", 0) != 0)
++        result.message = "lambda body error: " + result.message;
++    for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
++        const Instr* call = it->ret - 1;
++        if (call->op == OpCode::CollectionCall && !(call->c & kConstantBit))
++            result.diagnostic_frames.push_back(
++                {nift::detail::DiagnosticFrameKind::Callback, "collection callback", {}, {}});
++    }
++    // A primitive failure in a block's legacy expression view has the
++    // collection call's source view. An Error's stored origin is untouched;
++    // named/nested callees retain their own reporting/provenance rules.
++    if (proto->collection_expression_view && !result.error_origin && !frames_.empty()) {
++        const Frame& frame = frames_.back();
++        const Instr* call = frame.ret - 1;
++        if (call->op == OpCode::CollectionCall && !(call->c & kConstantBit))
++            result.offset = frame.proto->offsets[static_cast<std::size_t>(call - frame.proto->code.data())];
++    }
++}
++} // namespace nift::rt
+--- /dev/null
++++ b/src/rt/vm_collection_report.h
+@@ -0,0 +1,3 @@
++#pragma once
++// Final uncaught collection context projection; no caught Error mutation.
++#include "rt/vm.h"

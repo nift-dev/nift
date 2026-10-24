@@ -30,6 +30,7 @@
 // legacy also reaches it is an Internal failure (exit 70). Either way the
 // process stops before the host runs out of memory.
 #include "rt/heap_account.h"
+#include "Diagnostic.h"
 #include "rt/proto.h"
 #include "rt/source_map.h"
 #include "rt/value_cycle.h"
@@ -62,6 +63,8 @@ struct VmOptions {
 };
 
 struct VmResult {
+    // Cold uncaught-report context; never applied to a caught Error.
+    std::vector<nift::detail::DiagnosticFrame> diagnostic_frames;
     StopReason reason = StopReason::None;  // None: the program completed
     std::string message;                   // legacy's message (Error) or the failure (Internal)
     std::uint32_t offset = 0;              // source offset of the failing expression
@@ -186,6 +189,7 @@ private:
     void flush_if_needed(std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);
+    void collection_error_context(VmResult&, const Fault&, const Proto*, const Instr*) const;
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
     std::uint32_t report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const;
     bool memory_ok(Fault& fault) {

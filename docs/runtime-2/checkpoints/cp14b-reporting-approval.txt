@@ -1,0 +1,18 @@
+CP14B narrow uncaught-reporting extension — owner approved in this chat.
+
+The owner answered “Approve the narrow reporting patch” to the explicit
+question about the prepared reporting extension. Patch SHA-256:
+35c265b1f0226a32d86a4aec2517de8337bd40d4fc59083e20d87792d186fdb1
+
+Scope: one cold hook in error_result, VmResult callback context, and new
+collection reporting files. No caught Error mutation, Frame layout change,
+or ordinary-call-entry diagnostic work. The original exception boundary seam
+remains separately committed as 3b902b15.
+
+The owner's subsequent full decision additionally requires: caught Error
+identity/fields/cause/catchability/origin unchanged; no new fault slot or handler
+selection changes; correct nested/rethrow prefixes; both dispatch modes;
+unchanged ordinary CP13B reporting and the million-catch instruction gate.
+The final implementation reads const Fault context to reconstruct only the
+uncaught VmResult message. The original proposal hash above remains historical;
+the delivery manifest identifies the final reporting commit and patch hash.

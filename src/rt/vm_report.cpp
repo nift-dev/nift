@@ -96,6 +96,7 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
         result.origin_column = result.error_origin ? static_cast<std::uint32_t>(error->column) : 0;
     }
     result.offset = report_offset(fault, proto, pc);
+    collection_error_context(result, fault, proto, pc);
     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)
     result.error_in_loop_path = in_loop_path(pc);
 }

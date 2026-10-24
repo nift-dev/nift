@@ -48,6 +48,7 @@ struct Note {
 };
 
 struct Proto {
+    bool collection_expression_view = false;
     std::string name;
     std::uint16_t nparams = 0;
     std::uint16_t nregs = 0;
