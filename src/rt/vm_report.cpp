@@ -70,6 +70,9 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             result.message = "return: " + result.message;
     }
     result.offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
+    if ((pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
+        fault.message.rfind("reference target no longer exists: ", 0) == 0)
+        result.offset = selector_offset(result.offset);
     if (fault.use_call_site) result.offset = main_offset(result.offset);
     MUTATE_ERROR_OFFSET(result.offset)
     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)

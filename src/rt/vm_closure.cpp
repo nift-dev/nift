@@ -114,6 +114,8 @@ bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     function->code = protos_[in.b];
     function->is_lambda = true;
     function->expression_body = (in.flags & kInstrLambdaExprBody) != 0;
+    function->selector_call_site = function->expression_body &&
+        ((in.flags & kInstrLambdaReturnOrigin) || (closure_ && closure_->selector_call_site));
     function->upvalues.reserve(in.c);
     for (std::uint16_t k = 0; k < in.c; ++k) function->upvalues.push_back(R[in.a + 1 + k]);
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 8)

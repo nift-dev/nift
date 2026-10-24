@@ -46,12 +46,15 @@ cases.update({
 cases.update({'read_before': 'f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>x[0];x[0]=9}\nprint(f())\n', 'callback_write': 'f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>{x[0]=9;return x[0]}}\nprint(f());print(f())\n', 'callback_read_write': 'f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>{print(x[0]);x[0]=9;return x[0]}}\nprint(f());print(f())\n', 'rebound_cached_owner': 'f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>{x[0]=9;return x[0]}}\na=[[8]]\nprint(f())\n'})
 
 
-MISSING_SELECTORS = {"selector_missing_index", "selector_missing_member",
+MISSING_SELECTORS = {"nested_selector_missing_call", "nested_selector_missing_print", "selector_missing_index", "selector_missing_member",
                      "selector_missing_cached_write", "selector_missing_side_effect"}
 ERROR_CASES = MISSING_SELECTORS | {"missing_after_loop"}
+ERROR_CASES |= {"nested_source_view", "nested_decl_view", "nested_active_caller", "nested_third_escape"}
 for name in MISSING_SELECTORS:
     cases[name] = (HERE / "cp12c-probes/src" / (name + ".f")).read_text()
 GOLDENS["selector_missing_side_effect"] = "1\nafter-write\n"
+
+cases.update({'nested_source_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>()=>x[0]}\ng:=h()\na=[]\nprint(g())\n', 'nested_decl_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{f:=()=>x[0];return f}}\ng:=h()\na=[]\nprint(g())\n', 'nested_active_caller': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>x[0]}}\ng:=h()\na=[]\nfn(invoke(cb)){cb()}\ninvoke(g)\n', 'nested_third_escape': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>()=>x[0]}}\ng:=h()\ng=g()\na=[]\nprint(g())\n'})
 
 
 def main():

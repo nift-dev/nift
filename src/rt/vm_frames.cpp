@@ -12,4 +12,14 @@ std::uint32_t Vm::main_offset(std::uint32_t own) const {
     return main.proto->offsets[static_cast<std::size_t>(main.ret - 1 - main.proto->code.data())];
 }
 
+std::uint32_t Vm::selector_offset(std::uint32_t own) const {
+    const FunctionObject* active = closure_;
+    for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
+        if (!active || !active->selector_call_site) break;
+        own = it->proto->offsets[static_cast<std::size_t>(it->ret - 1 - it->proto->code.data())];
+        active = it->closure;
+    }
+    return own;
+}
+
 } // namespace nift::rt

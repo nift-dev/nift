@@ -146,7 +146,13 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         }
     }
     const std::uint8_t saved_flags = fb_->flags();
-    if (expression_body) fb_->set_flags(static_cast<std::uint8_t>(fb_->flags() | kInstrLambdaExprBody));
+    if (expression_body) {
+        std::uint8_t flags = static_cast<std::uint8_t>(saved_flags | kInstrLambdaExprBody);
+        // Legacy's textual return constructs this literal from an unmapped
+        // string. A nested lambda in an expression body retains its source view.
+        if (saved_flags & kInstrReturnCall) flags |= kInstrLambdaReturnOrigin;
+        fb_->set_flags(flags);
+    }
     fb_->emit(OpCode::Closure, base, slot, static_cast<std::uint16_t>(task.captures.size()));
     fb_->set_flags(saved_flags);
     if (dst != base) fb_->emit(OpCode::Move, dst, base);

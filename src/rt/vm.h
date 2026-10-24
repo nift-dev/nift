@@ -115,6 +115,7 @@ private:
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
     std::uint32_t main_offset(std::uint32_t own) const;
+    std::uint32_t selector_offset(std::uint32_t own) const;
     bool frame_check(const Proto* callee, const char* error_name, Fault& fault);
 #if defined(__GNUC__)
     __attribute__((noinline, cold))

@@ -74,6 +74,7 @@ struct FunctionObject : HeapObject {
     std::uint32_t native_id = 0;
     bool is_lambda = false;
     bool expression_body = false;
+    bool selector_call_site = false;  // returned expression body lacks a legacy source view
     std::vector<Value> upvalues;
     FunctionObject() : HeapObject(Kind::Function) {}
 };
