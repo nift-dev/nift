@@ -9,7 +9,9 @@ manifest matching their own bytes.
 import hashlib
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -70,4 +72,22 @@ def verify(path, mutant, manifest, normal, build):
         return None, "manifest does not bind the supplied unmutated baseline"
     if actual != expected:
         return None, f"mutant executable SHA256 {actual} != manifest {expected}"
+    # Independently rebuild the intended mutant through the reviewed Makefile
+    # recipe in a fresh output directory and bind credit to that build result.
+    temp = tempfile.mkdtemp(prefix="cp12c-mutant-build-")
+    try:
+        variant = "CLOSURE_MUTANT" if build == "closure-mutant" else "FOR_MUTANT"
+        target = Path(temp) / directory / f"nift-{mutant}"
+        built = subprocess.run(["make", "-s", "-C", str(repo), f"TEST_DIR={temp}",
+                                f"{variant}={mutant}", str(target)],
+                               capture_output=True, text=True, timeout=300)
+        if built.returncode != 0 or not target.exists():
+            return None, "trusted mutant rebuild failed"
+        trusted_sha = _sha256(target)
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, f"trusted mutant rebuild failed: {e}"
+    finally:
+        shutil.rmtree(temp, ignore_errors=True)
+    if actual != trusted_sha:
+        return None, f"executable SHA256 {actual} != trusted rebuild {trusted_sha}"
     return data, None

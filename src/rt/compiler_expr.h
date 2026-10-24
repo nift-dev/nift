@@ -62,12 +62,14 @@ public:
         std::uint16_t index = 0;
         std::uint16_t type_index = 0;
         bool snapshot_loop_cell = false;
+        Binding loop_binding;
     };
     struct LambdaTask {
         NodeId lambda = kNoNode;
         std::uint16_t proto_slot = 0;
         std::vector<std::string_view> upvalue_names;
         std::vector<NodeId> upvalue_decls;
+        std::vector<bool> upvalue_loop;
         std::vector<Capture> captures;
     };
 

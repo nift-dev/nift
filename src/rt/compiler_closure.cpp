@@ -114,9 +114,11 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     }
     std::vector<std::string_view> names;
     collect_lambda_names(node.b, names);
+    const bool expression_body = (node.flags & kFlagBlockBody) == 0;
     std::vector<Capture> captures;
     std::vector<std::string_view> upvalue_names;
     std::vector<NodeId> upvalue_decls;
+    std::vector<bool> upvalue_loop;
     for (std::string_view name : names) {
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
@@ -129,22 +131,29 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
             const Binding& global = top_level_bindings_.at(name);
             if (binding->reg == global.reg) continue;  // the direct program-level global, not a shadow
         }
+        // Legacy copies scalar loop values at expression-lambda creation but
+        // keeps aggregate handles bound to the iteration cell (mutation and
+        // reassignment of the aggregate remain visible). Unknown kinds share.
+        const bool snapshot = binding->loop_binding && expression_body &&
+                              (binding->decl_kinds & (kKindAggregate | kKindUnknown)) == 0;
         if (binding->cell) {
             captures.push_back({Capture::Source::LocalCell, binding->reg, binding->type_reg,
-                                binding->loop_binding});
+                                snapshot, snapshot ? *binding : Binding()});
         } else if (binding->upvalue) {
-            captures.push_back({Capture::Source::OuterUpvalue, binding->upvalue_index});
+            captures.push_back({Capture::Source::OuterUpvalue, binding->upvalue_index, binding->type_reg,
+                                snapshot, snapshot ? *binding : Binding()});
         } else {
             return fail(node, "lambda-capture");
         }
         upvalue_names.push_back(name);
         upvalue_decls.push_back(binding->decl_node);
+        upvalue_loop.push_back(binding->loop_binding);
     }
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
     lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(upvalue_decls),
-                                       std::move(captures)});
+                                       std::move(upvalue_loop), std::move(captures)});
     const LambdaTask& task = lambda_tasks_.back();
     const std::uint16_t mark = fb_->top();
     std::uint16_t base = 0;
@@ -159,23 +168,34 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
                 // M3: capture the shared loop cell instead of a snapshot.
                 fb_->emit(OpCode::Move, reg, capture.index);
 #else
-                // A loop variable captured by a lambda is a per-iteration
-                // snapshot at lambda creation. Keep the loop binding's own
-                // cell mutable for direct reads, but give the closure a fresh
-                // cell containing the value visible now.
+                // An expression-body lambda captures the value visible at
+                // creation. for_read_source uses the lazy live element or the
+                // current cell value; NewCell shares aggregate handles.
                 std::uint16_t value = 0;
-                if (!temp(value)) return false;
-                fb_->emit(OpCode::CellLoad, value, capture.index);
+                bool owned = false;
+                if (!for_read_source(capture.loop_binding, value, owned)) return false;
                 fb_->emit(OpCode::NewCell, reg, value, capture.type_index);
+                if (owned) fb_->emit(OpCode::LoadNull, value);
 #endif
             } else {
                 fb_->emit(OpCode::Move, reg, capture.index);
             }
         } else {
-            fb_->emit(OpCode::GetUpvalueCell, reg, capture.index);
+            if (capture.snapshot_loop_cell) {
+#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 3
+                fb_->emit(OpCode::GetUpvalueCell, reg, capture.index);
+#else
+                std::uint16_t value = 0;
+                bool owned = false;
+                if (!for_read_source(capture.loop_binding, value, owned)) return false;
+                fb_->emit(OpCode::NewCell, reg, value, capture.type_index);
+                if (owned) fb_->emit(OpCode::LoadNull, value);
+#endif
+            } else {
+                fb_->emit(OpCode::GetUpvalueCell, reg, capture.index);
+            }
         }
     }
-    const bool expression_body = (node.flags & kFlagBlockBody) == 0;
     const std::uint8_t saved_flags = fb_->flags();
     if (expression_body) fb_->set_flags(static_cast<std::uint8_t>(fb_->flags() | kInstrLambdaExprBody));
     fb_->emit(OpCode::Closure, base, slot, static_cast<std::uint16_t>(task.captures.size()));
@@ -228,6 +248,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         binding.upvalue = true;
         binding.upvalue_index = k;
         binding.decl_node = task.upvalue_decls[k];
+        binding.loop_binding = task.upvalue_loop[k];
         binding.typed = true;
         binding.decl_kinds = static_cast<KindSet>(kKindAll | kKindUnknown);
         if (!scopes_.declare(task.upvalue_names[k], binding)) return false;
