@@ -59,7 +59,9 @@ bool UnitCompiler::for_lazy_read(const Binding& b, std::uint16_t& reg) {
         const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
         const std::size_t done = fb_->emit(OpCode::Jmp);
         fb_->patch(assigned, fb_->here());
-        fb_->emit(OpCode::Move, value, b.reg);
+        if (b.cell) fb_->emit(OpCode::CellLoad, value, b.reg);
+        else if (b.upvalue) fb_->emit(OpCode::GetUpvalue, value, b.upvalue_index);
+        else fb_->emit(OpCode::Move, value, b.reg);
         fb_->patch(done, fb_->here());
         reg = value;
         return true;

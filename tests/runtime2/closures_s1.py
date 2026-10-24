@@ -158,7 +158,7 @@ def main():
     nift = os.path.abspath(args.nift)
     normal = os.path.abspath(args.normal) if args.normal else None
     if args.mutant:
-        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info)
+        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info, normal, 'closure-mutant')
         if provenance_error:
             print(f"FAIL closure mutant {args.mutant}: harness: {provenance_error}")
             return 1

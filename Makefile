@@ -3197,10 +3197,11 @@ $(CLOSURE_MUTANT_BIN): $(filter-out src/rt/vm.o src/rt/value.o src/rt/vm_closure
 .PHONY: test-runtime2-closures-s1-mutants
 test-runtime2-closures-s1-mutants: $(TARGET)
 	python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TARGET)"
+	normal_sha=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
 	for n in 1 2 3 4 5 6; do \
 		$(MAKE) CLOSURE_MUTANT=$$n "$(TEST_DIR)/closure-mutants/nift-$$n" >/dev/null || exit 1; \
 		sha=$$(sha256sum "$(TEST_DIR)/closure-mutants/nift-$$n" | cut -d' ' -f1); \
-		printf '{"mutant": %s, "sha256": "%s"}\n' "$$n" "$$sha" > "$(TEST_DIR)/closure-mutants/nift-$$n.json"; \
+		printf '{"mutant": %s, "sha256": "%s", "build": "closure-mutant", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal_sha" > "$(TEST_DIR)/closure-mutants/nift-$$n.json"; \
 		python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" \
 			--normal "$(CURDIR)/$(TARGET)" --mutant-info "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n.json" \
 			--mutant $$n || exit 1; \
@@ -3251,10 +3252,11 @@ test-runtime2-cp12c-probes: $(TARGET)
 test: test-runtime2-cp12c-probes
 test-runtime2-for-s2-mutants: $(TARGET)
 	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
+	normal_sha=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
 	for n in 1 2 3 4 5 6 7; do \
 		$(MAKE) FOR_MUTANT=$$n "$(TEST_DIR)/for-mutants/nift-$$n" >/dev/null || exit 1; \
 		sha=$$(sha256sum "$(TEST_DIR)/for-mutants/nift-$$n" | cut -d' ' -f1); \
-		printf '{"mutant": %s, "sha256": "%s"}\n' "$$n" "$$sha" > "$(TEST_DIR)/for-mutants/nift-$$n.json"; \
+		printf '{"mutant": %s, "sha256": "%s", "build": "for-mutant", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal_sha" > "$(TEST_DIR)/for-mutants/nift-$$n.json"; \
 		python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TEST_DIR)/for-mutants/nift-$$n" \
 			--normal "$(CURDIR)/$(TARGET)" --mutant-info "$(CURDIR)/$(TEST_DIR)/for-mutants/nift-$$n.json" \
 			--mutant $$n || exit 1; \

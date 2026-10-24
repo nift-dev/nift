@@ -41,8 +41,10 @@ def main():
                 f.write("#!/usr/bin/python3\nimport sys\n" + body)
             os.chmod(fake, 0o755)
             digest = hashlib.sha256(open(fake, "rb").read()).hexdigest()
+            normal_digest = hashlib.sha256(open(normal, "rb").read()).hexdigest()
             info = os.path.join(d, label + ".json")
-            json.dump({"mutant": 1, "sha256": digest}, open(info, "w"))
+            json.dump({"mutant": 1, "sha256": digest, "build": "for-mutant",
+                       "normal_sha256": normal_digest}, open(info, "w"))
             for script, mutant in (("for_s2.py", 1), ("for_s2.py", 5), ("closures_s1.py", 1)):
                 rc, out = run(os.path.join(here, script), fake, normal, info, mutant)
                 if rc == 0 or "PASS" in out:

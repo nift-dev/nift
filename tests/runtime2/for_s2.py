@@ -149,9 +149,12 @@ def check_mutant(nift, normal, work, name, want, budget, timeout_s, mutant):
     if vm[2] != sig["exit"] or st.get("outcome") != sig["outcome"]:
         return False, False, f"mutation signature exit/outcome {vm[2]}/{st.get('outcome')} != {sig['exit']}/{sig['outcome']}"
     if "heap_leak_gt" in sig:
-        leak = st.get("heap_live", 0) - normal_st.get("heap_live", 0)
+        live, peak = st.get("heap_live", 0), st.get("heap_peak", 0)
+        if live > peak or peak < normal_st.get("heap_peak", 0):
+            return False, True, f"inconsistent heap telemetry (live={live}, peak={peak})"
+        leak = live - normal_st.get("heap_live", 0)
         if leak <= sig["heap_leak_gt"]:
-            return False, False, f"no heap_live leak (mutant {st.get('heap_live')}, normal {normal_st.get('heap_live')})"
+            return False, False, f"no heap_live leak (mutant {live}, normal {normal_st.get('heap_live')})"
         return True, False, f"heap_live leak {leak} bytes after break"
     if st.get("reason") != "":
         return False, False, f"unexpected mutation reason {st.get('reason')!r}"
@@ -169,7 +172,7 @@ def main():
     nift = os.path.abspath(args.nift)
     normal = os.path.abspath(args.normal) if args.normal else None
     if args.mutant:
-        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info)
+        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info, normal, 'for-mutant')
         if provenance_error:
             print(f"FAIL for-s2 mutant {args.mutant}: harness: {provenance_error}")
             return 1
