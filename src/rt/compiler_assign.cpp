@@ -19,6 +19,7 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     binding.typed = true;  // every binding: assignments check it, bare references propagate it
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
     binding.reg = reg;
+    binding.decl_node = node_id(at);
     if (captured_binding(node_id(at))) {
         if (!fb_->alloc(binding.cell_reg)) return builder_ok();
         binding.cell = true;
@@ -83,6 +84,17 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
     if (!text_type_of(type, ast_.at(node.b), text_type)) return false;
+    if (b.lazy_for) {
+        if (b.cell) {
+            std::uint16_t untyped = 0;
+            if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+            fb_->emit(OpCode::CellStore, b.reg, value, untyped);
+        } else if (b.reg != value) {
+            fb_->emit(OpCode::Move, b.reg, value);
+        }
+        fb_->emit(OpCode::LoadI, b.lazy_active, 0);
+        return builder_ok();
+    }
     if (b.cell || b.upvalue) {
         fb_->set_offset(node.begin);
         const std::uint16_t mark = fb_->top();

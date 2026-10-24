@@ -56,6 +56,12 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     state.error_only = state.force_mode >= 0;
 
     if (!state.error_only) for_source_binding(iterable, state.place);
+    if (state.place != nullptr) {
+        // Keep binding identity stable: declaring the loop name below can
+        // reallocate the scope vector and must not scroll the source binding.
+        state.source_holder = *state.place;
+        state.place = &state.source_holder;
+    }
     if (iterable.kind == NodeKind::Ident) state.source_name = text(iterable);
     state.live = !state.error_only && state.place != nullptr;
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1

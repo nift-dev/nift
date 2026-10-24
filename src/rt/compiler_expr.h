@@ -65,6 +65,7 @@ public:
         NodeId lambda = kNoNode;
         std::uint16_t proto_slot = 0;
         std::vector<std::string_view> upvalue_names;
+        std::vector<NodeId> upvalue_decls;
         std::vector<Capture> captures;
     };
 

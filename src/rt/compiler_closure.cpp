@@ -88,6 +88,14 @@ void UnitCompiler::collect_lambda_names(NodeId id, std::vector<std::string_view>
             if (std::find(out.begin(), out.end(), name) == out.end()) out.push_back(name);
         }
         if (n.kind == NodeKind::FnDecl) continue;  // a separate (unsupported here) callable
+        if (n.kind == NodeKind::Member || n.kind == NodeKind::SafeMember) {
+            stack.push_back(n.a);
+            continue;
+        }
+        if (n.kind == NodeKind::Property) {
+            stack.push_back(n.b);
+            continue;
+        }
         for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
         const NodeId* list = ast_.list(n);
         for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
@@ -106,29 +114,17 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     }
     std::vector<std::string_view> names;
     collect_lambda_names(node.b, names);
-    // Lambda-local names shadow enclosing bindings; do not over-capture them.
-    std::unordered_set<std::string_view> locals;
-    for (std::uint32_t k = 0; k < node.count; ++k) locals.insert(text(ast_.at(params[k])));
-    std::vector<NodeId> stack{node.b};
-    while (!stack.empty()) {
-        const NodeId id = stack.back();
-        stack.pop_back();
-        if (id == kNoNode) continue;
-        const Node& n = ast_.at(id);
-        if (n.kind == NodeKind::Declare && n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident)
-            locals.insert(text(ast_.at(n.a)));
-        if (n.kind == NodeKind::FnDecl) continue;
-        for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
-        const NodeId* list = ast_.list(n);
-        for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
-    }
     std::vector<Capture> captures;
     std::vector<std::string_view> upvalue_names;
+    std::vector<NodeId> upvalue_decls;
     for (std::string_view name : names) {
-        if (locals.count(name)) continue;
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
         if (binding->global) continue;
+        // The lexical capture pass is scope-aware: an inner declaration does
+        // not hide an outer binding used outside its block, and member keys
+        // are not variable references.
+        if (binding->decl_node == kNoNode || !captured_binding(binding->decl_node)) continue;
         if (!in_function_ && top_level_bindings_.count(name)) {
             const Binding& global = top_level_bindings_.at(name);
             if (binding->reg == global.reg) continue;  // the direct program-level global, not a shadow
@@ -141,11 +137,13 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
             return fail(node, "lambda-capture");
         }
         upvalue_names.push_back(name);
+        upvalue_decls.push_back(binding->decl_node);
     }
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
-    lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(captures)});
+    lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(upvalue_decls),
+                                       std::move(captures)});
     const LambdaTask& task = lambda_tasks_.back();
     const std::uint16_t mark = fb_->top();
     std::uint16_t base = 0;
@@ -211,9 +209,39 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         Binding binding;
         binding.upvalue = true;
         binding.upvalue_index = k;
+        binding.decl_node = task.upvalue_decls[k];
         binding.typed = true;
         binding.decl_kinds = static_cast<KindSet>(kKindAll | kKindUnknown);
         if (!scopes_.declare(task.upvalue_names[k], binding)) return false;
+    }
+    // Legacy rejects a nested lambda that declares a name already visible
+    // in its enclosing scope (the declaration would shadow a captured/outer
+    // binding). Only this lambda's own declarations count; a deeper lambda's
+    // declaration is checked when that lambda is compiled.
+    {
+        std::vector<NodeId> stack{lambda.b};
+        std::vector<std::pair<std::string_view, NodeId>> declared;
+        while (!stack.empty()) {
+            const NodeId id = stack.back();
+            stack.pop_back();
+            if (id == kNoNode) continue;
+            const Node& n = ast_.at(id);
+            if (n.kind == NodeKind::Lambda || n.kind == NodeKind::FnDecl) continue;
+            if (n.kind == NodeKind::Declare && n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident)
+                declared.emplace_back(text(ast_.at(n.a)), n.a);
+            if (n.kind == NodeKind::Try && n.b != kNoNode)
+                declared.emplace_back(text(ast_.at(n.b)), n.b);
+            if (n.kind == NodeKind::For) {
+                const Node& h = ast_.at(n.a);
+                const NodeId* names = ast_.list(h);
+                for (std::uint32_t k = 0; k < h.count; ++k) declared.emplace_back(text(ast_.at(names[k])), names[k]);
+            }
+            for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
+            const NodeId* list = ast_.list(n);
+            for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
+        }
+        for (const auto& d : declared)
+            if (find_binding(d.first) != nullptr) return fail(ast_.at(d.second), "static-error:redeclared");
     }
     scopes_.push();  // parameters and locals
     const NodeId* params = ast_.list(lambda);
@@ -226,6 +254,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         const std::string_view name = text(param);
         Binding binding;
         binding.reg = regs[k];
+        binding.decl_node = node_id(param);
         binding.typed = true;
         binding.decl_kinds = kinds(params[k]);
         if (!fb_->alloc(binding.type_reg)) return false;

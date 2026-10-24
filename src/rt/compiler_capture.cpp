@@ -92,12 +92,38 @@ private:
                 return;
             }
             case NodeKind::Param: return;
+            case NodeKind::Member: case NodeKind::SafeMember: node(n.a, owner); return;
+            case NodeKind::Property: node(n.b, owner); return;
             case NodeKind::FnDecl: case NodeKind::StructDecl: case NodeKind::EnumDecl: return;
             case NodeKind::Block: block(n, owner); return;
             case NodeKind::If: {
                 node(n.a, owner);
                 node(n.b, owner);
                 if (n.c != kNoNode) node(n.c, owner);
+                return;
+            }
+            case NodeKind::For: {
+                const Node& h = ast_.at(n.a);
+                node(h.a, owner);
+                scopes_.emplace_back();
+                const NodeId* names = ast_.list(h);
+                for (std::uint32_t k = 0; k < h.count; ++k) add(ast_.text(ast_.at(names[k])), names[k], owner);
+                add("loop", n.a, owner);
+                node(n.b, owner);
+                scopes_.pop_back();
+                return;
+            }
+            case NodeKind::Try: {
+                if (n.b != kNoNode) {
+                    scopes_.emplace_back();
+                    add(ast_.text(ast_.at(n.b)), n.b, owner);
+                    node(n.a, owner);
+                    node(n.c, owner);
+                    scopes_.pop_back();
+                } else {
+                    node(n.a, owner);
+                    node(n.c, owner);
+                }
                 return;
             }
             case NodeKind::While: {

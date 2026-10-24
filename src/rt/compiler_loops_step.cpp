@@ -29,11 +29,22 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
                                  state.second_binding))
             return false;
     }
+    auto set_decl = [&](std::string_view name, Binding& b, NodeId decl) {
+        b.decl_node = decl;
+        scopes_.update(name, b);
+    };
+    if (!state.pair) set_decl(text(ast_.at(state.names[0])), state.first_binding, state.names[0]);
+    else {
+        set_decl(text(ast_.at(state.names[0])), state.first_binding, state.names[0]);
+        set_decl(text(ast_.at(state.names[1])), state.second_binding, state.names[1]);
+    }
     std::uint32_t loop_first = 0;
     state.has_loop = for_body_reads(body, "loop", loop_first);
     if (state.has_loop) {
         const bool captured = for_body_captures(body, "loop");
         if (!for_declare_binding("loop", header, captured, kKindObject, state.loop_binding)) return false;
+        state.loop_binding.decl_node = node_id(header);
+        scopes_.update("loop", state.loop_binding);
     }
 
     if (!temp(state.index)) return false;
@@ -72,13 +83,36 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     const bool second_captured = state.pair ? for_body_captures(body, text(ast_.at(state.names[1]))) : false;
     state.first_used = state.reads_first || first_writes || first_captured;
     state.second_used = state.pair && (state.reads_second || second_writes || second_captured);
-    if (!state.pair && !first_writes && !first_captured && state.live && !state.source_name.empty() &&
-        !state.snapshot_mutant && !state.first_binding.cell) {
+    const bool lazy_first = !state.pair && state.live && !state.source_name.empty() &&
+                            !state.snapshot_mutant;
+    if (lazy_first) {
         Binding lazy = state.first_binding;
         lazy.lazy_for = true;
         lazy.lazy_source_name = state.source_name;
         lazy.lazy_name = text(ast_.at(state.names[0]));
         lazy.lazy_index = state.index;
+        if (!temp(lazy.lazy_active)) return false;
+        const Binding& src = *state.place;
+        if (src.lazy_for) {
+            lazy.lazy_source_global = src.lazy_source_global;
+            lazy.lazy_source_cell = src.lazy_source_cell;
+            lazy.lazy_source_upvalue = src.lazy_source_upvalue;
+            lazy.lazy_source_lazy = true;
+            lazy.lazy_source_ancestor_lazy = src.lazy_source_lazy;
+            lazy.lazy_source_reg = src.lazy_source_reg;
+            lazy.lazy_source_index = src.lazy_index;
+            lazy.lazy_source_active = src.lazy_active;
+        } else {
+            lazy.lazy_source_global = src.global;
+            lazy.lazy_source_cell = src.cell;
+            lazy.lazy_source_upvalue = src.upvalue;
+            lazy.lazy_source_lazy = false;
+            lazy.lazy_source_ancestor_lazy = false;
+            lazy.lazy_source_reg = src.reg;
+            lazy.lazy_source_index = src.upvalue_index;
+            lazy.lazy_source_active = 0;
+        }
+        fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
         state.first_binding = lazy;
         scopes_.update(text(ast_.at(state.names[0])), lazy);
     }
@@ -90,8 +124,8 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         return fail(node, "for-capture-vanishing");
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))
         return fail(node, "for-missing-write");
-    if (state.pair && shrink && !second_writes && !second_captured && state.live && !state.source_name.empty() &&
-        !state.snapshot_mutant && !state.second_binding.cell) {
+    if (state.pair && shrink && state.live && !state.source_name.empty() &&
+        !state.snapshot_mutant) {
         Binding lazy = state.second_binding;
         lazy.lazy_for = true;
         lazy.lazy_pair = true;
@@ -99,6 +133,28 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         lazy.lazy_name = text(ast_.at(state.names[1]));
         lazy.lazy_keys = state.keys;
         lazy.lazy_index = state.index;
+        if (!temp(lazy.lazy_active)) return false;
+        const Binding& src = *state.place;
+        if (src.lazy_for) {
+            lazy.lazy_source_global = src.lazy_source_global;
+            lazy.lazy_source_cell = src.lazy_source_cell;
+            lazy.lazy_source_upvalue = src.lazy_source_upvalue;
+            lazy.lazy_source_lazy = true;
+            lazy.lazy_source_ancestor_lazy = src.lazy_source_lazy;
+            lazy.lazy_source_reg = src.lazy_source_reg;
+            lazy.lazy_source_index = src.lazy_index;
+            lazy.lazy_source_active = src.lazy_active;
+        } else {
+            lazy.lazy_source_global = src.global;
+            lazy.lazy_source_cell = src.cell;
+            lazy.lazy_source_upvalue = src.upvalue;
+            lazy.lazy_source_lazy = false;
+            lazy.lazy_source_ancestor_lazy = false;
+            lazy.lazy_source_reg = src.reg;
+            lazy.lazy_source_index = src.upvalue_index;
+            lazy.lazy_source_active = 0;
+        }
+        fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
         state.second_binding = lazy;
         scopes_.update(text(ast_.at(state.names[1])), lazy);
     }

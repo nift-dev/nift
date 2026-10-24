@@ -151,6 +151,12 @@ NodeId ExprParser::whole_statement() {
     const NodeId value = unit();
     if (value == kNoNode) return kNoNode;
     if (!is(Tok::End)) return fail(OpaqueReason::LegacyRuntimeError);
+    const Node& target = ast_.at(left);
+    const Node& rhs = ast_.at(value);
+    const std::string_view src = ast_.source();
+    if (op == Op::None && rhs.kind == NodeKind::Lambda && target.end + 1 < src.size() &&
+        src[target.end] == '=' && src[target.end + 1] == '(')
+        return fail(OpaqueReason::LegacyRuntimeError);
     return node2(op == Op::None ? NodeKind::Assign : NodeKind::CompoundAssign, op, begin, left, value);
 }
 

@@ -152,6 +152,11 @@ def main():
                 if problems and any("no NIFT_VM=1 statistics" in p or "harness:" in p for p in problems):
                     failures += 1
                     print(f"FAIL mutant {args.mutant} {name}: harness: " + "; ".join(problems))
+                elif name in MUTANT_CASES.get(args.mutant, set()) and (
+                        st.get("outcome") not in ("vm", "vm-error", "internal-error") or st.get("vm_executions") != 1):
+                    failures += 1
+                    print(f"FAIL mutant {args.mutant} {name}: harness: no real VM execution "
+                          f"(outcome={st.get('outcome')}, vm_executions={st.get('vm_executions')})")
                 elif name in MUTANT_CASES.get(args.mutant, set()):
                     if problems:
                         detected.add(name)

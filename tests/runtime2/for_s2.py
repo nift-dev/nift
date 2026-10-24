@@ -119,6 +119,12 @@ def check_mutant(nift, normal, work, name, want, budget, timeout_s):
         return False, True, f"unexpected timeout after {timeout_s}s"
     if st is None:
         return False, True, "no statistics"
+    if vm[2] < 0 or vm[2] >= 128 or vm[2] in (124, 125):
+        return False, True, f"abnormal exit {vm[2]} (not a semantic mismatch)"
+    if st.get("outcome") not in ("vm", "vm-error") or st.get("vm_executions") != 1:
+        return False, True, f"invalid statistics (outcome={st.get('outcome')}, vm_executions={st.get('vm_executions')})"
+    if vm[2] not in (0, 1):
+        return False, True, f"unexpected exit {vm[2]}"
     problems, _ = check(nift, work, name, want, budget, timeout_s)
     if name == "g6_break_object.f":
         if normal is None:

@@ -22,6 +22,7 @@
 namespace nift::rt {
 
 struct Binding {
+    NodeId decl_node = kNoNode;
     std::uint16_t reg = 0;
     std::uint16_t type_reg = 0;
     bool typed = false;  // has a binding-type register (only bindings that are ever assigned)
@@ -49,6 +50,15 @@ struct Binding {
     std::string_view lazy_source_name;
     std::string_view lazy_name;
     std::uint16_t lazy_index = 0;
+    std::uint16_t lazy_active = 0;
+    bool lazy_source_global = false;
+    bool lazy_source_cell = false;
+    bool lazy_source_upvalue = false;
+    bool lazy_source_lazy = false;
+    bool lazy_source_ancestor_lazy = false;
+    std::uint16_t lazy_source_reg = 0;
+    std::uint16_t lazy_source_active = 0;
+    std::uint16_t lazy_source_index = 0;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

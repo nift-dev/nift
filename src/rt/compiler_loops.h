@@ -11,6 +11,7 @@ struct UnitCompiler::ForState {
     bool pair = false;
     const NodeId* names = nullptr;
     const Binding* place = nullptr;
+    Binding source_holder;
     std::string_view source_name;
     bool live = false;
     bool snapshot_mutant = false;

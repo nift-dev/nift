@@ -253,6 +253,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         if (plan_.index.count(name)) return fail(param, "param-shadows-fn");
         Binding binding;
         binding.reg = regs[k];
+        binding.decl_node = node_id(param);
         binding.typed = true;
         binding.decl_kinds = kinds(params[k]);
         binding.decl_may_double = may_double_[f].count(name) != 0;
