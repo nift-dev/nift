@@ -706,7 +706,10 @@ def main():
         # same mutant may legitimately crash through UB and must not turn the
         # release gate into a harness failure.
         asan_only = {stem(c) for c in spec.get("asan_cases", [])}
-        normal_cases = [c for c in cases if c not in asan_only]
+        # Checked-only cases are exercised by --checked-mutant (the release
+        # mutant may pop a stale handler defensively, as the design says).
+        checked_only = {stem(c) for c in spec.get("checked_cases", [])}
+        normal_cases = [c for c in cases if c not in asan_only and c not in checked_only]
         harness, detected, missed, control_failures = mutant_gate(normal_cases, checker, required, controls)
         required_missed = sorted(required - detected)
         if harness or required_missed or control_failures or not required:

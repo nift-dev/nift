@@ -51,7 +51,8 @@ bool UnitCompiler::try_statement(const Node& node) {
     scopes_.pop();
     if (!catch_ok) return false;
 #if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 3
-    if (!scopes_.declare(text(name), binding)) return fail(name, "static-error:redeclared");
+    if (scopes_.find(text(name)) == nullptr && !scopes_.declare(text(name), binding))
+        return fail(name, "static-error:redeclared");
 #endif
     if (!fb_->patch(over, fb_->here())) return builder_ok();
     fb_->release_to(mark);
