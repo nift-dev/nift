@@ -219,7 +219,8 @@ VmResult Vm::run(std::string& output) {
     DISPATCH();
 #else
     bool checked = false;
-    for (;;) switch (pc->op) {
+    for (;;) {
+    switch (pc->op) {
 #endif
     OP(LoadK) { R[pc->a] = K[pc->b]; NEXT(); } OP(LoadI) { R[pc->a] = Value::integer(jump_offset(pc->b)); NEXT(); }
     OP(LoadNull) { R[pc->a] = Value(); NEXT(); } OP(LoadBool) { R[pc->a] = Value::boolean(pc->b != 0); NEXT(); }
