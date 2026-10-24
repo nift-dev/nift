@@ -62,12 +62,22 @@ ProcessGroup::~ProcessGroup() {
     runtime::index_remove(this);
     // Keep attribution while any descendant outlives this object; the orphan
     // sweep prunes the pgid once the group is truly gone (F6).
+    bool absent = false;
+#ifdef __linux__
+    // Linux keeps zombie tasks in the process-group lookup until reaped.
+    // Only ESRCH proves absence; success/EPERM/uncertainty must still use
+    // the unfiltered scan below (group_has_members alone excludes zombies).
+    // pgid 1 is excluded: kill(-1, 0) queries all permitted processes.
+    absent = s.pgid > 1 && ::kill(-s.pgid, 0) == -1 && errno == ESRCH;
+#endif
     bool any_member = false;
-    for (const auto& process : runtime::proc_scan()) {
-        if (process.pgrp == s.pgid) { any_member = true; break; }
+    if (!absent) {
+        for (const auto& process : runtime::proc_scan()) {
+            if (process.pgrp == s.pgid) { any_member = true; break; }
+        }
     }
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 10
-    if (!any_member && !group_has_members(s)) runtime::forget_managed_pgid(s.pgid);
+    if (!any_member && (absent || !group_has_members(s))) runtime::forget_managed_pgid(s.pgid);
 #endif
 }
 
