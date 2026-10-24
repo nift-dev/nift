@@ -43,6 +43,12 @@ void delete_object(HeapObject* object) noexcept {
         case Kind::Function: delete static_cast<FunctionObject*>(object); return;
         case Kind::Struct: delete static_cast<StructObject*>(object); return;
         case Kind::Error: delete static_cast<ErrorObject*>(object); return;
+        case Kind::Handle: {  // a counted handle box: drop its table reference (never blocks)
+            auto* box = static_cast<HandleBoxObject*>(object);
+            if (box->release) box->release(box->table, box->handle_kind, box->id, box->generation);
+            delete box;
+            return;
+        }
         case Kind::Cell: delete static_cast<CellObject*>(object); return;
         default: return;  // immediate kinds never reach the heap
     }
