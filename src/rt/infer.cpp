@@ -200,7 +200,8 @@ TyRef Inference::expr(NodeId id) {
         }
         case NodeKind::Member: {
             const TyRef error_receiver = expr(n.a);
-            if (error_receiver->kinds & kKindError) {
+            if ((error_receiver->kinds & kKindError) &&
+                (error_receiver->kinds & ~(kKindError | kKindNull)) == 0) {
                 const std::string_view member = ast_.text(ast_.at(n.b));
                 if (member == "message" || member == "code" || member == "category" || member == "source")
                     t = kinds_ty(kKindString);
@@ -326,8 +327,8 @@ TyRef Inference::call(const Node& n) {
     if (callee.kind == NodeKind::Member) {
         const TyRef recv = expr(callee.a);
         const std::string_view name = ast_.text(ast_.at(callee.b));
-        if ((recv->kinds & kKindError) && (name == "stringify" || name == "prettify" || name == "highlight") &&
-            n.count == 0)
+        if ((recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0 &&
+            (name == "stringify" || name == "prettify" || name == "highlight") && n.count == 0)
             return kinds_ty(kKindString);
     }
     if (callee.kind == NodeKind::Member && !plan_.structs.empty()) {  // CP12b: a struct method
