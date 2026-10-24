@@ -49,7 +49,7 @@ python3 "$here/run.py" --nift "$nift" --selftest
 echo "== H3: fd-based Host trace positive control =="
 python3 "$here/run.py" --nift "$nift" --trace-selftest
 
-echo "== H1: a tampering wrapper must not make mutant 6 PASS on the unimplemented binary =="
+echo "== H1: a tampering wrapper must not make mutant 6 PASS =="
 set +e
 tamper_out="$(python3 "$here/run.py" --nift "$work/tamper.py" --oracle "$nift" --mutant 6 2>&1)"
 tamper_status=$?
@@ -59,8 +59,8 @@ if [ "$tamper_status" -eq 0 ]; then
   echo "$tamper_out" >&2
   exit 1
 fi
-if ! grep -q "PENDING-PHASE-B" <<<"$tamper_out"; then
-  echo "FAIL harness self-test: tamper run was not classified PENDING-PHASE-B" >&2
+if grep -q "PASS exception mutant 6" <<<"$tamper_out"; then
+  echo "FAIL harness self-test: a tampering wrapper was credited as a detection" >&2
   echo "$tamper_out" >&2
   exit 1
 fi
@@ -75,8 +75,8 @@ if [ "$nostats_status" -eq 0 ]; then
   echo "$nostats_out" >&2
   exit 1
 fi
-if ! grep -q "PENDING-PHASE-B" <<<"$nostats_out"; then
-  echo "FAIL harness self-test: no-statistics run was not classified PENDING/harness" >&2
+if grep -q "PASS exception mutant 6" <<<"$nostats_out"; then
+  echo "FAIL harness self-test: a no-statistics wrapper was credited as a detection" >&2
   echo "$nostats_out" >&2
   exit 1
 fi

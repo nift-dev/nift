@@ -7,9 +7,16 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../../.." && pwd)"
 out="${TMPDIR:-/tmp}/cp13b-error-lifecycle-$$"
-trap 'rm -f "$out"' EXIT
+stubs="${TMPDIR:-/tmp}/cp13b-error-stubs-$$.cpp"
+trap 'rm -f "$out" "$stubs"' EXIT
+cat >"$stubs" <<'EOF'
+#include "rt/host/host_error.h"
+#include "rt/natives/builtin.h"
+namespace nift::rt::host { bool catchable(std::string_view) { return true; } }
+namespace nift::rt::natives { bool is_recoverable_code(std::string_view) { return false; } }
+EOF
 "${CXX:-g++}" -I"$root/src" -std=c++17 -O2 -Wall -Wextra -pedantic \
-  "$here/error_lifecycle_unit.cpp" \
+  "$here/error_lifecycle_unit.cpp" "$stubs" \
   "$root/src/rt/error.cpp" "$root/src/rt/heap_account.cpp" \
   "$root/src/rt/value.cpp" "$root/src/rt/string.cpp" -o "$out"
 echo "== normal (must pass) =="

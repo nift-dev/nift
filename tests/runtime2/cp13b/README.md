@@ -1,7 +1,8 @@
-# CP13B exception fixtures (Phase A R2)
+# CP13B exception fixtures (Phase A R2, implemented Phase B)
 
 Test-only fixtures and harness for `try`/`catch`/`throw`/`error()` on the
-Runtime 2.0 VM. Not wired into `make test`. No production source is changed.
+Runtime 2.0 VM. Phase B implementation is present; the suite is still
+evidence rather than part of `make test`.
 
 ```sh
 python3 tests/runtime2/cp13b/run.py --nift ./nift --mode legacy
@@ -21,8 +22,9 @@ python3 tests/runtime2/cp13b/mutant_build.py --root . --dry-run
 - `cases/` and `expected/`: legacy oracle goldens regenerated from the legacy
   engine on this base. `name.m.nft` is copied to `m.nft`;
   `name.init.nft`/`name.lib.nft` support multi-module fixtures.
-- `MANIFEST.tsv`: the current structured refusal per case; `@vm` marks a
-  fixture the current VM already executes (checked against the legacy golden).
+- `MANIFEST.tsv`: the `NIFT_VM=require` expectation per case after Phase B;
+  `@vm` marks a fixture that executes on the VM (checked against the legacy
+  golden), otherwise the exact whole-unit refusal reason remains.
 - `EXPECT_FUTURE.tsv`: outcome (`vm`, `vm-error`, `fallback:<exact reason>`,
   `limit`), approved policy ids (`D-001#4` -> `D-001#4 recursion`, `D-018c` ->
   `D-018c diagnostics`), VM-only environment, and checks (`uncatchable`,
@@ -44,6 +46,6 @@ genuine VM execution for `vm`/`vm-error`; fallback reasons are exact;
 detect only after genuine VM execution. Fallbacks, refusals, signals,
 sanitizer reports, exit 70/unexpected exits, timeouts, missing/malformed
 statistics and oracle mismatches are harness failures, never detections.
-Controls must still pass under the mutant. On the unimplemented binary every
-mutant gate is PENDING-PHASE-B (E5: PENDING-CP16), never PASS. `cp16` fixtures
-remain incomplete until CP16 and N1 integrate.
+Controls must still pass under the mutant. E1–E8 and the E2 checked-build and
+E7 ASan controls are validated by Phase B. `cp16` fixtures exercise the
+integrated CP16/N1 Host codes.
