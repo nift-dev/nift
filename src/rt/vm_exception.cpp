@@ -1,3 +1,5 @@
+#include "rt/vm_exception.h"
+
 #include "rt/error.h"
 #include "rt/heap.h"
 #include "rt/string.h"
@@ -29,6 +31,40 @@ bool Vm::pop_handlers_for_frame(std::size_t depth, Fault& fault) {
 #endif
 }
 
+
+bool Vm::handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
+                     std::size_t& base, const Instr*& pc) {
+    if (fault.large) note_large(pc, fault);
+#if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)
+    if (fault.reason == StopReason::Error && !fault.catchable) {
+        SourceOrigin origin;
+        if (origin_at(report_offset(fault, proto, pc), origin, fault)) {
+            fault.error = make_user_error(fault.message);
+            fault.catchable = true;
+        }
+    }
+#endif
+    if (fault.reason == StopReason::Error && fault.catchable) {
+        if (!fault.error.is(Kind::Error)) {
+            fault.catchable = false;
+            fault.error = Value();
+            internal(fault, "catchable fault without Error payload");
+        }
+#if !defined(NIFT_EXC_MUTANT) || NIFT_EXC_MUTANT != 1
+        else if (global_taken_ != 0) {
+            fault.catchable = false;
+            fault.error = Value();
+            internal(fault, "global taken during an exception");
+        }
+#endif
+        else if (unwind(fault, R, K, proto, base, pc)) {
+            return true;
+        }
+    }
+    error_result(result, fault, proto, pc);
+    return false;
+}
+
 bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, const Instr* pc, Fault& fault) {
     Handler handler;
     handler.frame_depth = frames_.size();
@@ -43,6 +79,7 @@ bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, con
 }
 
 bool Vm::op_try_end(const Instr& in, Fault& fault) {
+    (void)in;
 #if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 2
     if (in.c != 0) return true;  // E2: leave a handler on break/return exits
     (void)fault;

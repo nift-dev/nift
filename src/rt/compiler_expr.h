@@ -95,6 +95,8 @@ private:
     bool try_statement(const Node& node);
     bool throw_statement(const Node& node);
     bool error_new(const Node& node, std::uint16_t dst);
+    bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
+    bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);
     // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
     bool for_loop(const Node& node);

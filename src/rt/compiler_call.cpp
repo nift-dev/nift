@@ -7,8 +7,7 @@
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
-// Calls (user functions, natives), methods, member and index reads (CP11,
-// CP12). Errors are reported at the failing expression (D-018c).
+// Calls, methods, member and index reads (CP11/CP12); errors at the expression (D-018c).
 namespace nift::rt::detail {
 bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
@@ -17,14 +16,12 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
     if (const Binding* binding = find_binding(name); binding != nullptr) return call_value(node, node.a, false, dst);
-    if (name == "error") return error_new(node, dst);  // CP13B reserved Error constructor
+    if (name == "error") return error_new(node, dst);  // rt-lint: allow-string-compare reserved Error constructor
     if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
     const auto fn = plan_.index.find(name);
     NativeInfo native{};
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
-    // CP14: a free built-in (`range`, `min`, `html_escape`, `type`, ...). A
-    // user function or binding of that name is refused before this point
-    // (reserved names, D-009#3).
+    // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;
     if (fn == plan_.index.end() && !is_native && !builtin) return fail(callee, "callable:" + std::string(name));
     const std::uint16_t arity =
@@ -197,18 +194,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
-    // CP13B: Error JSON methods are explicit (ErrorJson), not native edits.
-    if ((name == "stringify" || name == "prettify" || name == "highlight") && node.count == 0 &&
-        (kinds(callee.a) & kKindError) && (kinds(callee.a) & ~(kKindError | kKindNull)) == 0) {
-        const std::uint16_t mark = fb_->top();
-        std::uint16_t receiver = 0;
-        if (!reg_any(callee.a, receiver)) return false;
-        fb_->set_offset(site(node));
-        const std::size_t at = fb_->emit(OpCode::ErrorJson, dst, receiver, name == "prettify" ? 1 : 0);
-        fb_->note(at, std::string(text(node)));
-        fb_->release_to(mark);
-        return true;
-    }
+    if (error_method_call(node, dst, name, callee.a)) return true;
     // `length()`/`size()` keep the CP11/CP12 Length opcode (the fast path,
     // with its own kind checks and the context:object-length refusal, Q3).
     const bool length_opcode =
@@ -351,21 +337,7 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node)) return false;
     std::string location;
     if (!argument_path(node, location)) return false;
-    if ((kinds(node.a) & kKindError) && (kinds(node.a) & ~(kKindError | kKindNull)) == 0) {
-        const std::string_view member = text(ast_.at(node.b));
-        if (member != "message" && member != "code" && member != "category" && member != "source" &&
-            member != "line" && member != "column" && member != "cause")
-            return fail(node, "method:" + std::string(member));
-        const std::uint16_t mark = fb_->top();
-        std::uint16_t receiver = 0;
-        if (!reg_any(node.a, receiver)) return false;
-        const Atom key = atom(member);
-        if (key.id > 0xffff) return fail(node, "limit:atoms");
-        fb_->set_offset(site(node));
-        fb_->emit(OpCode::GetMember, dst, receiver, static_cast<std::uint16_t>(key.id));
-        fb_->release_to(mark);
-        return true;
-    }
+    if (error_member_access(node, dst, node.a)) return true;
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
@@ -425,24 +397,4 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     fb_->release_to(mark);
     return true;
 }
-bool UnitCompiler::error_new(const Node& node, std::uint16_t dst) {
-    if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
-    const bool in_place = dst + 1u == fb_->top();
-    const std::uint16_t base = in_place ? dst : fb_->top();
-    const NodeId* args = ast_.list(node);
-    for (std::uint32_t k = 0; k < node.count; ++k) {
-        if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        std::uint16_t reg = base + k;
-        if (!(in_place && k == 0) && !temp(reg)) return false;
-        if (!expr_to(args[k], reg)) return false;
-    }
-    std::uint16_t slot = base;
-    if (node.count == 0 && !in_place && !temp(slot)) return false;
-    fb_->set_offset(error_call_offset_ == kNoNode ? site(node) : error_call_offset_);
-    fb_->emit(OpCode::ErrorNew, base, base, static_cast<std::uint16_t>(node.count));
-    if (dst != base) fb_->emit(OpCode::Move, dst, base);
-    fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
-    return builder_ok();
-}
-
 } // namespace nift::rt::detail

@@ -159,6 +159,7 @@ private:
     bool op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     void op_mark_global(const Instr& in);
     bool op_check_global(const Instr& in, Fault& fault, const Proto* proto);
+    bool op_meta_global(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     // CP13B: exception dispatch (vm_exception.cpp).
     bool unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc);
     bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
@@ -168,6 +169,8 @@ private:
     bool op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc, Fault& fault);
     bool op_error_new(const Instr& in, Value* R, Fault& fault);
     bool op_error_json(const Instr& in, Value* R, Fault& fault);
+    bool handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
+                     std::size_t& base, const Instr*& pc);
     // CP12C slice 2 default `for` opcodes (vm_iter.cpp).
     bool op_iter_check(const Instr& in, Value* R, Fault& fault);
     bool op_array_elem(const Instr& in, Value* R, Fault& fault);

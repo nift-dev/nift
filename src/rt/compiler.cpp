@@ -294,8 +294,11 @@ bool UnitCompiler::expression_statement(const Node& node) {
         }
     }
     // Legacy renders other expression statements as template text (an
-    // aggregate value is an error there); only calls are compiled.
+    // aggregate value is an error there); only calls are compiled. A call
+    // whose value may be an Error is rendered by legacy's template path
+    // (`Error values cannot be rendered as text in $[...]`): refuse it.
     if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
+    if (kinds(node.a) == kKindError) return fail(expr, "error-result-expression");
     std::uint16_t scratch = 0;
     return temp(scratch) && expr_to(node.a, scratch);
 }

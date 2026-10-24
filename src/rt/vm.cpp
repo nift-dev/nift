@@ -180,6 +180,21 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
       R = stack_.data() + base; K = proto->constants.data(); pc = f.ret; }                          \
     DISPATCH();
 
+bool Vm::op_meta_global(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
+    switch (in.op) {
+        case OpCode::GetGlobal: R[in.a] = stack_[in.b]; return true;
+        case OpCode::GetGlobalChecked: return op_get_global_checked(in, R, fault, proto);
+        case OpCode::SetGlobal:
+            if (in.flags & kInstrGlobalTake) ++global_taken_;
+            else if (in.flags & kInstrGlobalPut) { if (global_taken_ != 0) --global_taken_; }
+            stack_[in.a] = R[in.b];
+            return true;
+        case OpCode::MarkGlobal: op_mark_global(in); return true;
+        case OpCode::CheckGlobal: return op_check_global(in, fault, proto);
+        default: return internal(fault, "global opcode");
+    }
+}
+
 VmResult Vm::run(std::string& output) {
     VmResult result;
     Fault fault;
@@ -196,8 +211,8 @@ VmResult Vm::run(std::string& output) {
     const void* checked_labels[std::size(kLabels)];
     std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
     for (const auto& [op, label] : {std::pair{OpCode::Add, &&LC_Add}, {OpCode::Sub, &&LC_Sub},
-                                    {OpCode::Mul, &&LC_Mul}, {OpCode::Mod, &&LC_Mod}, {OpCode::AddI, &&LC_AddI},
-                                    {OpCode::AddAssign, &&LC_AddAssign}})
+                                    {OpCode::Mul, &&LC_Mul}, {OpCode::Mod, &&LC_Mod},
+                                    {OpCode::AddI, &&LC_AddI}, {OpCode::AddAssign, &&LC_AddAssign}})
         checked_labels[static_cast<std::size_t>(op)] = label;
     MUTATE_CHECKED_TABLE(checked_labels)
     const void* const* labels = kLabels;
@@ -275,18 +290,13 @@ VmResult Vm::run(std::string& output) {
         if (tag_assignable(tag, to)) NEXT();
         binding_type_error(tag, to, note_at(proto, pc), fault); FAIL();
     }
-    OP(Call) {
-        if (!op_call(*pc, R, K, proto, base, pc, fault)) FAIL();
-        DISPATCH();
-    }
+    OP(Call) { if (!op_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(CallValue) { if (!op_call_value(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(LoadFunction) { if (!op_load_function(*pc, R, fault)) FAIL(); NEXT(); }
     OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
     OP(CellLoadCached) OP(CellStoreCached) OP(CellTake) OP(CellAnchor) OP(CellSlot) {
-        if (!op_cell_cached(*pc, R, fault)) FAIL();
-        NEXT();
-    }
+        if (!op_cell_cached(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }
@@ -321,52 +331,16 @@ VmResult Vm::run(std::string& output) {
             FAIL();
         NOTE_LARGE NEXT();
     }
-    OP(GetGlobal) { R[pc->a] = stack_[pc->b]; NEXT(); }
-    OP(GetGlobalChecked) { if (!op_get_global_checked(*pc, R, fault, proto)) FAIL(); NEXT(); }
-    OP(SetGlobal) {
-        if (pc->flags & kInstrGlobalTake) ++global_taken_;
-        else if (pc->flags & kInstrGlobalPut) { if (global_taken_ != 0) --global_taken_; }
-        stack_[pc->a] = R[pc->b];
+    OP(GetGlobal) OP(GetGlobalChecked) OP(SetGlobal) OP(MarkGlobal) OP(CheckGlobal) {
+        if (!op_meta_global(*pc, R, fault, proto)) FAIL();
         NEXT();
     }
-    OP(MarkGlobal) { op_mark_global(*pc); NEXT(); }
-    OP(CheckGlobal) { if (!op_check_global(*pc, fault, proto)) FAIL(); NEXT(); }
 #if !NIFT_RT_COMPUTED_GOTO
     default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
+#endif
 bail:
-#endif
-#if NIFT_RT_COMPUTED_GOTO
-bail:
-#endif
-    if (fault.large) note_large(pc, fault);
-#if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)
-    if (fault.reason == StopReason::Error && !fault.catchable) {
-        SourceOrigin origin;
-        if (origin_at(report_offset(fault, proto, pc), origin, fault)) {
-            fault.error = make_user_error(fault.message);
-            fault.catchable = true;
-        }
-    }
-#endif
-    if (fault.reason == StopReason::Error && fault.catchable) {
-        if (!fault.error.is(Kind::Error)) {
-            fault.catchable = false;
-            fault.error = Value();
-            internal(fault, "catchable fault without Error payload");
-        }
-#if !defined(NIFT_EXC_MUTANT) || NIFT_EXC_MUTANT != 1
-        else if (global_taken_ != 0) {
-            fault.catchable = false;
-            fault.error = Value();
-            internal(fault, "global taken during an exception");
-        }
-#endif
-        else if (unwind(fault, R, K, proto, base, pc)) {
-            DISPATCH();
-        }
-    }
-    error_result(result, fault, proto, pc);
+    if (handle_bail(fault, result, R, K, proto, base, pc)) DISPATCH();
     goto done;
 #if !NIFT_RT_COMPUTED_GOTO
     }

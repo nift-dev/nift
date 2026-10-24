@@ -172,6 +172,11 @@ void limits_from_environment(VmOptions& options) {
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code);
 
+SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& path, const std::string& source) {
+    return link.linked ? SourceMap::linked(link, path.generic_string(), source)
+                       : SourceMap::single(path.generic_string(), source);
+}
+
 } // namespace
 
 VmMode vm_mode_from_environment() {
@@ -318,15 +323,10 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     const char* dump = std::getenv("NIFT_VM_DUMP");
     if (dump && std::string(dump) == "1") std::cerr << disassemble(*compiled.program);
-
     VmOptions options;
     limits_from_environment(options);
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
-    // CP13B: own the source positions beside the linked unit; the map is
-    // destroyed before its borrowed link (declaration order below).
-    const SourceMap source_map = link.linked
-        ? SourceMap::linked(link, source_path.generic_string(), source)
-        : SourceMap::single(source_path.generic_string(), source);
+    const SourceMap source_map = source_map_for(link, source_path, source);  // owns source positions
     options.source_map = &source_map;
     // From here on the unit runs on the VM and only on the VM: whatever
     // happens, the legacy engine never runs it (engine selection is final).
