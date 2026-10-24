@@ -330,9 +330,40 @@ $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread \
 		tests/rt/source_map_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
-.PHONY: test-rt-source-map test-rt-source-map-sanitize test-rt-source-map-tsan
-test-rt-source-map: $(SOURCE_MAP_UNIT)
+SOURCE_MAP_RETRY_UNIT := $(TEST_DIR)/rt/source-map-retry
+$(SOURCE_MAP_RETRY_UNIT): tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/source_map.h \
+		src/rt/module_link.cpp src/rt/module_link.h
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -ffunction-sections -fdata-sections -pthread \
+		tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/module_link.cpp \
+		-Wl,--gc-sections -o "$@"
+
+ERROR_OOM_UNIT := $(TEST_DIR)/rt/error-oom
+$(ERROR_OOM_UNIT): tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/error.h \
+		src/rt/heap_account.cpp src/rt/value.cpp src/rt/string.cpp
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/heap_account.cpp \
+		src/rt/value.cpp src/rt/string.cpp -o "$@"
+
+.PHONY: test-rt-source-map test-rt-source-map-retry test-rt-source-map-sanitize test-rt-source-map-tsan test-rt-error-oom test-rt-error-oom-sanitize
+test-rt-source-map: $(SOURCE_MAP_UNIT) $(SOURCE_MAP_RETRY_UNIT)
 	"$(SOURCE_MAP_UNIT)"
+	"$(SOURCE_MAP_RETRY_UNIT)"
+
+test-rt-source-map-retry: $(SOURCE_MAP_RETRY_UNIT)
+	"$(SOURCE_MAP_RETRY_UNIT)"
+
+test-rt-error-oom: $(ERROR_OOM_UNIT)
+	"$(ERROR_OOM_UNIT)"
+
+test-rt-error-oom-sanitize:
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread \
+		tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/heap_account.cpp \
+		src/rt/value.cpp src/rt/string.cpp -o "$(TEST_DIR)/rt-san/error-oom"
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		timeout 300 "$(TEST_DIR)/rt-san/error-oom"
 
 test-rt-source-map-sanitize:
 	mkdir -p "$(TEST_DIR)/rt-san"

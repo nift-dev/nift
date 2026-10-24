@@ -62,7 +62,7 @@ bool make_system_error(std::string code, std::string message, const SourceOrigin
         error = "code is not catchable";
         return false;
     }
-    auto* object = new ErrorObject();
+    std::unique_ptr<ErrorObject> object(new ErrorObject());
     object->category = code.substr(0, code.find('.'));
     object->message = std::move(message);
     object->code = std::move(code);
@@ -74,15 +74,15 @@ bool make_system_error(std::string code, std::string message, const SourceOrigin
         object->line = 0;
         object->column = 0;
     }
-    heap_retally(object);
-    out = Value::adopt(object);
+    heap_retally(object.get());
+    out = Value::adopt(object.release());
     return true;
 }
 
 Value clone_error_with_origin(const Value& error, const SourceOrigin& origin) {
     if (!error.is(Kind::Error)) return error;
     const auto* source = error.heap_as<ErrorObject>();
-    auto* copy = new ErrorObject();
+    std::unique_ptr<ErrorObject> copy(new ErrorObject());
     copy->message = source->message;
     copy->code = source->code;
     copy->category = source->category;
@@ -90,8 +90,8 @@ Value clone_error_with_origin(const Value& error, const SourceOrigin& origin) {
     copy->line = origin.line;
     copy->column = origin.column;
     copy->cause = source->cause;
-    heap_retally(copy);
-    return Value::adopt(copy);
+    heap_retally(copy.get());
+    return Value::adopt(copy.release());
 }
 
 namespace {

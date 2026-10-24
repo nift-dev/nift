@@ -171,6 +171,10 @@ bool Vm::op_error_new(const Instr& in, Value* R, Fault& fault) {
 }
 
 bool Vm::op_error_json(const Instr& in, Value* R, Fault& fault) {
+    if (R[in.b].is_null()) {  // Error.cause is Error|Null; legacy stringifies null
+        R[in.a] = make_string("null");
+        return memory_ok(fault);
+    }
     if (!R[in.b].is(Kind::Error)) return internal(fault, "ErrorJson receiver");
     R[in.a] = make_string(error_to_json(R[in.b], in.c != 0));
     return memory_ok(fault);
