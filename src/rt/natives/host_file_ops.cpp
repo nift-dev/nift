@@ -1,10 +1,83 @@
 #include "rt/natives/host_file_ops.h"
-// rt-lint: cold-file file copy/move/remove operations
+// rt-lint: cold-file file copy/move/remove operations and the free close(handle)
 
+#include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_file_handles_internal.h"
+#include "rt/natives/host_stream_handles.h"
 
 namespace nift::rt::natives {
 using namespace host_handle_detail;
+
+Status handle_close(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+    if (argc != 1 || !args[0].is(Kind::Handle)) {
+        error = "close: expected a file or stream handle";
+        return Status::Error;
+    }
+    if (args[0].handle_kind() == HandleKind::File) return file_close(context, args, argc, out, error);
+    if (args[0].handle_kind() == HandleKind::Stream) return stream_close(context, args, argc, out, error);
+    error = "close: expected a file or stream handle";
+    return Status::Error;
+}
+
+Status file_save(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+    std::shared_ptr<FileResource> file;
+    Status status = Status::Ok;
+    if (!resource_arg(context, args, argc, "save", file, error, status)) return status;
+    if (!file->open) { error = "save: file is not open"; return Status::Error; }
+    if (file->mode == "r") { error = "save: file is not open for writing"; return Status::Error; }
+    if (!no_args(argc, "save", error)) return Status::Error;
+    HostCall call(context.host, host::HostOp::Save, "save");
+    call.adopt(file->path);
+    if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
+    file->update_dirty();
+    if (!file->dirty) { call.succeed(); out = Value::null(); return Status::Ok; }
+    std::error_code ec;
+    const auto parent = file->path.parent_path();
+    if (!parent.empty() && !fs::exists(parent, ec)) {
+        error = "save: parent directory does not exist";
+        if (context.host.error_code) *context.host.error_code = "io.write_failed";
+        call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
+        return Status::Recoverable;
+    }
+    const fs::perms perms =
+        fs::exists(file->path, ec) && !ec ? fs::status(file->path, ec).permissions() : fs::perms::unknown;
+    fs::path temp = file->path;
+    temp += ".nift-tmp-" + std::to_string(static_cast<unsigned long long>(
+                               std::chrono::steady_clock::now().time_since_epoch().count()));
+    {
+        std::ofstream output(temp, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            error = "save: cannot create temporary file";
+            if (context.host.error_code) *context.host.error_code = "io.write_failed";
+            call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
+            return Status::Recoverable;
+        }
+        output.write(file->working.data(), static_cast<std::streamsize>(file->working.size()));
+        output.flush();
+        if (!output) {
+            output.close();
+            fs::remove(temp, ec);
+            error = "save: temporary write failed";
+            if (context.host.error_code) *context.host.error_code = "io.write_failed";
+            call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
+            return Status::Recoverable;
+        }
+    }
+    if (perms != fs::perms::unknown) fs::permissions(temp, perms, ec);
+    if (!filesystem::replace_file_atomic(temp, file->path)) {
+        error = "save: atomic replace failed";
+        if (context.host.error_code) *context.host.error_code = "io.atomic_replace_failed";
+        call.fail(host::HostStatus::Recoverable, host_error("io.atomic_replace_failed", error));
+        return Status::Recoverable;
+    }
+    file->saved_is_working = true;
+    file->saved.clear();
+    file->dirty = false;
+    file->existed_at_open = true;
+    call.succeed();
+    out = Value::null();
+    return Status::Ok;
+}
 
 Status file_copy(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     std::shared_ptr<FileResource> file;

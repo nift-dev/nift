@@ -52,6 +52,12 @@ inline constexpr KindSet kKindFunction = kKindBytes;
 inline constexpr KindSet kKindFunction = 1u << 8;  // a first-class callable (CP12C)
 #endif
 inline constexpr KindSet kKindError = 1u << 9;     // reserved for CP13B
+// CP17 W13: handles. Bit 11 is the handle family; bits 12-13 refine a handle
+// whose resource kind is statically known (file/stream). Handle bits are
+// deliberately outside kKindAll: no generic value operation admits a handle.
+inline constexpr KindSet kKindHandle = 1u << 11;
+inline constexpr KindSet kKindFile = kKindHandle | (1u << 12);
+inline constexpr KindSet kKindStream = kKindHandle | (1u << 13);
 inline constexpr KindSet kKindNumber = kKindInt | kKindFrac;
 inline constexpr KindSet kKindAggregate = kKindArray | kKindObject;
 inline constexpr KindSet kKindScalar = kKindNull | kKindBool | kKindNumber | kKindString;
@@ -68,7 +74,11 @@ static_assert(kKindFunction == (1u << 8));
 #endif
 static_assert(kKindError == (1u << 9));
 static_assert(kKindUnknown == (1u << 10));
+static_assert(kKindHandle == (1u << 11));
+static_assert((kKindFile & kKindHandle) == kKindHandle && (kKindStream & kKindHandle) == kKindHandle);
+static_assert((kKindFile & kKindStream) == kKindHandle);
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
+static_assert((kKindAll & kKindHandle) == 0);
 
 struct UnitKinds {
     std::vector<KindSet> kinds;  // per NodeId (expressions)

@@ -15,6 +15,8 @@ Receiver receiver_family(KindSet kinds) {
     if ((kinds & ~kKindNumber) == 0) return Receiver::Number;
     if (kinds == kKindBool) return Receiver::Bool;
     if (kinds == kKindNull) return Receiver::Null;
+    if (kinds == kKindFile) return Receiver::File;
+    if (kinds == kKindStream) return Receiver::Stream;
     return Receiver::None;
 }
 
@@ -43,7 +45,8 @@ MethodBinding bind_method(KindSet kinds, std::string_view name, const BuiltinSpe
     }
     const Receiver family = receiver_family(kinds);
     if (family != Receiver::None) spec = natives::find_builtin(family, name);
-    if (!spec && !(kinds & kKindUnknown)) spec = natives::find_builtin(Receiver::Any, name);
+    if (!spec && !(kinds & kKindUnknown) && !(kinds & kKindHandle))
+        spec = natives::find_builtin(Receiver::Any, name);
     return spec ? MethodBinding::Bound : MethodBinding::Receiver;
 }
 

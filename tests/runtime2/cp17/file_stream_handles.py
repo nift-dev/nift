@@ -24,7 +24,7 @@ CASES = [
     ("file_local_reassign", 'f := file("a"); f = file("b"); f.open("r"); print(f.read_all()); f.close()\n', "vm"),
     ("ifstream", 's := ifstream("p"); print(s.read_line()); close(s)\n', "vm"),
     ("ofstream", 'o := ofstream("o"); o.write("y"); close(o); print(open("o"))\n', "vm"),
-    ("close_alias", 'f := file("p"); g := f; g.close(); print("closed")\n', "vm"),
+    ("close_alias", 'f := file("p"); f.open("r"); g := f; g.close(); print("closed")\n', "vm"),
     ("array_store", 'a := [file("p")]\n', "refuse"),
     ("object_store", 'o := {"f": file("p")}\n', "refuse"),
     ("call_arg", 'fn(use(h)) { return 1 }\nuse(file("p"))\n', "refuse"),
@@ -37,18 +37,18 @@ CASES = [
     ("type", 'print(type(file("p")))\n', "refuse"),
     ("interpolation", 'print("$[file(\'p\')]")\n', "refuse"),
     ("native_arg", 'print(len(file("p")))\n', "refuse"),
-    ("merge", 'x := 1\nif (true) { x := file("p") }\nprint(x)\n', "refuse"),
+    ("merge", 'x := 0\nif (true) { x = file("p") }\nprint(x)\n', "refuse"),
     ("side_effect_before_refusal", 'touch("marker"); a := [file("p")]\n', "refuse"),
 ]
 
 
-def run(nift, root, source, vm):
+def run(nift, root, source, mode):
     (root / "case.f").write_text(source)
     env = dict(os.environ)
-    env["NIFT_VM"] = "require" if vm else "0"
+    env["NIFT_VM"] = mode
     env.pop("NIFT_VM_STATS", None)
     stats = root / "stats.jsonl"
-    if vm:
+    if mode != "0":
         env["NIFT_VM_STATS"] = str(stats)
     proc = subprocess.run([nift, "case.f"], cwd=root, env=env, stdin=subprocess.DEVNULL,
                           capture_output=True, timeout=60)
@@ -72,16 +72,21 @@ def main():
             root = Path(root)
             for path, text in FILES.items():
                 (root / path).write_text(text)
-            legacy, _ = run(nift, root, source, False)
-            # Side-effect marker before a refusal must not appear.
+            legacy, _ = run(nift, root, source, "0")
+            # Side-effect marker before a refusal must not appear (the legacy
+            # oracle above may legitimately have created it).
             marker = root / "marker"
-            vm, record = run(nift, root, source, True)
+            if marker.exists():
+                marker.unlink()
+            vm, record = run(nift, root, source, "require" if mode == "vm" else "classify")
             problems = []
             if record is None:
                 problems.append("no statistics")
             elif mode == "refuse":
                 if record.get("outcome") != "fallback" or record.get("reason") != "host-handle-flow":
                     problems.append(f"expected host-handle-flow refusal, got {record.get('outcome')}/{record.get('reason')}")
+                if record.get("vm_executions", 0) != 0:
+                    problems.append("refused unit still executed on the VM")
                 if marker.exists():
                     problems.append("side effect ran before the refusal")
             else:

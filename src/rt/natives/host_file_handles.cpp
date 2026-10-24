@@ -79,16 +79,17 @@ Status file_open(const Context& context, const Value* args, std::uint32_t argc, 
     call.adopt(file->path);
     call.set_open_mode(mode);
     call.set_pre_result(mode);
-    if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
     std::error_code ec;
     const bool exists = fs::exists(file->path, ec) && !ec;
     if ((mode == "r" || mode == "rw") && !exists) {
+        if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
         call.fail(host::HostStatus::Recoverable, host_error("io.open_failed", "open: file does not exist"));
         error = "open: file does not exist";
         if (context.host.error_code) *context.host.error_code = "io.open_failed";
         return Status::Recoverable;
     }
     if (exists && fs::is_directory(file->path, ec)) {
+        if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
         error = "open: path is a directory";
         call.fail(host::HostStatus::Fatal, host_error("runtime.invalid_operation", error));
         return Status::Error;
@@ -97,11 +98,22 @@ Status file_open(const Context& context, const Value* args, std::uint32_t argc, 
     if (exists) {
         std::string read_error;
         Status read_status = Status::Ok;
-        if (!read_whole_path(context, call, "open", data, read_error, read_status)) {
+        if (mode == "r" || mode == "rw") {
+            // Legacy reads the existing file before its open line is emitted.
+            HostCall read(context.host, host::HostOp::Read, "open");
+            read.adopt(file->path);
+            if (read.begin() != host::HostStatus::Ok) { error = read.error().message; return Status::Error; }
+            if (!read_whole_path(context, read, "open", data, read_error, read_status)) {
+                error = read_error;
+                return read_status;
+            }
+            if (read.succeed(std::to_string(data.size())) != host::HostStatus::Ok) return Status::Error;
+        } else if (!read_whole_path(context, call, "open", data, read_error, read_status)) {
             error = read_error;
             return read_status;
         }
     }
+    if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
     host::Observation obs;
     obs.bytes = data;
     obs.open_mode = mode;
@@ -138,11 +150,7 @@ Status file_close(const Context& context, const Value* args, std::uint32_t argc,
         return status;
     }
     if (!no_args(argc, "close", error)) return Status::Error;
-    if (!file->open) {
-        const HandleStatus h = handles::native_handle_close(context.handles, "close", args[0], HandleKind::File, error);
-        if (h == HandleStatus::Ok) { out = Value::null(); return Status::Ok; }
-        return map_handle(h);
-    }
+    if (!file->open) { error = "close: file is not open"; return Status::Error; }
     file->update_dirty();
     if (file->dirty) { error = "close: file has unsaved changes; save() or revert() first"; return Status::Error; }
     file->open = false;
@@ -254,51 +262,6 @@ Status file_flush(const Context& context, const Value* args, std::uint32_t argc,
     return Status::Ok;
 }
 
-Status file_save(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
-    std::shared_ptr<FileResource> file;
-    Status status = Status::Ok;
-    if (!resource_arg(context, args, argc, "save", file, error, status)) return status;
-    if (!file->open) { error = "save: file is not open"; return Status::Error; }
-    if (file->mode == "r") { error = "save: file is not open for writing"; return Status::Error; }
-    if (!no_args(argc, "save", error)) return Status::Error;
-    file->update_dirty();
-    if (!file->dirty) { out = Value::null(); return Status::Ok; }
-    std::error_code ec;
-    const auto parent = file->path.parent_path();
-    if (!parent.empty() && !fs::exists(parent, ec)) {
-        error = "save: parent directory does not exist";
-        return Status::Error;
-    }
-    const fs::perms perms =
-        fs::exists(file->path, ec) && !ec ? fs::status(file->path, ec).permissions() : fs::perms::unknown;
-    fs::path temp = file->path;
-    temp += ".nift-tmp-" + std::to_string(static_cast<unsigned long long>(
-                               std::chrono::steady_clock::now().time_since_epoch().count()));
-    {
-        std::ofstream output(temp, std::ios::binary | std::ios::trunc);
-        if (!output) { error = "save: cannot create temporary file"; return Status::Error; }
-        output.write(file->working.data(), static_cast<std::streamsize>(file->working.size()));
-        output.flush();
-        if (!output) {
-            output.close();
-            fs::remove(temp, ec);
-            error = "save: temporary write failed";
-            return Status::Error;
-        }
-    }
-    if (perms != fs::perms::unknown) fs::permissions(temp, perms, ec);
-    if (!filesystem::replace_file_atomic(temp, file->path)) {
-        error = "save: atomic replace failed";
-        return Status::Error;
-    }
-    file->saved_is_working = true;
-    file->saved.clear();
-    file->dirty = false;
-    file->existed_at_open = true;
-    out = Value::null();
-    return Status::Ok;
-}
-
 Status file_revert(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     std::shared_ptr<FileResource> file;
     Status status = Status::Ok;
@@ -385,12 +348,16 @@ handles::CleanupOutcome cleanup_file(handles::CleanupEvent& event) {
     auto file = std::static_pointer_cast<FileResource>(event.resource);
     if (!file) return handles::CleanupOutcome::completed();
     file->update_dirty();
-    const bool dirty = file->open && file->dirty;
+    const bool open = file->open;
+    const bool dirty = open && file->dirty;
     const std::string path = file->path.generic_string();
     file->open = false;
-    if (dirty)
-        return handles::CleanupOutcome::failure("io.write_failed",
-                                                "managed file left open: " + path + " (unsaved changes discarded)");
+    if (open) {
+        std::string message = "managed file left open: " + path;
+        if (dirty) message += " (unsaved changes discarded)";
+        return handles::CleanupOutcome::failure(dirty ? "io.write_failed" : "runtime.invalid_operation",
+                                                std::move(message));
+    }
     return handles::CleanupOutcome::completed();
 }
 

@@ -66,6 +66,7 @@ SUPPORTED = [
     ("os_arch", 'print(os()); print(arch())'),
     ("platform_hw", 'print(platform()); print(hardware_concurrency() >= 1)'),
     ("time", 'print(epoch() > 0); sleep(1); print("slept")'),
+    ("file_handle", 'f := file("text.txt")'),
 ]
 
 SYMLINK = [
@@ -88,12 +89,11 @@ ERRORS = [
 ]
 
 UNSUPPORTED = [
-    ("file_handle", 'f := file("text.txt")', "callable:file"),
     ("cmd_handle", 'c := cmd("echo")', "callable:cmd"),
     ("timer_handle", 't := timer()', "callable:timer"),
     ("run_process", 'run("echo")', "callable:run"),
     ("inject_dynamic", 'print(inject("data.json"))', "callable:inject"),
-    ("read_val_dynamic", 'f := file("text.txt"); f.open("r"); print(f.read_val())', "callable:file"),
+    ("read_val_dynamic", 'f := file("text.txt"); f.open("r"); print(f.read_val())', "host-handle-flow"),
 ]
 
 

@@ -79,12 +79,17 @@ inline constexpr KindSet kObject = 1u << 6;
 inline constexpr KindSet kNumber = kInt | kFrac;
 inline constexpr KindSet kScalar = kNull | kBool | kNumber | kString;
 inline constexpr KindSet kBytes = 1u << 7;
+// CP17 W13: handle family (bit 11) and its file/stream refinements. Handles
+// are not part of kAny: a native family must opt in explicitly.
+inline constexpr KindSet kHandle = 1u << 11;
+inline constexpr KindSet kFile = kHandle | (1u << 12);
+inline constexpr KindSet kStream = kHandle | (1u << 13);
 inline constexpr KindSet kAny = 0xff;
 
 // The receiver a built-in is called on: a method of a string, array,
 // object, number, bool or null, a method of any value (Any: the presentation
 // methods), or a free function (None).
-enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes };
+enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream };
 
 // How the result kinds follow from the argument kinds (for kind inference).
 enum class ResultRule : std::uint8_t {
@@ -122,11 +127,11 @@ inline constexpr std::uint8_t kVariadic = 255;
 // last in builtin_list.inc. Used by the R1 refusal of linked units
 // (script_runner.cpp). A built-in appended after the block must be added here
 // deliberately (the assert fails until it is).
-static_assert(static_cast<std::uint16_t>(BuiltinId::HostSecureRandomBytes) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::StreamEof) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "host_builtin(): review the host block when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {
-    return id >= BuiltinId::HostOpen && id <= BuiltinId::HostSecureRandomBytes;
+    return id >= BuiltinId::HostOpen && id <= BuiltinId::StreamEof;
 }
 
 // The whole table, indexed by BuiltinId.

@@ -6,9 +6,19 @@
 
 namespace nift::rt::natives {
 
+Status handle_close(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_factory(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+inline Status handle_file(const Context& c, const Value* a, std::uint32_t n, Value& o, std::string& e) {
+    return file_factory(c, a, n, o, e);
+}
 Status ifstream_factory(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+inline Status handle_ifstream(const Context& c, const Value* a, std::uint32_t n, Value& o, std::string& e) {
+    return ifstream_factory(c, a, n, o, e);
+}
 Status ofstream_factory(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+inline Status handle_ofstream(const Context& c, const Value* a, std::uint32_t n, Value& o, std::string& e) {
+    return ofstream_factory(c, a, n, o, e);
+}
 
 Status file_open(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_close(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

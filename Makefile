@@ -737,6 +737,7 @@ test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT)
 .PHONY: test-runtime2-cp17-handles
 test-runtime2-cp17-handles: $(TARGET)
 	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
 
 .PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
 test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT)
@@ -3025,6 +3026,10 @@ RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
 RT_HOST_HANDLE_SOURCES := src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_ops.cpp \
 	src/rt/natives/host_stream_handles.cpp
 RT_ISOLATION_SOURCES := $(filter-out $(RT_HOST_HANDLE_SOURCES),$(RT_BUILTINS_SOURCES))
+# The isolated bench still links the built-in table, which names the Host
+# handle natives. Test-only stubs satisfy those names without linking the
+# render/legacy value bridge (the real natives are tested by test-rt-host).
+RT_ISOLATION_STUBS := tests/rt/host_handle_native_stubs.cpp
 # CP16: the native table includes the Host built-ins, which call the Host layer
 # and the RuntimeValue-free helpers in ParserHostHelpers.cpp (never
 # ParserHelpers.cpp, which needs the legacy value model). Every builtins binary,
@@ -3032,6 +3037,7 @@ RT_ISOLATION_SOURCES := $(filter-out $(RT_HOST_HANDLE_SOURCES),$(RT_BUILTINS_SOU
 RT_BUILTINS_HOST := $(RT_HOST_LINK_SOURCES) src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp
 RT_BUILTINS_CORE += $(RT_BUILTINS_HOST)
 RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/natives/*.inc) \
+	$(RT_ISOLATION_STUBS) \
 	$(RT_BUILTINS_HOST) src/ParserHostHelpers.h \
 	$(RT_BUILTINS_CORE) $(wildcard src/rt/*.h) src/RuntimeValue.h tests/rt/rt_test.h tests/rt/builtins_support.h
 RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
@@ -3084,7 +3090,7 @@ RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 # CP16 certification fix: secure_random_bytes checks the budget before its
 # buffer exists and keeps one result-sized buffer. Linked with the isolated core
@@ -3093,7 +3099,7 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
 $(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 .PHONY: test-rt-host-random-budget
 test-rt-host-random-budget: $(RT_HOST_RANDOM_BUDGET)

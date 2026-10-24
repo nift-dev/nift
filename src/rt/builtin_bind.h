@@ -27,6 +27,9 @@ static_assert(natives::kNull == kKindNull && natives::kBool == kKindBool && nati
 // old alias with Unknown is gone. Function and Error are outside CP14's
 // 8-bit family set and are refused where a native family is required.
 static_assert(natives::kBytes == kKindBytes, "the bytes bit must match CP12's Bytes kind");
+static_assert(natives::kHandle == kKindHandle && natives::kFile == kKindFile &&
+                  natives::kStream == kKindStream,
+              "CP17 handle bits must match CP12's kind bits");
 static_assert((kKindFunction & natives::kAny) == 0 && (kKindError & natives::kAny) == 0,
               "Function/Error are not CP14 native families");
 static_assert(static_cast<std::size_t>(natives::BuiltinId::Count) + kFirstBuiltin <= 0x10000,

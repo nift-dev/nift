@@ -1,5 +1,8 @@
 #include "rt/compiler.h"
 
+#include "rt/compiler_handles.h"
+
+#include "rt/builtin_bind.h"
 #include "rt/compiler_expr.h"
 #include "rt/globals.h"
 #include "rt/literal.h"
@@ -348,6 +351,13 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     if (!kinds.converged) {  // never compile with unsound kinds (review D1)
         result.reason = "analysis-limit:kinds";
         result.offset = ast.at(root).begin;
+        return result;
+    }
+    std::string handle_reason;
+    std::uint32_t handle_offset = 0;
+    if (detail::check_handle_flow(ast, root, kinds, handle_reason, handle_offset)) {
+        result.reason = std::move(handle_reason);
+        result.offset = handle_offset;
         return result;
     }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
