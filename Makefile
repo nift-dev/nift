@@ -585,6 +585,22 @@ $(RT_HOST_PROCESS_UNIT): tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) $(RT_
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS $(CXXFLAGS) tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 
+# CP20 F6 cleanup (Linux /proc and process-group semantics): positive
+# lifecycle controls in the functional Host target, the five source mutants in
+# the mutation target, the ASan/UBSan positive cases in the sanitizer target.
+# certification_guard.sh requires each edge (removal control).
+.PHONY: test-runtime2-f6-cleanup test-runtime2-f6-mutants test-runtime2-f6-sanitize
+F6_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP F6 cleanup controls: Linux-only"; exit 0; fi;
+test-runtime2-f6-cleanup:
+	@$(F6_LINUX_ONLY) $(PYTHON) tests/runtime2/f6_cleanup_controls.py
+test-runtime2-f6-mutants:
+	@$(F6_LINUX_ONLY) $(PYTHON) tests/runtime2/f6_cleanup_controls.py --mutants
+test-runtime2-f6-sanitize:
+	@$(F6_LINUX_ONLY) $(PYTHON) tests/runtime2/f6_cleanup_controls.py --sanitize
+test-rt-host: test-runtime2-f6-cleanup
+test-rt-host-mutants: test-runtime2-f6-mutants
+test-rt-host-sanitize: test-runtime2-f6-sanitize
+
 .PHONY: test-rt-host test-rt-host-sanitize test-rt-host-tsan
 test-rt-host: $(RT_HOST_LAYER_UNIT) $(RT_HOST_PROCESS_UNIT)
 	"$(RT_HOST_LAYER_UNIT)"

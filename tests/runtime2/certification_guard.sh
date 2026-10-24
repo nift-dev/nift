@@ -68,14 +68,20 @@ PY
 inventory_status=$?
 [ "$inventory_status" -eq 0 ] || exit "$inventory_status"
 
-# Removal control for the N1 positive target: it must be reached through
-# test-rt-vm, and removing that specific edge must make the guard fail even if
-# another path keeps the target reachable.
+# Removal controls for required edges: each child must be reached through its
+# named parent, and removing that specific edge must make the guard fail even if
+# another path keeps the child reachable. N1: test-rt-vm -> test-runtime2-cp16-n1.
+# CP20 F6: the cleanup controls, mutants and sanitizer cases hang off the Host
+# functional, mutation and sanitizer targets respectively.
 python3 - <<'PYCONTROL'
 import sys
 sys.path.insert(0, 'scripts')
 import certify
 deps, _ = certify.make_db(certify.ROOT, 'certify-targets')
+EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
+         ('test-rt-host', 'test-runtime2-f6-cleanup'),
+         ('test-rt-host-mutants', 'test-runtime2-f6-mutants'),
+         ('test-rt-host-sanitize', 'test-runtime2-f6-sanitize')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
@@ -85,38 +91,37 @@ def reachable(graph):
         seen.add(t); stack.extend(graph.get(t, ()))
     return seen
 
-def remove_edge(graph):
-    return {k: [d for d in v if not (k == 'test-rt-vm' and d == 'test-runtime2-cp16-n1')]
-            for k, v in graph.items()}
+def remove_edge(graph, parent, child):
+    return {k: [d for d in v if not (k == parent and d == child)] for k, v in graph.items()}
 
-def removal_ok(graph):
-    if 'test-runtime2-cp16-n1' not in graph.get('test-rt-vm', []):
+def removal_ok(graph, parent, child):
+    if child not in graph.get(parent, []):
         return False
-    return 'test-runtime2-cp16-n1' not in reachable(remove_edge(graph))
+    return child not in reachable(remove_edge(graph, parent, child))
 
-if 'test-runtime2-cp16-n1' not in reachable(deps):
-    print('FAIL certification guard removal control: test-runtime2-cp16-n1 is not reached')
-    sys.exit(1)
-if 'test-runtime2-cp16-n1' not in deps.get('test-rt-vm', []):
-    print('FAIL certification guard removal control: the test-rt-vm edge is absent')
-    sys.exit(1)
-if not removal_ok(deps):
-    print('FAIL certification guard removal control: target is still reached without its edge')
-    sys.exit(1)
-
-# Alternate-edge control: a direct certify-targets -> N1 edge must not be
-# accepted by the removal predicate merely because the target stays reachable.
-alt = {k: list(v) for k, v in deps.items()}
-alt.setdefault('certify-targets', []).append('test-runtime2-cp16-n1')
-alt_reduced = remove_edge(alt)
-if 'test-runtime2-cp16-n1' not in reachable(alt_reduced):
-    print('FAIL certification guard alternate-edge control: the synthetic edge did not reach N1')
-    sys.exit(1)
-if removal_ok(alt_reduced):
-    print('FAIL certification guard alternate-edge control: an alternate edge satisfied the removal predicate')
-    sys.exit(1)
-print('PASS certification guard removal control: the test-rt-vm edge is required')
-print('PASS certification guard alternate-edge control: a direct certify-targets edge is rejected')
+for parent, child in EDGES:
+    if child not in reachable(deps):
+        print(f'FAIL certification guard removal control: {child} is not reached')
+        sys.exit(1)
+    if child not in deps.get(parent, []):
+        print(f'FAIL certification guard removal control: the {parent} -> {child} edge is absent')
+        sys.exit(1)
+    if not removal_ok(deps, parent, child):
+        print(f'FAIL certification guard removal control: {child} is still reached without its {parent} edge')
+        sys.exit(1)
+    # Alternate-edge control: a direct certify-targets edge must not satisfy
+    # the removal predicate merely because the child stays reachable.
+    alt = {k: list(v) for k, v in deps.items()}
+    alt.setdefault('certify-targets', []).append(child)
+    alt_reduced = remove_edge(alt, parent, child)
+    if child not in reachable(alt_reduced):
+        print(f'FAIL certification guard alternate-edge control: the synthetic edge did not reach {child}')
+        sys.exit(1)
+    if removal_ok(alt_reduced, parent, child):
+        print(f'FAIL certification guard alternate-edge control: an alternate edge satisfied {child}')
+        sys.exit(1)
+    print(f'PASS certification guard removal control: the {parent} -> {child} edge is required')
+print('PASS certification guard alternate-edge control: direct certify-targets edges are rejected')
 PYCONTROL
 removal_status=$?
 [ "$removal_status" -eq 0 ] || exit "$removal_status"

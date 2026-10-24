@@ -67,3 +67,24 @@ if ! grep -Eq "removal control|alternate-edge control" "$TMP/alternate.log"; the
     exit 1
 fi
 echo "PASS guard control: an alternate certify-targets edge is rejected"
+
+# CP20 F6: removing any of its three edges must fail certification, naming it.
+for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test-runtime2-f6-mutants" "test-rt-host-sanitize: test-runtime2-f6-sanitize"; do
+    name="${edge##* }"
+    populate "$TMP/f6-$name"
+    python3 - "$TMP/f6-$name/Makefile" "$edge" <<'PY'
+import sys
+path, edge = sys.argv[1], sys.argv[2] + '\n'
+text = open(path).read()
+if edge not in text:
+    raise SystemExit('edge not found: ' + edge)
+open(path, 'w').write(text.replace(edge, '', 1))
+PY
+    if bash "$TMP/f6-$name/tests/runtime2/certification_guard.sh" >"$TMP/f6-$name.log" 2>&1; then
+        echo "FAIL guard control: removing '$edge' still passed" >&2; cat "$TMP/f6-$name.log" >&2; exit 1
+    fi
+    if ! grep -q "removal control.*$name" "$TMP/f6-$name.log"; then
+        echo "FAIL guard control: removal of '$edge' was not named" >&2; cat "$TMP/f6-$name.log" >&2; exit 1
+    fi
+    echo "PASS guard control: removing '$edge' fails certification"
+done
