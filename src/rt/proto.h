@@ -60,6 +60,7 @@ struct Proto {
 };
 
 struct Program {
+    bool has_collection_boundaries = false;
     std::vector<std::unique_ptr<Proto>> protos;  // protos[0] is the top-level program
     const Proto& main() const { return *protos.front(); }
 };

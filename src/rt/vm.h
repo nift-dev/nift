@@ -199,6 +199,9 @@ private:
     bool memory_exceeded(Fault& fault);
     void update_heap_limit();
 
+    bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
+                                      const Proto*, std::size_t base, const Instr* pc);
+    bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;
     std::vector<Value> stack_;

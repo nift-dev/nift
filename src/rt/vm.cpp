@@ -45,6 +45,7 @@ VmResult register_budget_exceeded() {
 } // namespace
 
 Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(options) {
+    program_has_collection_boundaries_ = program.has_collection_boundaries;
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
     named_functions_.resize(protos_.size());
     stack_.resize(256);

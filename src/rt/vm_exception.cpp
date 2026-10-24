@@ -193,6 +193,11 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
         raise(fault, StopReason::Internal, "stale exception handler");
         return false;
     }
+    if (program_has_collection_boundaries_ &&
+        !drain_collection_boundaries(fault, handler.frame_depth, proto, base, pc)) {
+        raise(fault, StopReason::Internal, "collection boundary drain failed");
+        return false;
+    }
     while (frames_.size() > handler.frame_depth) {
         for (std::uint16_t k = 0; k < proto->nregs; ++k) R[k] = Value();
         const Frame frame = frames_.back();
