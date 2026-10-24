@@ -346,6 +346,44 @@ $(ERROR_OOM_UNIT): tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/error.h \
 		tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/heap_account.cpp \
 		src/rt/value.cpp src/rt/string.cpp -o "$@"
 
+# CP13B Phase B exceptions: permanent gates (tests/runtime2/cp13b/README.md).
+# Functional tier (in test-rt-vm): fixtures in legacy/current/future modes,
+# future mode on the portable switch-dispatch build too, harness self-tests,
+# nullable Error presentation on both builds, SourceMap and Error-OOM units.
+# Sanitizer tier (in test-rt-vm-sanitize): SourceMap ASan and TSan, Error-OOM
+# ASan/LSan/UBSan. Certification tier (own certify leaf): E1-E8 mutants,
+# 1M-catch stress, Error lifecycle. certification_guard.sh requires each edge.
+CP13B_SWITCH_NIFT := $(TEST_DIR)/cp13b/nift-switch$(EXEEXT)
+# The switch object tracks its full header closure (-MMD) so it can never be
+# linked stale; every other object is the main build's, tracked the same way.
+$(TEST_DIR)/cp13b/vm-switch.o: src/rt/vm.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -MMD -MP -c src/rt/vm.cpp -o "$@"
+-include $(TEST_DIR)/cp13b/vm-switch.d
+$(CP13B_SWITCH_NIFT): $(filter-out src/rt/vm.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o "$@"
+.PHONY: test-runtime2-cp13b test-runtime2-cp13b-mutants
+test-runtime2-cp13b: $(TARGET) $(CP13B_SWITCH_NIFT)
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(TARGET)" --selftest
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(TARGET)" --trace-selftest
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(TARGET)" --mode legacy
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(TARGET)" --mode current
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(TARGET)" --mode future
+	$(PYTHON) tests/runtime2/cp13b/run.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --mode future
+	$(PYTHON) tests/runtime2/cp13b/adversarial/selftest.py
+	$(PYTHON) tests/runtime2/cp13b/adversarial/mutant_build_selftest.py
+	bash tests/runtime2/cp13b/harness_selftest.sh "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp13b/nullable_error_presentation.py --nift "$(CURDIR)/$(TARGET)" --switch-nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)"
+test-runtime2-cp13b-mutants: $(TARGET)
+	PYTHON="$(PYTHON)" bash tests/runtime2/cp13b/mutation_gate.sh "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-cp13b
+test-rt-vm: test-rt-source-map
+test-rt-vm: test-rt-error-oom
+test-rt-vm-sanitize: test-rt-source-map-sanitize
+test-rt-vm-sanitize: test-rt-source-map-tsan
+test-rt-vm-sanitize: test-rt-error-oom-sanitize
+certify-targets: test-runtime2-cp13b-mutants
+
 .PHONY: test-rt-source-map test-rt-source-map-retry test-rt-source-map-sanitize test-rt-source-map-tsan test-rt-error-oom test-rt-error-oom-sanitize
 test-rt-source-map: $(SOURCE_MAP_UNIT) $(SOURCE_MAP_RETRY_UNIT)
 	"$(SOURCE_MAP_UNIT)"

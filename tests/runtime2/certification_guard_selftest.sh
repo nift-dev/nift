@@ -68,8 +68,10 @@ if ! grep -Eq "removal control|alternate-edge control" "$TMP/alternate.log"; the
 fi
 echo "PASS guard control: an alternate certify-targets edge is rejected"
 
-# CP20 F6: removing any of its three edges must fail certification, naming it.
-for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test-runtime2-f6-mutants" "test-rt-host-sanitize: test-runtime2-f6-sanitize"; do
+# CP20 F6 and CP13B: removing any required edge must fail certification, naming it.
+for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test-runtime2-f6-mutants" "test-rt-host-sanitize: test-runtime2-f6-sanitize" \
+            "test-rt-vm: test-runtime2-cp13b" "test-rt-vm: test-rt-source-map" "test-rt-vm: test-rt-error-oom" \
+            "test-rt-vm-sanitize: test-rt-source-map-sanitize" "test-rt-vm-sanitize: test-rt-source-map-tsan" "test-rt-vm-sanitize: test-rt-error-oom-sanitize"; do
     name="${edge##* }"
     populate "$TMP/f6-$name"
     python3 - "$TMP/f6-$name/Makefile" "$edge" <<'PY'
@@ -88,3 +90,22 @@ PY
     fi
     echo "PASS guard control: removing '$edge' fails certification"
 done
+
+# CP13B certification tier: dropping the mutation gate from certify-targets
+# must fail the required-target check.
+populate "$TMP/cp13b-leaf"
+python3 - "$TMP/cp13b-leaf/Makefile" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'certify-targets: test-runtime2-cp13b-mutants\n'
+if needle not in text:
+    raise SystemExit('certify edge not found')
+open(path, 'w').write(text.replace(needle, '', 1))
+PY
+if bash "$TMP/cp13b-leaf/tests/runtime2/certification_guard.sh" >"$TMP/cp13b-leaf.log" 2>&1; then
+    echo "FAIL guard control: dropping test-runtime2-cp13b-mutants from certify-targets still passed" >&2
+    cat "$TMP/cp13b-leaf.log" >&2; exit 1
+fi
+grep -q "test-runtime2-cp13b-mutants" "$TMP/cp13b-leaf.log" || { echo "FAIL guard control: the missing CP13B leaf was not named" >&2; cat "$TMP/cp13b-leaf.log" >&2; exit 1; }
+echo "PASS guard control: dropping the CP13B mutation gate fails certification"
