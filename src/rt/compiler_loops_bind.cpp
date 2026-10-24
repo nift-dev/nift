@@ -22,10 +22,10 @@ bool UnitCompiler::for_lazy_read(const Binding& b, std::uint16_t& reg) {
     if (b.selector) {
         if (!temp(reg)) return false;
         const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
-        fb_->emit(OpCode::CellLoad, reg, b.selector_reg);
+        emit_binding_read(OpCode::CellLoad, reg, b.selector_reg);
         const std::size_t done = fb_->emit(OpCode::Jmp);
         fb_->patch(assigned, fb_->here());
-        fb_->emit(OpCode::CellLoad, reg, b.reg);
+        emit_binding_read(OpCode::CellLoad, reg, b.reg);
         fb_->patch(done, fb_->here());
         return true;
     }

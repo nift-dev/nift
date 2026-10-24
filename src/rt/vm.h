@@ -127,10 +127,10 @@ private:
     void result_stats(VmResult& result);
     bool op_new_cell(const Instr& in, Value* R, Fault& fault);
     bool op_cell_cached(const Instr& in, Value* R, Fault& fault);
-    bool op_cell_load(const Instr& in, Value* R, Fault& fault);
+    bool op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note);
     bool op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
     bool op_closure(const Instr& in, Value* R, Fault& fault);
-    bool op_get_upvalue(const Instr& in, Value* R, Fault& fault);
+    bool op_get_upvalue(const Instr& in, Value* R, Fault& fault, const Note* note);
     bool op_get_upvalue_cell(const Instr& in, Value* R, Fault& fault);
     bool op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
     bool op_call(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,

@@ -46,6 +46,14 @@ cases.update({
 cases.update({'read_before': 'f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>x[0];x[0]=9}\nprint(f())\n', 'callback_write': 'f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>{x[0]=9;return x[0]}}\nprint(f());print(f())\n', 'callback_read_write': 'f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>{print(x[0]);x[0]=9;return x[0]}}\nprint(f());print(f())\n', 'rebound_cached_owner': 'f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>{x[0]=9;return x[0]}}\na=[[8]]\nprint(f())\n'})
 
 
+MISSING_SELECTORS = {"selector_missing_index", "selector_missing_member",
+                     "selector_missing_cached_write", "selector_missing_side_effect"}
+ERROR_CASES = MISSING_SELECTORS | {"missing_after_loop"}
+for name in MISSING_SELECTORS:
+    cases[name] = (HERE / "cp12c-probes/src" / (name + ".f")).read_text()
+GOLDENS["selector_missing_side_effect"] = "1\nafter-write\n"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -71,10 +79,10 @@ def main():
                 rows.append({"case": name, "mode": mode, "stdout": result[0].decode(),
                              "stderr": result[1].decode(), "exit": result[2], "stats": telemetry})
                 if mode != "0" and (not telemetry or telemetry.get("vm_executions") != 1 or
-                        telemetry.get("outcome") != ("vm-error" if name == "missing_after_loop" else "vm")):
+                        telemetry.get("outcome") != ("vm-error" if name in ERROR_CASES else "vm")):
                     failures += 1
                     print(f"FAIL {name}/{mode}: required VM execution: {telemetry}")
-            expected_exit = 1 if name == "missing_after_loop" else 0
+            expected_exit = 1 if name in ERROR_CASES else 0
             if (results["0"][2] != expected_exit or results["0"] != results["1"] or
                     results["0"] != results["require"]):
                 failures += 1

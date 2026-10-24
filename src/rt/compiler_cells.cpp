@@ -30,14 +30,23 @@ bool UnitCompiler::indexed_binding(const Binding& b, std::uint16_t& reg) {
     return true;
 }
 
+std::size_t UnitCompiler::emit_binding_read(OpCode op, std::uint16_t dst, std::uint16_t source) {
+    const std::uint32_t saved_offset = fb_->offset();
+    if (return_read_offset_ != kNoNode) fb_->set_offset(return_read_offset_);
+    const std::size_t at = fb_->emit(op, dst, source);
+    fb_->set_offset(saved_offset);
+    if (!global_note_.empty()) fb_->note(at, std::string(global_note_));
+    return at;
+}
+
 bool UnitCompiler::read_binding(const Binding& b, std::uint16_t& reg) {
     if (b.upvalue) {
         if (!temp(reg)) return false;
-        fb_->emit(OpCode::GetUpvalue, reg, b.upvalue_index);
+        emit_binding_read(OpCode::GetUpvalue, reg, b.upvalue_index);
     } else if (b.cell) {
         std::uint16_t cell = 0;
         if (!binding_cell(b, cell) || !temp(reg)) return false;
-        fb_->emit(OpCode::CellLoad, reg, cell);
+        emit_binding_read(OpCode::CellLoad, reg, cell);
     } else if (b.global) return global_read(b.reg, reg);
     else reg = b.reg;
     return true;

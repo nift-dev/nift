@@ -46,7 +46,7 @@ bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault) {
     return memory_ok(fault);
 }
 
-bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault) {
+bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note) {
     CellObject* cell = cell_of(R[in.b]);
     if (cell == nullptr) return internal(fault, "cell");
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 5
@@ -55,7 +55,7 @@ bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault) {
     std::string missing;
     if (!cell_read(R[in.b], R[in.a], missing)) {
         if (missing.empty()) return internal(fault, "cell location");
-        return raise(fault, StopReason::Error, "reference target no longer exists: " + missing);
+        return raise(fault, StopReason::Error, "reference target no longer exists: " + (note ? note->text : missing));
     }
 #endif
     return true;
@@ -123,7 +123,7 @@ bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     return memory_ok(fault);
 }
 
-bool Vm::op_get_upvalue(const Instr& in, Value* R, Fault& fault) {
+bool Vm::op_get_upvalue(const Instr& in, Value* R, Fault& fault, const Note* note) {
     if (closure_ == nullptr || in.b >= closure_->upvalues.size()) return internal(fault, "upvalue");
     CellObject* cell = cell_of(closure_->upvalues[in.b]);
     if (cell == nullptr) return internal(fault, "upvalue cell");
@@ -133,7 +133,7 @@ bool Vm::op_get_upvalue(const Instr& in, Value* R, Fault& fault) {
     std::string missing;
     if (!cell_read(closure_->upvalues[in.b], R[in.a], missing)) {
         if (missing.empty()) return internal(fault, "upvalue location");
-        return raise(fault, StopReason::Error, "reference target no longer exists: " + missing);
+        return raise(fault, StopReason::Error, "reference target no longer exists: " + (note ? note->text : missing));
     }
 #endif
     return true;

@@ -213,12 +213,15 @@ bool UnitCompiler::return_statement(const Node& node) {
     }
     if (!no_alias(node.a, node)) return false;
     if (!in_function_ && !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
-    // Errors in the expression are reported where they occur, without
-    // legacy's "return: " prefixes (approved changes D-009#5, D-018).
+    // Other expression errors retain D-009#5 / D-018 attribution. Missing
+    // selector reads in a lambda preserve the legacy return statement site.
     std::uint16_t value = 0;
     const std::uint8_t saved_flags = fb_->flags();
     fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrReturnCall));
+    const std::uint32_t saved_return_offset = return_read_offset_;
+    if (in_lambda_) return_read_offset_ = node.begin;
     const bool value_ok = temp(value) && expr_to(node.a, value);
+    return_read_offset_ = saved_return_offset;
     fb_->set_flags(saved_flags);
     if (!value_ok) return false;
     fb_->set_offset(node.begin);

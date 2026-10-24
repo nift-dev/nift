@@ -56,7 +56,11 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
                 in_expression_lambda ||
                 (frame.closure != nullptr && frame.closure->is_lambda && frame.closure->expression_body);
         if (in_expression_lambda) result.message = "lambda body error: " + result.message;
-        bool return_call = false;
+        // A vanished selector read in a lambda return belongs to that return
+        // statement. Other expression errors retain the existing D-018 policy.
+        bool return_call = (pc->flags & kInstrReturnCall) &&
+                           (pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
+                           fault.message.rfind("reference target no longer exists: ", 0) == 0;
         bool in_lambda = closure_ != nullptr && closure_->is_lambda;
         for (const Frame& frame : frames_) {
             return_call = return_call || frame.return_call;

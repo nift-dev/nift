@@ -279,12 +279,13 @@ VmResult Vm::run(std::string& output) {
     OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
     OP(CellLoadCached) OP(CellStoreCached) OP(CellTake) OP(CellAnchor) OP(CellSlot) {
-        if (!op_cell_cached(*pc, R, fault)) FAIL(); NEXT();
+        if (!op_cell_cached(*pc, R, fault)) FAIL();
+        NEXT();
     }
-    OP(CellLoad) { if (!op_cell_load(*pc, R, fault)) FAIL(); NEXT(); }
+    OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }
-    OP(GetUpvalue) { if (!op_get_upvalue(*pc, R, fault)) FAIL(); NEXT(); }
+    OP(GetUpvalue) { if (!op_get_upvalue(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(GetUpvalueCell) { if (!op_get_upvalue_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(SetUpvalue) { if (!op_set_upvalue(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Undefined) { if (!op_undefined(*pc, fault, proto)) FAIL(); NEXT(); }

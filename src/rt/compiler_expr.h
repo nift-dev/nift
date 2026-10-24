@@ -118,6 +118,7 @@ private:
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
+    std::size_t emit_binding_read(OpCode op, std::uint16_t dst, std::uint16_t source);
     bool read_binding(const Binding& b, std::uint16_t& reg);
     bool binding_cell(const Binding& b, std::uint16_t& reg);
     bool indexed_binding(const Binding& b, std::uint16_t& reg);
@@ -326,7 +327,8 @@ private:
     const Node* chain_top_ = nullptr;   // the outermost member/index chain (chain_enter)
     const Node* chain_next_ = nullptr;  // its next receiver
     const Node* print_arg_ = nullptr;   // the native call argument being compiled
-    std::string_view global_note_;      // the full place text for a checked global read
+    std::string_view global_note_;      // full access path for checked binding reads
+    std::uint32_t return_read_offset_ = kNoNode;  // active lambda return expression
     bool global_offset_set_ = false;
     std::uint32_t global_offset_ = 0;
     int index_depth_ = 0;             // inside index brackets
