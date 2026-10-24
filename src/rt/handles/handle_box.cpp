@@ -1,5 +1,7 @@
 #include "rt/handles/handle_box.h"
 
+#include "rt/heap_account.h"
+
 namespace nift::rt::handles {
 
 namespace {
@@ -18,6 +20,7 @@ Value box_counted_handle(HandleTable& table, const Value& handle) {
     box->handle_kind = handle.handle_kind();
     box->table = &table;
     box->release = release_box;
+    heap_retally(box);
     return Value::adopt_handle_box(box);
 }
 

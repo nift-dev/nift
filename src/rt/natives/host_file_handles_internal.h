@@ -80,7 +80,11 @@ bool resource_arg(const Context& context, const Value* args, std::uint32_t argc,
     if (argc == 0) { error = std::string(builtin) + ": handle expected"; status = Status::Error; return false; }
     const HandleStatus h =
         handles::native_handle_arg<T>(context.handles, builtin, args[0], HandleKind::File, resource, error);
-    if (h != HandleStatus::Ok) { status = map_handle(h); return false; }
+    if (h != HandleStatus::Ok) {
+        if (context.host.error_code) *context.host.error_code = nift::rt::handle_status_code(h);
+        status = map_handle(h);
+        return false;
+    }
     return true;
 }
 
@@ -90,7 +94,11 @@ bool stream_arg(const Context& context, const Value* args, std::uint32_t argc, s
     if (argc == 0) { error = std::string(builtin) + ": handle expected"; status = Status::Error; return false; }
     const HandleStatus h =
         handles::native_handle_arg<T>(context.handles, builtin, args[0], HandleKind::Stream, resource, error);
-    if (h != HandleStatus::Ok) { status = map_handle(h); return false; }
+    if (h != HandleStatus::Ok) {
+        if (context.host.error_code) *context.host.error_code = nift::rt::handle_status_code(h);
+        status = map_handle(h);
+        return false;
+    }
     return true;
 }
 
@@ -98,7 +106,10 @@ inline Status create_handle(const Context& context, std::string_view builtin, Ha
                      std::shared_ptr<void> resource, Value& out, std::string& error) {
     const HandleStatus h = handles::native_handle_result(context.handles, builtin, kind, std::move(resource),
                                                                    out, error, handles::CreateOptions{true});
-    if (h != HandleStatus::Ok) return map_handle(h);
+    if (h != HandleStatus::Ok) {
+        if (context.host.error_code) *context.host.error_code = nift::rt::handle_status_code(h);
+        return map_handle(h);
+    }
     return Status::Ok;
 }
 

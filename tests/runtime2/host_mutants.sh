@@ -219,4 +219,21 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         exit 1
     fi
     echo "PASS N2 mutant $mutant: host observer checks rejected the mutant"
+    if ! make -C "$BUILD" -j"${JOBS:-4}" N2_REBUILD_MUTANT=$mutant         ".build/rt/n2-rebuild-decision-m$mutant" >"$TMP/rebuild-$mutant-build.log" 2>&1; then
+        echo "FAIL N2 mutant $mutant: rebuild-decision build failed (harness failure)" >&2
+        tail -20 "$TMP/rebuild-$mutant-build.log" >&2
+        exit 1
+    fi
+    if ! NIFT_N2_MUTANT=$mutant "$BUILD/.build/rt/n2-rebuild-decision-m$mutant" \
+        >"$TMP/rebuild-$mutant.log" 2>&1; then
+        echo "FAIL N2 mutant $mutant: rebuild-decision witness rejected the intended mutant" >&2
+        cat "$TMP/rebuild-$mutant.log" >&2
+        exit 1
+    fi
+    if ! grep -q "rebuild-decision" "$TMP/rebuild-$mutant.log"; then
+        echo "FAIL N2 mutant $mutant: rebuild test produced no decision banner" >&2
+        cat "$TMP/rebuild-$mutant.log" >&2
+        exit 1
+    fi
+    echo "PASS N2 mutant $mutant: production rebuild-decision witness detected the missing observation"
 done

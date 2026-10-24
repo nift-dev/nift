@@ -738,10 +738,42 @@ test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT)
 test-runtime2-cp17-handles: $(TARGET)
 	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
+
+# CP17 N2 R1: production incremental decision fed by observer observations.
+N2_REBUILD_UNIT := $(TEST_DIR)/rt/n2-rebuild-decision$(EXEEXT)
+N2_REBUILD_OBJECTS := $(filter-out src/nift.o src/CLI.o src/embed/%,$(OBJECTS))
+$(N2_REBUILD_UNIT): tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS) $(LDLIBS) -o "$@"
+N2_REBUILD_MUTANT ?= 0
+N2_REBUILD_MUTANT_DIR := $(TEST_DIR)/rt/n2-rebuild-mutants/$(N2_REBUILD_MUTANT)
+N2_REBUILD_MUTANT_BIN := $(TEST_DIR)/rt/n2-rebuild-decision-m$(N2_REBUILD_MUTANT)
+$(N2_REBUILD_MUTANT_DIR)/host_fs_write.o: src/rt/natives/host_fs_write.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(N2_REBUILD_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_HOST_MUTANT=$(N2_REBUILD_MUTANT) -c $< -o $@
+$(N2_REBUILD_MUTANT_BIN): tests/rt/n2_rebuild_decision.cpp $(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) \
+		$(N2_REBUILD_MUTANT_DIR)/host_fs_write.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp \
+		$(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) $(N2_REBUILD_MUTANT_DIR)/host_fs_write.o $(LDLIBS) -o "$@"
+.PHONY: test-runtime2-cp17-n2-rebuild-mutant
+test-runtime2-cp17-n2-rebuild-mutant: $(N2_REBUILD_MUTANT_BIN)
+	NIFT_N2_MUTANT=$(N2_REBUILD_MUTANT) "$(N2_REBUILD_MUTANT_BIN)"
+
+.PHONY: test-runtime2-cp17-n2-rebuild
+test-runtime2-cp17-n2-rebuild: $(N2_REBUILD_UNIT)
+	"$(N2_REBUILD_UNIT)"
+	"$(N2_REBUILD_UNIT)" --omit cp
+	"$(N2_REBUILD_UNIT)" --omit mv
 
 .PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
-test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT)
+test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT) $(N2_REBUILD_UNIT)
 	"$(RT_N2_PARITY_UNIT)"
+	"$(N2_REBUILD_UNIT)"
+	"$(N2_REBUILD_UNIT)" --omit cp
+	"$(N2_REBUILD_UNIT)" --omit mv
 test-runtime2-cp17-tripwire: $(TARGET)
 	python3 tests/runtime2/cp17/build_vm_tripwire.py --nift "$(CURDIR)/$(TARGET)"
 

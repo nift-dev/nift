@@ -24,7 +24,7 @@ def check(ok, label, detail=""):
         FAILS.append(label)
 
 
-def project(root: Path, *, hook: bool) -> None:
+def project(root: Path, *, hook: bool, template: bool = False) -> None:
     for d in (".nift", "content", "templates", "public", "scripts", "data"):
         (root / d).mkdir(parents=True, exist_ok=True)
     config = {"config": {
@@ -33,12 +33,15 @@ def project(root: Path, *, hook: bool) -> None:
         "incremental-mode": "modified", "minify-exts": [],
     }}
     tracked = {"name": "index", "title": "Index"}
+    if template:
+        tracked["template"] = "templates/t.html"
     if hook:
         config["config"]["pre build"] = "scripts/pre.f"
         tracked["pre-build"] = "scripts/pre.f"
     (root / ".nift/config.json").write_text(json.dumps(config))
     (root / ".nift/tracked.json").write_text(json.dumps({"tracked": [tracked]}))
-    (root / "templates/t.html").write_text("@content")
+    (root / "templates/t.html").write_text(
+        'TPL:$[open("data/inside.txt")]\n@content\n' if template else "@content")
     (root / "data/inside.txt").write_text("PAGE-OK")
     # `try` is refused by the VM compiler. If a page ever runs on the VM under
     # NIFT_VM=require, the build fails; on legacy it succeeds.
@@ -59,18 +62,18 @@ def run(nift: Path, root: Path, stats: Path, *args: str):
 
 def vm_stats(path: Path):
     if not path.exists():
-        return None
-    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    return rows[-1] if rows else None
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def protected(label: str, stats: Path, executed: bool):
-    """The tripwire predicate: the protected path executed and no VM execution
-    record exists. Returns (ok, detail)."""
-    record = vm_stats(stats)
-    vm_ran = bool(record and (record.get("vm_executions", 0) or record.get("outcome") in ("vm", "vm-error")))
+    """The tripwire predicate: the protected path executed, wrote statistics,
+    and no record in the file shows a VM execution. Every row is inspected:
+    a VM row followed by a fallback row is still a violation."""
+    rows = vm_stats(stats)
+    vm_ran = any(row.get("vm_executions", 0) or row.get("outcome") in ("vm", "vm-error") for row in rows)
     ok = executed and not vm_ran
-    detail = "" if ok else f"executed={executed} stats={record}"
+    detail = "" if ok else f"executed={executed} stats={rows}"
     return ok, detail
 
 
@@ -92,31 +95,52 @@ def main() -> int:
         env["NIFT_VM_STATS"] = str(stats)
         proc = subprocess.run([str(nift), str(standalone)], cwd=work, env=env, text=True, capture_output=True,
                               timeout=60)
-        record = vm_stats(stats)
+        rows = vm_stats(stats)
+        record = rows[-1] if rows else None
         check(proc.returncode == 0 and record and record.get("outcome") == "vm" and
               record.get("vm_executions") == 1 and "VM-OK" in proc.stdout,
-              "standalone selects the VM", f"rc={proc.returncode} stats={record}")
+              "standalone selects the VM", f"rc={proc.returncode} stats={rows}")
 
         # Page and hook paths: legacy only.
-        for label, hook in (("build/page", True), ("page-only", False), ("hook", True)):
+        for label, hook, template in (("build/page", True, False), ("page-only", False, False),
+                                      ("hook", True, False), ("template", False, True)):
             root = work / label.replace("/", "-")
-            project(root, hook=hook)
+            project(root, hook=hook, template=template)
             stats = root / "stats.json"
             proc = run(nift, root, stats, "build", "--all")
             page = root / "public/index.html"
-            page_ok = proc.returncode == 0 and page.exists() and "PAGE-OK" in page.read_text(errors="replace")
+            text = page.read_text(errors="replace") if page.exists() else ""
+            page_ok = proc.returncode == 0 and "PAGE-OK" in text and (not template or "TPL:PAGE-OK" in text)
             hook_ok = (root / "hook-marker.txt").exists() if hook else True
             ok, detail = protected(label, stats, page_ok and hook_ok)
             check(ok, f"{label}: legacy execution, no VM record", detail)
 
-        # Detector self-test: a synthetic VM record must fail the predicate,
-        # and a missing record without execution must fail too.
+        # Missing statistics alone are not evidence of legacy execution.
+        ok, _ = protected("negative: missing statistics", work / "none.json", False)
+        check(not ok, "detector rejects missing statistics without execution")
+
+        # Detector self-test: a synthetic VM record and a VM row followed by a
+        # fallback row must both fail; a standalone real VM run provides the
+        # same shape without synthetic statistics.
         fake = work / "fake.json"
         fake.write_text(json.dumps({"outcome": "vm", "vm_executions": 1}) + "\n")
         ok, _ = protected("negative: forced VM record", fake, True)
         check(not ok, "detector rejects a forced VM record")
-        ok, _ = protected("negative: no execution", work / "none.json", False)
-        check(not ok, "detector rejects missing stats without execution")
+        mixed = work / "mixed.json"
+        mixed.write_text(json.dumps({"outcome": "vm", "vm_executions": 1}) + "\n" +
+                         json.dumps({"outcome": "fallback", "vm_executions": 0}) + "\n")
+        ok, _ = protected("negative: earlier VM record", mixed, True)
+        check(not ok, "detector inspects earlier VM records")
+
+        standalone_stats = work / "standalone-real.json"
+        env = dict(os.environ)
+        env["NIFT_VM"] = "require"
+        env["NIFT_VM_STATS"] = str(standalone_stats)
+        proc = subprocess.run([str(nift), str(standalone)], cwd=work, env=env, text=True,
+                              capture_output=True, timeout=60)
+        for label in ("build", "page", "hook", "template"):
+            ok, _ = protected(f"negative: real VM record for {label}", standalone_stats, True)
+            check(not ok and proc.returncode == 0, f"detector rejects a real VM record ({label})")
 
     print("PASS build/page/hook VM routing tripwire" if not FAILS else
           f"FAIL build/page/hook VM routing tripwire ({len(FAILS)} failures)")

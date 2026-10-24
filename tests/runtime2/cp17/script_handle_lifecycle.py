@@ -73,8 +73,8 @@ def main():
             elif mode == "vm-error-only":
                 if record.get("outcome") != "vm-error":
                     problems.append(f"expected vm-error, got {record.get('outcome')}/{record.get('reason')}")
-                elif "runtime.handle_closed" not in (record.get("reason") or ""):
-                    problems.append(f"expected runtime.handle_closed, got {record.get('reason')!r}")
+                elif record.get("code") != "runtime.handle_closed":
+                    problems.append(f"expected structured runtime.handle_closed, got {record.get('code')!r}")
                 elif b"handle is closed" not in vm[1]:
                     problems.append(f"missing closed-handle wording: {vm[1]!r}")
             elif mode == "managed-error":

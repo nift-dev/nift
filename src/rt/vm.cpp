@@ -1,4 +1,5 @@
 #include "rt/vm.h"
+#include "rt/handles/limit_setting.h"
 
 #include "rt/aggregate.h"
 #include "rt/cell.h"
@@ -44,7 +45,8 @@ VmResult register_budget_exceeded() {
 
 } // namespace
 
-Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(options) {
+Vm::Vm(const Program& program, VmOptions options)
+    : program_(program), options_(options), handle_table_(handles::table_options_from_environment()) {
     program_has_collection_boundaries_ = program.has_collection_boundaries;
     open_handle_runtime();
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
