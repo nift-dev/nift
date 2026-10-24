@@ -60,6 +60,8 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
     context.host.paths = &vm_path_policy();
     context.host.error_code = &context.host_error_code;  // N1: per-call Host code
+    context.handles =
+        handles::HandleAccess{&handle_table_, handle_context_open_ ? handle_context_ : handles::kDetached};
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {

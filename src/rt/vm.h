@@ -29,6 +29,7 @@
 // deeper than legacy's 64 frames is the recursion error above; at a depth
 // legacy also reaches it is an Internal failure (exit 70). Either way the
 // process stops before the host runs out of memory.
+#include "rt/handles/table.h"
 #include "rt/heap_account.h"
 #include "Diagnostic.h"
 #include "rt/proto.h"
@@ -131,6 +132,8 @@ private:
         std::uint16_t reg_top = 0;
     };
     bool reserve_registers(std::size_t needed);
+    void open_handle_runtime();
+    void close_handle_runtime(VmResult& result);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
     std::uint32_t main_offset(std::uint32_t own) const;
@@ -213,6 +216,9 @@ private:
     bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;
+    handles::HandleTable handle_table_;  // CP17: one table per VM run
+    handles::ContextId handle_context_ = 0;
+    bool handle_context_open_ = false;
     std::vector<Value> stack_;
     std::vector<std::uint8_t> global_ready_;
     std::vector<Frame> frames_;

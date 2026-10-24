@@ -27,6 +27,7 @@
 //   * Every heap object a native creates goes through the CP09 constructors
 //     (make_string, make_array, array_push, object_set), so the live-heap total
 //     stays exact (heap_account.h).
+#include "rt/handles/native_access.h"
 #include "rt/host/host_call.h"
 #include "rt/value.h"
 
@@ -48,6 +49,7 @@ struct Context {
     static constexpr std::size_t kNoHeapLimit = static_cast<std::size_t>(-1);
     std::size_t heap_limit = kNoHeapLimit;
     host::HostCallEnv host;  // trace/path policy; no observer for standalone scripts
+    handles::HandleAccess handles;  // CP17: table + execution context for handle natives
     // N1: the code of the failing HostCall in this call (empty when the native
     // has no HostCall, e.g. validate's schema.rejected).
     std::string host_error_code;
