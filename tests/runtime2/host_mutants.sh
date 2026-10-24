@@ -12,6 +12,7 @@ for mutant in 1 2 3 5; do
     BUILD="$TMP/m$mutant"
     mkdir -p "$BUILD"
     git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
     if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
         CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
         >"$TMP/build-$mutant.log" 2>&1; then
@@ -19,7 +20,7 @@ for mutant in 1 2 3 5; do
         tail -20 "$TMP/build-$mutant.log" >&2
         exit 1
     fi
-    if python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
+    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: vm_host tests passed (mutant not caught)" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
@@ -30,6 +31,7 @@ done
 BUILD="$TMP/m4"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" -j"${JOBS:-4}" .build/rt/host-native-unit \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=4" \
     >"$TMP/build-4.log" 2>&1; then
@@ -47,6 +49,7 @@ echo "PASS host mutant 4: observer test rejected the mutant"
 BUILD="$TMP/m6"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=6" \
     >"$TMP/build-6.log" 2>&1; then
@@ -54,7 +57,7 @@ if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     tail -20 "$TMP/build-6.log" >&2
     exit 1
 fi
-if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-6.log" 2>&1; then
+if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-6.log" 2>&1; then
     echo "FAIL host mutant 6: memory test passed (mutant not caught)" >&2
     cat "$TMP/test-6.log" >&2
     exit 1
@@ -64,6 +67,7 @@ echo "PASS host mutant 6: late open budget check rejected"
 BUILD="$TMP/m7"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=7" \
     >"$TMP/build-7.log" 2>&1; then
@@ -71,7 +75,7 @@ if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     tail -20 "$TMP/build-7.log" >&2
     exit 1
 fi
-if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-7.log" 2>&1; then
+if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-7.log" 2>&1; then
     echo "FAIL host mutant 7: memory test passed (mutant not caught)" >&2
     cat "$TMP/test-7.log" >&2
     exit 1
@@ -82,6 +86,7 @@ for mutant in 8 9 10 12; do
     BUILD="$TMP/m$mutant"
     mkdir -p "$BUILD"
     git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
     if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
         CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
         >"$TMP/build-$mutant.log" 2>&1; then
@@ -89,7 +94,7 @@ for mutant in 8 9 10 12; do
         tail -20 "$TMP/build-$mutant.log" >&2
         exit 1
     fi
-    if python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
+    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: memory test passed (mutant not caught)" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
@@ -114,6 +119,7 @@ done
 BUILD="$TMP/m11"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=11" \
     >"$TMP/build-11.log" 2>&1; then
@@ -121,7 +127,7 @@ if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     tail -20 "$TMP/build-11.log" >&2
     exit 1
 fi
-if python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-11.log" 2>&1; then
+if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-11.log" 2>&1; then
     echo "FAIL host mutant 11: vm_host tests passed (mutant not caught)" >&2
     cat "$TMP/test-11.log" >&2
     exit 1
@@ -131,6 +137,7 @@ echo "PASS host mutant 11: symlink parity tests rejected the mutant"
 BUILD="$TMP/m13"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" .build/rt/host-random-budget \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=13" \
     >"$TMP/build-13.log" 2>&1; then
@@ -161,6 +168,7 @@ fi
 BUILD="$TMP/m14"
 mkdir -p "$BUILD"
 git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
 if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=14" \
     >"$TMP/build-14.log" 2>&1; then
@@ -184,3 +192,31 @@ if ! python3 "$ROOT/tests/runtime2/cp16_n1_result.py" --log "$TMP/test-14.log" -
 fi
 echo "PASS host mutant 14: per-built-in mapping rejected by the validated structured record"
 echo "PASS host negative controls: 13 behavioural mutants rejected (1-9, 11-14); M10 accounting-formula control detected by the NIFT_TRIM probe"
+
+# N2: cp source-read and mv source-absence observations. The host-native unit
+# has the direct observer checks; the mutant must make that unit fail.
+for mutant in 15 16; do
+    BUILD="$TMP/m$mutant"
+    mkdir -p "$BUILD"
+    git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
+rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
+    if ! make -C "$BUILD" -j"${JOBS:-4}" .build/rt/host-native-unit \
+        CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
+        >"$TMP/build-$mutant.log" 2>&1; then
+        echo "FAIL N2 mutant $mutant: build failed (harness failure)" >&2
+        tail -20 "$TMP/build-$mutant.log" >&2
+        exit 1
+    fi
+    if "$BUILD/.build/rt/host-native-unit" >"$TMP/test-$mutant.log" 2>&1; then
+        echo "FAIL N2 mutant $mutant: observer checks passed (mutant not caught)" >&2
+        cat "$TMP/test-$mutant.log" >&2
+        exit 1
+    fi
+    if ! grep -q "N2 cp/mv observer" "$TMP/test-$mutant.log" && ! grep -q "N2 cp source" "$TMP/test-$mutant.log" \
+        && ! grep -q "N2 mv absence" "$TMP/test-$mutant.log"; then
+        echo "FAIL N2 mutant $mutant: rejected, but not by the N2 observer case" >&2
+        cat "$TMP/test-$mutant.log" >&2
+        exit 1
+    fi
+    echo "PASS N2 mutant $mutant: host observer checks rejected the mutant"
+done
