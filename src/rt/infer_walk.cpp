@@ -204,6 +204,10 @@ void Inference::statement(NodeId id) {
             if (n.b != kNoNode) declare(ast_.text(ast_.at(n.b)), n.b, kinds_ty(kKindError));
             block(n.c);
             scopes_.pop_back();
+#if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 3
+            if (n.b != kNoNode && find(ast_.text(ast_.at(n.b))) == nullptr)
+                declare(ast_.text(ast_.at(n.b)), n.b, kinds_ty(kKindError));
+#endif
             break;
         case NodeKind::Throw:
             if (n.a != kNoNode) expr(n.a);

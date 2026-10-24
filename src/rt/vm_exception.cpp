@@ -17,10 +17,16 @@ bool Vm::origin_at(std::uint32_t offset, SourceOrigin& out, Fault& fault) const 
 
 bool Vm::pop_handlers_for_frame(std::size_t depth, Fault& fault) {
     if (handlers_.empty() || handlers_.back().frame_depth < depth) return true;
+#if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 2 && !defined(NIFT_EXC_CHECKED)
+    // E2 release build: pop defensively, as the unfixed VM would.
+    while (!handlers_.empty() && handlers_.back().frame_depth >= depth) handlers_.pop_back();
+    return true;
+#else
     // TryEnd is emitted on every normal exit. A handler of the returning frame
     // still live here is stale; it is reported through the ordinary internal
     // path (statistics written), never by aborting.
     return internal(fault, "stale exception handler");
+#endif
 }
 
 bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, const Instr* pc, Fault& fault) {
@@ -36,9 +42,13 @@ bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, con
     return memory_ok(fault);
 }
 
-bool Vm::op_try_end(Fault& fault) {
+bool Vm::op_try_end(const Instr& in, Fault& fault) {
 #if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 2
-    (void)fault;  // E2: leave the handler behind
+    if (in.c != 0) return true;  // E2: leave a handler on break/return exits
+    (void)fault;
+    if (handlers_.empty() || handlers_.back().frame_depth != frames_.size())
+        return internal(fault, "stale exception handler");
+    handlers_.pop_back();
     return true;
 #else
     if (handlers_.empty() || handlers_.back().frame_depth != frames_.size())

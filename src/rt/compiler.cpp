@@ -214,7 +214,7 @@ bool UnitCompiler::while_loop(const Node& node) {
 bool UnitCompiler::return_statement(const Node& node) {
     const auto end_tries = [this, &node] {
         fb_->set_offset(node.begin);
-        for (std::size_t k = 0; k < try_scopes_.size(); ++k) fb_->emit(OpCode::TryEnd);
+        for (std::size_t k = 0; k < try_scopes_.size(); ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
     };
     if (node.flags & kFlagBare || node.a == kNoNode) {
         end_tries();
@@ -244,7 +244,7 @@ bool UnitCompiler::loop_jump(const Node& node) {
     if (loops_.empty()) return fail(node, "jump-outside-loop");
     fb_->set_offset(node.begin);
     const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
-    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd);
+    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
     const std::size_t at = fb_->emit(OpCode::Jmp);
     if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
     else loops_.back().continues.push_back(at);

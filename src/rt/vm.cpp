@@ -310,7 +310,7 @@ VmResult Vm::run(std::string& output) {
     }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
-    OP(TryEnd) { if (!op_try_end(fault)) FAIL(); NEXT(); }
+    OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }
     OP(Throw) { if (!op_throw(*pc, R, proto, pc, fault)) FAIL(); NEXT(); }
     OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
     OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }
