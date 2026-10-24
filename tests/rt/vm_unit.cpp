@@ -165,6 +165,7 @@ void check_errors() {
         {"print(1 / 0)\n", StopReason::Error, "division by zero"},
         {"x := 1\nx = \"s\"\n", StopReason::Error, "cannot assign string to int binding 'x'"},
         {"a := [1]\nprint(a[3])\n", StopReason::Error, "JSON array index 3 is out of range in 'a[3]'"},
+        {"e := error(\"x\")\nprint(e.cause.message)\n", StopReason::Error, "value has no member: message"},
         {"x := 4000000000\nprint(x * x)\n", StopReason::Error, "signed 64-bit integer overflow"},
         {"x := 100000000\nprint(x * x)\n", StopReason::None, "10000000000000000\n"},
         {"x := 0\ny := -1\nprint(x * y)\n", StopReason::None, "0\n"},
