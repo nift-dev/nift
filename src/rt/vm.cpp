@@ -280,23 +280,22 @@ VmResult Vm::run(std::string& output) {
     OP(JmpTrue) { pc += truth(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }
     OP(JmpNotNull) { pc += R[pc->a].is_null() ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
     OP(BindType) { R[pc->a] = Value::integer(text_binding_type(BIND_TEXT(pc->c), R[pc->b])); NEXT(); }
-    OP(CheckAssign) {  // textual `x = e`: the type legacy derives from the text and the value
+    OP(CheckAssign) {  // textual `x = e`: legacy's text-derived type and the value
         const std::int64_t assigned = text_binding_type(RK(pc->c).as_int(), R[pc->a]);
         if (tag_assignable(assigned, R[pc->b].as_int())) NEXT();
-        binding_type_error(assigned, R[pc->b].as_int(), note_at(proto, pc), fault); FAIL();
-    }
+        binding_type_error(assigned, R[pc->b].as_int(), note_at(proto, pc), fault); FAIL(); }
     OP(CheckType) {
         const std::int64_t to = R[pc->b].as_int(); const std::int64_t tag = fast_tag(R[pc->a]);
         if (tag_assignable(tag, to)) NEXT();
-        binding_type_error(tag, to, note_at(proto, pc), fault); FAIL();
-    }
+        binding_type_error(tag, to, note_at(proto, pc), fault); FAIL(); }
     OP(Call) { if (!op_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(CallValue) { if (!op_call_value(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(LoadFunction) { if (!op_load_function(*pc, R, fault)) FAIL(); NEXT(); }
     OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
     OP(CellLoadCached) OP(CellStoreCached) OP(CellTake) OP(CellAnchor) OP(CellSlot) {
-        if (!op_cell_cached(*pc, R, fault)) FAIL(); NEXT(); }
+        if (!op_cell_cached(*pc, R, fault)) FAIL();
+        NEXT(); }
     OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }
