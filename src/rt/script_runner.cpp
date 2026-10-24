@@ -379,6 +379,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         stats.reason = message;
         stats.code = result.code;
         stats.catchable = result.catchable;
+        stats.error_origin = result.error_origin;
         report(stats);
         error_line(report_path, stats, message);
         exit_code = 1;
