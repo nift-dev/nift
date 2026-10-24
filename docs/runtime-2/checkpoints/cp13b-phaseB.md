@@ -40,9 +40,10 @@ against that freeze; it is not a competing interface authority.
 Focused gates: Phase A legacy/current/future 80/80; CP13B self-tests,
 adversarial 24/24, E1–E8 mutants (including E2 checked and E7 ASan), 1M-catch
 stress, diagnostics 89 baseline + changes 34, closures 52, capture 82,
-SourceMap unit/TSan/ASan, `test-rt-vm`, Host/CP16 N1 and read-limit tests,
-`rt-diff` 820 entries, warnings, lint and test integrity. See the evidence
-package for the exact logs and identities.
+SourceMap unit/TSan/ASan, both dispatch builds (`-DNIFT_RT_VM_SWITCH`
+included), `test-rt-vm`, Host/CP16 N1 and read-limit tests, `rt-diff` 820
+entries, warnings, lint and test integrity. See the evidence package for the
+exact logs and identities.
 
 ## Outstanding
 
