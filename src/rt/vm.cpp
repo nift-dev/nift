@@ -248,6 +248,13 @@ VmResult Vm::run(std::string& output) {
     COMPARE(JmpNotGe, Ge, x >= y, pc->a, pc->b, JUMP_UNLESS)
     COMPARE(JmpNotEq, Eq, x == y, pc->a, pc->b, JUMP_UNLESS)
     COMPARE(JmpNotNe, Ne, x != y, pc->a, pc->b, JUMP_UNLESS)
+    OP(JmpIncLt) {
+        Value& x = R[pc->a];
+        if (x.is(Kind::Int) && safe_integer(x.as_int() + 1)) x = Value::integer(x.as_int() + 1);
+        else x = Value::integer(0);  // only reachable if the loop counter overflowed
+        if (x.as_int() < R[pc->b].as_int()) { pc += 1 + jump_offset(pc->c); DISPATCH(); }
+        NEXT();
+    }
     OP(Jmp) { pc += 1 + jump_offset(pc->c); DISPATCH(); }
     OP(JmpFalse) { pc += truth(R[pc->a]) ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
     OP(JmpTrue) { pc += truth(R[pc->a]) ? 1 + jump_offset(pc->c) : 1; DISPATCH(); }

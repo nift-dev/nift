@@ -16,6 +16,7 @@ g2_object_after vm
 g2_object_order vm
 g3_break vm
 g3_continue vm
+g3_continue_finite vm
 g3_continue_not_last fallback:jump-not-last
 g3_for_in_while vm
 g3_nested vm

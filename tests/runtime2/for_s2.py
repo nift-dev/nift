@@ -18,14 +18,28 @@ import subprocess
 import sys
 import tempfile
 
+import mutant_provenance
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "for-s2")
+
+# The intended observable defect of each mutant, not just "something failed".
+MUTANT_SIGNATURES = {
+    1: {"t26_read_after_shrink_first_iter.f": {"stdout": b"1\n2\n3\n", "exit": 0, "outcome": "vm"}},
+    2: {"g6_push_once.f": {"stdout": b"1\n2\n3\n4\n", "exit": 0, "outcome": "vm"}},
+    3: {"g7_closure_loop_var.f": {"stdout": b"3\n3\n3\n", "exit": 0, "outcome": "vm"}},
+    4: {"g3_continue_finite.f": {"stdout": b"1\n2\n", "exit": 0, "outcome": "vm"}},
+    5: {"g6_break_object.f": {"stdout": b"a\n", "exit": 0, "outcome": "vm", "heap_leak_gt": 32}},
+    6: {"g2_object_order.f": {"stdout": b"2\nb\n1\na\n3\nc\n", "exit": 0, "outcome": "vm"},
+        "g1_object.f": {"stdout": b"2\nb\n1\na\n", "exit": 0, "outcome": "vm"}},
+    7: {"g2_object_order.f": {"stdout": b"c\n3\na\n1\nb\n2\n", "exit": 0, "outcome": "vm"}},
+}
 
 MUTANT_CASES = {
     1: ["t26_read_after_shrink_first_iter.f"],
     2: ["g6_push_once.f"],
     3: ["g7_closure_loop_var.f"],
-    4: ["g3_continue.f"],
+    4: ["g3_continue_finite.f"],
     5: ["g6_break_object.f"],
     6: ["g2_object_order.f", "g1_object.f"],
     7: ["g2_object_order.f"],
@@ -110,35 +124,38 @@ def check(nift, work, name, want, budget=None, timeout_s=60):
     return problems, st
 
 
-def check_mutant(nift, normal, work, name, want, budget, timeout_s):
+def check_mutant(nift, normal, work, name, want, budget, timeout_s, mutant):
     """Run one designated mutant case. Returns (detected, harness_failure, note)."""
+    if normal is None:
+        return False, True, "--normal is required for mutant detection"
     vm, st = run(nift, work, name, want, budget, timeout_s)
     if vm[3]:
-        if name == "g3_continue.f":
-            return True, False, "timeout (intended non-advancing continue)"
-        return False, True, f"unexpected timeout after {timeout_s}s"
+        return False, True, f"timeout after {timeout_s}s"
     if st is None:
         return False, True, "no statistics"
     if vm[2] < 0 or vm[2] >= 128 or vm[2] in (124, 125):
         return False, True, f"abnormal exit {vm[2]} (not a semantic mismatch)"
-    if st.get("outcome") not in ("vm", "vm-error") or st.get("vm_executions") != 1:
+    if st.get("outcome") not in ("vm", "vm-error", "internal-error") or st.get("vm_executions") != 1:
         return False, True, f"invalid statistics (outcome={st.get('outcome')}, vm_executions={st.get('vm_executions')})"
-    if vm[2] not in (0, 1):
-        return False, True, f"unexpected exit {vm[2]}"
-    problems, _ = check(nift, work, name, want, budget, timeout_s)
-    if name == "g6_break_object.f":
-        if normal is None:
-            return False, True, "--normal is required for M4"
-        _, normal_st = run(normal, work, name, want, budget, timeout_s)
-        if normal_st is None:
-            return False, True, "normal build has no statistics"
+    normal_vm, normal_st = run(normal, work, name, want, budget, timeout_s)
+    if normal_vm[3] or normal_st is None or normal_st.get("outcome") not in ("vm", "vm-error"):
+        return False, True, "unmutated baseline did not execute"
+    baseline_problems, _ = check(normal, work, name, want, budget, timeout_s)
+    if baseline_problems:
+        return False, True, "unmutated baseline fails: " + "; ".join(baseline_problems)
+    sig = MUTANT_SIGNATURES[mutant][name]
+    if vm[0] != sig["stdout"]:
+        return False, False, f"mutation signature stdout {vm[0]!r} != {sig['stdout']!r}"
+    if vm[2] != sig["exit"] or st.get("outcome") != sig["outcome"]:
+        return False, False, f"mutation signature exit/outcome {vm[2]}/{st.get('outcome')} != {sig['exit']}/{sig['outcome']}"
+    if "heap_leak_gt" in sig:
         leak = st.get("heap_live", 0) - normal_st.get("heap_live", 0)
-        if leak > 32:
-            return True, False, f"heap_live leak {leak} bytes after break"
-        return False, False, f"no heap_live leak (mutant {st.get('heap_live')}, normal {normal_st.get('heap_live')})"
-    if problems:
-        return True, False, "; ".join(problems)
-    return False, False, "not detected"
+        if leak <= sig["heap_leak_gt"]:
+            return False, False, f"no heap_live leak (mutant {st.get('heap_live')}, normal {normal_st.get('heap_live')})"
+        return True, False, f"heap_live leak {leak} bytes after break"
+    if st.get("reason") != "":
+        return False, False, f"unexpected mutation reason {st.get('reason')!r}"
+    return True, False, "expected semantic defect"
 
 
 def main():
@@ -146,10 +163,16 @@ def main():
     ap.add_argument("--nift", required=True)
     ap.add_argument("--normal")
     ap.add_argument("--mutant", type=int, choices=sorted(MUTANT_CASES))
+    ap.add_argument("--mutant-info")
     ap.add_argument("--skip-million", action="store_true")
     args = ap.parse_args()
     nift = os.path.abspath(args.nift)
     normal = os.path.abspath(args.normal) if args.normal else None
+    if args.mutant:
+        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info)
+        if provenance_error:
+            print(f"FAIL for-s2 mutant {args.mutant}: harness: {provenance_error}")
+            return 1
 
     if args.mutant:
         failures, detected, notes = 0, [], []
@@ -164,8 +187,9 @@ def main():
                     failures += 1
                     notes.append(f"{name}: not in EXPECT")
                     continue
-                timeout_s = 5 if name == "g3_continue.f" else 30
-                ok, harness_failure, note = check_mutant(nift, normal, work, name, want, budget, timeout_s)
+                timeout_s = 30
+                ok, harness_failure, note = check_mutant(nift, normal, work, name, want, budget, timeout_s,
+                                                          args.mutant)
                 if ok:
                     detected.append(name)
                 if harness_failure:

@@ -42,6 +42,7 @@ struct UnitCompiler::ForState {
     std::uint16_t first_flag = 0;
     std::uint16_t second_flag = 0;
     std::size_t loop_start = 0;
+    std::size_t body_start = 0;
     std::vector<std::size_t> exits;
 };
 

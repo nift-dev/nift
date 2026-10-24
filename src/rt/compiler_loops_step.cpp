@@ -73,6 +73,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     }
 #endif
     state.exits.push_back(fb_->emit(OpCode::JmpNotLt, state.index, state.count));
+    state.body_start = fb_->here();
 
     state.reads_first = for_body_reads(body, text(ast_.at(state.names[0])), state.first_read);
     state.reads_second =
@@ -83,8 +84,9 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     const bool second_captured = state.pair ? for_body_captures(body, text(ast_.at(state.names[1]))) : false;
     state.first_used = state.reads_first || first_writes || first_captured;
     state.second_used = state.pair && (state.reads_second || second_writes || second_captured);
-    const bool lazy_first = !state.pair && state.live && !state.source_name.empty() &&
-                            !state.snapshot_mutant;
+    const bool source_changes = for_source_may_change(body, state.place, state.source_name);
+    const bool lazy_first = !state.pair && state.first_used && state.live && !state.source_name.empty() &&
+                            !state.snapshot_mutant && source_changes;
     if (lazy_first) {
         Binding lazy = state.first_binding;
         lazy.lazy_for = true;
@@ -93,25 +95,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         lazy.lazy_index = state.index;
         if (!temp(lazy.lazy_active)) return false;
         const Binding& src = *state.place;
-        if (src.lazy_for) {
-            lazy.lazy_source_global = src.lazy_source_global;
-            lazy.lazy_source_cell = src.lazy_source_cell;
-            lazy.lazy_source_upvalue = src.lazy_source_upvalue;
-            lazy.lazy_source_lazy = true;
-            lazy.lazy_source_ancestor_lazy = src.lazy_source_lazy;
-            lazy.lazy_source_reg = src.lazy_source_reg;
-            lazy.lazy_source_index = src.lazy_index;
-            lazy.lazy_source_active = src.lazy_active;
-        } else {
-            lazy.lazy_source_global = src.global;
-            lazy.lazy_source_cell = src.cell;
-            lazy.lazy_source_upvalue = src.upvalue;
-            lazy.lazy_source_lazy = false;
-            lazy.lazy_source_ancestor_lazy = false;
-            lazy.lazy_source_reg = src.reg;
-            lazy.lazy_source_index = src.upvalue_index;
-            lazy.lazy_source_active = 0;
-        }
+        lazy.lazy_source_binding = std::make_shared<const Binding>(src);
         fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
         state.first_binding = lazy;
         scopes_.update(text(ast_.at(state.names[0])), lazy);
@@ -135,25 +119,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         lazy.lazy_index = state.index;
         if (!temp(lazy.lazy_active)) return false;
         const Binding& src = *state.place;
-        if (src.lazy_for) {
-            lazy.lazy_source_global = src.lazy_source_global;
-            lazy.lazy_source_cell = src.lazy_source_cell;
-            lazy.lazy_source_upvalue = src.lazy_source_upvalue;
-            lazy.lazy_source_lazy = true;
-            lazy.lazy_source_ancestor_lazy = src.lazy_source_lazy;
-            lazy.lazy_source_reg = src.lazy_source_reg;
-            lazy.lazy_source_index = src.lazy_index;
-            lazy.lazy_source_active = src.lazy_active;
-        } else {
-            lazy.lazy_source_global = src.global;
-            lazy.lazy_source_cell = src.cell;
-            lazy.lazy_source_upvalue = src.upvalue;
-            lazy.lazy_source_lazy = false;
-            lazy.lazy_source_ancestor_lazy = false;
-            lazy.lazy_source_reg = src.reg;
-            lazy.lazy_source_index = src.upvalue_index;
-            lazy.lazy_source_active = 0;
-        }
+        lazy.lazy_source_binding = std::make_shared<const Binding>(src);
         fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
         state.second_binding = lazy;
         scopes_.update(text(ast_.at(state.names[1])), lazy);
@@ -168,7 +134,10 @@ bool UnitCompiler::for_step(ForState& state) {
     // A loop variable nobody reads, writes or captures is not materialised:
     // the body runs for the fixed count, exactly as legacy (its binding has no
     // observable use). This keeps the modifying benchmark at while-loop cost.
-    const bool need_source = state.pair ? state.second_used : (state.first_used && !state.first_binding.lazy_for);
+    const bool eager_lazy_cell = !state.pair && state.first_used && state.first_binding.lazy_for &&
+                                 state.first_binding.cell;
+    const bool need_source = state.pair ? state.second_used :
+                             (eager_lazy_cell || (state.first_used && !state.first_binding.lazy_for));
     std::uint16_t source = 0;
     bool source_temp = false;
     if (need_source) {
@@ -180,7 +149,17 @@ bool UnitCompiler::for_step(ForState& state) {
     }
 
     if (!state.pair) {
-        if (state.first_used && !state.first_binding.lazy_for) {
+        if (eager_lazy_cell) {
+            std::uint16_t value = 0;
+            if (!temp(value)) return false;
+            fb_->emit(OpCode::ArrayElemValue, value, source, state.index);
+            if (source_temp) for_clear_register(source);
+            fb_->emit(OpCode::BindType, state.first_binding.type_reg, value, state.untyped);
+            if (!for_bind_value(state.first_binding, value, state.first_binding.type_reg, true,
+                                state.first_flag))
+                return false;
+            for_clear_register(value);
+        } else if (state.first_used && !state.first_binding.lazy_for) {
             if (!state.track_missing && !state.first_binding.cell) {
                 fb_->emit(OpCode::ArrayElemValue, state.first_binding.reg, source, state.index);
                 if (source_temp) for_clear_register(source);

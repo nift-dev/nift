@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 // Name resolution for the Runtime 2.0 compiler (CP11): lexical block scopes
 // mapping local names to registers, the unit's function table, and the
 // unit-level admission rules for functions (D-001 whole-unit fallback).
@@ -22,6 +23,11 @@
 namespace nift::rt {
 
 struct Binding {
+    // Loop-variable invariant: the current value lives in reg (or in cell reg
+    // when captured). While lazy_source_binding is set and lazy_active is 1,
+    // a read evaluates "source[lazy_index]" from that immutable source snapshot
+    // (which may itself be a lazy binding, preserving arbitrary nesting). A
+    // write stores reg and clears lazy_active; captures read the bound cell.
     NodeId decl_node = kNoNode;
     std::uint16_t reg = 0;
     std::uint16_t type_reg = 0;
@@ -51,14 +57,7 @@ struct Binding {
     std::string_view lazy_name;
     std::uint16_t lazy_index = 0;
     std::uint16_t lazy_active = 0;
-    bool lazy_source_global = false;
-    bool lazy_source_cell = false;
-    bool lazy_source_upvalue = false;
-    bool lazy_source_lazy = false;
-    bool lazy_source_ancestor_lazy = false;
-    std::uint16_t lazy_source_reg = 0;
-    std::uint16_t lazy_source_active = 0;
-    std::uint16_t lazy_source_index = 0;
+    std::shared_ptr<const Binding> lazy_source_binding;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

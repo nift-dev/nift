@@ -3199,14 +3199,18 @@ test-runtime2-closures-s1-mutants: $(TARGET)
 	python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TARGET)"
 	for n in 1 2 3 4 5 6; do \
 		$(MAKE) CLOSURE_MUTANT=$$n "$(TEST_DIR)/closure-mutants/nift-$$n" >/dev/null || exit 1; \
-		python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" --mutant $$n || exit 1; \
+		sha=$$(sha256sum "$(TEST_DIR)/closure-mutants/nift-$$n" | cut -d' ' -f1); \
+		printf '{"mutant": %s, "sha256": "%s"}\n' "$$n" "$$sha" > "$(TEST_DIR)/closure-mutants/nift-$$n.json"; \
+		python3 tests/runtime2/closures_s1.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" \
+			--normal "$(CURDIR)/$(TARGET)" --mutant-info "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n.json" \
+			--mutant $$n || exit 1; \
 	done
 	for n in 7 8; do \
 		$(MAKE) CLOSURE_MUTANT=$$n "$(TEST_DIR)/closure-mutants/nift-$$n" >/dev/null || exit 1; \
 		python3 tests/runtime2/closures_s1_stress.py --nift "$(CURDIR)/$(TEST_DIR)/closure-mutants/nift-$$n" --mutant || exit 1; \
 	done
 	python3 tests/runtime2/closures_s1_mutant_harness.py --nift "$(CURDIR)/$(TARGET)"
-test-rt-vm: test-runtime2-kind-bits test-runtime2-closures-s1 test-runtime2-closures-s1-stress test-runtime2-closures-s1-mutants
+test-rt-vm: test-runtime2-kind-bits test-runtime2-closures-s1 test-runtime2-closures-s1-stress test-runtime2-closures-s1-mutants test-runtime2-cp12c-mutant-controls
 
 # CP12C slice 2: default `for` differential fixtures, mutants and the
 # memory/performance measurement (compiler_loops.cpp + vm_iter.cpp mutants).
@@ -3239,6 +3243,8 @@ $(FOR_MUTANT_BIN): $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
 		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
 		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LDLIBS) -o $@
 .PHONY: test-runtime2-cp12c-probes
+test-runtime2-cp12c-mutant-controls: $(TARGET)
+	python3 tests/runtime2/cp12c_mutant_controls.py --normal "$(CURDIR)/$(TARGET)"
 test-runtime2-cp12c-probes: $(TARGET)
 	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src .build/cp12c-probes-src
 	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src2 .build/cp12c-probes-src2
@@ -3247,8 +3253,11 @@ test-runtime2-for-s2-mutants: $(TARGET)
 	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
 	for n in 1 2 3 4 5 6 7; do \
 		$(MAKE) FOR_MUTANT=$$n "$(TEST_DIR)/for-mutants/nift-$$n" >/dev/null || exit 1; \
+		sha=$$(sha256sum "$(TEST_DIR)/for-mutants/nift-$$n" | cut -d' ' -f1); \
+		printf '{"mutant": %s, "sha256": "%s"}\n' "$$n" "$$sha" > "$(TEST_DIR)/for-mutants/nift-$$n.json"; \
 		python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TEST_DIR)/for-mutants/nift-$$n" \
-			--normal "$(CURDIR)/$(TARGET)" --mutant $$n || exit 1; \
+			--normal "$(CURDIR)/$(TARGET)" --mutant-info "$(CURDIR)/$(TEST_DIR)/for-mutants/nift-$$n.json" \
+			--mutant $$n || exit 1; \
 	done
 test-rt-vm: test-runtime2-for-s2 test-runtime2-for-s2-mutants
 test-runtime2-for-s2-bench: $(TARGET)

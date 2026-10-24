@@ -36,47 +36,35 @@ bool UnitCompiler::for_read_source(const Binding& b, std::uint16_t& reg, bool& t
 }
 
 bool UnitCompiler::for_lazy_read(const Binding& b, std::uint16_t& reg) {
-    Binding source;
-    source.global = b.lazy_source_global;
-    source.cell = b.lazy_source_cell;
-    source.upvalue = b.lazy_source_upvalue;
-    source.lazy_for = b.lazy_source_lazy;
-    source.lazy_index = b.lazy_source_index;
-    source.lazy_active = b.lazy_source_active;
-    source.lazy_source_global = b.lazy_source_global;
-    source.lazy_source_cell = b.lazy_source_cell;
-    source.lazy_source_upvalue = b.lazy_source_upvalue;
-    source.lazy_source_lazy = b.lazy_source_ancestor_lazy;
-    source.lazy_source_reg = b.lazy_source_reg;
-    source.lazy_source_index = b.lazy_source_index;
-    source.lazy_source_active = b.lazy_source_active;
-    source.reg = b.lazy_source_reg;
-    source.upvalue_index = b.lazy_source_index;
-    std::uint16_t src = 0, value = 0, found = 0;
-    bool src_temp = false;
-    if (!for_read_source(source, src, src_temp)) return false;
-    if (b.lazy_pair) {
-        std::uint16_t key = 0;
-        if (!temp(key) || !temp(value) || !temp(found) || found != value + 1) return false;
-        fb_->emit(OpCode::GetIndex, key, b.lazy_keys, b.lazy_index);
-        fb_->emit(OpCode::ObjectLookup, value, src, key);
-        for_clear_register(key);
-    } else {
-        if (!temp(value) || !temp(found) || found != value + 1) return false;
-        fb_->emit(OpCode::ArrayElem, value, src, b.lazy_index);
+    if (b.lazy_source_binding) {
+        Binding source = *b.lazy_source_binding;
+        std::uint16_t src = 0, value = 0, found = 0;
+        bool src_temp = false;
+        if (!for_read_source(source, src, src_temp)) return false;
+        if (b.lazy_pair) {
+            std::uint16_t key = 0;
+            if (!temp(key) || !temp(value) || !temp(found) || found != value + 1) return false;
+            fb_->emit(OpCode::GetIndex, key, b.lazy_keys, b.lazy_index);
+            fb_->emit(OpCode::ObjectLookup, value, src, key);
+            for_clear_register(key);
+        } else {
+            if (!temp(value) || !temp(found) || found != value + 1) return false;
+            fb_->emit(OpCode::ArrayElem, value, src, b.lazy_index);
+        }
+        if (src_temp) for_clear_register(src);
+        const std::size_t have = fb_->emit(OpCode::JmpTrue, found);
+        const std::size_t at = fb_->emit(OpCode::IterMissing);
+        fb_->note(at, std::string(b.lazy_name.empty() ? b.lazy_source_name : b.lazy_name));
+        fb_->patch(have, fb_->here());
+        const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
+        const std::size_t done = fb_->emit(OpCode::Jmp);
+        fb_->patch(assigned, fb_->here());
+        fb_->emit(OpCode::Move, value, b.reg);
+        fb_->patch(done, fb_->here());
+        reg = value;
+        return true;
     }
-    if (src_temp) for_clear_register(src);
-    const std::size_t have = fb_->emit(OpCode::JmpTrue, found);
-    const std::size_t at = fb_->emit(OpCode::IterMissing);
-    fb_->note(at, std::string(b.lazy_name.empty() ? b.lazy_source_name : b.lazy_name));
-    fb_->patch(have, fb_->here());
-    const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
-    const std::size_t done = fb_->emit(OpCode::Jmp);
-    fb_->patch(assigned, fb_->here());
-    fb_->emit(OpCode::Move, value, b.reg);
-    fb_->patch(done, fb_->here());
-    reg = value;
-    return true;
+    return fail(ast_.at(root_), "for-lazy-source");
 }
 
 bool UnitCompiler::for_source_binding(const Node& iterable, const Binding*& binding) const {

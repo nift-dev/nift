@@ -91,7 +91,8 @@ namespace nift::rt {
     X(ObjectLookupValue) /* R[a] = R[b][R[c]] (object), no found flag           */                     \
     X(IterMissing) /* raise "reference target no longer exists: <note>"         */                     \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
-    X(Halt)       /* end the script                                             */
+    X(Halt)       /* end the script                                             */                    \
+    X(JmpIncLt)   /* R[a] += 1; if R[a] < R[b] pc += int16 c (for-loop back edge) */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,

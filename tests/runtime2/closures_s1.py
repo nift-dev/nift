@@ -22,11 +22,25 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "closures-s1")
 sys.path.insert(0, HERE)
 import vm_policies  # noqa: E402
+import mutant_provenance  # noqa: E402
 
 # Phase A: the feature is not implemented yet. A fixture must be refused by
 # the current compiler for one of the reasons this slice will remove, except
 # the D-038 fixture, which must keep its documented caller-local refusal.
 PREPARE_REASONS = {"expression:Lambda", "fn-as-value", "call-binding", "method:f"}
+MUTANT_SIGNATURES = {
+    1: {"g1_shared_escape.f": {"stdout": b"1\n1\n1\n", "exit": 0, "outcome": "vm"}},
+    2: {"g2_isolation.f": {"stdout": b"10\n11\n12\n13\n7\n8\n9\n", "exit": 0, "outcome": "vm"},
+        "g2_cell_isolation.f": {"stdout": b"10\n10\n10\n", "exit": 0, "outcome": "vm"}},
+    3: {"g1_self_cycle.f": {"stdout": b"true\n", "exit": 0, "outcome": "vm"},
+        "g1_mutual_cycles.f": {"stdout": b"false\n", "exit": 0, "outcome": "vm"}},
+    4: {"g4_closure_restore.f": {"stdout": b"10\n", "exit": 0, "outcome": "vm"}},
+    5: {"g12_cell_not_observable.f": {"stdout": b"", "exit": 70, "outcome": "internal-error",
+                                      "reason": "unexpected operands (compiler defect): cell reached a native"}},
+    6: {"g7_lambda_too_few.f": {"stdout": b"null\n", "exit": 0, "outcome": "vm"},
+        "g7_named_too_many.f": {"stdout": b"1\n", "exit": 0, "outcome": "vm"}},
+}
+
 MUTANT_CASES = {
     1: {"g1_shared_escape.f"},
     2: {"g2_isolation.f", "g2_cell_isolation.f"},
@@ -138,34 +152,59 @@ def main():
     ap.add_argument("--nift", required=True)
     ap.add_argument("--prepare", action="store_true")
     ap.add_argument("--mutant", type=int, choices=range(1, 7))
+    ap.add_argument("--normal")
+    ap.add_argument("--mutant-info")
     args = ap.parse_args()
     nift = os.path.abspath(args.nift)
+    normal = os.path.abspath(args.normal) if args.normal else None
+    if args.mutant:
+        _, provenance_error = mutant_provenance.verify(nift, args.mutant, args.mutant_info)
+        if provenance_error:
+            print(f"FAIL closure mutant {args.mutant}: harness: {provenance_error}")
+            return 1
+        if normal is None:
+            print(f"FAIL closure mutant {args.mutant}: harness: --normal is required")
+            return 1
     failures, tally = 0, {}
     detected = set()
     with tempfile.TemporaryDirectory(prefix="closures-s1-") as work:
-        for name, want in cases():
+        selected = [(n, w) for n, w in cases() if n in MUTANT_CASES.get(args.mutant, set())] if args.mutant else cases()
+        for name, want in selected:
             problems, outcome, st = check(nift, work, name, want, args.prepare)
             if args.mutant:
-                # A mutant is detected only by a semantic differential failure
-                # with a statistics line. A crash, timeout or missing statistics
-                # is a harness failure, never a detection (review R2).
-                if problems and any("no NIFT_VM=1 statistics" in p or "harness:" in p for p in problems):
+                baseline_problems, _, _ = check(normal, work, name, want, False)
+                if baseline_problems:
                     failures += 1
-                    print(f"FAIL mutant {args.mutant} {name}: harness: " + "; ".join(problems))
-                elif name in MUTANT_CASES.get(args.mutant, set()) and (
-                        st.get("outcome") not in ("vm", "vm-error", "internal-error") or st.get("vm_executions") != 1):
+                    print(f"FAIL mutant {args.mutant} {name}: baseline: " + "; ".join(baseline_problems))
+                    continue
+                mode = "1" if want.startswith("fallback:") else "require"
+                vm, st = run(nift, work, name, mode)
+                if st is None:
+                    failures += 1
+                    print(f"FAIL mutant {args.mutant} {name}: harness: no statistics")
+                    continue
+                if vm[2] in (124, 125) or vm[2] < 0 or vm[2] >= 128:
+                    failures += 1
+                    print(f"FAIL mutant {args.mutant} {name}: harness: abnormal exit {vm[2]}")
+                    continue
+                if st.get("outcome") not in ("vm", "vm-error", "internal-error") or st.get("vm_executions") != 1:
                     failures += 1
                     print(f"FAIL mutant {args.mutant} {name}: harness: no real VM execution "
                           f"(outcome={st.get('outcome')}, vm_executions={st.get('vm_executions')})")
-                elif name in MUTANT_CASES.get(args.mutant, set()):
-                    if problems:
-                        detected.add(name)
-                        st = st or {}
-                        print(f"ok   mutant {args.mutant} {name}: rejected "
-                              f"(outcome={st.get('outcome')}, reason={st.get('reason')}, "
-                              f"vm_exec={st.get('vm_executions')}, peak={st.get('heap_peak')})")
-                    else:
-                        print(f"miss mutant {args.mutant} {name}: still correct")
+                    continue
+                sig = MUTANT_SIGNATURES[args.mutant][name]
+                ok = vm[0] == sig["stdout"] and vm[2] == sig["exit"] and st.get("outcome") == sig["outcome"]
+                if "reason" in sig:
+                    ok = ok and st.get("reason") == sig["reason"]
+                if ok:
+                    detected.add(name)
+                    print(f"ok   mutant {args.mutant} {name}: rejected "
+                          f"(outcome={st.get('outcome')}, reason={st.get('reason')}, "
+                          f"vm_exec={st.get('vm_executions')})")
+                else:
+                    print(f"miss mutant {args.mutant} {name}: signature "
+                          f"stdout={vm[0]!r} exit={vm[2]} outcome={st.get('outcome')} "
+                          f"reason={st.get('reason')!r}; expected {sig}")
                 continue
             tally[outcome or "?"] = tally.get(outcome or "?", 0) + 1
             if problems:

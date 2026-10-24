@@ -154,6 +154,7 @@ struct CaptureScan {
 struct ShrinkScan {
     const Ast& ast;
     std::string_view name;
+    bool element_writes = false;
     bool found = false;
 
     void call(NodeId id) {
@@ -184,7 +185,13 @@ struct ShrinkScan {
         const Node& n = ast.at(id);
         if (n.kind == NodeKind::Ident && ast.text(n) == name) { found = true; return; }
         if (n.kind == NodeKind::Member) { node(n.a); return; }
-        if (n.kind == NodeKind::Index) { node(n.a); node(n.b); return; }
+        if (n.kind == NodeKind::Index) {
+            const Node& holder = ast.at(n.a);
+            if (element_writes && holder.kind == NodeKind::Ident && ast.text(holder) == name) found = true;
+            node(n.a);
+            node(n.b);
+            return;
+        }
         node(id);
     }
 
@@ -226,6 +233,14 @@ bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place,
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if (place->cell || place->upvalue || place->global) return true;  // conservative
     ShrinkScan scan{ast_, name};
+    scan.node(node_id(body));
+    return scan.found;
+}
+
+bool UnitCompiler::for_source_may_change(const Node& body, const Binding* place, std::string_view name) const {
+    if (place == nullptr) return false;
+    if (place->cell || place->upvalue || place->global) return true;
+    ShrinkScan scan{ast_, name, true};
     scan.node(node_id(body));
     return scan.found;
 }

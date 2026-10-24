@@ -103,6 +103,7 @@ private:
     bool for_body_writes(const Node& body, std::string_view name) const;
     bool for_body_captures(const Node& body, std::string_view name) const;
     bool for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const;
+    bool for_source_may_change(const Node& body, const Binding* place, std::string_view name) const;
     bool for_declare_binding(std::string_view name, const Node& at, bool captured, KindSet decl_kinds,
                              Binding& binding);
     bool for_bind_value(const Binding& binding, std::uint16_t value, std::uint16_t type_reg, bool first,

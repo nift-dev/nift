@@ -122,9 +122,17 @@ bool UnitCompiler::for_finish(ForState& state) {
     for (std::size_t at : loops_.back().continues) fb_->patch(at, increment);
 #endif
     fb_->set_offset(node.begin);
-    fb_->emit(OpCode::AddI, state.index, state.index, jump_operand(1));
-    const std::size_t back = fb_->emit(OpCode::Jmp);
-    fb_->patch(back, state.loop_start);
+#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 2
+    if (state.live && !state.pair) {  // M1b: dynamic length also after each body
+        std::uint16_t fresh = 0;
+        bool fresh_temp = false;
+        if (!for_read_source(*state.place, fresh, fresh_temp)) return false;
+        fb_->emit(OpCode::Length, state.count, fresh, 0);
+        if (fresh_temp) for_clear_register(fresh);
+    }
+#endif
+    if (state.body_start != 0)
+        fb_->patch(fb_->emit(OpCode::JmpIncLt, state.index, state.count), state.body_start);
 
     // Clean up iterator state on every normal/break exit (M4: breaks skip it).
     const std::size_t cleanup = fb_->here();
