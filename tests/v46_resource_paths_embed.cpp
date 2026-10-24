@@ -1,6 +1,7 @@
 #include <nift/nift.h>
 
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -68,16 +69,19 @@ int main() {
     assert(threaded.value().string() == (root / "modules" / "asset-thread.txt").generic_string());
     auto thread_escape = engine.execute(
         "import(\"./modules/owner.f\")\nescape_worker := thread(thread_escape)\nreturn escape_worker.join()");
-    assert(!thread_escape.ok());
-    assert(thread_escape.error().message.find("path must stay inside the Nift project") != std::string::npos);
+    // D-051: no default project-root containment. Without an explicit
+    // filesystem root an outside module path resolves like any other path.
+    const std::string outside = (root / "modules" / ".." / ".." / "escape.txt").lexically_normal().generic_string();
+    assert(thread_escape.ok());
+    assert(thread_escape.value().string() == outside);
     auto futured = engine.execute(
         "import(\"./modules/owner.f\")\nresource_future := future_resource()\nreturn await resource_future");
     assert(futured.ok());
     assert(futured.value().string() == (root / "modules" / "asset-future.txt").generic_string());
     auto future_escape_result = engine.execute(
         "import(\"./modules/owner.f\")\nescape_future := future_escape()\nreturn await escape_future");
-    assert(!future_escape_result.ok());
-    assert(future_escape_result.error().message.find("path must stay inside the Nift project") != std::string::npos);
+    assert(future_escape_result.ok());
+    assert(future_escape_result.value().string() == outside);
 
     auto rendered = engine.render(nift::Source::path("partial.html"));
     assert(rendered.ok());
@@ -92,10 +96,38 @@ int main() {
         std::ofstream escape(root / "modules" / "escape.f");
         escape << "fn(resource()) { return module_path(\"../../escape.txt\") }\nexport(resource)\n";
     }
-    nift::Engine confined(root);
-    auto escaped = confined.execute("import(\"./modules/escape.f\")\nreturn resource()");
-    assert(!escaped.ok());
-    assert(escaped.error().message.find("path must stay inside the Nift project") != std::string::npos);
+    nift::Engine unconfined(root);
+    auto escaped = unconfined.execute("import(\"./modules/escape.f\")\nreturn resource()");
+    assert(escaped.ok());
+    assert(escaped.value().string() == outside);
+
+    // The explicit opt-in restriction (NIFT_FS_ROOT, as --fs-root sets it) is
+    // installed here and must reject every escape, while in-root paths work.
+#ifdef _WIN32
+    _putenv_s("NIFT_FS_ROOT", root.string().c_str());
+#else
+    setenv("NIFT_FS_ROOT", root.string().c_str(), 1);
+#endif
+    {
+        const auto restricted_error = [](const auto& result) {
+            return !result.ok() &&
+                result.error().message.find("escapes configured filesystem root") != std::string::npos;
+        };
+        nift::Engine confined(root);
+        auto inside = confined.execute("import(\"./modules/owner.f\")\nreturn resource()");
+        assert(inside.ok());
+        assert(inside.value().string() == (root / "modules" / "asset.txt").generic_string());
+        assert(restricted_error(confined.execute("import(\"./modules/escape.f\")\nreturn resource()")));
+        assert(restricted_error(confined.execute(
+            "import(\"./modules/owner.f\")\nescape_worker := thread(thread_escape)\nreturn escape_worker.join()")));
+        assert(restricted_error(confined.execute(
+            "import(\"./modules/owner.f\")\nescape_future := future_escape()\nreturn await escape_future")));
+    }
+#ifdef _WIN32
+    _putenv_s("NIFT_FS_ROOT", "");
+#else
+    unsetenv("NIFT_FS_ROOT");
+#endif
 
     fs::remove_all(root, error);
     return 0;

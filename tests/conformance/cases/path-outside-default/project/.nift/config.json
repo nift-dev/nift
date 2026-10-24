@@ -1,0 +1,1 @@
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","incremental-mode":"modified","build-threads":1}}

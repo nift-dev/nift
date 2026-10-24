@@ -38,7 +38,9 @@ REJECT_CLASSES = {
     "missing-source": ["content file"],
     "unknown-config-key": ["unknown config key"],
     "duplicate-tracked-name": ["duplicate tracked name"],
-    "project-root-escape": ["path must stay inside the Nift project"],
+    # D-051: there is no default project-root containment. Only an explicit
+    # filesystem root (--fs-root / NIFT_FS_ROOT) rejects an escaping path.
+    "filesystem-root-escape": ["escapes configured filesystem root"],
 }
 import json
 import os
@@ -128,6 +130,25 @@ def run_parity(name, case, case_dir, project, extra_env):
     return None
 
 
+def run_accept(name, case, project, extra_env):
+    """The fixture must build under both implementations (no golden output:
+    used where paths are host-specific, e.g. files outside the project)."""
+    cli = run([NIFT, "build", "--all"], project, extra_env)
+    if cli.returncode != 0:
+        return f"{name}: CLI build failed: {cli.stderr[:400]}"
+    pages = list(case["pages"])
+    eng = run([RUNNER, str(project), str(project.parent), *pages], project, extra_env)
+    if eng.returncode != 0:
+        return f"{name}: cpp_runner failed: {eng.stderr[:400]}"
+    for page, output_rel in case["pages"].items():
+        engine_out = (project.parent / (esc(page) + ".out")).read_text()
+        if engine_out.startswith("ERROR: "):
+            return f"{name}: page '{page}' Engine rejected: {engine_out[:200]}"
+        if not (project / output_rel).exists():
+            return f"{name}: page '{page}' CLI output missing"
+    return None
+
+
 def _matches_class(text, klass):
     needles = REJECT_CLASSES.get(klass)
     if not needles:
@@ -172,11 +193,18 @@ def main():
         with tempfile.TemporaryDirectory(prefix="nift-conformance-") as td:
             project = Path(td) / "project"
             shutil.copytree(case_dir / "project", project)
-            extra_env = meta.get("env")
+            # Files beside the project (e.g. a target outside the project
+            # root) and "{project}" in env values, both per temporary copy.
+            for rel, text in meta.get("outside_files", {}).items():
+                (Path(td) / rel).write_text(text)
+            extra_env = {k: v.replace("{project}", str(project))
+                         for k, v in meta.get("env", {}).items()} or None
             if meta["category"] == "parity":
                 err = run_parity(name, meta, case_dir, project, extra_env)
             elif meta["category"] == "reject":
                 err = run_reject(name, meta, project, extra_env)
+            elif meta["category"] == "accept":
+                err = run_accept(name, meta, project, extra_env)
             else:
                 err = f"{name}: unknown category {meta['category']}"
             ran += 1

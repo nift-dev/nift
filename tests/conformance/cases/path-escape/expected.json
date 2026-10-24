@@ -1,1 +1,1 @@
-{"category":"reject","expect":"project-root-escape","pages":{"/":null}}
+{"category":"reject","expect":"filesystem-root-escape","env":{"NIFT_FS_ROOT":"{project}"},"outside_files":{"outside":"outside-content"},"pages":{"/":null}}
