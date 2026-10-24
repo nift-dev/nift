@@ -25,7 +25,7 @@ bool Vm::pop_handlers_for_frame(std::size_t depth, Fault& fault) {
     // TryEnd is emitted on every normal exit. A handler of the returning frame
     // still live here is stale; it is reported through the ordinary internal
     // path (statistics written), never by aborting.
-    return internal(fault, "stale exception handler");
+    return raise(fault, StopReason::Internal, "stale exception handler");
 #endif
 }
 
@@ -47,12 +47,12 @@ bool Vm::op_try_end(const Instr& in, Fault& fault) {
     if (in.c != 0) return true;  // E2: leave a handler on break/return exits
     (void)fault;
     if (handlers_.empty() || handlers_.back().frame_depth != frames_.size())
-        return internal(fault, "stale exception handler");
+        return raise(fault, StopReason::Internal, "stale exception handler");
     handlers_.pop_back();
     return true;
 #else
     if (handlers_.empty() || handlers_.back().frame_depth != frames_.size())
-        return internal(fault, "stale exception handler");
+        return raise(fault, StopReason::Internal, "stale exception handler");
     handlers_.pop_back();
     return true;
 #endif
@@ -149,7 +149,7 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
 #endif
     const Handler handler = handlers_[selected];
     if (handler.frame_depth > frames_.size()) {
-        internal(fault, "stale exception handler");
+        raise(fault, StopReason::Internal, "stale exception handler");
         return false;
     }
     while (frames_.size() > handler.frame_depth) {
