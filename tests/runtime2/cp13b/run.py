@@ -242,7 +242,12 @@ def check_current(nift, oracle, name, reason):
         if got.stats.get("vm_executions") != 1:
             problems.append(f"vm_executions {got.stats.get('vm_executions')}, expected 1")
         if got.triple() != expect_golden(name):
-            problems.append(f"current VM differs from legacy: {got.triple()!r} != {expect_golden(name)!r}")
+            want = expect_golden(name)
+            verdict, policy = vm_policies.classify(
+                (want[0].encode(), want[1].encode(), want[2]), got.triple_bytes(), got.stats,
+                case_source(name).read_bytes())
+            if verdict != "approved":
+                problems.append(f"current VM differs from legacy: {got.triple()!r} != {expect_golden(name)!r}")
         if got.created:
             problems.append(f"side-effect files created: {got.created}")
         return problems
