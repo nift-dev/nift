@@ -310,7 +310,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
         work = copy;
     }
     const bool post = node.op == Op::PostInc || node.op == Op::PostDec;
-    if (b.lazy_for && !post) {
+    if (b.loop_binding && !post) {
         // Legacy's expression parser treats `++x`/`--x` on a loop location as
         // an unapplied prefix read, not a conventional increment/decrement.
         if (work != dst) fb_->emit(OpCode::Move, dst, work);

@@ -9,6 +9,8 @@ manifest matching their own bytes.
 import hashlib
 import json
 import os
+import subprocess
+from pathlib import Path
 
 
 def _sha256(path):
@@ -22,6 +24,22 @@ def _sha256(path):
 def verify(path, mutant, manifest, normal, build):
     if not manifest or not os.path.exists(manifest):
         return None, "mutant provenance manifest is required"
+    repo = Path(__file__).resolve().parents[2]
+    directory = "closure-mutants" if build == "closure-mutant" else "for-mutants"
+    trusted_bin = repo / ".build" / directory / f"nift-{mutant}"
+    trusted_manifest = repo / ".build" / directory / f"nift-{mutant}.json"
+    try:
+        if Path(path).resolve() != trusted_bin.resolve():
+            return None, f"executable is outside the reviewed build output {trusted_bin}"
+        if Path(manifest).resolve() != trusted_manifest.resolve():
+            return None, f"manifest is outside the reviewed build output {trusted_manifest}"
+    except OSError as e:
+        return None, f"cannot resolve build provenance paths: {e}"
+    try:
+        tree = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD^{tree}"],
+                                       text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None, "cannot determine the reviewed source tree"
     try:
         with open(path, "rb") as f:
             if f.read(4) != b"\x7fELF":
@@ -36,6 +54,8 @@ def verify(path, mutant, manifest, normal, build):
         return None, f"manifest names mutant {data.get('mutant')!r}, expected {mutant}"
     if data.get("build") != build:
         return None, f"manifest build {data.get('build')!r}, expected {build}"
+    if data.get("source_tree") != tree:
+        return None, f"manifest source tree {data.get('source_tree')!r} != reviewed tree {tree}"
     expected = data.get("sha256")
     if not isinstance(expected, str) or len(expected) != 64:
         return None, "manifest has no valid sha256"

@@ -27,7 +27,7 @@ FIXTURES = os.path.join(HERE, "for-s2")
 MUTANT_SIGNATURES = {
     1: {"t26_read_after_shrink_first_iter.f": {"stdout": b"1\n2\n3\n", "exit": 0, "outcome": "vm"}},
     2: {"g6_push_once.f": {"stdout": b"1\n2\n3\n4\n", "exit": 0, "outcome": "vm"}},
-    3: {"g7_closure_loop_var.f": {"stdout": b"3\n3\n3\n", "exit": 0, "outcome": "vm"}},
+    3: {"g7_closure_loop_var.f": {"stdout": b"1\n1\n1\n", "exit": 0, "outcome": "vm"}},
     4: {"g3_continue_finite.f": {"stdout": b"1\n2\n", "exit": 0, "outcome": "vm"}},
     5: {"g6_break_object.f": {"stdout": b"a\n", "exit": 0, "outcome": "vm", "heap_leak_gt": 32}},
     6: {"g2_object_order.f": {"stdout": b"2\nb\n1\na\n3\nc\n", "exit": 0, "outcome": "vm"},

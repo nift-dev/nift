@@ -60,6 +60,8 @@ public:
         enum class Source : std::uint8_t { LocalCell, OuterUpvalue };
         Source source = Source::LocalCell;
         std::uint16_t index = 0;
+        std::uint16_t type_index = 0;
+        bool snapshot_loop_cell = false;
     };
     struct LambdaTask {
         NodeId lambda = kNoNode;

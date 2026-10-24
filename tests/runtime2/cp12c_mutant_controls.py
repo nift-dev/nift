@@ -59,6 +59,51 @@ def main():
                 if p.returncode == 0 or "PASS" in p.stdout + p.stderr:
                     failures += 1
                     print(f"FAIL control {label}/{script}/M{mutant} passed without provenance")
+        # Native replay: a real ELF that runs the normal binary, preserves its
+        # output/status/telemetry and changes only heap_live. It is outside the
+        # reviewed build output and must never receive mutant credit.
+        src = os.path.join(d, "native-replay.cpp")
+        exe = os.path.join(d, "native-heap-replay")
+        with open(src, "w") as f:
+            f.write(r"""
+#include <sys/wait.h>
+#include <unistd.h>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <regex>
+#include <string>
+#include <vector>
+int main(int argc,char**argv){
+ const char* normal=std::getenv("CP12C_NORMAL");
+ pid_t child=fork(); if(child<0)return 2;
+ if(child==0){std::vector<char*> a;a.push_back(const_cast<char*>(normal));
+  for(int i=1;i<argc;++i)a.push_back(argv[i]);a.push_back(nullptr);
+  execv(normal,a.data());_exit(127);}
+ int status=0;waitpid(child,&status,0);
+ if(const char* p=std::getenv("NIFT_VM_STATS")){std::ifstream f(p);
+  std::string d((std::istreambuf_iterator<char>(f)),{});f.close();
+  if(!d.empty()){d=std::regex_replace(d,std::regex("\"heap_live\"\\s*:\\s*[0-9]+"),
+   "\"heap_live\":704");std::ofstream o(p);o<<d;}}
+ return WIFEXITED(status)?WEXITSTATUS(status):128+WTERMSIG(status);}
+""")
+        built = subprocess.run(["g++", "-O2", src, "-o", exe], capture_output=True, text=True)
+        if built.returncode == 0:
+            digest = hashlib.sha256(open(exe, "rb").read()).hexdigest()
+            normal_digest = hashlib.sha256(open(normal, "rb").read()).hexdigest()
+            tree = subprocess.check_output(["git", "-C", os.path.dirname(here), "rev-parse", "HEAD^{tree}"],
+                                           text=True).strip()
+            info = os.path.join(d, "native-replay.json")
+            json.dump({"mutant": 5, "sha256": digest, "build": "for-mutant",
+                       "normal_sha256": normal_digest, "source_tree": tree}, open(info, "w"))
+            p = subprocess.run([sys.executable, os.path.join(here, "for_s2.py"), "--nift", exe,
+                                "--normal", normal, "--mutant-info", info, "--mutant", "5"],
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90,
+                               env=dict(os.environ, CP12C_NORMAL=normal))
+            if p.returncode == 0 or "PASS" in p.stdout + p.stderr:
+                failures += 1
+                print("FAIL control native-replay was credited")
+                print((p.stdout + p.stderr)[-1200:])
     if failures:
         print(f"FAIL CP12C mutant controls: {failures} false positive(s)")
         return 1

@@ -51,6 +51,7 @@ struct Binding {
     std::uint16_t upvalue_index = 0;
     // CP12C slice 2 lazy `for` read binding (array single form).
     bool lazy_for = false;
+    bool loop_binding = false;
     bool lazy_pair = false;
     std::uint16_t lazy_keys = 0;
     std::string_view lazy_source_name;

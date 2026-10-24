@@ -130,7 +130,8 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
             if (binding->reg == global.reg) continue;  // the direct program-level global, not a shadow
         }
         if (binding->cell) {
-            captures.push_back({Capture::Source::LocalCell, binding->reg});
+            captures.push_back({Capture::Source::LocalCell, binding->reg, binding->type_reg,
+                                binding->loop_binding});
         } else if (binding->upvalue) {
             captures.push_back({Capture::Source::OuterUpvalue, binding->upvalue_index});
         } else {
@@ -152,10 +153,27 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         const Capture& capture = task.captures[k];
         std::uint16_t reg = 0;
         if (!temp(reg)) return false;
-        if (capture.source == Capture::Source::LocalCell)
-            fb_->emit(OpCode::Move, reg, capture.index);
-        else
+        if (capture.source == Capture::Source::LocalCell) {
+            if (capture.snapshot_loop_cell) {
+#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 3
+                // M3: capture the shared loop cell instead of a snapshot.
+                fb_->emit(OpCode::Move, reg, capture.index);
+#else
+                // A loop variable captured by a lambda is a per-iteration
+                // snapshot at lambda creation. Keep the loop binding's own
+                // cell mutable for direct reads, but give the closure a fresh
+                // cell containing the value visible now.
+                std::uint16_t value = 0;
+                if (!temp(value)) return false;
+                fb_->emit(OpCode::CellLoad, value, capture.index);
+                fb_->emit(OpCode::NewCell, reg, value, capture.type_index);
+#endif
+            } else {
+                fb_->emit(OpCode::Move, reg, capture.index);
+            }
+        } else {
             fb_->emit(OpCode::GetUpvalueCell, reg, capture.index);
+        }
     }
     const bool expression_body = (node.flags & kFlagBlockBody) == 0;
     const std::uint8_t saved_flags = fb_->flags();

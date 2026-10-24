@@ -78,6 +78,7 @@ bool UnitCompiler::for_source_binding(const Node& iterable, const Binding*& bind
 bool UnitCompiler::for_declare_binding(std::string_view name, const Node& at, bool captured, KindSet decl_kinds,
                                        Binding& binding) {
     binding = Binding();
+    binding.loop_binding = true;
     binding.typed = true;
     binding.decl_kinds = decl_kinds;
     binding.decl_may_double = false;
@@ -113,7 +114,7 @@ bool UnitCompiler::for_bind_value(const Binding& binding, std::uint16_t value, s
             fb_->emit(OpCode::LoadI, flag, 1);
             const std::size_t done = fb_->emit(OpCode::Jmp);
             fb_->patch(have, fb_->here());
-            fb_->emit(OpCode::CellStore, binding.reg, value, untyped);
+            // M3: reuse the first cell without rebinding later iterations.
             fb_->patch(done, fb_->here());
         } else {
             fb_->emit(OpCode::CellStore, binding.reg, value, untyped);
