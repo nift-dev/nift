@@ -14,28 +14,21 @@ bool UnitCompiler::for_read_source(const Binding& b, std::uint16_t& reg, bool& t
         temp_owned = true;
         return true;
     }
-    if (b.cell) {
-        if (!temp(reg)) return false;
-        fb_->emit(OpCode::CellLoad, reg, b.reg);
-        temp_owned = true;
-        return true;
-    }
-    if (b.upvalue) {
-        if (!temp(reg)) return false;
-        fb_->emit(OpCode::GetUpvalue, reg, b.upvalue_index);
-        temp_owned = true;
-        return true;
-    }
-    if (b.global) {
-        if (!global_read(b.reg, reg)) return false;
-        temp_owned = true;
-        return true;
-    }
-    reg = b.reg;  // a plain local: read the binding register directly (no extra owner)
-    return true;
+    temp_owned = b.cell || b.upvalue || b.global;
+    return read_binding(b, reg);
 }
 
 bool UnitCompiler::for_lazy_read(const Binding& b, std::uint16_t& reg) {
+    if (b.selector) {
+        if (!temp(reg)) return false;
+        const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
+        fb_->emit(OpCode::CellLoad, reg, b.selector_reg);
+        const std::size_t done = fb_->emit(OpCode::Jmp);
+        fb_->patch(assigned, fb_->here());
+        fb_->emit(OpCode::CellLoad, reg, b.reg);
+        fb_->patch(done, fb_->here());
+        return true;
+    }
     if (b.lazy_source_binding) {
         Binding source = *b.lazy_source_binding;
         std::uint16_t src = 0, value = 0, found = 0;
@@ -110,7 +103,8 @@ bool UnitCompiler::for_bind_value(const Binding& binding, std::uint16_t value, s
         if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
         if (flag != 0) {
             const std::size_t have = fb_->emit(OpCode::JmpTrue, flag);
-            fb_->emit(OpCode::NewCell, binding.reg, value, type_reg);
+            fb_->emit(binding.location_source ? OpCode::NewSourceSlot : OpCode::NewCell,
+                  binding.reg, value, type_reg);
             fb_->emit(OpCode::LoadI, flag, 1);
             const std::size_t done = fb_->emit(OpCode::Jmp);
             fb_->patch(have, fb_->here());
@@ -123,7 +117,8 @@ bool UnitCompiler::for_bind_value(const Binding& binding, std::uint16_t value, s
     }
 #endif
     if (binding.cell) {
-        fb_->emit(OpCode::NewCell, binding.reg, value, type_reg);
+        fb_->emit(binding.location_source ? OpCode::NewSourceSlot : OpCode::NewCell,
+                  binding.reg, value, type_reg);
         return builder_ok();
     }
     if (binding.reg != value) fb_->emit(OpCode::Move, binding.reg, value);

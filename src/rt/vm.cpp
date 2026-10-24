@@ -276,7 +276,11 @@ VmResult Vm::run(std::string& output) {
     }
     OP(CallValue) { if (!op_call_value(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(LoadFunction) { if (!op_load_function(*pc, R, fault)) FAIL(); NEXT(); }
-    OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
+    OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
+    OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
+    OP(CellLoadCached) OP(CellStoreCached) OP(CellTake) OP(CellAnchor) OP(CellSlot) {
+        if (!op_cell_cached(*pc, R, fault)) FAIL(); NEXT();
+    }
     OP(CellLoad) { if (!op_cell_load(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }
@@ -294,11 +298,7 @@ VmResult Vm::run(std::string& output) {
     }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
-        if (!append_rendered(R[pc->a], result.return_text)) {
-            internal(fault, "script return value");
-            FAIL();
-        }
-        result.returned = true;
+        if (!op_top_return(*pc, R, result, fault)) FAIL();
         goto done;
     }
     OP(Halt) { goto done; }
@@ -321,15 +321,7 @@ bail:
     if (fault.large) note_large(pc, fault);
     error_result(result, fault, proto, pc);
 done:
-    result.beyond_legacy_depth = beyond_legacy_depth_;
-    result.large_numbers = large_numbers_;
-    result.large_in_loop_path = large_in_loop_path_;
-    result.large_lines = std::move(large_lines_);
-    result.derived_lines = std::move(derived_lines_);
-    result.evidence_truncated = evidence_truncated_;
-    result.output_lines = lines_;
-    result.heap_peak = heap_peak_;
-    result.heap_live = live_heap_bytes();
+    result_stats(result);
     return result;
 }
 

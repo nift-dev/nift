@@ -1,4 +1,5 @@
 #include "rt/compiler_loops_step.h"
+#include "rt/string.h"
 
 // Per-iteration and body emission for the default `for` (CP12C slice 2). The
 // loop variable is a value binding; a vanished element/key is checked before
@@ -17,20 +18,25 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     }
     if (!state.pair) {
         const bool captured = for_body_captures(body, text(ast_.at(state.names[0])));
-        if (!for_declare_binding(text(ast_.at(state.names[0])), header, captured, elem_kinds, state.first_binding))
+        if (!for_declare_binding(text(ast_.at(state.names[0])), header,
+                                 captured || selector_roots_.count(state.names[0]), elem_kinds, state.first_binding))
             return false;
     } else {
         const bool key_captured = for_body_captures(body, text(ast_.at(state.names[0])));
         const bool value_captured = for_body_captures(body, text(ast_.at(state.names[1])));
-        if (!for_declare_binding(text(ast_.at(state.names[0])), header, key_captured, kKindString,
+        if (!for_declare_binding(text(ast_.at(state.names[0])), header,
+                                 key_captured || selector_roots_.count(state.names[0]), kKindString,
                                  state.first_binding))
             return false;
-        if (!for_declare_binding(text(ast_.at(state.names[1])), header, value_captured, elem_kinds,
+        if (!for_declare_binding(text(ast_.at(state.names[1])), header,
+                                 value_captured || selector_roots_.count(state.names[1]), elem_kinds,
                                  state.second_binding))
             return false;
     }
     auto set_decl = [&](std::string_view name, Binding& b, NodeId decl) {
         b.decl_node = decl;
+        b.selector_root_only = selector_roots_.count(decl) && !captured_binding(decl);
+        b.location_source = selector_roots_.count(decl);
         scopes_.update(name, b);
     };
     if (!state.pair) set_decl(text(ast_.at(state.names[0])), state.first_binding, state.names[0]);
@@ -86,7 +92,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     state.second_used = state.pair && (state.reads_second || second_writes || second_captured);
     const bool source_changes = for_source_may_change(body, state.place, state.source_name);
     const bool lazy_first = !state.pair && state.first_used && state.live && !state.source_name.empty() &&
-                            !state.snapshot_mutant && source_changes;
+                            !state.snapshot_mutant && (source_changes || state.first_binding.cell);
     if (lazy_first) {
         Binding lazy = state.first_binding;
         lazy.lazy_for = true;
@@ -108,7 +114,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         return fail(node, "for-capture-vanishing");
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))
         return fail(node, "for-missing-write");
-    if (state.pair && shrink && state.live && !state.source_name.empty() &&
+    if (state.pair && (shrink || state.second_binding.cell) && state.live && !state.source_name.empty() &&
         !state.snapshot_mutant) {
         Binding lazy = state.second_binding;
         lazy.lazy_for = true;
@@ -123,6 +129,13 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
         state.second_binding = lazy;
         scopes_.update(text(ast_.at(state.names[1])), lazy);
+    }
+    Binding& selected = state.pair ? state.second_binding : state.first_binding;
+    if (selected.cell && selected.lazy_for && state.live) {
+        selected.selector = true;
+        selected.location_source = true;
+        if (!temp(selected.selector_reg)) return false;
+        scopes_.update(text(ast_.at(state.names[state.pair ? 1 : 0])), selected);
     }
     state.track_missing = shrink && ((!state.pair && state.first_used && !state.first_binding.lazy_for) ||
                                     (state.pair && state.second_used && !state.second_binding.lazy_for));
@@ -194,7 +207,7 @@ bool UnitCompiler::for_step(ForState& state) {
                 return false;
 #endif
         }
-        if (state.second_used && !state.second_binding.lazy_for) {
+        if (state.second_used && (!state.second_binding.lazy_for || state.second_binding.cell)) {
             if (!state.track_missing && !state.second_binding.cell) {
                 fb_->emit(OpCode::ObjectLookupValue, state.second_binding.reg, source, key);
                 if (source_temp) for_clear_register(source);
@@ -239,6 +252,33 @@ bool UnitCompiler::for_step(ForState& state) {
         if (state.second_used && value_allocated) for_clear_register(value);
     }
 
+    const Binding& selected = state.pair ? state.second_binding : state.first_binding;
+    if (selected.selector) {
+        // The descriptor owns the source SLOT, not a copied iterable Value.
+        // Its path is stable while direct writes use the iteration's cache.
+        const std::uint16_t mark = fb_->top();
+        std::uint16_t payload = 0, parts[8], root = 0, descriptor_type = 0, name = 0;
+        if (!temp(payload)) return false;
+        for (auto& part : parts) if (!temp(part)) return false;
+        if (!binding_cell(*state.place, root)) return false;
+        fb_->emit(OpCode::CellSlot, parts[0], root);
+        if (state.pair) fb_->emit(OpCode::GetIndex, parts[1], state.keys, state.index);
+        else fb_->emit(OpCode::Move, parts[1], state.index);
+        fb_->emit(OpCode::Move, parts[2], selected.type_reg);
+        if (!fb_->constant(make_string(text(ast_.at(state.names[state.pair ? 1 : 0]))), name) ||
+            !temp(descriptor_type)) return false;
+        fb_->emit(OpCode::LoadI, descriptor_type, jump_operand(-2));
+        fb_->emit(OpCode::LoadK, parts[3], static_cast<std::uint16_t>(name & ~kConstantBit));
+        fb_->emit(OpCode::CellAnchor, parts[4], selected.reg);
+        fb_->emit(OpCode::LoadBool, parts[5], 0);
+        fb_->emit(OpCode::LoadNull, parts[6]);
+        fb_->emit(OpCode::Move, parts[7], selected.reg);
+        fb_->emit(OpCode::NewArray, payload, parts[0], 8);
+        fb_->emit(OpCode::NewCell, selected.selector_reg, payload, descriptor_type);
+        for_clear_register(payload);
+        for (auto part : parts) for_clear_register(part);
+        fb_->release_to(mark);
+    }
     if (state.has_loop && !for_emit_loop_metadata(state.loop_binding, state.index, state.count)) return false;
     return true;
 }

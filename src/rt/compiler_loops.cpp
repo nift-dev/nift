@@ -142,6 +142,8 @@ bool UnitCompiler::for_finish(ForState& state) {
 #endif
     if (state.pair) for_clear_register(state.keys);
     if (!state.live || state.snapshot_mutant) for_clear_register(state.held);
+    if (state.first_binding.selector) for_clear_register(state.first_binding.selector_reg);
+    if (state.second_binding.selector) for_clear_register(state.second_binding.selector_reg);
     if (state.has_loop) for_clear_register(state.loop_binding.reg);
     for_clear_register(state.first_binding.reg);
     if (state.pair) for_clear_register(state.second_binding.reg);

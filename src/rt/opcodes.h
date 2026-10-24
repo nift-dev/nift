@@ -92,7 +92,14 @@ namespace nift::rt {
     X(IterMissing) /* raise "reference target no longer exists: <note>"         */                     \
     X(TopReturn)  /* end the script; R[a] is rendered as the script result      */                    \
     X(Halt)       /* end the script                                             */                    \
-    X(JmpIncLt)   /* R[a] += 1; if R[a] < R[b] pc += int16 c (for-loop back edge) */
+    X(JmpIncLt)   /* R[a] += 1; if R[a] < R[b] pc += int16 c (for-loop back edge) */ \
+    X(CopyCellLocation) /* copy a selector descriptor; share an ordinary binding slot */              \
+    X(CellLoadCached) /* indexed selector targets use the descriptor cache */                          \
+    X(CellStoreCached) /* commit an indexed selector write without detaching */                        \
+    X(CellTake) /* move a source slot's Value out during checked mutation */                          \
+    X(NewSourceSlot) /* boxed slot owning a replaceable value cell */                                  \
+    X(CellAnchor) /* R[a] = the current value owner of slot R[b] */                                     \
+    X(CellSlot) /* R[a] = the descriptor's own lexical slot */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,

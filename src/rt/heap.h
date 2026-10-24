@@ -80,7 +80,8 @@ struct FunctionObject : HeapObject {
 
 // CP12C: a captured binding. Internal only: never reachable from script values,
 // natives or Host; the VM's cell opcodes and the D-040 cycle graph are its only
-// users. `binding_type` is the legacy binding tag fixed at declaration.
+// users. `binding_type` is the legacy binding tag fixed at declaration, or
+// kSelectorCell for a GC-visible location descriptor (see cell.h).
 struct CellObject : HeapObject {
     Value value;
     std::int64_t binding_type = -1;

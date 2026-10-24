@@ -246,7 +246,9 @@ bool UnitCompiler::expression_statement(const Node& node) {
             const bool global = holder != nullptr && holder->global;  // CP12b: taken, pushed, put back
             const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
             const Binding held = (global || indirect) ? *holder : Binding();
-            if (receiver.kind != NodeKind::Ident || (!global && !local_register(receiver, reg)))
+            if (receiver.kind != NodeKind::Ident ||
+                (!global && !(holder && holder->cell ? indexed_binding(*holder, reg) :
+                              local_register(receiver, reg))))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) return fail(node, "static-error:push-arity");
             const NodeId arg = ast_.list(expr)[0];
@@ -259,6 +261,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
                  !kinds_within(callee.a, kKindArray, receiver, "type:push")))
                 return false;
             if (!expr_any(arg, value)) return false;
+            if (indirect && !global && held.selector_root_only && !held.loop_binding)
+                fb_->emit(OpCode::CellTake, reg, held.reg);
             if (global && !global_take(held, reg, text(receiver))) return false;
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
@@ -267,7 +271,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             else if (indirect) {
                 std::uint16_t untyped = 0;
                 if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
-                if (!store_binding(held, reg, untyped)) return false;
+                if (!store_indexed_binding(held, reg)) return false;
             }
             return true;
         }

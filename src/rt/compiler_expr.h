@@ -60,9 +60,7 @@ public:
         enum class Source : std::uint8_t { LocalCell, OuterUpvalue };
         Source source = Source::LocalCell;
         std::uint16_t index = 0;
-        std::uint16_t type_index = 0;
-        bool snapshot_loop_cell = false;
-        Binding loop_binding;
+        Binding binding;
     };
     struct LambdaTask {
         NodeId lambda = kNoNode;
@@ -121,6 +119,9 @@ private:
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
     bool read_binding(const Binding& b, std::uint16_t& reg);
+    bool binding_cell(const Binding& b, std::uint16_t& reg);
+    bool indexed_binding(const Binding& b, std::uint16_t& reg);
+    bool store_indexed_binding(const Binding& b, std::uint16_t value);
     bool store_binding(const Binding& b, std::uint16_t value, std::uint16_t text_type);
 
     // compiler_expr.cpp: expressions
@@ -165,6 +166,7 @@ private:
     // CP12C closures: lambda construction, deferred Proto compilation and
     // the static capture pass that decides which bindings need cells.
     bool lambda_value(const Node& node, std::uint16_t dst);
+    bool lambda_upvalues(const LambdaTask& task);
     bool compile_lambda_task(const struct LambdaTask& task, std::unique_ptr<Proto>& out);
     void prepare_captures();
     bool captured_binding(NodeId id) const { return captured_bindings_.count(id) != 0; }
@@ -247,7 +249,7 @@ private:
     // A global aggregate taken out of its slot for an in-place update (so the
     // update does not copy it), and put back after.
     bool global_take(const Binding& b, std::uint16_t& reg, std::string_view name = {});
-    void global_put(const Binding& b, std::uint16_t reg) { fb_->emit(OpCode::SetGlobal, b.reg, reg); }
+    void global_put(const Binding& b, std::uint16_t reg);
     std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
     // CP12b structs (compiler_structs.cpp): instances live in bindings and are
     // used only as receivers of their fields and methods (no copies, so
@@ -291,6 +293,7 @@ private:
     std::unordered_map<std::string_view, Binding> top_level_bindings_;  // every direct top-level declaration
     std::unordered_set<NodeId> top_level_decl_ids_;
     std::unordered_set<NodeId> captured_bindings_;
+    std::unordered_set<NodeId> selector_roots_;
     std::unordered_set<std::string_view> declared_names_;
     std::vector<LambdaTask> lambda_tasks_;
     Program* program_ = nullptr;

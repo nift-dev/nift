@@ -42,6 +42,7 @@ bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault) {
 #else
     R[in.a] = make_cell(R[in.b], R[in.c].as_int());
 #endif
+    if (in.op == OpCode::NewSourceSlot) R[in.a] = make_cell(R[in.a], kSourceSlot);
     return memory_ok(fault);
 }
 
@@ -51,17 +52,44 @@ bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault) {
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 5
     R[in.a] = R[in.b];
 #else
-    R[in.a] = cell->value;
+    std::string missing;
+    if (!cell_read(R[in.b], R[in.a], missing)) {
+        if (missing.empty()) return internal(fault, "cell location");
+        return raise(fault, StopReason::Error, "reference target no longer exists: " + missing);
+    }
 #endif
     return true;
+}
+
+bool Vm::op_cell_cached(const Instr& in, Value* R, Fault& fault) {
+    std::string missing;
+    bool ok = false;
+    if (in.op == OpCode::CellTake) { R[in.a] = cell_take(R[in.b]); return true; }
+    if (in.op == OpCode::CellAnchor) { R[in.a] = cell_anchor(R[in.b]); return true; }
+    if (in.op == OpCode::CellSlot) { R[in.a] = cell_slot(R[in.b]); return true; }
+    if (in.op == OpCode::CellLoadCached) ok = cell_cached_read(R[in.b], R[in.a], missing);
+    else {
+#if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
+        Value owner = cell_cached_owner(R[in.a]);
+        if (would_close_cycle(CycleTarget::captured_cell(cell_of(owner)), R[in.b], cycle_graph_)) {
+            raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
+            fault.code = "runtime.reference_cycle";
+            return false;
+        }
+#endif
+        ok = cell_cached_put(R[in.a], R[in.b], missing);
+    }
+    if (ok) return memory_ok(fault);
+    if (missing.empty()) return internal(fault, "cached cell");
+    return raise(fault, StopReason::Error, "reference target no longer exists: " + missing);
 }
 
 bool Vm::op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type) {
     CellObject* cell = cell_of(R[in.a]);
     if (cell == nullptr) return internal(fault, "cell");
     const std::int64_t assigned = text_binding_type(text_type, R[in.b]);
-    if (!tag_assignable(assigned, cell->binding_type)) {
-        binding_type_error(assigned, cell->binding_type, note_at(proto, &in), fault);
+    if (!tag_assignable(assigned, cell_binding_type(*cell))) {
+        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault);
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
@@ -74,9 +102,8 @@ bool Vm::op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* pro
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 1
     return true;
 #else
-    cell->value = R[in.b];
-    if (may_contain_identity(cell->value)) mark_may_hold_identity(cell);
-    return true;
+    cell_rebind(R[in.a], R[in.b]);
+    return memory_ok(fault);
 #endif
 }
 
@@ -103,7 +130,11 @@ bool Vm::op_get_upvalue(const Instr& in, Value* R, Fault& fault) {
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 5
     R[in.a] = closure_->upvalues[in.b];
 #else
-    R[in.a] = cell->value;
+    std::string missing;
+    if (!cell_read(closure_->upvalues[in.b], R[in.a], missing)) {
+        if (missing.empty()) return internal(fault, "upvalue location");
+        return raise(fault, StopReason::Error, "reference target no longer exists: " + missing);
+    }
 #endif
     return true;
 }
@@ -119,8 +150,8 @@ bool Vm::op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* pr
     CellObject* cell = cell_of(closure_->upvalues[in.a]);
     if (cell == nullptr) return internal(fault, "upvalue cell");
     const std::int64_t assigned = text_binding_type(text_type, R[in.b]);
-    if (!tag_assignable(assigned, cell->binding_type)) {
-        binding_type_error(assigned, cell->binding_type, note_at(proto, &in), fault);
+    if (!tag_assignable(assigned, cell_binding_type(*cell))) {
+        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault);
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
@@ -133,9 +164,9 @@ bool Vm::op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* pr
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 1
     return true;
 #else
-    cell->value = R[in.b];
-    if (may_contain_identity(cell->value)) mark_may_hold_identity(cell);
-    return true;
+    Value slot = closure_->upvalues[in.a];
+    cell_rebind(slot, R[in.b]);
+    return memory_ok(fault);
 #endif
 }
 

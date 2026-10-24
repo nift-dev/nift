@@ -20,7 +20,9 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
     binding.reg = reg;
     binding.decl_node = node_id(at);
-    if (captured_binding(node_id(at))) {
+    if (captured_binding(node_id(at)) || selector_roots_.count(node_id(at))) {
+        binding.selector_root_only = !captured_binding(node_id(at));
+        binding.location_source = selector_roots_.count(binding.decl_node);
         if (!fb_->alloc(binding.cell_reg)) return builder_ok();
         binding.cell = true;
         binding.reg = binding.cell_reg;
@@ -55,7 +57,11 @@ bool UnitCompiler::declare(const Node& node) {
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
-    if (binding.cell) fb_->emit(OpCode::NewCell, binding.cell_reg, reg, binding.type_reg);
+    if (binding.cell) {
+        const auto op = binding.location_source ? OpCode::NewSourceSlot : OpCode::NewCell;
+        fb_->emit(op, binding.cell_reg, reg, binding.type_reg);
+        if (binding.location_source) fb_->emit(OpCode::LoadNull, reg);
+    }
     // A declaration in loop code whose binding type legacy's prepared path
     // would derive differently was refused (rt/prepared.h, prepared-decl-type).
     if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
@@ -137,7 +143,9 @@ bool UnitCompiler::assign(const Node& node) {
         const bool global = holder != nullptr && holder->global;
         const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
         const Binding held = (global || indirect) ? *holder : Binding();
-        if (object.kind != NodeKind::Ident || (!global && !local_register(object, reg)))
+        if (object.kind != NodeKind::Ident ||
+                (!global && !(holder && holder->cell ? indexed_binding(*holder, reg) :
+                              local_register(object, reg))))
             return fail(target, "index-assign-target");
         if (!element_target_ok(target)) return false;
         if (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
@@ -148,6 +156,8 @@ bool UnitCompiler::assign(const Node& node) {
             fb_->set_offset(target.begin);
             if (!global_check_defined(held.reg, text(object))) return false;
         }
+        if (indirect && !global && held.selector_root_only && !held.loop_binding)
+            fb_->emit(OpCode::CellTake, reg, held.reg);
         if (global && !global_take(held, reg, text(object))) return false;  // CP12b: in place, after the operands
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
@@ -156,7 +166,7 @@ bool UnitCompiler::assign(const Node& node) {
         else if (indirect) {
             std::uint16_t untyped = 0;
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
-            if (!store_binding(held, reg, untyped)) return false;
+            if (!store_indexed_binding(held, reg)) return false;
         }
         return true;
     }

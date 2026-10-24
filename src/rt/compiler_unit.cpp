@@ -269,9 +269,13 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         if (observable_[f][k]) text_type = binding.type_reg;
         else if (!fb_->constant(Value::integer(-1), text_type)) return builder_ok();
         fb_->emit(OpCode::BindType, binding.type_reg, binding.reg, text_type);
-        if (captured_binding(node_id(param))) {
+        if (captured_binding(node_id(param)) || selector_roots_.count(node_id(param))) {
+            binding.selector_root_only = !captured_binding(node_id(param));
+            binding.location_source = selector_roots_.count(binding.decl_node);
             if (!fb_->alloc(binding.cell_reg)) return builder_ok();
-            fb_->emit(OpCode::NewCell, binding.cell_reg, binding.reg, binding.type_reg);
+            const auto op = binding.location_source ? OpCode::NewSourceSlot : OpCode::NewCell;
+            fb_->emit(op, binding.cell_reg, binding.reg, binding.type_reg);
+            if (binding.location_source) fb_->emit(OpCode::LoadNull, binding.reg);
             binding.cell = true;
             binding.reg = binding.cell_reg;
         }
@@ -287,7 +291,8 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     for (const Instr& in : out->code)
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k] &&
-                !captured_binding(node_id(ast_.at(params[k]))))
+                !captured_binding(node_id(ast_.at(params[k]))) &&
+                !selector_roots_.count(node_id(ast_.at(params[k]))))
                 return fail(ast_.at(params[k]), "param-type-unpredicted");
     return true;
 }

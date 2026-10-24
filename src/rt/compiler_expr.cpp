@@ -87,7 +87,7 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
     }
     if (binding->struct_id >= 0) return fail(node, "struct-value");  // CP12b: instances are never copied
     if (binding->lazy_for) return for_lazy_read(*binding, reg);
-    if (binding->global)
+    if (binding->global && !binding->cell)
         return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);
     return read_binding(*binding, reg);
 }

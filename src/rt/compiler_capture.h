@@ -12,6 +12,7 @@ namespace nift::rt::detail {
 
 void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
                               std::unordered_set<NodeId>& top_level_decls,
-                              std::unordered_set<NodeId>& captured);
+                              std::unordered_set<NodeId>& captured,
+                              std::unordered_set<NodeId>& selector_roots);
 
 } // namespace nift::rt::detail

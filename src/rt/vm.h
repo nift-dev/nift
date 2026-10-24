@@ -123,7 +123,10 @@ private:
     bool cold(const Instr& in, const Note* note, Value* R, const Value* K, std::string& output, Fault& fault);
     // CP12C closure opcodes (vm_closure.cpp).
     bool op_load_function(const Instr& in, Value* R, Fault& fault);
+    bool op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault);
+    void result_stats(VmResult& result);
     bool op_new_cell(const Instr& in, Value* R, Fault& fault);
+    bool op_cell_cached(const Instr& in, Value* R, Fault& fault);
     bool op_cell_load(const Instr& in, Value* R, Fault& fault);
     bool op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
     bool op_closure(const Instr& in, Value* R, Fault& fault);

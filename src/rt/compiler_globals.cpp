@@ -87,12 +87,29 @@ bool UnitCompiler::global_check_defined(std::uint16_t slot, std::string_view nam
 // a caught fault would leave the global null, unlike legacy. CP13B must
 // restore the slot on unwind, or update the global in place without taking.
 bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg, std::string_view name) {
+    if (b.cell) {
+        if (b.selector_root_only) {
+            std::uint16_t cell = 0;
+            if (!global_read(b.reg, cell) || !temp(reg)) return false;
+            fb_->emit(OpCode::CellTake, reg, cell);
+            return true;
+        }
+        return read_binding(b, reg);
+    }
     std::uint16_t empty = 0;
     if (name.empty() ? !global_read(b.reg, reg) : !global_read_value(b.reg, reg, name)) return false;
     if (!temp(empty)) return false;
     fb_->emit(OpCode::LoadNull, empty);
     fb_->emit(OpCode::SetGlobal, b.reg, empty);
     return true;
+}
+
+void UnitCompiler::global_put(const Binding& b, std::uint16_t reg) {
+    if (b.cell) {
+        std::uint16_t cell = 0, untyped = 0;
+        if (!global_read(b.reg, cell) || !fb_->constant(Value::integer(-1), untyped)) return;
+        fb_->emit(OpCode::CellStoreCached, cell, reg);
+    } else fb_->emit(OpCode::SetGlobal, b.reg, reg);
 }
 
 } // namespace nift::rt::detail

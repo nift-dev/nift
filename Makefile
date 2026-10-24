@@ -3269,3 +3269,10 @@ test-runtime2-for-s2-bench: $(TARGET)
 .PHONY: test-runtime2-for-s2-known-deps
 test-runtime2-for-s2-known-deps: $(TARGET)
 	python3 tests/runtime2/for_s2_known_deps.py --nift "$(CURDIR)/$(TARGET)"
+
+# CP12C R7: source-location identity versus iteration-slot ownership.
+.PHONY: test-runtime2-capture-origins
+test-runtime2-capture-origins: $(TARGET)
+	python3 tests/runtime2/capture_origins.py --nift "$(CURDIR)/$(TARGET)"
+test: test-runtime2-capture-origins
+test-rt-vm: test-runtime2-capture-origins

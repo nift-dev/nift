@@ -124,4 +124,22 @@ bool Vm::cold(const Instr& in, const Note* note, Value* R, const Value* K, std::
     return true;
 }
 
+bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault) {
+    if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
+    result.returned = true;
+    return true;
+}
+
+void Vm::result_stats(VmResult& result) {
+    result.beyond_legacy_depth = beyond_legacy_depth_;
+    result.large_numbers = large_numbers_;
+    result.large_in_loop_path = large_in_loop_path_;
+    result.large_lines = std::move(large_lines_);
+    result.derived_lines = std::move(derived_lines_);
+    result.evidence_truncated = evidence_truncated_;
+    result.output_lines = lines_;
+    result.heap_peak = heap_peak_;
+    result.heap_live = live_heap_bytes();
+}
+
 } // namespace nift::rt

@@ -231,7 +231,7 @@ bool UnitCompiler::for_body_writes(const Node& body, std::string_view name) cons
 
 bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const {
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
-    if (place->cell || place->upvalue || place->global) return true;  // conservative
+    if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
     ShrinkScan scan{ast_, name};
     scan.node(node_id(body));
     return scan.found;
@@ -239,7 +239,7 @@ bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place,
 
 bool UnitCompiler::for_source_may_change(const Node& body, const Binding* place, std::string_view name) const {
     if (place == nullptr) return false;
-    if (place->cell || place->upvalue || place->global) return true;
+    if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;
     ShrinkScan scan{ast_, name, true};
     scan.node(node_id(body));
     return scan.found;

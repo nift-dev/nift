@@ -20,8 +20,9 @@ struct Decl {
 
 class Scanner {
 public:
-    Scanner(const Ast& ast, const std::unordered_set<NodeId>& globals, std::unordered_set<NodeId>& captured)
-        : ast_(ast), globals_(globals), captured_(captured) {}
+    Scanner(const Ast& ast, const std::unordered_set<NodeId>& globals,
+            std::unordered_set<NodeId>& captured, std::unordered_set<NodeId>& roots)
+        : ast_(ast), globals_(globals), captured_(captured), roots_(roots) {}
 
     void function(const Node& fn, int owner) {
         scopes_.clear();
@@ -66,7 +67,14 @@ private:
 
     void ident(const Node& n, int owner) {
         const Decl* decl = find(ast_.text(n));
-        if (decl != nullptr && decl->owner != owner && decl->owner != kGlobalOwner) captured_.insert(decl->node);
+        if (decl != nullptr && decl->owner != owner && decl->owner != kGlobalOwner) {
+            captured_.insert(decl->node);
+            NodeId source = decl->node;
+            while (selector_sources_.count(source)) {
+                source = selector_sources_.at(source);
+                roots_.insert(source);
+            }
+        }
     }
 
     void block(const Node& block, int owner) {
@@ -105,9 +113,16 @@ private:
             case NodeKind::For: {
                 const Node& h = ast_.at(n.a);
                 node(h.a, owner);
+                NodeId source = kNoNode;
+                if (ast_.at(h.a).kind == NodeKind::Ident)
+                    if (const Decl* root = find(ast_.text(ast_.at(h.a)))) source = root->node;
                 scopes_.emplace_back();
                 const NodeId* names = ast_.list(h);
-                for (std::uint32_t k = 0; k < h.count; ++k) add(ast_.text(ast_.at(names[k])), names[k], owner);
+                for (std::uint32_t k = 0; k < h.count; ++k) {
+                    add(ast_.text(ast_.at(names[k])), names[k], owner);
+                    if (source != kNoNode && (!(h.flags & kFlagPairBinding) || k == 1))
+                        selector_sources_[names[k]] = source;
+                }
                 add("loop", n.a, owner);
                 node(n.b, owner);
                 scopes_.pop_back();
@@ -143,6 +158,8 @@ private:
     const Ast& ast_;
     const std::unordered_set<NodeId>& globals_;
     std::unordered_set<NodeId>& captured_;
+    std::unordered_set<NodeId>& roots_;
+    std::unordered_map<NodeId, NodeId> selector_sources_;
     std::vector<std::vector<std::pair<std::string_view, Decl>>> scopes_;
     int next_owner_ = 1 << 20;  // lambdas are distinct from function owners
 };
@@ -151,9 +168,11 @@ private:
 
 void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
                               std::unordered_set<NodeId>& top_level_decls,
-                              std::unordered_set<NodeId>& captured) {
+                              std::unordered_set<NodeId>& captured,
+                              std::unordered_set<NodeId>& selector_roots) {
     top_level_decls.clear();
     captured.clear();
+    selector_roots.clear();
     const Node& program = ast.at(root);
     const NodeId* list = ast.list(program);
     for (std::uint32_t k = 0; k < program.count; ++k) {
@@ -163,7 +182,7 @@ void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
             top_level_decls.insert(n.a);
         }
     }
-    Scanner scanner(ast, top_level_decls, captured);
+    Scanner scanner(ast, top_level_decls, captured, selector_roots);
     scanner.program(program);
     for (std::size_t f = 0; f < plan.functions.size(); ++f)
         scanner.function(ast.at(plan.functions[f]), static_cast<int>(f));

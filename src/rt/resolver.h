@@ -1,5 +1,4 @@
 #pragma once
-#include <memory>
 // Name resolution for the Runtime 2.0 compiler (CP11): lexical block scopes
 // mapping local names to registers, the unit's function table, and the
 // unit-level admission rules for functions (D-001 whole-unit fallback).
@@ -13,6 +12,7 @@
 #include "rt/value.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -23,11 +23,10 @@
 namespace nift::rt {
 
 struct Binding {
-    // Loop-variable invariant: the current value lives in reg (or in cell reg
-    // when captured). While lazy_source_binding is set and lazy_active is 1,
-    // a read evaluates "source[lazy_index]" from that immutable source snapshot
-    // (which may itself be a lazy binding, preserving arbitrary nesting). A
-    // write stores reg and clears lazy_active; captures read the bound cell.
+    // Loop reads use the source location until explicit reassignment. The
+    // per-iteration cache is a separate slot (indexed selector writes use it).
+    // Captures copy the live descriptor or share the detached/held slot; they
+    // do not infer value-vs-alias behavior from scalar/aggregate kinds.
     NodeId decl_node = kNoNode;
     std::uint16_t reg = 0;
     std::uint16_t type_reg = 0;
@@ -52,6 +51,12 @@ struct Binding {
     // CP12C slice 2 lazy `for` read binding (array single form).
     bool lazy_for = false;
     bool loop_binding = false;
+    // A named iterable's slot is boxed only if an escaping selector needs it.
+    // This internal owner does not imply mutation through a user closure.
+    bool selector_root_only = false;
+    bool location_source = false;
+    bool selector = false;
+    std::uint16_t selector_reg = 0;
     bool lazy_pair = false;
     std::uint16_t lazy_keys = 0;
     std::string_view lazy_source_name;
