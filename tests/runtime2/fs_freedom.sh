@@ -29,6 +29,21 @@ LS:@script { return ls("../neighbour/data/*.txt").length() }
 WRITE:@script { f := file("$W/elsewhere/out.txt"); f.open("w"); f.write("written"); f.save(); f.close(); return "ok" }
 OUTLINK:<a href="@pathto("../neighbour/data/note.txt")">n</a>
 EOF
+# Modified mode keeps the v4.12 rule (D-050): an input whose mtime is >= the
+# page-info's is rebuilt, so an input written in the same coarse timestamp tick
+# as the build legitimately triggers one more rebuild. The no-perpetual-rebuild
+# check below needs every input strictly older than the build: establish that
+# explicitly (fixture inputs back-dated 2 s; no sleep-and-hope).
+python3 - "$W/project" "$W/neighbour" <<'PY' || { echo "setup failed: back-dating inputs"; exit 2; }
+import os, sys, time
+t = time.time() - 2
+for top in sys.argv[1:]:
+    for d, _, files in os.walk(top):
+        for f in files:
+            p = os.path.join(d, f)
+            if not os.path.islink(p):
+                os.utime(p, (t, t))
+PY
 if "$NIFT" build --all >/dev/null 2>"$W/err"; then pass "build reading/writing outside the project"; else bad "build failed: $(head -3 "$W/err")"; fi
 for want in "ABS:NEIGHBOUR-1" "REL:NEIGHBOUR-1" "LINK:NEIGHBOUR-1" "JSON:external json" "External markdown" "EXISTS:true" "LS:1" "WRITE:ok" 'OUTLINK:<a href="../../neighbour/data/note.txt">'; do
   grep -q -- "$want" public/index.html && pass "output has $want" || bad "missing $want"
