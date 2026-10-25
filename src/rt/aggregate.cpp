@@ -3,10 +3,15 @@
 #include "rt/heap_account.h"
 
 #include <cstdlib>
+#include <memory>
 
 namespace nift::rt {
 
 namespace {
+
+struct CloneDeleter {
+    void operator()(HeapObject* object) const noexcept { destroy_heap_object(object); }
+};
 
 // Reference-safety enforcement (CP11 review round 2, owner item 6): in
 // sanitizer builds (or with NIFT_RT_CHECKED_REFS) every mutation entry point
@@ -117,29 +122,30 @@ ObjectObject& object_mut(Value& object) {
 
 bool unshare(Value& value) {
     if (value.refcount() <= 1) return false;
-    HeapObject* copy = nullptr;
+    // Own every partial clone before copying or checked-reference relocation.
+    std::unique_ptr<HeapObject, CloneDeleter> copy;
     if (value.is(Kind::Array)) {
         auto* a = new ArrayObject();
+        copy.reset(a);
         a->items = value.heap_as<ArrayObject>()->items;
-        copy = a;
     } else if (value.is(Kind::Object)) {
         auto* o = new ObjectObject();
+        copy.reset(o);
         const auto* source = value.heap_as<ObjectObject>();
         o->entries = source->entries;
         o->index = source->index;
-        copy = o;
     } else if (value.is(Kind::Struct)) {
         const auto* source = value.heap_as<StructObject>();
         auto* st = new StructObject(source->type_name);
+        copy.reset(st);
         st->fields = source->fields;
-        copy = st;
     } else {
         return false;
     }
-    copy_summary(value.heap(), copy);
+    copy_summary(value.heap(), copy.get());
     relocate_storage(value.heap());  // stale references into the shared original fault too
-    heap_retally(copy);
-    value.replace_heap(copy);
+    heap_retally(copy.get());
+    value.replace_heap(copy.release());
     return true;
 }
 
