@@ -145,10 +145,13 @@ bool unshare(Value& value) {
 
 
 Value make_array(std::size_t reserve) {
-    auto* array = new ArrayObject();
+    // Own the object before reserve: embedding contains bad_alloc and keeps
+    // the process alive, so a failed reserve must release the partial array.
+    Value owned = Value::adopt(new ArrayObject());
+    auto* array = owned.heap_as<ArrayObject>();
     array->items.reserve(reserve);
     heap_retally(array);
-    return Value::adopt(array);
+    return owned;
 }
 
 const std::vector<Value>& array_items(const Value& array) { return array.heap_as<ArrayObject>()->items; }
