@@ -17,7 +17,7 @@ CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
-EMBED_SOURCES := src/embed/Engine.cpp src/embed/Context.cpp src/embed/c_abi.cpp
+EMBED_SOURCES := src/embed/Engine.cpp src/embed/Context.cpp src/embed/c_abi.cpp src/embed/program_api.cpp
 SOURCES := $(CORE_SOURCES) $(EMBED_SOURCES)
 MARKUP_C_NAMES := blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e houdini_html_u html inlines iterator node references render scanners utf8
 MARKUP_C_SOURCES := $(addprefix markuppp/vendor/cmark/,$(addsuffix .c,$(MARKUP_C_NAMES)))
@@ -1296,7 +1296,7 @@ test-node-binding: node-binding
 	cd bindings/node && node --test test/nift.test.js
 
 test-python-binding: python-binding
-	cd bindings/python && python3 -m unittest tests.test_nift
+	cd bindings/python && python3 -m unittest tests.test_nift tests.test_program
 
 test-binding-warnings:
 	python3 scripts/check_binding_warnings.py
@@ -3471,3 +3471,34 @@ test-runtime2-cp14b-profile:
 test-rt-vm: test-runtime2-cp14b-profile
 test-rt-vm-sanitize: test-runtime2-cp14b-sanitize
 certify-targets: test-runtime2-cp14b-mutants
+
+# CP18 compiled-program interface: separate from legacy Engine execution.
+CP18_C_TEST := $(TEST_DIR)/cp18/program$(EXEEXT)
+$(CP18_C_TEST): tests/runtime2/cp18/program.c $(SHARED_LIB) include/nift/c_abi.h
+	mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) -std=c11 -Wall -Wextra -pedantic $< -L. -lnift_c -pthread -Wl,-rpath,$(CURDIR) -o $@
+.PHONY: test-runtime2-cp18
+test-runtime2-cp18: $(CP18_C_TEST)
+	$(CP18_C_TEST)
+	$(PYTHON) tests/runtime2/cp18/python.py "$(CURDIR)/$(SHARED_LIB)"
+test-embed: test-runtime2-cp18
+
+CP18_SWITCH_LIB := $(TEST_DIR)/cp18/switch/$(SHARED_LIB)
+CP18_SWITCH_OBJ := $(TEST_DIR)/cp18/vm-switch.o
+$(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -c $< -o $@
+$(CP18_SWITCH_LIB): $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(SHARED_SYS_LIBS)
+$(TEST_DIR)/cp18/program-switch$(EXEEXT): tests/runtime2/cp18/program.c $(CP18_SWITCH_LIB)
+	$(CC) $(CPPFLAGS) -std=c11 -Wall -Wextra -pedantic $< $(abspath $(CP18_SWITCH_LIB)) -pthread -Wl,-rpath,$(abspath $(dir $(CP18_SWITCH_LIB))) -o $@
+.PHONY: test-runtime2-cp18-switch
+test-runtime2-cp18-switch: $(TEST_DIR)/cp18/program-switch$(EXEEXT)
+	$(TEST_DIR)/cp18/program-switch$(EXEEXT)
+	$(PYTHON) tests/runtime2/cp18/python.py "$(abspath $(CP18_SWITCH_LIB))"
+test-runtime2-cp18: test-runtime2-cp18-switch
+.PHONY: test-runtime2-cp18-sanitize
+test-runtime2-cp18-sanitize:
+	$(PYTHON) tests/runtime2/cp18/sanitize.py --out "$(CURDIR)/$(TEST_DIR)/cp18/sanitize"
+test-embed: test-runtime2-cp18-sanitize

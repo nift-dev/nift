@@ -12,7 +12,7 @@ cd "$ROOT"
 REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
           test-rt-parser test-sha256 test-site-dx
-          test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants test-runtime2-cp14b-mutants)
+          test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants test-runtime2-cp14b-mutants test-runtime2-cp18 test-runtime2-cp18-switch test-runtime2-cp18-sanitize)
 WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys
@@ -83,6 +83,9 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-host-mutants', 'test-runtime2-f6-mutants'),
          ('test-rt-host-sanitize', 'test-runtime2-f6-sanitize'),
          ('test-rt-vm', 'test-runtime2-cp13b'),
+         ('test-embed', 'test-runtime2-cp18'),
+         ('test-runtime2-cp18', 'test-runtime2-cp18-switch'),
+         ('test-embed', 'test-runtime2-cp18-sanitize'),
          ('test-rt-vm', 'test-rt-source-map'),
          ('test-rt-vm', 'test-rt-error-oom'),
          ('test-rt-vm-sanitize', 'test-rt-source-map-sanitize'),

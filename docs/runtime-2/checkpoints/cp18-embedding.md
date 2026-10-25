@@ -54,3 +54,36 @@ Permanent C/Python gates, both dispatch variants and sanitizer allocation
 controls are reachable through `test-embed` / `certify-targets`. Standalone
 acceptance is distinct from combined-tree integration. No integration, push,
 CI, release or spending is authorized. Cross-platform evidence is pending.
+
+## Resource correction and evidence
+
+The in-process allocation campaign exposed an inherited CP09 factory leak:
+`make_array(reserve)` allocated an ArrayObject before a potentially throwing
+vector reserve. The same aggregate source is present in accepted CP13B and the
+reviewed CP14B candidate. A separate resource-ownership commit adopts the object
+into a Value before reserve; it preserves the existing bad_alloc propagation,
+Error semantics, VM layout, collection method code and exception routing.
+Both dispatches pass 321 compile and 16 run allocation-failure sites under
+ASan/UBSan with leak detection. Restoring only the unsafe factory is detected
+as a 32-byte leak in both dispatches. No temporary CP17 mechanisms are added.
+
+Each dispatch passes 1,044 pure-C assertions and 70 focused Python assertions.
+The standalone Python extension links from exactly the same 176 native sources
+selected by setup.py and build.sh, and passes 28 public-package tests (25
+unchanged legacy tests, three CP18 tests). The version-1.3 C smoke test passes.
+The unchanged C adversarial suite has exactly one failure: its hard-coded
+`nift_abi_version_minor() == 3` conflicts with the required ABI 1.4 version.
+The owner was asked whether that single metadata assertion may be updated.
+Until that decision arrives, retain the assertion unchanged and report this
+as an unresolved acceptance gate; do not call the entire ABI suite green.
+All prior C ABI layouts, declarations and definitions are unchanged apart from
+the additive program section and version macros. The new public header is
+byte-identical to the old header after removing that section and restoring the
+two version macros.
+
+The existing VM starts with 256 registers. Nonzero max_registers below 256 is
+an invalid API argument; larger limits use accepted VM growth/budget rules.
+The API does not advertise these limits as a sandbox or total process budget.
+Cross-platform runs, full combined-tree certification and independent CP18
+review remain outstanding. Focused evidence is standalone candidate evidence,
+not permission to integrate.

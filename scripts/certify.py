@@ -37,6 +37,7 @@ AGGREGATE = "certify-targets"
 # as exclusive automatically when its recipe runs a sub-make (shared build
 # outputs) — see recipe_runs_make().
 EXCLUSIVE = {
+    "test-runtime2-cp18-sanitize": "compiles both VM dispatches and runs allocation-failure controls",
     "test-build-boundary-nondestructive": "snapshots the whole checkout before/after; any concurrent writer is reported as a modification",
     "test-build-boundary": "builds from a clean copy of the checkout; reads the tree while others write it",
     # Isolation audit (docs/runtime-2/certification.md): these recipes write

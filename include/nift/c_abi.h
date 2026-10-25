@@ -20,7 +20,7 @@
 #include <stdint.h>
 
 #define NIFT_C_ABI_VERSION_MAJOR 1
-#define NIFT_C_ABI_VERSION_MINOR 3
+#define NIFT_C_ABI_VERSION_MINOR 4
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +30,7 @@ extern "C" {
 /* Versioning                                                               */
 /* ------------------------------------------------------------------------ */
 
-#define NIFT_ABI_VERSION "1.3"
+#define NIFT_ABI_VERSION "1.4"
 
 /* ABI version policy:
  *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;
@@ -281,6 +281,56 @@ nift_status nift_engine_render_text(nift_engine* engine,
                                     const nift_context* context,
                                     const char* text, size_t text_len,
                                     nift_render_result** out_result);
+
+/* ------------------------------------------------------------------------ */
+/* Runtime 2.0 programs (ABI 1.4; independent of the legacy Engine runtime)   */
+/* ------------------------------------------------------------------------ */
+typedef struct nift_program nift_program;
+typedef struct nift_program_result nift_program_result;
+
+typedef enum {
+    NIFT_PROGRAM_COMPLETE = 0,
+    NIFT_PROGRAM_SYNTAX_ERROR,
+    NIFT_PROGRAM_REFUSED,
+    NIFT_PROGRAM_ERROR,
+    NIFT_PROGRAM_INTERNAL
+} nift_program_outcome;
+
+/* Compile a complete in-memory script without executing it. Only
+ * NIFT_SOURCE_TEXT is accepted; logical_name is used verbatim for diagnostics.
+ * NIFT_OK means the call was mechanically valid. Inspect result_outcome:
+ * syntax errors and unsupported VM constructs return a result and NULL program.
+ * No legacy fallback, filesystem loading, callbacks or host-handle interfaces.
+ * Both output slots are required, cleared on entry, and independently owned.
+ * All source storage is copied; input buffers may be released on return.
+ *
+ * Programs are thread-affine (compile/run/free on the compiling thread),
+ * matching the Runtime 2.0 non-atomic value heap. Wrong-thread run/free returns
+ * INVALID_ARGUMENT without consuming the handle. No concurrent operations on
+ * the same program. Results contain only copied data and may outlive programs.
+ * Every run starts a fresh VM: no globals, effects or failed state are retained.
+ * Reuse does not recompile. Environment VM selection never changes this API. */
+nift_status nift_program_compile(const nift_source* source,
+                                  nift_program** out_program,
+                                  nift_program_result** out_result);
+nift_status nift_program_free(nift_program* program); /* NULL is a no-op. */
+/* Zero limits select the existing VM defaults. Nonzero max_registers must
+ * be at least 256 (the existing VM initial register stack). Limits apply to each fresh run;
+ * they do not bound parsing, compilation, captured output or host allocations. */
+nift_status nift_program_run(const nift_program* program,
+                              size_t max_frames, size_t max_registers, size_t heap_budget,
+                              nift_program_result** out_result);
+void nift_program_result_free(nift_program_result* result);
+nift_program_outcome nift_program_result_outcome(const nift_program_result* result);
+int nift_program_result_returned(const nift_program_result* result);
+int nift_program_result_catchable(const nift_program_result* result);
+nift_status nift_program_result_output(const nift_program_result* result, nift_string* out);
+nift_status nift_program_result_return_text(const nift_program_result* result, nift_string* out);
+nift_status nift_program_result_error_message(const nift_program_result* result, nift_string* out);
+nift_status nift_program_result_error_code(const nift_program_result* result, nift_string* out);
+nift_status nift_program_result_error_source(const nift_program_result* result, nift_string* out);
+unsigned long long nift_program_result_error_line(const nift_program_result* result);
+unsigned long long nift_program_result_error_column(const nift_program_result* result);
 
 /* ------------------------------------------------------------------------ */
 /* Result                                                                   */

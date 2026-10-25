@@ -50,6 +50,7 @@ CABI_SOURCES = [
     "native/src/WatchList.cpp",
     "native/src/BuildProgress.cpp",
     "native/src/embed/c_abi.cpp",
+    "native/src/embed/program_api.cpp",
 ]
 PARSER_SOURCES = sorted(glob.glob(os.path.join(NATIVE, "src", "Parser*.cpp")))
 if os.path.join(NATIVE, "src", "Parser.cpp") not in PARSER_SOURCES:
@@ -67,6 +68,10 @@ with open(os.path.join(NATIVE, "src", "rt", "host-sources.txt"), encoding="utf-8
     RT_HOST_SOURCES = [os.path.join(NATIVE, line.strip()) for line in _list
                        if line.strip() and not line.startswith("#")]
 PARSER_SOURCES += RT_HOST_SOURCES
+# ABI 1.4 program execution links the complete accepted VM/compiler, not only
+# the syntax prevalidator used by the legacy Engine embedding interface.
+PARSER_SOURCES = sorted(set(PARSER_SOURCES + glob.glob(os.path.join(NATIVE, "src", "rt", "*.cpp")) +
+                            glob.glob(os.path.join(NATIVE, "src", "rt", "natives", "*.cpp"))))
 sources = [os.path.join(BASE, s) for s in CABI_SOURCES] + PARSER_SOURCES
 sources.append(os.path.join(BASE, "src", "nift_module.cc"))
 

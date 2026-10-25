@@ -62,12 +62,18 @@ PARSER_SOURCES="$PARSER_SOURCES $RT_PARSER_SOURCES"
 [ -f "$EMBED/src/rt/host-sources.txt" ] || { echo "error: src/rt/host-sources.txt missing" >&2; exit 1; }
 RT_HOST_SOURCES="$(grep -v '^#' "$EMBED/src/rt/host-sources.txt" | tr '\n' ' ')"
 PARSER_SOURCES="$PARSER_SOURCES $RT_HOST_SOURCES"
+# ABI 1.4 programs need the accepted VM/compiler as well as the parser.
+for source in "$EMBED"/src/rt/*.cpp "$EMBED"/src/rt/natives/*.cpp; do
+  [ -f "$source" ] || continue
+  PARSER_SOURCES="$PARSER_SOURCES ${source#"$EMBED"/}"
+done
+PARSER_SOURCES="$(printf '%s\n' $PARSER_SOURCES | LC_ALL=C sort -u)"
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   $PARSER_SOURCES src/Ast.cpp src/Automation.cpp src/Process.cpp src/Hooks.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
-  src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp"
+  src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp src/embed/program_api.cpp"
 MARKUP_C_NAMES="blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e houdini_html_u \
   html inlines iterator node references render scanners utf8"
 PIC_OBJECTS=""

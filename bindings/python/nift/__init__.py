@@ -11,8 +11,9 @@ import json
 # destruction until in-flight renders quiesce (enforced invariant; a render
 # holds a strong reference to the Engine/Context for its duration).
 from . import _nift
+from .program import Program, ProgramResult, ProgramCompileError
 
-__all__ = ["Engine", "Context", "RenderResult", "ScriptResult"]
+__all__ = ["Engine", "Context", "RenderResult", "ScriptResult", "Program", "ProgramResult", "ProgramCompileError"]
 
 
 class RenderResult:
