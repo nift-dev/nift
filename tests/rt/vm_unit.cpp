@@ -122,7 +122,6 @@ void check_fallbacks() {
         {"x := 1\nx := 2\n", "static-error:redeclared"},
         {"fn(f(a)) { return a }\nprint(f())\n", "static-error:arity"},
         {"o := {\"k\": 1}\no.k = 2\n", "static-error:member-assign"},
-        {"a := [1]\na.push(1, 2)\n", "static-error:push-arity"},
         // M1/N1: declarations typed from another binding, in prepared-reachable code.
         {"i := 0\nwhile(i < 1) { i += 1; a := 2.0; b := a; b = 2.5 }\n", "prepared-decl-type"},
         {"a := \"s\"\ni := 0\nwhile(i < 1) { i += 1\na := 2.5\nb := (a)\nprint(b) }\n", "prepared-decl-type"},
@@ -162,6 +161,8 @@ void check_errors() {
         const char* message;  // for Error; for None, the output
     };
     const ErrorCase cases[] = {
+        // CP14B: fixed arity diagnostic is emitted before operand execution.
+        {"a := [1]\na.push(1, 2)\n", StopReason::Error, "push: expected one argument"},
         {"print(1 / 0)\n", StopReason::Error, "division by zero"},
         {"x := 1\nx = \"s\"\n", StopReason::Error, "cannot assign string to int binding 'x'"},
         {"a := [1]\nprint(a[3])\n", StopReason::Error, "JSON array index 3 is out of range in 'a[3]'"},
@@ -552,7 +553,6 @@ void check_kind_inference() {
     // The reviewer's repros: 201 functions (one more than the old 200-pass
     // limit), the chain never called; each tail must still be refused.
     const Case tails[] = {
-        {"a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "aliasing"},
         {"x := 0\ni := 0\nwhile (i < 1) { i += 1\nprint(-x) }\n", "context:negative-zero"},
         {"fn_v := 1\nprint(\"x\" < 1)\n", "type:<"},
         {"x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i++ }\nprint(x)\n", "context:assignment-type"},
@@ -563,6 +563,14 @@ void check_kind_inference() {
             CHECK(r.reason == c.output);
             if (r.reason != c.output) std::fprintf(stderr, "  chain %d %s: reason [%s]\n", n, c.output, r.reason.c_str());
         }
+    }
+    // CP14B's approved D-040 copy is independent. Keep long-chain coverage
+    // as a positive execution assertion, rather than the obsolete refusal.
+    for(int n:{199,201,500}) {
+        const auto copied=rt_vm_tool::run(chain_program(n,
+            "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n"));
+        CHECK(copied.reason.empty());CHECK(copied.result.reason==StopReason::None);
+        CHECK(copied.output=="1\n");
     }
     // Convergence cost: a 500-function chain needs O(n) walks (each unit a
     // few times), not O(n) passes over all n functions.

@@ -78,6 +78,7 @@ def main():
     intended_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     driver_hash=hashlib.sha256(Path('tests/runtime2/cp14b/design_harness.cpp').read_bytes()).hexdigest()
     flags=['-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-Wall','-Wextra','-pedantic','-pthread']
+    subprocess.run(['make','-j2','nift','.build/cp13b/nift-switch'],check=True)
     objects=[str(f) for root in ['src','minifypp','markuppp'] for f in Path(root).rglob('*.o') if str(f)!='src/nift.o']
     def build(name,stem=None,macro=0,number=0):
         driver=out/(name+'-driver.o');binary=out/name
