@@ -3481,6 +3481,7 @@ $(CP18_C_TEST): tests/runtime2/cp18/program.c $(SHARED_LIB) include/nift/c_abi.h
 test-runtime2-cp18: $(CP18_C_TEST)
 	$(CP18_C_TEST)
 	$(PYTHON) tests/runtime2/cp18/python.py "$(CURDIR)/$(SHARED_LIB)"
+	$(PYTHON) tests/runtime2/cp18/combined_cp14b.py "$(CURDIR)/$(SHARED_LIB)"
 test-embed: test-runtime2-cp18
 
 CP18_SWITCH_LIB := $(TEST_DIR)/cp18/switch/$(SHARED_LIB)
@@ -3497,6 +3498,7 @@ $(TEST_DIR)/cp18/program-switch$(EXEEXT): tests/runtime2/cp18/program.c $(CP18_S
 test-runtime2-cp18-switch: $(TEST_DIR)/cp18/program-switch$(EXEEXT)
 	$(TEST_DIR)/cp18/program-switch$(EXEEXT)
 	$(PYTHON) tests/runtime2/cp18/python.py "$(abspath $(CP18_SWITCH_LIB))"
+	$(PYTHON) tests/runtime2/cp18/combined_cp14b.py "$(abspath $(CP18_SWITCH_LIB))"
 test-runtime2-cp18: test-runtime2-cp18-switch
 .PHONY: test-runtime2-cp18-sanitize
 test-runtime2-cp18-sanitize:
