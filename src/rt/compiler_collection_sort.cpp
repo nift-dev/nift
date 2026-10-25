@@ -42,7 +42,13 @@ bool UnitCompiler::comparator_sort(const Node& node,std::uint16_t dst,const Bind
     fb_->set_offset(collection_offset(node));
     const auto call=fb_->emit(OpCode::CollectionCall,window,state+Callback,
         kConstantBit|2|collection_diagnostic_flags(node,callback,true));
-    fb_->note(call,"collection comparator");
+    std::string note="collection comparator";
+    const Node& target=ast_.at(callback);
+    if(target.kind==NodeKind::Lambda&&(target.flags&kFlagBlockBody)) {
+        const Node& body=ast_.at(target.b);
+        note+=" block "+std::to_string(body.begin+1)+" "+std::to_string(body.end-1);
+    }
+    fb_->note(call,std::move(note));
     fb_->emit(OpCode::Move,state+Returned,window);fb_->release_to(window);
     fb_->emit(OpCode::CollectionSort,state,place,flags|1);
     const auto back=fb_->emit(OpCode::Jmp);

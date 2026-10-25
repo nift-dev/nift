@@ -344,14 +344,11 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
     stats.beyond_legacy_depth = result.beyond_legacy_depth;
-    stats.large_numbers = result.large_numbers;
-    stats.large_in_loop_path = result.large_in_loop_path;
+    stats.large_numbers = result.large_numbers;stats.large_in_loop_path = result.large_in_loop_path;
     stats.error_in_loop_path = result.error_in_loop_path;
-    stats.large_lines = result.large_lines;
-    stats.derived_lines = result.derived_lines;
+    stats.large_lines = result.large_lines;stats.derived_lines = result.derived_lines;
     stats.evidence_truncated = result.evidence_truncated;
-    stats.heap_peak = result.heap_peak;
-    stats.heap_live = result.heap_live;
+    stats.heap_peak = result.heap_peak;stats.heap_live = result.heap_live;
     write_stdout(output, nullptr);
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {
@@ -366,6 +363,9 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         report_path = result.origin_source;
         stats.line = result.origin_line;
         stats.column = result.origin_column;
+    } else if(!result.diagnostic_frames.empty()&&!result.diagnostic_frames.front().site.source.empty()) {
+        const auto& display=result.diagnostic_frames.front().site;
+        report_path=display.source;stats.line=display.line;stats.column=display.column;
     } else {
         locate_linked(result.offset);
     }

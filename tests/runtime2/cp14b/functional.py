@@ -142,6 +142,13 @@ CASES.update({
 'return_method_arity_error':'fn(f()) { return [1].map() }; f()',
 })
 
+CASES.update({
+'fast_named_helper_error':'fn(g(x)) { return x/0 }; fn(cb(x)) { return g(x) }; [1].map(cb)',
+'comparator_block_return_error':'a:=[2,1]; a.sort((x,y)=>{ return x/0 })',
+'script_return_kernel_error':'a:=[]; return a.pop()',
+'ordinary_lambda_collection_error':'g:=()=>[1].filter(x=>x); g()',
+})
+
 def run(binary,mode,source,root):
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')

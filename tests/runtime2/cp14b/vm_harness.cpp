@@ -37,6 +37,11 @@ int main(int argc,char** argv) {
         stats(result.reason==StopReason::Error?"vm-error":"internal",1,result);
         auto origin=map.at(result.offset);
         if(result.error_origin)origin={result.origin_source,result.origin_line,result.origin_column};
+        else if(!result.diagnostic_frames.empty()&&!result.diagnostic_frames.front().site.source.empty()) {
+            const auto& display=result.diagnostic_frames.front().site;
+            origin={display.source.generic_string(),static_cast<std::uint32_t>(display.line),
+                static_cast<std::uint32_t>(display.column)};
+        }
         if(result.reason==StopReason::Error)
             std::fprintf(stderr,"error: %s:%u:%u: %s\n",origin.path.c_str(),origin.line,origin.column,result.message.c_str());
         else std::fprintf(stderr,"NIFT_VM internal failure: %s\n",result.message.c_str());

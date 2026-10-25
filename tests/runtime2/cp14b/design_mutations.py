@@ -41,7 +41,7 @@ def inject(number,source):
         source=substitute(source,'Value* s=R+in.a;const auto m=static_cast<M>(in.b);','Value* s=R+in.a;const auto m=static_cast<M>(in.b); Value saved_receiver=s[Source];')
         return substitute(source,'heap_retally(s[Source].heap());return memory_ok(fault);','heap_retally(s[Source].heap());s[Source]=std::move(saved_receiver);return memory_ok(fault);')
     if number==7:return substitute(source,'frames_.size()>=next_frame_check_||callee_base+callee->nregs+1u>stack_.size()','callee_base+callee->nregs+1u>stack_.size()')
-    if number==8:return substitute(source,'if((it->ret-1)->op==OpCode::CollectionCall&& !((it->ret-1)->c&kConstantBit))','if(false)')
+    if number==8:return substitute(source,'if((it->ret-1)->op==OpCode::CollectionCall)','if(false)')
     if number==10:return substitute(source,'const bool once=(method>=CollectionMethod::Map&&method<=CollectionMethod::Count)||method==CollectionMethod::GroupBy;','const bool once=true;')
     if number==11:
         source=substitute(source,'if(argc>1&&!expr_to(args[1],state+Returned))return false;','if(argc>1&&!expr_to(args[1],state+Returned))return false;\n    if(method==M::Splice&&argc==3&&!expr_to(args[2],state+Keys))return false;')
