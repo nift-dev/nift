@@ -20,13 +20,29 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         tail -20 "$TMP/build-$mutant.log" >&2
         exit 1
     fi
+    if [ "$mutant" = "3" ]; then
+        if ! python3 "$BUILD/tests/runtime2/host_m3_order.py" --nift "$BUILD/nift" --oracle "$ORACLE"             >"$TMP/test-$mutant.log" 2>&1; then
+            echo "FAIL host mutant 3: deterministic M3 ordering witness failed" >&2
+            cat "$TMP/test-$mutant.log" >&2
+            exit 1
+        fi
+        echo "PASS host mutant 3: deterministic sorted-ls witness rejected the mutant"
+        if NIFT_M3_TEST_SORTED=1 python3 "$BUILD/tests/runtime2/host_m3_order.py" \
+            --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-3-sorted.log" 2>&1; then
+            echo "FAIL host mutant 3: sorted-order control was accepted as established" >&2
+            cat "$TMP/test-3-sorted.log" >&2
+            exit 1
+        fi
+        if ! grep -q "NOT ESTABLISHED" "$TMP/test-3-sorted.log"; then
+            echo "FAIL host mutant 3: sorted-order control failed for an unrelated reason" >&2
+            cat "$TMP/test-3-sorted.log" >&2
+            exit 1
+        fi
+        echo "PASS host mutant 3: unestablished sorted-order witness is rejected"
+        continue
+    fi
     if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: vm_host tests passed (mutant not caught)" >&2
-        cat "$TMP/test-$mutant.log" >&2
-        exit 1
-    fi
-    if [ "$mutant" = "3" ] && ! grep -q "FAIL ls_dir" "$TMP/test-$mutant.log"; then
-        echo "FAIL host mutant 3: rejected, but not by the sorted-ls witness" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
     fi
