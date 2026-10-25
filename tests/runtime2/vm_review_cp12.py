@@ -13,7 +13,8 @@ evidence (vm_policies.classify). Never a crash, an internal failure (exit
 
   D1  kind inference gave up after 200 passes on call chains and switched
       the aliasing/type/context refusals off: chains of 199/201 functions
-      (never called) followed by programs that must be refused.
+      (never called) followed by programs that must be refused (the alias
+      tail, admitted by CP14B, must instead be the exact D-040 witness).
   D2  INT64_MIN % -1 (SIGFPE) as `%`, `%=`, through a call, in a loop.
   D3  -INT64_MIN (an exact Decimal) printed, concatenated, used.
   D4  large operands in loop code (big - big2, m == m + 0, ...): evidence
@@ -41,13 +42,16 @@ def chain(n):
 
 def programs():
     """(group, name, source, expectation): expectation is None (any accepted
-    verdict) or a fallback reason the VM must report."""
+    verdict), a fallback reason the VM must report, or "D-040" (exactly the
+    pinned d040_witnesses.py witness)."""
     out = []
     # D1 (nc2.py, nc3.py)
     for n in (199, 201):
         guard = f"if (0 > 1) {{ print(g{n - 1}(1)) }}\n"
         for name, tail, reason in (
-                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "aliasing"),
+                # CP14B admits b.push through the alias; D-040 (owner 2026-10-25):
+                # exactly the pinned witness (d040_witnesses.py), never a refusal.
+                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "D-040"),
                 ("negzero", "x := 0\ni := 0\nwhile (i < 1) { i += 1\nprint(-x) }\n", "context:negative-zero"),
                 ("order", 'fn_v := 1\nprint("x" < 1)\n', "type:<"),
                 ("assign", "x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i++ }\nprint(x)\n", "context:assignment-type"),
@@ -145,7 +149,11 @@ def main():
                 verdict, policy = ("pinned", "exact") if vm == pinned else ("diff", None)
             key = f"{group} {outcome}" + (f" {policy}" if policy else "")
             tally[key] = tally.get(key, 0) + 1
-            if reason is not None and (outcome != "fallback" or st.get("reason") != reason):
+            if reason == "D-040":
+                if (verdict, policy) != ("approved", "D-040 independent copy"):
+                    failures.append(f"{group} {name}: expected the exact D-040 witness, got {verdict} {policy} "
+                                    f"({outcome} {st and st.get('reason')}): legacy {legacy!r} vm {vm!r}")
+            elif reason is not None and (outcome != "fallback" or st.get("reason") != reason):
                 failures.append(f"{group} {name}: expected refusal {reason}, got {outcome} {st and st.get('reason')}")
             elif not isinstance(vm[2], int) or vm[2] < 0 or vm[2] == 70 or outcome in ("internal-error", None):
                 failures.append(f"{group} {name}: crash or internal failure (exit {vm[2]}, {outcome})")

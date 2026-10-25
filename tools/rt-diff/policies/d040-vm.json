@@ -1,0 +1,50 @@
+[
+ {
+  "id": "replay_alias-d040-stdout",
+  "decision": "D-040#1",
+  "entry": "vm-corpus/cp11/replay_alias.f",
+  "source_sha256": "958e68ecd988feb3eee0774084ef5921c84216eff6574e22a1dcebdfe69c4313",
+  "channel": "stdout",
+  "old": "3\n",
+  "new": "2\n",
+  "count": 1,
+  "justification": "D-040 #1 value semantics (owner 2026-10-20; CP14B automatic mode reaffirmed 2026-10-25): b := a makes an independent value, so b.push leaves a unchanged where legacy aliases. vm_parity.py confirms the entry against its exact witness and its own VM statistics (one VM execution, no legacy).",
+  "test": "tests/runtime2/d040_witnesses.py (exact witness vm-corpus/cp11/replay_alias.f)"
+ },
+ {
+  "id": "replay_alias-d040-combined",
+  "decision": "D-040#1",
+  "entry": "vm-corpus/cp11/replay_alias.f",
+  "source_sha256": "958e68ecd988feb3eee0774084ef5921c84216eff6574e22a1dcebdfe69c4313",
+  "channel": "combined",
+  "old": "3\n",
+  "new": "2\n",
+  "count": 1,
+  "justification": "D-040 #1 value semantics (owner 2026-10-20; CP14B automatic mode reaffirmed 2026-10-25): b := a makes an independent value, so b.push leaves a unchanged where legacy aliases. vm_parity.py confirms the entry against its exact witness and its own VM statistics (one VM execution, no legacy).",
+  "test": "tests/runtime2/d040_witnesses.py (exact witness vm-corpus/cp11/replay_alias.f)"
+ },
+ {
+  "id": "alias_place-d040-stdout",
+  "decision": "D-040#1",
+  "entry": "semantics/alias_place.f",
+  "source_sha256": "63ca2419b730409a0d90d7299113e875719aa6ed1edfaf952a4aeb4efcab66de",
+  "channel": "stdout",
+  "old": "[1,2,3]",
+  "new": "[1,2]",
+  "count": 2,
+  "justification": "D-040 #1 value semantics (owner 2026-10-20; CP14B automatic mode reaffirmed 2026-10-25): b := a makes an independent value, so b.push leaves a unchanged where legacy aliases. vm_parity.py confirms the entry against its exact witness and its own VM statistics (one VM execution, no legacy).",
+  "test": "tests/runtime2/d040_witnesses.py (exact witness semantics/alias_place.f)"
+ },
+ {
+  "id": "alias_place-d040-combined",
+  "decision": "D-040#1",
+  "entry": "semantics/alias_place.f",
+  "source_sha256": "63ca2419b730409a0d90d7299113e875719aa6ed1edfaf952a4aeb4efcab66de",
+  "channel": "combined",
+  "old": "[1,2,3]",
+  "new": "[1,2]",
+  "count": 2,
+  "justification": "D-040 #1 value semantics (owner 2026-10-20; CP14B automatic mode reaffirmed 2026-10-25): b := a makes an independent value, so b.push leaves a unchanged where legacy aliases. vm_parity.py confirms the entry against its exact witness and its own VM statistics (one VM execution, no legacy).",
+  "test": "tests/runtime2/d040_witnesses.py (exact witness semantics/alias_place.f)"
+ }
+]

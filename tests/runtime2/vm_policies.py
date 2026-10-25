@@ -14,6 +14,11 @@ exact Python evaluation of constant operands, tests/runtime2/vm_sites.py).
   D-001#4 recursion   legacy fails with "callable recursion depth exceeded"
                       at its 64-frame limit, its output a prefix of the VM's;
                       the VM completed or stopped with a program error.
+  D-040 independent copy  (CP14B integration, owner 2026-10-25) exactly the
+                      programs pinned in d040_witnesses.py: exact source
+                      hash, exact legacy and VM (stdout, stderr, exit), and
+                      one VM execution with no legacy execution. Never a
+                      general alias-difference rule.
   D-018c diagnostics  errors reported where they occur (D-009#1, #5): same
                       stdout, both exit 1 with one diagnostic on the same
                       file; messages equal once legacy's "return: " prefixes
@@ -46,6 +51,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vm_sites  # noqa: E402
+import d040_witnesses  # noqa: E402
 
 # Every consumer needs the independent AST oracle, including direct invocations.
 vm_sites.require_tool()
@@ -54,7 +60,7 @@ RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceede
 DIAGNOSTIC = re.compile(rb"^error: (.*):(\d+):(\d+): ([^\n]*)\n\Z")
 RETURN_PREFIX = b"return: "
 
-POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix")
+POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix", "D-040 independent copy")
 
 
 IMPORT_PREFIX = b"import: "
@@ -247,6 +253,8 @@ def _classify(legacy, vm, st, source=None):
     st = st or {}
     if st.get("outcome") not in ("vm", "vm-error"):
         return "diff", None
+    if d040_witnesses.match(_source_bytes(source, st) or b"", legacy, vm, st):
+        return "approved", "D-040 independent copy"
     if _recursion(legacy, vm, st):
         return "approved", "D-001#4 recursion"
     if _return_prefix(legacy, vm, st, source):

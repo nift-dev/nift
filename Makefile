@@ -3451,5 +3451,11 @@ test-runtime2-cp14b-mutants: $(TARGET)
 test-rt-vm: test-runtime2-cp14b
 test-rt-vm: test-runtime2-cp14b-sort
 test-rt-vm: test-runtime2-cp14b-witnesses
+# D-040 exact witnesses (CP14B integration, owner 2026-10-25): negative controls
+# for the shared vm_policies / rt-diff approvals of the six pinned programs.
+.PHONY: test-runtime2-d040-witnesses
+test-runtime2-d040-witnesses: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	$(PYTHON) tests/runtime2/d040_witnesses_selftest.py
+test-rt-vm: test-runtime2-d040-witnesses
 test-rt-vm-sanitize: test-runtime2-cp14b-sanitize
 certify-targets: test-runtime2-cp14b-mutants

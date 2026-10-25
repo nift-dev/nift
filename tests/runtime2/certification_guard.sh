@@ -91,7 +91,8 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-vm', 'test-runtime2-cp14b'),
          ('test-rt-vm', 'test-runtime2-cp14b-sort'),
          ('test-rt-vm', 'test-runtime2-cp14b-witnesses'),
-         ('test-rt-vm-sanitize', 'test-runtime2-cp14b-sanitize')]
+         ('test-rt-vm-sanitize', 'test-runtime2-cp14b-sanitize'),
+         ('test-rt-vm', 'test-runtime2-d040-witnesses')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
