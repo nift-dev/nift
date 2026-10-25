@@ -3384,7 +3384,7 @@ test-runtime2-capture-origins: $(TARGET)
 test: test-runtime2-capture-origins
 test-rt-vm: test-runtime2-capture-origins
 
-# CP14B focused collection gates, additive until independent acceptance.
+# CP14B focused collection gates (accepted; wired into the hierarchy below).
 CP14B_EVIDENCE ?= $(TEST_DIR)/cp14b/evidence
 CP14B_BASE ?= $(CURDIR)/$(TARGET)
 CP14B_ORACLE := tests/runtime2/cp14b/fixtures/d4-traces.json.gz
@@ -3414,3 +3414,42 @@ test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 t
 test-rt-vm-policy-tooling: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	python3 tests/runtime2/vm_policy_tooling_test.py
 test-rt-vm: test-rt-vm-policy-tooling
+
+# CP14B permanent wiring (integration, 2026-10-25). Functional tier under
+# test-rt-vm; ASan/UBSan, drain and allocation-failure tier under
+# test-rt-vm-sanitize; named and design mutants in certification. Witnesses
+# whose base is only the legacy oracle (NIFT_VM=0, unchanged under D-006) use
+# this binary; delta witnesses against a pre-CP14B VM (inventory,
+# context_matrix, comparator_contexts, reporting_regression) need an explicit
+# accepted CP14B_BASE and are integration evidence, not permanent gates.
+CP14B_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP CP14B $@: Linux/libstdc++ only (D4)"; exit 0; fi;
+.PHONY: test-runtime2-cp14b-witnesses test-runtime2-cp14b-sanitize test-runtime2-cp14b-mutants
+test-runtime2-cp14b-witnesses: $(TARGET) $(CP13B_SWITCH_NIFT)
+	mkdir -p "$(CP14B_EVIDENCE)"
+	$(PYTHON) tests/runtime2/cp14b/push_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/push-admission.json"
+	$(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses.json"
+	$(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses-switch.json"
+	$(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission.json"
+	$(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission-switch.json"
+test-runtime2-cp14b-sanitize: $(TARGET)
+	@$(CP14B_LINUX_ONLY) true
+	mkdir -p "$(CP14B_EVIDENCE)"
+	$(PYTHON) tests/runtime2/cp14b/build_sanitizer.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/san"
+	$(PYTHON) tests/runtime2/cp14b/build_drain.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/drain"
+	set -e; for b in cp14b-san cp14b-san-switch; do \
+	  bin="$(CURDIR)/$(TEST_DIR)/cp14b/san/$$b"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$$bin" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-functional-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/sort_replay.py --sanitizer --nift "$$bin" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/san-sort-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-origins-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-copy-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/const_admission.py --vm-only-harness --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-const-$$b.json"; \
+	done
+test-runtime2-cp14b-mutants: $(TARGET)
+	@$(CP14B_LINUX_ONLY) true
+	$(PYTHON) tests/runtime2/cp14b/mutations.py --nift "$(CURDIR)/$(TARGET)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/mutants"
+	$(MAKE) test-runtime2-cp14b-design-mutants
+test-rt-vm: test-runtime2-cp14b
+test-rt-vm: test-runtime2-cp14b-sort
+test-rt-vm: test-runtime2-cp14b-witnesses
+test-rt-vm-sanitize: test-runtime2-cp14b-sanitize
+certify-targets: test-runtime2-cp14b-mutants

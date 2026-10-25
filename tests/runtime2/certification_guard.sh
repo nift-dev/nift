@@ -12,7 +12,7 @@ cd "$ROOT"
 REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
           test-rt-parser test-sha256 test-site-dx
-          test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants)
+          test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants test-runtime2-cp14b-mutants)
 WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys
@@ -87,7 +87,11 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-vm', 'test-rt-error-oom'),
          ('test-rt-vm-sanitize', 'test-rt-source-map-sanitize'),
          ('test-rt-vm-sanitize', 'test-rt-source-map-tsan'),
-         ('test-rt-vm-sanitize', 'test-rt-error-oom-sanitize')]
+         ('test-rt-vm-sanitize', 'test-rt-error-oom-sanitize'),
+         ('test-rt-vm', 'test-runtime2-cp14b'),
+         ('test-rt-vm', 'test-runtime2-cp14b-sort'),
+         ('test-rt-vm', 'test-runtime2-cp14b-witnesses'),
+         ('test-rt-vm-sanitize', 'test-runtime2-cp14b-sanitize')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
