@@ -59,6 +59,14 @@ independent D-040 copies are permitted. Public refusal remains method:sort.
 Evidence-only categories are self-structural, receiver-write, location-escape,
 unknown-target and unknown-effects. Unresolved safety is genuine CP25 debt.
 
+Prepared-loop comparator call arguments must be a named/declared callable
+binding. Inline lambda and factory expressions lose legacy's mutable receiver
+and report cannot mutate const array with an empty receiver name. They retain
+method:sort refusal before effects, with automatic mode running legacy once.
+This context-dependent mutability difference is not covered by the owner's
+Error-origin exception. All six contexts for binding callbacks remain admitted.
+comparator_contexts.py preserves the full 24-case admission/parity matrix.
+
 Comparator source selectors/iterator locations remain refused: their writeback
 can allocate, so an allocation-free unwind has not been established. Mutators
 on arbitrary member/index receivers retain the existing method refusal.
