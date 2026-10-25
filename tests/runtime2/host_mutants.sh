@@ -20,8 +20,13 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         tail -20 "$TMP/build-$mutant.log" >&2
         exit 1
     fi
-    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
+    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: vm_host tests passed (mutant not caught)" >&2
+        cat "$TMP/test-$mutant.log" >&2
+        exit 1
+    fi
+    if [ "$mutant" = "3" ] && ! grep -q "FAIL ls_dir" "$TMP/test-$mutant.log"; then
+        echo "FAIL host mutant 3: rejected, but not by the sorted-ls witness" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
     fi
@@ -127,7 +132,7 @@ if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
     tail -20 "$TMP/build-11.log" >&2
     exit 1
 fi
-if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" >"$TMP/test-11.log" 2>&1; then
+if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-11.log" 2>&1; then
     echo "FAIL host mutant 11: vm_host tests passed (mutant not caught)" >&2
     cat "$TMP/test-11.log" >&2
     exit 1

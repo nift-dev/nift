@@ -5,21 +5,22 @@
  #include "HostTrace.h"
  #include "P4Plan.h"
  #include "RuntimeJson.h"
-@@ -837,6 +838,19 @@
+@@ -837,6 +838,20 @@
              const std::uint64_t file_checkpoint=begin_file_operation();
              ++function_call_depth_;
              const bool saved_strict=strict_script_mode_; strict_script_mode_=true;
 +            if (std::getenv("NIFT_CP17_ROUTING_MUTANT") != nullptr) {
 +                int routed_exit = 0;
 +                if (nift::rt::run_script_on_vm(source.substr(bo+1, bc-bo-1), source_path, routed_exit)) {
-+                    RenderResult routed;
-+                    routed.ok = routed_exit == 0;
-+                    if (!routed.ok) routed.error.message = "review routing mutant: forced page VM refusal";
-+                    else { routed.output = "TEMPLATE-VM"; routed.content_used = true; }
-+                    result_ = routed;
 +                    strict_script_mode_ = saved_strict;
 +                    --function_call_depth_;
-+                    break;
++                    if (routed_exit != 0) {
++                        fail(source_path, source, i, "review routing mutant: forced page VM refusal");
++                        break;
++                    }
++                    output += "TEMPLATE-VM";
++                    i = bc + 1;
++                    continue;
 +                }
 +            }
              auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1,source_provenance,true,view.slice(bo+1,bc-bo-1));

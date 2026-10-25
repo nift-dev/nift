@@ -92,11 +92,8 @@ def main():
                 page = (proj / "public/index.html").exists()
                 vm = any(r.get("vm_executions", 0) or r.get("outcome") in ("vm", "vm-error") for r in rows)
                 print(f"{kind}/{label}: exit={proc.returncode} marker={marker} page={page} vm_rows={len(rows)}")
-                if label == "normal" and (proc.returncode != 0 or not marker or not page):
+                if proc.returncode != 0 or not marker or not page:
                     print(f"FAIL {kind}/{label}: protected execution did not produce output/marker")
-                    failures += 1
-                elif label == "mutant" and not marker:
-                    print(f"FAIL {kind}/{label}: protected mutation produced no marker")
                     failures += 1
                 elif label == "normal" and vm:
                     print(f"FAIL {kind}: normal path executed on the VM")

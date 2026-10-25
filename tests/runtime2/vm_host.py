@@ -121,7 +121,8 @@ def normalise(text, root):
     return text.replace(str(root), "<root>")
 
 
-def run_both(nift, source, oracle_root, vm_root, extra_env=None):
+def run_both(nift, source, oracle_root, vm_root, extra_env=None, oracle_nift=None):
+    oracle_bin = oracle_nift or nift
     for root, vm in ((oracle_root, False), (vm_root, True)):
         (root / "case.f").write_text(source)
         env = dict(os.environ)
@@ -138,7 +139,7 @@ def run_both(nift, source, oracle_root, vm_root, extra_env=None):
             os.dup2(trace_fd, 3)
         trace_fd = os.open(trace, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         try:
-            proc = subprocess.run([nift, "case.f"], cwd=root, env=env, stdin=subprocess.DEVNULL,
+            proc = subprocess.run([nift if vm else oracle_bin, "case.f"], cwd=root, env=env, stdin=subprocess.DEVNULL,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   preexec_fn=preexec, pass_fds=(trace_fd,))
         finally:
@@ -157,10 +158,12 @@ def run_both(nift, source, oracle_root, vm_root, extra_env=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--nift", required=True)
+    parser.add_argument("--oracle", help="unmodified legacy oracle (defaults to --nift)")
     parser.add_argument("--only", choices=["supported", "errors", "unsupported"])
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     nift = os.path.abspath(args.nift)
+    oracle_nift = os.path.abspath(args.oracle) if args.oracle else nift
     failures = []
     passed = refused = 0
 
@@ -248,7 +251,7 @@ def main():
                 for root in (oracle_root, vm_root):
                     root.mkdir()
                     setup_files(root)
-                oracle, vm = run_both(nift, source, oracle_root, vm_root)
+                oracle, vm = run_both(nift, source, oracle_root, vm_root, oracle_nift=oracle_nift)
                 check(f"{name}@{context}", source, oracle, vm, "supported")
 
     symlink_ok = True
@@ -264,7 +267,7 @@ def main():
             except (OSError, NotImplementedError):
                 symlink_ok = False
                 break
-            oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root)
+            oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root, oracle_nift=oracle_nift)
             check(f"{name}", body, oracle, vm, "supported")
     if not symlink_ok:
         print("SKIP symlink fixtures: symlinks unavailable")
@@ -277,7 +280,7 @@ def main():
             for root in (oracle_root, vm_root):
                 root.mkdir()
                 setup_files(root)
-            oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root)
+            oracle, vm = run_both(nift, body + "\n", oracle_root, vm_root, oracle_nift=oracle_nift)
             check(name, body, oracle, vm, "error")
 
     root_cases = [
@@ -327,7 +330,7 @@ def main():
                     env["NIFT_VM_STATS"] = str(stats)
                 fd = os.open(trace, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
                 try:
-                    proc = subprocess.run([nift, "case.f"], cwd=inside, env=env, stdin=subprocess.DEVNULL,
+                    proc = subprocess.run([nift if vm_mode else oracle_nift, "case.f"], cwd=inside, env=env, stdin=subprocess.DEVNULL,
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           preexec_fn=lambda: os.dup2(fd, 3), pass_fds=(fd,))
                 finally:

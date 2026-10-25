@@ -792,6 +792,8 @@ test-runtime2-cp17-tripwire: $(TARGET)
 .PHONY: test-runtime2-cp16-n1
 test-runtime2-cp16-n1: $(TARGET) $(RT_HOST_NATIVE_UNIT)
 	"$(RT_HOST_NATIVE_UNIT)"
+	@if env NIFT_HOST_NATIVE_NEGATIVE=1 "$(RT_HOST_NATIVE_UNIT)" >/dev/null 2>&1; then \
+		echo "FAIL native assertion negative control passed" >&2; exit 1; fi
 	$(PYTHON) tests/runtime2/cp16_n1.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp16_n1_controls.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp16_n1_consumer_controls.py

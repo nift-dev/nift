@@ -131,7 +131,10 @@ bool file_stream_cases() {
     CHECK(call(nift::rt::natives::file_open, context, {open_file, make_string("w")}, out, error) ==
           nift::rt::natives::Status::Ok);
     const CloseReport report = table.close_context(context_id);
-    CHECK(!report.cleanup_failed());
+    // An open file at context end is legacy's "managed file left open" failure,
+    // including a clean dirty-buffer state.
+    CHECK(report.cleanup_failed());
+    CHECK(!report.failures.empty() && report.failures.front().code == "io.write_failed");
     CHECK(call(nift::rt::natives::file_path, context, {open_file}, out, error) ==
           nift::rt::natives::Status::Recoverable);
     std::filesystem::remove_all(root, ignored);
@@ -286,6 +289,10 @@ bool sink_cases() {
 } // namespace
 
 int main() {
+    if (std::getenv("NIFT_HOST_NATIVE_NEGATIVE") != nullptr) {
+        CHECK(false);  // test-integrity negative control: must make the target fail
+        return rt_test::finish("rt host native negative control");
+    }
     const std::filesystem::path path = "host-native-observer.txt";
     { std::ofstream out(path, std::ios::binary); out << "x"; }
     Spy spy;
@@ -335,5 +342,5 @@ int main() {
 #else
     std::printf("N1 native post-open read-failure code mapping: SKIP (Linux-only fixture)\n");
 #endif
-    return 0;
+    return rt_test::finish("rt host native");
 }
