@@ -149,6 +149,12 @@ def show(label, a, b):
             print(f"  {ch}: legacy={a[i]!r:.300} vm={b[i]!r:.300}")
 
 
+def copy_fixture_matches(text, legacy, vm):
+    """Exact D-040 witness, not a general alias-difference policy."""
+    return (text == "a := [1, 2]\nb := a\nb.push(3)\nprint(a.length())\n" and
+            legacy == (b"3\n", b"", 0) and vm == (b"2\n", b"", 0))
+
+
 def corpus(args, work):
     expect = {}
     for line in open(os.path.join(CORPUS, "EXPECT")):
@@ -166,7 +172,8 @@ def corpus(args, work):
                                     require=bool(want and want[0] in ("vm", "vm-error")))
         got = outcome_key(st)
         tally[got] += 1
-        v = verdict(same, a, b, st)
+        v = ("approved D-040 independent copy" if single_execution(st) and copy_fixture_matches(text, a, b)
+             else verdict(same, a, b, st))
         if v.startswith("approved"):
             tally[v] += 1
         elif v != "same":
@@ -184,7 +191,7 @@ def corpus(args, work):
         elif st is None or st["outcome"] != want[0] or not st["reason"].startswith(want[1]):
             print(f"FAIL corpus {name}: expected {want[0]} {want[1]}, got {got}")
             failures += 1
-        elif c is not None and c != a and not classify_difference(a, c, st).startswith("approved"):
+        elif c is not None and c != a and not copy_fixture_matches(text, a, c) and not classify_difference(a, c, st).startswith("approved"):
             show(f"corpus {name} (NIFT_VM=require)", a, c)
             failures += 1
     print(f"vm corpus: {len(names)} scripts, {failures} failures; outcomes {dict(sorted(tally.items()))}")

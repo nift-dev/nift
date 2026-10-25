@@ -64,7 +64,7 @@ CASES = [
      "fallback", {}),
     ("fallback-file-write-then-error", FILE_WRITE + 'print("wrote")\nprint(1 / 0)\n', "fallback", {}),
     ("fallback-type-error", 'print("a")\nprint("x" < 1)\n', "fallback", {}),
-    ("fallback-aliasing", 'a := [1]\nb := a\nb.push(2)\nprint(a.length())\n', "fallback", {}),
+    ("vm-d040-copy", 'a := [1]\nb := a\nb.push(2)\nprint(a.length())\n', "vm", {}),
     ("internal-failure", 'print("start")\ns := "abcdefghijklmnopq"\nk := 0\nwhile (k < 22) { s += s\nk += 1 }\n'
                          'print(s.length())\n', "internal-error", {"NIFT_VM_HEAP_BUDGET": str(4 << 20)}),
 ]
@@ -82,6 +82,8 @@ APPROVED = {
 #     iteration (legacy re-evaluates and prints it twice).
 W = 9007199254740991
 GOLDEN = {
+    # D-040: b.push mutates the independent copy; a still has one element.
+    "vm-d040-copy": (b"1\n", b"", 0),
     "vm-error-in-function": (b"g 0\n1\ng 1\n2\ng 2\n",
                              b"error: {path}:2:8: JSON array index 2 is out of range in 'a[k]'\n", 1),
     "vm-large-reevaluation": (("loud %d\n%d\nloud %d\n%d\n" % (W, W + 2, W + 1, W + 3)).encode(), b"", 0),
