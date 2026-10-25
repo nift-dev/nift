@@ -134,6 +134,14 @@ CASES.update({
 'aggregate_min_result':'r:=[[1],[2,3]].min_by(x=>x.size()); print([r].stringify())',
 })
 
+CASES.update({
+'return_comparator_result_error':'fn(f()) { a:=[2,1]; return a.sort((x,y)=>x+y) }; f()',
+'return_collection_predicate_error':'fn(f()) { return [1].filter(x=>x) }; f()',
+'return_mutator_error':'fn(f()) { a:=[]; return a.pop() }; f()',
+'return_callback_arity_error':'fn(f()) { return [1].map((x,y)=>x) }; f()',
+'return_method_arity_error':'fn(f()) { return [1].map() }; f()',
+})
+
 def run(binary,mode,source,root):
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')
