@@ -48,6 +48,7 @@ struct Note {
 };
 
 struct Proto {
+    const Proto* collection_entry = nullptr;  // owned by Program::protos
     bool collection_expression_view = false;
     std::string name;
     std::uint16_t nparams = 0;

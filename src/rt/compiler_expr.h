@@ -70,6 +70,7 @@ public:
         std::vector<NodeId> upvalue_decls;
         std::vector<bool> upvalue_loop;
         std::vector<bool> upvalue_readonly;
+        std::vector<bool> upvalue_const_array;
         std::vector<Capture> captures;
     };
 
@@ -94,6 +95,11 @@ private:
     bool while_loop(const Node& node);
     bool try_statement(const Node& node);
     bool throw_statement(const Node& node);
+    bool collection_failure(const Node&,std::uint16_t,std::string);
+    int collection_method_call(const Node&,std::uint16_t);
+    bool collection_call(const Node& node, std::uint16_t dst, int method);
+    bool comparator_sort(const Node& node, std::uint16_t dst, const Binding& binding);
+    bool array_mutation(const Node& node, std::uint16_t dst, int method);
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);
@@ -174,8 +180,12 @@ private:
     // CP12C closures: lambda construction, deferred Proto compilation and
     // the static capture pass that decides which bindings need cells.
     bool lambda_value(const Node& node, std::uint16_t dst);
+    std::uint32_t collection_offset(const Node&) const;
+    std::uint16_t collection_diagnostic_flags(const Node&,NodeId,bool comparator=false) const;
+    bool collection_callback_shape(const Node&,NodeId,std::uint32_t argc);
+    bool compile_lambda_body(const Node&,const NodeId*,bool collection_view);
     bool lambda_upvalues(const LambdaTask& task);
-    bool compile_lambda_task(const struct LambdaTask& task, std::unique_ptr<Proto>& out);
+    bool compile_lambda_task(const struct LambdaTask& task, std::unique_ptr<Proto>& out, bool collection_view = false);
     void prepare_captures();
     bool captured_binding(NodeId id) const { return captured_bindings_.count(id) != 0; }
     void collect_lambda_names(NodeId id, std::vector<std::string_view>& out) const;

@@ -31,13 +31,15 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
 }
 
 bool UnitCompiler::declare(const Node& node) {
-    if (node.flags & (kFlagConst | kFlagImmut)) return fail(node, "declare-const");
+    if ((node.flags & kFlagImmut) || ((node.flags & kFlagConst) && kinds(node.b) != kKindArray))
+        return fail(node, "declare-const");
     const Node& target = ast_.at(node.a);
     if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
     const std::string_view name = text(target);
     std::uint16_t reg = 0;
     Binding binding;
     if (!new_binding(name, target, reg, binding)) return false;
+    binding.const_array = (node.flags & kFlagConst) != 0;
     // CP12b structs: `p := Name(args)` makes the instance the binding holds.
     const Node& init = ast_.at(node.b);
     const auto made = init.kind == NodeKind::Call && ast_.at(init.a).kind == NodeKind::Ident
@@ -176,6 +178,7 @@ bool UnitCompiler::assign(const Node& node) {
         if (const StructFieldInfo* field = own_field(text(target)))  // CP12b: an implicit field
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->const_array) return fail(target, "declare-const");
     if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
@@ -258,6 +261,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->const_array) return fail(target, "declare-const");
     if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
@@ -290,6 +294,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
+    if (binding->const_array) return fail(target, "declare-const");
     if (binding->readonly) return fail(target, "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
@@ -302,6 +307,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* found = find_binding(text(target));
     if (!found) return fail(target, "assign-free-name");
+    if (found->const_array) return fail(target, "declare-const");
     if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;

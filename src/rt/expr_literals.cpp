@@ -178,7 +178,7 @@ NodeId ExprParser::lambda_body(NodeId lambda) {
         }
         return lambda;
     }
-    const NodeId body = unit();
+    const NodeId body = lambda_assignment(unit());
     if (body == kNoNode) return kNoNode;
     ast_.at(lambda).b = body;
     ast_.at(lambda).end = prev_end_;

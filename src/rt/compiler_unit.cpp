@@ -226,6 +226,13 @@ bool UnitCompiler::compile_program(NodeId root, Program& program) {
         const LambdaTask task = lambda_tasks_[i];
         std::unique_ptr<Proto> proto;
         if (!compile_lambda_task(task, proto)) return false;
+        if(kinds_.collection_lambdas.count(task.lambda)&&(ast_.at(task.lambda).flags&kFlagBlockBody)) {
+            std::unique_ptr<Proto> entry;
+            if(!compile_lambda_task(task,entry,true))return false;
+            if(program.protos.size()>=0xffff)return fail(ast_.at(task.lambda),"limit:lambdas");
+            proto->collection_entry=entry.get();
+            program.protos.push_back(std::move(entry));
+        }
         program.protos[task.proto_slot] = std::move(proto);
     }
     program_ = nullptr;

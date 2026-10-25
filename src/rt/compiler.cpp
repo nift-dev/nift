@@ -267,7 +267,14 @@ bool UnitCompiler::expression_statement(const Node& node) {
                 (!global && !(holder && holder->cell ? indexed_binding(*holder, reg) :
                               local_register(receiver, reg))))
                 return fail(receiver, "push-receiver");
-            if (expr.count != 1) return fail(node, "static-error:push-arity");
+            if (expr.count != 1) {
+                std::uint16_t result=0;
+                return temp(result)&&collection_failure(expr,result,"push: expected one argument");
+            }
+            if(holder&&(holder->const_array||holder->selector||holder->loop_binding)) {
+                std::uint16_t result=0;
+                return temp(result)&&array_mutation(expr,result,0);
+            }
             const NodeId arg = ast_.list(expr)[0];
             // records20k coverage (stage 4): legacy pushes an aggregate taken
             // from a place as a location reference (refused: no_alias); a

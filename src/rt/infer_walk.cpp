@@ -133,7 +133,7 @@ void Inference::statement(NodeId id) {
             }
             KindSet out = arithmetic_kinds(op, (*var)->kinds, v->kinds);
             if (op == Op::Add && ((*var)->kinds & kKindString) && (v->kinds & kKindString)) out |= kKindString;
-            merge_local(*var, kinds_ty(out));
+            merge_local(*var,with_text_number(kinds_ty(out),v->legacy_text_number||(*var)->legacy_text_number));
             record(n.a, *var);
             break;
         }
@@ -225,6 +225,7 @@ void Inference::statement(NodeId id) {
                 for (std::uint32_t k = 0; k < e.count; ++k) v = expr(args[k]);
                 expr(ast_.at(e.a).a);
                 if (e.count == 1) add_element(ast_.at(ast_.at(e.a).a), v);
+                expr(ast_.at(e.a).a);
                 break;
             }
             expr(n.a);
@@ -252,9 +253,22 @@ void Inference::walk_lambda(std::size_t id) {
         declare(ast_.text(ast_.at(params[k])), params[k], record(params[k], info.params[k]));
     if (lambda.flags & kFlagBlockBody) {
         statements(ast_.at(lambda.b));
+        const Node& body=ast_.at(lambda.b);
+        TyRef collection=empty_ty();
+        if(body.count==1) {
+            const Node& n=ast_.at(ast_.list(body)[0]);
+            if(n.kind==NodeKind::ExprStmt||n.kind==NodeKind::Assign||n.kind==NodeKind::CompoundAssign)
+                collection=expr(n.a);
+        }
+        if(merge(lambdas_[id].collection_returns,collection))
+            for(auto caller:lambdas_[id].callers)enqueue(caller);
         if (block_falls_through(ast_, lambda.b)) merge_lambda_return(id, kinds_ty(kKindNull));
     } else {
-        merge_lambda_return(id, expr(lambda.b));
+        const Node& body=ast_.at(lambda.b);
+        if(body.kind==NodeKind::Assign||body.kind==NodeKind::CompoundAssign) {
+            statement(lambda.b);
+            merge_lambda_return(id,expr(body.a));
+        } else merge_lambda_return(id, expr(lambda.b));
     }
 }
 

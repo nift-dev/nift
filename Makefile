@@ -3383,3 +3383,21 @@ test-runtime2-capture-origins: $(TARGET)
 	python3 tests/runtime2/capture_origins.py --nift "$(CURDIR)/$(TARGET)"
 test: test-runtime2-capture-origins
 test-rt-vm: test-runtime2-capture-origins
+
+# CP14B focused collection gates, additive until independent acceptance.
+CP14B_EVIDENCE ?= $(TEST_DIR)/cp14b/evidence
+CP14B_BASE ?= $(CURDIR)/$(TARGET)
+CP14B_ORACLE := tests/runtime2/cp14b/fixtures/d4-traces.json.gz
+.PHONY: test-runtime2-cp14b test-runtime2-cp14b-sort
+# The default legacy oracle is this binary's unchanged NIFT_VM=0 engine.
+# Pass the accepted foundation binary as CP14B_BASE for an immutable comparison.
+test-runtime2-cp14b: $(TARGET) $(CP13B_SWITCH_NIFT)
+	mkdir -p "$(CP14B_EVIDENCE)"
+	$(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional.json"
+	$(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional-switch.json"
+	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects.json"
+	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects-switch.json"
+test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
+	mkdir -p "$(CP14B_EVIDENCE)"
+	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
+	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort-switch.json"

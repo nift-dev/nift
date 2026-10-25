@@ -1,0 +1,103 @@
+CP14B IMPLEMENTATION — REVIEW NOTES
+
+Foundation: 70fda90227b31f6c7e5ea4ede4b9451047e94c17
+Foundation tree: ad66b69f72494c036a5987837f71aa871f9ede20
+Frozen design: 70a34968d095b36930324ea92affbaa7c3a1326c
+D4–D6 refinement: 130cc69fd77f8547510143fef3de20039dae604a
+This candidate is for independent review; it does not authorize integration.
+
+Architecture
+
+All 26 entries across 25 names have dedicated lowering. Statement push keeps
+its existing path where applicable. CollectionStep performs callback-free
+native traversal/building; CollectionCall enters ordinary VM frames. map/filter
+and related methods keep a source snapshot and Value-owned state. sort_by
+collects callback keys before native index sorting, preserving stable ties
+without calling back into the VM. Comparator sort is a resumable controller;
+it never re-enters Vm::run from C++.
+
+Core transformations evaluate their callable once; the extra methods retain
+per-element factory evaluation. reduce evaluates the seed before the callable
+factory. Short circuits stop callback execution. F4 mutators write back through
+the established local/global/cell/iterator binding path. splice commits deletion
+before evaluating replacement. Const checks preserve their phase and captures.
+
+Shared exception boundary
+
+The separately committed Vm::unwind seam runs after CP13B validates/selects the
+handler and before clearing frames. It visits current/saved collection owners
+inside out, includes the retained owner frame, and finishes pending comparator
+moves with false results and no further user calls. It performs no allocation,
+heap charge or budget check. Original element graphs remain pinned during drain;
+COW drain storage is reserved on the normal path. Terminal exits do not drain.
+Logical drain failure becomes Internal; bad_alloc reaches the existing fatal
+runner boundary. No competing handler selection or new fault slot exists.
+
+The separately committed reporting extension has one cold error_result hook.
+It projects immutable call-site context into VmResult only after an Error has
+escaped. Fault and Error objects are read-only. Prefixes are reconstructed once
+per actual lambda/return boundary, including nested callbacks and user messages
+that happen to contain prefix text. Ordinary non-collection reporting returns
+from this hook without changing the result. Frame layout and ordinary call
+entry are unchanged. The owner explicitly approved this reporting exception.
+
+Admission and CP25 debt
+
+D-040 binding copies are admitted only along binding chains used by collection
+methods; CP14B result containers also permit ordinary value presentation. The
+previous alias refusal is retained for unrelated location/aggregate programs.
+Known aggregate values flowing as collection callback arguments retain the same
+provenance, permitting named callbacks to return their argument and array
+callbacks to wrap it. The same rule covers aggregate pop/reduce/min results
+and nullable find results. Each aggregate alternative must have proven value
+provenance; ordinary calls do not acquire that provenance.
+Source-location/selector semantics continue through CP12C's descriptors.
+
+Comparator effects use finite callable targets, semantic declaration identities
+and a transitive fixed point. Disjoint scalar state, known-safe helpers and
+independent D-040 copies are permitted. Public refusal remains method:sort.
+Evidence-only categories are self-structural, receiver-write, location-escape,
+unknown-target and unknown-effects. Unresolved safety is genuine CP25 debt.
+
+Comparator source selectors/iterator locations remain refused: their writeback
+can allocate, so an allocation-free unwind has not been established. Mutators
+on arbitrary member/index receivers retain the existing method refusal.
+Unproved callback block expression-view shapes retain the method's refusal;
+this is not blanket callback-shape coverage. Unknown callable targets are
+refused before execution, including in units whose source would produce output.
+
+Comparator storage admission excludes possible text-backed top-level numeric
+values (large exact numbers and decimals), Bytes, Functions, Errors and unknown
+receiver elements. Executable legacy probes showed moved-from numeric storage
+can expose empty tokens, while VM numbers remain intact. This is recorded
+storage-profile/unknown-effects debt rather than an invented parity golden.
+Object/array element moves follow the frozen native profile, with original
+graphs pinned. No unsafe structural comparator is run as a legacy oracle.
+
+Portability
+
+The comparator schedule is tied to the verified GCC 15.2/libstdc++ profile:
+__GLIBCXX__ 20260321, _GLIBCXX_RELEASE 15, full temporary-buffer stable_sort.
+Unverified standard-library profiles are refused, not silently approximated.
+Native allocation-fallback schedules and libc++/MSVC profiles remain unproved.
+VM scratch allocation failure is fatal under the existing resource contract.
+The frozen 234 traces contain comparator requests, complete visible receiver
+states and fail-position witnesses. Production replay does not execute new
+native-oracle children. The pre-controller bounded campaign is closed.
+
+Review/reconciliation
+
+Review compiler inference/capture edits alongside CP13B and CP17 when Claude
+integrates. Proto owns immutable collection-entry metadata; Program owns both
+entry Protos. FunctionObject identity and captured-cell identity are preserved.
+No production Parser*, Host, process or handle implementation is changed.
+The rt expression parser's lambda assignment support is scoped to this work.
+No general const/location redesign, suspension design or spawn change is made.
+Future suspension still requires explicit collection continuation ownership;
+this synchronous controller is not a suspension acceptance claim.
+
+The raw older parity suites must not be presented as all green when they pin
+legacy aliases against the already approved D-040 value-copy semantics. Ordinary
+return diagnostic discrepancies found on the accepted base are preserved and
+reported separately; this reporting approval does not permit fixing them.
+See the delivery report for exact final gate results and immutable hashes.

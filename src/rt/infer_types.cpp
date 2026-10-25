@@ -46,6 +46,11 @@ namespace {
 constexpr int kMaxDepth = 6;
 } // namespace
 
+TyRef with_text_number(const TyRef& value,bool maybe) {
+    if(!maybe||value->legacy_text_number)return value;
+    auto next=std::make_shared<Ty>(*value);next->legacy_text_number=true;return next;
+}
+
 TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     if (!a || a.get() == empty_ty().get()) return b ? b : empty_ty();
     if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return a;
@@ -55,6 +60,11 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     }
     auto t = std::make_shared<Ty>();
     t->kinds = a->kinds | b->kinds;
+    t->legacy_text_number=a->legacy_text_number||b->legacy_text_number;
+    t->collection_array = (t->kinds & kKindArray) && (!(a->kinds & kKindArray) || a->collection_array) &&
+                          (!(b->kinds & kKindArray) || b->collection_array);
+    t->collection_object = (t->kinds & kKindObject) && (!(a->kinds & kKindObject) || a->collection_object) &&
+                           (!(b->kinds & kKindObject) || b->collection_object);
     t->struct_id = a->struct_id == b->struct_id ? a->struct_id : -2;
     if (a->elem || b->elem) t->elem = unite(a->elem, b->elem, depth + 1);
     if (a->tuple && b->tuple && a->items.size() == b->items.size()) {
@@ -76,6 +86,8 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
 
 bool same(const TyRef& a, const TyRef& b) {
     if (a.get() == b.get()) return true;
+    if(a&&b&&(a->collection_array!=b->collection_array||a->collection_object!=b->collection_object||
+              a->legacy_text_number!=b->legacy_text_number))return false;
     const bool a_empty = !a || (a->kinds == 0 && !a->elem && a->fields.empty() && !a->any);
     const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
@@ -105,6 +117,7 @@ TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long po
         out = unite(out, t->elem);
     }
     if (t->kinds & kKindObject) {
+        if(t->elem)out=unite(out,t->elem);
         if (key) {
             auto it = t->fields.find(*key);
             if (it != t->fields.end()) out = unite(out, it->second);

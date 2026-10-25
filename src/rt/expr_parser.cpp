@@ -204,6 +204,18 @@ NodeId ExprParser::pattern_statement(std::uint32_t begin) {
 // applies a leading or trailing `++`/`--` to the whole unit text, so an
 // increment is only regular when it is the entire unit; likewise a lambda
 // (`=>` anywhere at depth 0 makes the whole unit a lambda) and `await`.
+NodeId ExprParser::lambda_assignment(NodeId left) {
+    if(left==kNoNode)return left;
+    const Op op=compound_op(tok_.kind);
+    if(!is(Tok::Assign)&&op==Op::None)return left;
+    if(!assignable(ast_.at(left).kind))return fail(OpaqueReason::LegacyRuntimeError);
+    const auto begin=ast_.at(left).begin;
+    advance();
+    const NodeId right=unit();
+    if(right==kNoNode)return right;
+    return node2(op==Op::None?NodeKind::Assign:NodeKind::CompoundAssign,op,begin,left,right);
+}
+
 NodeId ExprParser::unit() {
     const std::uint32_t saved = unit_begin_;
     unit_begin_ = tok_.begin;

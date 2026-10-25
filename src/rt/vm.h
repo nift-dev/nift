@@ -167,6 +167,11 @@ private:
     bool unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc);
     bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
     bool origin_at(std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
+    bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
+    bool collection(const Instr&,Value*,Fault&,const Proto*);
+    bool op_collection_sort(const Instr&, Value*, Fault&, const Proto*);
+    bool op_collection_step(const Instr&, Value*, Fault&);
+    bool op_collection_call(const Instr&, Value*&, const Value*&, const Proto*&, std::size_t&, const Instr*&, Fault&);
     bool op_try_begin(const Instr& in, std::size_t base, const Proto* proto, const Instr* pc, Fault& fault);
     bool op_try_end(const Instr& in, Fault& fault);
     bool op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc, Fault& fault);

@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nift::rt {
@@ -78,6 +79,14 @@ struct UnitKinds {
     // False when the fixpoint ran out of its walk budget: the kinds are then
     // not sound and the compiler refuses the unit (`analysis-limit:kinds`),
     // never compiles it with weakened checks (review CP12 round 1, D1).
+    std::unordered_map<NodeId, std::vector<NodeId>> callable_targets;
+    std::unordered_map<NodeId, bool> callable_unknown;
+    std::unordered_set<NodeId> collection_lambdas;
+    std::unordered_set<NodeId> collection_objects;
+    std::unordered_set<NodeId> collection_arrays;
+    std::unordered_map<NodeId,NodeId> bindings;
+    std::unordered_map<NodeId,KindSet> collection_elements;
+    std::unordered_set<NodeId> collection_text_numbers;
     bool converged = false;
     std::size_t walks = 0;  // unit walks the worklist needed (statistics, tests)
     KindSet of(NodeId id) const {

@@ -17,6 +17,9 @@ using TyRef = std::shared_ptr<const Ty>;
 
 struct Ty {
     KindSet kinds = 0;
+    bool legacy_text_number = false;  // may have moved-from StrNumber storage
+    bool collection_array = false;  // CP14B array result provenance
+    bool collection_object = false;  // CP14B result-container provenance
     bool any = false;  // every kind at every depth
     TyRef elem;        // arrays: the elements
     // Arrays that are all literals of one length never changed in place:
@@ -38,6 +41,7 @@ const TyRef& top_ty();
 // The value of something the compiler refuses anyway (kKindUnknown).
 const TyRef& any_ty();
 TyRef kinds_ty(KindSet kinds);
+TyRef with_text_number(const TyRef&,bool maybe);
 TyRef unite(const TyRef& a, const TyRef& b, int depth = 0);
 bool same(const TyRef& a, const TyRef& b);
 // The type of `value[key]` (key: a literal string, or null when unknown;

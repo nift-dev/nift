@@ -194,14 +194,14 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
+    if (int r = collection_method_call(node, dst); r >= 0) return r == 1;
     if (error_method_call(node, dst, name, callee.a)) return true;
     // `length()`/`size()` keep the CP11/CP12 Length opcode (the fast path,
     // with its own kind checks and the context:object-length refusal, Q3).
     const bool length_opcode =
         (name == "length" || name == "size") && node.count == 0;  // rt-lint: allow-string-compare compile time
     if (!length_opcode) {
-        // CP14: every other method is a built-in native or refused.
-        const KindSet k = kinds(callee.a);
+            const KindSet k = kinds(callee.a);
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
             case MethodBinding::Bound: case MethodBinding::Dead: break;

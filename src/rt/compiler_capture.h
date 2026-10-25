@@ -3,6 +3,7 @@
 // nested lambda captures, and the direct top-level declarations that remain
 // globals. Used by the compiler before any code is emitted.
 #include "rt/ast.h"
+#include "rt/infer.h"
 #include "rt/resolver.h"
 
 #include <cstdint>
@@ -10,7 +11,7 @@
 
 namespace nift::rt::detail {
 
-void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
+void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                               std::unordered_set<NodeId>& top_level_decls,
                               std::unordered_set<NodeId>& captured,
                               std::unordered_set<NodeId>& selector_roots);

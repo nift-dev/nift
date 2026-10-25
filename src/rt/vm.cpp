@@ -315,6 +315,8 @@ VmResult Vm::run(std::string& output) {
         if (!op_top_return(*pc, R, result, fault) || !pop_handlers_for_frame(0, fault)) FAIL();
         goto done; }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
+    OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
+    OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
     OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }
     OP(Throw) { if (!op_throw(*pc, R, proto, pc, fault)) FAIL(); NEXT(); }
@@ -342,10 +344,8 @@ bail:
     }
 #endif
 done:
-    result_stats(result);
-    return result;
+    result_stats(result); return result;
 }
-
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     if (in.b >= global_ready_.size() || !global_ready_[in.b]) {
         const Note* note = note_at(proto, &in);
@@ -357,12 +357,10 @@ bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Pr
     R[in.a] = stack_[in.b];
     return true;
 }
-
 void Vm::op_mark_global(const Instr& in) {
     if (in.a >= global_ready_.size()) global_ready_.resize(in.a + 1u);
     global_ready_[in.a] = 1;
 }
-
 bool Vm::op_check_global(const Instr& in, Fault& fault, const Proto* proto) {
     if (in.a < global_ready_.size() && global_ready_[in.a]) return true;
     const Note* note = note_at(proto, &in);

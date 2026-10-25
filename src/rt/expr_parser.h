@@ -79,6 +79,7 @@ private:
     NodeId object(std::uint32_t begin);
     NodeId lambda_if_any(std::uint32_t begin, bool async);
     NodeId lambda_body(NodeId lambda);
+    NodeId lambda_assignment(NodeId left);
     bool skip_group();
     NodeId leaf(NodeKind kind, Token token) { return ast_.add(kind, token.begin, token.end); }
     NodeId node1(NodeKind kind, std::uint32_t begin, NodeId a);

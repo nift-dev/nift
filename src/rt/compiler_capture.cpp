@@ -1,4 +1,5 @@
 #include "rt/compiler_capture.h"
+#include "rt/collection.h"
 
 #include <string_view>
 #include <utility>
@@ -20,9 +21,9 @@ struct Decl {
 
 class Scanner {
 public:
-    Scanner(const Ast& ast, const std::unordered_set<NodeId>& globals,
+    Scanner(const Ast& ast, const UnitKinds& kinds, const std::unordered_set<NodeId>& globals,
             std::unordered_set<NodeId>& captured, std::unordered_set<NodeId>& roots)
-        : ast_(ast), globals_(globals), captured_(captured), roots_(roots) {}
+        : ast_(ast), kinds_(kinds), globals_(globals), captured_(captured), roots_(roots) {}
 
     void function(const Node& fn, int owner) {
         scopes_.clear();
@@ -88,6 +89,24 @@ private:
         if (id == kNoNode) return;
         const Node& n = ast_.at(id);
         switch (n.kind) {
+            case NodeKind::Call: {
+                const Node& callee=ast_.at(n.a);
+                if(callee.kind==NodeKind::Member&&ast_.at(callee.a).kind==NodeKind::Ident&&
+                   kinds_.of(callee.a)==kKindArray) {
+                    const int method=collection_method(ast_.text(ast_.at(callee.b)));
+                    if(method>=0&&method<static_cast<int>(CollectionMethod::Map)) {
+                        const Decl* decl=find(ast_.text(ast_.at(callee.a)));
+                        if(decl&&selector_sources_.count(decl->node)) {
+                            NodeId source=decl->node;
+                            roots_.insert(source);
+                            while(selector_sources_.count(source)) {
+                                source=selector_sources_.at(source);roots_.insert(source);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
             case NodeKind::Ident: ident(n, owner); return;
             case NodeKind::Lambda: lambda(n, owner); return;
             case NodeKind::Declare: {
@@ -156,6 +175,7 @@ private:
     }
 
     const Ast& ast_;
+    const UnitKinds& kinds_;
     const std::unordered_set<NodeId>& globals_;
     std::unordered_set<NodeId>& captured_;
     std::unordered_set<NodeId>& roots_;
@@ -166,7 +186,7 @@ private:
 
 } // namespace
 
-void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
+void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                               std::unordered_set<NodeId>& top_level_decls,
                               std::unordered_set<NodeId>& captured,
                               std::unordered_set<NodeId>& selector_roots) {
@@ -182,7 +202,7 @@ void prepare_capture_bindings(const Ast& ast, NodeId root, const UnitPlan& plan,
             top_level_decls.insert(n.a);
         }
     }
-    Scanner scanner(ast, top_level_decls, captured, selector_roots);
+    Scanner scanner(ast, kinds, top_level_decls, captured, selector_roots);
     scanner.program(program);
     for (std::size_t f = 0; f < plan.functions.size(); ++f)
         scanner.function(ast.at(plan.functions[f]), static_cast<int>(f));

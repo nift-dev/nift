@@ -1,0 +1,32 @@
+CP14B dedicated measurement — prepared, NOT authorized to provision
+
+The implementation candidate supplies tests/runtime2/cp14b/campaign.py.
+It accepts exact accepted-base/candidate executable paths and writes individual
+samples, output digests, VM execution statistics, CPU/wall and exact-child RSS.
+It separates cold startup from steady scripts, calibrates identical repetitions
+until both engines exceed 80 ms, and uses balanced randomized engine order.
+It compares map, filter and sort_by independently at 100,000 elements. The
+31-sample default reports separate medians and bootstrap ratio confidence
+intervals; it never pools methods or treats fallback as a VM execution.
+
+Prepared command, run only on an owner-approved machine/campaign:
+python3 tests/runtime2/cp14b/campaign.py --legacy /absolute/accepted-base-nift --nift /absolute/candidate-nift --n 100000 --samples 31 --output /absolute/raw-cp14b.json
+
+Build the two source trees with the same compiler, library, flags and hardware.
+Record source commits/trees, compiler version/flags, CPU/cache/kernel details,
+binary hashes, raw outputs and provider billing evidence. Retain all failed
+samples; the script persists every row before proceeding. Report cold and steady
+results separately. Distinguish total collection cost from callback cost; add
+heavy/named/captured callback and one/multiple-key sort workloads as separate
+strata before generalizing beyond the supplied light callback workloads.
+
+Target: faster than legacy for each method. Any meaningful regression requires
+explanation; substantial regression blocks acceptance. The candidate's local
+shared-machine observations are preliminary and do not substitute for this
+comparison or establish portable instruction thresholds.
+
+Owner must approve provider instance class, additional cost cap, campaign count
+and sample protocol before provisioning. No CP14B provisioning or spend has
+occurred. Previous Host/F6 Linode authorization is not reused for CP14B.
+After an authorized campaign, delete the instance, verify deletion through the
+provider API, and retain cost/deletion evidence. This file grants no approval.

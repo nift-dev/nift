@@ -1,6 +1,7 @@
 #include "rt/infer.h"
 
 #include "rt/infer_builtins.h"
+#include "rt/collection.h"
 #include "rt/infer_unit.h"
 #include "rt/literal.h"
 #include "rt/number.h"
@@ -90,6 +91,7 @@ void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
 
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
+    binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
     merge_local(vars_[slot], value);
     scopes_.back().emplace_back(name, slot);
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
@@ -113,10 +115,6 @@ TyRef* Inference::find(std::string_view name) {
 
 TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
 
-TyRef Inference::record(NodeId id, TyRef t) {
-    result_.kinds[id] = t->kinds;
-    return t;
-}
 
 int Inference::function_index(const Node& callee) const {
     if (callee.kind != NodeKind::Ident) return -1;
@@ -128,11 +126,7 @@ TyRef Inference::expr(NodeId id) {
     const Node& n = ast_.at(id);
     TyRef t;
     switch (n.kind) {
-        case NodeKind::Number: {
-            Value v; if (!decode_number_literal(ast_.text(n), v)) t = kinds_ty(kKindNumber);
-            else if (v.is(Kind::Decimal)) t = kinds_ty(number_is_integer(v) ? kKindInt : kKindFrac);
-            else { t = constant(id, v.is(Kind::Int) ? static_cast<double>(v.as_int()) : v.as_double()); } break;
-        }
+        case NodeKind::Number: t=number_literal(id);break;
         case NodeKind::String: t = kinds_ty(kKindString); break;
         case NodeKind::True: case NodeKind::False: t = kinds_ty(kKindBool); break;
         case NodeKind::Null: t = kinds_ty(kKindNull); break;
@@ -165,6 +159,7 @@ TyRef Inference::expr(NodeId id) {
             t = kinds_ty(n.op == Op::Not ? kKindBool
                                          : static_cast<KindSet>(o->kinds & (kKindNumber | kKindUnknown)));
             if (n.op == Op::Neg && constants_.has(n.a)) t = constant(id, -constants_.at(n.a));
+            t=with_text_number(t,o->legacy_text_number&&n.op!=Op::Not);
             break;
         }
         case NodeKind::Binary: {
@@ -178,6 +173,7 @@ TyRef Inference::expr(NodeId id) {
                     break;
                 default: t = kinds_ty(kKindBool); break;
             }
+            t=with_text_number(t,(t->kinds&kKindNumber)&&(l->legacy_text_number||r->legacy_text_number));
             break;
         }
         case NodeKind::Logical: expr(n.a); expr(n.b); t = kinds_ty(kKindBool); break;
@@ -266,7 +262,7 @@ TyRef Inference::expr(NodeId id) {
             if (!t) t = o;
             break;
         }
-        case NodeKind::IncDec: { expr(n.a); t = kinds_ty(kKindNumber); break; }
+        case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
         case NodeKind::Call: t = call(n); break;
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)
     }
@@ -285,6 +281,7 @@ std::size_t Inference::lambda_unit(NodeId node) {
                               : owner_function_;
     info.params.assign(ast_.at(node).count, empty_ty());
     info.returns = empty_ty();
+    info.collection_returns = empty_ty();
     info.scopes = scopes_;
     lambdas_.push_back(std::move(info));
     lambda_unit_.emplace(node, unit);
@@ -368,7 +365,13 @@ TyRef Inference::call(const Node& n) {
             const TyRef result = call_callables(field, values, grew);
             return result;
         }
-        return method_result(ast_, n, recv, values);
+        const int collection = collection_method(key);
+        if (collection >= 0 && recv->kinds == kKindArray) return collection_result(n, recv, values, collection);
+        TyRef result=method_result(ast_, n, recv, values);
+        if((result->kinds&kKindNumber)&&key!="size"&&key!="length") {
+            result=with_text_number(result,true);
+        }
+        return result;
     }
     const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
@@ -378,7 +381,11 @@ TyRef Inference::call(const Node& n) {
         return call_callables(callee_ty, values, grew);
     }
     // print, a CP14 free built-in, or something the compiler refuses
-    return callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
+    TyRef result=callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
+    if(result->kinds&kKindNumber) {
+        result=with_text_number(result,true);
+    }
+    return result;
 }
 
 } // namespace infer_detail

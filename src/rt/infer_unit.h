@@ -40,6 +40,7 @@ private:
         int owner_function = -1;  // enclosing named function for global lookup
         std::vector<TyRef> params;
         TyRef returns;
+        TyRef collection_returns;
         std::set<std::size_t> callers;
         std::vector<Scope> scopes;  // lexical scopes at the lambda expression
     };
@@ -69,6 +70,8 @@ private:
     TyRef method_call(std::size_t f, const Node& n);
     // CP12C: merge call arguments into every callable unit a callee value may
     // be, enqueue the ones that grew, and return the union of their returns.
+    TyRef collection_callables(const TyRef&,const std::vector<TyRef>&,bool&);
+    TyRef collection_result(const Node&, const TyRef&, const std::vector<TyRef>&, int);
     TyRef call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew);
     // The unit of a lambda expression, creating it on first sight.
     std::size_t lambda_unit(NodeId node);
@@ -76,6 +79,7 @@ private:
 
     // Constant-folded literal arithmetic (doubles; only the kind is used).
     TyRef constant(NodeId id, double v);
+    TyRef number_literal(NodeId id);
 
     TyRef record(NodeId id, TyRef t);
 
@@ -106,6 +110,7 @@ private:
     std::vector<std::vector<TyRef>> params_;
     std::vector<TyRef> returns_;
     std::vector<TyRef> vars_;
+    std::unordered_map<std::size_t,NodeId> binding_decls_;
     std::vector<std::size_t> persist_index_;
     Constants constants_;
     std::vector<Scope> scopes_;

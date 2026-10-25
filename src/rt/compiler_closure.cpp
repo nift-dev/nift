@@ -12,7 +12,7 @@
 namespace nift::rt::detail {
 
 void UnitCompiler::prepare_captures() {
-    prepare_capture_bindings(ast_, root_, plan_, top_level_decl_ids_, captured_bindings_, selector_roots_);
+    prepare_capture_bindings(ast_, root_, plan_, kinds_, top_level_decl_ids_, captured_bindings_, selector_roots_);
     declared_names_.clear();
     std::vector<NodeId> stack{root_};
     while (!stack.empty()) {
@@ -87,6 +87,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     std::vector<NodeId> upvalue_decls;
     std::vector<bool> upvalue_loop;
     std::vector<bool> upvalue_readonly;
+    std::vector<bool> upvalue_const_array;
     for (std::string_view name : names) {
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
@@ -107,12 +108,14 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         upvalue_decls.push_back(binding->decl_node);
         upvalue_loop.push_back(binding->loop_binding);
         upvalue_readonly.push_back(binding->readonly);
+        upvalue_const_array.push_back(binding->const_array);
     }
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
     lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(upvalue_decls),
                                        std::move(upvalue_loop), std::move(upvalue_readonly),
+                                       std::move(upvalue_const_array),
                                        std::move(captures)});
     const LambdaTask& task = lambda_tasks_.back();
     const std::uint16_t mark = fb_->top();
@@ -171,6 +174,7 @@ bool UnitCompiler::lambda_upvalues(const LambdaTask& task) {
         binding.decl_node = task.upvalue_decls[k];
         binding.loop_binding = task.upvalue_loop[k];
         binding.readonly = task.upvalue_readonly[k];
+        binding.const_array = task.upvalue_const_array[k];
         binding.typed = true;
         binding.decl_kinds = static_cast<KindSet>(kKindAll | kKindUnknown);
         if (binding.loop_binding) {
@@ -187,7 +191,7 @@ bool UnitCompiler::lambda_upvalues(const LambdaTask& task) {
     return true;
 }
 
-bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<Proto>& out) {
+bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<Proto>& out, bool collection_view) {
     auto saved_fb = std::move(fb_);
     const Scopes saved_scopes = scopes_;
     const std::vector<Loop> saved_loops = loops_;
@@ -290,18 +294,11 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         }
         if (!scopes_.declare(name, binding)) return fail(param, "param-duplicate");
     }
-    bool ok;
-    if (lambda.flags & kFlagBlockBody) {
-        ok = statements(ast_.at(lambda.b));
-        if (ok) fb_->emit(OpCode::ReturnNull);
-    } else {
-        std::uint16_t value = 0;
-        ok = temp(value) && expr_to(lambda.b, value);
-        if (ok) fb_->emit(OpCode::Return, value);
-    }
+    bool ok = compile_lambda_body(lambda, params, collection_view);
     if (ok) {
         fb_->drop_unread_types();
         ok = finish(out);
+        if(ok)out->collection_expression_view=collection_view;
     }
     if (!ok) {
         // Keep the failure reason/offset from the lambda body; the unit is

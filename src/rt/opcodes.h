@@ -104,7 +104,11 @@ namespace nift::rt {
     X(TryEnd)    /* pop the current frame's innermost handler                                  */         \
     X(Throw)     /* throw R[a] (an Error); scene origin is the throw statement                 */         \
     X(ErrorNew)  /* R[a] = error(R[b] .. R[b+c-1])                                            */         \
-    X(ErrorJson) /* R[a] = JSON text of Error R[b] (c: 0 compact / 1 pretty)                   */
+    X(ErrorJson) /* R[a] = JSON text of Error R[b] (c: 0 compact / 1 pretty)                   */ \
+    X(CollectionSort) /* resumable callback sorter */ \
+    X(CollectionStep) /* private CP14B state-window operation */ \
+    X(CollectionCall) /* checked ordinary-frame collection callback */ \
+    X(ArrayMutate) /* synchronous bare-binding mutation */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,

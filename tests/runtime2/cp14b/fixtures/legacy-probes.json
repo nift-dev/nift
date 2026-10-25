@@ -1,0 +1,638 @@
+{
+  "binary": "/tmp/codex-cp14b-design/nift",
+  "sha256": "2c734a9adda31c06f09380b349013c20f80a695fd21e41422ff5de08f939d1e7",
+  "environment": {
+    "PATH": "/home/nick/.local/bin:/home/nick/.codex/tmp/arg0/codex-arg0r99iaZ:/home/nick/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/nick/.local/bin:/home/nick/.bun/bin:/home/nick/.opencode/bin:/home/nick/.cargo/bin:/home/nick/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/nick/.dotnet/tools:/home/nick/.local/bin:/home/nick/.local/bin:/home/nick/.local/bin:/home/nick/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/nick/.local/bin",
+    "HOME": "/home/nick",
+    "NIFT_VM": "0",
+    "NIFT_PREVALIDATE": "off",
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "limits": "AS 512 MiB; file 1 MiB; CPU 3s; timeout 5s; core 0",
+  "cases": [
+    {
+      "id": "method.push",
+      "source": "a := [3,1,2]\nr := a.push(7)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[7]\n[3,1,2,7]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.pop",
+      "source": "a := [3,1,2]\nr := a.pop()\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[2]\n[3,1]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.insert",
+      "source": "a := [3,1,2]\nr := a.insert(1, 9)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[9]\n[3,9,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.remove",
+      "source": "a := [3,1,2]\nr := a.remove(1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1]\n[3,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.clear",
+      "source": "a := [3,1,2]\nr := a.clear()\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[null]\n[]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.splice",
+      "source": "a := [3,1,2]\nr := a.splice(1, 1, [7, 8])\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[1]]\n[3,7,8,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.reverse",
+      "source": "a := [3,1,2]\nr := a.reverse()\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[2,1,3]]\n[2,1,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.sort",
+      "source": "a := [3,1,2]\nr := a.sort()\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[1,2,3]]\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.sort_comparator",
+      "source": "a := [3,1,2]\nr := a.sort((x,y) => x < y)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[1,2,3]]\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.map",
+      "source": "a := [3,1,2]\nr := a.map(x => x * 2)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[6,2,4]]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.filter",
+      "source": "a := [3,1,2]\nr := a.filter(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[3,2]]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.reduce",
+      "source": "a := [3,1,2]\nr := a.reduce((acc,x) => acc + x, 10)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[16]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.any",
+      "source": "a := [3,1,2]\nr := a.any(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[true]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.all",
+      "source": "a := [3,1,2]\nr := a.all(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[false]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.find",
+      "source": "a := [3,1,2]\nr := a.find(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[3]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.find_index",
+      "source": "a := [3,1,2]\nr := a.find_index(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[0]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.count",
+      "source": "a := [3,1,2]\nr := a.count(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[2]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.sort_by",
+      "source": "a := [3,1,2]\nr := a.sort_by(x => -x)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[3,2,1]]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.group_by",
+      "source": "a := [3,1,2]\nr := a.group_by(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"true\":[3,2],\"false\":[1]}]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.index_by",
+      "source": "a := [3,1,2]\nr := a.index_by(x => x)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"3\":3,\"1\":1,\"2\":2}]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.partition",
+      "source": "a := [3,1,2]\nr := a.partition(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"matched\":[3,2],\"unmatched\":[1]}]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.unique_by",
+      "source": "a := [3,1,2]\nr := a.unique_by(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[3,1]]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.min_by",
+      "source": "a := [3,1,2]\nr := a.min_by(x => -x)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[3]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.max_by",
+      "source": "a := [3,1,2]\nr := a.max_by(x => -x)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.count_by",
+      "source": "a := [3,1,2]\nr := a.count_by(x => x > 1)\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"true\":2,\"false\":1}]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "method.group_by_each",
+      "source": "a := [3,1,2]\nr := a.group_by_each(x => [\"all\", x > 1, \"all\"])\nprint([r].stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"all\":[3,1,2],\"true\":[3,2],\"false\":[1]}]\n[3,1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.map",
+      "source": "a := []\nr := a.map(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.filter",
+      "source": "a := []\nr := a.filter(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.any",
+      "source": "a := []\nr := a.any(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.all",
+      "source": "a := []\nr := a.all(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.find",
+      "source": "a := []\nr := a.find(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.find_index",
+      "source": "a := []\nr := a.find_index(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.count",
+      "source": "a := []\nr := a.count(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.sort_by",
+      "source": "a := []\nr := a.sort_by(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[[]]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.group_by",
+      "source": "a := []\nr := a.group_by(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "empty.bad_callback.index_by",
+      "source": "a := []\nr := a.index_by(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[{}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.partition",
+      "source": "a := []\nr := a.partition(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"matched\":[],\"unmatched\":[]}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.unique_by",
+      "source": "a := []\nr := a.unique_by(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[[]]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.min_by",
+      "source": "a := []\nr := a.min_by(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: min_by: cannot select from an empty array\n"
+    },
+    {
+      "id": "empty.bad_callback.max_by",
+      "source": "a := []\nr := a.max_by(9)\nprint([r].stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: max_by: cannot select from an empty array\n"
+    },
+    {
+      "id": "empty.bad_callback.count_by",
+      "source": "a := []\nr := a.count_by(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[{}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "empty.bad_callback.group_by_each",
+      "source": "a := []\nr := a.group_by_each(9)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "[{}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.block_legacy_error",
+      "source": "a := [1]\nr := a.map(x => { return x + 1 })\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:19: lambda body error: unknown value or malformed expression: return x\n"
+    },
+    {
+      "id": "empty.reduce",
+      "source": "a := []\nr := a.reduce(9, 11)\nprint(r)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: transformation: callback must be callable\n"
+    },
+    {
+      "id": "snapshot.push",
+      "source": "a := [1,2,3]\nfn(cb(x)) { a.push(9)\n return x }\nr := a.map(cb)\nprint(r.stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2,3]\n[1,2,3,9,9,9]\n",
+      "stderr": ""
+    },
+    {
+      "id": "snapshot.pop",
+      "source": "a := [1,2,3]\nfn(cb(x)) { a.pop()\n return x }\nr := a.map(cb)\nprint(r.stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2,3]\n[]\n",
+      "stderr": ""
+    },
+    {
+      "id": "snapshot.replace",
+      "source": "a := [1,2,3]\nfn(cb(x)) { a = [9]\n return x }\nr := a.map(cb)\nprint(r.stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2,3]\n[9]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.arity",
+      "source": "a := [1,2]\nr := a.map((x,i) => x)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: callback argument count mismatch\n"
+    },
+    {
+      "id": "callback.named_error",
+      "source": "fn(bad(x)) { return x / 0 }\na := [1,2]\nr := a.map(bad)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:1:14: return: division by zero\n"
+    },
+    {
+      "id": "callback.lambda_error",
+      "source": "a := [1,2]\nr := a.map(x => x / 0)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:17: lambda body error: division by zero\n"
+    },
+    {
+      "id": "callback.nonbool",
+      "source": "a := [1,2]\nr := a.filter(x => 1)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: filter: callback must return bool\n"
+    },
+    {
+      "id": "callback.short_any",
+      "source": "n := 0\na := [1,2,3]\nfn(cb(x)) { n += 1\n return x == 2 }\nr := a.any(cb)\nprint(r)\nprint(n)\n",
+      "exit": 0,
+      "stdout": "true\n2\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.short_find",
+      "source": "n := 0\na := [1,2,3]\nfn(cb(x)) { n += 1\n return x == 2 }\nr := a.find(cb)\nprint(r)\nprint(n)\n",
+      "exit": 0,
+      "stdout": "2\n2\n",
+      "stderr": ""
+    },
+    {
+      "id": "splice.replacement_observes_erase",
+      "source": "a := [1,2,3]\nfn(replacement()) { print(a.stringify())\n return [9] }\nr := a.splice(1,1,replacement())\nprint(r.stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,3]\n[2]\n[1,9,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "splice.invalid_replacement",
+      "source": "a := [1,2,3]\ntry { a.splice(1,1,9) } catch(e) { print(\"caught\") }\nprint(a.stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:7: splice: replacements must be an array\n"
+    },
+    {
+      "id": "splice.throw_replacement",
+      "source": "a := [1,2,3]\nfn(replacement()) { throw error(\"stop\") }\ntry { a.splice(1,1,replacement()) } catch(e) { print(\"caught\") }\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "caught\n[1,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "insert.lazy_validation",
+      "source": "a := [1]\nfn(v()) { print(\"value\")\n return 9 }\nr := a.insert(-1,v())\n",
+      "exit": 1,
+      "stdout": "value\n",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:4:6: insert: invalid index\n"
+    },
+    {
+      "id": "const.push",
+      "source": "const a := [1]\na.push(2)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:1: cannot mutate const array: a\n"
+    },
+    {
+      "id": "const.pop_empty",
+      "source": "const a := []\nr := a.pop()\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: pop: array is empty\n"
+    },
+    {
+      "id": "alias.copy",
+      "source": "a := [1,2]\nb := a\nb.push(9)\nprint(a.stringify())\nprint(b.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2,9]\n[1,2,9]\n",
+      "stderr": ""
+    },
+    {
+      "id": "capture.mutate",
+      "source": "fn(f()) { a := [1,2]\n cb := () => { a.pop()\n return a.length() }\nprint(cb())\nprint(a.stringify()) }\nf()\n",
+      "exit": 0,
+      "stdout": "1\n[1]\n",
+      "stderr": ""
+    },
+    {
+      "id": "selector.mutate",
+      "source": "a := [[1,2],[3]]\nfor(v : a) { v.push(9) }\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[[1,2,9],[3,9]]\n",
+      "stderr": ""
+    },
+    {
+      "id": "nested.mutate",
+      "source": "h := {\"a\":[1,2]}\nr := h.a.pop()\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: unknown value or malformed expression: h.a.pop()\n"
+    },
+    {
+      "id": "sort.trace",
+      "source": "trace := \"\"\na := [3,1,2]\nr := a.sort((x,y) => { trace = trace + x.to_string() + \":\" + y.to_string() + \";\"\n return x < y })\nprint(trace)\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "1:3;2:3;2:1;\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort.nonbool",
+      "source": "a := [3,1,2]\nr := a.sort((x,y) => 1)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: sort: comparator must return bool\n"
+    },
+    {
+      "id": "sort.stability",
+      "source": "a := [{\"k\":1,\"id\":\"a\"},{\"k\":0,\"id\":\"b\"},{\"k\":1,\"id\":\"c\"}]\nr := a.sort((x,y) => x.k < y.k)\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[{\"k\":0,\"id\":\"b\"},{\"k\":1,\"id\":\"a\"},{\"k\":1,\"id\":\"c\"}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort.failure_partial",
+      "source": "a := [3,1,2]\nn := 0\ntry { a.sort((x,y) => { n += 1\n if(n == 2) { throw error(\"stop\") }\n return x < y }) } catch(e) { print(\"caught\") }\nprint(a.stringify())\nprint(n)\n",
+      "exit": 0,
+      "stdout": "caught\n[1,3,2]\n2\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort_by.directions_binding",
+      "source": "a := [1,3,2]\nr := a.sort_by(x => x,\"desc\")\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "[3,2,1]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort_by.directions_literal",
+      "source": "r := [1,3,2].sort_by(x => x,\"desc\")\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "[3,2,1]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort_by.direction_variable",
+      "source": "a := [1,3,2]\nd := \"desc\"\nr := a.sort_by(x => x,d)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:3:6: sort_by: direction must be quoted 'asc' or 'desc'\n"
+    },
+    {
+      "id": "sort_by.mixed_binding",
+      "source": "a := [1,\"x\",true]\nr := a.sort_by(x => x)\nprint(r.stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: sort_by: keys must be comparable and homogeneous\n"
+    },
+    {
+      "id": "sort_by.mixed_literal",
+      "source": "r := [1,\"x\",true].sort_by(x => x)\nprint(r.stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:1:6: sort_by: keys must be comparable and homogeneous\n"
+    },
+    {
+      "id": "sort_by.multikey_order",
+      "source": "trace := \"\"\na := [3,1,2]\nfn(ka(x)) { trace = trace + \"a\" + x.to_string()\n return x }\nfn(kb(x)) { trace = trace + \"b\" + x.to_string()\n return 0 }\nr := a.sort_by(ka,\"asc\",kb,\"desc\")\nprint(trace)\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "a3b3a1b1a2b2\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "id": "index_by.collision",
+      "source": "a := [1,\"1\"]\nr := a.index_by(x => x)\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:2:6: index_by: duplicate generated key '1'\n"
+    },
+    {
+      "id": "group_by.collision",
+      "source": "a := [1,\"1\"]\nr := a.group_by(x => x)\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "{\"1\":[1,\"1\"]}\n",
+      "stderr": ""
+    },
+    {
+      "id": "unique_by.structural",
+      "source": "fn(key(x)) { return {\"k\":x % 2} }\na := [1,2,3]\nr := a.unique_by(key)\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2]\n",
+      "stderr": ""
+    },
+    {
+      "id": "min_by.tie",
+      "source": "a := [3,1,2]\nr := a.min_by(x => 0)\nprint(r)\n",
+      "exit": 0,
+      "stdout": "3\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.factory.map",
+      "source": "n := 0\nfn(make()) { n += 1\n return x => x }\na := [3,1,2]\nr := a.map(make())\nprint(n)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "1\n[[3,1,2]]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.factory.index_by",
+      "source": "n := 0\nfn(make()) { n += 1\n return x => x }\na := [3,1,2]\nr := a.index_by(make())\nprint(n)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "3\n[{\"3\":3,\"1\":1,\"2\":2}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.factory.sort_by",
+      "source": "n := 0\nfn(make()) { n += 1\n return x => x }\na := [3,1,2]\nr := a.sort_by(make())\nprint(n)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "3\n[[1,2,3]]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.factory.min_by",
+      "source": "n := 0\nfn(make()) { n += 1\n return x => x }\na := [3,1,2]\nr := a.min_by(make())\nprint(n)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "3\n[1]\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.factory.group_by_each",
+      "source": "n := 0\nfn(make()) { n += 1\n return x => [x] }\na := [3,1,2]\nr := a.group_by_each(make())\nprint(n)\nprint([r].stringify())\n",
+      "exit": 0,
+      "stdout": "3\n[{\"3\":[3],\"1\":[1],\"2\":[2]}]\n",
+      "stderr": ""
+    },
+    {
+      "id": "snapshot.sort_by_pop",
+      "source": "a := [3,1,2]\nfn(cb(x)) { a.pop()\n return x }\nr := a.sort_by(cb)\nprint(r.stringify())\nprint(a.stringify())\n",
+      "exit": 0,
+      "stdout": "[1,2,3]\n[]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort.singleton_noncallable",
+      "source": "a := [true]\nr := a.sort(9)\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "[true]\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort.singleton_bool",
+      "source": "a := [true]\nr := a.sort()\nprint(r.stringify())\n",
+      "exit": 0,
+      "stdout": "[true]\n",
+      "stderr": ""
+    },
+    {
+      "id": "reduce.argument_order",
+      "source": "a := [1,2]\ntrace := \"\"\nfn(cbexpr()) { trace = trace + \"C\"\n return (a,x) => a+x }\nfn(seed()) { trace = trace + \"S\"\n return 0 }\nr := a.reduce(cbexpr(),seed())\nprint(trace)\nprint(r)\n",
+      "exit": 0,
+      "stdout": "SC\n3\n",
+      "stderr": ""
+    },
+    {
+      "id": "sort.self_push_bounded",
+      "source": "a := [3,1,2]\nn := 0\nfn(cmp(x,y)) { if(n == 0) { a.push(4) }\n n += 1\n return x < y }\na.sort(cmp)\nprint(a.stringify())\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: /tmp/cp14b-design-2ozcq5gu/probe.f:5:2: return: ordering comparisons require two numbers or two strings\n"
+    },
+    {
+      "id": "callback.block_assignment_only",
+      "source": "n := 0\na := [1,2]\nr := a.map(x => { n += x })\nprint(r.stringify())\nprint(n)\n",
+      "exit": 0,
+      "stdout": "[1,3]\n3\n",
+      "stderr": ""
+    },
+    {
+      "id": "callback.expression_assignment",
+      "source": "n := 0\na := [1,2]\nr := a.map(x => n += x)\nprint(r.stringify())\nprint(n)\n",
+      "exit": 0,
+      "stdout": "[1,3]\n3\n",
+      "stderr": ""
+    }
+  ]
+}
