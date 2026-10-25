@@ -9,6 +9,9 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/cp13b-guard-selftest-XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 populate() {
     local dest="$1"
+    # Each control is done with its copy before the next one is made: drop the
+    # previous tree copies (logs stay) so the self-test needs one copy of disk.
+    find "$TMP" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
     mkdir -p "$dest"
     git -C "$ROOT" archive HEAD | tar -x -C "$dest"
 }
