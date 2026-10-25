@@ -103,8 +103,12 @@ HARNESS_REFUSAL = "not compiled: method:sort\n"  # the VM-only sanitizer/drain h
 
 
 def _refused(result, harness):
+    """harness: False (CLI), True (VM-only sanitizer harness) or "design"
+    (the design-mutant driver: silent exit 1, its marker in the statistics)."""
     st = result["stats"][-1] if result["stats"] else {}
-    if harness:
+    if harness == "design":
+        shape = result["exit"] == 1 and result["err"] == "" and "marker" in st and st.get("reason") == "method:sort"
+    elif harness:
         shape = result["exit"] == 2 and result["err"] == HARNESS_REFUSAL
     else:
         shape = result["exit"] == 1 and bool(REFUSAL.match(result["err"])) and st.get("reason") == "method:sort"
@@ -134,6 +138,8 @@ def profile(nift):
         found, harness = "refused", False
     elif _refused(result, harness=True):
         found, harness = "refused", True
+    elif _refused(result, harness="design"):
+        found, harness = "refused", "design"
     else:
         raise ProfileError(f"comparator probe neither ran on the VM nor was refused with method:sort: {result!r}")
     cxx = os.environ.get("NIFT_CP14B_CXX")

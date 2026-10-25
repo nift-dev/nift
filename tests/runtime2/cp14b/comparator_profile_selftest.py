@@ -72,6 +72,14 @@ def main():
     with_run({"require": HARNESS})
     p = cp.profile("nift")
     check("exact harness refusal -> refused (harness)", p.refused and p.harness is True)
+    DESIGN = dict(out="", err="", exit=1, stats=stats(outcome="require-error", reason="method:sort", vm_executions=0, marker="control"))
+    with_run({"require": DESIGN})
+    p = cp.profile("nift")
+    check("exact design-driver refusal -> refused (design)", p.refused and p.harness == "design")
+    profile_raises("silent refusal without a design marker -> failure",
+                   dict(DESIGN, stats=stats(outcome="require-error", reason="method:sort", vm_executions=0)))
+    profile_raises("design-shaped refusal with another reason -> failure",
+                   dict(DESIGN, stats=stats(outcome="require-error", reason="aliasing", vm_executions=0, marker="control")))
     profile_raises("VM ran with wrong output -> failure", dict(VERIFIED, out="[2,1]\n"))
     profile_raises("VM ran twice (replay) -> failure", dict(VERIFIED, stats=stats(vm_executions=2)))
     profile_raises("legacy executed -> failure", dict(VERIFIED, stats=stats(legacy_executions=1)))
