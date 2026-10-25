@@ -3401,3 +3401,7 @@ test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
 	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
 	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort-switch.json"
+
+.PHONY: test-runtime2-cp14b-design-mutants
+test-runtime2-cp14b-design-mutants: $(TARGET)
+	$(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"

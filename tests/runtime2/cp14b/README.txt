@@ -41,3 +41,15 @@ resources.py records preliminary local map/filter/sort_by results at 100k and
 future dedicated Linode campaign, and it does not authorize infrastructure.
 The delivery records unchanged existing native guard results and million-catch
 Callgrind counts separately from collection wall time.
+
+The complete approved design mutation strategy is also reproducible:
+make test-runtime2-cp14b-design-mutants CP14B_BASE=/absolute/base-nift
+This builds twelve fresh named variants, including ignored results/direction,
+mutation of a copy in four binding forms, a test-only small frame budget,
+missing reporting metadata, factory hoisting and early splice replacement.
+Source-copy injections never edit production files. Every variant has a fresh
+marker/hash, a passing exact normal oracle (or the explicit small-budget stop),
+an unaffected control, and negative classifier controls. Missing/malformed or
+duplicate stats, fallback, stale identity, signals, unrelated errors, timeout
+and wrong marker are harness failures, never semantic detections. The normal
+and mutant design drivers link the actual final runtime objects.
