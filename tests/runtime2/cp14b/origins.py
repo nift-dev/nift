@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Owner-approved actual Error origins; all other observable fields stay frozen."""
-import argparse,hashlib,json,tempfile
+import argparse,hashlib,json,re,tempfile
 from pathlib import Path
 from functional import run
 
@@ -19,6 +19,15 @@ def main():
                 ok=ok and case['source'][span['begin']:span['end']]==span['text']
                 ok=ok and span['line']==case['source'].count('\n',0,span['begin'])+1
                 ok=ok and span['column']==span['begin']-case['source'].rfind('\n',0,span['begin'])
+            # Independently pin each golden origin to an actual Throw AST span.
+            text=case['expected']['out']
+            found=re.search(r'stop\n(\d+)\n(\d+)\n',text)
+            if not found and 'cause' in case['name']:
+                found=re.search(r'(\d+)\n(\d+)\n$',text)
+            if not found and case['expected']['err']:
+                found=re.search(r'case.f:(\d+):(\d+):',case['expected']['err'])
+            ok=bool(ok and found and tuple(map(int,found.groups())) in
+                    [(span['line'],span['column']) for span in case['throw_spans']])
             rows.append(dict(name=case['name'],pass_=bool(ok),approved_origin_difference=case['approved_origin_difference'],actual=actual,legacy=legacy));print('PASS' if ok else 'FAIL',case['name'])
     result=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
     Path(a.output).write_text(json.dumps(result,indent=2)+'\n');return 0 if result['status']=='PASS' else 1
