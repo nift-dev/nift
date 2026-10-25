@@ -60,3 +60,12 @@ Run for both dispatch modes and both sanitizer harnesses. Fixed expectations
 assert actual first-throw file coordinates for detached inline comparator bodies;
 all unaffected behavior requires exact frozen legacy parity. See the checkpoint
 cp14b-origin-decision.txt ledger and retained 48-variant investigation.
+
+Additional directly affected witnesses:
+python3 tests/runtime2/cp14b/push_admission.py --nift /absolute/nift --base /absolute/base-nift --output push-admission.json
+python3 tests/runtime2/cp14b/copy_witnesses.py --nift /absolute/nift --base /absolute/base-nift --output copy-witnesses.json
+Run copy_witnesses for both CLI modes and both sanitizer drivers. The eight
+exact programs have handwritten full outputs; no general parity policy changes.
+For const_admission.py use --vm-only-harness only with the sanitizer driver;
+its four refusals have no legacy fallback. Both real CLI modes must also pass
+the default six-check suite, including automatic-routing parity.

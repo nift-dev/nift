@@ -62,6 +62,13 @@ unknown-target and unknown-effects. Unresolved safety is genuine CP25 debt.
 Comparator source selectors/iterator locations remain refused: their writeback
 can allocate, so an allocation-free unwind has not been established. Mutators
 on arbitrary member/index receivers retain the existing method refusal.
+Wrong-arity statement push retains static-error:push-arity for non-array
+receivers and prepared-loop source views. Proven top-level/direct-function
+array guards execute their legacy error without evaluating arguments.
+Expression-form guards are distinct and retain their tested legacy view.
+Generic writes through const array indices retain declare-const refusal;
+the F4 declaration admission does not authorize ordinary const setters.
+
 Unproved callback block expression-view shapes retain the method's refusal;
 this is not blanket callback-shape coverage. Unknown callable targets are
 refused before execution, including in units whose source would produce output.
