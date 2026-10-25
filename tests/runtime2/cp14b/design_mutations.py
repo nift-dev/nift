@@ -24,7 +24,7 @@ MUTANTS=[
 ('removed-const-guard','compiler_array_mutation',11,[CASES['const_precedence']]),
 ('callback-frame-budget-bypass','vm_collection',0,[BUDGET]),
 ('missing-callback-report-frame','vm_collection_report',0,[CASES['block_error']]),
-('live-source-not-snapshot','compiler_collection',3,[CASES['snapshot_mutation'],CASES['snapshot_growth'],CASES['snapshot_rebind']]),
+('live-source-not-snapshot','compiler_collection',3,[CASES['snapshot_mutation'],'a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())','a:=[1,2,3]; fn(cb(x)) { a=[9,9,9]; return x }; print(a.map(cb).stringify()); print(a.stringify())']),
 ('selector-factory-hoisted','compiler_collection',0,[CASES['extra_factory'],CASES['sort_by_factories']]),
 ('splice-replacement-early','compiler_array_mutation',0,[SPLICE,CASES['splice_throw']]),
 ('premature-comparator-unwind','vm_collection_sort',9,[DRAIN+'; print(n)']),

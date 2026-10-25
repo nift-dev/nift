@@ -142,6 +142,9 @@ bool UnitCompiler::assign(const Node& node) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
+        // Const admission is limited to CP14B's guarded methods. The older
+        // generic index setter has no const lifecycle contract: retain refusal.
+        if(holder&&holder->const_array)return fail(target,"declare-const");
         const bool global = holder != nullptr && holder->global;
         const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
         const Binding held = (global || indirect) ? *holder : Binding();
