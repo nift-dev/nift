@@ -3393,20 +3393,20 @@ CP14B_ORACLE := tests/runtime2/cp14b/fixtures/d4-traces.json.gz
 # Pass the accepted foundation binary as CP14B_BASE for an immutable comparison.
 test-runtime2-cp14b: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
-	$(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional.json"
-	$(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional-switch.json"
-	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects.json"
-	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects-switch.json"
-	$(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins.json"
-	$(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins-switch.json"
 test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
-	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
-	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort-switch.json"
 
 .PHONY: test-runtime2-cp14b-design-mutants
 test-runtime2-cp14b-design-mutants: $(TARGET)
-	$(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
 
 # D-018c consumers require the independent parser even when invoked separately.
 test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 test-runtime2-closures-s1-mutants test-runtime2-cp14b: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
@@ -3415,6 +3415,14 @@ test-rt-vm-policy-tooling: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	python3 tests/runtime2/vm_policy_tooling_test.py
 test-rt-vm: test-rt-vm-policy-tooling
 
+# CP14B comparator profile (owner decision 2026-10-25): sort(comparator) runs
+# on the VM only for the frozen GCC 15.2/libstdc++ 20260321 schedule; every
+# comparator check first probes the binary (tests/runtime2/cp14b/
+# comparator_profile.py) and cross-checks NIFT_CP14B_CXX. On any other profile
+# it requires the exact method:sort refusal and legacy parity and prints
+# "SKIP UNVERIFIED COMPARATOR COVERAGE" -- never comparator certification. The
+# milestone run sets NIFT_CP14B_REQUIRE_COMPARATOR=1 on GCC 15.2, which makes a
+# refused profile fail.
 # CP14B permanent wiring (integration, 2026-10-25). Functional tier under
 # test-rt-vm; ASan/UBSan, drain and allocation-failure tier under
 # test-rt-vm-sanitize; named and design mutants in certification. Witnesses
@@ -3426,27 +3434,27 @@ CP14B_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP CP14B $@: Lin
 .PHONY: test-runtime2-cp14b-witnesses test-runtime2-cp14b-sanitize test-runtime2-cp14b-mutants
 test-runtime2-cp14b-witnesses: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
-	$(PYTHON) tests/runtime2/cp14b/push_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/push-admission.json"
-	$(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses.json"
-	$(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses-switch.json"
-	$(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission.json"
-	$(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/push_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/push-admission.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/copy-witnesses-switch.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission.json"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/const_admission.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/const-admission-switch.json"
 test-runtime2-cp14b-sanitize: $(TARGET)
 	@$(CP14B_LINUX_ONLY) true
 	mkdir -p "$(CP14B_EVIDENCE)"
-	$(PYTHON) tests/runtime2/cp14b/build_sanitizer.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/san"
-	$(PYTHON) tests/runtime2/cp14b/build_drain.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/drain"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/build_sanitizer.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/san"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/build_drain.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/drain"
 	set -e; for b in cp14b-san cp14b-san-switch; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp14b/san/$$b"; \
-	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$$bin" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-functional-$$b.json"; \
-	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/sort_replay.py --sanitizer --nift "$$bin" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/san-sort-$$b.json"; \
-	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-origins-$$b.json"; \
-	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-copy-$$b.json"; \
-	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 $(PYTHON) tests/runtime2/cp14b/const_admission.py --vm-only-harness --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-const-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$$bin" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-functional-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/sort_replay.py --sanitizer --nift "$$bin" --legacy "$(CP14B_BASE)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/san-sort-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-origins-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/copy_witnesses.py --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-copy-$$b.json"; \
+	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/const_admission.py --vm-only-harness --nift "$$bin" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-const-$$b.json"; \
 	done
 test-runtime2-cp14b-mutants: $(TARGET)
 	@$(CP14B_LINUX_ONLY) true
-	$(PYTHON) tests/runtime2/cp14b/mutations.py --nift "$(CURDIR)/$(TARGET)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/mutants"
+	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/mutations.py --nift "$(CURDIR)/$(TARGET)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/mutants"
 	$(MAKE) test-runtime2-cp14b-design-mutants
 test-rt-vm: test-runtime2-cp14b
 test-rt-vm: test-runtime2-cp14b-sort
@@ -3457,5 +3465,9 @@ test-rt-vm: test-runtime2-cp14b-witnesses
 test-runtime2-d040-witnesses: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	$(PYTHON) tests/runtime2/d040_witnesses_selftest.py
 test-rt-vm: test-runtime2-d040-witnesses
+.PHONY: test-runtime2-cp14b-profile
+test-runtime2-cp14b-profile:
+	$(PYTHON) tests/runtime2/cp14b/comparator_profile_selftest.py
+test-rt-vm: test-runtime2-cp14b-profile
 test-rt-vm-sanitize: test-runtime2-cp14b-sanitize
 certify-targets: test-runtime2-cp14b-mutants

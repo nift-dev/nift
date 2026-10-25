@@ -96,9 +96,17 @@ def main():
         subprocess.run(['g++','-pthread',str(driver),*linked,'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)],check=True,capture_output=True)
         return binary,dict(intended_commit=intended_commit,driver_sha256=driver_hash,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),source_sha256=source_hash,flags=flags,macro=macro,marker=name)
     normal,normal_identity=build('control');results=[];negatives=[]
+    import comparator_profile as cprof
+    prof=cprof.profile(str(normal));unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-design-mutants-') as folder:
         root=Path(folder)
         for number,(name,stem,macro,witnesses) in enumerate(MUTANTS,1):
+            tagged=[cprof.is_comparator(source) for source in witnesses]
+            if prof.refused and any(tagged):
+                if not all(tagged):raise RuntimeError('Mixed comparator and non-comparator witnesses: '+name)
+                oks=[cprof.refused_ok(prof,str(normal),a.legacy,source,root)[0] for source in witnesses];unverified+=1
+                results.append(dict(number=number,name=name,detected=all(oks),coverage='unverified-comparator'))
+                print('UNVERIFIED' if all(oks) else 'FAIL',number,name,flush=True);continue
             binary,identity=build(name,stem,macro,number);records=[]
             for source in witnesses:
                 if number==7:os.environ['NIFT_CP14B_TEST_MAX_FRAMES']='1'
@@ -130,6 +138,8 @@ def main():
                 elif label=='timeout':bad['exit']=124;bad['err']='TIMEOUT'
                 else:bad['stats'][0]['marker']='wrong'
                 ok=verdict(number,old,bad,name)=='HARNESS';negatives.append(dict(mutant=name,case=label,pass_=ok))
-            (out/'results.json').write_text(json.dumps(dict(results=results,negative_controls=negatives,normal_identity=normal_identity),indent=2)+'\n')
+            (out/'results.json').write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_mutants=unverified,results=results,negative_controls=negatives,normal_identity=normal_identity),indent=2)+'\n')
+    (out/'results.json').write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_mutants=unverified,results=results,negative_controls=negatives,normal_identity=normal_identity),indent=2)+'\n')
+    print(cprof.banner(prof,unverified,'design mutants'))
     raise SystemExit(0 if all(r['detected'] for r in results) and all(r['pass_'] for r in negatives) else 1)
 if __name__=='__main__':main()

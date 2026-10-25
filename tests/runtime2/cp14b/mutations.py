@@ -21,9 +21,16 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',required=True);a=p.parse_args();out=Path(a.out);out.mkdir(parents=True,exist_ok=True)
     objects=[str(p) for root in ['src','minifypp','markuppp'] for p in Path(root).rglob('*.o')]
     results=[]
+    import comparator_profile as cprof
+    prof=cprof.profile(a.nift);unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-mutants-') as folder:
         root=Path(folder)
         for number,name,stem,source in MUTANTS:
+            if prof.refused and cprof.is_comparator(source):
+                # The production gate refuses this witness before the mutated code can run.
+                ok,detail=cprof.refused_ok(prof,a.nift,a.nift,source,root);unverified+=1
+                results.append(dict(id=number,name=name,source=source,detected=bool(ok),coverage='unverified-comparator',detail=detail))
+                print('UNVERIFIED' if ok else 'FAIL',number,name,flush=True);continue
             normal=run(a.nift,'require',source,root)
             oracle=run(a.nift,'0',source,root)
             if any(normal[k]!=oracle[k] for k in ['out','err','exit']):
@@ -45,5 +52,6 @@ def main():
                 detected=actual['exit'] in [0,1] and actual_st.get('vm_executions')==1 and actual_st.get('legacy_executions')==0 and any(actual[k]!=normal[k] for k in ['out','err','exit'])
             results.append(dict(id=number,name=name,source=source,detected=bool(detected),normal=normal,oracle=oracle,mutant=actual,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest()))
             print('DETECTED' if detected else 'SURVIVED',number,name,flush=True)
-    (out/'results.json').write_text(json.dumps(results,indent=2)+'\n');return 0 if all(r['detected'] for r in results) else 1
+    print(cprof.banner(prof,unverified,'named mutants'))
+    (out/'results.json').write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_mutants=unverified,results=results),indent=2)+'\n');return 0 if all(r['detected'] for r in results) else 1
 if __name__=='__main__':raise SystemExit(main())

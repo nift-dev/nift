@@ -20,6 +20,15 @@ void operator delete(void* p)noexcept{std::free(p);}
 void operator delete[](void* p)noexcept{std::free(p);}
 void operator delete(void* p,std::size_t)noexcept{std::free(p);}
 void operator delete[](void* p,std::size_t)noexcept{std::free(p);}
+// CP14B comparator profile (owner decision 2026-10-25): the same frozen
+// libstdc++ check as the production gate (src/rt/compiler_collection_sort.cpp).
+// Elsewhere every comparator program must be refused with exactly method:sort;
+// that refusal is reported as UNVERIFIED COMPARATOR COVERAGE, never a pass.
+#if defined(__GLIBCXX__) && __GLIBCXX__ == 20260321
+constexpr bool kComparatorProfileVerified=true;
+#else
+constexpr bool kComparatorProfileVerified=false;
+#endif
 int main() {
     using namespace nift::rt;
     const char* cases[]={
@@ -33,9 +42,14 @@ int main() {
         "a:=[5,4,3,2,1]; saved:=[0]; fn(cmp(x,y)){ saved=a; return x<y }; a.sort(cmp); print(a.size())",
         "a:=[{\"k\":5},{\"k\":4},{\"k\":3}]; fn(cmp(x,y)){ throw error(\"stop\") }; try { a.sort(cmp) } catch(e) { print(e.message) }; print(a.size())"
     };
-    long total=0;
+    long total=0;int unverified=0;
     for(const char* source:cases) {
         auto c=rt_vm_tool::compile(source);
+        const bool comparator=std::string(source).find("a.sort(cmp)")!=std::string::npos;
+        if(comparator&&!kComparatorProfileVerified) {
+            if(c.program||c.reason!="method:sort"){std::fprintf(stderr,"FAIL expected the exact method:sort refusal, got %s\n",c.program?"a compiled program":c.reason.c_str());return 1;}
+            ++unverified;continue;
+        }
         if(!c.program){std::fprintf(stderr,"refusal %s\n",c.reason.c_str());return 1;}
         auto map=SourceMap::single("allocation.f",source);VmOptions options;options.source_map=&map;
         struct Probe {long count;bool hit,ok;};
@@ -80,4 +94,5 @@ int main() {
         }
     }
     std::printf("PASS %ld allocation sites: fatal failure and owned heap released (thread atom charges separate)\n",total);
+    if(unverified)std::printf("SKIP UNVERIFIED COMPARATOR COVERAGE: allocation: %d comparator workload(s) refused with method:sort on an unverified libstdc++ profile\n",unverified);
 }

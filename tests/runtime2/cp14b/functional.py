@@ -157,10 +157,16 @@ def run(binary,mode,source,root):
     return dict(out=p.stdout,err=p.stderr.replace(str(root),'$CASE'),exit=p.returncode,stats=records)
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--legacy',required=True);p.add_argument('--output',required=True);a=p.parse_args();results=[]
+    import comparator_profile as cprof
+    prof=cprof.profile(a.nift);unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-functional-') as tmp:
         for name,source in CASES.items():
+            if prof.refused and cprof.is_comparator(source):
+                ok,detail=cprof.refused_ok(prof,a.nift,a.legacy,source,Path(tmp));unverified+=1
+                results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
             legacy=run(a.legacy,'0',source,Path(tmp));vm=run(a.nift,'require',source,Path(tmp))
             ok=all(legacy[k]==vm[k] for k in ['out','err','exit']) and vm['stats'] and vm['stats'][-1]['outcome'] in ['vm','vm-error'] and vm['stats'][-1]['legacy_executions']==0
             results.append(dict(name=name,source=source,pass_=bool(ok),legacy=legacy,vm=vm));print('PASS' if ok else 'FAIL',name)
-    Path(a.output).write_text(json.dumps(dict(results=results),indent=2)+'\n');return 0 if all(r['pass_'] for r in results) else 1
+    print(cprof.banner(prof,unverified,'functional'))
+    Path(a.output).write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_cases=unverified,results=results),indent=2)+'\n');return 0 if all(r['pass_'] for r in results) else 1
 if __name__=='__main__':raise SystemExit(main())

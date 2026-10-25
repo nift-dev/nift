@@ -69,3 +69,19 @@ exact programs have handwritten full outputs; no general parity policy changes.
 For const_admission.py use --vm-only-harness only with the sanitizer driver;
 its four refusals have no legacy fallback. Both real CLI modes must also pass
 the default six-check suite, including automatic-routing parity.
+
+Comparator toolchain profile (owner decision 2026-10-25)
+sort(comparator) runs on the VM only for the frozen GCC 15.2/libstdc++
+__GLIBCXX__ 20260321 schedule (production gate in compiler_collection_sort.cpp).
+Every comparator check first decides the binary's profile with one narrow
+admission probe (comparator_profile.py), cross-checked against NIFT_CP14B_CXX
+(the Makefile passes $(CXX)); the C++ harnesses use the same frozen-macro check
+as production. On the verified profile every comparator case runs on the VM
+and all functional, replay, context, sanitizer and mutation requirements apply.
+On any other profile each comparator case must show the exact method:sort
+refusal and automatic-mode legacy parity; scripts print
+"SKIP UNVERIFIED COMPARATOR COVERAGE" and record comparator_profile=refused.
+That is refusal-only evidence, never comparator certification. A crash,
+internal error, different refusal, VM misexecution or missing/disagreeing
+compiler fails (comparator_profile_selftest.py). The milestone run on GCC 15.2
+sets NIFT_CP14B_REQUIRE_COMPARATOR=1, which makes a refused profile fail.

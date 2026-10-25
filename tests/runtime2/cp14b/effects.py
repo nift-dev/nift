@@ -20,9 +20,15 @@ CASES={
 }
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--legacy',required=True);p.add_argument('--output',required=True);a=p.parse_args();results=[]
+    import comparator_profile as cprof
+    prof=cprof.profile(a.nift);unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-effects-') as folder:
         root=Path(folder)
         for name,(source,refusal) in CASES.items():
+            # On a refused profile a D5 refusal cannot be told from the toolchain refusal: unverified.
+            if prof.refused and cprof.is_comparator(source):
+                ok,detail=cprof.refused_ok(prof,a.nift,a.legacy,source,root);unverified+=1
+                results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
             vm=run(a.nift,'require',source,root)
             if refusal:
                 st=vm['stats'][-1] if vm['stats'] else {}
@@ -35,5 +41,6 @@ def main():
             else:
                 legacy=run(a.legacy,'0',source,root);ok=all(vm[k]==legacy[k] for k in ['out','err','exit'])
             results.append(dict(name=name,source=source,pass_=bool(ok),vm=vm,legacy=legacy));print('PASS' if ok else 'FAIL',name)
+    print(cprof.banner(prof,unverified,'effects'))
     Path(a.output).write_text(json.dumps(results,indent=2)+'\n');return 0 if all(r['pass_'] for r in results) else 1
 if __name__=='__main__':raise SystemExit(main())

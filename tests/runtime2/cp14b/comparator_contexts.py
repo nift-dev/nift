@@ -13,9 +13,16 @@ def main():
                ('declared',['n := [3,1,2]','cmp := (x,y)=>x<y'],'n.sort(cmp)'),
                ('named',['fn(cmp(x,y)) { return x<y }','n := [3,1,2]'],'n.sort(cmp)'),
                ('factory',['fn(mk()) { return (x,y)=>x<y }','n := [3,1,2]'],'n.sort(mk())')]
+        import comparator_profile as cprof
+        prof=cprof.profile(a.nift);unverified=0
+        if prof.refused and bool(prof.harness)!=bool(a.vm_only_harness):
+            raise SystemExit('FAIL comparator contexts: --vm-only-harness does not match the binary')
         for name,setup,expr in forms:
           for context in CONTEXTS:
             source=program(setup,expr,context);root=Path(folder)
+            if prof.refused:
+                ok,detail=cprof.refused_ok(prof,a.nift,a.base,source,root);unverified+=1
+                rows.append(dict(kind=name,context=context,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name,context);continue
             legacy=run(a.base,'0',source,root);base=run(a.base,'require',source,root);actual=run(a.nift,'require',source,root);st=actual['stats'][-1] if actual['stats'] else {}
             refused=name in ['inline','factory'] and context in ['loop','loop-arg','fn-loop']
             if refused:
@@ -28,5 +35,6 @@ def main():
             else:
                 auto=None;ok=all(legacy[k]==actual[k] for k in ['out','err','exit']) and st.get('outcome')=='vm' and st.get('vm_executions')==1 and st.get('legacy_executions')==0
             rows.append(dict(kind=name,context=context,source=source,refused=refused,pass_=bool(ok),legacy=legacy,base=base,actual=actual,automatic=auto));print('PASS' if ok else 'FAIL',name,context)
+    print(cprof.banner(prof,unverified,'comparator contexts'))
     Path(a.output).write_text(json.dumps(rows,indent=2)+'\n');return 0 if all(r['pass_'] for r in rows) else 1
 if __name__=='__main__':raise SystemExit(main())

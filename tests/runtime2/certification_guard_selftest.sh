@@ -73,7 +73,7 @@ for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test
             "test-rt-vm: test-runtime2-cp13b" "test-rt-vm: test-rt-source-map" "test-rt-vm: test-rt-error-oom" \
             "test-rt-vm-sanitize: test-rt-source-map-sanitize" "test-rt-vm-sanitize: test-rt-source-map-tsan" "test-rt-vm-sanitize: test-rt-error-oom-sanitize" \
             "test-rt-vm: test-runtime2-cp14b" "test-rt-vm: test-runtime2-cp14b-sort" "test-rt-vm: test-runtime2-cp14b-witnesses" \
-            "test-rt-vm-sanitize: test-runtime2-cp14b-sanitize" "test-rt-vm: test-runtime2-d040-witnesses"; do
+            "test-rt-vm-sanitize: test-runtime2-cp14b-sanitize" "test-rt-vm: test-runtime2-d040-witnesses" "test-rt-vm: test-runtime2-cp14b-profile"; do
     name="${edge##* }"
     populate "$TMP/f6-$name"
     python3 - "$TMP/f6-$name/Makefile" "$edge" <<'PY'

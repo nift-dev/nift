@@ -5,10 +5,16 @@ from pathlib import Path
 from functional import run
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--base',required=True);p.add_argument('--probes',required=True);p.add_argument('--output',required=True);a=p.parse_args()
 cases=json.loads(Path(a.probes).read_text())['cases'];results=[]
+import comparator_profile as cprof
+prof=cprof.profile(a.nift);unverified=0
 with tempfile.TemporaryDirectory(prefix='cp14b-inventory-') as folder:
  root=Path(folder)
  for c in cases:
-  source=c['source'];vm=run(a.nift,'require',source,root);old=run(a.base,'require',source,root)
+  source=c['source']
+  if prof.refused and cprof.is_comparator(source):
+   ok,detail=cprof.refused_ok(prof,a.nift,a.base,source,root);unverified+=1
+   results.append(dict(id=c['id'],source=source,classification='unverified comparator',pass_=bool(ok),detail=detail));print('UNVERIFIED' if ok else 'FAIL',c['id']);continue
+  vm=run(a.nift,'require',source,root);old=run(a.base,'require',source,root)
   refusal=bool(vm['stats'] and vm['stats'][-1]['outcome']=='require-error');legacy=None
   if c['id']=='sort.self_push_bounded':
    classification='self-structural';ok=refusal and not vm['out'] and vm['stats'][-1]['vm_executions']==0
@@ -20,5 +26,6 @@ with tempfile.TemporaryDirectory(prefix='cp14b-inventory-') as folder:
    else:classification='exact parity';ok=same and not refusal
   results.append(dict(id=c['id'],source=source,classification=classification,pass_=bool(ok),legacy=legacy,base=old,candidate=vm))
   print('PASS' if ok else 'FAIL',c['id'],classification)
-report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),counts=dict(collections.Counter(r['classification'] for r in results)),results=results)
+print(cprof.banner(prof,unverified,'inventory'))
+report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),counts=dict(collections.Counter(r['classification'] for r in results)),results=results)
 Path(a.output).write_text(json.dumps(report,indent=2)+'\n');raise SystemExit(0 if report['status']=='PASS' else 1)

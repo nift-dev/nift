@@ -19,10 +19,17 @@ def main():
             baseline=run(a.base,'require',source,root);actual=run(a.nift,'require',source,root)
             ok=all(baseline[k]==actual[k] for k in ['out','err','exit']) and actual['stats'] and actual['stats'][-1]['vm_executions']==1 and actual['stats'][-1]['legacy_executions']==0
             rows.append(dict(kind='ordinary accepted CP13B',source=source,pass_=bool(ok),baseline=baseline,actual=actual))
+        import comparator_profile as cprof
+        prof=cprof.profile(a.nift);unverified=0
         for name in ['return_comparator_result_error','return_collection_predicate_error','return_mutator_error','return_callback_arity_error','return_method_arity_error']:
-            source=CASES[name];baseline=run(a.base,'0',source,root);actual=run(a.nift,'require',source,root)
+            source=CASES[name]
+            if prof.refused and cprof.is_comparator(source):
+                ok,detail=cprof.refused_ok(prof,a.nift,a.base,source,root);unverified+=1
+                rows.append(dict(kind=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));continue
+            baseline=run(a.base,'0',source,root);actual=run(a.nift,'require',source,root)
             ok=all(baseline[k]==actual[k] for k in ['out','err','exit']) and actual['stats'] and actual['stats'][-1]['vm_executions']==1 and actual['stats'][-1]['legacy_executions']==0
             rows.append(dict(kind=name,source=source,pass_=bool(ok),baseline=baseline,actual=actual))
-    report=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
+    print(cprof.banner(prof,unverified,'reporting'))
+    report=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
     Path(a.output).write_text(json.dumps(report,indent=2)+'\n');print(report['status'],len(rows),'reporting contracts');return 0 if report['status']=='PASS' else 1
 if __name__=='__main__':raise SystemExit(main())

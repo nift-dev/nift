@@ -4,6 +4,16 @@
 #include <cstdlib>
 #include <cstdio>
 #include <new>
+#include <string>
+// CP14B comparator profile (owner decision 2026-10-25): the same frozen
+// libstdc++ check as the production gate (src/rt/compiler_collection_sort.cpp).
+// Elsewhere every comparator program must be refused with exactly method:sort;
+// that refusal is reported as UNVERIFIED COMPARATOR COVERAGE, never a pass.
+#if defined(__GLIBCXX__) && __GLIBCXX__ == 20260321
+constexpr bool kComparatorProfileVerified=true;
+#else
+constexpr bool kComparatorProfileVerified=false;
+#endif
 namespace { bool forbidden=false; unsigned attempts=0,drains=0; }
 void* operator new(std::size_t n) {
     if(forbidden){++attempts;throw std::bad_alloc();}
@@ -26,6 +36,14 @@ int main() {
         "a := [5,4,3,2,1]; saved := [0]; fn(cmp(x,y)) { saved=a; throw error(\"stop\") }; try { a.sort(cmp) } catch(e) { print(e.message) }; print(saved.stringify()); print(a.stringify())",
         "a := [5,4,3,2,1]; fn(cmp(x,y)) { try { throw error(\"inside\") } catch(e) { }; return x<y }; a.sort(cmp); print(a.stringify())"
     };
+    if(!kComparatorProfileVerified) {
+        for(const char* source:cases) {
+            auto c=rt_vm_tool::compile(source);
+            if(c.program||c.reason!="method:sort"){std::fprintf(stderr,"FAIL expected the exact method:sort refusal, got %s\n",c.program?"a compiled program":c.reason.c_str());return 1;}
+        }
+        std::printf("SKIP UNVERIFIED COMPARATOR COVERAGE: drain: %zu comparator programs refused with method:sort on an unverified libstdc++ profile; no drain witnessed\n",sizeof(cases)/sizeof(cases[0]));
+        return 0;
+    }
     try {
         for(const char* source:cases) {
             auto c=rt_vm_tool::compile(source);
