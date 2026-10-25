@@ -3520,5 +3520,5 @@ test-runtime2-cp18-cow: $(CP18_COW) $(CP18_COW_SWITCH) $(SHARED_LIB) $(CP18_SWIT
 	$(CP18_COW_SWITCH)
 	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(CURDIR)/$(SHARED_LIB)"
 	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(abspath $(CP18_SWITCH_LIB))"
-	$(PYTHON) tests/runtime2/cp18/cow_negative.py --out "$(CURDIR)/$(TEST_DIR)/cp18/cow-negative"
+	$(PYTHON) tests/runtime2/cp18/cow_negative.py --out "$(CURDIR)/$(TEST_DIR)/cp18/cow-negative" --libffi "$(CURDIR)/$(LIBFFI_A)"
 test-runtime2-cp18: test-runtime2-cp18-cow

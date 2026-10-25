@@ -6,7 +6,10 @@ from pathlib import Path
 import re
 import subprocess
 
-parser = argparse.ArgumentParser(); parser.add_argument('--out',required=True);args=parser.parse_args()
+parser = argparse.ArgumentParser(); parser.add_argument('--out',required=True)
+# The exact libffi of the ordinary build (Makefile $(LIBFFI_A)), never a glob: a
+# sanitizer libffi may sit beside it once the sanitizer tier has run.
+parser.add_argument('--libffi',required=True);args=parser.parse_args()
 out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
 source=Path('src/rt/aggregate.cpp').read_text()
 start=source.index('bool unshare(Value& value) {');end=source.index('\n\nValue make_array',start)
@@ -16,7 +19,8 @@ mutant.write_text(source[:start]+Path('tests/runtime2/cp18/unsafe_unshare.txt').
 obj=out/'unsafe-cow.o'
 subprocess.run(['g++','-std=c++17','-O2','-Isrc','-Iinclude','-fPIC','-c',str(mutant),'-o',str(obj)],check=True)
 objects=sorted(Path('.build/pic').rglob('*.o'))
-ffi=list(Path('.build/libffi').glob('*/install/lib/libffi.a'));assert len(ffi)==1
+ffi=[Path(args.libffi)]
+if not ffi[0].is_file():raise RuntimeError('missing libffi: '+args.libffi)
 rows=[]
 for mode in ('default','switch'):
     chosen=[obj if p==Path('.build/pic/src/rt/aggregate.o') else
