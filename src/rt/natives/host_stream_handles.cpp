@@ -69,6 +69,7 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
     if (all && total == limit && stream.input->good()) {
         char extra = 0;
         stream.input->read(&extra, 1);
+        if (stream.input->bad()) return stream_read_failure(context, operation, error);
         if (stream.input->gcount() > 0)
             return stream_limit(context,
                                 nift::readlimit::exceeded_message(std::string(operation),
@@ -76,10 +77,14 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
                                 "limit.exceeded", error);
     }
     std::string text = data.take();
-    if (!reserve_result(context, text.size()))
+    // Move the buffer into the StringObject: copying here would keep both the
+    // temporary and the result live. Charge the retained capacity, not just
+    // the logical size.
+    const std::size_t retained = text.capacity();
+    if (!reserve_result(context, retained))
         return stream_limit(context, std::string(operation) + ": file exceeds the memory budget",
                             "limit.exceeded", error);
-    out = make_string(text);
+    out = make_string(std::move(text));
     return Status::Ok;
 }
 
@@ -150,9 +155,10 @@ Status stream_read_line(const Context& context, const Value* args, std::uint32_t
     if (stream->input->bad()) return stream_read_failure(context, "read_line", error);
     if (!extracted) { out = Value::null(); return Status::Ok; }
     std::string text = line.take();
-    if (!reserve_result(context, text.size()))
+    const std::size_t retained = text.capacity();
+    if (!reserve_result(context, retained))
         return stream_limit(context, "read_line: file exceeds the memory budget", "limit.exceeded", error);
-    out = make_string(text);
+    out = make_string(std::move(text));
     return Status::Ok;
 }
 
@@ -239,6 +245,9 @@ Status stream_close(const Context& context, const Value* args, std::uint32_t arg
                 stream->output->close();
                 stream->open = false;
                 stream->closed = true;
+                const HandleStatus closed = handles::native_handle_close(
+                    context.handles, "close", args[0], HandleKind::Stream, error);
+                (void)closed;  // the stream operation error is the primary result
                 error = "close: output flush failed";
                 if (context.host.error_code) *context.host.error_code = "stream.close_failed";
                 return Status::Recoverable;

@@ -19,13 +19,11 @@ struct FileResource {
         if (saved_is_working) { saved = working; saved_is_working = false; }
     }
     void update_dirty() {
-        // `open("w")` is dirty until saved even when both buffers are empty;
-        // an absent file opened for append must still be created. The
-        // saved-is-working flag records the explicit save/revert, so it is the
-        // authoritative pending-write bit.
-        dirty = (mode == "w" && !saved_is_working) ||  // rt-lint: allow-string-compare compile time
-                (mode == "a" && !existed_at_open) ||  // rt-lint: allow-string-compare compile time
-                (!saved_is_working && working != saved);
+        // The dirty flag is set at open() and by save/revert; content
+        // comparison can only clear it after a mutation. Recomputing it from
+        // mode bits on every close would reintroduce pending-creation and
+        // same-content regressions.
+        dirty = !saved_is_working && working != saved;
         if (!dirty) { saved_is_working = true; saved.clear(); }
     }
 };

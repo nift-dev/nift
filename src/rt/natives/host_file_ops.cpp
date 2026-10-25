@@ -29,7 +29,6 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
     HostCall call(context.host, host::HostOp::Save, "save");
     call.adopt(file->path);
     if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
-    file->update_dirty();
     if (!file->dirty) { call.succeed(); out = Value::null(); return Status::Ok; }
     std::error_code ec;
     const auto parent = file->path.parent_path();

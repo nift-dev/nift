@@ -151,7 +151,6 @@ Status file_close(const Context& context, const Value* args, std::uint32_t argc,
     }
     if (!no_args(argc, "close", error)) return Status::Error;
     if (!file->open) { error = "close: file is not open"; return Status::Error; }
-    file->update_dirty();
     if (file->dirty) { error = "close: file has unsaved changes; save() or revert() first"; return Status::Error; }
     file->open = false;
     file->mode.clear();
@@ -302,7 +301,6 @@ Status file_modified(const Context& context, const Value* args, std::uint32_t ar
     if (!resource_arg(context, args, argc, "modified", file, error, status)) return status;
     if (!file->open) { error = "modified: file is not open"; return Status::Error; }
     if (!no_args(argc, "modified", error)) return Status::Error;
-    file->update_dirty();
     out = Value::boolean(file->dirty);
     return Status::Ok;
 }
@@ -347,7 +345,6 @@ Status file_eof(const Context& context, const Value* args, std::uint32_t argc, V
 handles::CleanupOutcome cleanup_file(handles::CleanupEvent& event) {
     auto file = std::static_pointer_cast<FileResource>(event.resource);
     if (!file) return handles::CleanupOutcome::completed();
-    file->update_dirty();
     const bool open = file->open;
     const bool dirty = open && file->dirty;
     const std::string path = file->path.generic_string();

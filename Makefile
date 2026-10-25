@@ -726,6 +726,11 @@ $(RT_N2_PARITY_UNIT): tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/Pa
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp -o "$@"
 
+RT_STREAM_GUARD_UNIT := $(TEST_DIR)/rt/stream-resource-guards$(EXEEXT)
+$(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
 $(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
 	mkdir -p "$(TEST_DIR)/rt-san"
@@ -735,11 +740,13 @@ test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
 
 .PHONY: test-runtime2-cp17-handles
-test-runtime2-cp17-handles: $(TARGET)
+test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT)
+	"$(RT_STREAM_GUARD_UNIT)"
 	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
 
 # CP17 N2 R1: production incremental decision fed by observer observations.
 N2_REBUILD_UNIT := $(TEST_DIR)/rt/n2-rebuild-decision$(EXEEXT)
@@ -767,6 +774,10 @@ test-runtime2-cp17-n2-rebuild: $(N2_REBUILD_UNIT)
 	"$(N2_REBUILD_UNIT)"
 	"$(N2_REBUILD_UNIT)" --omit cp
 	"$(N2_REBUILD_UNIT)" --omit mv
+
+.PHONY: test-runtime2-cp17-routing-mutants
+test-runtime2-cp17-routing-mutants: $(TARGET)
+	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
 
 .PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
 test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT) $(N2_REBUILD_UNIT)
