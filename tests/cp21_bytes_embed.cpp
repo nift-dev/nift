@@ -192,9 +192,11 @@ void test_result_accessors() {
 }  // namespace
 
 int main() {
-    CHECK(std::string(nift_abi_version()) == "1.3");
+    // Runtime matches the compiled header; ABI 1.x with the 1.3 bytes API or later
+    // (minor increases are additive, include/nift/c_abi.h).
+    CHECK(std::string(nift_abi_version()) == NIFT_ABI_VERSION);
     CHECK(nift_abi_version_major() == 1);
-    CHECK(nift_abi_version_minor() == 3);
+    CHECK(nift_abi_version_minor() >= 3);
     test_setters_and_lifetime();
     test_context_setter();
     test_result_accessors();

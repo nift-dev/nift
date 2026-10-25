@@ -68,6 +68,15 @@ internal static class Program
         }
     }
 
+    // ABI 1.x with minor >= 3 (the binding's minimum); minor increases are additive.
+    private static void AssertAbiCompatible(string what)
+    {
+        string[] parts = NiftApi.AbiVersion.Split('.');
+        int minor;
+        Assert(parts.Length == 2 && parts[0] == "1" && int.TryParse(parts[1], out minor) && minor >= 3,
+               what + ": expected ABI 1.x with x >= 3, got " + NiftApi.AbiVersion);
+    }
+
     private static void AssertEq<T>(T actual, T expected, string what)
     {
         if (!EqualityComparer<T>.Default.Equals(actual, expected))
@@ -138,7 +147,7 @@ internal static class Program
 
     private static void TestAbiVersion()
     {
-        AssertEq(NiftApi.AbiVersion, "1.3", "abi version");
+        AssertAbiCompatible("abi version");
         using (var scriptEngine = Engine.New()) { AssertEq(scriptEngine.ExecuteJson("x := 40; return x + 2;"), "42", "v4.5 execute"); AssertEq(scriptEngine.EvaluateJson("x + 1"), "41", "v4.5 evaluate"); }
     }
 
@@ -185,7 +194,7 @@ internal static class Program
         var engine = Engine.New();
         Assert(!engine.IsOpen(), "standalone engine should not be open");
         engine.Dispose();
-        AssertEq(NiftApi.AbiVersion, "1.3", "abi still reachable");
+        AssertAbiCompatible("abi still reachable");
     }
 
     private static void TestProjectOpen()
