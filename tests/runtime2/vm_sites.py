@@ -25,12 +25,21 @@ import hashlib
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DUMP = os.environ.get("VM_PARSE_DUMP", os.path.join(REPO, ".build", "rt-parse-dump"))
 LINE = re.compile(r"^( *)(\w+)(?: ([^@]+?))? @(\d+)\.\.(\d+)(?: `.*`)?$")
 _cache = {}
+
+
+def require_tool():
+    """Fail as infrastructure, never as an unapproved semantic difference."""
+    if not os.path.isfile(DUMP) or not os.access(DUMP, os.X_OK):
+        print(f"HARNESS INFRASTRUCTURE FAILURE: D-018c requires executable parser: {DUMP} "
+              "(build make .build/rt-parse-dump or set VM_PARSE_DUMP)", file=sys.stderr)
+        raise SystemExit(2)
 
 
 class Node:
@@ -47,32 +56,32 @@ class Node:
 
 
 def parse(source):
-    """The CP10 AST of `source` (bytes), or None (parse error, no tool)."""
+    """The CP10 AST of `source` (bytes), or None (parse error). Missing tooling is fatal."""
+    require_tool()
     key = hashlib.sha256(source).hexdigest()
     if key in _cache:
         return _cache[key]
     root = None
-    if os.path.exists(DUMP):
-        with tempfile.NamedTemporaryFile(suffix=".f", delete=False) as f:
-            f.write(source)
-        try:
-            out = subprocess.run([DUMP, "dump", f.name], capture_output=True, timeout=60).stdout.decode()
-        finally:
-            os.unlink(f.name)
-        stack = []
-        for line in out.splitlines():
-            m = LINE.match(line)
-            if not m:
-                continue
-            depth = len(m.group(1)) // 2
-            node = Node(m.group(2), (m.group(3) or "").strip(), int(m.group(4)), int(m.group(5)))
-            del stack[depth:]
-            if stack:
-                node.parent = stack[-1]
-                stack[-1].children.append(node)
-            else:
-                root = node
-            stack.append(node)
+    with tempfile.NamedTemporaryFile(suffix=".f", delete=False) as f:
+        f.write(source)
+    try:
+        out = subprocess.run([DUMP, "dump", f.name], capture_output=True, timeout=60).stdout.decode()
+    finally:
+        os.unlink(f.name)
+    stack = []
+    for line in out.splitlines():
+        m = LINE.match(line)
+        if not m:
+            continue
+        depth = len(m.group(1)) // 2
+        node = Node(m.group(2), (m.group(3) or "").strip(), int(m.group(4)), int(m.group(5)))
+        del stack[depth:]
+        if stack:
+            node.parent = stack[-1]
+            stack[-1].children.append(node)
+        else:
+            root = node
+        stack.append(node)
     _cache[key] = root
     return root
 

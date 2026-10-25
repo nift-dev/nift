@@ -47,6 +47,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vm_sites  # noqa: E402
 
+# Every consumer needs the independent AST oracle, including direct invocations.
+vm_sites.require_tool()
+
 RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
 DIAGNOSTIC = re.compile(rb"^error: (.*):(\d+):(\d+): ([^\n]*)\n\Z")
 RETURN_PREFIX = b"return: "

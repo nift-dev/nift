@@ -1,0 +1,51 @@
+CP14B — owner decision and focused correction ledger
+
+Reviewed candidate: 919d9b351da64150aa50280179ebf5b08ccbfa0d
+Reviewed tree: de6cefd014d151ff9dfb61e776fa37634387ba7c
+Independent attribution: .cp14b-review/REVIEW.md and its evidence directory
+Owner decision: CP14B — DeepSeek 6 Independent Review, 2026-10-25.
+
+CLOSED OWNER PERFORMANCE EXCEPTION
+The owner accepts approximately +0.762% whole-process instructions for one
+million catches, +0.432% with cells, and approximately 23 additional machine
+instructions per caught exception. This is real, technically avoidable cost,
+not noise. No optimization round is authorized.
+
+DeepSeek 6 independently measured 3,020,641,963 -> 3,043,661,498 instructions
+(catches), and 5,337,732,137 -> 5,360,768,854 (cells). Unwind self instructions
+rise from 200,999,989 to 223,999,988. Removing only the hook block in a scratch
+control gives 3,020,660,978 instructions. Attribution is the hook block's
+call-site/prologue/register costs even when no collection boundary exists;
+it is not collection draining. Vm::run and handle_bail self counts, bytecode
+budgets and heap budgets are unchanged. The former "one predictable branch"
+claim is withdrawn. This exception covers caught-exception cost only; it does
+not extend to ordinary dispatch, calls, collections or website builds.
+
+BOUNDED CORRECTIONS
+D-018c tooling: every shared-policy consumer checks the executable independent
+parser before comparisons. Missing tooling exits 2 with HARNESS INFRASTRUCTURE
+FAILURE, rather than silently rejecting an approved diagnostic. Relevant Make
+entry points declare the parser prerequisite. A missing-parser negative control
+covers direct harness invocations and direct AST-oracle use. Policy matching
+rules and production diagnostics are unchanged.
+
+Reporting hygiene: split the three paired statistics assignments. Shorten only
+an existing explanatory comment to retain the existing function-length limit.
+C++ tokens are unchanged; no reporting or Error semantics change.
+
+CLOSED FINDINGS AND REMAINING OBLIGATIONS
+Preserve the independent functional, mutation, allocation, sanitizer and
+provenance findings for 919d9b35. No complete new mutation campaign is needed
+for harness, comment and formatting changes. The 15 native-guard failures are
+inherited CP13B debt; no CP14B optimization work is authorized.
+The two raw alias differences and six broader differential differences remain
+the exact approved D-040 independent-copy cases, pinned by eight witnesses.
+The six prepared inline/factory comparator refusals remain specific accepted
+CP25 debt, together with the documented frozen-design admission boundaries.
+No blanket exception for other shapes is granted. Actual inline Error origins
+remain the approved exception; caught Error identity and provenance are intact.
+Comparator scheduling remains verified only for GCC 15.2/libstdc++
+__GLIBCXX__=20260321. libc++, MSVC and allocation-fallback schedules remain
+unverified. Local collection timings are preliminary, not dedicated acceptance.
+No integration, push, CI, tag, release or infrastructure spending is authorized.
+Next disposition: focused DeepSeek 6 confirmation of these bounded corrections.

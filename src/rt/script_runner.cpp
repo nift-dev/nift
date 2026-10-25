@@ -294,14 +294,9 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         locate_linked(compiled.offset);
         return not_compiled(stats, mode, report_path, exit_code);
     }
-    // R1 (owner, 2026-10-21): a linked unit reads every module before it
-    // runs, so a host operation that legacy runs before (or between) imports
-    // would see different files and trace in a different order (a copy over
-    // a module before its import imports the old text). Until imports run at
-    // their position, a linked unit that can call any host built-in, in the
-    // main unit or a module, anywhere (any function, any path), is refused
-    // before it runs. The scan is over the compiled code of every proto, so
-    // it does not depend on where the call sits in the source.
+    // R1 (owner, 2026-10-21): linking reads all modules before execution.
+    // A host operation before/between imports could observe different files.
+    // Until imports run in place, scan every proto and refuse linked host built-ins.
 #if !defined(NIFT_R1_MUTANT)  // test-only negative control (tests/runtime2/module_host_order_mutant.sh)
     if (link.linked) {
         std::string host_reason;
@@ -344,11 +339,14 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
     stats.beyond_legacy_depth = result.beyond_legacy_depth;
-    stats.large_numbers = result.large_numbers;stats.large_in_loop_path = result.large_in_loop_path;
+    stats.large_numbers = result.large_numbers;
+    stats.large_in_loop_path = result.large_in_loop_path;
     stats.error_in_loop_path = result.error_in_loop_path;
-    stats.large_lines = result.large_lines;stats.derived_lines = result.derived_lines;
+    stats.large_lines = result.large_lines;
+    stats.derived_lines = result.derived_lines;
     stats.evidence_truncated = result.evidence_truncated;
-    stats.heap_peak = result.heap_peak;stats.heap_live = result.heap_live;
+    stats.heap_peak = result.heap_peak;
+    stats.heap_live = result.heap_live;
     write_stdout(output, nullptr);
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {

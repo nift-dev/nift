@@ -3407,3 +3407,10 @@ test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 .PHONY: test-runtime2-cp14b-design-mutants
 test-runtime2-cp14b-design-mutants: $(TARGET)
 	$(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
+
+# D-018c consumers require the independent parser even when invoked separately.
+test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 test-runtime2-closures-s1-mutants test-runtime2-cp14b: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+.PHONY: test-rt-vm-policy-tooling
+test-rt-vm-policy-tooling: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	python3 tests/runtime2/vm_policy_tooling_test.py
+test-rt-vm: test-rt-vm-policy-tooling
