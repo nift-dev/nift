@@ -3397,6 +3397,8 @@ test-runtime2-cp14b: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp14b/functional.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/functional-switch.json"
 	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects.json"
 	$(PYTHON) tests/runtime2/cp14b/effects.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/effects-switch.json"
+	$(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(TARGET)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins.json"
+	$(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins-switch.json"
 test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
 	$(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
