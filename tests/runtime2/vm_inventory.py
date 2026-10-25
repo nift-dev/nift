@@ -28,7 +28,7 @@ CASES = [
     ("chained-member-loop", 'fn(f()) { return {"k": 1} }\ni := 0\nwhile (i < 1) {\n  i += 1\n  print(f().k)\n}\n',
      {"postfix-receiver:member"}),
     ("lambda-argument", "xs := [1, 2]\ny := xs.map((v) => v + 1)\nprint(y.join(\",\"))\n",
-     {"method:map", "method:join"}),
+     set()),
     ("for-and-try", "for (i : [1, 2]) {\n  print(i.zap())\n}\ntry {\n  print(1)\n  nothere()\n} catch (e) {\n"
      "  print(e)\n}\n", {"method:zap", "callable:nothere"}),
     ("fn-after-global", "g := 10\nfn(f(x)) {\n  return x + g\n}\nprint(f(1))\n",

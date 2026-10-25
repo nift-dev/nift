@@ -268,6 +268,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
                               local_register(receiver, reg))))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) {
+                // The legacy receiver diagnostic and prepared-function view
+                // are unproved here; retain their original static refusal.
+                if(kinds(callee.a)!=kKindArray||loop_reachable())
+                    return fail(expr,"static-error:push-arity");
                 std::uint16_t result=0;
                 return temp(result)&&collection_failure(expr,result,"push: expected one argument");
             }

@@ -880,7 +880,7 @@ INJECT = [
     ("redeclared", "", "zx := 1\nzx := 2", "any", "static-error:redeclared"),
     ("reserved-binding", "", "title := 1\nprint(title)", "any", "binding-name-reserved"),
     ("member-assign", "", 'zo := {"k": 1}\nzo.k = 2', "any", "static-error:member-assign"),
-    ("push-arity", "", "za := [1]\nza.push(1, 2)", "any", "static-error:push-arity"),
+    ("push-arity", "fn(zbadpush()) { za := [1]; za.push(1, 2) }", "while(false) { zbadpush() }", "any", "static-error:push-arity"),
     ("comparison-chain", "", "print(1 != 1 == 1)", "any", "comparison-chain"),
     ("comparison-chain-rel", "", "zx := 2\nprint((zx < 3) == true)", "any", "comparison-chain"),
     ("index-target-dot", "", "za := [1, 2]\nza[za.length() - 1] = 9\nprint(za[1])", "any", "index-target"),

@@ -189,7 +189,7 @@ UNSUPPORTED = [
     ("redeclared", "x := 1\nx := 2\n", "static-error:redeclared"),
     ("arity", "fn(f(a)) { return a }\nprint(f())\n", "static-error:arity"),
     ("member-assign", 'o := {"k": 1}\no.k = 2\n', "static-error:member-assign"),
-    ("push-arity", "a := [1]\na.push(1, 2)\n", "static-error:push-arity"),
+    ("push-arity", "fn(zbadpush()) { a := [1]; a.push(1, 2) }\nwhile(false) { zbadpush() }\n", "static-error:push-arity"),
     # Parser (CP10): Opaque shapes.
     ("bang-precedence", "x := 2\nprint(!x + 1)\n", "opaque:irregular-legacy-parse"),
     ("postfix-space", "a := [1]\nprint(a [0])\n", "opaque:legacy-runtime-error"),

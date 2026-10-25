@@ -187,6 +187,8 @@ SUPPORTED = {
 # array element) is integer negation, refused in loop code
 # (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
 SUPPORTED_TOP = [
+    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n"),
+    ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n"),
     # The one place the two readings meet: JSON except for one fallback
     # spelling (`.5`). As JSON `-0` stays -0; read as Nift it is 0.
     ("w9-meet", 'jn := {"a": 0.10, "b": -0, "c": 0.5}\nfb := {"a": 0.10, "b": -0, "c": .5}\n'
@@ -284,8 +286,6 @@ UNSUPPORTED = [
     # is refused either way; only the refusing layer changed.
     ("q14-presentation-chain", 'o := {"a": 1}\nprint(o.stringify().stringify())\n', "builtin-presentation-chain"),
     # F4 mutating methods and F5 callbacks: not wired.
-    ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n", "method:pop"),
-    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n", "method:sort"),
     # Batch B (CP15) and C (CP16) names.
     # CP15 W8: bytes have no CP12 kind bit; W9: a literal of constants that
     # is not JSON; W10: a quoted-literal validate argument (J-Q2).
