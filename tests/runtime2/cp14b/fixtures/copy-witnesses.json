@@ -1,0 +1,90 @@
+[
+  {
+    "name": "cp11-alias",
+    "source": "a := [1, 2]\nb := a\nb.push(3)\nprint(a.length())\n",
+    "source_sha256": "958e68ecd988feb3eee0774084ef5921c84216eff6574e22a1dcebdfe69c4313",
+    "expected": "2\n",
+    "legacy": {
+      "out": "3\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "semantics-alias",
+    "source": "a := [1, 2]\nb := a\nb.push(3)\nprint(a.stringify())\nb = [7]\nprint(a.stringify())\nprint(b.stringify())\n",
+    "source_sha256": "63ca2419b730409a0d90d7299113e875719aa6ed1edfaf952a4aeb4efcab66de",
+    "expected": "[1,2]\n[1,2]\n[7]\n",
+    "legacy": {
+      "out": "[1,2,3]\n[1,2,3]\n[7]\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "generated-102",
+    "source": "// rt-diff gen.py --seed 2 index 102\nfn(f1()) { return (7 + 7) }\nprint(f1())\na2 := [-4, (1 + 3), 3, (5 - 0)]\ni3 := a2.length()\nfn(f4(p5)) { return i3 }\nprint(f4(a2.length()))\nal6 := a2\nal6.push(8)\nprint(a2.stringify())\nprint(al6.stringify())\nal6 = [0]\nprint(a2.stringify())\nprint(al6.stringify())\ni7 := f4(a2.length())\nfn(mut8(xs)) { xs.push(99); return xs.length() }\na9 := [1, 2]\nprint(mut8(a9))\nprint(a9.stringify())\nprint(\"$\")\nprint(a2.stringify())\n",
+    "source_sha256": "8e859bf290991ef459e63d107bb17fc0317af91b53e54e6cb207151692ddb6fa",
+    "expected": "14\n4\n[-4,4,3,5]\n[-4,4,3,5,8]\n[-4,4,3,5]\n[0]\n3\n[1,2]\n$\n[-4,4,3,5]\n",
+    "legacy": {
+      "out": "14\n4\n[-4,4,3,5,8]\n[-4,4,3,5,8]\n[-4,4,3,5,8]\n[0]\n3\n[1,2]\n$\n[-4,4,3,5,8]\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "generated-151",
+    "source": "// rt-diff gen.py --seed 2 index 151\ntry {\n  print(2)\n} catch(err1) {\n  print(err1.message)\n}\na2 := [0, 0, 7, 100]\na3 := [7, a2.length(), a2.length(), (7 - 42)]\nw4 := 0\nwhile(w4 < 3) {\n  al5 := a2\n  al5.push(9)\n  print(a2.stringify())\n  print(al5.stringify())\n  al5 = [0]\n  print(a2.stringify())\n  print(al5.stringify())\n  i6 := ((10 + 2) + (100 / 7))\n  w4 += 1\n}\nt7 := \"pq\"\nprint(t7.length())\nprint(t7.to_upper())\nprint(t7.contains(\"a\"))\nprint(t7.starts_with(\"N\"))\nprint(t7.split(\"-\").stringify())\ns8 := \"Nift\"\nprint(\"-\" + \"q\")\nfn(f9(p10)) { return p10 }\nprint(f9(10))\nlc11 := 0\nwhile(true) {\n  lc11 += 1\n  if(lc11 > 1) { break }\n  if(lc11 == 0) { continue }\n  print(lc11)\n}\nfor(fe12 : [1, 2, 3, 4]) {\n  if(fe12 == 2) { continue }\n  if(fe12 == 4) { break }\n  print(fe12)\n}\n",
+    "source_sha256": "8a16e4d11a486b24f1cdb0235ccef2806f0286d3c22ec427c6eaad3a207258b6",
+    "expected": "2\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n2\nPQ\nfalse\nfalse\n[\"pq\"]\n-q\n10\n1\n1\n3\n",
+    "legacy": {
+      "out": "2\n[0,0,7,100,9]\n[0,0,7,100,9]\n[0,0,7,100,9]\n[0]\n[0,0,7,100,9,9]\n[0,0,7,100,9,9]\n[0,0,7,100,9,9]\n[0]\n[0,0,7,100,9,9,9]\n[0,0,7,100,9,9,9]\n[0,0,7,100,9,9,9]\n[0]\n2\nPQ\nfalse\nfalse\n[\"pq\"]\n-q\n10\n1\n1\n3\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "generated-162",
+    "source": "// rt-diff gen.py --seed 2 index 162\nif(3 < (1 + 3)) {\n  s1 := \"-\".split(\"-\").stringify()\n} else if(3 > 1) {\n  lc2 := 0\n  while(true) {\n    lc2 += 1\n    if(lc2 > 2) { break }\n    if(lc2 == 3) { continue }\n    print(lc2)\n  }\n  for(fe3 : [1, 2, 3, 4]) {\n    if(fe3 == 3) { continue }\n    if(fe3 == 3) { break }\n    print(fe3)\n  }\n} else {\n  w4 := 0\n  while(w4 < 3) {\n    s5 := \"q\".replace(\"p\", \"P\")\n    s6 := \"-\" + \"-\"\n    w4 += 1\n  }\n}\nb7 := true\nprint(b7 && !true)\nprint(b7 || false)\nfn(mut8(xs)) { xs.push(99); return xs.length() }\na9 := [1, 2]\nprint(mut8(a9))\nprint(a9.stringify())\na10 := [42, 10, (5 - 5), -4]\nb11 := ((42 / 7) >= a10.length())\nprint(b11 && !true)\nprint(b11 || false)\nb12 := (((0 + 2) != a10.length()) && (0 < a10.length()))\nprint(b12 && !b12)\nprint(b12 || false)\nal13 := a10\nal13.push(2)\nprint(a10.stringify())\nprint(al13.stringify())\nal13 = [0]\nprint(a10.stringify())\nprint(al13.stringify())\nt14 := \"alpha-beta\"\nprint(t14.length())\nprint(t14.to_upper())\nprint(t14.contains(\"a\"))\nprint(t14.starts_with(\"N\"))\nprint(t14.split(\"-\").stringify())\n",
+    "source_sha256": "dc97d140ce3202925e1383f2d1a30db510881c1ab5a6856a7ec46bf4817b51f6",
+    "expected": "false\ntrue\n3\n[1,2]\nfalse\ntrue\nfalse\ntrue\n[42,10,0,-4]\n[42,10,0,-4,2]\n[42,10,0,-4]\n[0]\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
+    "legacy": {
+      "out": "false\ntrue\n3\n[1,2]\nfalse\ntrue\nfalse\ntrue\n[42,10,0,-4,2]\n[42,10,0,-4,2]\n[42,10,0,-4,2]\n[0]\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "generated-176",
+    "source": "// rt-diff gen.py --seed 2 index 176\na1 := [0, (5 * 3)]\nm2 := {\"k\": (7 + 1), \"s\": \"q\"}\nprint(m2[\"k\"])\nprint(m2[\"s\"])\nprint(m2.stringify())\nif(a1.length() != (7 % 2)) {\n  fl3 := (2.0 * 1.0)\n  print(fl3)\n} else if((2 < (3 / 1)) && ((2 - 3) >= (2 + 2))) {\n  print(\"q\".replace(\"p\", \"P\"))\n  w4 := 0\n  while(w4 < 1) {\n    a1.sort()\n    print(a1.stringify())\n    al5 := a1\n    al5.push(5)\n    print(a1.stringify())\n    print(al5.stringify())\n    al5 = [0]\n    print(a1.stringify())\n    print(al5.stringify())\n    i6 := 7\n    w4 += 1\n  }\n}\nif(a1.length() > 0) { print(a1[0]) } else { print(\"empty\") }\nprint(a1.stringify())\nm7 := {\"k\": 10, \"s\": \"-\"}\nprint(m7[\"k\"])\nprint(m7[\"s\"])\nprint(m7.stringify())\nal8 := a1\nal8.push(4)\nprint(a1.stringify())\nprint(al8.stringify())\nal8 = [0]\nprint(a1.stringify())\nprint(al8.stringify())\n",
+    "source_sha256": "bcfcb75a69ba21c732359e0c0e2d9c994fb5b8a96a4704d5d91f345a956f6cf4",
+    "expected": "8\nq\n{\"k\":8,\"s\":\"q\"}\n2\n0\n[0,15]\n10\n-\n{\"k\":10,\"s\":\"-\"}\n[0,15]\n[0,15,4]\n[0,15]\n[0]\n",
+    "legacy": {
+      "out": "8\nq\n{\"k\":8,\"s\":\"q\"}\n2\n0\n[0,15]\n10\n-\n{\"k\":10,\"s\":\"-\"}\n[0,15,4]\n[0,15,4]\n[0,15,4]\n[0]\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "adversarial-copy-top",
+    "source": "o := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := b\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n",
+    "source_sha256": "b1fb57089539a629921eb65162d4372b79e170b33ffdf57d0f793c440e8b2d18",
+    "expected": "1\n1\n1\n",
+    "legacy": {
+      "out": "1\n2\n1\n",
+      "err": "",
+      "exit": 0
+    }
+  },
+  {
+    "name": "adversarial-copy-function",
+    "source": "fn(w0()) {\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := b\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\nreturn 0\n}\nprint(w0())\n",
+    "source_sha256": "b7657064d81dd5ab858df288d45135fc4813a551527059275e9a65febf22664d",
+    "expected": "1\n1\n1\n0\n",
+    "legacy": {
+      "out": "1\n2\n1\n0\n",
+      "err": "",
+      "exit": 0
+    }
+  }
+]
