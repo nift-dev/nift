@@ -51,7 +51,7 @@ rows = []
 for mode in ('default', 'switch'):
     selected = [switch_obj if mode == 'switch' and src == 'src/rt/vm.cpp' else obj
                 for src, obj in zip(sources, objects)]
-    for test in ('program.c', 'allocation.cpp'):
+    for test in ('program.c', 'allocation.cpp', 'cow_allocation.cpp'):
         binary = out / (Path(test).stem + '-' + mode)
         subprocess.run(['g++', *flags, '-no-pie', str(Path('tests/runtime2/cp18') / test),
                         *map(str, selected), '-ldl', '-o', str(binary)], check=True)
@@ -100,6 +100,35 @@ for mode in ('default', 'switch'):
     if not detected:
         raise RuntimeError('ownership negative control failed for ' + mode)
     print('PASS ownership negative control', mode, flush=True)
+# Restore only R1 unshare, leaving the independently accepted make_array fix.
+start = aggregate.index('bool unshare(Value& value) {')
+end = aggregate.index('\n\nValue make_array', start)
+if 'std::unique_ptr<HeapObject, CloneDeleter> copy;' not in aggregate[start:end]:
+    raise RuntimeError('stale COW ownership negative control')
+old_unshare = Path('tests/runtime2/cp18/unsafe_unshare.txt').read_text().rstrip()
+cow_mutant = out / 'unsafe-cow-aggregate.cpp'
+cow_mutant.write_text(aggregate[:start] + old_unshare + aggregate[end:])
+cow_obj = out / 'unsafe-cow-aggregate.o'
+subprocess.run(['g++', *flags, '-c', str(cow_mutant), '-o', str(cow_obj)], check=True)
+cow_negative = []
+for mode in ('default', 'switch'):
+    selected = [cow_obj if src == 'src/rt/aggregate.cpp' else
+                switch_obj if mode == 'switch' and src == 'src/rt/vm.cpp' else obj
+                for src, obj in zip(sources, objects)]
+    binary = out / ('unsafe-cow-' + mode)
+    subprocess.run(['g++', *flags, '-no-pie', 'tests/runtime2/cp18/cow_allocation.cpp',
+                    *map(str, selected), '-ldl', '-o', str(binary)], check=True)
+    result = subprocess.run([str(binary)], env=env, capture_output=True, timeout=180)
+    (out / (binary.name + '.run.log')).write_bytes(result.stdout + result.stderr)
+    detected = (result.returncode == 1 and b'LeakSanitizer: detected memory leaks' in result.stderr
+                and b'unshare' in result.stderr and b'outstanding_allocations ==' in result.stderr)
+    cow_negative.append({'mode': mode, 'detected': detected, 'exit': result.returncode,
+                         'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+                         'mutant_source_sha256': hashlib.sha256(cow_mutant.read_bytes()).hexdigest()})
+    (out / 'cow-negative-controls.json').write_text(json.dumps(cow_negative, indent=2) + '\n')
+    if not detected:
+        raise RuntimeError('COW leak negative control failed for ' + mode)
+    print('PASS COW negative control', mode, flush=True)
 if any(row['exit'] != 0 for row in rows):
     raise RuntimeError('CP18 sanitizer controls failed; see per-test logs and results.json')
 print('PASS CP18 ASan/UBSan: C consumer and allocation controls, both dispatches')

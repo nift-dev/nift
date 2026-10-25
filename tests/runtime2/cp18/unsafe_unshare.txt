@@ -1,0 +1,27 @@
+bool unshare(Value& value) {
+    if (value.refcount() <= 1) return false;
+    HeapObject* copy = nullptr;
+    if (value.is(Kind::Array)) {
+        auto* a = new ArrayObject();
+        a->items = value.heap_as<ArrayObject>()->items;
+        copy = a;
+    } else if (value.is(Kind::Object)) {
+        auto* o = new ObjectObject();
+        const auto* source = value.heap_as<ObjectObject>();
+        o->entries = source->entries;
+        o->index = source->index;
+        copy = o;
+    } else if (value.is(Kind::Struct)) {
+        const auto* source = value.heap_as<StructObject>();
+        auto* st = new StructObject(source->type_name);
+        st->fields = source->fields;
+        copy = st;
+    } else {
+        return false;
+    }
+    copy_summary(value.heap(), copy);
+    relocate_storage(value.heap());  // stale references into the shared original fault too
+    heap_retally(copy);
+    value.replace_heap(copy);
+    return true;
+}

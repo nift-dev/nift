@@ -3502,3 +3502,21 @@ test-runtime2-cp18: test-runtime2-cp18-switch
 test-runtime2-cp18-sanitize:
 	$(PYTHON) tests/runtime2/cp18/sanitize.py --out "$(CURDIR)/$(TEST_DIR)/cp18/sanitize"
 test-embed: test-runtime2-cp18-sanitize
+
+# CP18 R2: ordinary optimized allocation accounting, independent of LSan.
+CP18_COW := $(TEST_DIR)/cp18/cow-allocation$(EXEEXT)
+CP18_COW_SWITCH := $(TEST_DIR)/cp18/cow-allocation-switch$(EXEEXT)
+$(CP18_COW): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+$(CP18_COW_SWITCH): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(LDLIBS) -o $@
+.PHONY: test-runtime2-cp18-cow
+test-runtime2-cp18-cow: $(CP18_COW) $(CP18_COW_SWITCH) $(SHARED_LIB) $(CP18_SWITCH_LIB)
+	$(CP18_COW)
+	$(CP18_COW_SWITCH)
+	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(CURDIR)/$(SHARED_LIB)"
+	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(abspath $(CP18_SWITCH_LIB))"
+	$(PYTHON) tests/runtime2/cp18/cow_negative.py --out "$(CURDIR)/$(TEST_DIR)/cp18/cow-negative"
+test-runtime2-cp18: test-runtime2-cp18-cow
