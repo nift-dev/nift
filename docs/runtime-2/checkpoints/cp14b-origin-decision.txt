@@ -1,0 +1,32 @@
+CP14B owner semantic decision — 25 October 2026 — Option A APPROVED
+
+Retain accepted CP13B first-throw provenance. For newly admitted inline collection
+callbacks whose detached legacy body loses its original SourceView, VM Error
+origins use actual source-file coordinates. Only the first established line or
+column may differ. No message, code, category, cause, identity, catchability,
+routing or evaluation-order exception is granted. Already-originated Errors,
+ordinary functions, declared comparators and helpers retain their provenance.
+No synthetic legacy-relative Error origins, fault slots or Frame changes.
+
+Rationale and immutable bounded investigation:
+.cp14b-recovery/origin-investigation/CP14B-ERROR-ORIGIN-DECISION.txt
+.cp14b-recovery/origin-investigation/FULL-MATRIX.txt
+48 variants / 144 runs; refused cases remain admission evidence. Accepted CP13B
+refuses comparator sorts; the reference is its provenance rule, not direct
+comparator equivalence. Full raw source, AST spans, binary/source hashes and
+preserved working-state diff accompany the candidate evidence archive.
+
+The reporting-only extension remains separately reviewable and unaccepted
+pending its tests. It may reconstruct uncaught prefixes and retain diagnostic
+context outside Error. It must never override an established Error origin or
+alter a caught Error. Legacy fatal (non-Error) display projection is distinct
+from script-visible provenance; no reporting projection hides this exception.
+
+Permanent origins.py / fixtures/origins.json assert fixed actual coordinates
+for the approved difference and exact legacy parity otherwise; both dispatch
+modes and sanitizer harnesses must run them. Identity, first-origin cloning,
+cause, internal/external catches, nesting and rethrows are retained in fixtures.
+No general differential policy waiver has been added.
+
+Owner also authorizes resumption of full CP14B verification and independent
+review delivery. No integration, push, CI, tag, release, provisioning or spend.

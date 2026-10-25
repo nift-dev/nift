@@ -1,0 +1,770 @@
+{
+  "owner_decision": "2026-10-25 Option A: actual first-throw source coordinates for detached inline callback bodies only",
+  "cases": [
+    {
+      "name": "declared_comparator-uncaught",
+      "source": "a:=[2,1]; cmp:=(x,y)=>{ throw error(\"stop\") }; a.sort(cmp)",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:25: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:25: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 24,
+          "end": 44,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 25
+        }
+      ]
+    },
+    {
+      "name": "declared_comparator-caught",
+      "source": "try { a:=[2,1]; cmp:=(x,y)=>{ throw error(\"stop\") }; a.sort(cmp) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n31\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n31\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 30,
+          "end": 50,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "name": "inline_padded-uncaught",
+      "source": "a:=[2,1]; a.sort((x,y)=>{     throw error(\"stop\") })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:31: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:6: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 30,
+          "end": 50,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "name": "inline_padded-caught",
+      "source": "try { a:=[2,1]; a.sort((x,y)=>{     throw error(\"stop\") }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n37\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n6\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 36,
+          "end": 56,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "name": "inline_shifted-uncaught",
+      "source": "a:=[2,1];                 a.sort((x,y)=>{ throw error(\"stop\") })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:43: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 42,
+          "end": 62,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 43
+        }
+      ]
+    },
+    {
+      "name": "inline_shifted-caught",
+      "source": "try { a:=[2,1];                 a.sort((x,y)=>{ throw error(\"stop\") }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n49\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 48,
+          "end": 68,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 49
+        }
+      ]
+    },
+    {
+      "name": "inline_multiline-uncaught",
+      "source": "a:=[2,1];\na.sort((x,y)=>{\n    throw error(\"stop\")\n})",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:2:5: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 30,
+          "end": 49,
+          "text": "throw error(\"stop\")",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "name": "inline_multiline-caught",
+      "source": "try { a:=[2,1];\na.sort((x,y)=>{\n    throw error(\"stop\")\n}) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n2\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 36,
+          "end": 55,
+          "text": "throw error(\"stop\")",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "name": "declared_multiline-uncaught",
+      "source": "a:=[2,1];\ncmp:=(x,y)=>{\n    throw error(\"stop\")\n}; a.sort(cmp)",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 28,
+          "end": 47,
+          "text": "throw error(\"stop\")",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "name": "declared_multiline-caught",
+      "source": "try { a:=[2,1];\ncmp:=(x,y)=>{\n    throw error(\"stop\")\n}; a.sort(cmp) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 34,
+          "end": 53,
+          "text": "throw error(\"stop\")",
+          "line": 3,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "name": "internal_catch-uncaught",
+      "source": "a:=[2,1]; a.sort((x,y)=>{ try { throw error(\"stop\") } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }; return x<y })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n33\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 32,
+          "end": 52,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "name": "internal_catch-caught",
+      "source": "try { a:=[2,1]; a.sort((x,y)=>{ try { throw error(\"stop\") } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }; return x<y }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n39\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 38,
+          "end": 58,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 39
+        }
+      ]
+    },
+    {
+      "name": "rethrow-uncaught",
+      "source": "a:=[2,1]; a.sort((x,y)=>{ try { throw error(\"stop\") } catch(e) { print(e.line);print(e.column);throw e } })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "1\n33\n",
+        "err": "error: $CASE/case.f:1:33: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "1\n8\n",
+        "err": "error: $CASE/case.f:1:8: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 32,
+          "end": 52,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 33
+        },
+        {
+          "kind": "Throw",
+          "begin": 95,
+          "end": 103,
+          "text": "throw e ",
+          "line": 1,
+          "column": 96
+        }
+      ]
+    },
+    {
+      "name": "rethrow-caught",
+      "source": "try { a:=[2,1]; a.sort((x,y)=>{ try { throw error(\"stop\") } catch(e) { print(e.line);print(e.column);throw e } }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "1\n39\nstop\n1\n39\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "1\n8\nstop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 38,
+          "end": 58,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 39
+        },
+        {
+          "kind": "Throw",
+          "begin": 101,
+          "end": 109,
+          "text": "throw e ",
+          "line": 1,
+          "column": 102
+        }
+      ]
+    },
+    {
+      "name": "ordinary_named_caught",
+      "source": "fn(f()) { throw error(\"stop\") }; try { f() } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 10,
+          "end": 30,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "name": "ordinary_lambda_internal",
+      "source": "f:=()=>{ try { throw error(\"stop\") } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) } }; f()",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 15,
+          "end": 35,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "name": "named_comparator_caught",
+      "source": "fn(cmp(x,y)) { throw error(\"stop\") }; a:=[2,1]; try { a.sort(cmp) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 15,
+          "end": 35,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "name": "helper_inline_caught",
+      "source": "fn(f()) { throw error(\"stop\") }; a:=[2,1]; try { a.sort((x,y)=>{ return f() }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 10,
+          "end": 30,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "name": "existing_unoriginated",
+      "source": "problem:=error(\"stop\"); a:=[2,1]; try { a.sort((x,y)=>{ throw problem }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category);print(problem.line);print(problem.column);print(e==problem) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n57\nuser.raised\nuser\n0\n0\nfalse\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n0\n0\nfalse\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 56,
+          "end": 70,
+          "text": "throw problem ",
+          "line": 1,
+          "column": 57
+        }
+      ]
+    },
+    {
+      "name": "existing_originated",
+      "source": "fn(f()) { throw error(\"stop\") }; a:=[2,1]; try { f() } catch(original) { try { a.sort((x,y)=>{ throw original }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category);print(e==original);print(e.line==original.line);print(e.column==original.column) } }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\n1\n11\nuser.raised\nuser\ntrue\ntrue\ntrue\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\ntrue\ntrue\ntrue\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 10,
+          "end": 30,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 11
+        },
+        {
+          "kind": "Throw",
+          "begin": 95,
+          "end": 110,
+          "text": "throw original ",
+          "line": 1,
+          "column": 96
+        }
+      ]
+    },
+    {
+      "name": "inline_identity_rethrow",
+      "source": "a:=[2,1]; a.sort((x,y)=>{ try { throw error(\"stop\") } catch(original) { try { throw original } catch(e) { print(e==original);print(e.line==original.line);print(e.column==original.column);print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }; return x<y } })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "true\ntrue\ntrue\nstop\n1\n33\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "true\ntrue\ntrue\nstop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 32,
+          "end": 52,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 33
+        },
+        {
+          "kind": "Throw",
+          "begin": 78,
+          "end": 93,
+          "text": "throw original ",
+          "line": 1,
+          "column": 79
+        }
+      ]
+    },
+    {
+      "name": "nested_inline_caught",
+      "source": "a:=[2,1]; try { [1].map(z=>a.sort((x,y)=>{ throw error(\"stop\") })) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n44\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 43,
+          "end": 63,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 44
+        }
+      ]
+    },
+    {
+      "name": "ordinary_rethrow",
+      "source": "fn(f()) { try { throw error(\"stop\") } catch(original) { try { throw original } catch(e) { print(e==original);print(e.line==original.line);print(e.column==original.column);print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) } } }; f()",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "true\ntrue\ntrue\nstop\n1\n17\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "true\ntrue\ntrue\nstop\n1\n17\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 16,
+          "end": 36,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 17
+        },
+        {
+          "kind": "Throw",
+          "begin": 62,
+          "end": 77,
+          "text": "throw original ",
+          "line": 1,
+          "column": 63
+        }
+      ]
+    },
+    {
+      "name": "factory_error",
+      "source": "fn(f()) { return error(\"stop\") }; a:=[2,1]; try { a.sort((x,y)=>{ throw f() }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n67\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 66,
+          "end": 76,
+          "text": "throw f() ",
+          "line": 1,
+          "column": 67
+        }
+      ]
+    },
+    {
+      "name": "local_construct_then_throw",
+      "source": "a:=[2,1]; try { a.sort((x,y)=>{ problem:=error(\"stop\"); throw problem }) } catch(e) { print(e.message);print(e.line);print(e.column);print(e.code);print(e.category) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n57\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n26\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 56,
+          "end": 70,
+          "text": "throw problem ",
+          "line": 1,
+          "column": 57
+        }
+      ]
+    },
+    {
+      "name": "comparator_cause",
+      "source": "cause:=error(\"root\"); a:=[2,1]; try { a.sort((x,y)=>{ throw error(\"stop\",\"user.test\",cause) }) } catch(e) { print(e.message);print(e.code);print(e.category);print(e.cause==cause);print(cause.line);print(cause.column);print(e.line);print(e.column) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n55\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n2\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 54,
+          "end": 92,
+          "text": "throw error(\"stop\",\"user.test\",cause) ",
+          "line": 1,
+          "column": 55
+        }
+      ]
+    },
+    {
+      "name": "ordinary_cause",
+      "source": "cause:=error(\"root\"); f:=()=>{ throw error(\"stop\",\"user.test\",cause) }; try { f() } catch(e) { print(e.message);print(e.code);print(e.category);print(e.cause==cause);print(cause.line);print(cause.column);print(e.line);print(e.column) }",
+      "approved_origin_difference": false,
+      "expected": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n32\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n32\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 31,
+          "end": 69,
+          "text": "throw error(\"stop\",\"user.test\",cause) ",
+          "line": 1,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "name": "original_caught",
+      "source": "a:=[2,1]; try { a.sort((x,y)=>{ throw error(\"stop\") }) } catch(e) { print(e.message);print(e.line);print(e.column) }",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "stop\n1\n33\n",
+        "err": "",
+        "exit": 0
+      },
+      "legacy": {
+        "out": "stop\n1\n2\n",
+        "err": "",
+        "exit": 0
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 32,
+          "end": 52,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "name": "original_uncaught",
+      "source": "a:=[2,1]; a.sort((x,y)=>{ throw error(\"stop\") })",
+      "approved_origin_difference": true,
+      "expected": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:27: stop\n",
+        "exit": 1
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: stop\n",
+        "exit": 1
+      },
+      "throw_spans": [
+        {
+          "kind": "Throw",
+          "begin": 26,
+          "end": 46,
+          "text": "throw error(\"stop\") ",
+          "line": 1,
+          "column": 27
+        }
+      ]
+    }
+  ]
+}
