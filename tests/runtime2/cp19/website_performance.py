@@ -9,7 +9,11 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--base',required=True);p.add_argument('--nift',required=True)
 p.add_argument('--switch',required=True);p.add_argument('--out',type=Path,required=True)
 p.add_argument('--pages',type=int,default=1000);p.add_argument('--samples',type=int,default=21)
+p.add_argument('--cpu',type=int)
 a=p.parse_args();a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=True)
+if a.cpu is not None:
+ assert a.cpu in os.sched_getaffinity(0),'CPU outside the permitted affinity set'
+ os.sched_setaffinity(0,{a.cpu})
 binaries={k:Path(v).resolve() for k,v in [('base',a.base),('default',a.nift),('switch',a.switch)]}
 for name in binaries:
  root=a.out/name;root.mkdir();(root/'.nift').mkdir();(root/'content').mkdir();(root/'templates').mkdir()
@@ -41,5 +45,6 @@ for name in binaries:
  draws=sorted(statistics.median(rng.choices(values,k=len(values))) for _ in range(2000))
  summary.append(dict(binary=name,median_ns=statistics.median(values),median_95ci_ns=[draws[49],draws[1949]],samples=len(values)))
 (a.out/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+(a.out/'affinity.json').write_text(json.dumps(dict(cpu_affinity=sorted(os.sched_getaffinity(0)),pin_requested=a.cpu))+'\n')
 (a.out/'binaries.json').write_text(json.dumps({k:dict(path=str(v),sha256=hashlib.sha256(v.read_bytes()).hexdigest()) for k,v in binaries.items()},indent=2)+'\n')
 print('PASS ordinary website output parity and local full-rewrite observations; no VM or portable release claim')

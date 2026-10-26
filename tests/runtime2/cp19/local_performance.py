@@ -11,7 +11,11 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--base',required=True);p.add_argument('--nift',required=True)
 p.add_argument('--switch',required=True);p.add_argument('--out',type=Path,required=True)
 p.add_argument('--samples',type=int,default=21);p.add_argument('--units',type=int,default=30)
+p.add_argument('--cpu',type=int,help='pin this local run and children to one permitted Linux CPU')
 a=p.parse_args();a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=True)
+if a.cpu is not None:
+ assert a.cpu in os.sched_getaffinity(0),'CPU outside the permitted affinity set'
+ os.sched_setaffinity(0,{a.cpu})
 binaries={name:Path(value).resolve() for name,value in [('base',a.base),('default',a.nift),('switch',a.switch)]}
 records=[];rng=random.Random(191027)
 
@@ -84,6 +88,7 @@ def run(name,mode,workload,sample):
 provenance=dict(local_only=True,system=platform.platform(),flags='-std=c++17 -O2 -Wall -Wextra -pedantic -pthread',
  binaries={k:dict(path=str(v),sha256=hashlib.sha256(v.read_bytes()).hexdigest()) for k,v in binaries.items()},
  cpu=subprocess.check_output(['lscpu','--json'],text=True),samples=a.samples,units=a.units,
+ cpu_affinity=sorted(os.sched_getaffinity(0)),pin_requested=a.cpu,
  limitations=['CP18 shell/eval use the existing legacy comparator; counters retained.',
  'Local wall-clock observations do not establish dedicated-hardware release gates.',
  'PTY and scripted workloads remain separate.'])
@@ -104,4 +109,16 @@ for workload in ['startup','eval','script','pty']:
    values=[r['elapsed_ns'] for r in records if r['workload']==workload and r['binary']==name and r['mode']==mode and not r['warmup']]
    summary.append(dict(workload=workload,binary=name,mode=mode,samples=len(values),median_ns=statistics.median(values),median_95ci_ns=interval(values)))
 (a.out/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+comparisons=[]
+for workload in ['startup','eval','script','pty']:
+ for mode in ['0','require']:
+  base={r['sample']:r['elapsed_ns'] for r in records if r['binary']=='base' and r['workload']==workload and r['mode']==mode and not r['warmup']}
+  for name in ['default','switch']:
+   candidate={r['sample']:r['elapsed_ns'] for r in records if r['binary']==name and r['workload']==workload and r['mode']==mode and not r['warmup']}
+   keys=sorted(base);draws=[]
+   for _ in range(2000):
+    selection=rng.choices(keys,k=len(keys))
+    draws.append(statistics.median(candidate[k] for k in selection)/statistics.median(base[k] for k in selection))
+   draws.sort();comparisons.append(dict(workload=workload,mode=mode,binary=name,ratio_of_medians=statistics.median(candidate.values())/statistics.median(base.values()),paired_95ci=[draws[49],draws[1949]]))
+(a.out/'comparisons.json').write_text(json.dumps(comparisons,indent=2)+'\n')
 print('PASS matched local samples; no portable performance gate claimed')
