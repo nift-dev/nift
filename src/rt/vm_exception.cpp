@@ -199,7 +199,11 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
         return false;
     }
     while (frames_.size() > handler.frame_depth) {
-        for (std::uint16_t k = 0; k < proto->nregs; ++k) R[k] = Value();
+        for (std::uint16_t k = 0; k < proto->nregs; ++k) {
+            // CP17 x CP13B (decision B): before this frame's reference dies.
+            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);
+            R[k] = Value();
+        }
         const Frame frame = frames_.back();
         frames_.pop_back();
         base = frame.base;

@@ -20,6 +20,10 @@ void Vm::open_handle_runtime() {
         HandleStatus::Ok;
 }
 
+void Vm::abandon_unwound_handle(const Value& value) {
+    if (handle_context_open_) natives::abandon_file_on_unwind(handle_table_, handle_context_, value);
+}
+
 void Vm::close_handle_runtime(VmResult& result) {
     if (!handle_context_open_) return;
     const handles::CloseReport close = handle_table_.close_context(handle_context_);

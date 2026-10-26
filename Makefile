@@ -731,20 +731,34 @@ $(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# CP17 x CP13B decision B: the unwound-frame file release rule, linked against
+# the production natives and handle table (functional and ASan/UBSan builds).
+RT_UNWIND_RELEASE_UNIT := $(TEST_DIR)/rt/unwind-file-release$(EXEEXT)
+$(RT_UNWIND_RELEASE_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+RT_UNWIND_RELEASE_SAN_UNIT := $(TEST_DIR)/rt-san/unwind-file-release
+$(RT_UNWIND_RELEASE_SAN_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
 RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
 $(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 .PHONY: test-runtime2-cp17-sanitize
-test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT)
+test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT) $(RT_UNWIND_RELEASE_SAN_UNIT)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_UNWIND_RELEASE_SAN_UNIT)"
 
 .PHONY: test-runtime2-cp17-handles
-test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT)
+test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT) $(RT_UNWIND_RELEASE_UNIT)
 	"$(RT_STREAM_GUARD_UNIT)"
+	"$(RT_UNWIND_RELEASE_UNIT)"
 	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/closed_handle_catchable.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/unwind_handle_release.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
