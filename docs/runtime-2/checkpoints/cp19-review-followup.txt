@@ -1,0 +1,163 @@
+CP19 focused review follow-up — 2026-10-27
+
+Frozen review candidate: 1c0b157fa6803dc3ad58cc47f0c27729e4c4c8d4
+Tree: 25207dc1b90b3d2650d435f8a72b40fed59a5c1c
+Production correction: 16cddd265eaa8ae00b950b6673859036d84e9255
+Correction tree: f4dc268430c9c293c781f68da5b28d021aa0569c
+The correction is one separately reviewable production-file commit. The frozen
+review candidate, original binaries and historical evidence remain unchanged.
+This follow-up does not grant CP19 acceptance or a performance exception.
+
+Ordinary-path attribution
+
+Whole-process Callgrind profiles use the unchanged million-catch fixtures.
+The frozen default dispatch has +4M ordinary-catch instructions: +2M in
+Vm::run and +2M in op_throw, plus a few thousand compilation/startup/report
+instructions. No persistent namespace walk or session activation runs in that
+loop. SourceMap::at and unwind self counts match the CP18 default control.
+
+With captured Cells the frozen default excess is approximately +22M:
+Vm::run +10M; op_closure +6M; Function destruction +3M; get_member +1M;
+op_throw +2M. Named self-cost deltas account for essentially the full excess.
+The closure paths now initialize session identity/display/owner fields, test
+Proto::session_source and return-value options, and check optional Program
+ownership during destruction. The member and VM-loop deltas include generated
+register/prologue/dispatch code changes; they are not evidence of a session
+namespace service executing per instruction. Disassembly and self profiles are
+preserved. Attribution to those compiled functions is exact; mapping their
+register-allocation effects to a unique C++ statement would overstate the data.
+Ordinary call-value self instructions remain 103M and the accepted CP14B unwind
+self counts remain 223,999,988 / 367,999,946. No unwind hook was optimized away.
+
+The correction keeps a nonpersistent script's existing SourceMap::at lookup
+local to op_throw. Only a missing ordinary source map takes the unchanged
+per-Proto owner/call-site helper. Stamp conditions, cloning, Error identity,
+origin values, memory checks, handlers and Frame/Fault layout are unchanged.
+The helper loses 43M self instructions in this workload; op_throw gains 26M
+from the local lookup: a measured net reduction of about 17M per million throws.
+This removes a call/register burden from ordinary scripts, without weakening
+persistent ownership or changing Error semantics.
+
+The earlier switch comparison used CP18's default dispatch. A clean CP18
+switch control was built from the exact 8e65196b archive with the same flags
+and unchanged libffi prerequisite, then measured on both unchanged workloads.
+The old cross-dispatch measurements remain preserved; the new comparison is
+explicitly additional evidence, not a rewrite of them.
+
+Matched-dispatch instruction deltas versus CP18:
+                       Frozen 1c0b157f       Corrected 16cddd26
+Default caught             +0.1315%              -0.4270%
+Default caught_cell        +0.4105%              +0.0934%
+Switch caught              +0.0984%              -0.4586%
+Switch caught_cell         +0.2605%              -0.0556%
+
+Default Cell overhead still exists (+5,005,995 instructions). Neither an
+instruction gate nor the entire performance obligation is declared passed.
+No threshold or prior exception changed. This correction does not claim to
+recover every ordinary-path cost or to optimize the shell compiler itself.
+
+Actual PTY attribution
+
+A reproducible actual-PTY profile drives x:=0 followed by 1000 (x+=1) commands.
+A separate zero-command run subtracts startup. It preserves transcripts,
+profiles, VM counters and binary hashes, including a current VM-off control.
+Per-command guest instructions:
+CP18 legacy 149,550; current legacy 150,122; persistent default 209,923;
+persistent switch 209,748. The legacy control adds about 572 instructions,
+while persistent compilation/session handling adds about 60,000 versus it.
+
+Candidate inclusive anchors are about 35,000 instructions for shared eval
+compilation; 7,000 for session source construction; 14,618 for run_session_unit,
+including 6,743 in its two temporary-stack cleanup calls; and 21,944 for the
+per-unit statistics reporter. These nested inclusive values cannot simply be
+added, and some replace legacy interpreter work. Native-clock counters put
+median parse/compile/execute stages near 1.594/4.767/0.760us in the original
+instrumented run. No runtime Value-based type narrowing, reentrant VM call or
+per-element callback lookup is implicated by this command workload.
+
+The original benchmark enabled NIFT_VM_STATS. Persistent commands produce
+statistics on every unit; the CP18 legacy shell does not. A new matched run
+turns telemetry off on the exact frozen binaries, retaining the original
+stats-on evidence and a repeated stats-on control.21 measured samples/lane,
+plus warmups, CPU0 affinity; supplementary stats-off timings are not VM-coverage
+proof. Companion stats-on runs verify actual VM execution.
+
+Telemetry off: CP18 47.118us; default 52.505us, ratio 1.1143 [1.0943,1.1395];
+switch 52.071us, ratio 1.1051 [1.0815,1.1319]. Repeated telemetry on:
+CP18 47.634us; default 60.848us; switch 60.042us. Thus about 8–9us of the
+instrumented candidate latency belongs to diagnostics output; roughly 5us
+additional user-facing latency remains with telemetry off. It is real local
+cost, not noise or an accepted waiver. Current VM-off timing intervals overlap
+CP18; there is no newly established generic shell/startup regression here.
+No production telemetry, cleanup, compile checks or ownership was suppressed.
+
+Admission boundary
+
+cp19-refusal-review.json mechanically catalogs all 28 session-specific reason
+literals, with source locations and A/B/C classifications. A means mandatory
+CP19 gap; B means an actual documented policy/invalid-input boundary; C means
+inherited compiler/native debt. A/B or B/C rows require their stated contextual
+predicate: a reason name is not blanket permission for all inputs it rejects.
+D-054 forbids fallback; it does not waive otherwise required language support.
+
+The executable curated boundary has 25 cases per dispatch. 8 probes are
+admitted, 9 expose A gaps, 4 are B policy/invalid-input cases, and 4 expose C debt.
+Each case also runs legacy and a recorded CP18 stateless counterfactual.
+Across mode1/require this is 50 probes per dispatch: 16 admitted probes and 34
+compile refusals; 100 additional setup/state-readback units execute on VM.
+Every refusal is before FORBIDDEN and preserves the checked old state. No
+refusal is a successful VM execution. These are deliberately selected boundary
+cases, not an estimate that only32% of normal Nift is supported.11 of 28 reason
+families have direct curated witnesses. Other signature/layout/invariant and
+resource-exhaustion guards are source-classified, not executable-certified.
+
+A gaps measured: direct/nested/captured aggregate-kind widening; lambda-alias
+rebind; mixed-order named replacement; schema replacement; unrelated named
+replacement blocked by a retained loop-location closure; wrapper-induced
+false dynamic-shadow; explicit this.v falsely blocked by a global v.
+
+D-038 permits refusing genuinely caller-dependent lookup. It does not permit
+classifying those last two false positives as accepted exclusions. Positive
+witnesses retain unrelated lexical shadowing, numeric aggregate mutations,
+fresh lambda replacement, persistent struct mutation and scalar place calls.
+
+C witnesses distinguish inherited missing bytes/prepared support, legacy native
+method precedence (CP18 VM accepts a field-call which legacy rejects), and the
+captured-struct receiver defect (CP18 stateless execution reaches status70 on
+member access). Their existence does not certify release completeness; they
+retain their owning checkpoints' repair/coverage obligations.
+
+Hostile interaction evidence and correction checks
+
+The session suite grows from 365 to 391 checks per dispatch. It checks Function
+identity, current code/Program owner and nested value identity immediately
+across failed whole-unit inference/admission and a late bytes codegen refusal,
+after earlier declaration/rebinding/replacement syntax. A subsequent forbidden
+widening still refuses. Successful replacement, rebinding and numeric loop
+mutation survive an ensuing runtime Error. Captured mutable array bounds are
+then challenged independently. Unrelated replacement with a retained
+loop-location closure remains an explicit A refusal witness, not claimed
+successful coverage. Successful units may activate equivalent code versions;
+owner/code snapshots are compared across refusal itself, not across unrelated
+admitted compilations.
+
+391 normal and ASan/LSan/UBSan checks pass per dispatch. The original seven
+session mutants pass exact behavioral witnesses; M7 remains in the existing
+permanent Make target. Focused existing CP13B E4 (restamp) and E8 (mutate shared
+Error) mutants are detected using the original oracle. These are explicit
+one-object focused controls, not a claim of a new clean full E1–E8 campaign.
+CP13B 80-case legacy/current/future lanes, CP14B effects/origins, CP18 ownership/
+COW, original CP19 R1/ownership and runtime lint pass. Corrected binaries repeat
+the complete 25-case admission boundary in both dispatches without differences.
+
+Remaining work and authority
+
+The classification exposes genuine CP19 gaps beyond the CP17 resource blocker;
+no unsupported case is silently promoted to a permanent accepted refusal.
+This is a focused performance/admission follow-up for independent review, not
+full-checkpoint delivery. The owner-relayed exact integrated CP17 commit/tree
+and interfaces are still required before persistent-resource implementation.
+No provisional lifecycle API, intermediate CP17 rebase, job-control change,
+agent coordination, authoritative integration, push, CI, tag, release or spending
+occurred. Linux/GCC evidence does not certify macOS/Windows or other compilers.
+Raw evidence is in .cp19-development/complete/assessment-1c0b157f/.

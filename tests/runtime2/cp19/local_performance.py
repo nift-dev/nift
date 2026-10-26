@@ -12,10 +12,13 @@ p=argparse.ArgumentParser();p.add_argument('--base',required=True);p.add_argumen
 p.add_argument('--switch',required=True);p.add_argument('--out',type=Path,required=True)
 p.add_argument('--samples',type=int,default=21);p.add_argument('--units',type=int,default=30)
 p.add_argument('--cpu',type=int,help='pin this local run and children to one permitted Linux CPU')
+p.add_argument('--no-stats',action='store_true',help='supplementary timing only; companion stats-on run proves VM admission')
+p.add_argument('--workload',action='append',choices=['startup','eval','script','pty'])
 a=p.parse_args();a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=True)
 if a.cpu is not None:
  assert a.cpu in os.sched_getaffinity(0),'CPU outside the permitted affinity set'
  os.sched_setaffinity(0,{a.cpu})
+workloads=a.workload or ['startup','eval','script','pty']
 binaries={name:Path(value).resolve() for name,value in [('base',a.base),('default',a.nift),('switch',a.switch)]}
 records=[];rng=random.Random(191027)
 
@@ -24,7 +27,8 @@ def save():
 
 def environment(folder,mode):
  env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')}
- env.update(HOME=str(folder),NIFT_VM=mode,NIFT_VM_STATS=str(folder/'stats'),NO_COLOR='1',TERM='dumb')
+ env.update(HOME=str(folder),NIFT_VM=mode,NO_COLOR='1',TERM='dumb')
+ if not a.no_stats:env['NIFT_VM_STATS']=str(folder/'stats')
  return env
 
 def stats(folder):
@@ -79,21 +83,21 @@ def run(name,mode,workload,sample):
   assert (proc.returncode,proc.stdout,proc.stderr)==(0,expected,''),(row,proc)
   row.update(elapsed_ns=elapsed,status=proc.returncode)
  rows=stats(folder);row['stats']=rows
- if mode=='require' and (workload=='script' or (workload=='eval' and name!='base')):
+ if not a.no_stats and mode=='require' and (workload=='script' or (workload=='eval' and name!='base')):
   assert len(rows)==1 and rows[0]['outcome']=='vm' and rows[0]['vm_executions']==1 and rows[0]['legacy_executions']==0,row
- if workload=='pty' and name!='base' and mode=='require':
+ if not a.no_stats and workload=='pty' and name!='base' and mode=='require':
   assert len(rows)==a.units+1 and all(s['outcome']=='vm' and s['vm_executions']==1 and s['legacy_executions']==0 for s in rows),row
  records.append(row);save()
 
 provenance=dict(local_only=True,system=platform.platform(),flags='-std=c++17 -O2 -Wall -Wextra -pedantic -pthread',
  binaries={k:dict(path=str(v),sha256=hashlib.sha256(v.read_bytes()).hexdigest()) for k,v in binaries.items()},
  cpu=subprocess.check_output(['lscpu','--json'],text=True),samples=a.samples,units=a.units,
- cpu_affinity=sorted(os.sched_getaffinity(0)),pin_requested=a.cpu,
+ telemetry_enabled=not a.no_stats,workloads=workloads,cpu_affinity=sorted(os.sched_getaffinity(0)),pin_requested=a.cpu,
  limitations=['CP18 shell/eval use the existing legacy comparator; counters retained.',
  'Local wall-clock observations do not establish dedicated-hardware release gates.',
  'PTY and scripted workloads remain separate.'])
 (a.out/'provenance.json').write_text(json.dumps(provenance,indent=2)+'\n')
-for workload in ['startup','eval','script','pty']:
+for workload in workloads:
  for sample in range(-2,a.samples):
   order=[(name,mode) for name in binaries for mode in ['0','require']];rng.shuffle(order)
   for name,mode in order:run(name,mode,workload,sample)
@@ -103,14 +107,14 @@ def interval(values):
  draws=[statistics.median(rng.choices(values,k=len(values))) for _ in range(2000)];draws.sort()
  return [draws[49],draws[1949]]
 summary=[]
-for workload in ['startup','eval','script','pty']:
+for workload in workloads:
  for name in binaries:
   for mode in ['0','require']:
    values=[r['elapsed_ns'] for r in records if r['workload']==workload and r['binary']==name and r['mode']==mode and not r['warmup']]
    summary.append(dict(workload=workload,binary=name,mode=mode,samples=len(values),median_ns=statistics.median(values),median_95ci_ns=interval(values)))
 (a.out/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
 comparisons=[]
-for workload in ['startup','eval','script','pty']:
+for workload in workloads:
  for mode in ['0','require']:
   base={r['sample']:r['elapsed_ns'] for r in records if r['binary']=='base' and r['workload']==workload and r['mode']==mode and not r['warmup']}
   for name in ['default','switch']:

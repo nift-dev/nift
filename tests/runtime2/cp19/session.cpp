@@ -403,6 +403,57 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         CHECK(string_view_of(r.value) == "[[1],[2]]");
     }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("a:=[[1]];f:=()=>a.stringify();old:=f;fn(g()){return 1}", "combined-state", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto count = session.binding_count();
+        const auto array = session.value("a"), function = session.value("f"), named = session.value("g");
+        for (const char* rejected : {
+            "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(\"bad\")};print(\"FORBIDDEN\")",
+            "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(2)};print(\"FORBIDDEN\");bytes([65])"}) {
+            const auto owner = function.heap_as<FunctionObject>()->program_owner;
+            const auto* code = function.heap_as<FunctionObject>()->code;
+            r = session.execute(rejected, "combined-refusal", output);
+            CHECK(!r.admitted && r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
+            CHECK(r.refusal == (std::string(rejected).find("bytes") != std::string::npos ?
+                "builtin-bytes:bytes" : "session:binding-shape-contract"));
+            CHECK(!session.contains("leaked") && session.binding_count() == count);
+            CHECK(session.value("a").heap() == array.heap() && session.value("f").heap() == function.heap());
+            CHECK(session.value("g").heap() == named.heap() && function.heap_as<FunctionObject>()->program_owner == owner &&
+                function.heap_as<FunctionObject>()->code == code);
+            r = session.execute("print(\"FORBIDDEN\");for(row:a){row.push(\"bad\")}", "bounds-still-original", output);
+            CHECK(!r.admitted && r.refusal == "session:binding-shape-contract" && output.empty());
+            r = session.evaluate("g()", "named-still-original", output);
+            CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+            r = session.evaluate("old()", "reader-still-original", output);
+            CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1]]");
+        }
+        r = session.execute("fn(g()){return 3};f = ()=>\"live\";for(row:a){row.push(2.5)};"
+            "print(\"ONCE\");throw error(\"stop\")", "combined-runtime", output);
+        if (!r.admitted || r.execution.reason != StopReason::Error)
+            std::cerr << "combined runtime refusal=" << r.refusal << " runtime=" << r.execution.message << '\n';
+        CHECK(r.admitted && r.vm_executions == 1 && r.execution.reason == StopReason::Error && output == "ONCE\n");
+        output.clear();
+        r = session.evaluate("g()", "replacement-survives", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.evaluate("f()", "rebind-survives", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "live");
+        CHECK(session.value("f").heap() != function.heap() && bool(function.heap_as<FunctionObject>()->program_owner));
+        r = session.evaluate("old()", "old-reader-new-cell", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,2.5]]");
+        r = session.execute("fn(makec()){caparr:=[[1]];return v=>{for(row:caparr){row.push(v)};return caparr.stringify()}};"
+            "c:=makec();warm:=c(0)", "combined-capture", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        // This conservative boundary is a CP19 gap, not successful replacement coverage.
+        r = session.execute("fn(g()){return 4};print(\"FORBIDDEN\")", "replacement-with-loop-capture", output);
+        CHECK(!r.admitted && r.refusal == "session:redefinition-callable-flow" && output.empty());
+        r = session.execute("print(\"FORBIDDEN\");c(\"bad\")", "capture-still-original", output);
+        CHECK(!r.admitted && r.refusal == "session:capture-contract" && output.empty());
+        r = session.evaluate("c(2)", "capture-valid", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,0,2]]");
+    }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");
 }

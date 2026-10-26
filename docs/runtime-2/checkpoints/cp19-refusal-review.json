@@ -1,0 +1,508 @@
+{
+  "review_candidate": "1c0b157fa6803dc3ad58cc47f0c27729e4c4c8d4",
+  "policy": "A=mandatory CP19 gap; B=documented policy/invalid-input exclusion; C=inherited debt. Contextual A/B or B/C must be resolved per witness. No automatic waivers.",
+  "literal_count": 28,
+  "source_only_warning": "Catalog completeness is not executable coverage. Signature/layout/invariant and resource-exhaustion guards without a witness are explicitly unverified.",
+  "inherited_non_session_reasons": "Shared compiler opaque, alias, prepared-context, module, builtin and native refusals retain their existing inventory and owner; this catalog covers every session-prefixed/limit:session literal, not all possible core compiler diagnostics.",
+  "entries": [
+    {
+      "reason": "limit:session-bindings",
+      "classification": "B",
+      "rationale": "Existing 16-bit operand/storage bound; not a semantic coverage claim.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 240
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "limit:session-protos",
+      "classification": "B",
+      "rationale": "Existing 16-bit Proto index bound; not a semantic coverage claim.",
+      "locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 210
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:binding-contract",
+      "classification": "A",
+      "rationale": "Older inferred kind cannot broaden; invalid scalar assignments are a separate invalid-input subcase.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 116
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:binding-shape-contract",
+      "classification": "A",
+      "rationale": "Older aggregate graph cannot broaden; array-kind and nested-kind witnesses.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session_contract.cpp",
+          "line": 17
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 120
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "array-kind",
+          "classification": "A"
+        },
+        {
+          "case": "nested-kind",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:binding-struct-contract",
+      "classification": "A",
+      "rationale": "Reserved but unreached instance slot cannot change schema; no exclusion waiver.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 239
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:call-alias-contract",
+      "classification": "A",
+      "rationale": "Incomplete retained argument/escape facts; inherited core alias cases stay C, but loss of existing proof across units is A. Scalar place calls are positive.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 177
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 193
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:call-kind-contract",
+      "classification": "A",
+      "rationale": "Retained fallback signature lacks a proof for the later argument kind.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 188
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:call-signature",
+      "classification": "A",
+      "rationale": "Missing retained signature facts; source-only invariant guard, not an exercised user feature.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 184
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:callable-flow",
+      "classification": "A",
+      "rationale": "Callable target/signature flow not proved for persistent compilation.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 216
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 221
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:callable-rebind",
+      "classification": "A",
+      "rationale": "Valid lambda-alias rebind is excluded; named-function assignment rejected by legacy is B, not evidence of a valid lost feature.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 113
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "lambda-alias",
+          "classification": "A"
+        },
+        {
+          "case": "named-assignment",
+          "classification": "B"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:capture-contract",
+      "classification": "A",
+      "rationale": "Older captured aggregate bounds cannot broaden.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session_contract.cpp",
+          "line": 11
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "capture-kind",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:capture-layout",
+      "classification": "A",
+      "rationale": "Persistent metadata/layout mismatch guard; if reachable for valid input it is a CP19 correctness gap, not a release exclusion.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 307
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 309
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 320
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 325
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:captured-struct",
+      "classification": "C",
+      "rationale": "CP12b/closure receiver lowering defect reproduced in CP18 stateless execution, status70 member failure; session guard prevents admission. Still a release gap until repaired by its owner.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_closure.cpp",
+          "line": 99
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "struct-capture",
+          "classification": "C"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:dynamic-shadow",
+      "classification": "A/B",
+      "rationale": "B only for genuinely caller-dependent named lookup under D-038. A for never-executed lambda wrapper false positives; wrapper-shadow-overreach witness.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 156
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "wrapper-shadow-overreach",
+          "classification": "A"
+        },
+        {
+          "case": "dynamic-named",
+          "classification": "B"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:element-contract",
+      "classification": "A",
+      "rationale": "Direct inserted element exceeds older aggregate bounds; no release waiver.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 145
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:function-assignment",
+      "classification": "A/B",
+      "rationale": "B for actual readonly named-function/catch bindings and invalid input. A if a valid mutable callable is rejected; needs contextual review, not blanket permission.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 187
+        },
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 271
+        },
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 305
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:lambda-assignment-spelling",
+      "classification": "B",
+      "rationale": "Specific unseparated spelling is rejected by legacy textual lambda parsing; measured invalid-input witness, not a valid-language exclusion.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 115
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "lambda-spelling",
+          "classification": "B"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:legacy-method-precedence",
+      "classification": "C",
+      "rationale": "Inherited CP15/native dispatch conflict: CP18 VM accepts a Function field that legacy reserves/rejects. New session guard avoids reproducing the mismatch.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 165
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "reserved-method",
+          "classification": "C"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:opaque",
+      "classification": "C",
+      "rationale": "Shared parser opaque/unsupported syntax; malformed input is B. Actual detailed opaque reasons remain inherited compiler inventory.",
+      "locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 185
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:parse",
+      "classification": "B/C",
+      "rationale": "B malformed input; C valid legacy grammar beyond the shared parser. Not evidence that all parsing failures are acceptable release exclusions.",
+      "locations": [
+        {
+          "file": "src/rt/session_inventory.cpp",
+          "line": 19
+        },
+        {
+          "file": "src/rt/session.cpp",
+          "line": 185
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:redeclared",
+      "classification": "A",
+      "rationale": "Publication/redefinition invariant guard. Valid session redeclarations, if rejected, are an implementation gap; invalid declarations are B.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 233
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:redefinition-callable-flow",
+      "classification": "A",
+      "rationale": "An untracked retained callable blocks named replacement, including unrelated replacement with a retained loop-location closure.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 281
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "replacement-loop-capture",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:redefinition-order",
+      "classification": "A",
+      "rationale": "Existing named replacement after executable statements is not implemented; registration-order semantics must be preserved.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 288
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "named-order",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:reserved-binding-contract",
+      "classification": "A",
+      "rationale": "Unreached reserved slot cannot change mutability/const contract; no owner exclusion.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 236
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:shadow-or-redeclare",
+      "classification": "A",
+      "rationale": "Top-level existing binding redeclaration; valid cross-command reuse is a gap, while truly illegal redeclarations are B.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 110
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:struct-dynamic-shadow",
+      "classification": "A/B",
+      "rationale": "B genuinely dynamic field lookup under D-038; A explicit this.v access falsely rejected because a global v exists.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 59
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 61
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 78
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 86
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 95
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 154
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "struct-dynamic",
+          "classification": "B"
+        },
+        {
+          "case": "struct-explicit-field-shadow",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    },
+    {
+      "reason": "session:struct-name-conflict",
+      "classification": "A",
+      "rationale": "Separate name namespaces/conflicts need semantic review; no blanket documented exclusion.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 82
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 89
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 97
+        }
+      ],
+      "witnesses": [],
+      "witnessed": false
+    },
+    {
+      "reason": "session:struct-redeclared",
+      "classification": "A",
+      "rationale": "Persistent schema replacement/versioning not implemented; no explicit release waiver.",
+      "locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 80
+        }
+      ],
+      "witnesses": [
+        {
+          "case": "struct-replacement",
+          "classification": "A"
+        }
+      ],
+      "witnessed": true
+    }
+  ]
+}
