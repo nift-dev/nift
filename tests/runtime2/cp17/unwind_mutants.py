@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -72,11 +73,26 @@ MUTANTS = [
      "    const auto self = contexts_.find(id);\n    if (self == contexts_.end()) return;\n",
      "    const auto self = contexts_.find(id);\n    if (self == contexts_.end()) return;\n"
      "    const_cast<ExecContext&>(self->second).state = ContextState::Closing;\n", "oom",
-     "handle_close_oom_unit.cpp:118: CHECK failed: t.open(c)"),
+     "HANG section=close"),
     ("close-no-restore", "src/rt/handles/table_contexts.cpp", "        bool armed = true;", "        bool armed = false;",
-     "oom", "handle_close_oom_unit.cpp:118: CHECK failed: t.open(c)"),
+     "oom", "HANG section=close"),
     ("close-restore-to-open", "src/rt/handles/table_contexts.cpp", "c->state = c->before_close;",
-     "c->state = ContextState::Open;", "oom", "handle_close_oom_unit.cpp:117: CHECK failed"),
+     "c->state = ContextState::Open;", "oom", "CHECK failed: !t.open(c) && t.table.cancel_context(c)"),
+    # CP17 x CP18: cleanup bookkeeping, create and ticket settlement under allocation failure.
+    ("cleanup-no-recovery", "src/rt/handles/table.cpp", "        abandon_cleanup_locked(t.record, t.owner);\n", "",
+     "oom", "HANG section=drop"),
+    ("record-not-reserved", "src/rt/handles/table.cpp",
+     "    if (status == HandleStatus::Ok) records_.reserve_one();\n", "", "oom",
+     "CHECK failed: t.table.stats().live == before.live"),
+    ("settle-no-recovery", "src/rt/handles/table_settle.cpp", "        lose_record_locked(id, owner);\n        throw;",
+     "        throw;", "oom", "CHECK failed: table.stats().pending_obligations == 0"),
+    ("settle-report-first", "src/rt/handles/table_settle.cpp",
+     "    ++settled_;\n    release_record_locked(id, owner);\n    if (failed) {",
+     "    ++settled_;\n    if (failed) failures_of(owner).push_back(failure);\n    release_record_locked(id, owner);\n"
+     "    if (false) {", "oom", "CHECK failed: table.stats().pending_obligations == 0"),
+    ("release-allocates", "src/rt/handles/slot_store.cpp",
+     "        if (free_.capacity() < slots_.size() + 1)\n", "        if (false)\n", "oom",
+     "CHECK failed: !threw && !injected"),
     ("release-handler-frame", "src/rt/vm_exception.cpp",
      "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();\n",
      "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) { if (R[k].is(Kind::Handle)) "
@@ -90,9 +106,29 @@ def run(cmd, cwd, timeout):
 
 def copy_tree(dest):
     # Working tree plus build outputs, without .git (the copy is never committed).
+    # Only the build outputs the witnesses reuse (libffi, rt units); the
+    # sanitizer and other suites' trees would multiply disk use per mutant.
     def ignore(directory, names):
-        return [".git"] if Path(directory) == ROOT else []
+        if Path(directory) == ROOT:
+            return [".git"]
+        if Path(directory) == ROOT / ".build":
+            return [n for n in names if n not in ("libffi", "rt")]
+        return []
     shutil.copytree(ROOT, dest, symlinks=True, ignore=ignore, copy_function=shutil.copy2)
+
+
+def fresh(tree, kind, path, start):
+    """Proof that the mutant's own production code was compiled: the witness
+    artifact (and, for a .cpp in the VM build, that file's object) is newer
+    than the mutation. The reduced tree copy keeps unmutated build outputs, so
+    a stale artifact would otherwise test the original code."""
+    artifact = tree / (OOM_UNIT if kind == "oom" else UNIT if kind == "unit" else "nift")
+    stale = [str(artifact.relative_to(tree))] if not artifact.exists() or artifact.stat().st_mtime < start else []
+    if kind == "vm" and path.endswith(".cpp"):
+        obj = tree / (path[:-4] + ".o")
+        if not obj.exists() or obj.stat().st_mtime < start:
+            stale.append(str(obj.relative_to(tree)))
+    return stale
 
 
 def witness(tree, kind):
@@ -155,8 +191,13 @@ def main():
                 shutil.rmtree(tree)
                 continue
             (tree / path).write_text(source.replace(old, new, 1))
+            start = time.time()
             rc, out = witness(tree, kind)
-            if rc is None:
+            stale = fresh(tree, kind, path, start)
+            if stale:
+                print(f"FAIL {name}: stale build output {stale}: the mutated source was not compiled into the witness")
+                failures += 1
+            elif rc is None:
                 print(f"FAIL {name}: mutant did not build (a build failure is not a kill)\n{out}")
                 failures += 1
             elif rc == 0:
@@ -166,7 +207,7 @@ def main():
                 print(f"FAIL {name}: killed, but not by the intended witness ({expected!r} absent)\n{out[-1500:]}")
                 failures += 1
             else:
-                print(f"ok   {name}: killed by {kind} witness ({expected})")
+                print(f"ok   {name}: killed by {kind} witness ({expected}); rebuilt from the mutated {path}")
             if not args.keep:
                 shutil.rmtree(tree)
     finally:

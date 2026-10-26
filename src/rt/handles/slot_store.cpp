@@ -1,5 +1,7 @@
 #include "rt/handles/slot_store.h"
 
+#include <algorithm>
+
 namespace nift::rt::handles {
 
 HandleStatus SlotStore::classify(const Value& handle, HandleKind expected, std::uint32_t& index) const {
@@ -33,6 +35,10 @@ HandleStatus SlotStore::allocate(HandleKind kind, std::shared_ptr<void>& resourc
         free_.pop_back();
     } else {
         if (slots_.size() >= capacity_) return HandleStatus::LimitExceeded;
+        // CP17 x CP18: the free list can always take every slot back, so take()
+        // (a cleanup's first step, reached from a dying VM box) never allocates.
+        if (free_.capacity() < slots_.size() + 1)
+            free_.reserve(std::max<std::size_t>(16, 2 * (slots_.size() + 1)));
         index = static_cast<std::uint32_t>(slots_.size());
         slots_.emplace_back();
     }

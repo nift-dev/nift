@@ -6,8 +6,16 @@ namespace nift::rt::handles {
 
 namespace {
 
-void release_box(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) {
-    static_cast<HandleTable*>(table)->drop(Value::handle(kind, id, generation));
+void release_box(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) noexcept {
+    // Runs from a Value destructor (noexcept): an allocation failure in the
+    // cleanup's bookkeeping must not escape (std::terminate). The table has
+    // already released the cleanup (abandon_cleanup_locked); only that
+    // cleanup's report is lost (CP17 x CP18).
+    try {
+        static_cast<HandleTable*>(table)->drop(Value::handle(kind, id, generation));
+    } catch (...) {
+        static_cast<HandleTable*>(table)->note_report_lost();
+    }
 }
 
 } // namespace

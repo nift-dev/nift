@@ -19,6 +19,7 @@ src/rt/handles/native_access.cpp
 src/rt/handles/slot_store.cpp
 src/rt/handles/table.cpp
 src/rt/handles/table_contexts.cpp
+src/rt/handles/table_settle.cpp
 src/rt/handles/types.cpp
 src/rt/host/host_call.cpp
 src/rt/host/host_error.cpp

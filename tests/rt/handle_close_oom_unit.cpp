@@ -11,13 +11,21 @@
 //    (create() in it succeeds; the close can be retried) or it is gone;
 //  - a later close_context / shutdown() completes (no wait for an abandoned
 //    close); no failure is reported twice.
+#include "rt/handles/completion.h"
 #include "rt/handles/table.h"
 #include "rt_test.h"
 
+#include <chrono>
+#include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <stdexcept>
+#include <thread>
+#include <vector>
+#include <unistd.h>
 
 namespace {
 long countdown = -1;  // >= 0: the allocation at which operator new fails
@@ -75,9 +83,218 @@ struct Tree {
     }
 };
 
+// Runs `body` (on this thread) under a watchdog: a body that does not return
+// within 20 s is the witnessed defect (an in-flight count or obligation never
+// released), reported with its section and site; the process then exits 3.
+template <class F> void bounded(const char* section, long site, F body) {
+    std::mutex mu;
+    std::condition_variable cv;
+    bool done = false;
+    std::thread watchdog([&] {
+        std::unique_lock<std::mutex> lock(mu);
+        if (!cv.wait_for(lock, std::chrono::seconds(20), [&] { return done; })) {
+            std::fprintf(stderr, "HANG section=%s site=%ld\n", section, site);
+            std::fflush(stderr);
+            _exit(3);
+        }
+    });
+    body();
+    {
+        std::lock_guard<std::mutex> lock(mu);
+        done = true;
+    }
+    cv.notify_all();
+    watchdog.join();
+}
+
+// A table with one context holding `open` counted handles whose hook reports
+// a failure (a file left open).
+struct Open {
+    HandleTable table;
+    ContextId ctx = 0;
+    std::vector<Value> handles;
+    explicit Open(int open) {
+        KindSpec spec;
+        spec.name = "custom";
+        spec.cleanup = [](CleanupEvent&) { return CleanupOutcome::failure("test.left_open", "left open"); };
+        table.register_kind(HandleKind::Custom, spec);
+        CHECK(table.open_context(ContextKind::Script, kDetached, ctx, "script") == HandleStatus::Ok);
+        for (int k = 0; k < open; ++k) {
+            Value v;
+            CHECK(table.create(ctx, HandleKind::Custom, std::make_shared<int>(k), v, CreateOptions{true}) ==
+                  HandleStatus::Ok);
+            handles.push_back(v);
+        }
+    }
+};
+
+// Cleanup bookkeeping (run_cleanup / settle) under allocation failure: the
+// last-reference drop path (a VM box dying) and the context-close path.
+int cleanup_bookkeeping() {
+    int sites = 0;
+    for (const char* section : {"drop", "close"}) {
+        bool completed = false;
+        for (long i = 0; i < 10000 && !completed; ++i) {
+            Open t(3);
+            bool threw = false;
+            injected = false;
+            bounded(section, i, [&] {
+                countdown = i;
+                try {
+                    if (section[0] == 'd') {
+                        for (const Value& v : t.handles) CHECK(t.table.drop(v) == HandleStatus::Ok);
+                    } else {
+                        t.table.close_context(t.ctx);
+                    }
+                } catch (const std::bad_alloc&) {
+                    threw = true;
+                }
+                countdown = -1;
+            });
+            if (!injected) {
+                CHECK(!threw);
+                completed = true;
+            } else {
+                ++sites;
+                CHECK(threw);
+            }
+            // Whatever happened, ending the context and the table returns, no
+            // obligation is left behind, and every slot is reclaimed.
+            bounded(section, i, [&] {
+                t.table.close_context(t.ctx);
+                t.table.shutdown();
+            });
+            const TableStats st = t.table.stats();
+            CHECK(st.live == 0 && st.contexts == 0 && st.pending_obligations == 0);
+        }
+        CHECK(completed);
+    }
+    return sites;
+}
+
+// create() under allocation failure: no live slot without its lifecycle record.
+int create_sites() {
+    int sites = 0;
+    bool completed = false;
+    for (long i = 0; i < 10000 && !completed; ++i) {
+        Open t(1);
+        const TableStats before = t.table.stats();
+        Value v;
+        bool threw = false;
+        injected = false;
+        countdown = i;
+        try {
+            t.table.create(t.ctx, HandleKind::Custom, std::shared_ptr<int>(std::make_shared<int>(9)), v,
+                           CreateOptions{true});
+        } catch (const std::bad_alloc&) {
+            threw = true;
+        }
+        countdown = -1;
+        if (!injected) {
+            completed = true;
+            CHECK(!threw && t.table.stats().live == before.live + 1);
+        } else {
+            ++sites;
+            CHECK(threw);
+            CHECK(t.table.stats().live == before.live);  // nothing half-created
+        }
+        bounded("create", i, [&] { t.table.shutdown(); });
+        CHECK(t.table.stats().live == 0 && t.table.stats().contexts == 0);
+    }
+    CHECK(completed);
+    return sites;
+}
+
+// A ticket completed later (the CP16 reaper path) under allocation failure:
+// the record must not keep its obligation (close_context would wait forever).
+CompletionTicket* g_pending = nullptr;
+int ticket_sites() {
+    int sites = 0;
+    bool completed = false;
+    for (long i = 0; i < 10000 && !completed; ++i) {
+        HandleTable table;
+        CompletionTicket held;
+        g_pending = &held;
+        KindSpec spec;
+        spec.name = "process";
+        spec.cleanup = [](CleanupEvent& e) {
+            *g_pending = std::move(*e.ticket);
+            return CleanupOutcome::pending();
+        };
+        table.register_kind(HandleKind::Process, spec);
+        ContextId ctx = 0;
+        // A label beyond the small-string buffer, and an outcome without its own
+        // code/message (the table fills in defaults): building the report
+        // allocates before anything is recorded, as well as when it is stored.
+        CHECK(table.open_context(ContextKind::Script, kDetached, ctx, "script context with a long label") ==
+              HandleStatus::Ok);
+        Value v;
+        CHECK(table.create(ctx, HandleKind::Process, std::make_shared<int>(1), v) == HandleStatus::Ok);
+        CHECK(table.close(v, HandleKind::Process, ctx) == HandleStatus::Ok);  // pending: an obligation
+        CHECK(table.stats().pending_obligations == 1);
+        CleanupOutcome outcome = CleanupOutcome::failure({}, {});
+        bool threw = false;
+        injected = false;
+        countdown = i;
+        try {
+            held.complete(std::move(outcome));
+        } catch (const std::bad_alloc&) {
+            threw = true;
+        }
+        countdown = -1;
+        if (!injected) completed = true;
+        else { ++sites; CHECK(threw); }
+        CHECK(table.stats().pending_obligations == 0);
+        bounded("ticket", i, [&] { table.close_context(ctx); table.shutdown(); });
+    }
+    CHECK(completed);
+    return sites;
+}
+
+// Releasing a slot (SlotStore::take, the first step of every cleanup, reached
+// from a dying VM box) must not allocate at all: with every allocation failing,
+// dropping handles whose hook allocates nothing succeeds.
+void release_is_allocation_free() {
+    HandleTable table;
+    KindSpec spec;
+    spec.name = "quiet";
+    spec.cleanup = [](CleanupEvent&) { return CleanupOutcome::completed(); };
+    table.register_kind(HandleKind::Custom, spec);
+    ContextId ctx = 0;
+    CHECK(table.open_context(ContextKind::Script, kDetached, ctx, "script") == HandleStatus::Ok);
+    std::vector<Value> handles;
+    for (int k = 0; k < 40; ++k) {  // past every small-capacity boundary of the slot store
+        Value v;
+        CHECK(table.create(ctx, HandleKind::Custom, std::make_shared<int>(k), v, CreateOptions{true}) == HandleStatus::Ok);
+        handles.push_back(v);
+    }
+    bool threw = false;
+    injected = false;
+    countdown = 0;  // the next allocation fails
+    try {
+        for (const Value& v : handles) table.drop(v);
+    } catch (const std::bad_alloc&) {
+        threw = true;
+    }
+    countdown = -1;
+    CHECK(!threw && !injected);
+    CHECK(table.stats().live == 0);
+    table.close_context(ctx);
+}
+
 } // namespace
 
 int main() {
+    const int creates = create_sites();
+    CHECK(creates > 0);
+    std::printf("create allocation failures: %d injected sites\n", creates);
+    const int tickets = ticket_sites();
+    CHECK(tickets > 0);
+    std::printf("ticket completion allocation failures: %d injected sites\n", tickets);
+    const int bookkeeping_sites = cleanup_bookkeeping();
+    release_is_allocation_free();  // after the others: thread-local hook bookkeeping is warm
+    CHECK(bookkeeping_sites > 0);
+    std::printf("cleanup bookkeeping allocation failures: %d injected sites\n", bookkeeping_sites);
     int sites = 0;
     bool completed = false;
     for (long i = 0; i < 10000 && !completed; ++i) {

@@ -40,6 +40,10 @@ CleanupFailure make_failure(const LifeRecord& base, LifeState state, CleanupOutc
 // single ticket ever issued for it is spent by then (complete() empties it).
 class LifecycleStore {
 public:
+    // CP17 x CP18 allocation safety: makes room for one more record, so the
+    // next add() and every erase() up to then cannot allocate (may throw
+    // std::bad_alloc; changes nothing visible).
+    void reserve_one();
     std::uint64_t add(HandleKind kind, const Value& handle, ContextId owner);
     LifeRecord* find(std::uint64_t id);
     const LifeRecord* find(std::uint64_t id) const;

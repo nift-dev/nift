@@ -757,6 +757,11 @@ $(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/R
 test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT) $(RT_UNWIND_RELEASE_SAN_UNIT)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_UNWIND_RELEASE_SAN_UNIT)"
+	# CP17 x CP18: the handle table under injected allocation failure (ASan/LSan/UBSan).
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-san/handle-close-oom"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-san/handle-close-oom"
 
 .PHONY: test-runtime2-cp17-handles
 test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT) $(RT_UNWIND_RELEASE_UNIT)
@@ -3623,6 +3628,14 @@ CP18_COW_SWITCH := $(TEST_DIR)/cp18/cow-allocation-switch$(EXEEXT)
 $(CP18_COW): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+# CP17 x CP18: allocation failure in handle-using programs through the program API.
+CP17_HANDLE_ALLOC := $(TEST_DIR)/cp17/handle-allocation$(EXEEXT)
+$(CP17_HANDLE_ALLOC): tests/runtime2/cp17/handle_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+.PHONY: test-runtime2-cp17-handle-allocation
+test-runtime2-cp17-handle-allocation: $(CP17_HANDLE_ALLOC)
+	timeout 1800 $(CP17_HANDLE_ALLOC)
 $(CP18_COW_SWITCH): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(LDLIBS) -o $@
@@ -3651,6 +3664,7 @@ test-rt-host: test-rt-handles
 test-rt-host: test-rt-handles-guards
 test-rt-host: test-runtime2-cp17-handles
 test-rt-host: test-runtime2-cp17-n2-rebuild
+test-rt-host: test-runtime2-cp17-handle-allocation
 test-rt-host-sanitize: test-rt-handles-sanitize
 test-rt-host-sanitize: test-rt-handles-tsan
 test-rt-host-sanitize: test-runtime2-cp17-sanitize

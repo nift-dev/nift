@@ -4,6 +4,8 @@
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_stream_handles.h"
 
+#include <new>
+
 namespace nift::rt {
 
 void Vm::open_handle_runtime() {
@@ -28,6 +30,10 @@ void Vm::close_handle_runtime(VmResult& result) {
     if (!handle_context_open_) return;
     const handles::CloseReport close = handle_table_.close_context(handle_context_);
     handle_context_open_ = false;
+    // CP17 x CP18: a cleanup report lost to an allocation failure (a dying
+    // box cannot throw) fails the run as the allocation failure it was, never
+    // as a run that silently lost a leak report.
+    if (handle_table_.reports_lost()) throw std::bad_alloc();
     if (result.reason == StopReason::None && close.cleanup_failed()) {
         result.reason = StopReason::Error;
         result.message = close.failures.front().message;

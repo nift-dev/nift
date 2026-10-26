@@ -90,7 +90,8 @@ for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test
             "test-rt-host-mutants: test-runtime2-cp17-routing-mutants" \
             "test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant" \
             "test-rt-host-mutants: test-runtime2-cp17-handle-mutants" \
-            "test-rt-host-mutants: test-runtime2-cp17-unwind-mutants"; do
+            "test-rt-host-mutants: test-runtime2-cp17-unwind-mutants" \
+            "test-rt-host: test-runtime2-cp17-handle-allocation"; do
     name="${edge##* }"
     populate "$TMP/f6-$name"
     python3 - "$TMP/f6-$name/Makefile" "$edge" <<'PY'

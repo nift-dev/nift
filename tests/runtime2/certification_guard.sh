@@ -110,7 +110,8 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-host-mutants', 'test-runtime2-cp17-routing-mutants'),
          ('test-rt-host-mutants', 'test-runtime2-cp17-n2-rebuild-mutant'),
          ('test-rt-host-mutants', 'test-runtime2-cp17-handle-mutants'),
-         ('test-rt-host-mutants', 'test-runtime2-cp17-unwind-mutants')]
+         ('test-rt-host-mutants', 'test-runtime2-cp17-unwind-mutants'),
+         ('test-rt-host', 'test-runtime2-cp17-handle-allocation')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']

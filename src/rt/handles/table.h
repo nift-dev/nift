@@ -162,6 +162,14 @@ public:
     // Lock-free, for a VM marking the start of each evaluation a handler may
     // abort.
     std::uint64_t creation_count() const noexcept { return created_.load(std::memory_order_relaxed); }
+    // CP17 x CP18: true once a cleanup's report was lost to an allocation
+    // failure in its bookkeeping (the cleanup itself was released). A caller
+    // whose result must include every report (a VM run) treats it as the
+    // allocation failure it was.
+    bool reports_lost() const noexcept { return reports_lost_.load(std::memory_order_relaxed); }
+    // For a caller that had to swallow an allocation failure from this table
+    // (a dying box): the run's result must not claim success.
+    void note_report_lost() noexcept { reports_lost_.store(true, std::memory_order_relaxed); }
     // Withdraws, from `owner`'s pending CloseReport failures, exactly those of
     // kind `kind` whose handle was created after `since` (sequence > since),
     // whose last counted reference was dropped (reason Abandoned: no owner
@@ -204,6 +212,13 @@ private:
     // Runs the hook (lock released around it) and settles a synchronous
     // outcome. Returns true and fills `failure` when it settled Failed/Lost.
     bool run_cleanup(Started& started, std::unique_lock<std::mutex>& lock, CleanupFailure* failure);
+    // CP17 x CP18: releases a cleanup whose bookkeeping threw (no allocation)
+    // and records that its report was lost (reports_lost()).
+    void abandon_cleanup_locked(std::uint64_t record, ContextId owner) noexcept;
+    // CP17 x CP18 (no allocation): settles an unsettled record Lost and
+    // releases its obligation (lose_), or only releases it (release_).
+    void lose_record_locked(std::uint64_t id, ContextId owner) noexcept;
+    void release_record_locked(std::uint64_t id, ContextId owner) noexcept;
     void finish_locked(ContextId owner);
     HandleStatus close_locked(std::uint32_t index, std::unique_lock<std::mutex>& lock, CleanupFailure* failure);
     void close_one(ContextId id, CloseReport& report, std::unique_lock<std::mutex>& lock);
@@ -224,6 +239,7 @@ private:
     std::vector<CleanupFailure> detached_failures_;
     // created_: also read without mu_ by creation_count() (written only under mu_).
     std::atomic<std::uint64_t> created_{0};
+    std::atomic<bool> reports_lost_{false};
     std::uint64_t cleaned_ = 0, settled_ = 0, next_closer_ = 1;
 };
 
