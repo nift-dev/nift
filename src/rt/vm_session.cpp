@@ -1,5 +1,8 @@
 #include "rt/vm_session.h"
 #include <algorithm>
+#if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 3
+#include "rt/source_map.h"
+#endif
 #include <stdexcept>
 
 // rt-lint: cold-file session unit entry and temporary execution teardown
@@ -17,6 +20,7 @@ void Vm::clear_session_execution() {
     closure_ = nullptr;
     frames_.clear();
     handlers_.clear();
+    named_functions_.clear();  // canonical identities survive in the namespace, not in a stale code-slot cache
     for (auto& value : stack_) value = Value();
     global_taken_ = 0;
 }
@@ -26,8 +30,10 @@ VmResult Vm::run_session_unit(const Program& unit, const std::vector<const Proto
     protos_ = linked;
     protos_.front() = &unit.main();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 3
+    const auto newest = unit.main().session_source->at(unit.main().offsets.back());
+    const auto wrong_map = std::make_shared<const SourceMap>(SourceMap::single(newest.path, ""));
     for (const auto* proto : linked) if (proto)
-        const_cast<Proto*>(proto)->session_source = unit.main().session_source;  // M3: newest source for old code
+        const_cast<Proto*>(proto)->session_source = wrong_map;  // M3: latest command for every old origin
 #endif
     named_functions_.resize(protos_.size());
     global_ready_.resize(options_.session_globals->size());
@@ -40,7 +46,16 @@ VmResult Vm::run_session_unit(const Program& unit, const std::vector<const Proto
     large_lines_.clear(); derived_lines_.clear();
     evidence_truncated_ = beyond_legacy_depth_ = false;
     next_frame_check_ = std::min(kLegacyMaxDepth, options_.max_frames);
-    auto result = run(output);
+    const auto budget = options_.heap_budget;
+    const auto storage = options_.session_globals->capacity() * sizeof(Value);
+    options_.heap_budget = storage < budget ? budget - storage : 0;
+    Fault budget_fault;
+    VmResult result;
+    if (!memory_exceeded(budget_fault)) {
+        result.reason = budget_fault.reason; result.message = budget_fault.message;
+    } else result = run(output);
+    options_.heap_budget = budget;
+    update_heap_limit();
     clear_session_execution();
     return result;
 }

@@ -12,10 +12,13 @@
 namespace nift::rt {
 
 bool Vm::origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const {
+    if (options_.source_map) {
+        out = options_.source_map->at(offset);
+        return true;
+    }
     const auto* owner = fault.use_call_site && !frames_.empty() ? frames_.front().proto : proto;
-    const SourceMap* map = owner->session_source ? owner->session_source.get() : options_.source_map;
-    if (map == nullptr) return internal(fault, "exception origin without source map");
-    out = map->at(offset);
+    if (!owner->session_source) return internal(fault, "exception origin without source map");
+    out = owner->session_source->at(offset);
     return true;
 }
 

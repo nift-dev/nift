@@ -3,15 +3,17 @@
 #include "rt/unit_check.h"
 #include "rt/infer.h"
 #include "rt/parser.h"
+#include "rt/compiler_eval.h"
 #include <stdexcept>
 
 // rt-lint: cold-file immutable declaration linking, never executable history replay
 namespace nift::rt {
 SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context) {
     SessionText out;
-    std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> available;
+    std::unordered_map<std::string, std::vector<std::shared_ptr<const SessionDefinition>>> available;
     for (const auto& symbol : context.symbols)
-        if (symbol.defined && symbol.definition) available.emplace(symbol.name, symbol.definition);
+        if (symbol.defined) for (const auto& callable : session_callable_targets(symbol.callable_shape))
+            available[symbol.name].push_back(callable.definition);
     std::unordered_set<std::string> declarations;
     Ast original(source);
     const auto parsed = parse_script(original);
@@ -25,12 +27,25 @@ SessionText session_text(const std::string& source, const std::string& path, con
         for (auto token = lexer.next(); token.kind != Tok::End; token = lexer.next()) {
             if (token.kind != Tok::Ident) continue;
             const auto found = available.find(std::string(text.substr(token.begin, token.end - token.begin)));
-            if (found != available.end() && !declarations.count(found->second->name) &&
-                out.imports.emplace(found->second->name, found->second).second)
-                selected.push_back(found->second);
+            if (found != available.end()) for (const auto& definition : found->second)
+                if (!declarations.count(definition->name) &&
+                    out.imports.emplace(definition->name, definition).second) selected.push_back(definition);
         }
     };
     scan(source);
+    if (parsed.ok) {
+        const auto prior_nodes = original.size();
+        normalize_session_callbacks(original, parsed.root, context);
+        // Only statically proven Array callback strings were parsed into
+        // these nodes. Ordinary strings never import executable definitions.
+        for (NodeId id = static_cast<NodeId>(prior_nodes); id < original.size(); ++id)
+            if (original.at(id).kind == NodeKind::Ident) scan(original.text(original.at(id)));
+    }
+    // Redefinition changes a registry entry seen by every retained alias.
+    // Compile all reachable readers against it, including captured callables.
+    bool redefining = false;
+    for (const auto& symbol : context.symbols) redefining = redefining || declarations.count(symbol.name);
+    if (redefining) for (const auto& symbol : context.symbols) scan(symbol.name);
     for (std::size_t k = 0; k < selected.size(); ++k) {
         const auto definition = selected[k];
         scan(std::string_view(*definition->source).substr(definition->begin, definition->end - definition->begin));
@@ -72,6 +87,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
                                const SessionCompileContext& current, SessionCompileContext& pending) {
     pending.source_owner = std::make_shared<const std::string>(text.text);
     pending.lambda_templates.clear(); pending.capture_seeds.clear();
+    pending.callable_templates.clear(); pending.capture_callable_seeds.clear();
     pending.capture_contracts.clear(); pending.template_definitions.clear();
     if (parsed_ok) for (std::uint32_t k = 0; k < ast.at(root).count; ++k) {
         const auto& fn = ast.at(ast.list(ast.at(root))[k]);
@@ -85,10 +101,22 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
         if (tail.kind != NodeKind::Return || ast.at(tail.a).kind != NodeKind::Lambda)
             throw std::logic_error("session lambda template body");
         pending.template_definitions.emplace(tail.a, imported->second);
+        pending.callable_templates.emplace(imported->second.get(), tail.a);
         for (std::uint32_t c = 0; c + 1 < body.count; ++c) {
             const auto& declaration = ast.at(ast.list(body)[c]);
             pending.capture_seeds.emplace(declaration.b, imported->second->captures[c].shape);
             pending.capture_contracts.emplace(declaration.a, imported->second->captures[c].shape);
+            for (const auto& symbol : current.symbols)
+                for (const auto& target : session_callable_targets(symbol.callable_shape))
+                    if (target.definition == imported->second && c < target.captures.size()) {
+                        const auto shape = target.captures[c];
+                        if (!shape) continue;
+                        // Multiple closure instances share a definition, so
+                        // infer every possible callable captured at this slot.
+                        auto& seed = pending.capture_callable_seeds[declaration.b];
+                        if (!seed) seed = shape;
+                        else seed = merge_session_callable_shapes(seed, shape);
+                    }
         }
         for (const auto& symbol : current.symbols) if (symbol.definition == imported->second)
             pending.lambda_templates.emplace(symbol.name, tail.a);

@@ -77,8 +77,6 @@ struct VmResult {
     // when the stop is in a callee): where in the top-level code the program
     // was (CP12b modules: which module was initialising).
     std::uint32_t main_offset = 0;
-    bool return_inspection = false;
-    SourceOrigin report_origin;  // cold session diagnostics; separate from the Error payload
     bool returned = false;                 // the script ended with `return value`
     std::string return_text;               // rendering of that value
     bool beyond_legacy_depth = false;      // the call depth exceeded legacy's 64 frames
@@ -106,6 +104,9 @@ struct VmResult {
     bool error_origin = false;
     std::string origin_source;
     std::uint32_t origin_line = 0, origin_column = 0;
+    bool return_inspection = false;
+    SourceOrigin report_origin;  // cold session diagnostics; separate from the Error payload
+    std::string statement_text;  // buffered REPL presentation, discarded on failure
 };
 
 // The stop's reason, message, code and catchability.
@@ -127,11 +128,6 @@ public:
 private:
     Value& global_slot(std::size_t slot) {
         return options_.session_globals ? options_.session_globals->at(slot) : stack_[slot];
-    }
-    const Proto* callable_code(const FunctionObject* function, const Proto* caller) const {
-        for (const auto& target : caller->session_targets)
-            if (target.first == function->session_identity) return target.second;
-        return static_cast<const Proto*>(function->code);
     }
     struct Frame {
         const Instr* ret = nullptr;
@@ -162,6 +158,7 @@ private:
               std::string& output, Fault& fault);
     // CP12C closure opcodes (vm_closure.cpp).
     bool op_load_function(const Instr& in, Value* R, Fault& fault);
+    bool op_session_render(const Instr&, Value*, VmResult&, Fault&, const Proto*);
     bool op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto);
     void result_stats(VmResult& result);
     bool op_new_cell(const Instr& in, Value* R, Fault& fault);
@@ -236,8 +233,6 @@ private:
     std::vector<Frame> frames_;
     std::vector<Handler> handlers_;
     std::vector<const Proto*> protos_;
-    std::uint64_t next_callable_display_id_ = 1;
-    std::uint64_t next_session_callable_id_ = 1;
     std::vector<Value> named_functions_;  // canonical named-function values (LoadFunction)
     const FunctionObject* closure_ = nullptr;  // the running closure
     CycleGraph cycle_graph_;
@@ -251,6 +246,8 @@ private:
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
     std::size_t global_taken_ = 0;  // C6: globals nulled by global_take and not yet put back
+    std::uint64_t next_callable_display_id_ = 1;
+    std::uint64_t next_session_callable_id_ = 1;
 };
 
 } // namespace nift::rt

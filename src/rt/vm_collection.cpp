@@ -25,7 +25,7 @@ bool Vm::op_collection_call(const Instr& in,Value*& R,const Value*& K,const Prot
     const Value& value=R[in.b];
     const auto* function=value.is(Kind::Function)?value.heap_as<FunctionObject>():nullptr;
     if(!function||!function->code)return raise(fault,StopReason::Error,"transformation: callback must be callable");
-    const auto* callee=callable_code(function, proto);
+    const auto* callee=static_cast<const Proto*>(function->code);
     if(!(in.c&kConstantBit)&&callee->collection_entry)callee=callee->collection_entry;
     if((in.c&0x1fffu)!=callee->nparams)return raise(fault,StopReason::Error,"callback argument count mismatch");
     const std::size_t callee_base=base+in.a;

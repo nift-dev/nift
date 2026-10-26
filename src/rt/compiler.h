@@ -8,6 +8,7 @@
 #include "rt/ast.h"
 #include "rt/proto.h"
 #include "rt/session_definition.h"
+#include "rt/session_callable.h"
 #include <unordered_set>
 #include <unordered_map>
 
@@ -33,6 +34,7 @@ struct SessionSymbol {
     std::string name;
     std::shared_ptr<const SessionDefinition> definition;
     std::shared_ptr<const infer_detail::Ty> structure;
+    std::shared_ptr<const SessionCallableShape> callable_shape;
     std::uint64_t identity = 0;
     std::uint16_t slot = 0, kinds = 0, returns = 0, arity = 0, contract = 0;
     bool callable = false, const_array = false, defined = true, readonly = false;
@@ -44,6 +46,8 @@ struct SessionCompileContext {
     std::unordered_set<std::string> imported_functions;
     std::unordered_map<std::string, NodeId> declarations;
     std::unordered_map<std::string, NodeId> lambda_templates;
+    std::unordered_map<const SessionDefinition*, NodeId> callable_templates;
+    std::unordered_map<NodeId, std::shared_ptr<const SessionCallableShape>> capture_callable_seeds;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> capture_seeds, capture_contracts;
     std::unordered_map<NodeId, std::shared_ptr<const SessionDefinition>> template_definitions;
     std::shared_ptr<const std::string> source_owner;

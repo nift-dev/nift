@@ -22,6 +22,8 @@ cases=[
  ('stdin',['-i','-'],'x:=2;print(x)','',1),
  ('inline',['-i','-c','x:=2;fn(getx()){return x}'],'x += 3\ngetx()\nexit\n','',3),
  ('multiline',['-i'],'x:=1\nfn(getx()){\nreturn x\n}\ngetx()\nexit\n','',3),
+ ('assignment_condition',['-i'],'x:=0;if(x=1){print(x)};print(x)\nx\nexit\n','',2),
+ ('assignment_return',['-i'],'x:=0\nfn(f()){return 1+(x=3)}\nf()\nx\nexit\n','',4),
  ('assignment_index',['-i'],'a:=[1,2];i:=0\n(a[1]=(i+=1))\na.stringify()\ni\nexit\n','',4),
  ('assignment_expr',['-i'],'x:=1\n(x=2)\n(x+=3)\n1+(x=7)\nx\nexit\n','',5),
  ('assignment_nested',['-i'],'x:=1;y:=2\n(x=(y=3))\n(x+y)\n(false && (x=8))\nx\nexit\n','',5),

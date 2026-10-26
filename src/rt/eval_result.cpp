@@ -2,6 +2,7 @@
 #include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/heap.h"
+#include "rt/render.h"
 
 // rt-lint: cold-file CLI result serialization after execution
 namespace nift::rt {
@@ -13,9 +14,7 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
     }
     if (value.is(Kind::Function)) {
         const auto* function = value.heap_as<FunctionObject>();
-        out = nift::RuntimeValue(std::string("\x1fnift:callable:") +
-            (function->is_lambda ? "lambda:" + std::to_string(function->display_id)
-                                 : "named:" + function->name));
+        out = nift::RuntimeValue(callable_marker(*function));
         return true;
     }
     if (value.is(Kind::Array)) {

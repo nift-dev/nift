@@ -1,6 +1,7 @@
 #include "rt/compiler_session.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
+#include "rt/legacy_names.h"
 #include <algorithm>
 
 // rt-lint: cold-file incremental compiler namespace publication
@@ -21,11 +22,16 @@ void UnitCompiler::set_session(SessionCompileContext* session) {
         session_bindings_.emplace(symbol.name, binding);
     }
 }
-bool UnitCompiler::session_tail(NodeId id) {
+bool UnitCompiler::session_render(NodeId id) {
+    const auto& node = ast_.at(id);
+    const auto expression = node.a;
     std::uint16_t value = 0;
-    if (!temp(value) || !expr_to(ast_.at(id).a, value)) return false;
-    fb_->set_offset(ast_.at(id).begin);
-    fb_->note(fb_->emit(OpCode::TopReturn, value), "", false, true);
+    if (!temp(value) || !expr_to(expression, value)) return false;
+    const auto source = std::string(text(node));
+    const auto last = source.find_last_not_of(" \t\r\n");
+    fb_->set_offset(node.begin);
+    fb_->note(fb_->emit(OpCode::SessionRender, value,
+        last != std::string::npos && source[last] == ')' ? 1 : 0), source);
     return true;
 }
 bool UnitCompiler::session_admit() {
@@ -101,6 +107,9 @@ bool UnitCompiler::session_admit() {
     return true;
 }
 bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint16_t base) {
+    if (ast_.at(callee).kind == NodeKind::Member &&
+        legacy_special_method(text(ast_.at(ast_.at(callee).b))))
+        return fail(node, "session:legacy-method-precedence");
     const auto name = ast_.at(callee).kind == NodeKind::Ident ? text(ast_.at(callee)) : std::string_view{};
     for (const auto& symbol : session_->symbols) {
         if (symbol.name != name || !symbol.callable || session_->lambda_templates.count(symbol.name)) continue;
@@ -169,6 +178,9 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
     if (existing != session_->symbols.end() && existing->defined &&
         !(binding.readonly && binding.decl_kinds == kKindFunction && existing->readonly && existing->callable))
         return fail(ast_.at(root_), "session:redeclared");
+    if (existing != session_->symbols.end() && !existing->defined &&
+        (binding.readonly != existing->readonly || binding.const_array != existing->const_array))
+        return fail(ast_.at(root_), "session:reserved-binding-contract");
     if (session_->slots > 65532) return fail(ast_.at(root_), "limit:session-bindings");
     Binding global = binding;
     global.global = global.cell = true;
@@ -188,10 +200,16 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
     symbol.slot = global.reg;
     symbol.kinds = symbol.contract = binding.decl_kinds;
     const auto shape = kinds_.binding_shapes.find(std::string(name));
-    if (shape != kinds_.binding_shapes.end()) symbol.structure = shape->second;
+    if (shape != kinds_.binding_shapes.end()) symbol.structure = session_shape(shape->second);
     symbol.const_array = binding.const_array; symbol.readonly = binding.readonly;
     if (existing == session_->symbols.end()) session_->symbols.push_back(std::move(symbol));
-    else { symbol.contract = existing->contract; *existing = std::move(symbol); }
+    else {
+        symbol.contract = existing->contract;
+        // Older closures were compiled against the reserved slot's complete
+        // bounds, including mutations after its original declaration.
+        if (!existing->defined) symbol.structure = existing->structure;
+        *existing = std::move(symbol);
+    }
     return true;
 }
 bool UnitCompiler::session_function(NodeId id) {

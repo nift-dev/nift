@@ -1,12 +1,16 @@
 #include "rt/infer_session.h"
 #include "rt/compiler.h"
+#include <algorithm>
 
 // rt-lint: cold-file incremental namespace facts in the shared kind inference
 namespace nift::rt::infer_detail {
 TyRef Inference::session_expression_seed(NodeId id) {
     if (!session_) return {};
     const auto seed = session_->capture_seeds.find(id);
-    return seed == session_->capture_seeds.end() ? TyRef{} : seed->second;
+    if (seed == session_->capture_seeds.end()) return {};
+    const auto callable = session_->capture_callable_seeds.find(id);
+    return callable == session_->capture_callable_seeds.end() ? seed->second :
+        session_type(seed->second, callable->second);
 }
 TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
 
@@ -15,14 +19,19 @@ void Inference::seed_session() {
         external_.emplace(symbol.name, vars_.size());
         const auto declaration = session_->declarations.find(symbol.name);
         if (declaration != session_->declarations.end()) binding_decls_[vars_.size()] = declaration->second;
-        auto type = std::make_shared<Ty>(symbol.structure ? *symbol.structure : Ty{});
-        type->kinds = symbol.kinds;
+        TyRef type = session_type(symbol.structure ? symbol.structure : kinds_ty(symbol.kinds), symbol.callable_shape);
         const auto lambda = session_->lambda_templates.find(symbol.name);
-        if (lambda != session_->lambda_templates.end())
-            type->callables.push_back(static_cast<std::uint32_t>(lambda_unit(lambda->second)));
-        else if (symbol.definition) {
-            const auto target = plan_.index.find(symbol.definition->name);
-            if (target != plan_.index.end()) type->callables.push_back(target->second - 1u);
+        const auto target = symbol.definition ? plan_.index.find(symbol.definition->name) : plan_.index.end();
+        if (type->kinds != symbol.kinds || lambda != session_->lambda_templates.end() || target != plan_.index.end()) {
+            auto adapted = std::make_shared<Ty>(*type);
+            adapted->kinds = symbol.kinds;
+            if (lambda != session_->lambda_templates.end())
+                adapted->callables.push_back(static_cast<std::uint32_t>(session_lambda_reference(lambda->second)));
+            else if (target != plan_.index.end()) adapted->callables.push_back(target->second - 1u);
+            std::sort(adapted->callables.begin(), adapted->callables.end());
+            adapted->callables.erase(std::unique(adapted->callables.begin(), adapted->callables.end()),
+                                    adapted->callables.end());
+            type = std::move(adapted);
         }
         vars_.push_back(type);
     }

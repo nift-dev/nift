@@ -39,6 +39,9 @@ public:
     std::size_t code_slots() const { return linked_.size(); }
     void close();
 private:
+    std::vector<std::pair<std::uint64_t, const Proto*>> activation_targets(const Program&) const;
+    void activate_code(const std::vector<std::pair<std::uint64_t, const Proto*>>&,
+                       const std::shared_ptr<Program>&);
     SessionResult execute_safe(const std::string&, const std::string&, std::string&, bool, bool);
     SessionResult execute_unit(const std::string&, std::string, std::string&, bool expression,
                                bool inspect_tail = false);
@@ -53,7 +56,7 @@ private:
     SessionCompileContext namespace_;
     std::vector<Value> globals_;
     std::unique_ptr<Vm> vm_;
-    bool closed_ = false;
+    bool closed_ = false, active_ = false, close_pending_ = false;
     std::uint64_t executions_ = 0, refusals_ = 0;
 };
 } // namespace nift::rt

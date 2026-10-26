@@ -56,7 +56,7 @@ private:
     std::unordered_map<std::string, Binding> session_bindings_;
     bool session_function(NodeId id);
     bool session_admit();
-    bool session_tail(NodeId id);
+    bool session_render(NodeId id);
     bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);
     bool session_publish(std::string_view name, const Binding& binding);
     bool expression_result_ = false;

@@ -3664,3 +3664,7 @@ test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp19/session_refusal_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-refusals-switch.json"
 	$(PYTHON) tests/runtime2/cp19/session_classify_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-classify.json"
 	$(PYTHON) tests/runtime2/cp19/session_classify_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-classify-switch.json"
+	$(PYTHON) tests/runtime2/cp19/session_render_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-render.json"
+	$(PYTHON) tests/runtime2/cp19/session_render_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-render-switch.json"
+	$(PYTHON) tests/runtime2/cp19/session_callable_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-callable.json"
+	$(PYTHON) tests/runtime2/cp19/session_callable_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-callable-switch.json"

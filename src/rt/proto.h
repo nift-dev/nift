@@ -54,12 +54,6 @@ struct Note {
 class SourceMap;
 struct Program;
 struct Proto {
-    std::shared_ptr<const SourceMap> session_source;
-    std::weak_ptr<const Program> session_owner;
-    std::shared_ptr<const SessionDefinition> session_definition;
-    std::vector<std::pair<std::uint64_t, const Proto*>> session_targets;
-    std::uint16_t session_returns = 0;
-    std::vector<std::uint16_t> session_params, session_param_types;
     const Proto* collection_entry = nullptr;  // owned by Program::protos
     bool collection_expression_view = false;
     std::string name;
@@ -71,6 +65,12 @@ struct Proto {
     std::vector<std::uint32_t> notes;  // parallel to code: index into note_table + 1, 0 = none
     std::vector<Note> note_table;
     const Note* note(std::size_t pc) const { return notes[pc] ? &note_table[notes[pc] - 1] : nullptr; }
+    // Session metadata follows the existing execution fields.
+    std::shared_ptr<const SourceMap> session_source;
+    std::weak_ptr<const Program> session_owner;
+    std::shared_ptr<const SessionDefinition> session_definition;
+    std::uint16_t session_returns = 0;
+    std::vector<std::uint16_t> session_params, session_param_types;
 };
 
 struct Program {

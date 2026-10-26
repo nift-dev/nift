@@ -71,16 +71,16 @@ struct ObjectObject : HeapObject {
 // closures do not). `code` and `environment` are opaque until the compiler
 // (CP11) defines protos; natives use `native_id`.
 struct FunctionObject : HeapObject {
-    std::shared_ptr<const Program> program_owner;  // session code lifetime, never a state bridge
     std::string name;
     const void* code = nullptr;
     std::uint32_t native_id = 0;
-    std::uint64_t session_identity = 0;  // stable across session named-function redefinition
-    std::uint64_t display_id = 0;  // CLI presentation only; callable identity remains the Value
     bool is_lambda = false;
     bool expression_body = false;
     bool selector_call_site = false;  // returned expression body lacks a legacy source view
     std::vector<Value> upvalues;
+    std::shared_ptr<const Program> program_owner;  // session code lifetime, never a state bridge
+    std::uint64_t session_identity = 0;  // stable across session named-function redefinition
+    std::uint64_t display_id = 0;  // CLI presentation only; callable identity remains the Value
     FunctionObject() : HeapObject(Kind::Function) {}
 };
 

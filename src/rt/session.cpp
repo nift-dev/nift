@@ -22,6 +22,7 @@ VmSession::VmSession(VmOptions options) {
     main->code.push_back(Instr{OpCode::Halt, 0, 0, 0, 0});
     main->offsets.push_back(0); main->notes.push_back(0);
     bootstrap_.protos.push_back(std::move(main));
+    options.source_map = nullptr;  // each owned session Proto supplies its immutable source map
     options.session_globals = &globals_;
     options.return_value = &last_value_;
     vm_ = std::make_unique<Vm>(bootstrap_, options);
@@ -29,6 +30,8 @@ VmSession::VmSession(VmOptions options) {
 VmSession::~VmSession() { close(); }
 void VmSession::close() {
     if (closed_) return;
+    if (active_) { close_pending_ = true; return; }
+    close_pending_ = false;
     // Destroy executable values before the immutable code they refer to.
     vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
@@ -68,20 +71,8 @@ void VmSession::refresh(SessionCompileContext& pending) {
         // later assignment beyond them refuses before execution; an observed
         // current value never silently narrows old code's assumptions.
         symbol.kinds = symbol.contract;
-        symbol.structure = session_shape(symbol.structure);
-        symbol.untracked_callables = false;
-        if (v.is(Kind::Object) || v.is(Kind::Array)) {
-            std::vector<Value> pending{v};
-            std::unordered_set<const HeapObject*> seen;
-            while (!pending.empty()) {
-                const auto value = std::move(pending.back()); pending.pop_back();
-                if (!value.is_heap() || !seen.insert(value.heap()).second) continue;
-                if (value.is(Kind::Function)) { symbol.untracked_callables = true; break; }
-                if (value.is(Kind::Array)) for (const auto& item : array_items(value)) pending.push_back(item);
-                if (value.is(Kind::Object))
-                    for (const auto& item : object_entries(value)) pending.push_back(item.second);
-            }
-        }
+        symbol.callable_shape = session_callable_shape(v);
+        symbol.untracked_callables = symbol.callable_shape && !symbol.callable_shape->complete;
         symbol.callable = v.is(Kind::Function);
         if (symbol.callable) {
             const auto* proto = static_cast<const Proto*>(v.template heap_as<FunctionObject>()->code);
@@ -111,9 +102,24 @@ SessionResult VmSession::evaluate(const std::string& source, std::string path, s
 }
 SessionResult VmSession::execute_safe(const std::string& source, const std::string& path, std::string& output,
                                       bool expression, bool inspect_tail) {
+    if (active_) {
+        SessionResult result;
+        result.execution.reason = StopReason::Internal;
+        result.execution.message = "session is already executing";
+        detail::Stats stats; stats.path = path; stats.outcome = "internal-error";
+        stats.reason = result.execution.message; detail::report(stats);
+        return result;  // never reset, retire or destroy a running VM
+    }
     const auto before = executions_;
-    try { return execute_unit(source, path, output, expression, inspect_tail); }
+    active_ = true;
+    try {
+        auto result = execute_unit(source, path, output, expression, inspect_tail);
+        active_ = false;
+        if (close_pending_) close();
+        return result;
+    }
     catch (const std::exception& error) {
+        active_ = false;
         SessionResult result;
         result.vm_executions = executions_ != before;
         result.admitted = result.vm_executions != 0;
@@ -122,6 +128,8 @@ SessionResult VmSession::execute_safe(const std::string& source, const std::stri
         detail::Stats stats; stats.path = path; stats.outcome = "internal-error";
         stats.reason = result.execution.message; stats.executions = static_cast<int>(result.vm_executions);
         close(); detail::report(stats); return result;
+    } catch (...) {
+        active_ = false; close(); throw;
     }
 }
 SessionResult VmSession::execute_unit(const std::string& source, std::string path, std::string& output,
@@ -189,7 +197,6 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     }
     auto owned = std::shared_ptr<Program>(std::move(compiled.program));
     auto& program = *owned;
-    const auto plan = plan_unit(ast, parsed.root);
     session_definitions(ast, parsed.root, text, path, pending, program, executions_);
     auto linked = linked_;
     auto vacant = vacant_;
@@ -202,20 +209,10 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
         }
         linked[slots[k]] = program.protos[k].get();
     }
-    std::vector<std::pair<std::uint64_t, const Proto*>> targets;
-    for (const auto& symbol : namespace_.symbols) if (symbol.definition && symbol.identity) {
-        if (symbol.definition->lambda) {
-            for (const auto& proto : program.protos) if (proto->session_definition == symbol.definition)
-                targets.emplace_back(symbol.identity, proto.get());
-        } else {
-            const auto target = plan.index.find(symbol.definition->name);
-            if (target != plan.index.end()) targets.emplace_back(symbol.identity, program.protos[target->second].get());
-        }
-    }
+    const auto targets = activation_targets(program);
     for (auto& proto : program.protos) {
         proto->session_source = source_map;
         proto->session_owner = owned;
-        proto->session_targets = targets;
         for (auto& instruction : proto->code)
             if (instruction.op == OpCode::Call || instruction.op == OpCode::LoadFunction ||
                 instruction.op == OpCode::Closure) instruction.b = slots.at(instruction.b);
@@ -233,8 +230,11 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     std::vector<Value> before;
     for (const auto& cell : globals_) before.push_back(is_cell(cell) ? cell_load(cell) : Value());
 #endif
+    activate_code(targets, owned);
+    retire_code();  // old code may have lost its final owner during activation
     const auto execute_begin = std::chrono::steady_clock::now();
     result.execution = vm_->run_session_unit(*owned, linked_, output);
+    if (result.execution.reason != StopReason::None) result.execution.statement_text.clear();
     stats.execute_us = std::chrono::duration<double, std::micro>(
         std::chrono::steady_clock::now() - execute_begin).count();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 4
@@ -247,6 +247,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_.imported_functions.clear();
     namespace_.declarations.clear();
     namespace_.lambda_templates.clear(); namespace_.capture_seeds.clear();
+    namespace_.callable_templates.clear(); namespace_.capture_callable_seeds.clear();
     namespace_.capture_contracts.clear(); namespace_.template_definitions.clear();
     namespace_.source_owner.reset();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2

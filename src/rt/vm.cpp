@@ -311,9 +311,8 @@ VmResult Vm::run(std::string& output) {
         NEXT(); }
     OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
-    OP(TopReturn) {
-        if (!op_top_return(*pc, R, result, fault, proto) || !pop_handlers_for_frame(0, fault)) FAIL();
-        goto done; }
+    OP(SessionRender) { if (!op_session_render(*pc, R, result, fault, proto)) FAIL(); NEXT(); }
+    OP(TopReturn) { if (!op_top_return(*pc, R, result, fault, proto)) FAIL(); goto done; }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
     OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }

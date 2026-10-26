@@ -1,5 +1,6 @@
 #include "rt/session.h"
 #include "rt/session_inventory.h"
+#include "rt/session_callable.h"
 #include "rt/parser.h"
 #include "rt/heap.h"
 #include "rt/aggregate.h"
@@ -9,6 +10,9 @@
 #include <filesystem>
 using namespace nift::rt;
 int main() {
+    // Atom storage belongs to the thread (CP23); pre-intern fixture keys so
+    // the exact final heap comparison measures owned runtime values.
+    atom("left"); atom("right"); atom("f");
     const auto before = live_heap_bytes();
     {
         VmSession session;
@@ -29,6 +33,8 @@ int main() {
         const auto count = session.binding_count();
         const auto calls = session.executions();
         const auto closure = session.value("counter");
+        const auto* original_code = closure.heap_as<FunctionObject>()->code;
+        const auto* original_owner = closure.heap_as<FunctionObject>()->program_owner.get();
         std::string output;
         auto refused = session.execute("leaked:=99;print(\"FORBIDDEN\");bytes([65])", "unit-6", output);
         CHECK(!refused.admitted && !refused.refusal.empty());
@@ -36,6 +42,8 @@ int main() {
         CHECK(!session.contains("leaked") && session.binding_count() == count);
         CHECK(session.executions() == calls && session.refusals() == 1);
         CHECK(session.value("counter").heap() == closure.heap());
+        CHECK(closure.heap_as<FunctionObject>()->code == original_code);
+        CHECK(closure.heap_as<FunctionObject>()->program_owner.get() == original_owner);
         execute("print(getx());print(counter());print(x)", "5\n12\n5\n", 7);
         // Unit 8 closes once; an externally held closure owns its immutable
         // code until its final reference is dropped.
@@ -94,6 +102,18 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         r = session.evaluate("f()", "retained-closure", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 9);
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("f:=()=>ghost[0];throw error(\"stop\");ghost:=[1];ghost.push(\"later\")", "reserved-array", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && !session.contains("ghost"));
+        r = session.execute("ghost:=[3]", "fill-reserved-array", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.execute("ghost.push(\"later\")", "preserved-array-bound", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && array_size(session.value("ghost")) == 2);
+        r = session.evaluate("f()", "old-array-reader", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
     }
     {
         VmSession session;
@@ -175,6 +195,100 @@ int main() {
         const auto bounded = session_inventory_json(ast, parsed.root, parsed.ok, original, map, false, 1);
         CHECK(bounded.find("\"inventory_complete\":false") != std::string::npos);
         CHECK(bounded.find("round-limit") != std::string::npos && bounded.find("callable:unknown") == std::string::npos);
+    }
+    {
+        VmOptions options; options.heap_budget = 1;
+        VmSession session(options); session.initialize_invocation("budget", {});
+        std::string output;
+        const auto result = session.execute("print(\"MUST-NOT-RUN\")", "budget-unit", output);
+        CHECK(result.admitted && result.execution.reason == StopReason::Internal);
+        CHECK(result.execution.message == "memory budget exceeded" && output.empty());
+        CHECK(result.vm_executions == 1 && result.legacy_executions == 0 && session.binding_count() == 0);
+    }
+    {
+        VmSession session;
+        std::string output;
+        const auto result = session.execute("f:=()=>1;o:={\"left\":f,\"right\":f};a:=[f,f]", "callable-facts", output);
+        CHECK(result.admitted && result.execution.reason == StopReason::None);
+        const auto object = session_callable_shape(session.value("o"));
+        const auto array = session_callable_shape(session.value("a"));
+        CHECK(object && object->fields.size() == 2 && array && array->element);
+        const auto object_targets = session_callable_targets(object);
+        const auto array_targets = session_callable_targets(array);
+        CHECK(object_targets.size() == 1 && array_targets.size() == 1);
+        CHECK(object_targets.front().identity == array_targets.front().identity);
+        std::weak_ptr<const Program> owner = session.value("f").heap_as<FunctionObject>()->program_owner;
+        session.close();
+        CHECK(owner.expired());  // compiler facts never pin executable values or their Program
+        CHECK(object_targets.front().definition->path == "callable-facts");
+        CHECK(object_targets.front().definition->source->find("f:=()=>1") != std::string::npos);
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("o:={\"f\":v=>v+1};saved:=error(\"seed\")", "object-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto object = session.value("o");
+        const auto function = object_entries(object).front().second;
+        const auto code = function.heap_as<FunctionObject>()->code;
+        const auto owner = function.heap_as<FunctionObject>()->program_owner;
+        r = session.execute("leaked:=9;print(\"FORBIDDEN\");o.f(bytes([65]))", "refused-object-call", output);
+        CHECK(!r.admitted && !session.contains("leaked") && output.empty());
+        CHECK(function.heap_as<FunctionObject>()->code == code && function.heap_as<FunctionObject>()->program_owner == owner);
+        r = session.evaluate("o.f(4)", "specialized-object-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 5);
+        CHECK(object_entries(session.value("o")).front().second.heap() == function.heap());
+        r = session.execute("fn(makecb()){g:=x=>x+1;return x=>g(x)};c:=makecb()", "captured-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto facts = session_callable_shape(session.value("c"));
+        CHECK(facts && facts->complete && session_callable_targets(facts).size() == 2);
+        r = session.evaluate("c(7)", "captured-later-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 8);
+    }
+    {
+        struct State { VmSession* session = nullptr; SessionResult nested; std::string output, nested_output; } state;
+        VmOptions options; options.flush_threshold = 1; options.flush_context = &state;
+        options.flush = [](std::string& output, void* context) {
+            auto& state = *static_cast<State*>(context);
+            state.output += output; output.clear();
+            state.nested = state.session->execute("leaked:=9", "reentrant-unit", state.nested_output);
+        };
+        VmSession session(options); state.session = &session;
+        std::string output;
+        const auto result = session.execute("x:=1;print(\"ONCE\");x+=1", "outer-unit", output);
+        CHECK(result.admitted && result.execution.reason == StopReason::None && state.output == "ONCE\n");
+        CHECK(state.nested.execution.reason == StopReason::Internal && !state.nested.admitted);
+        CHECK(state.nested.vm_executions == 0 && state.nested.legacy_executions == 0 && state.nested_output.empty());
+        CHECK(!session.contains("leaked") && session.value("x").as_int() == 2 && session.executions() == 1);
+    }
+    {
+        struct State { VmSession* session = nullptr; std::string output; } state;
+        VmOptions options; options.flush_threshold = 1; options.flush_context = &state;
+        options.flush = [](std::string& output, void* context) {
+            auto& state = *static_cast<State*>(context);
+            state.output += output; output.clear(); state.session->close();
+        };
+        VmSession session(options); state.session = &session;
+        std::string output;
+        const auto result = session.execute("x:=1;print(\"ONCE\");x+=1;print(x)", "closing-unit", output);
+        CHECK(result.admitted && result.execution.reason == StopReason::None && state.output == "ONCE\n2\n");
+        CHECK(session.binding_count() == 0 && session.executions() == 1);
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto result = session.execute("saved:=error(\"seed\");x:=1", "render-state", output);
+        CHECK(result.admitted && result.execution.reason == StopReason::None);
+        const auto error = session.value("saved");
+        result = session.execute("x=2;print(\"ONCE\");saved", "render-error", output, true);
+        CHECK(result.admitted && result.execution.reason == StopReason::Error && !result.execution.catchable);
+        CHECK(result.execution.statement_text.empty() && output == "ONCE\n" && session.value("x").as_int() == 2);
+        CHECK(session.value("saved").heap() == error.heap());
+        CHECK(error.heap_as<ErrorObject>()->source.empty() && error.heap_as<ErrorObject>()->message == "seed");
+        output.clear();
+        result = session.execute("print(\"A\");print(\"B\")", "render-success", output, true);
+        CHECK(result.admitted && result.execution.reason == StopReason::None && output == "A\nB\n");
+        CHECK(result.execution.statement_text == "nullnull");
     }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");

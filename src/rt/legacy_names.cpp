@@ -35,6 +35,22 @@ constexpr std::string_view kNames[] = {
     "write_val", "xml",
 };
 
+constexpr std::string_view kMethods[] = {
+    "abs", "add", "all", "any", "append", "cat", "ceil", "chunk", "clear", "close", "compare_exchange", "contains",
+    "copy", "count", "count_by", "cwd", "decode", "done", "drop", "elapsed", "empty", "encode", "ends_with",
+    "entries", "env", "eof", "exchange", "exists", "fetch_add", "fetch_sub", "file", "filter", "find", "find_index",
+    "first", "flatten", "floor", "flush", "from_entries", "front", "get", "group_by", "group_by_each", "has",
+    "indexOf", "index_by", "index_of", "insert", "insert_after", "insert_before", "join", "keys", "last",
+    "last_index_of", "length", "load", "lock", "locked", "map", "max", "max_by", "merge", "merge_deep", "min",
+    "min_by", "modified", "move", "mv", "omit", "open", "partition", "path", "pause", "paused", "pick", "pipe", "pop",
+    "prepend", "push", "read", "read_all", "read_all_bytes", "read_bytes", "read_line", "read_val", "reduce",
+    "remove", "replace", "replace_once", "reset", "resume", "reverse", "revert", "round", "run", "running", "save",
+    "seek", "set", "size", "slice", "sort", "sort_by", "splice", "split", "start", "starts_with", "stat", "status",
+    "stderr", "stdin", "stdout", "stop", "store", "substr", "sum", "take", "tell", "to_double", "to_int", "to_lower",
+    "to_string", "to_upper", "top", "trim", "trim_end", "trim_start", "try_lock", "unique", "unique_by", "unlock",
+    "values", "write", "write_bytes", "write_line", "write_val",
+};
+
 } // namespace
 
 bool legacy_special_name(std::string_view name) {
@@ -42,5 +58,9 @@ bool legacy_special_name(std::string_view name) {
 }
 
 std::size_t legacy_special_name_count() { return std::size(kNames); }
+
+bool legacy_special_method(std::string_view name) {
+    return std::binary_search(std::begin(kMethods), std::end(kMethods), name);
+}
 
 } // namespace nift::rt

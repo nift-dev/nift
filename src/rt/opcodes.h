@@ -108,7 +108,8 @@ namespace nift::rt {
     X(CollectionSort) /* resumable callback sorter */ \
     X(CollectionStep) /* private CP14B state-window operation */ \
     X(CollectionCall) /* checked ordinary-frame collection callback */ \
-    X(ArrayMutate) /* synchronous bare-binding mutation */
+    X(ArrayMutate) /* synchronous bare-binding mutation */ \
+    X(SessionRender) /* append a compound REPL statement value, never stdout */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,

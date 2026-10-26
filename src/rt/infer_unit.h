@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+namespace nift::rt { struct SessionCallableShape; }
+
 namespace nift::rt::infer_detail {
 
 class Inference {
@@ -30,6 +32,8 @@ public:
 private:
     void enqueue(std::size_t unit);
     TyRef session_expression_seed(NodeId id);
+    TyRef session_type(const TyRef&, const std::shared_ptr<const SessionCallableShape>&);
+    std::size_t session_lambda_reference(NodeId);
     void seed_session();
     void export_session();
     TyRef session_call(const Node& n);

@@ -1,5 +1,6 @@
 #include "rt/script_runner.h"
 #include "rt/script_runner_stats.h"
+#include "rt/script_runner_options.h"
 
 #include "HostTrace.h"
 #include "rt/compiler_eval.h"
@@ -88,23 +89,6 @@ void internal_failure(Stats& stats, const std::filesystem::path& path, const std
     std::cerr << "error: " << path.generic_string() << ": NIFT_VM internal failure: " << what
               << " (the script was not run on the legacy engine)" << std::endl;
     exit_code = 70;
-}
-
-// Test-only knobs: NIFT_VM_HEAP_BUDGET=<bytes> lowers the memory budget
-// (review round 2 R5 tests); NIFT_VM_FLUSH=<bytes> the streaming threshold.
-bool size_from_environment(const char* name, std::size_t& out) {
-    const char* value = std::getenv(name);
-    if (!value || !*value) return false;
-    char* end = nullptr;
-    const unsigned long long limit = std::strtoull(value, &end, 10);
-    if (!end || *end != '\0' || limit == 0) return false;
-    out = static_cast<std::size_t>(limit);
-    return true;
-}
-
-void limits_from_environment(VmOptions& options) {
-    size_from_environment("NIFT_VM_HEAP_BUDGET", options.heap_budget);
-    size_from_environment("NIFT_VM_FLUSH", options.flush_threshold);
 }
 
 struct EvalResult { nift::RuntimeValue& value; std::string& error; };
@@ -350,7 +334,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     const char* dump = std::getenv("NIFT_VM_DUMP");
     if (dump && std::string(dump) == "1") std::cerr << disassemble(*compiled.program);
     VmOptions options;
-    limits_from_environment(options);
+    detail::limits_from_environment(options);
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
     const SourceMap source_map = source_map_for(link, source_path, source);  // owns source positions
     options.source_map = &source_map;

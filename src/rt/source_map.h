@@ -59,10 +59,10 @@ private:
     struct Impl {
         std::vector<std::string> paths;
         std::vector<std::string> sources;
-        std::vector<LinkSegment> pieces;
-        const LinkedUnit* link = nullptr;  // borrowed; only locate() is used
+        const LinkedUnit* link = nullptr;  // borrowed for linked(), owned for pieces(); locate() only
         mutable std::once_flag built;
         mutable std::vector<std::vector<std::uint32_t>> line_starts;
+        std::unique_ptr<LinkedUnit> owned_link;
 #ifdef NIFT_SOURCEMAP_COUNTER
         mutable std::atomic<std::uint64_t> lookups{0};
 #endif

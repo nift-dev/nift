@@ -1,0 +1,97 @@
+CP19 persistent compiler/session implementation — development record
+Foundation: CP18 8e65196b7f67abef317e7cfecb1eb97c227c5d96
+Status: local development; not checkpoint acceptance or integration.
+
+Authority and scope
+One VM owns the session from construction (D-054). Unsupported compilation
+refuses before effects without losing the session, selecting legacy, replaying
+history, or copying executable state into Parser values. CP21 job control,
+history and completion remain with their existing owner. CP24 stays deferred.
+CP17 persistent resource admission awaits the exact owner-relayed integrated
+interfaces. No replacement handle APIs, detach, or cleanup suppression exists.
+
+Authoritative namespace and publication
+VmSession owns stable cells and type slots; the shared compiler compiles each
+new unit against immutable bounds. Compilation uses a private context, resolves
+and checks the entire unit, and allocates publication containers before entry.
+Refusal cannot update cells, consume callable identities or replace code.
+Runtime failure preserves effects that executed and publishes only reached
+bindings. Unreached slots stay reserved but invisible; later compatible
+initialization preserves their original shape and mutability contract.
+
+Callable ownership and specialization
+Function values retain their Program independently of the VM. Immutable source
+buffers and per-Proto maps retain definition origins across units. Weak code-unit
+records reclaim unused slots; escaped function Values keep old code alive.
+Equivalent specializations activate once at admitted unit entry, preserving
+Function identity and captured cells. Ordinary call entry still follows the
+Function's code pointer directly. Native array traversal and VM callback frames
+remain the CP14B architecture, without a reentrant VM call or per-element codec.
+
+Callable metadata describes actual reachable functions in objects, arrays and
+plain captured cells. It stores identities, immutable definitions and structural
+facts, never runtime Values or Program owners. Depth truncation, unsupported
+locations and graph back edges are explicitly incomplete facts. Metadata
+collection never resolves a selector. Callable facts overlay the compiler's
+original structural bounds; observed values cannot narrow those bounds.
+Plain-data aggregates use the existing identity summary and need no deep scan.
+Immutable sanitized type graphs are shared across commands.
+
+Only needed declarations are imported into fresh compilation; executable
+statements are never replayed. Lambda wrappers seed capture bounds and are never
+executed. Referencing a lambda template cannot install the caller's lexical
+scope. Actual template traversal restores its original capture environment.
+Named redefinition preserves the registry Function identity seen by aliases.
+Retained readers, including captured functions and object fields, are compiled
+against a replacement before it can be admitted. Replacement takes effect at
+its registration instruction. A mixed-order unit with executable statements
+before an existing named replacement remains refused rather than observing
+the replacement prematurely.
+
+Shell routes and presentation
+.niftrc, interactive statements, file/stdin/inline -i continuation and selected
+command interpolation share the same VM session. cmd and args are immutable
+invocation cells. Classification does not execute or publish; shell syntax is
+validated before interpolation. An internal VM failure is terminal status 70,
+including interpolation and command-style Nift invocation, so later command
+segments cannot run against a closed session.
+
+The shared parser/compiler lower assignment expressions once. Indexed RHS and
+target effects are not replayed. CP12 prepared-loop and index-target admission
+rules remain in force. Quoted callbacks are parsed only for proven Array
+receivers; ordinary string contents cannot import executable definitions.
+Legacy's reserved method precedence is preserved using source-generated method
+heads, rather than calling a same-named plain-object Function field.
+
+REPL inspection and compound statement presentation are different legacy modes.
+SessionRender buffers compound expression text; explicit print remains a real
+side effect. Runtime failure discards buffered presentation, preserving explicit
+output and cell effects. Prepared loop bodies and compiled push statements
+retain their existing discard rules. .niftrc discards presentation, not print.
+Caught Error payloads, identity, origin and handler selection remain unchanged;
+Frame and Fault layout are unchanged.
+
+API safety
+Same-session reentry refuses before touching compilation or execution state.
+Close requested from a flush callback is deferred until execution returns.
+Per-command teardown clears temporary registers, frames, handlers and stale
+named-function caches. Session namespace storage is charged to the configured
+heap budget. Fatal internal stops close the session; runtime Errors retain it.
+
+Remaining admission boundaries
+The compiler's established unsupported syntax, builtins, alias/handle and
+prepared-context refusals remain. CP19 additionally refuses widening an older
+binding/capture contract, unsupported callable rebinding, unproved callable
+flow, mixed-order named replacement, dynamic named-function shadowing and
+persistent struct schemas. These are coverage limitations, not execution
+passes, compatibility waivers or justification to switch a VM session engine.
+The final traceability/refusal inventory must identify their release impact.
+
+Evidence policy
+Affirmative VM and zero legacy counts are required for admitted cases in both
+dispatches. Refusals are counted separately. Runtime failures must retain effects
+without replay. Exact parity, compiled behavioral mutants, ownership/source-map
+checks and ASan/LSan/UBSan support local verification. An implementation owner's
+rerun of reviewer tests is not independent acceptance. Original evidence is
+preserved; later fixes get new logs. Final performance, resource reconciliation
+and macOS/Windows certification are not implied by local functional passes.

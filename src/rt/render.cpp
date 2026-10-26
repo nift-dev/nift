@@ -1,4 +1,5 @@
 #include "rt/render.h"
+#include "rt/heap.h"
 
 #include "RuntimeValue.h"
 #include "rt/string.h"
@@ -6,6 +7,11 @@
 #include <charconv>
 
 namespace nift::rt {
+std::string callable_marker(const FunctionObject& function) {
+    return std::string("\x1fnift:callable:") + (function.is_lambda
+        ? "lambda:" + std::to_string(function.display_id) : "named:" + function.name);
+}
+
 
 bool append_rendered(const Value& value, std::string& out) {
     switch (value.kind()) {

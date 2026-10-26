@@ -8,6 +8,8 @@
 #include <string>
 
 namespace nift::rt {
+struct FunctionObject;
+std::string callable_marker(const FunctionObject& function);
 
 // Appends the rendering of `value` to `out`. Returns false (appending
 // nothing) for values legacy does not render as text (arrays, objects,

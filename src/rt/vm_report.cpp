@@ -163,7 +163,7 @@ bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault
     if (options_.return_value) *options_.return_value = R[in.a];
     else if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
     result.returned = true;
-    return true;
+    return pop_handlers_for_frame(0, fault);
 }
 
 void Vm::result_stats(VmResult& result) {
