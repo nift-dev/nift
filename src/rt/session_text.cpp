@@ -5,21 +5,27 @@
 #include "rt/parser.h"
 #include "rt/compiler_eval.h"
 #include <stdexcept>
+#include <algorithm>
 
 // rt-lint: cold-file immutable declaration linking, never executable history replay
 namespace nift::rt {
 SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context) {
     SessionText out;
     std::unordered_map<std::string, std::vector<std::shared_ptr<const SessionDefinition>>> available;
-    for (const auto& symbol : context.symbols)
-        if (symbol.defined) for (const auto& callable : session_callable_targets(symbol.callable_shape))
+    for (const auto& schema : context.structures) available[schema.first].push_back(schema.second);
+    for (const auto& symbol : context.symbols) if (symbol.defined) {
+        for (const auto& callable : session_callable_targets(symbol.callable_shape))
             available[symbol.name].push_back(callable.definition);
+        const auto schema = context.structures.find(symbol.struct_name);
+        if (schema != context.structures.end()) available[symbol.name].push_back(schema->second);
+    }
     std::unordered_set<std::string> declarations;
     Ast original(source);
     const auto parsed = parse_script(original);
     if (parsed.ok) for (std::uint32_t k = 0; k < original.at(parsed.root).count; ++k) {
         const auto& node = original.at(original.list(original.at(parsed.root))[k]);
-        if (node.kind == NodeKind::FnDecl) declarations.emplace(original.text(original.at(node.a)));
+        if (node.kind == NodeKind::FnDecl || node.kind == NodeKind::StructDecl)
+            declarations.emplace(original.text(original.at(node.a)));
     }
     std::vector<std::shared_ptr<const SessionDefinition>> selected;
     auto scan = [&](std::string_view text) {
@@ -56,6 +62,7 @@ SessionText session_text(const std::string& source, const std::string& path, con
                               static_cast<std::uint32_t>(value.size())});
     };
     out.imports.clear();
+    std::stable_partition(selected.begin(), selected.end(), [](const auto& item) { return item->structure; });
     for (const auto& definition : selected) {
         if (definition->lambda) {
             std::string wrapper = "__cp19_template";

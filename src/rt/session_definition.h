@@ -15,7 +15,8 @@ struct SessionDefinition {
     std::string name, path;
     std::shared_ptr<const std::string> source;
     std::uint32_t begin = 0, end = 0;
-    bool lambda = false;
+    bool lambda = false, structure = false;
     std::vector<SessionCapture> captures;
+    std::vector<std::string> dynamic_fields;  // struct fields subject to legacy caller lookup
 };
 } // namespace nift::rt

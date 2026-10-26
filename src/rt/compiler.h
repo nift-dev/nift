@@ -31,7 +31,7 @@ struct CompileResult {
 // `root` must be the Program node of a successful parse_script.
 // Analysis limits (tests lower them to exercise the refusal).
 struct SessionSymbol {
-    std::string name;
+    std::string name, struct_name;
     std::shared_ptr<const SessionDefinition> definition;
     std::shared_ptr<const infer_detail::Ty> structure;
     std::shared_ptr<const SessionCallableShape> callable_shape;
@@ -43,6 +43,7 @@ struct SessionSymbol {
 };
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
+    std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
     std::unordered_set<std::string> imported_functions;
     std::unordered_map<std::string, NodeId> declarations;
     std::unordered_map<std::string, NodeId> lambda_templates;

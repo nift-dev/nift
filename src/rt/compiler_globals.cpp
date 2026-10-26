@@ -13,6 +13,10 @@ namespace nift::rt::detail {
 
 const Binding* UnitCompiler::find_binding(std::string_view name) const {
     if (const Binding* local = scopes_.find(name)) return local;
+    // Preserve CP12b's method scope: fields are resolved by own_field, and
+    // outer session globals must not silently override them or broaden the
+    // existing refusal of method-global lookup.
+    if (in_function_ && plan_.is_method(function_)) return nullptr;
     const auto external = session_bindings_.find(std::string(name));
     if (external != session_bindings_.end()) return &external->second;
     if (in_lambda_) {

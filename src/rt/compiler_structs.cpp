@@ -51,8 +51,13 @@ bool UnitCompiler::receiver_slot(NodeId object, std::uint16_t dst) {
         fb_->emit(OpCode::SlotOf, dst, b->reg);
         return true;
     }
-    std::uint16_t k = 0;  // a global: main's slot is absolute
-    if (!fb_->constant(Value::integer(b->reg), k)) return builder_ok();
+    if (session_ && !global_check_defined(b->reg, b->session_name)) return false;
+    // Negative locations identify stable session cells. Ordinary scripts keep
+    // their existing absolute main-frame locations, and constructors use a
+    // temporary stack location until the instance is published.
+    const auto location = session_ ? -1 - static_cast<std::int64_t>(b->reg) : b->reg;
+    std::uint16_t k = 0;
+    if (!fb_->constant(Value::integer(location), k)) return builder_ok();
     fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(k & ~kConstantBit));
     return true;
 }

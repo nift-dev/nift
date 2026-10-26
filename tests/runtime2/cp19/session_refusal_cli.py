@@ -3,6 +3,9 @@ from pathlib import Path
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True);a=ap.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('struct-outer-shadow','v:=99\nstruct(Counter){v:=0;fn(get()){return v}};print("FORBIDDEN");c:=Counter()\nv\nexit\n','99\n','session:struct-dynamic-shadow'),
+ ('struct-later-shadow','struct(Counter){v:=0;fn(get()){return v}};c:=Counter()\nprint("FORBIDDEN");v:=99\nc.get()\nexit\n','0\n','session:struct-dynamic-shadow'),
+ ('struct-caller-shadow','struct(Counter){v:=0;fn(get()){return v}};c:=Counter()\nprint("FORBIDDEN");fn(caller(v)){return c.get()}\nc.get()\nexit\n','0\n','session:struct-dynamic-shadow'),
  ('local-dynamic-shadow','x:=1;fn(readx()){return x}\nprint("FORBIDDEN");fn(caller()){x:=7;return readx()}\nx\nreadx()\nexit\n','1\n1\n','session:dynamic-shadow'),
  ('parameter-dynamic-shadow','x:=1;fn(readx()){return x}\nprint("FORBIDDEN");fn(caller(x)){return readx()}\nx\nreadx()\nexit\n','1\n1\n','session:dynamic-shadow'),
  ('dynamic-flow','o:={"set":v=>v+1};x:=5\nprint("FORBIDDEN");o.set(4)\nx\nexit\n','5\n','session:legacy-method-precedence'),

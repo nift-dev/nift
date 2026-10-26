@@ -55,6 +55,26 @@ Named-reader admission checks parameters and local declarations that can shadow
 an external free name. D-038 caller-dependent lookup is refused before effects;
 unrelated lexical shadowing without a named free reader remains admitted.
 
+Persistent structs
+The existing CP12b subset now retains immutable schema declarations and stable
+instance cells across units. Only already-admitted constant field initializers
+and methods are imported; declaration-time executable statements are not replayed.
+Type identities use schema names when a fresh compiler plan assigns local ids.
+Methods receive an internal location number: ordinary scripts retain absolute
+stack slots, while a session uses a checked encoding of a stable cell slot.
+This adds no Frame field or borrowed register pointer. COW field updates reach
+the same instance cell and preserve independent snapshots.
+
+Schema publication follows successful whole-unit compilation. Refusal publishes
+no schema; an admitted runtime failure retains schemas whose declarations
+preceded executable statements under the existing CP12b ordering rule. Original
+method source maps survive later construction/invocation. Schema replacement,
+name conflicts and unproved dynamic field shadowing refuse before effects.
+Parameters/locals in a method with no call cannot expose a caller binding to a
+second reader; ordinary constructor parameter names remain usable. Unrelated
+callback parameters do not acquire a false struct dependency. Existing CP12b
+struct sharing, alias, private-field and prepared-loop limits remain in force.
+
 Shell routes and presentation
 .niftrc, interactive statements, file/stdin/inline -i continuation and selected
 command interpolation share the same VM session. cmd and args are immutable

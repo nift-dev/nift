@@ -2,6 +2,7 @@
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/legacy_names.h"
+#include "rt/compiler_session_scope.h"
 #include <algorithm>
 
 // rt-lint: cold-file incremental compiler namespace publication
@@ -19,6 +20,8 @@ void UnitCompiler::set_session(SessionCompileContext* session) {
         binding.type_reg = symbol.slot + 1;
         binding.decl_kinds = symbol.kinds;
         binding.const_array = symbol.const_array; binding.readonly = symbol.readonly;
+        const auto schema = plan_.struct_index.find(symbol.struct_name);
+        if (schema != plan_.struct_index.end()) binding.struct_id = static_cast<int>(schema->second);
         session_bindings_.emplace(symbol.name, binding);
     }
 }
@@ -35,6 +38,13 @@ bool UnitCompiler::session_render(NodeId id) {
     return true;
 }
 bool UnitCompiler::session_admit() {
+    // Admission precedes prepare_captures, which later populates the member
+    // top-level set used for lowering. Build the syntax-only set locally.
+    std::unordered_set<NodeId> top_level;
+    for (std::uint32_t k = 0; k < ast_.at(root_).count; ++k) {
+        const auto id = ast_.list(ast_.at(root_))[k];
+        if (ast_.at(id).kind == NodeKind::Declare) top_level.insert(id);
+    }
     // Other retained readers share these cells and keep their original
     // inferred bounds, even when this command specializes a new caller.
     for (const auto& binding : kinds_.bindings) {
@@ -47,6 +57,18 @@ bool UnitCompiler::session_admit() {
     // Legacy named functions can see caller-local bindings. Only names read
     // freely by a named function need the D-038 shadow guard; ordinary lexical
     // shadowing that cannot influence such a reader remains admitted.
+    std::unordered_set<std::string_view> dynamic_struct_fields;
+    for (const auto& schema : plan_.structs) if (!schema.methods.empty())
+        for (const auto& field : schema.fields) {
+            dynamic_struct_fields.insert(field.name);
+            if (session_->structures.count(std::string(field.name)))
+                return fail(ast_.at(schema.decl), "session:struct-dynamic-shadow");
+            for (const auto& symbol : session_->symbols)
+                if (symbol.name == field.name) return fail(ast_.at(schema.decl), "session:struct-dynamic-shadow");
+        }
+    std::unordered_set<std::string_view> retained_struct_fields;
+    for (const auto& schema : session_->structures)
+        for (const auto& name : schema.second->dynamic_fields) retained_struct_fields.insert(name);
     std::unordered_set<std::string_view> dynamic_reads;
     if (globals_) for (const auto& function : globals_->free)
         for (const auto& ref : function)
@@ -57,10 +79,28 @@ bool UnitCompiler::session_admit() {
         const auto id = pending.back(); pending.pop_back();
         if (id == kNoNode) continue;
         const auto& n = ast_.at(id);
-        if (n.kind == NodeKind::StructDecl) return fail(n, "session:struct-schema");
+        if (n.kind == NodeKind::StructDecl) {
+            const auto name = text(ast_.at(n.a));
+            if (retained_struct_fields.count(name)) return fail(n, "session:struct-dynamic-shadow");
+            if (session_->structures.count(std::string(name)) && !session_->imported_functions.count(std::string(name)))
+                return fail(n, "session:struct-redeclared");
+            for (const auto& symbol : session_->symbols)
+                if (symbol.name == name) return fail(n, "session:struct-name-conflict");
+        }
+        if (n.kind == NodeKind::FnDecl && plan_.index.count(text(ast_.at(n.a))) &&
+            (dynamic_struct_fields.count(text(ast_.at(n.a))) || retained_struct_fields.count(text(ast_.at(n.a)))))
+            return fail(n, "session:struct-dynamic-shadow");
+        if (n.kind == NodeKind::FnDecl && plan_.index.count(text(ast_.at(n.a))) &&
+            session_->structures.count(std::string(text(ast_.at(n.a)))))
+            return fail(n, "session:struct-name-conflict");
         if ((n.kind == NodeKind::Assign || n.kind == NodeKind::Declare) &&
             n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident) {
             const auto name = text(ast_.at(n.a));
+            if (n.kind == NodeKind::Declare && top_level.count(id) &&
+                (dynamic_struct_fields.count(name) || retained_struct_fields.count(name)))
+                return fail(n, "session:struct-dynamic-shadow");
+            if (n.kind == NodeKind::Declare && top_level.count(id) &&
+                session_->structures.count(std::string(name))) return fail(n, "session:struct-name-conflict");
             const auto bound = kinds_.bindings.find(n.a);
             for (const auto& symbol : session_->symbols) if (symbol.name == name) {
                 const auto external = session_->declarations.find(symbol.name);
@@ -106,7 +146,10 @@ bool UnitCompiler::session_admit() {
         }
         const Node* declared = n.kind == NodeKind::Param ? &n :
             n.kind == NodeKind::Declare && n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident &&
-            !top_level_decl_ids_.count(id) ? &ast_.at(n.a) : nullptr;
+            !top_level.count(id) ? &ast_.at(n.a) : nullptr;
+        if (declared && dynamic_struct_fields.count(text(*declared)) &&
+            !session_isolated_method_local(ast_, plan_, *declared))
+            return fail(n, "session:struct-dynamic-shadow");
         if (declared && dynamic_reads.count(text(*declared)))
             return fail(n, "session:dynamic-shadow");
         for (auto child : {n.a, n.b, n.c}) pending.push_back(child);
@@ -205,6 +248,7 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
     scopes_.update(name, global);
     SessionSymbol symbol;
     symbol.name = std::string(name);
+    if (binding.struct_id >= 0) symbol.struct_name = plan_.structs.at(binding.struct_id).name;
     symbol.slot = global.reg;
     symbol.kinds = symbol.contract = binding.decl_kinds;
     const auto shape = kinds_.binding_shapes.find(std::string(name));

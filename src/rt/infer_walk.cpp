@@ -32,7 +32,7 @@ void Inference::seed_struct_fields() {
     for (const StructInfo& s : plan_.structs)
         for (const StructFieldInfo& f : s.fields) {
             TyRef& var = vars_[field_slot(f)];
-            var = unite(var, kinds_ty(value_kinds(f.value)));
+            var = unite(var, kinds_ty(session_ && f.type == 3 ? kKindNumber : value_kinds(f.value)));
         }
 }
 

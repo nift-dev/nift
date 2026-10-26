@@ -33,7 +33,7 @@ void VmSession::close() {
     if (active_) { close_pending_ = true; return; }
     close_pending_ = false;
     // Destroy executable values before the immutable code they refer to.
-    vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear();
+    vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
 }
 std::size_t VmSession::retained_code_units() const {
@@ -48,7 +48,7 @@ void VmSession::retire_code() {
     }), units_.end());
 }
 bool VmSession::contains(const std::string& name) const {
-    return std::any_of(namespace_.symbols.begin(), namespace_.symbols.end(),
+    return namespace_.structures.count(name) || std::any_of(namespace_.symbols.begin(), namespace_.symbols.end(),
                        [&](const auto& symbol) { return symbol.defined && symbol.name == name; });
 }
 Value VmSession::value(const std::string& name) const {
@@ -57,7 +57,7 @@ Value VmSession::value(const std::string& name) const {
     return Value();
 }
 std::size_t VmSession::binding_count() const {
-    return std::count_if(namespace_.symbols.begin(), namespace_.symbols.end(),
+    return namespace_.structures.size() + std::count_if(namespace_.symbols.begin(), namespace_.symbols.end(),
                          [](const auto& symbol) { return symbol.defined; });
 }
 void VmSession::refresh(SessionCompileContext& pending) {
@@ -87,11 +87,13 @@ void VmSession::refresh(SessionCompileContext& pending) {
 std::vector<std::string> VmSession::namespace_names() const {
     std::vector<std::string> names;
     for (const auto& symbol : namespace_.symbols) if (symbol.defined) names.push_back(symbol.name);
+    for (const auto& schema : namespace_.structures) names.push_back(schema.first);
     return names;
 }
 std::vector<std::string> VmSession::callable_names() const {
     std::vector<std::string> names;
     for (const auto& symbol : namespace_.symbols) if (symbol.defined && symbol.callable) names.push_back(symbol.name);
+    for (const auto& schema : namespace_.structures) names.push_back(schema.first);
     return names;
 }
 SessionResult VmSession::execute(const std::string& source, std::string path, std::string& output, bool inspect_tail) {
@@ -198,6 +200,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     auto owned = std::shared_ptr<Program>(std::move(compiled.program));
     auto& program = *owned;
     session_definitions(ast, parsed.root, text, path, pending, program, executions_);
+    session_structures(ast, parsed.root, text, path, pending);
     auto linked = linked_;
     auto vacant = vacant_;
     std::vector<std::uint16_t> slots(program.protos.size());

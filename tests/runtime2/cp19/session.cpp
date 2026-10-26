@@ -12,7 +12,7 @@ using namespace nift::rt;
 int main() {
     // Atom storage belongs to the thread (CP23); pre-intern fixture keys so
     // the exact final heap comparison measures owned runtime values.
-    atom("left"); atom("right"); atom("f");
+    atom("left"); atom("right"); atom("f"); atom("Counter"); atom("Kept"); atom("v");
     const auto before = live_heap_bytes();
     {
         VmSession session;
@@ -261,6 +261,35 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         r = session.evaluate("localv()", "lexical-local", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 7);
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("struct(Counter){v:=0;fn(add(n)){v+=n} fn(get()){return v} fn(fail()){throw error(\"original\")}}", "schema-source", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && session.contains("Counter"));
+        r = session.execute("c:=Counter()", "instance-unit", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto snapshot = session.value("c");
+        r = session.execute("saved:=error(\"seed\");try{c.fail()}catch(e){saved=e}", "new-method-catcher", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto saved = session.value("saved");
+        CHECK(saved.is(Kind::Error) && saved.heap_as<ErrorObject>()->source == "schema-source");
+        CHECK(saved.is(Kind::Error) && saved.heap_as<ErrorObject>()->message == "original");
+        r = session.execute("c.add(3)", "method-unit", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && output.empty());
+        CHECK(struct_get(snapshot, atom("v"))->as_int() == 0);
+        r = session.evaluate("c.get()", "method-result", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.execute("struct(Ghost){v:=0};print(\"FORBIDDEN\");bytes([65])", "refused-schema", output);
+        CHECK(!r.admitted && !session.contains("Ghost") && output.empty());
+        r = session.execute("struct(Counter){v:=99}", "refused-schema-replacement", output);
+        CHECK(!r.admitted && r.refusal == "session:struct-redeclared" && output.empty());
+        r = session.evaluate("c.v", "after-refusals", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.execute("struct(Kept){v:=0};throw error(\"stop\")", "runtime-schema", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && session.contains("Kept"));
+        r = session.execute("k:=Kept()", "after-schema-error", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && session.value("k").is(Kind::Struct));
     }
     {
         struct State { VmSession* session = nullptr; SessionResult nested; std::string output, nested_output; } state;

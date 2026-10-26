@@ -22,9 +22,12 @@ void Inference::seed_session() {
         TyRef type = session_type(symbol.structure ? symbol.structure : kinds_ty(symbol.kinds), symbol.callable_shape);
         const auto lambda = session_->lambda_templates.find(symbol.name);
         const auto target = symbol.definition ? plan_.index.find(symbol.definition->name) : plan_.index.end();
-        if (type->kinds != symbol.kinds || lambda != session_->lambda_templates.end() || target != plan_.index.end()) {
+        const auto schema = plan_.struct_index.find(symbol.struct_name);
+        if (type->kinds != symbol.kinds || lambda != session_->lambda_templates.end() ||
+            target != plan_.index.end() || schema != plan_.struct_index.end()) {
             auto adapted = std::make_shared<Ty>(*type);
             adapted->kinds = symbol.kinds;
+            if (schema != plan_.struct_index.end()) adapted->struct_id = static_cast<int>(schema->second);
             if (lambda != session_->lambda_templates.end())
                 adapted->callables.push_back(static_cast<std::uint32_t>(session_lambda_reference(lambda->second)));
             else if (target != plan_.index.end()) adapted->callables.push_back(target->second - 1u);
