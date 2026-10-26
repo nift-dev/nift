@@ -113,7 +113,8 @@ struct Vm::Coro {
     static void release(Task& task) noexcept;
     // Creates the task of `callee` with the call window R[in.a ..] and puts
     // its future in R[in.a]. `function` is the callee value (null for Spawn).
-    static bool spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault);
+    static bool spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault,
+                      bool thread = false);
     // Per-proto global slots a task of that proto can reach (build once).
     static void build_snapshot(Coro& coro, const std::vector<const Proto*>& protos);
 

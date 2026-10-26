@@ -9,7 +9,6 @@ r_flow_method.f	coro-future-flow:Member
 r_struct.f	coro-struct
 r_collection.f	coro-collection-callback
 r_main_cell.f	coro-main-cell
-r_thread.f	callable:thread
 r_at_fn_async.f	fn-flags
 r_await_plain.f	await-outside-coroutine-unit
 r_return_top.f	coro-future-flow:Return
@@ -18,3 +17,9 @@ r_future_result.f	coro-future-flow:Return
 err_arity.f	static-error:arity
 deep_chain.f	coro-async-recursion
 iso_undeclared_at_spawn.f	free-name
+r_thread_lambda.f	coro-thread-callee
+r_thread_async.f	coro-async-value
+r_thread_arity.f	coro-thread-arity
+r_thread_result.f	coro-future-flow:Return
+r_future_join.f	coro-future-flow:Member
+r_thread_value.f	coro-thread-callee

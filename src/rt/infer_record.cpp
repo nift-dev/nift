@@ -29,4 +29,22 @@ TyRef Inference::record(NodeId id, TyRef t) {
     return t;
 }
 
+// CP22: `thread(f, args…)` (legacy's thread built-in) in a coroutine unit: f
+// is called by the task with the arguments; the value is a thread handle
+// whose join() gives f's result (kept as its `elem`, like a future's).
+TyRef Inference::thread_call(const Node& n) {
+    const std::string_view name = ast_.text(ast_.at(n.a));
+    if(name!="thread"||find(name)!=nullptr||plan_.index.find(name)!=plan_.index.end())return nullptr;
+    const NodeId* args=ast_.list(n);
+    const TyRef f=expr(args[0]);
+    std::vector<TyRef> values;
+    for(std::uint32_t k=1;k<n.count;++k)values.push_back(expr(args[k]));
+    bool grew=false;
+    const TyRef returns=f->callables.empty()?any_ty():call_callables(f,values,grew);
+    auto handle=std::make_shared<Ty>();
+    handle->kinds=kKindThread;
+    handle->elem=returns;
+    return handle;
+}
+
 }

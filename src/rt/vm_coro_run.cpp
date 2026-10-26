@@ -57,6 +57,14 @@ int Vm::coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto
     const Value& callee = R[in.b];
     const FunctionObject* f = callee.is(Kind::Function) ? callee.heap_as<FunctionObject>() : nullptr;
     const Proto* code = f != nullptr ? static_cast<const Proto*>(f->code) : nullptr;
+    if (in.c & 0x8000u) {  // `thread(f, …)`: the compiler admits a synchronous function with matching arity
+        if (code == nullptr || code->is_async || (in.c & 0x7fffu) != code->nparams)
+            return internal(fault, "thread callee") ? 1 : 0;
+        const Value function = callee;
+        if (!Coro::spawn(*this, in, code, function, R, fault, true)) return 0;
+        ++pc;
+        return 1;
+    }
     if (code == nullptr || !code->is_async) return op_call_value(in, R, K, proto, base, pc, fault) ? 1 : 0;
     if (in.c != code->nparams) {
         const Note* note = note_of(proto, &in);

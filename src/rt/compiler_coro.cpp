@@ -25,12 +25,12 @@ int UnitCompiler::coro_call(const Node& node, std::string_view name, const nativ
     if (builtin->id == natives::BuiltinId::FnType && node.count == 1) {
         const NodeId arg = ast_.list(node)[0];
         const KindSet k = kinds(arg);
-        if (!(k & kKindFuture)) return -1;
-        if (k != kKindFuture) return fail(node, "coro-future-flow:type") ? 1 : 0;
+        if (!(k & kKindTask)) return -1;
+        if (k != kKindFuture && k != kKindThread) return fail(node, "coro-future-flow:type") ? 1 : 0;
         const std::uint16_t mark = fb_->top();
         std::uint16_t reg = 0, text = 0;
         if (!temp(reg) || !expr_to(arg, reg)) return 0;
-        if (!fb_->constant(make_string("future"), text)) return builder_ok() ? 1 : 0;
+        if (!fb_->constant(make_string(k == kKindFuture ? "future" : "thread"), text)) return builder_ok() ? 1 : 0;
         fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(text & ~kConstantBit));
         fb_->release_to(mark);
         return builder_ok() ? 1 : 0;
@@ -46,22 +46,63 @@ int UnitCompiler::coro_call(const Node& node, std::string_view name, const nativ
     return -1;
 }
 
+// `p.done()`, `p.status()` (FutureOp); a thread handle's `t.join()` is an
+// Await of the thread (c = 1: legacy's `thread: ` failures).
 int UnitCompiler::future_method(const Node& node, std::uint16_t dst) {
     if (!plan_.coroutines) return -1;
     const Node& callee = ast_.at(node.a);
-    if (!(kinds(callee.a) & kKindFuture)) return -1;
+    const KindSet k = kinds(callee.a);
+    if (!(k & kKindTask)) return -1;
     const std::string_view name = text(ast_.at(callee.b));
     const bool done = name == "done";
     const bool status = name == "status";
-    if ((!done && !status) || node.count != 0 || kinds(callee.a) != kKindFuture)
+    const bool join = name == "join" && k == kKindThread;
+    if ((!done && !status && !join) || node.count != 0 || (k != kKindFuture && k != kKindThread))
         return fail(node, "coro-future-flow:method") ? 1 : 0;
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;
     if (!reg_any(callee.a, receiver)) return 0;
     fb_->set_offset(site(node));
-    fb_->emit(OpCode::FutureOp, dst, receiver, done ? 0 : 1);
+    if (join) fb_->emit(OpCode::Await, dst, receiver, 1);
+    else fb_->emit(OpCode::FutureOp, dst, receiver, done ? 0 : 1);
     fb_->release_to(mark);
     return builder_ok() ? 1 : 0;
+}
+
+// `thread(f, args…)` in a coroutine unit (legacy's thread built-in): f, a
+// synchronous top-level function named directly with matching arity, runs as
+// a task with the arguments (CallValueAny with the thread bit, c & 0x8000);
+// the value is its thread handle. Other forms are refused (legacy reports a
+// wrong count against its internal `__thread_callable` at 1:1, a defect).
+bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uint16_t dst) {
+    const Node& callee = ast_.at(node.a);
+    if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));
+    if (node.count == 0) return fail(node, "coro-thread-callee");
+    const NodeId* args = ast_.list(node);
+    const Node& f = ast_.at(args[0]);
+    const bool named = f.kind == NodeKind::Ident && find_binding(text(f)) == nullptr;
+    const auto fn = named ? plan_.index.find(text(f)) : plan_.index.end();
+    if (fn == plan_.index.end() || (ast_.at(plan_.functions[fn->second - 1]).flags & kFlagAsync))
+        return fail(f, "coro-thread-callee");
+    if (ast_.at(plan_.functions[fn->second - 1]).count != node.count - 1) return fail(node, "coro-thread-arity");
+    const std::uint16_t mark = fb_->top();
+    std::uint16_t callee_reg = 0;
+    if (!temp(callee_reg) || !expr_to(args[0], callee_reg)) return false;
+    const std::uint16_t base = fb_->top();
+    for (std::uint32_t k = 1; k < node.count; ++k) {
+        if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
+        std::uint16_t reg = 0;
+        if (!temp(reg) || !expr_to(args[k], reg)) return false;
+    }
+    std::uint16_t result = 0;
+    if (node.count == 1 && !temp(result)) return false;
+    fb_->set_offset(site(node));
+    const std::size_t at = fb_->emit(OpCode::CallValueAny, base, callee_reg,
+                                     static_cast<std::uint16_t>((node.count - 1u) | 0x8000u));
+    fb_->note(at, std::string(text(f)));
+    if (dst != base) fb_->emit(OpCode::Move, dst, base);
+    fb_->release_to(mark);
+    return builder_ok();
 }
 
 bool UnitCompiler::await_expr(const Node& node, std::uint16_t dst) {
@@ -84,7 +125,17 @@ namespace {
 // that may hold one) outside the admitted positions (§5 of the record).
 class FutureFlow {
 public:
-    FutureFlow(const Ast& ast, const UnitPlan& plan, const UnitKinds& kinds) : ast_(ast), plan_(plan), kinds_(kinds) {}
+    FutureFlow(const Ast& ast, const UnitPlan& plan, const UnitKinds& kinds) : ast_(ast), plan_(plan), kinds_(kinds) {
+        // A thread body's result reaches the joining parent (legacy: a handle
+        // created in the thread is then invalid, "thread: invalid handle").
+        for (NodeId id = 0; id < ast.size(); ++id) {
+            const Node& n = ast.at(id);
+            if (n.kind != NodeKind::Call || n.count == 0 || !thread_builtin(n.a)) continue;
+            const Node& f = ast.at(ast.list(n)[0]);
+            const auto fn = f.kind == NodeKind::Ident ? plan.index.find(ast.text(f)) : plan.index.end();
+            if (fn != plan.index.end()) thread_bodies_.push_back(plan.functions[fn->second - 1]);
+        }
+    }
 
     bool run(NodeId root, std::string& reason, std::uint32_t& offset) {
         // in_function: 0 top level, 1 a function or lambda, 2 an async one.
@@ -97,6 +148,7 @@ public:
             const Node& n = ast_.at(item.id);
             int in_function = item.in_function;
             if (n.kind == NodeKind::FnDecl || n.kind == NodeKind::Lambda) in_function = (n.flags & kFlagAsync) ? 2 : 1;
+            if (n.kind == NodeKind::FnDecl && thread_body(item.id)) in_function = 2;
             if (!check(item.id, item.parent, item.in_function, reason)) {
                 offset = n.begin;
                 return false;
@@ -114,7 +166,15 @@ private:
         return fn != plan_.index.end() && (ast_.at(plan_.functions[fn->second - 1]).flags & kFlagAsync);
     }
     bool holds(NodeId id) const {
-        return (kinds_.of(id) & kKindFuture) || kinds_.future_holders.count(id) != 0;
+        return (kinds_.of(id) & kKindTask) || kinds_.future_holders.count(id) != 0;
+    }
+    bool thread_builtin(NodeId callee) const {
+        return callee != kNoNode && ast_.at(callee).kind == NodeKind::Ident && ast_.text(ast_.at(callee)) == "thread" &&
+               !plan_.index.count("thread");
+    }
+    bool thread_body(NodeId fn) const {
+        for (NodeId body : thread_bodies_) if (body == fn) return true;
+        return false;
     }
     std::string_view member_name(const Node& member) const { return ast_.text(ast_.at(member.b)); }
 
@@ -181,6 +241,7 @@ private:
         if (member.a != id) return false;
         const std::string_view name = member_name(member);
         if (k == kKindFuture) return name == "done" || name == "status";
+        if (k == kKindThread) return name == "done" || name == "status" || name == "join";
         return k == kKindArray && (name == "push" || name == "size" ||
                                    name == "length");
     }
@@ -194,7 +255,8 @@ private:
         if (callee.kind != NodeKind::Ident) return false;
         const std::string_view name = ast_.text(callee);
         if (plan_.index.count(name)) return true;
-        if (name == "type") return k == kKindFuture || !(k & kKindFuture);
+        if (thread_builtin(call.a)) return true;  // handles reach a thread's snapshot (legacy shares them)
+        if (name == "type") return k == kKindFuture || k == kKindThread || !(k & kKindTask);
         // A call through a binding (a lambda value): legacy binds the value.
         return (kinds_.of(call.a) & kKindFunction) && !(kinds_.of(call.a) & kKindUnknown);
     }
@@ -202,6 +264,7 @@ private:
     const Ast& ast_;
     const UnitPlan& plan_;
     const UnitKinds& kinds_;
+    std::vector<NodeId> thread_bodies_;
 };
 
 // Calls made in a subtree: named functions of the unit (by index), and
@@ -217,8 +280,14 @@ void calls_in(const Ast& ast, NodeId root, const UnitPlan& plan, std::vector<std
             const std::string_view name = ast.text(ast.at(n.a));
             const auto fn = plan.index.find(name);
             NativeInfo native{};
-            if (fn != plan.index.end()) named.push_back(fn->second - 1u);
-            else if (!lookup_native(name, native) && bind_function(name) == nullptr && name != "error") by_value = true;
+            if (fn != plan.index.end()) {
+                named.push_back(fn->second - 1u);
+            } else if (name == "thread" && n.count > 0 && ast.at(ast.list(n)[0]).kind == NodeKind::Ident) {
+                const auto body = plan.index.find(ast.text(ast.at(ast.list(n)[0])));  // `thread(f, …)` calls f
+                if (body != plan.index.end()) named.push_back(body->second - 1u);
+            } else if (!lookup_native(name, native) && bind_function(name) == nullptr && name != "error") {
+                by_value = true;
+            }
         }
         for (NodeId child : {n.a, n.b, n.c}) work.push_back(child);
         const NodeId* list = ast.list(n);

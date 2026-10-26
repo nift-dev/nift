@@ -61,6 +61,7 @@ MUTANTS = {
     9: ("structured completion skipped", {"drain_structured.f": {"stdout": b"2\nafter\ninner done\n", "exit": 0,
                                                                  "outcome": "vm"}}),
     10: ("no preemption", {"vm-only/v_preempt.f": {"stdout": b"false\n", "exit": 0, "outcome": "vm"}}),
+    11: ("await accepts a thread handle", {"th_await_thread.f": {"stdout": b"4\n4\n", "exit": 0, "outcome": "vm"}}),
 }
 
 
@@ -162,21 +163,26 @@ def check_vm(nift, name, policy):
     return problems
 
 
+POLICY_PREFIX = {"D-009#5-future": "future: ", "D-009#5-thread": "thread: "}
+
+
 def policy_ok(policy, legacy, vm):
-    """D-009#5 through await: legacy reports a task's fatal error at the
-    task's return statement with a `return: ` prefix after `future: `; the VM
-    at the failing expression without it. Same stdout and exit, one line."""
-    if policy != "D-009#5-future":
+    """D-009#5 through await (`future: `) or a thread's join (`thread: `):
+    legacy reports a task's fatal error at the task's return statement with a
+    `return: ` prefix after the task prefix; the VM at the failing expression
+    without it. Same stdout and exit, one line."""
+    prefix = POLICY_PREFIX.get(policy)
+    if prefix is None:
         return False
     if legacy[0] != vm[0] or legacy[2] != vm[2] or legacy[2] != 1:
         return False
-    shape = re.compile(r"^error: ([^\n]*):(\d+):(\d+): (future: [^\n]*)\n\Z")
+    shape = re.compile(r"^error: ([^\n]*):(\d+):(\d+): (" + re.escape(prefix) + r"[^\n]*)\n\Z")
     lm, vm_m = shape.match(legacy[1].decode()), shape.match(vm[1].decode())
     if not lm or not vm_m or lm.group(1) != vm_m.group(1):
         return False
     lmsg = lm.group(4)
-    while "future: return: " in lmsg:
-        lmsg = lmsg.replace("future: return: ", "future: ")
+    while prefix + "return: " in lmsg:
+        lmsg = lmsg.replace(prefix + "return: ", prefix)
     # Same message once legacy's return: prefixes go; the VM's position is
     # the failing expression, on the same line, after legacy's `return`.
     return lmsg == vm_m.group(4) and lm.group(2) == vm_m.group(2) and int(vm_m.group(3)) > int(lm.group(3))

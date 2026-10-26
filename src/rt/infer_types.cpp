@@ -215,7 +215,7 @@ TyRef awaited(const TyRef& t) {
 
 bool holds_future(const TyRef& t, int depth) {
     if (!t) return false;
-    if (t->kinds & kKindFuture) return true;
+    if (t->kinds & kKindTask) return true;
     if (depth > kMaxDepth + 2) return false;
     if (holds_future(t->elem, depth + 1)) return true;
     for (const TyRef& item : t->items)

@@ -122,8 +122,12 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
     }
     // Declarations after statements: admitted when no call can run first.
     if (late && !check_declaration_order(ast, root, plan, position)) return plan;
-    for (NodeId id = 0; !plan.coroutines && id < ast.size(); ++id)  // CP22: async lambdas
-        plan.coroutines = ast.at(id).kind == NodeKind::Lambda && (ast.at(id).flags & kFlagAsync);
+    for (NodeId id = 0; !plan.coroutines && id < ast.size(); ++id) {  // CP22: async lambdas, `thread(…)` calls
+        const Node& n = ast.at(id);
+        plan.coroutines = (n.kind == NodeKind::Lambda && (n.flags & kFlagAsync)) ||
+                          (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
+                           ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"));
+    }
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");

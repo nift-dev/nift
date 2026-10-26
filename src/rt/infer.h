@@ -72,6 +72,10 @@ inline constexpr KindSet kKindUnknown = 1u << 10;
 // value operation admits one; the coroutine flow check (compiler_coro.h)
 // admits the positions whose legacy behaviour the VM reproduces.
 inline constexpr KindSet kKindFuture = 1u << 14;
+// CP22: a thread handle (legacy `thread(f, …)`): like a future, with join().
+// The last bit of the 16-bit set (widening KindSet is compile-time only).
+inline constexpr KindSet kKindThread = 1u << 15;
+inline constexpr KindSet kKindTask = kKindFuture | kKindThread;  // either task handle
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -84,6 +88,7 @@ static_assert((kKindFile & kKindStream) == kKindHandle);
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 static_assert((kKindAll & kKindHandle) == 0);
 static_assert(kKindFuture == (1u << 14) && (kKindAll & kKindFuture) == 0 && kKindFuture != kKindUnknown);
+static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
 
 struct UnitKinds {
     std::vector<KindSet> kinds;  // per NodeId (expressions)

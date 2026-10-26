@@ -3647,7 +3647,7 @@ $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJEC
 		$(addprefix $(CP22_MUTANT_DIR)/$*/,$(notdir $(CP22_CORO_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
 test-runtime2-cp22-mutants: $(TARGET)
 	set -e; normal=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
-	for n in 1 2 3 4 5 6 7 8 9 10; do \
+	for n in 1 2 3 4 5 6 7 8 9 10 11; do \
 	  $(MAKE) "$(CP22_MUTANT_DIR)/nift-$$n" >/dev/null; \
 	  sha=$$(sha256sum "$(CP22_MUTANT_DIR)/nift-$$n" | cut -d' ' -f1); \
 	  printf '{"mutant": %s, "sha256": "%s", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal" \

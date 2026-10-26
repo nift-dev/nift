@@ -64,7 +64,8 @@ void add_slot(std::vector<std::uint16_t>& slots, std::uint16_t slot) {
 
 }  // namespace
 
-// The global slots a task of an async proto can reach: the slots read or
+// The global slots a task of a proto can reach (an async proto, or a thread's
+// function): the slots read or
 // written by every proto reachable from it through Call, Spawn, Closure and
 // LoadFunction; a proto that calls a value (CallValue, CallValueAny,
 // CollectionCall) can reach every proto that is ever made a function value.
@@ -96,7 +97,6 @@ void Vm::Coro::build_snapshot(Coro& coro, const std::vector<const Proto*>& proto
     }
     coro.snapshot.assign(n, {});
     for (std::size_t root = 1; root < n; ++root) {
-        if (!protos[root]->is_async) continue;
         std::vector<bool> seen(n, false);
         std::vector<std::uint32_t> work{static_cast<std::uint32_t>(root)};
         bool widened = false;

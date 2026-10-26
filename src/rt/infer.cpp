@@ -374,6 +374,7 @@ TyRef Inference::call(const Node& n) {
         }
         return result;
     }
+    if (plan_.coroutines && callee.kind == NodeKind::Ident && n.count > 0) if (TyRef t = thread_call(n)) return t;
     const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
     for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);

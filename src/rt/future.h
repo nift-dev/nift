@@ -38,6 +38,10 @@ struct FutureObject : HeapObject {
     FutureFailure failure;
     std::vector<std::uint32_t> waiters;  // ids of tasks blocked in `await` on this future
     std::size_t task_bytes = 0;          // suspended task storage charged to the heap
+    // A thread handle (legacy `thread(f, …)`): the same task record joined by
+    // `join()`, `type` "thread", failures prefixed `thread: ` (a heap subkind
+    // of Kind::Future: no value tag of its own).
+    bool thread = false;
     FutureObject() : HeapObject(Kind::Future) {}
 };
 

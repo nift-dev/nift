@@ -118,6 +118,11 @@ TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv, const std:
         if (name == "done") return kinds_ty(kKindBool);  // rt-lint: allow-string-compare compile time
         if (name == "status") return kinds_ty(kKindString);  // rt-lint: allow-string-compare compile time
     }
+    if (recv->kinds == kKindThread && n.count == 0) {  // CP22 FutureOp, Await (join)
+        if (name == "done") return kinds_ty(kKindBool);  // rt-lint: allow-string-compare compile time
+        if (name == "status") return kinds_ty(kKindString);  // rt-lint: allow-string-compare compile time
+        if (name == "join") return recv->elem ? recv->elem : empty_ty();  // rt-lint: allow-string-compare
+    }
     const natives::BuiltinSpec* spec = nullptr;
     switch (bind_method(recv->kinds, name, spec)) {
         case MethodBinding::Bound: return builtin_result(ast, *spec, recv, values, n);

@@ -137,7 +137,8 @@ record `checkpoints/cp22-coroutines.md`.
 | `sleep` | Blocks the calling thread | `sleep_*.f` | `sleep_for` | In coroutine units the task suspends (same validation and trace); elsewhere unchanged |
 | Futures | `type` `future`; identity equality; truthy; binding type string; `done()`, `status()` | `fut_*.f` | async handle tags | Unchanged where admitted; other uses refused before execution (`coro-future-flow:*`) |
 | Async named function as a value | The future fails with `invalid async callable` (defect) | `refuse/r_async_value.f` | `set_named_callable_async` | Refused before execution (`coro-async-value`) |
-| Threads, mutexes, atomics | OS threads with the snapshot rule | `v45_threads.sh` etc. | `thread()` | Stay on legacy until CP23 isolates |
+| Threads | `thread(f, args…)` runs on an OS thread with the snapshot rule; `join()` (repeatable), `done()`, `status()`, `type` `thread`; fatal failure `thread: <message>` at the thread's position; thrown Error re-raised unchanged; unjoined threads drain | `th_*.f` | `thread()` (`ParserExpression.cpp`) | VM task on the scheduler (cooperative, FIFO: one of legacy's interleavings); `thread: ` follows D-009#5 like `future: ` (`th_error_fatal.r2.*`); a lambda/async/value callee, a wrong argument count and a handle returned from a thread body refused before execution (`coro-thread-*`, `coro-future-flow:Return`) |
+| Mutexes, atomics | OS locks and atomics shared across threads | `v45_mutex.sh`, `v45_atomics.sh` | `mutex()`, `atomic<…>` | Stay on legacy (CP23) |
 
 ## D-009#3 compatibility scan
 

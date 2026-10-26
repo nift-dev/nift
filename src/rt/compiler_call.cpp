@@ -25,7 +25,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;
-    if (fn == plan_.index.end() && !is_native && !builtin) return fail(callee, "callable:" + std::string(name));
+    if (fn == plan_.index.end() && !is_native && !builtin) return thread_call(node, name, dst);  // or refused
     const std::uint16_t arity =
         builtin ? 0 : is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
     // When `dst` is the newest register nothing above it is live, so the call

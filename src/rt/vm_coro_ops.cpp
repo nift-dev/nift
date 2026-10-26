@@ -29,7 +29,8 @@ Clock::time_point deadline_after(std::int64_t milliseconds) {
 
 }  // namespace
 
-bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault) {
+bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault,
+                     bool thread) {
     Coro& coro = *vm.coro_;
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
     std::uint32_t id = 0;
@@ -65,9 +66,10 @@ bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& 
     task.children = 0;
     ++coro.tasks[coro.current].children;
     auto* future = new FutureObject();
+    future->thread = thread;
     heap_retally(future);
     task.future = Value::adopt(future);
-    if (coro.trace) task.label = nift::trace::child_label("async");
+    if (coro.trace) task.label = nift::trace::child_label(thread ? "thread" : "async");
     coro.run_queue.push_back(id);
     ++coro.spawned;
     if (++coro.live > coro.live_peak) coro.live_peak = coro.live;
@@ -76,13 +78,21 @@ bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& 
     return vm.memory_ok(fault);
 }
 
-// `await R[b]`: a value at once, the original Error re-raised (CP13B A2), or
-// a fatal failure reported at the task's position with legacy's `future: `.
+// `await R[b]` (c = 0) or a thread's `join()` (c = 1): a value at once, the
+// original Error re-raised (CP13B A2), or a fatal failure reported at the
+// task's position with legacy's `future: ` / `thread: `.
 int Vm::Coro::await(Vm& vm, const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                     const Instr*& pc, Fault& fault) {
     Coro& coro = *vm.coro_;
     FutureObject* future = future_of(R[in.b]);
-    if (future == nullptr) return raise(fault, StopReason::Error, "await: expected future") ? 1 : 0;
+    const bool join = in.c == 1;
+    if (future != nullptr && future->thread != join && join) return internal(fault, "join receiver") ? 1 : 0;
+#if NIFT_CORO_MUTANT == 11
+    if (future == nullptr)  // M11: `await` accepts a thread handle
+#else
+    if (future == nullptr || future->thread != join)
+#endif
+        return raise(fault, StopReason::Error, "await: expected future") ? 1 : 0;
     if (future->state == FutureState::Pending) {
         future->waiters.push_back(coro.current);
         heap_retally(future);
@@ -114,7 +124,7 @@ int Vm::Coro::await(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
 #endif
         return 0;
     }
-    raise(fault, StopReason::Error, "future: " + failure.message);
+    raise(fault, StopReason::Error, (join ? "thread: " : "future: ") + failure.message);
     fault.code = failure.code;
     coro.pending_report = true;
     coro.report_offset = failure.offset;

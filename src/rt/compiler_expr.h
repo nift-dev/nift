@@ -109,6 +109,7 @@ private:
     OpCode call_opcode(std::size_t f) const;
     int coro_call(const Node& node, std::string_view name, const natives::BuiltinSpec* builtin, std::uint16_t dst);
     int future_method(const Node& node, std::uint16_t dst);
+    bool thread_call(const Node& node, std::string_view name, std::uint16_t dst);  // CP22, else `callable:<name>`
     bool await_expr(const Node& node, std::uint16_t dst);
     // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
