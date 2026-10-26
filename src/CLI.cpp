@@ -1691,6 +1691,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     }
     if (interactive_after && target == "native" && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
         nift::rt::VmSession session(session_options());
+        session.initialize_invocation(cmd, script_args);
         const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
                                                     SessionDisplay::Script);
         if (status != 0) return status;
@@ -2730,6 +2731,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     std::unique_ptr<nift::rt::VmSession> owned_session;
     if (!session && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
         owned_session = std::make_unique<nift::rt::VmSession>(session_options()); session = owned_session.get();
+        session->initialize_invocation("<repl>", {});
     }
     std::string pending; nift::shell::JobTable jobs; ShellJobTable legacy_jobs;
     auto history=load_nift_history();

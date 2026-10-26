@@ -5,12 +5,18 @@ from pathlib import Path
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text('')
 cases=[
+ ('invocation_readonly',['-i'],'x:=5\nprint("ONCE");args.push("bad")\nx\nargs.stringify()\nexit\n','',4),
+ ('invocation',['-i'],'cmd\nargs.stringify()\nexit\n','',2),
+ ('invocation_inline',['-i','-c','x:=2','--','hello','-literal'],'cmd\nargs.stringify()\nx\nexit\n','',4),
+ ('invocation_rc',['-i'],'saved\nexit\n','saved:=cmd',2),
  ('bindings',['-i'],'x:=1\nprint(x)\nx += 4\nprint(x)\nfn(getx()){return x}\ngetx()\nexit\n','',6),
  ('closure',['-i'],'fn(makec()){n:=10;return ()=>{n+=1;return n}};c:=makec()\nc()\nc()\nexit\n','',3),
  ('nested',['-i'],'fn(makec()){n:=10;return ()=>()=>{n+=1;return n}};outer:=makec()\ninner:=outer()\ninner()\ninner()\nexit\n','',4),
  ('interpolation',['-i'],'x:=7\ncommand /usr/bin/printf "%s\\n" "$[x]"\nx += 1\ncommand /usr/bin/printf "%s\\n" "$[x]"\nexit\n','',4),
  ('rc',['-i'],'x\nx += 2\ngetx()\nexit\n','x:=5;fn(getx()){return x}',4),
  ('rc_output',['-i'],'x\nexit\n','print("RC");x:=5',2),
+ ('file',['-i','@script'],'x += 3\ngetx()\ncmd\nargs.stringify()\nexit\n','',5),
+ ('stdin',['-i','-'],'x:=2;print(x)','',1),
  ('inline',['-i','-c','x:=2;fn(getx()){return x}'],'x += 3\ngetx()\nexit\n','',3),
  ('multiline',['-i'],'x:=1\nfn(getx()){\nreturn x\n}\ngetx()\nexit\n','',3),
  ('increments',['-i'],'x:=1\n(x++)\n(++x)\nprint(x)\nexit\n','',4),
@@ -33,12 +39,14 @@ count=0
 for name,argv,stdin,rc,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-session-cli-') as td:
   root=Path(td)
+  script=root/'initial.nift';script.write_text('x:=2;fn(getx()){return x}')
+  actual_argv=[str(script) if x=='@script' else x for x in argv]
   if rc:(root/'.niftrc').write_text(rc)
   baseline=None
   for mode in ['0','1','require']:
    stats=root/'stats';stats.unlink(missing_ok=True)
    env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')
-   p=subprocess.run([binary,*argv],input=stdin,text=True,cwd=td,env=env,capture_output=True,timeout=30)
+   p=subprocess.run([binary,*actual_argv],input=stdin,text=True,cwd=td,env=env,capture_output=True,timeout=30)
    rows=[json.loads(x) for x in stats.read_text().splitlines()] if stats.exists() else []
    r=dict(case=name,mode=mode,status=p.returncode,stdout=p.stdout,stderr=p.stderr,stats=rows)
    with a.out.open('a') as f:f.write(json.dumps(r)+'\n')
@@ -51,5 +59,6 @@ for name,argv,stdin,rc,units in cases:
     assert channels == (0,'3\n[1,2]\n[1,2,3]\n',''),r
    else: assert channels==baseline,(name,baseline,r)
    assert len(rows)==units,(name,units,r)
-   assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome']=='vm' for s in rows),r
+   assert len([s for s in rows if s['outcome']=='vm-error']) == (1 if name=='invocation_readonly' else 0),r
+   assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome'] in ('vm','vm-error') for s in rows),r
 print(f'PASS real session entry checks (parity and explicit D-040 witness): {count} observations')

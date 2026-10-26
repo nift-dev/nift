@@ -22,6 +22,7 @@ class VmSession {
 public:
     explicit VmSession(VmOptions options = VmOptions());
     ~VmSession();
+    void initialize_invocation(const std::string& command, const std::vector<std::string>& arguments);
     VmSession(const VmSession&) = delete;
     VmSession& operator=(const VmSession&) = delete;
     SessionResult execute(const std::string& source, std::string path, std::string& output,
