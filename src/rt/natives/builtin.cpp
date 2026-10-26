@@ -1,5 +1,7 @@
 #include "rt/natives/builtin.h"
 
+#include "rt/handle.h"
+
 #include "rt/natives/array_methods.h"
 #include "rt/natives/bytes_methods.h"
 #include "rt/natives/host_file_handles.h"
@@ -120,6 +122,8 @@ Status call_builtin(const BuiltinSpec& spec, const Context& context, const Value
 
 bool is_recoverable_code(std::string_view code) {
     if (code.empty()) return false;
+    // CP17 handle statuses classed Recoverable (D-035 runtime.handle_closed).
+    if (handle_code_recoverable(code)) return true;
     for (std::uint16_t i = 0; i < static_cast<std::uint16_t>(BuiltinId::Count); ++i)
         if (recoverable_code(static_cast<BuiltinId>(i)) == code) return true;
     return false;

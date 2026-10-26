@@ -744,6 +744,7 @@ test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT)
 	"$(RT_STREAM_GUARD_UNIT)"
 	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/closed_handle_catchable.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"

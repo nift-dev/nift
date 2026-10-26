@@ -40,6 +40,23 @@ void status_codes() {
     CHECK(handle_error_class(HandleStatus::TransferForbidden) == HandleErrorClass::Internal);
     CHECK(handle_error_class(HandleStatus::DetachForbidden) == HandleErrorClass::Error);
     CHECK(handle_error_class(HandleStatus::Ok) == HandleErrorClass::None);
+    // CP13B x CP17 (D-035): exactly the Recoverable statuses' codes may become
+    // catchable Errors; every fatal, limit and internal handle code may not.
+    CHECK(handle_code_recoverable("runtime.handle_closed"));
+    // kLastHandleStatus is the last named status (the derivation walks up to it).
+    CHECK(std::string(handle_status_code(static_cast<HandleStatus>(static_cast<int>(kLastHandleStatus) + 1))) ==
+          "internal.handle_unknown_status");
+    for (int s = 0; s <= static_cast<int>(kLastHandleStatus); ++s) {
+        const auto status = static_cast<HandleStatus>(s);
+        CHECK(handle_code_recoverable(handle_status_code(status)) ==
+              (handle_error_class(status) == HandleErrorClass::Recoverable));
+    }
+    CHECK(!handle_code_recoverable("limit.exceeded"));
+    CHECK(!handle_code_recoverable("runtime.cleanup_failed"));
+    CHECK(!handle_code_recoverable("internal.handle_forged"));
+    CHECK(!handle_code_recoverable("internal.handle_unknown_status"));
+    CHECK(!handle_code_recoverable(""));
+    CHECK(!handle_code_recoverable("runtime.handle_closed.x"));
     // Every status has a distinct, non-empty code.
     std::map<std::string, int> seen;
     for (int s = 1; s <= static_cast<int>(HandleStatus::ReentrantClose); ++s) {

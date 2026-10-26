@@ -143,8 +143,9 @@ const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name);
 // The error code of a Status::Recoverable result of `id` ("schema.rejected"
 // for validate); empty for built-ins that never return Recoverable.
 std::string_view recoverable_code(BuiltinId id);
-// True when `code` is the recoverable code of any built-in (one predicate,
-// derived from recoverable_code; no second classification table).
+// True when `code` is the recoverable code of any built-in, or of a handle
+// status classed Recoverable (handle_code_recoverable, D-035). Derived from
+// recoverable_code and handle_error_class; no second classification table.
 bool is_recoverable_code(std::string_view code);
 
 // Calls the native. Each native checks its own arity and reports legacy's

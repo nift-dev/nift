@@ -126,4 +126,14 @@ bool HandleRegistry::set_free_slot_generation_for_test(std::uint64_t id, std::ui
     return true;
 }
 
+bool handle_code_recoverable(std::string_view code) {
+    // Every HandleStatus value, Ok .. kLastHandleStatus (handle.h).
+    for (unsigned v = 0; v <= static_cast<unsigned>(kLastHandleStatus); ++v) {
+        const auto status = static_cast<HandleStatus>(v);
+        if (handle_error_class(status) == HandleErrorClass::Recoverable && code == handle_status_code(status))
+            return true;
+    }
+    return false;
+}
+
 } // namespace nift::rt

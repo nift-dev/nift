@@ -15,6 +15,8 @@
 // rt::handles::HandleTable (CP17).
 #include "rt/value.h"
 
+#include <string_view>
+
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -53,6 +55,8 @@ enum class HandleStatus : std::uint8_t {
     InvalidCause,       // begin_termination with a cause that is not Exited/Deadline/Cancel
     ReentrantClose,     // close_context/shutdown from inside a cleanup hook of this table
 };
+// The last HandleStatus (keep it last: handle_code_recoverable walks Ok .. this).
+inline constexpr HandleStatus kLastHandleStatus = HandleStatus::ReentrantClose;
 
 // How a failure surfaces (D-035): Recoverable = a catchable program error
 // (`runtime.handle_closed`: the handle was valid and has been closed or
@@ -66,6 +70,10 @@ enum class HandleErrorClass : std::uint8_t { None, Recoverable, Internal, Limit,
 const char* handle_status_code(HandleStatus status);   // e.g. "runtime.handle_closed"
 const char* handle_status_text(HandleStatus status);   // e.g. "handle is closed"
 HandleErrorClass handle_error_class(HandleStatus status);
+// True when `code` is the code of a handle status whose class is Recoverable
+// (today exactly runtime.handle_closed, catchable by D-035). Derived from
+// handle_status_code/handle_error_class over every status; no second table.
+bool handle_code_recoverable(std::string_view code);
 
 class HandleRegistry {
 public:
