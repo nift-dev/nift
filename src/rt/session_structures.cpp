@@ -23,7 +23,7 @@ void session_structures(const Ast& ast, NodeId root, const SessionText& text,
                 detail::session_method_uses_bare_field(ast, ast.list(body)[k], ast.text(ast.at(field.a))))
                 definition->dynamic_fields.emplace_back(ast.text(ast.at(field.a)));
         }
-        pending.structures.emplace(definition->name, std::move(definition));
+        pending.structures.insert_or_assign(definition->name, std::move(definition));
     }
 }
 } // namespace nift::rt

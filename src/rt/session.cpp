@@ -71,6 +71,14 @@ void VmSession::refresh(SessionCompileContext& pending) {
         // later assignment beyond them refuses before execution; an observed
         // current value never silently narrows old code's assumptions.
         symbol.kinds = symbol.contract;
+        if (!symbol.struct_name.empty() && !symbol.struct_definition) {
+            const auto schema = pending.structures.find(symbol.struct_name);
+            if (schema != pending.structures.end()) symbol.struct_definition = schema->second;
+            else {
+                const auto imported = pending.schema_templates.find(symbol.struct_name);
+                if (imported != pending.schema_templates.end()) symbol.struct_definition = imported->second;
+            }
+        }
         symbol.callable_shape = session_callable_shape(v);
         symbol.untracked_callables = symbol.callable_shape && !symbol.callable_shape->complete;
         symbol.callable = v.is(Kind::Function);
@@ -169,6 +177,13 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     pending.declarations.clear();
     for (const auto& symbol : pending.symbols)
         pending.declarations.emplace(symbol.name, ast.add(NodeKind::Ident, 0, 0));
+    pending.schema_templates.clear();
+    for (auto& symbol : pending.symbols) {
+        const auto name = text.schema_names.find(symbol.name);
+        if (name != text.schema_names.end()) symbol.struct_name = name->second;
+    }
+    for (const auto& imported : text.imports)
+        if (imported.second->structure) pending.schema_templates.emplace(imported);
     pending.imported_functions.clear();
     for (const auto& imported : text.imports) pending.imported_functions.insert(imported.first);
     prepare_session_templates(ast, parsed.root, parsed.ok, text, namespace_, pending);
@@ -252,7 +267,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_.lambda_templates.clear(); namespace_.capture_seeds.clear();
     namespace_.callable_templates.clear(); namespace_.capture_callable_seeds.clear();
     namespace_.capture_contracts.clear(); namespace_.template_definitions.clear(); namespace_.const_captures.clear();
-    namespace_.source_owner.reset();
+    namespace_.source_owner.reset(); namespace_.schema_templates.clear();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2
     if (executions_ == 1) for (const auto& symbol : namespace_.symbols)
         if (symbol.name == "x") cell_put(globals_[symbol.slot], Value::integer(0));  // M2: lose retained state

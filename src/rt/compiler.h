@@ -32,7 +32,7 @@ struct CompileResult {
 // Analysis limits (tests lower them to exercise the refusal).
 struct SessionSymbol {
     std::string name, struct_name;
-    std::shared_ptr<const SessionDefinition> definition;
+    std::shared_ptr<const SessionDefinition> definition, struct_definition;
     std::shared_ptr<const infer_detail::Ty> structure;
     std::shared_ptr<const SessionCallableShape> callable_shape;
     std::uint64_t identity = 0;
@@ -45,6 +45,7 @@ struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
     std::unordered_set<std::string> imported_functions;
+    std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> schema_templates;
     std::unordered_map<std::string, NodeId> declarations;
     std::unordered_map<std::string, NodeId> lambda_templates;
     std::unordered_map<const SessionDefinition*, NodeId> callable_templates;

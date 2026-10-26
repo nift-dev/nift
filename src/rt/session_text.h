@@ -8,6 +8,7 @@ struct SessionText {
     std::string text;
     std::vector<SourceMap::Piece> pieces;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> imports;
+    std::unordered_map<std::string, std::string> schema_names;
     std::uint32_t unit_begin = 0;
 };
 void prepare_session_templates(const Ast&, NodeId, bool, const SessionText&,

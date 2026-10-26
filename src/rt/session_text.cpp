@@ -11,14 +11,8 @@
 namespace nift::rt {
 SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context) {
     SessionText out;
-    std::unordered_map<std::string, std::vector<std::shared_ptr<const SessionDefinition>>> available;
-    for (const auto& schema : context.structures) available[schema.first].push_back(schema.second);
-    for (const auto& symbol : context.symbols) if (symbol.defined) {
-        for (const auto& callable : session_callable_targets(symbol.callable_shape))
-            available[symbol.name].push_back(callable.definition);
-        const auto schema = context.structures.find(symbol.struct_name);
-        if (schema != context.structures.end()) available[symbol.name].push_back(schema->second);
-    }
+    struct Entry { std::shared_ptr<const SessionDefinition> definition; std::string name; };
+    std::unordered_map<std::string, std::vector<Entry>> available;
     std::unordered_set<std::string> declarations;
     Ast original(source);
     const auto parsed = parse_script(original);
@@ -27,15 +21,39 @@ SessionText session_text(const std::string& source, const std::string& path, con
         if (node.kind == NodeKind::FnDecl || node.kind == NodeKind::StructDecl)
             declarations.emplace(original.text(original.at(node.a)));
     }
-    std::vector<std::shared_ptr<const SessionDefinition>> selected;
+    for (const auto& schema : context.structures)
+        available[schema.first].push_back({schema.second, schema.first});
+    std::unordered_map<const SessionDefinition*, std::string> schema_names;
+    unsigned serial = 0;
+    for (const auto& symbol : context.symbols) if (symbol.defined) {
+        for (const auto& callable : session_callable_targets(symbol.callable_shape))
+            available[symbol.name].push_back({callable.definition, callable.definition->name});
+        if (!symbol.struct_definition) continue;
+        auto& name = schema_names[symbol.struct_definition.get()];
+        if (name.empty()) {
+            name = symbol.struct_name;
+            const auto current = context.structures.find(name);
+            if (declarations.count(name) ||
+                (name != symbol.struct_definition->name && source.find(name) != std::string::npos) ||
+                (current != context.structures.end() && current->second != symbol.struct_definition)) {
+                do { name = "__cp19_schema" + std::to_string(serial++); }
+                while (source.find(name) != std::string::npos || available.count(name) ||
+                    std::any_of(context.symbols.begin(), context.symbols.end(),
+                        [&](const auto& other) { return other.name == name || other.struct_name == name; }));
+            }
+        }
+        out.schema_names.emplace(symbol.name, name);
+        available[symbol.name].push_back({symbol.struct_definition, name});
+    }
+    std::vector<Entry> selected;
     auto scan = [&](std::string_view text) {
         Lexer lexer(text, 0, static_cast<std::uint32_t>(text.size()));
         for (auto token = lexer.next(); token.kind != Tok::End; token = lexer.next()) {
             if (token.kind != Tok::Ident) continue;
             const auto found = available.find(std::string(text.substr(token.begin, token.end - token.begin)));
-            if (found != available.end()) for (const auto& definition : found->second)
-                if (!declarations.count(definition->name) &&
-                    out.imports.emplace(definition->name, definition).second) selected.push_back(definition);
+            if (found != available.end()) for (const auto& entry : found->second)
+                if (!declarations.count(entry.name) &&
+                    out.imports.emplace(entry.name, entry.definition).second) selected.push_back(entry);
         }
     };
     scan(source);
@@ -53,7 +71,7 @@ SessionText session_text(const std::string& source, const std::string& path, con
     for (const auto& symbol : context.symbols) redefining = redefining || declarations.count(symbol.name);
     if (redefining) for (const auto& symbol : context.symbols) scan(symbol.name);
     for (std::size_t k = 0; k < selected.size(); ++k) {
-        const auto definition = selected[k];
+        const auto definition = selected[k].definition;
         scan(std::string_view(*definition->source).substr(definition->begin, definition->end - definition->begin));
     }
     auto generated = [&](std::string value) {
@@ -62,14 +80,17 @@ SessionText session_text(const std::string& source, const std::string& path, con
                               static_cast<std::uint32_t>(value.size())});
     };
     out.imports.clear();
-    std::stable_partition(selected.begin(), selected.end(), [](const auto& item) { return item->structure; });
-    for (const auto& definition : selected) {
+    std::stable_partition(selected.begin(), selected.end(),
+        [](const auto& item) { return item.definition->structure; });
+    for (const auto& entry : selected) {
+        const auto& definition = entry.definition;
         if (definition->lambda) {
             std::string wrapper = "__cp19_template";
             auto collision = [&](const std::string& name) {
                 if (source.find(name) != std::string::npos) return true;
                 for (const auto& symbol : context.symbols) if (symbol.name == name) return true;
-                for (const auto& item : selected) if (item->source->find(name) != std::string::npos) return true;
+                for (const auto& item : selected)
+                    if (item.definition->source->find(name) != std::string::npos) return true;
                 return false;
             };
             while (collision(wrapper) || out.imports.count(wrapper)) wrapper += "_";
@@ -77,10 +98,35 @@ SessionText session_text(const std::string& source, const std::string& path, con
             generated("fn(" + wrapper + "()){");
             for (const auto& capture : definition->captures) generated(capture.name + ":=null;");
             generated("return ");
-        } else out.imports.emplace(definition->name, definition);
-        out.text.append(*definition->source, definition->begin, definition->end - definition->begin);
-        out.pieces.push_back({definition->path, definition->source, definition->begin,
-                              definition->end - definition->begin});
+        } else out.imports.emplace(entry.name, definition);
+        if (definition->structure && entry.name != definition->name) {
+            Ast schema(*definition->source);
+            const auto parsed_schema = parse_script_range(schema, definition->begin, definition->end);
+            if (!parsed_schema.ok) throw std::logic_error("session schema source");
+            const auto& node = schema.at(schema.list(schema.at(parsed_schema.root))[0]);
+            std::vector<NodeId> names{node.a};
+            for (std::uint32_t m = 0; m < node.count; ++m) {
+                const auto& method = schema.at(schema.list(node)[m]);
+                if (method.kind == NodeKind::FnDecl && schema.text(schema.at(method.a)) == definition->name)
+                    names.push_back(method.a);
+            }
+            auto position = definition->begin;
+            for (const auto id : names) {
+                const auto& name = schema.at(id);
+                out.text.append(*definition->source, position, name.begin - position);
+                out.pieces.push_back({definition->path, definition->source, position, name.begin - position});
+                out.text += entry.name;
+                out.pieces.push_back({definition->path, definition->source, name.begin,
+                                      static_cast<std::uint32_t>(entry.name.size())});
+                position = name.end;
+            }
+            out.text.append(*definition->source, position, definition->end - position);
+            out.pieces.push_back({definition->path, definition->source, position, definition->end - position});
+        } else {
+            out.text.append(*definition->source, definition->begin, definition->end - definition->begin);
+            out.pieces.push_back({definition->path, definition->source, definition->begin,
+                                 definition->end - definition->begin});
+        }
         generated(definition->lambda ? ";}\n" : "\n");
     }
     if (out.text.size() + source.size() > 0xffffffffu) throw std::length_error("session source offset limit");

@@ -1,4 +1,5 @@
 #include "rt/session.h"
+#include "rt/heap.h"
 #include "rt/string.h"
 #include "rt_test.h"
 #include <iostream>
@@ -24,6 +25,11 @@ int main(int argc, char** argv) {
         seed = "f:=()=>1;g:=()=>2;old:=f";
         probe = "f = g";
         check = "f()"; expected = refused ? "1" : "2"; reason = "session:callable-rebind";
+    } else if (test == "schema") {
+        seed = "struct(Point){v:=1;fn(fail()){throw error(\"old\")}};p:=Point()";
+        probe = "struct(Point){v:=2;fn(fail()){throw error(\"new\")}};q:=Point()";
+        check = refused ? "p.v" : "p.v*10+q.v";
+        expected = refused ? "1" : "12"; reason = "session:struct-redeclared";
     } else return 2;
     VmSession session;
     std::string output;
@@ -48,6 +54,24 @@ int main(int argc, char** argv) {
     CHECK(r.admitted && r.execution.reason == StopReason::None && r.legacy_executions == 0);
     if (r.value.is(Kind::String)) CHECK(string_view_of(r.value) == expected);
     else CHECK(r.value.is(Kind::Int) && std::to_string(r.value.as_int()) == expected);
+    if (test == "schema" && !refused) {
+        r = session.execute("saved:=error(\"seed\");try{p.fail()}catch(e){saved=e}", "old-catcher", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        auto saved = session.value("saved");
+        CHECK(saved.is(Kind::Error));
+        if (saved.is(Kind::Error)) {
+            CHECK(saved.heap_as<ErrorObject>()->message == "old");
+            CHECK(saved.heap_as<ErrorObject>()->source == "seed");
+        }
+        r = session.execute("try{q.fail()}catch(e){saved=e}", "new-catcher", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        saved = session.value("saved");
+        CHECK(saved.is(Kind::Error));
+        if (saved.is(Kind::Error)) {
+            CHECK(saved.heap_as<ErrorObject>()->message == "new");
+            CHECK(saved.heap_as<ErrorObject>()->source == "probe");
+        }
+    }
     const auto status = rt_test::finish("CP19 admission witness");
     if (!status) std::cout << "WITNESS " << test << ' ' << (refused ? "refused" : "admitted") << '\n';
     return status;

@@ -185,7 +185,12 @@ bool UnitCompiler::struct_construct(const Node& decl, int s, std::uint16_t reg) 
     const Node& call = ast_.at(decl.b);
     if (loop_region()) return fail(call, "context:struct-new");
     if (!plain_postfix(call) || !no_trailing_comma(call)) return false;
-    const Atom type = atom(info.name);
+    auto display_name = info.name;
+    if (session_) {
+        const auto schema = session_->schema_templates.find(std::string(info.name));
+        if (schema != session_->schema_templates.end()) display_name = schema->second->name;
+    }
+    const Atom type = atom(display_name);
     if (type.id > 0xffff) return fail(call, "limit:atoms");
     fb_->set_offset(site(call));
     fb_->emit(OpCode::NewStruct, reg, static_cast<std::uint16_t>(type.id));

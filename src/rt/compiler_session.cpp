@@ -83,8 +83,10 @@ bool UnitCompiler::session_admit() {
         if (n.kind == NodeKind::StructDecl) {
             const auto name = text(ast_.at(n.a));
             if (retained_struct_fields.count(name)) return fail(n, "session:struct-dynamic-shadow");
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 5
             if (session_->structures.count(std::string(name)) && !session_->imported_functions.count(std::string(name)))
                 return fail(n, "session:struct-redeclared");
+#endif
             for (const auto& symbol : session_->symbols)
                 if (symbol.name == name) return fail(n, "session:struct-name-conflict");
         }

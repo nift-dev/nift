@@ -6,6 +6,10 @@ p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argumen
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 schema='struct(Counter){v:=0;fn(add(n)){v+=n} fn(get()){return v}};c:=Counter()'
 cases=[
+ ('schema-replacement','struct(Point){v:=1;fn(get()){return v}};p:=Point()\nstruct(Point){v:=2;w:=3;fn(get()){return v+10}}\nq:=Point()\np.get()\nq.get()\n(p.v)\n(q.w)\nexit\n',7,0),
+ ('schema-repeated','struct(Point){v:=1};p:=Point()\nstruct(Point){v:=2};q:=Point()\nstruct(Point){v:=3};r:=Point()\n(p.v)\n(q.v)\n(r.v)\nexit\n',6,0),
+ ('schema-constructor','struct(Point){v:=1;fn(Point(n)){v=n} fn(get()){return v}};p:=Point(7)\nstruct(Point){v:=2;fn(Point(n)){v=n+1} fn(get()){return v+10}};q:=Point(7)\np.get()\nq.get()\nexit\n',4,0),
+ ('schema-internal-collision','struct(Point){v:=1};p:=Point()\nstruct(Point){v:=2};q:=Point()\n__cp19_schema0:=99\n(p.v)\n(q.v)\n__cp19_schema0\nexit\n',6,0),
  ('explicit-field-global','v:=99\nstruct(Point){v:=1;fn(get()){return this.v}};p:=Point()\np.get()\nv\nexit\n',4,0),
  ('explicit-field-later-global','struct(Point){v:=1;fn(get()){return this.v}};p:=Point()\nv:=99\np.get()\nv\nexit\n',4,0),
  ('rc-schema','c.add(3)\nc.get()\nexit\n',3,0,['-i'],schema),
