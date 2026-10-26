@@ -12,6 +12,8 @@ namespace nift::rt {
 
 Value make_cell(Value value, std::int64_t binding_type);
 CellObject* cell_of(const Value& cell);
+// Follow lexical forwarding only; never resolve a selector or its cache.
+const CellObject* cell_plain_capture(const Value& cell);
 // A plain Value copy (D-040 COW semantics for the value).
 Value cell_load(const Value& cell);
 // A selector is encoded in a Cell's existing, GC-visible Value payload:

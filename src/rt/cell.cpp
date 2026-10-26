@@ -18,6 +18,16 @@ Value make_cell(Value value, std::int64_t binding_type) {
 
 CellObject* cell_of(const Value& cell) { return cell.is(Kind::Cell) ? cell.heap_as<CellObject>() : nullptr; }
 
+const CellObject* cell_plain_capture(const Value& cell) {
+    const CellObject* current = cell_of(cell);
+    for (unsigned depth = 0; current && depth < 64; ++depth) {
+        if (current->binding_type >= 0) return current;
+        if (current->binding_type != kSourceSlot) return nullptr;
+        current = cell_of(current->value);
+    }
+    return nullptr;
+}
+
 std::int64_t cell_binding_type(const CellObject& cell) {
     const CellObject* current = &cell;
     while (current->binding_type == kSourceSlot) current = cell_of(current->value);

@@ -446,9 +446,12 @@ int main() {
         r = session.execute("fn(makec()){caparr:=[[1]];return v=>{for(row:caparr){row.push(v)};return caparr.stringify()}};"
             "c:=makec();warm:=c(0)", "combined-capture", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        // This conservative boundary is a CP19 gap, not successful replacement coverage.
-        r = session.execute("fn(g()){return 4};print(\"FORBIDDEN\")", "replacement-with-loop-capture", output);
-        CHECK(!r.admitted && r.refusal == "session:redefinition-callable-flow" && output.empty());
+        // A lexical forwarding capture cannot block unrelated registry replacement.
+        r = session.execute("fn(g()){return 4};print(\"ONCE\")", "replacement-with-loop-capture", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && output == "ONCE\n");
+        output.clear();
+        r = session.evaluate("g()", "replacement-with-loop-capture-value", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 4);
         r = session.execute("print(\"FORBIDDEN\");c(\"bad\")", "capture-still-original", output);
         CHECK(!r.admitted && r.refusal == "session:capture-contract" && output.empty());
         r = session.evaluate("c(2)", "capture-valid", output);

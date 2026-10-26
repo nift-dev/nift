@@ -30,8 +30,8 @@ void VmSession::activate_code(const std::vector<std::pair<std::uint64_t, const P
                 function->code = target.second; function->program_owner = owned; break;
             }
             for (const auto& capture : function->upvalues) {
-                const auto* cell = is_cell(capture) ? cell_of(capture) : nullptr;
-                if (cell && cell->binding_type >= 0) pending.push_back(cell->value);
+                const auto* cell = cell_plain_capture(capture);
+                if (cell) pending.push_back(cell->value);
             }
         } else if (value.is(Kind::Array)) {
             for (const auto& item : array_items(value)) pending.push_back(item);

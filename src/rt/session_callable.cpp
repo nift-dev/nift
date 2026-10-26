@@ -42,9 +42,9 @@ struct Scan {
             if (function->session_identity && proto && proto->session_definition) {
                 SessionCallable target{function->session_identity, proto->session_definition, {}};
                 for (const auto& capture : function->upvalues) {
-                    const auto* cell = is_cell(capture) ? cell_of(capture) : nullptr;
+                    const auto* cell = cell_plain_capture(capture);
                     // Never resolve a selector or read a cached location just to compile metadata.
-                    auto shape = cell && cell->binding_type >= 0 ? visit(cell->value, depth + 1) : incomplete();
+                    auto shape = cell ? visit(cell->value, depth + 1) : incomplete();
                     if (shape && !shape->complete) out->complete = false;
                     target.captures.push_back(std::move(shape));
                 }
