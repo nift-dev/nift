@@ -457,6 +457,29 @@ int main() {
         r = session.evaluate("c(2)", "capture-valid", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,0,2]]");
     }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("f:=()=>1;g:=()=>2;old:=f;reader:=()=>f()", "alias-seed", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto original = session.value("f"), replacement = session.value("g");
+        const auto count = session.binding_count();
+        r = session.execute("f = g;leaked:=77;print(\"FORBIDDEN\");bytes([65])", "alias-refused", output);
+        CHECK(!r.admitted && r.vm_executions == 0 && r.legacy_executions == 0);
+        CHECK(output.empty() && session.binding_count() == count && !session.contains("leaked"));
+        CHECK(session.value("f").heap() == original.heap());
+        r = session.execute("f = g;print(\"ONCE\");throw error(\"stop\")", "alias-runtime", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && r.vm_executions == 1);
+        CHECK(output == "ONCE\n" && session.value("f").heap() == replacement.heap());
+        CHECK(session.value("old").heap() == original.heap());
+        output.clear();
+        r = session.evaluate("reader()", "alias-cell-reader", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
+        r = session.evaluate("old()", "alias-old-reader", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+        r = session.evaluate("f==g", "alias-identity", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_bool());
+    }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");
 }

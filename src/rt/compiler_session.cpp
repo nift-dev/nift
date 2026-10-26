@@ -114,9 +114,12 @@ bool UnitCompiler::session_admit() {
                 if (n.kind == NodeKind::Declare && symbol.defined)
                     return fail(n, "session:shadow-or-redeclare");
                 if (symbol.callable && n.kind != NodeKind::Declare &&
-                    !(symbol.definition && symbol.definition->lambda && ast_.at(n.b).kind == NodeKind::Lambda))
+                    !(symbol.definition && symbol.definition->lambda &&
+                      (ast_.at(n.b).kind == NodeKind::Lambda ||
+                       (kinds(n.b) == kKindFunction && kinds_.callable_targets.count(n.b) &&
+                        !kinds_.callable_targets.at(n.b).empty()))))
                     return fail(n, "session:callable-rebind");
-                if (symbol.callable && n.kind == NodeKind::Assign &&
+                if (symbol.callable && n.kind == NodeKind::Assign && ast_.at(n.b).kind == NodeKind::Lambda &&
                     !session_lambda_assignment_spelling(ast_, n)) return fail(n, "session:lambda-assignment-spelling");
                 if (kinds(n.b) & ~symbol.contract) return fail(n, "session:binding-contract");
                 const auto shape = kinds_.session_shapes.find(n.b);
