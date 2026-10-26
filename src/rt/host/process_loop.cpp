@@ -31,7 +31,10 @@
 namespace nift::rt::host::runtime {
 
 // ---------------------------------------------------------------- host loop
-#ifndef _WIN32
+// POSIX: poll() over a wake pipe, timers and fd watches. Windows (and POSIX
+// builds with NIFT_HOST_LOOP_PORTABLE, which run the portable branch under
+// the sanitizers): timers only, on a condition variable (no fd watches there).
+#if !defined(_WIN32) && !defined(NIFT_HOST_LOOP_PORTABLE)
 namespace {
 std::atomic<int> g_loop_wake_fd{-1};
 std::atomic<bool> g_sigchld{false};
@@ -182,11 +185,71 @@ void loop_notify_sigchld() {
     if (fd >= 0) { const char byte = 2; ssize_t ignored = ::write(fd, &byte, 1); (void)ignored; }
 }
 #else
+// CP22: the portable host loop (timers). Same contract as the POSIX loop:
+// one lazily started thread, callbacks run on it without the lock held, a
+// timer never fires early, cancel is a no-op for fired/unknown ids.
+namespace {
+struct PortableLoop {
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::multimap<Clock::time_point, TaskId> timers;
+    std::map<TaskId, std::pair<Clock::time_point, std::function<void()>>> tasks;
+    TaskId next = 1;
+    bool started = false;
+};
+PortableLoop& ploop() { static PortableLoop* s = new PortableLoop; return *s; }  // never destroyed (as above)
+
+void ploop_thread() {
+    auto& l = ploop();
+    std::unique_lock<std::mutex> lock(l.mutex);
+    for (;;) {
+        if (l.timers.empty()) { l.cv.wait(lock); continue; }
+        const auto when = l.timers.begin()->first;
+        if (Clock::now() < when) { l.cv.wait_until(lock, when); continue; }
+        std::vector<std::function<void()>> due;
+        const auto now = Clock::now();
+        while (!l.timers.empty() && l.timers.begin()->first <= now) {
+            auto it = l.tasks.find(l.timers.begin()->second);
+            l.timers.erase(l.timers.begin());
+            if (it == l.tasks.end()) continue;
+            due.push_back(std::move(it->second.second));
+            l.tasks.erase(it);
+        }
+        lock.unlock();
+        for (auto& fn : due) if (fn) fn();
+        lock.lock();
+    }
+}
+} // namespace
+
 void loop_notify_sigchld() {}
-TaskId loop_at(Clock::time_point, std::function<void()>) { return 0; }
-TaskId loop_when_readable(int, std::function<void()>) { return 0; }
-void loop_cancel(TaskId) {}
-std::size_t loop_pending() { return 0; }
+TaskId loop_at(Clock::time_point when, std::function<void()> fn) {
+    auto& l = ploop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    if (!l.started) { l.started = true; std::thread(ploop_thread).detach(); }
+    const TaskId id = l.next++;
+    l.tasks.emplace(id, std::make_pair(when, std::move(fn)));
+    const bool earliest = l.timers.empty() || when < l.timers.begin()->first;
+    l.timers.emplace(when, id);
+    if (earliest) l.cv.notify_one();
+    return id;
+}
+TaskId loop_when_readable(int, std::function<void()>) { return 0; }  // no descriptor watches on this path
+void loop_cancel(TaskId id) {
+    if (!id) return;
+    auto& l = ploop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    auto it = l.tasks.find(id);
+    if (it == l.tasks.end()) return;
+    auto range = l.timers.equal_range(it->second.first);
+    for (auto t = range.first; t != range.second; ++t) if (t->second == id) { l.timers.erase(t); break; }
+    l.tasks.erase(it);
+}
+std::size_t loop_pending() {
+    auto& l = ploop();
+    std::lock_guard<std::mutex> lock(l.mutex);
+    return l.tasks.size();
+}
 std::size_t loop_fd_count() { return 0; }
 #endif
 

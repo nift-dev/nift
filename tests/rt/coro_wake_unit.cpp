@@ -1,8 +1,11 @@
 // Runtime 2.0 CP22: the coroutine scheduler's wait point (rt/coro_wake.h)
 // across threads, for TSan: posts from plain threads and from the CP16 host
 // loop thread (loop_at), racing a waiter that uses deadlines; a source
-// destroyed while its host-loop timer is pending is never touched.
+// destroyed while its host-loop timer is pending is never touched; a cancelled
+// timer never fires. Built twice: the POSIX loop and the portable (Windows)
+// timer loop (-DNIFT_HOST_LOOP_PORTABLE).
 #include "rt/coro_wake.h"
+#include "rt/host/process_loop.h"
 #include "rt_test.h"
 
 #include <atomic>
@@ -56,6 +59,13 @@ int main() {
         auto gone = std::make_shared<WakeSource>();
         gone->post_at(Clock::now() + std::chrono::milliseconds(k % 5));
     }
+    // A cancelled host-loop timer never fires.
+    auto cancelled = std::make_shared<WakeSource>();
+    const auto id = cancelled->post_at(Clock::now() + std::chrono::milliseconds(5));
+    CHECK(id != 0);
+    nift::rt::host::runtime::loop_cancel(id);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    CHECK(cancelled->posts() == 0);
+    CHECK(nift::rt::host::runtime::loop_pending() == 0);
     return rt_test::finish("coro-wake-unit");
 }

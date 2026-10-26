@@ -3630,6 +3630,10 @@ test-runtime2-cp22-tsan:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/coro_wake_unit.cpp src/rt/coro_wake.cpp $(RT_HOST_SOURCES) \
 		-o "$(TEST_DIR)/rt-tsan/coro-wake"
 	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-tsan/coro-wake"
+	# The portable (Windows) host-loop timer path, run here under TSan.
+	$(CXX) $(CPPFLAGS) -DNIFT_HOST_LOOP_PORTABLE -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/coro_wake_unit.cpp \
+		src/rt/coro_wake.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-tsan/coro-wake-portable"
+	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-tsan/coro-wake-portable"
 # Mutants: the three scheduler objects compiled -DNIFT_CORO_MUTANT=n, linked
 # with the normal objects; tests/runtime2/cp22/run.py --mutant checks each
 # against its named witness (provenance manifest: binary and oracle sha256).
