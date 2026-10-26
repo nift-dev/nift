@@ -1,5 +1,7 @@
 #include "rt/session_text.h"
 #include "rt/lexer.h"
+#include "rt/unit_check.h"
+#include "rt/infer.h"
 #include <stdexcept>
 
 // rt-lint: cold-file immutable declaration linking, never executable history replay
@@ -24,11 +26,31 @@ SessionText session_text(const std::string& source, const std::string& path, con
         const auto definition = selected[k];
         scan(std::string_view(*definition->source).substr(definition->begin, definition->end - definition->begin));
     }
+    auto generated = [&](std::string value) {
+        out.text += value;
+        out.pieces.push_back({path, std::make_shared<const std::string>(value), 0,
+                              static_cast<std::uint32_t>(value.size())});
+    };
+    out.imports.clear();
     for (const auto& definition : selected) {
+        if (definition->lambda) {
+            std::string wrapper = "__cp19_template";
+            auto collision = [&](const std::string& name) {
+                if (source.find(name) != std::string::npos) return true;
+                for (const auto& symbol : context.symbols) if (symbol.name == name) return true;
+                for (const auto& item : selected) if (item->source->find(name) != std::string::npos) return true;
+                return false;
+            };
+            while (collision(wrapper) || out.imports.count(wrapper)) wrapper += "_";
+            out.imports.emplace(wrapper, definition);
+            generated("fn(" + wrapper + "()){");
+            for (const auto& capture : definition->captures) generated(capture.name + ":=null;");
+            generated("return ");
+        } else out.imports.emplace(definition->name, definition);
         out.text.append(*definition->source, definition->begin, definition->end - definition->begin);
-        out.text += '\n';
         out.pieces.push_back({definition->path, definition->source, definition->begin,
-                              definition->end - definition->begin + 1});
+                              definition->end - definition->begin});
+        generated(definition->lambda ? ";}\n" : "\n");
     }
     if (out.text.size() + source.size() > 0xffffffffu) throw std::length_error("session source offset limit");
     out.unit_begin = static_cast<std::uint32_t>(out.text.size());
@@ -36,5 +58,68 @@ SessionText session_text(const std::string& source, const std::string& path, con
     out.pieces.push_back({path, std::make_shared<const std::string>(source), 0,
                          static_cast<std::uint32_t>(source.size())});
     return out;
+}
+void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, const SessionText& text,
+                               const SessionCompileContext& current, SessionCompileContext& pending) {
+    pending.source_owner = std::make_shared<const std::string>(text.text);
+    pending.lambda_templates.clear(); pending.capture_seeds.clear();
+    pending.capture_contracts.clear(); pending.template_definitions.clear();
+    if (parsed_ok) for (std::uint32_t k = 0; k < ast.at(root).count; ++k) {
+        const auto& fn = ast.at(ast.list(ast.at(root))[k]);
+        if (fn.kind != NodeKind::FnDecl) continue;
+        const auto imported = text.imports.find(std::string(ast.text(ast.at(fn.a))));
+        if (imported == text.imports.end() || !imported->second->lambda) continue;
+        const auto& body = ast.at(fn.b);
+        if (body.count != imported->second->captures.size() + 1)
+            throw std::logic_error("session lambda template shape");
+        const auto& tail = ast.at(ast.list(body)[body.count - 1]);
+        if (tail.kind != NodeKind::Return || ast.at(tail.a).kind != NodeKind::Lambda)
+            throw std::logic_error("session lambda template body");
+        pending.template_definitions.emplace(tail.a, imported->second);
+        for (std::uint32_t c = 0; c + 1 < body.count; ++c) {
+            const auto& declaration = ast.at(ast.list(body)[c]);
+            pending.capture_seeds.emplace(declaration.b, imported->second->captures[c].shape);
+            pending.capture_contracts.emplace(declaration.a, imported->second->captures[c].shape);
+        }
+        for (const auto& symbol : current.symbols) if (symbol.definition == imported->second)
+            pending.lambda_templates.emplace(symbol.name, tail.a);
+    }
+}
+void session_definitions(const Ast& ast, NodeId root, const SessionText& text, const std::string& path,
+                         const SessionCompileContext& pending, Program& program, std::uint64_t executions) {
+    const auto plan = plan_unit(ast, root);
+    for (std::size_t f = 0; f < plan.functions.size(); ++f) {
+        const auto& fn = ast.at(plan.functions[f]);
+        const auto name = std::string(ast.text(ast.at(fn.a)));
+        const auto imported = text.imports.find(name);
+        if (imported != text.imports.end()) {
+            if (!imported->second->lambda) program.protos[f + 1]->session_definition = imported->second;
+        }
+        else if (fn.begin >= text.unit_begin) {
+            auto definition = std::make_shared<SessionDefinition>();
+            definition->name = name; definition->path = path; definition->source = text.pieces.back().source;
+            definition->begin = fn.begin - text.unit_begin; definition->end = fn.end - text.unit_begin;
+            program.protos[f + 1]->session_definition = std::move(definition);
+        }
+    }
+    for (std::size_t p = 1; p < program.protos.size(); ++p) {
+        auto& proto = program.protos[p];
+        const auto& original = proto->session_definition;
+        if (!original || !original->lambda || original->source != pending.source_owner) continue;
+        auto definition = std::make_shared<SessionDefinition>(*original);
+        std::uint32_t position = 0;
+        bool mapped = false;
+        for (const auto& piece : text.pieces) {
+            if (definition->begin >= position && definition->end <= position + piece.length) {
+                definition->begin = definition->begin - position + piece.source_begin;
+                definition->end = definition->end - position + piece.source_begin;
+                definition->source = piece.source; definition->path = piece.path; mapped = true; break;
+            }
+            position += piece.length;
+        }
+        if (!mapped) throw std::logic_error("session lambda source mapping");
+        definition->name = "lambda:" + std::to_string(executions) + ":" + std::to_string(p);
+        proto->session_definition = std::move(definition);
+    }
 }
 } // namespace nift::rt

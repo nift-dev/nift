@@ -3,6 +3,7 @@
 #include "rt/compiler_capture.h"
 
 #include "rt/native.h"
+#include "rt/compiler.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -110,6 +111,8 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         upvalue_readonly.push_back(binding->readonly);
         upvalue_const_array.push_back(binding->const_array);
     }
+    if (session_ && !session_lambda_captures(node_id(node), node, upvalue_names, upvalue_loop,
+                                            upvalue_readonly, upvalue_const_array)) return false;
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
@@ -301,6 +304,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         ok = finish(out);
         if (ok) {
             out->collection_expression_view = collection_view;
+            if (session_ && !session_lambda_definition(task, *out)) return false;
             if (session_) for (std::uint32_t k = 0; k < lambda.count; ++k) {
                 out->session_params.push_back(kinds(params[k]));
                 out->session_param_types.push_back(0xffff);

@@ -29,6 +29,15 @@ bool UnitCompiler::session_tail(NodeId id) {
     return true;
 }
 bool UnitCompiler::session_admit() {
+    // Other retained readers share these cells and keep their original
+    // inferred bounds, even when this command specializes a new caller.
+    for (const auto& binding : kinds_.bindings) {
+        const auto bound = session_->capture_contracts.find(binding.second);
+        if (bound == session_->capture_contracts.end()) continue;
+        const auto shape = kinds_.session_shapes.find(binding.first);
+        if (shape != kinds_.session_shapes.end() && !session_shape_within(shape->second, bound->second))
+            return fail(ast_.at(binding.first), "session:capture-contract");
+    }
     std::vector<NodeId> pending{root_};
     while (!pending.empty()) {
         const auto id = pending.back(); pending.pop_back();
@@ -38,7 +47,17 @@ bool UnitCompiler::session_admit() {
         if ((n.kind == NodeKind::Assign || n.kind == NodeKind::Declare) &&
             n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident) {
             const auto name = text(ast_.at(n.a));
+            const auto bound = kinds_.bindings.find(n.a);
             for (const auto& symbol : session_->symbols) if (symbol.name == name) {
+                const auto external = session_->declarations.find(symbol.name);
+                if (n.kind == NodeKind::Assign && bound != kinds_.bindings.end() &&
+                    external != session_->declarations.end() && bound->second != external->second) continue;
+                if (n.kind == NodeKind::Declare) {
+                    bool top = false;
+                    for (std::uint32_t k = 0; k < ast_.at(root_).count; ++k)
+                        top = top || ast_.list(ast_.at(root_))[k] == id;
+                    if (!top) continue;
+                }
                 if (n.kind == NodeKind::Declare && symbol.defined)
                     return fail(n, "session:shadow-or-redeclare");
                 if (symbol.callable && n.kind != NodeKind::Declare) return fail(n, "session:callable-rebind");
@@ -83,7 +102,8 @@ bool UnitCompiler::session_admit() {
 }
 bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint16_t base) {
     const auto name = ast_.at(callee).kind == NodeKind::Ident ? text(ast_.at(callee)) : std::string_view{};
-    for (const auto& symbol : session_->symbols) if (symbol.name == name && symbol.callable) {
+    for (const auto& symbol : session_->symbols) {
+        if (symbol.name != name || !symbol.callable || session_->lambda_templates.count(symbol.name)) continue;
         if (symbol.definition) {
             const auto target = plan_.index.find(symbol.definition->name);
             if (target != plan_.index.end()) {
@@ -187,6 +207,50 @@ bool UnitCompiler::session_function(NodeId id) {
     binding.cell = binding.typed = binding.readonly = true;
     binding.decl_kinds = kKindFunction;
     if (!session_publish(name, binding)) return false;
+    return true;
+}
+bool UnitCompiler::session_lambda_captures(NodeId id, const Node& node, std::vector<std::string_view>& names,
+        std::vector<bool>& loop, std::vector<bool>& readonly, std::vector<bool>& const_array) {
+    const auto imported = session_->template_definitions.find(id);
+    if (imported != session_->template_definitions.end()) {
+        const auto& captures = imported->second->captures;
+        if (captures.size() != names.size()) return fail(node, "session:capture-layout");
+        for (std::size_t k = 0; k < captures.size(); ++k) {
+            if (captures[k].name != names[k]) return fail(node, "session:capture-layout");
+            loop[k] = captures[k].loop; readonly[k] = captures[k].readonly;
+            const_array[k] = captures[k].const_array;
+        }
+    }
+    return true;
+}
+bool UnitCompiler::session_lambda_definition(const LambdaTask& task, Proto& out) {
+    const auto imported = session_->template_definitions.find(task.lambda);
+    if (imported != session_->template_definitions.end()) {
+        const auto& expected = imported->second->captures;
+        if (expected.size() != task.upvalue_names.size()) return fail(ast_.at(task.lambda), "session:capture-layout");
+        for (std::size_t k = 0; k < expected.size(); ++k)
+            if (expected[k].name != task.upvalue_names[k] || expected[k].loop != task.upvalue_loop[k] ||
+                expected[k].readonly != task.upvalue_readonly[k] ||
+                expected[k].const_array != task.upvalue_const_array[k])
+                return fail(ast_.at(task.lambda), "session:capture-layout");
+        out.session_definition = imported->second;
+    } else {
+        auto definition = std::make_shared<SessionDefinition>();
+        definition->lambda = true; definition->source = session_->source_owner;
+        definition->begin = ast_.at(task.lambda).begin; definition->end = ast_.at(task.lambda).end;
+        for (std::size_t k = 0; k < task.upvalue_names.size(); ++k) {
+            infer_detail::TyRef shape;
+            for (const auto& binding : kinds_.bindings) if (binding.second == task.upvalue_decls[k]) {
+                const auto found = kinds_.session_shapes.find(binding.first);
+                if (found != kinds_.session_shapes.end())
+                    shape = infer_detail::unite(shape ? shape : infer_detail::empty_ty(), found->second);
+            }
+            if (!shape) shape = infer_detail::kinds_ty(kinds(task.upvalue_decls[k]));
+            definition->captures.push_back({std::string(task.upvalue_names[k]), session_shape(shape),
+                task.upvalue_loop[k], task.upvalue_readonly[k], task.upvalue_const_array[k]});
+        }
+        out.session_definition = std::move(definition);
+    }
     return true;
 }
 } // namespace nift::rt::detail

@@ -105,6 +105,22 @@ int main() {
         CHECK(session.retained_code_units() == 1);
         CHECK(session.code_slots() <= 4);
     }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("fn(makec()){n:=10;return v=>{n+=v;return n}};c:=makec()", "closure-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto closure = session.value("c");
+        r = session.evaluate("c(2)", "first-later-argument", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 12);
+        CHECK(session.value("c").heap() == closure.heap());
+        r = session.execute("leaked:=0;print(\"FORBIDDEN\");c(\"bad\")", "widening", output);
+        CHECK(!r.admitted && r.refusal == "session:capture-contract" && output.empty());
+        CHECK(!session.contains("leaked") && session.value("c").heap() == closure.heap());
+        r = session.evaluate("c(3)", "after-refusal", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 15);
+        CHECK(session.value("c").heap() == closure.heap());
+    }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");
 }

@@ -10,5 +10,9 @@ struct SessionText {
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> imports;
     std::uint32_t unit_begin = 0;
 };
+void prepare_session_templates(const Ast&, NodeId, bool, const SessionText&,
+                               const SessionCompileContext&, SessionCompileContext&);
+void session_definitions(const Ast&, NodeId, const SessionText&, const std::string&,
+                         const SessionCompileContext&, Program&, std::uint64_t);
 SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context);
 } // namespace nift::rt

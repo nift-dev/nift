@@ -21,7 +21,6 @@ namespace infer_detail {
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
                      const SessionCompileContext* session)
     : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
-    seed_session();
     result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));
     const Node& program = ast.at(root);
     const NodeId* top = ast.list(program);
@@ -39,6 +38,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
     const std::size_t n = plan_.functions.size();
     callers_.assign(n, {});
     queued_.assign(n + 1, false);
+    seed_session();
     seed_struct_fields();  // CP12b structs: each field starts as its initialiser
     enqueue(n);  // main first: its calls seed the parameters
     for (std::size_t f = n; f-- > 0;) enqueue(f);
@@ -130,6 +130,10 @@ int Inference::function_index(const Node& callee) const {
 
 TyRef Inference::expr(NodeId id) {
     const Node& n = ast_.at(id);
+    if (session_) {
+        const auto seed = session_->capture_seeds.find(id);
+        if (seed != session_->capture_seeds.end()) return record(id, seed->second);
+    }
     TyRef t;
     switch (n.kind) {
         case NodeKind::Number: t=number_literal(id);break;
@@ -273,48 +277,6 @@ TyRef Inference::expr(NodeId id) {
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)
     }
     return record(id, t ? t : empty_ty());
-}
-
-std::size_t Inference::lambda_unit(NodeId node) {
-    const auto found = lambda_unit_.find(node);
-    if (found != lambda_unit_.end()) return found->second;
-    const std::size_t id = lambdas_.size();
-    const std::size_t unit = plan_.functions.size() + 1 + id;
-    LambdaInfo info;
-    info.node = node;
-    info.owner_function = current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()
-                              ? current_
-                              : owner_function_;
-    info.params.assign(ast_.at(node).count, empty_ty());
-    info.returns = empty_ty();
-    info.collection_returns = empty_ty();
-    info.scopes = scopes_;
-    lambdas_.push_back(std::move(info));
-    lambda_unit_.emplace(node, unit);
-    enqueue(unit);
-    return unit;
-}
-
-TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew) {
-    TyRef out = empty_ty();
-    for (std::uint32_t unit : callee->callables) {
-        if (static_cast<std::size_t>(unit) < plan_.functions.size()) {
-            auto& params = params_[unit];
-            for (std::size_t k = 0; k < values.size() && k < params.size(); ++k)
-                grew = merge(params[k], values[k]) || grew;
-            callers_[unit].insert(current_unit());
-            out = unite(out, returns_[unit]);
-        } else if (static_cast<std::size_t>(unit) > plan_.functions.size()) {
-            const std::size_t id = static_cast<std::size_t>(unit) - plan_.functions.size() - 1;
-            LambdaInfo& info = lambdas_[id];
-            for (std::size_t k = 0; k < values.size() && k < info.params.size(); ++k)
-                grew = merge(info.params[k], values[k]) || grew;
-            info.callers.insert(current_unit());
-            out = unite(out, info.returns);
-        }
-        if (grew) enqueue(unit);
-    }
-    return out;
 }
 
 TyRef Inference::call(const Node& n) {

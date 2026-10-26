@@ -42,6 +42,10 @@ struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
     std::unordered_set<std::string> imported_functions;
     std::unordered_map<std::string, NodeId> declarations;
+    std::unordered_map<std::string, NodeId> lambda_templates;
+    std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> capture_seeds, capture_contracts;
+    std::unordered_map<NodeId, std::shared_ptr<const SessionDefinition>> template_definitions;
+    std::shared_ptr<const std::string> source_owner;
     std::uint16_t slots = 0;
     bool inspect_tail = false;
 };

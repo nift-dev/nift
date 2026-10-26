@@ -195,6 +195,10 @@ private:
     std::uint16_t collection_diagnostic_flags(const Node&,NodeId,bool comparator=false) const;
     bool collection_callback_shape(const Node&,NodeId,std::uint32_t argc);
     bool compile_lambda_body(const Node&,const NodeId*,bool collection_view);
+    bool session_lambda_definition(const LambdaTask& task, Proto& out);
+    bool session_lambda_captures(NodeId id, const Node& node, std::vector<std::string_view>& names,
+                                 std::vector<bool>& loop, std::vector<bool>& readonly,
+                                 std::vector<bool>& const_array);
     bool lambda_upvalues(const LambdaTask& task);
     bool compile_lambda_task(const struct LambdaTask& task, std::unique_ptr<Proto>& out, bool collection_view = false);
     void prepare_captures();

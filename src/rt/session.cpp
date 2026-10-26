@@ -145,6 +145,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
         pending.declarations.emplace(symbol.name, ast.add(NodeKind::Ident, 0, 0));
     pending.imported_functions.clear();
     for (const auto& imported : text.imports) pending.imported_functions.insert(imported.first);
+    prepare_session_templates(ast, parsed.root, parsed.ok, text, namespace_, pending);
     CompileLimits limits; limits.session = &pending;
     const auto parse_done = std::chrono::steady_clock::now();
     stats.parse_us = std::chrono::duration<double, std::micro>(parse_done - begin).count();
@@ -170,18 +171,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     auto owned = std::shared_ptr<Program>(std::move(compiled.program));
     auto& program = *owned;
     const auto plan = plan_unit(ast, parsed.root);
-    for (std::size_t f = 0; f < plan.functions.size(); ++f) {
-        const auto& fn = ast.at(plan.functions[f]);
-        const auto name = std::string(ast.text(ast.at(fn.a)));
-        const auto imported = text.imports.find(name);
-        if (imported != text.imports.end()) program.protos[f + 1]->session_definition = imported->second;
-        else if (fn.begin >= text.unit_begin) {
-            auto definition = std::make_shared<SessionDefinition>();
-            definition->name = name; definition->path = path; definition->source = text.pieces.back().source;
-            definition->begin = fn.begin - text.unit_begin; definition->end = fn.end - text.unit_begin;
-            program.protos[f + 1]->session_definition = std::move(definition);
-        }
-    }
+    session_definitions(ast, parsed.root, text, path, pending, program, executions_);
     auto linked = linked_;
     auto vacant = vacant_;
     std::vector<std::uint16_t> slots(program.protos.size());
@@ -195,8 +185,13 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     }
     std::vector<std::pair<const void*, const Proto*>> targets;
     for (const auto& symbol : namespace_.symbols) if (symbol.definition && symbol.code) {
-        const auto target = plan.index.find(symbol.definition->name);
-        if (target != plan.index.end()) targets.emplace_back(symbol.code, program.protos[target->second].get());
+        if (symbol.definition->lambda) {
+            for (const auto& proto : program.protos) if (proto->session_definition == symbol.definition)
+                targets.emplace_back(symbol.code, proto.get());
+        } else {
+            const auto target = plan.index.find(symbol.definition->name);
+            if (target != plan.index.end()) targets.emplace_back(symbol.code, program.protos[target->second].get());
+        }
     }
     for (auto& proto : program.protos) {
         proto->session_source = source_map;
@@ -232,6 +227,9 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_ = std::move(pending);
     namespace_.imported_functions.clear();
     namespace_.declarations.clear();
+    namespace_.lambda_templates.clear(); namespace_.capture_seeds.clear();
+    namespace_.capture_contracts.clear(); namespace_.template_definitions.clear();
+    namespace_.source_owner.reset();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2
     if (executions_ == 1) for (const auto& symbol : namespace_.symbols)
         if (symbol.name == "x") cell_put(globals_[symbol.slot], Value::integer(0));  // M2: lose retained state

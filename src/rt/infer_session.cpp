@@ -12,7 +12,10 @@ void Inference::seed_session() {
         if (declaration != session_->declarations.end()) binding_decls_[vars_.size()] = declaration->second;
         auto type = std::make_shared<Ty>(symbol.structure ? *symbol.structure : Ty{});
         type->kinds = symbol.kinds;
-        if (symbol.definition) {
+        const auto lambda = session_->lambda_templates.find(symbol.name);
+        if (lambda != session_->lambda_templates.end())
+            type->callables.push_back(static_cast<std::uint32_t>(lambda_unit(lambda->second)));
+        else if (symbol.definition) {
             const auto target = plan_.index.find(symbol.definition->name);
             if (target != plan_.index.end()) type->callables.push_back(target->second - 1u);
         }
@@ -28,7 +31,8 @@ TyRef Inference::session_call(const Node& n) {
     const Node& callee = ast_.at(n.a);
     if (!session_ || callee.kind != NodeKind::Ident) return {};
     for (const auto& symbol : session_->symbols) if (symbol.name == ast_.text(callee) && symbol.callable) {
-        if (symbol.definition && plan_.index.count(symbol.definition->name)) return {};
+        if (session_->lambda_templates.count(symbol.name) ||
+            (symbol.definition && plan_.index.count(symbol.definition->name))) return {};
         expr(n.a);
         for (std::uint32_t k = 0; k < n.count; ++k) expr(ast_.list(n)[k]);
         return kinds_ty(symbol.returns ? symbol.returns : static_cast<KindSet>(kKindAll | kKindUnknown));

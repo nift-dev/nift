@@ -35,9 +35,9 @@ int main(int argc, char** argv) {
     CHECK(output == "ONCE\n");
     CHECK(session.value("x").as_int() == expected_x + (expect == "runtime" ? 0 : 1));
     output.clear();
-    r = session.execute("saved:=error(\"seed\");fail0:=()=>{throw error(\"cross\")}", "original-source", output);
+    r = session.execute("saved:=error(\"seed\");o:={\"fail\":()=>{throw error(\"cross\")}}", "original-source", output);
     CHECK(r.admitted && r.execution.reason == StopReason::None);
-    r = session.execute("try{fail0()}catch(e){saved=e}", "catcher", output);
+    r = session.execute("try{o.fail()}catch(e){saved=e}", "catcher", output);
     CHECK(r.admitted && r.execution.reason == StopReason::None);
     auto error = session.value("saved");
     CHECK(error.is(Kind::Error));

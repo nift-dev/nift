@@ -16,6 +16,8 @@ cases=[
  ('increments',['-i'],'x:=1\n(x++)\n(++x)\nprint(x)\nexit\n','',4),
  ('signature',['-i'],'fn(addv(v)){return v+1};addv(0)\naddv(8)\nexit\n','',2),
  ('capture_param',['-i'],'fn(makec(n)){return ()=>{n+=1;return n}};c:=makec(10)\nc()\nc()\nexit\n','',3),
+ ('first_lambda',['-i'],'f:=v=>v+1\nf(8)\nf("x")\nexit\n','',3),
+ ('captured_lambda',['-i'],'fn(makec()){n:=10;return v=>{n+=v;return n}};c:=makec()\nc(2)\nc(3)\nexit\n','',3),
  ('first_call',['-i'],'fn(addv(v)){return v+1}\naddv(8)\naddv("x")\nexit\n','',3),
  ('alias_function',['-i'],'fn(addv(v)){return v+1}\nf:=addv\nf(8)\nexit\n','',3),
  ('callback_function',['-i'],'fn(inc(v)){return v+1}\n[1,2].map(inc).stringify()\nexit\n','',2),
