@@ -25,6 +25,7 @@ struct ExecContext {
     bool build_family = false;         // a build context or nested in one: no detach
     bool ending_on_error = false;      // set by close_context(id, true) for the closing subtree
     std::uint64_t closer = 0;          // the close_context call that owns ending this context
+    ContextState before_close = ContextState::Open;  // restored if that close fails (allocation)
     std::string label;                 // diagnostics: "page 'index'", "build", ...
     std::vector<ContextId> children;   // in open order
     OwnerList handles;                 // owned handles in creation order
@@ -64,8 +65,7 @@ public:
     static bool is_build_kind(ContextKind kind) { return kind != ContextKind::Script; }
 
 private:
-    void collect(ContextId id, std::uint64_t closer, std::vector<ContextId>& order,
-                 std::vector<ContextId>& elsewhere);
+    void collect(ContextId id, std::vector<ContextId>& order, std::vector<ContextId>& elsewhere) const;
 
     std::unordered_map<ContextId, ExecContext> contexts_;
     std::vector<ContextId> roots_;   // in open order

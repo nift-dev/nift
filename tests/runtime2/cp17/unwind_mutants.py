@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""CP17 x CP13B decision B: real compiled mutants of the unwound-frame release.
+"""CP17 combined-tree corrections (decision B, the statement rollback and the
+CP17 x CP18 close-under-allocation-failure fix): real compiled mutants.
 
 Each mutant applies one exact textual change (which must match exactly once)
 to a private copy of the tree, rebuilds the named artefact there and requires
@@ -24,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 UNIT = ".build/rt/unwind-file-release"
+OOM_UNIT = ".build/rt/handle-close-oom"
 FILE_NATIVES = "src/rt/natives/host_file_handles.cpp"
 GUARD = ("if (!value.boxed_handle() || value.refcount() != 1 || value.handle_kind() != HandleKind::File) "
          "return false;")
@@ -65,6 +67,16 @@ MUTANTS = [
      "return f.owner == owner", "unit", "unwind_file_release_unit.cpp:"),
     ("withdraw-any-state", "src/rt/handles/table_contexts.cpp", " && f.state == LifeState::CleanupIncomplete;", ";", "unit",
      "unwind_file_release_unit.cpp:"),
+    # CP17 x CP18: close_context under allocation failure.
+    ("close-mark-in-walk", "src/rt/handles/context_tree.cpp",
+     "    const auto self = contexts_.find(id);\n    if (self == contexts_.end()) return;\n",
+     "    const auto self = contexts_.find(id);\n    if (self == contexts_.end()) return;\n"
+     "    const_cast<ExecContext&>(self->second).state = ContextState::Closing;\n", "oom",
+     "handle_close_oom_unit.cpp:118: CHECK failed: t.open(c)"),
+    ("close-no-restore", "src/rt/handles/table_contexts.cpp", "        bool armed = true;", "        bool armed = false;",
+     "oom", "handle_close_oom_unit.cpp:118: CHECK failed: t.open(c)"),
+    ("close-restore-to-open", "src/rt/handles/table_contexts.cpp", "c->state = c->before_close;",
+     "c->state = ContextState::Open;", "oom", "handle_close_oom_unit.cpp:117: CHECK failed"),
     ("release-handler-frame", "src/rt/vm_exception.cpp",
      "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();\n",
      "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) { if (R[k].is(Kind::Handle)) "
@@ -84,11 +96,20 @@ def copy_tree(dest):
 
 
 def witness(tree, kind):
-    if kind == "unit":
-        build = run(["make", UNIT], tree, 3600)
+    if kind in ("unit", "oom"):
+        target = UNIT if kind == "unit" else OOM_UNIT
+        build = run(["make", target], tree, 3600)
         if build.returncode != 0:
             return None, build.stdout[-2000:] + build.stderr[-2000:]
-        result = run([str(tree / UNIT)], tree, 300)
+        try:
+            # A killed mutant may hang after its first failed CHECK (the defect
+            # it restores is a hang); the CHECK line is the witness, the
+            # timeout only bounds the run and never counts as a kill alone.
+            result = run([str(tree / target)], tree, 120)
+        except subprocess.TimeoutExpired as e:
+            def text(x):
+                return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
+            return 124, text(e.stdout) + text(e.stderr)
     else:
         build = run(["make", "-j2", "nift"], tree, 3600)
         if build.returncode != 0:
@@ -115,7 +136,7 @@ def main():
         print("ok   dead-binary control: the witness fails without a binary")
         control = work / "control"
         copy_tree(control)
-        for kind in ("unit", "vm"):
+        for kind in ("unit", "oom", "vm"):
             rc, out = witness(control, kind)
             if rc != 0:
                 print(f"FAIL control ({kind}): unmutated tree does not pass: rc={rc}\n{out[-1500:]}")

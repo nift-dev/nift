@@ -469,6 +469,12 @@ $(RT_HANDLE_UNIT): $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) -o "$@"
 
+# CP17 x CP18 (2026-10-27): HandleTable::close_context under allocation failure.
+RT_HANDLE_CLOSE_OOM := $(TEST_DIR)/rt/handle-close-oom$(EXEEXT)
+$(RT_HANDLE_CLOSE_OOM): tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_SOURCES) -o "$@"
+
 $(RT_HANDLE_STRESS): tests/rt/handle_table_stress.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) -o "$@"
@@ -488,7 +494,8 @@ $(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
 
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
-test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE) $(RT_HANDLE_BOX_UNIT)
+test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE) $(RT_HANDLE_BOX_UNIT) $(RT_HANDLE_CLOSE_OOM)
+	timeout 120 "$(RT_HANDLE_CLOSE_OOM)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_UNIT)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_BOX_UNIT)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_LIFECYCLE)"

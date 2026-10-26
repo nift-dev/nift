@@ -40,7 +40,8 @@ void HandleTable::close_one(ContextId id, CloseReport& report, std::unique_lock<
 void HandleTable::close_subtree(ContextId id, bool on_error, CloseReport& report,
                                 std::unique_lock<std::mutex>& lock) {
     std::vector<ContextId> elsewhere;
-    const std::vector<ContextId> order = contexts_.begin_close(id, next_closer_++, elsewhere);
+    const std::uint64_t closer = next_closer_++;
+    const std::vector<ContextId> order = contexts_.begin_close(id, closer, elsewhere);
     for (const ContextId each : order) {
         if (ExecContext* e = contexts_.find(each)) e->ending_on_error = e->ending_on_error || on_error;
     }
@@ -53,7 +54,31 @@ void HandleTable::close_subtree(ContextId id, bool on_error, CloseReport& report
         }
         return true;
     });
+    // CP17 x CP18 (2026-10-27): if ending a context throws (allocation
+    // failure), the contexts this close took over and has not ended go back
+    // to their previous state, so a later close or shutdown() can end them
+    // instead of waiting forever for this abandoned close.
+    struct Restore {
+        HandleTable& table;
+        const std::vector<ContextId>& order;
+        std::uint64_t closer;
+        std::unique_lock<std::mutex>& lock;
+        bool armed = true;
+        ~Restore() {
+            if (!armed) return;
+            if (!lock.owns_lock()) lock.lock();
+            for (const ContextId each : order) {
+                ExecContext* c = table.contexts_.find(each);
+                if (c && c->state == ContextState::Closing && c->closer == closer) {
+                    c->state = c->before_close;
+                    c->closer = 0;
+                }
+            }
+            table.idle_.notify_all();
+        }
+    } restore{*this, order, closer, lock};
     for (const ContextId each : order) close_one(each, report, lock);
+    restore.armed = false;
 }
 
 // CP17 x CP13B statement rollback (table.h).
