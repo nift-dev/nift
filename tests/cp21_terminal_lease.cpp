@@ -1,4 +1,5 @@
 // CP21 Host terminal-lease contract on a real PTY.
+#define _XOPEN_SOURCE 700
 #include "rt/host/process.h"
 
 #include <csignal>
@@ -23,8 +24,8 @@ void check(const char* name, bool ok) {
 bool make_controlling_tty() {
     const int master = ::posix_openpt(O_RDWR | O_NOCTTY);
     if (master < 0 || ::grantpt(master) != 0 || ::unlockpt(master) != 0) return false;
-    char name[128];
-    if (::ptsname_r(master, name, sizeof name) != 0) return false;
+    const char* name = ::ptsname(master);
+    if (!name) return false;
     if (::setsid() < 0) return false;
     const int slave = ::open(name, O_RDWR);
     if (slave < 0) return false;

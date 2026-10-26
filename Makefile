@@ -3354,7 +3354,7 @@ test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
 	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-delay "$(CURDIR)/$(TARGET)"; \
 	  CP21_FAIL_CONT_LIB="$(CURDIR)/$(TEST_DIR)/cp21-fail-cont.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-cont "$(CURDIR)/$(TARGET)"; \
 	fi
-	@if [ "$(shell uname -s)" = "Linux" ]; then $(MAKE) --no-print-directory test-cp21-terminal-lease; fi
+	$(MAKE) --no-print-directory test-cp21-terminal-lease
 test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS) $(CP21_PROBE)
 	@for m in 1 2 3 4 5; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT)"; \
