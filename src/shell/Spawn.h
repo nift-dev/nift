@@ -28,6 +28,10 @@ public:
     JobTable& operator=(const JobTable&) = delete;
 
     bool supported() const;
+    // True for the interactive shell: foreground waits return on a stop so
+    // the prompt and terminal come back to the shell. Scripts keep the
+    // blocking wait they had under CP20.
+    void set_interactive(bool interactive);
     ProcessResult launch(const std::vector<ProcessSpec>& specs, const std::string& command, bool foreground);
     void reap();
     std::vector<ShellJobInfo> jobs(bool include_done = true);

@@ -147,6 +147,7 @@ struct JobTable::Impl {
         ShellJobInfo info;
     };
     int next_id = 1;
+    bool interactive = false;
     std::vector<Entry> entries;
 
     Entry* find(int id) {
@@ -161,6 +162,9 @@ struct JobTable::Impl {
             entry.info.exit_code = entry.group->result().exit_code;
             entry.group.reset();  // release Host loop fds; job info remains for jobs/wait
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 9
+        } else {
+            entry.info.state = ShellJobState::Running;
+#elif defined(NIFT_CP21_MUTANT) && NIFT_CP21_MUTANT == 3
         } else {
             entry.info.state = ShellJobState::Running;
 #else
@@ -185,6 +189,8 @@ JobTable::~JobTable() {
 }
 
 bool JobTable::supported() const { return host_shell_supported(); }
+
+void JobTable::set_interactive(bool interactive) { impl_->interactive = interactive; }
 
 ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std::string& command, bool foreground) {
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 11
@@ -212,19 +218,32 @@ ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std:
 #endif
     request.exec_report_optional = true;
     request.own_group = true;
+#if defined(NIFT_CP21_MUTANT) && NIFT_CP21_MUTANT == 1
+    request.terminal = nift::rt::host::TerminalPolicy::Auto;
+#else
     request.terminal = foreground ? nift::rt::host::TerminalPolicy::Auto
                                   : nift::rt::host::TerminalPolicy::Never;
+#endif
     for (const auto& spec : specs) request.stages.push_back(convert_stage(spec));
     HostStatus status = HostStatus::Ok;
     HostError error;
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 7
     auto group = ProcessGroup::start_for_wait(std::move(request), status, error);
 #else
-    auto group = ProcessGroup::start(std::move(request), status, error);
+    // An interactive foreground job is driven by wait_job_control() itself,
+    // so it must not arm the persistent host loop (that would open the loop's
+    // descriptors for every ordinary command). Background jobs are armed.
+    auto group = (foreground && impl_->interactive)
+                     ? ProcessGroup::start_for_wait(std::move(request), status, error)
+                     : ProcessGroup::start(std::move(request), status, error);
 #endif
     if (status != HostStatus::Ok) return failure(error, status);
     Impl::Entry entry;
+#if defined(NIFT_CP21_MUTANT) && NIFT_CP21_MUTANT == 5
+    entry.id = 1;
+#else
     entry.id = impl_->next_id++;
+#endif
     entry.group = std::move(group);
     entry.info.id = entry.id;
     entry.info.process_group = entry.group->pgid();
@@ -236,13 +255,31 @@ ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std:
     out.launched = true;
     out.exit_code = 0;
     if (foreground) {
-        const auto& result = entry.group->wait();
-        entry.info.state = ShellJobState::Done;
-        entry.info.exit_code = result.exit_code;
-        out = convert_result(result);
-        entry.group.reset();
+        if (impl_->interactive) {
+            const auto job_wait = entry.group->wait_job_control();
+            if (job_wait == ProcessGroup::JobWait::Stopped) {
+                entry.info.state = ShellJobState::Stopped;
+#if !defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 4
+                entry.group->reclaim_terminal();
+#endif
+                out.launched = true;
+                out.exit_code = 128 + SIGTSTP;
+            } else {
+                const auto& result = entry.group->result();
+                entry.info.state = ShellJobState::Done;
+                entry.info.exit_code = result.exit_code;
+                out = convert_result(result);
+                entry.group.reset();
+            }
+        } else {
+            const auto& result = entry.group->wait();
+            entry.info.state = ShellJobState::Done;
+            entry.info.exit_code = result.exit_code;
+            out = convert_result(result);
+            entry.group.reset();
+        }
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 1
-        if (specs.size() > 1) {
+        if (foreground && specs.size() > 1) {
             if (!out.out.empty()) std::cout << out.out;
             if (!out.err.empty()) std::cerr << out.err;
             std::cout.flush();
@@ -285,6 +322,31 @@ ProcessResult JobTable::foreground(int job_id) {
         out.error = "unknown job";
         return out;
     }
+#ifndef _WIN32
+    if (impl_->interactive) {
+#if !defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 2
+        if (entry->info.state == ShellJobState::Stopped || entry->group->has_stopped_members())
+            entry->group->continue_group();
+#endif
+        entry->group->give_terminal();
+        const auto job_wait = entry->group->wait_job_control();
+        if (job_wait == ProcessGroup::JobWait::Stopped) {
+            entry->info.state = ShellJobState::Stopped;
+#if !defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 4
+            entry->group->reclaim_terminal();
+#endif
+            out.launched = true;
+            out.exit_code = 128 + SIGTSTP;
+            return out;
+        }
+        const auto& result = entry->group->result();
+        entry->info.state = ShellJobState::Done;
+        entry->info.exit_code = result.exit_code;
+        out = convert_result(result);
+        entry->group.reset();
+        return out;
+    }
+#endif
 #if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 8
     if (entry->group->has_stopped_members()) {
         out.launched = true;
@@ -309,8 +371,9 @@ bool JobTable::background(int job_id, std::string& error) {
     if (!entry->group) { error = "job is already complete"; return false; }
     if (entry->group->finished()) { error = "job is already complete"; return false; }
 #ifndef _WIN32
-#if !defined(NIFT_CP20_MUTANT) || NIFT_CP20_MUTANT != 8
-    if (entry->group->pgid() > 0) ::kill(-static_cast<pid_t>(entry->group->pgid()), SIGCONT);
+#if (!defined(NIFT_CP20_MUTANT) || NIFT_CP20_MUTANT != 8) && \
+    (!defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 2)
+    entry->group->continue_group();
 #endif
 #endif
     entry->info.state = ShellJobState::Running;

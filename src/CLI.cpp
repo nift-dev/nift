@@ -2063,11 +2063,7 @@ static int run_shell_job_builtin_impl(const std::string& builtin,
 static int run_shell_job_builtin(const std::string& builtin,
                                  const std::vector<std::string>& args,
                                  nift::shell::JobTable* jobs,
-                                 ShellJobTable* legacy_jobs,
-                                 bool interactive,
                                  bool print_errors) {
-    if (interactive && legacy_jobs && legacy_jobs->supported())
-        return run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
     return run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
 }
 
@@ -2075,8 +2071,6 @@ static int dispatch_shell_state(Parser& parser,
                                 const std::string& builtin,
                                 const std::vector<std::string>& args,
                                 nift::shell::JobTable* jobs,
-                                ShellJobTable* legacy_jobs,
-                                bool interactive,
                                 bool print_errors,
                                 bool& exit_requested,
                                 int& exit_code) {
@@ -2120,7 +2114,7 @@ static int dispatch_shell_state(Parser& parser,
         if (!result.output.empty()) std::cout << result.output << '\n';
         return 0;
     }
-    return run_shell_job_builtin(builtin, args, jobs, legacy_jobs, interactive, print_errors);
+    return run_shell_job_builtin(builtin, args, jobs, print_errors);
 }
 
 static int run_nift_command(Parser& parser,
@@ -2145,9 +2139,7 @@ static int run_external_words(Parser& parser,
                               const std::vector<ShellWord>& words,
                               const std::string& line,
                               bool print_errors,
-                              nift::shell::JobTable* jobs,
-                              ShellJobTable* legacy_jobs,
-                              bool interactive) {
+                              nift::shell::JobTable* jobs) {
     (void)parser;
     if (std::getenv("NIFT_NO_PROCESS")) {
         if (print_errors) console::error("external process execution disabled");
@@ -2212,8 +2204,8 @@ static int run_external_words(Parser& parser,
 
     const bool background = !words.empty() && words.back().operator_token && words.back().text == "&";
     if (background) {
-        if (interactive ? !legacy_jobs : !jobs) {
-            if (print_errors) console::error("background jobs require the interactive shell");
+        if (!jobs || !jobs->supported()) {
+            if (print_errors) console::error("interactive job control is not supported on Windows");
             return 2;
         }
     }
@@ -2224,21 +2216,13 @@ static int run_external_words(Parser& parser,
         }
     }
     if (background) {
-        ProcessResult result;
-        if (interactive && legacy_jobs && legacy_jobs->supported()) {
-            result = legacy_jobs->launch(stages, line, false);
-        } else if (!interactive && jobs && jobs->supported()) {
-            result = jobs->launch(stages, line, false);
-        } else {
-            if (print_errors) console::error("interactive job control is not supported on Windows");
-            return 2;
-        }
+        ProcessResult result = jobs->launch(stages, line, false);
         int status = result.exit_code;
         if (!result.error.empty()) {
             if (print_errors) console::error(result.error);
             return status < 0 ? 2 : status;
         }
-        auto list = (interactive && legacy_jobs) ? legacy_jobs->jobs(false) : jobs->jobs(false);
+        auto list = jobs->jobs(false);
         if (!list.empty()) {
             const auto& job = list.back();
             std::cout << "[" << job.id << "] " << job.process_group << '\n';
@@ -2248,15 +2232,7 @@ static int run_external_words(Parser& parser,
 
     const bool direct = !has_ops && stages.size() == 1;
     ProcessResult result;
-#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 10
-    if (interactive && legacy_jobs) {
-#else
-    if (interactive && legacy_jobs && legacy_jobs->supported()) {
-#endif
-        // J1(a): the complete legacy foreground job-control path stays until
-        // CP21 adds Host stop/continue. This preserves Ctrl-C/Ctrl-Z/fg/bg.
-        result = legacy_jobs->launch(stages, line, true);
-    } else if (jobs && jobs->supported()) {
+    if (jobs && jobs->supported()) {
         result = jobs->launch(stages, line, true);
     } else {
         if (direct) stages[0].foreground_terminal = true;
@@ -2269,8 +2245,6 @@ static int execute_shell_command(Parser& parser,
                                  const std::string& line,
                                  bool print_errors,
                                  nift::shell::JobTable* jobs,
-                                 ShellJobTable* legacy_jobs,
-                                 bool interactive,
                                  const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
                                  bool* exit_requested_out = nullptr,
                                  int* exit_code_out = nullptr) {
@@ -2365,7 +2339,7 @@ static int execute_shell_command(Parser& parser,
                     continue;
                 }
             }
-            last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 #endif
@@ -2385,7 +2359,7 @@ static int execute_shell_command(Parser& parser,
                 last = 2;
                 continue;
             }
-            last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 
@@ -2397,7 +2371,7 @@ static int execute_shell_command(Parser& parser,
                     args.assign(segment_texts.begin() + static_cast<std::ptrdiff_t>(name_index + 1),
                                 segment_texts.end());
                 }
-                last = dispatch_shell_state(parser, segment.first.name, args, jobs, legacy_jobs, interactive, print_errors,
+                last = dispatch_shell_state(parser, segment.first.name, args, jobs, print_errors,
                                             exit_requested, exit_code);
                 break;
             }
@@ -2406,7 +2380,7 @@ static int execute_shell_command(Parser& parser,
                 last = run_nift_command(parser, segment_texts, print_errors);
                 break;
             case nift::shell::CommandKind::External:
-                last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+                last = run_external_words(parser, segment_words, line, print_errors, jobs);
                 break;
             case nift::shell::CommandKind::NotFound:
                 if (print_errors) console::error("nift: " + segment.first.name + ": command not found");
@@ -2631,13 +2605,16 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 #endif
 static int run_script_shell_loop(Parser& parser, bool load_rc) {
-    std::string pending; nift::shell::JobTable jobs; ShellJobTable legacy_jobs;
+    std::string pending; nift::shell::JobTable jobs;
     auto history=load_nift_history();
 #ifndef _WIN32
     size_t hist_pos=history.size();
 #endif
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
+    jobs.set_interactive(interactive);
+#else
+    jobs.set_interactive(_isatty(_fileno(stdin)) != 0);
 #endif
     if(load_rc) if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());
@@ -2666,14 +2643,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         const auto snapshot=make_shell_snapshot(parser);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
-#ifndef _WIN32
-            const bool forced_scripted = std::getenv("NIFT_CP20_FORCE_SCRIPTED") != nullptr;
-            const bool interactive_shell = interactive && !forced_scripted;
-#else
-            const bool forced_interactive = std::getenv("NIFT_CP20_FORCE_INTERACTIVE") != nullptr;
-            const bool interactive_shell = _isatty(_fileno(stdin)) != 0 || forced_interactive;
-#endif
-            execute_shell_command(parser,trimmed,true,&jobs,&legacy_jobs,interactive_shell,&snapshot,&exit_requested,&exit_code);
+            execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code);
             pending.clear();
             if(exit_requested) return exit_code;
             continue;
@@ -2685,7 +2655,6 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
     if(jobs.has_live_jobs()) jobs.wait_all();
-    if(legacy_jobs.has_live_jobs()) legacy_jobs.wait_all();
     std::string resource_error;
     if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
     return 0;

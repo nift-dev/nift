@@ -32,6 +32,7 @@ src/rt/host/process_common.cpp
 src/rt/host/process_handles.cpp
 src/rt/host/process_loop.cpp
 src/rt/host/process_posix.cpp
+src/rt/host/process_posix_job.cpp
 src/rt/host/process_posix_launch.cpp
 src/rt/host/process_posix_lifecycle.cpp
 src/rt/host/process_posix_loop.cpp

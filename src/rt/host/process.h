@@ -266,6 +266,16 @@ public:
     bool has_live_members() const;
     bool has_stopped_members() const;  // CP20 B0: WNOWAIT query, does not reap
 
+    // CP21 job control. wait_job_control() returns when the group finishes or
+    // when every live stage is stopped (it does not consume the stop status).
+    // The terminal methods hand the controlling terminal to the group and
+    // return it to the shell; continue_group() resumes a stopped group.
+    enum class JobWait : std::uint8_t { Exited, Stopped };
+    JobWait wait_job_control();
+    bool continue_group();
+    bool give_terminal();
+    bool reclaim_terminal();
+
 private:
     explicit ProcessGroup(std::unique_ptr<State> state);
     static std::shared_ptr<ProcessGroup> start_impl(SpawnRequest request, HostStatus& status, HostError& error,

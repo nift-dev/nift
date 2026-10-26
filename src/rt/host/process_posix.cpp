@@ -302,18 +302,6 @@ std::vector<StageResult> ProcessGroup::stages() const {
 }
 bool ProcessGroup::has_live_members() const { return group_has_members(*s_); }
 
-bool ProcessGroup::has_stopped_members() const {
-    std::lock_guard<std::mutex> lock(s_->mu);
-    for (const auto& stage : s_->st) {
-        if (stage.pid <= 0 || stage.reaped) continue;
-        siginfo_t info{};
-        if (::waitid(P_PID, static_cast<id_t>(stage.pid), &info, WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT) == 0 &&
-            info.si_pid == stage.pid && info.si_code == CLD_STOPPED)
-            return true;
-    }
-    return false;
-}
-
 ProcessGroup::TerminateOutcome ProcessGroup::begin_terminate(CancelReason reason) {
     State& s = *s_;
     OpLock op(s);
