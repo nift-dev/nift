@@ -64,10 +64,14 @@ bool UnitCompiler::session_admit() {
     for (const auto& schema : session_->structures)
         for (const auto& name : schema.second->dynamic_fields) retained_struct_fields.insert(name);
     std::unordered_set<std::string_view> dynamic_reads;
-    if (globals_) for (const auto& function : globals_->free)
-        for (const auto& ref : function)
+    if (globals_) for (std::size_t f = 0; f < globals_->free.size(); ++f) {
+        // Imported lambda wrappers only seed inference. Their free names never
+        // participate in legacy named-function caller lookup.
+        if (session_->template_wrappers.count(plan_.functions[f])) continue;
+        for (const auto& ref : globals_->free[f])
             for (const auto& symbol : session_->symbols)
                 if (symbol.name == ref.first) dynamic_reads.insert(ref.first);
+    }
     std::vector<NodeId> pending{root_};
     while (!pending.empty()) {
         const auto id = pending.back(); pending.pop_back();

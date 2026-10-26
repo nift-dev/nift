@@ -5,6 +5,7 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('wrapper-lexical-shadow','a:=[[1]];f:=()=>a.stringify()\nfn(makec()){a:=[[1]];return v=>{for(row:a){row.push(v)};return a.stringify()}};c:=makec();c(0)\nf()\nc(2)\na.stringify()\nexit\n',5),
  ('nested-loop-mutation','a:=[[1],[2]]\nfor(v:a){v.push(2.5)}\na.stringify()\nexit\n',3),
  ('nested-loop-snapshot','a:=[[1],[2]];old:=a\nfor(v:a){v.push(2)}\na.stringify()\nold.stringify()\nexit\n',4),
 

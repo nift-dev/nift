@@ -93,7 +93,7 @@ SessionText session_text(const std::string& source, const std::string& path, con
 void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, const SessionText& text,
                                const SessionCompileContext& current, SessionCompileContext& pending) {
     pending.source_owner = std::make_shared<const std::string>(text.text);
-    pending.lambda_templates.clear(); pending.capture_seeds.clear();
+    pending.lambda_templates.clear(); pending.capture_seeds.clear(); pending.template_wrappers.clear();
     pending.callable_templates.clear(); pending.capture_callable_seeds.clear();
     pending.capture_contracts.clear(); pending.template_definitions.clear(); pending.const_captures.clear();
     if (parsed_ok) for (std::uint32_t k = 0; k < ast.at(root).count; ++k) {
@@ -107,6 +107,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
         const auto& tail = ast.at(ast.list(body)[body.count - 1]);
         if (tail.kind != NodeKind::Return || ast.at(tail.a).kind != NodeKind::Lambda)
             throw std::logic_error("session lambda template body");
+        pending.template_wrappers.insert(ast.list(ast.at(root))[k]);
         pending.template_definitions.emplace(tail.a, imported->second);
         pending.callable_templates.emplace(imported->second.get(), tail.a);
         for (std::uint32_t c = 0; c + 1 < body.count; ++c) {
