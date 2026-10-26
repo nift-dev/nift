@@ -36,8 +36,17 @@ int open_tty_locked(TerminalLease& l) {
     if (l.tty_fd >= 0) return l.tty_fd;
     int fd = ::open("/dev/tty", O_RDWR | O_CLOEXEC);
     if (fd < 0 && ::isatty(STDIN_FILENO)) {
+#if defined(NIFT_CP21_D3_MUTANT) && NIFT_CP21_D3_MUTANT
+        // Deliberate mutant: recreate the non-atomic duplicate window.
         fd = ::dup(STDIN_FILENO);
         if (fd >= 0) ::fcntl(fd, F_SETFD, FD_CLOEXEC);
+#elif defined(F_DUPFD_CLOEXEC)
+        fd = ::fcntl(STDIN_FILENO, F_DUPFD_CLOEXEC, 3);
+#else
+        // No atomic duplicate-with-CLOEXEC: refuse the fallback rather than
+        // exposing a non-CLOEXEC descriptor to concurrent fork/exec.
+        fd = -1;
+#endif
     }
     if (fd >= 0) l.tty_fd = fd;
     return fd;
