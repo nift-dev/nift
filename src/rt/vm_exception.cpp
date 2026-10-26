@@ -134,7 +134,11 @@ bool Vm::op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc
 #if !defined(NIFT_EXC_MUTANT) || NIFT_EXC_MUTANT != 8
     if (stamp) {
         SourceOrigin origin;
-        if (!origin_at(proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
+        const auto offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
+        // Ordinary scripts already own one source map. Keep their lookup local;
+        // only persistent code needs the per-Proto owner/call-site resolution.
+        if (options_.source_map) origin = options_.source_map->at(offset);
+        else if (!origin_at(proto, offset, origin, fault))
             return false;
         value = clone_error_with_origin(value, origin);
         if (!memory_ok(fault)) return false;
