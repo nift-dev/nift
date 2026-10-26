@@ -78,9 +78,9 @@ bool ProcessGroup::continue_group() {
 bool ProcessGroup::give_terminal() {
     State& s = *s_;
     OpLock op(s);
-    if (s.detached || s.finished || s.pgid <= 0 || !::isatty(STDIN_FILENO)) return false;
+    if (s.detached || s.finished || s.pgid <= 0) return false;
     if (!terminal_acquire(&s)) return false;
-    if (::tcsetpgrp(STDIN_FILENO, static_cast<pid_t>(s.pgid)) != 0) {
+    if (!terminal_set_foreground(static_cast<pid_t>(s.pgid))) {
         s.handoff = false;
         terminal_release(&s);
         return false;

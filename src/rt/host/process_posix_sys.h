@@ -41,6 +41,11 @@ enum SetupStep : int {
 [[noreturn]] void child_fail(int report_fd, int kind, int error, int code, int detail = 0);
 bool child_dup2(int source, int target);
 void child_take_terminal(int report_fd);
+// Foreground-terminal launch barrier: the child waits for the parent's
+// authoritative handoff decision before exec; the parent commits or aborts.
+void child_wait_handoff(int read_fd, int report_fd);
+void parent_commit_handoff(int write_fd);
+void parent_abort_handoff(int write_fd);
 void child_open_onto(int report, const std::string& path, int flags, int target, int step);
 
 struct PreparedExec {

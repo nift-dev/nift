@@ -2,6 +2,8 @@
 #ifndef _WIN32
 #include "rt/host/process_posix_sys.h"
 
+#include "rt/host/process_posix_launch.h"
+
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -169,6 +171,25 @@ std::string exec_failure_message(const SpawnStage& stage, const PreparedExec& pr
     }
 }
 
+void child_wait_handoff(int read_fd, int report_fd) {
+    char decision = 0;
+    ssize_t got;
+    do { got = ::read(read_fd, &decision, 1); } while (got < 0 && errno == EINTR);
+    ::close(read_fd);
+    if (got != 1 || decision != 'G')
+        child_fail(report_fd, ExecSetup, ECANCELED, 126, SetupTerminal);
+}
+
+void parent_commit_handoff(int write_fd) {
+    if (write_fd < 0) return;
+    (void)write_no_sigpipe(write_fd, "G", 1);
+    ::close(write_fd);
+}
+
+void parent_abort_handoff(int write_fd) {
+    if (write_fd >= 0) ::close(write_fd);
+}
+
 void child_take_terminal(int report_fd) {
     struct sigaction ign {};
     ign.sa_handler = SIG_IGN;
@@ -201,6 +222,61 @@ bool terminal_foreground() {
     if (!::isatty(STDIN_FILENO)) return false;
     return ::tcgetpgrp(STDIN_FILENO) == ::getpgrp();
 }
+
+namespace {
+std::string pipe_error() { return std::string("cannot create pipe: ") + std::strerror(errno); }
+} // namespace
+
+void open_endpoints(Launch& l) {
+    State& s = l.s;
+    const OutputMode mode = l.mode;
+    const bool pipes = mode == OutputMode::PipeCapture || mode == OutputMode::Interactive;
+    if (mode == OutputMode::FileCapture) {
+        s.out_file = open_capture_file();
+        s.err_file = open_capture_file();
+        if (s.out_file < 0 || s.err_file < 0) l.fail("cannot create capture files");
+        l.out_child = s.out_file;
+        l.err_child = s.err_file;
+    } else if (pipes) {
+        int o[2], e[2];
+        if (!make_pipe(o)) {
+            l.fail(pipe_error());
+        } else if (!make_pipe(e)) {
+            l.fail(pipe_error());
+            ::close(o[0]);
+            ::close(o[1]);
+        } else {
+            s.out_fd = o[0]; l.out_child = o[1];
+            s.err_fd = e[0]; l.err_child = e[1];
+            set_nonblocking(s.out_fd);
+            set_nonblocking(s.err_fd);
+        }
+    }
+    l.stdin_pipe =
+        !s.launch_failed && !l.detached && (mode == OutputMode::Interactive || s.req.stdin_mode == StdinMode::Text);
+    if (l.stdin_pipe) {
+        int i[2];
+        if (!make_pipe(i)) {
+            l.fail(pipe_error());
+        } else {
+            l.in_child = i[0];
+            s.in_fd = i[1];
+            set_nonblocking(s.in_fd);
+            if (mode != OutputMode::Interactive) {
+                s.in_pending = s.req.stdin_text;
+                s.stdin_total = s.req.stdin_text.size();
+                s.close_stdin_when_drained = true;
+            }
+        }
+    }
+    l.null_stdin = l.detached || s.req.stdin_mode == StdinMode::Null;
+    const bool blocking = mode == OutputMode::FileCapture || mode == OutputMode::PipeCapture ||
+                          mode == OutputMode::Stream || mode == OutputMode::Inherit;
+    l.want_handoff = !l.detached && s.req.own_group && blocking && !l.stdin_pipe && !l.null_stdin &&
+                     s.req.terminal != TerminalPolicy::Never &&
+                     s.req.stages.front().stdin_path.empty() && terminal_foreground();
+}
+
 
 } // namespace nift::rt::host::posix
 #endif  // !_WIN32

@@ -5,6 +5,7 @@
 // this coordinator.
 #ifndef _WIN32
 #include <cstdint>
+#include <sys/types.h>
 
 namespace nift::rt::host::posix {
 
@@ -18,6 +19,9 @@ bool terminal_acquire(const void* owner);
 // retries recovery. Only the current owner starts a release; a pending release
 // can be retried by any caller because it never transfers ownership.
 bool terminal_release(const void* owner);
+// Gives the current owner's controlling terminal to pgid. Uses the lease's
+// stable tty reference, not fd 0.
+bool terminal_set_foreground(pid_t pgid);
 bool terminal_owned_by(const void* owner);
 
 } // namespace nift::rt::host::posix
