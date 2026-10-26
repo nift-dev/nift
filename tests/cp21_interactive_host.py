@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """CP21 interactive Host job-control contract.
 
-Drives a real PTY and checks the migrated interactive shell: foreground
-terminal ownership, background groups, Ctrl-C, Ctrl-Z, fg/bg resume, job IDs,
-completion and a bounded prompt-latency diagnostic.
+The contract is behavioural and portable across POSIX terminals. Linux adds
+/proc process-group/tty ownership assertions; other POSIX hosts use the shell's
+job table, a small foreground probe and real terminal signals instead. No
+scenario is skipped wholesale on macOS.
 
-With --mutant N the same scenarios are run against a deliberate CP21 mutant
-build; the named scenario must fail (a mutant that still passes is a test
-defect, not a success).
+With --mutant N a compiled CP21 mutant must fail its named behavioural check
+after the expected prerequisite has been observed. Dead binaries, setup
+failures, unrelated failures and timeouts are rejected as non-detection.
 """
 import argparse
 import os
@@ -15,27 +16,49 @@ import pty
 import re
 import select
 import signal
+import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 
 ANSI = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
-LINUX = sys.platform.startswith("linux")
+LINUX = sys.platform.startswith("linux") and os.environ.get("CP21_FORCE_PORTABLE") != "1"
+PROBE = None
 
-MUTANT_SCENARIO = {
-    1: "background_owner",
-    2: "ctrl_z",
-    3: "ctrl_z",
-    4: "ctrl_z",
-    5: "jobs_ids",
+MUTANT = {
+    1: {"scenario": "background_owner", "witness": "background-started",
+        "check": "background-never-owns-terminal" if LINUX else "background-foreground-still-owns"},
+    2: {"scenario": "stop_bg_fg", "witness": "background-stopped", "check": "bg-state-running"},
+    3: {"scenario": "ctrl_z", "witness": "ctrl-z-jobs-queried", "check": "ctrl-z-stopped-state"},
+    4: {"scenario": "ctrl_z", "witness": "ctrl-z-returned", "check": "ctrl-z-restores-terminal"},
+    5: {"scenario": "jobs_ids", "witness": "second-background", "check": "job-ids-unique"},
 }
-
-failures = []
 
 
 class Timeout(Exception):
     pass
+
+
+class Result:
+    def __init__(self):
+        self.checks = []
+        self.witnesses = set()
+        self.setup_error = ""
+        self.completed = False
+
+    def witness(self, name):
+        self.witnesses.add(name)
+
+    def check(self, name, condition, detail=""):
+        print(f"{'PASS' if condition else 'FAIL'} {name}")
+        self.checks.append((name, bool(condition)))
+        if not condition and detail:
+            print(f"  detail: {detail}")
+        return condition
+
+    def failed_checks(self):
+        return [name for name, ok in self.checks if not ok]
 
 
 def proc_stat(pid):
@@ -48,33 +71,58 @@ def proc_stat(pid):
         return None
 
 
-def children(pid):
-    found = []
-    if not LINUX:
-        return found
-    for entry in Path("/proc").glob("[0-9]*"):
-        st = proc_stat(entry.name)
-        if not st:
+def ps_table():
+    if LINUX:
+        return {}
+    command = ["ps", "-axo", "pid=,ppid=,pgid=,stat="]
+    proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    if proc.returncode != 0:
+        return {}
+    table = {}
+    for line in proc.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
             continue
         try:
-            raw = Path(f"/proc/{entry.name}/stat").read_text().rsplit(")", 1)[1].split()
-            if int(raw[1]) == pid:
-                found.append(st)
-        except (OSError, ValueError):
-            pass
+            table[int(parts[0])] = {"ppid": int(parts[1]), "pgrp": int(parts[2]), "state": parts[3][0]}
+        except ValueError:
+            continue
+    return table
+
+
+def children(pid):
+    found = []
+    if LINUX:
+        for entry in Path("/proc").glob("[0-9]*"):
+            st = proc_stat(entry.name)
+            if not st:
+                continue
+            try:
+                fields = Path(f"/proc/{entry.name}/stat").read_text().rsplit(")", 1)[1].split()
+                if int(fields[1]) == pid:
+                    found.append(st)
+            except (OSError, ValueError):
+                pass
+        return found
+    for child, st in ps_table().items():
+        if st["ppid"] == pid:
+            found.append({"state": st["state"], "pgrp": st["pgrp"], "tpgid": -1})
     return found
 
 
 class Pty:
-    def __init__(self, binary):
+    def __init__(self, binary, extra_env=None):
         self.root = tempfile.mkdtemp(prefix="cp21-test-")
         self.buf = b""
         self.transcript = b""
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
-            os.environ.update(HOME=self.root, TERM="dumb", LANG="C", LC_ALL="C")
+            env = dict(os.environ)
+            env.update(HOME=self.root, TERM="dumb", LANG="C", LC_ALL="C")
+            if extra_env:
+                env.update(extra_env)
             os.chdir(self.root)
-            os.execv(binary, [binary])
+            os.execve(binary, [binary], env)
 
     def read_for(self, seconds):
         end = time.time() + seconds
@@ -83,7 +131,7 @@ class Pty:
             if not ready:
                 continue
             try:
-                data = os.read(self.fd, 8192)
+                data = os.read(self.fd, 16384)
             except OSError:
                 return False
             if not data:
@@ -93,10 +141,24 @@ class Pty:
 
     def until(self, predicate, timeout=4.0, what="condition"):
         end = time.time() + timeout
-        while time.time() < end:
+        while True:
             if predicate():
                 return True
-            self.read_for(0.05)
+            remaining = end - time.time()
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([self.fd], [], [], min(remaining, 0.05))
+            if not ready:
+                continue
+            try:
+                data = os.read(self.fd, 16384)
+            except OSError:
+                break
+            if not data:
+                break
+            self.buf += data
+        if predicate():
+            return True
         raise Timeout(what)
 
     def until_text(self, needle, timeout=4.0):
@@ -104,14 +166,24 @@ class Pty:
             needle = needle.encode()
         return self.until(lambda: needle in self.buf, timeout, repr(needle))
 
-    def prompt(self, timeout=4.0):
-        self.until(lambda: ANSI.sub(b"", self.buf[-256:]).rstrip().endswith(b"~$"),
-                   timeout, "prompt")
+    def prompt(self, timeout=4.0, initial=False):
+        def ready():
+            data = ANSI.sub(b"", self.buf)
+            if initial:
+                return b"~$ " in data
+            # The command echo itself contains prompt redraws. Wait for a
+            # prompt after the Enter newline; later background output is fine.
+            newline = data.find(b"\n")
+            return newline >= 0 and b"~$ " in data[newline + 1:]
+        self.until(ready, timeout, "prompt")
 
     def line(self, text):
         self.transcript += self.buf
         self.buf = b""
         os.write(self.fd, (text + "\r").encode())
+
+    def output(self):
+        return self.clean(self.buf)
 
     def snapshot(self):
         return {"shell": proc_stat(self.pid), "children": children(self.pid),
@@ -122,23 +194,20 @@ class Pty:
         text = text.replace("\r", "")
         return re.sub(r"\b[0-9]{5,}\b", "<pid>", text)
 
-    def wait_child(self, state=None, timeout=4.0):
-        def ready():
-            kids = children(self.pid)
-            if not kids:
-                return False
-            return state is None or any(kid["state"] == state for kid in kids)
-        self.until(ready, timeout, f"child state {state or 'any'}")
-
     def close(self):
+        if LINUX:
+            for st in children(self.pid):
+                if st["pgrp"] > 1 and st["pgrp"] != os.getpgrp():
+                    try:
+                        os.killpg(st["pgrp"], signal.SIGKILL)
+                    except OSError:
+                        pass
+        else:
+            try:
+                os.killpg(self.pid, signal.SIGKILL)
+            except OSError:
+                pass
         try:
-            if LINUX:
-                for st in children(self.pid):
-                    if st["pgrp"] > 1 and st["pgrp"] != os.getpgrp():
-                        try:
-                            os.killpg(st["pgrp"], signal.SIGKILL)
-                        except OSError:
-                            pass
             os.kill(self.pid, signal.SIGKILL)
         except OSError:
             pass
@@ -152,212 +221,346 @@ class Pty:
             pass
 
 
-def check(name, condition, detail=""):
-    print(f"{'PASS' if condition else 'FAIL'} {name}")
-    if not condition:
-        failures.append((name, detail))
-
-
-def shell_owns_tty(snap):
-    shell = snap["shell"]
+def shell_owns_tty(s):
+    if not LINUX:
+        return None
+    shell = proc_stat(s.pid)
     return bool(shell and shell["pgrp"] == shell["tpgid"])
 
 
-def fg_pipeline(s):
-    s.line("/bin/sh -c 'for i in 0 1 2; do if [ -t $i ]; then echo fd$i-tty; else echo fd$i-pipe; fi; done'")
-    s.until_text("fd2-tty")
+def initial_prompt(s):
+    s.prompt(initial=True)
+
+
+def probe_foreground(s):
+    s.line(PROBE)
+    s.until_text("foreground=")
     s.prompt()
-    snap = s.snapshot()
-    check("foreground-pipeline-tty", "fd2-tty" in snap["output"] and shell_owns_tty(snap), snap)
-    return True
+    return "tty=1,1,1 foreground=1" in s.output()
 
 
-def background_owner(s):
+def wait_jobs_state(s, job_id, state, timeout=4.0):
+    end = time.time() + timeout
+    while time.time() < end:
+        s.line("jobs")
+        s.prompt()
+        if f"[{job_id}] {state}" in s.output():
+            return True
+        time.sleep(0.02)
+    raise Timeout(f"job {job_id} {state}")
+
+
+def standalone_line(output, marker):
+    return any(line.strip() == marker for line in output.splitlines())
+
+
+def foreground_pipeline(s, r):
+    ok = probe_foreground(s)
+    r.check("foreground-owns-terminal", ok, s.output())
+    if LINUX:
+        r.check("foreground-shell-owns-tty", shell_owns_tty(s) is True)
+    s.line("printf hi | /bin/cat")
+    s.until_text("hi")
+    s.prompt()
+    r.check("foreground-pipeline-runs", "hi" in s.output())
+
+
+def background_owner(s, r):
     s.line("/bin/sleep 1 &")
-    s.until_text("[1]")
     s.prompt()
-    snap = s.snapshot()
-    if not LINUX:
-        return True
-    ok = shell_owns_tty(snap)
-    for kid in snap["children"]:
-        ok = ok and kid["pgrp"] != snap["shell"]["pgrp"]
-    check("background-never-owns-terminal", ok, snap)
-    if not ok:
-        return False
+    out = s.output()
+    if "[1]" in out:
+        r.witness("background-started")
+    if LINUX:
+        s.until(lambda: bool(children(s.pid)), 2.0, "background child")
+        snap = s.snapshot()
+        ok = shell_owns_tty(s) is True
+        for kid in snap["children"]:
+            ok = ok and kid["pgrp"] != snap["shell"]["pgrp"]
+        if not r.check("background-never-owns-terminal", ok, snap):
+            return
+    fg_ok = probe_foreground(s)
+    if not r.check("background-foreground-still-owns", fg_ok, s.output()):
+        return
+    s.line("jobs")
+    s.prompt()
+    r.check("background-running", "[1] Running" in s.output(), s.output())
     s.line("wait 1")
     s.prompt()
     s.line("jobs")
-    s.until_text("Done (0)")
     s.prompt()
-    return True
+    r.check("background-done", "[1] Done (0)" in s.output(), s.output())
 
 
-def ctrl_c(s):
-    s.line("/bin/sleep 5")
-    s.wait_child("S")
+def ctrl_c(s, r):
+    s.line("/bin/sh -c 'printf \"READY-%s\\n\" C; exec sleep 5'")
+    s.until_text("READY-C")
     os.write(s.fd, b"\x03")
     s.prompt()
-    snap = s.snapshot()
-    check("ctrl-c-restores-shell", shell_owns_tty(snap), snap)
-    s.line("/bin/echo ALIVE-C")
+    if LINUX:
+        r.check("ctrl-c-restores-terminal", shell_owns_tty(s) is True)
+    r.check("ctrl-c-foreground-probe", probe_foreground(s))
+    s.line("/bin/sh -c 'printf \"ALIVE-%s\\n\" C'")
     s.until_text("ALIVE-C")
     s.prompt()
     s.line("jobs")
-    s.until_text("Done (130)")
     s.prompt()
-    return True
+    r.check("ctrl-c-status", "Done (130)" in s.output(), s.output())
 
 
-def ctrl_z(s):
-    s.line("/bin/sleep 5")
-    s.wait_child("S")
+def ctrl_z(s, r):
+    s.line("/bin/sh -c 'printf \"READY-%s\\n\" Z; read line; printf \"GOT:%s\\n\" \"$line\"; exec sleep 5'")
+    s.until_text("READY-Z")
     os.write(s.fd, b"\x1a")
     s.prompt()
-    snap = s.snapshot()
-    restored = shell_owns_tty(snap)
-    check("ctrl-z-restores-terminal", restored, snap)
-    if not restored:
-        return False
+    r.witness("ctrl-z-returned")
+    if LINUX:
+        restored = shell_owns_tty(s) is True
+        if not r.check("ctrl-z-restores-terminal", restored):
+            return
     s.line("jobs")
-    s.until_text("Stopped")
     s.prompt()
+    out = s.output()
+    r.witness("ctrl-z-jobs-queried")
+    if "[1] Stopped" in out:
+        r.witness("ctrl-z-stopped")
+    if not r.check("ctrl-z-stopped-state", "[1] Stopped" in out, out):
+        return
     s.line("fg 1")
-    s.wait_child("S")
-    os.write(s.fd, b"\x03")
-    s.prompt()
-    s.line("/bin/echo ALIVE-Z")
-    s.until_text("ALIVE-Z")
-    s.prompt()
-    snap = s.snapshot()
-    check("ctrl-z-fg-resumes", shell_owns_tty(snap), snap)
-    return shell_owns_tty(snap)
-
-
-def stop_bg_fg(s):
-    s.line("sh -c 'kill -STOP $$; sleep 2' &")
-    s.wait_child("T")
+    os.write(s.fd, b"HELLO-Z\r")
+    try:
+        s.until_text("GOT:HELLO-Z", 3.0)
+        resumed = True
+    except Timeout:
+        resumed = False
+    if not r.check("ctrl-z-fg-resumes", resumed, s.output()):
+        return
+    # Second stop/resume cycle: the job is foreground again after the read.
+    os.write(s.fd, b"\x1a")
     s.prompt()
     s.line("jobs")
-    s.until_text("Stopped")
     s.prompt()
+    r.check("ctrl-z-second-stop", "[1] Stopped" in s.output(), s.output())
     s.line("bg 1")
-    s.wait_child("S")
-    s.line("jobs")
-    s.until_text("Running")
     s.prompt()
+    try:
+        wait_jobs_state(s, 1, "Running")
+        second_running = True
+    except Timeout:
+        second_running = False
+    r.check("ctrl-z-second-bg", second_running, s.output())
     s.line("fg 1")
-    s.wait_child("S")
+    time.sleep(0.2)
     os.write(s.fd, b"\x03")
     s.prompt()
-    s.line("/bin/echo STOP-RESUME")
-    s.until_text("STOP-RESUME")
+    r.check("ctrl-z-fg-interrupt", probe_foreground(s))
+
+
+def stop_bg_fg(s, r):
+    s.line("sh -c 'kill -STOP $$; exec sleep 5' &")
     s.prompt()
-    snap = s.snapshot()
-    check("stop-bg-fg-resume", shell_owns_tty(snap), snap)
-    return shell_owns_tty(snap)
+    r.witness("background-started")
+    wait_jobs_state(s, 1, "Stopped")
+    r.witness("background-stopped")
+    s.line("bg 1")
+    s.prompt()
+    bg_out = s.output()
+    if not r.check("bg-continues-job", "failed to continue job" not in bg_out, bg_out):
+        return
+    try:
+        wait_jobs_state(s, 1, "Running")
+        running = True
+    except Timeout:
+        running = False
+    if not r.check("bg-state-running", running, s.output()):
+        return
+    s.line("fg 1")
+    time.sleep(0.2)
+    os.write(s.fd, b"\x03")
+    s.prompt()
+    r.check("stop-bg-fg-resume", probe_foreground(s))
+    s.line("/bin/sh -c 'printf \"RESUME-%s\\n\" OK'")
+    s.until_text("RESUME-OK")
+    s.prompt()
+    r.check("stop-bg-fg-command", "RESUME-OK" in s.output())
 
 
-def jobs_ids(s):
+def jobs_ids(s, r):
     s.line("/bin/sleep 0.3 &")
-    s.until_text("[1]")
     s.prompt()
+    first = s.output()
+    if "[1]" in first:
+        r.witness("first-background")
     s.line("/bin/sleep 0.4 &")
-    s.until_text("[2]")
     s.prompt()
+    r.witness("second-background")
     s.line("jobs")
-    s.until_text("[1] Running")
-    s.until_text("[2] Running")
     s.prompt()
+    out = s.output()
+    if not r.check("job-ids-unique", "[1] Running" in out and "[2] Running" in out, out):
+        return
     s.line("wait")
     s.prompt()
     s.line("jobs")
-    s.until_text("[1] Done (0)")
-    s.until_text("[2] Done (0)")
     s.prompt()
-    out = s.snapshot()["output"]
-    check("job-ids-unique", "[1] Running" in out and "[2] Running" in out, out)
-    return "[1] Running" in out and "[2] Running" in out
+    r.check("job-ids-done", "[1] Done (0)" in s.output() and "[2] Done (0)" in s.output(), s.output())
 
 
-def fd_no_growth(s):
+def fg_reader_race(s, r):
+    s.line("sh -c 'printf \"READY-%s\\n\" R; read line; printf \"GOT:%s\\n\" \"$line\"; exec sleep 5' &")
+    s.until_text("READY-R")
+    s.prompt()
+    r.witness("background-started")
+    wait_jobs_state(s, 1, "Stopped")
+    r.witness("background-stopped")
+    s.line("fg 1")
+    os.write(s.fd, b"HELLO-R\r")
+    try:
+        s.until_text("GOT:HELLO-R", 3.0)
+        resumed = True
+    except Timeout:
+        resumed = False
+    if not r.check("fg-reader-resumes", resumed, s.output()):
+        return
+    if LINUX:
+        r.check("fg-reader-owns-terminal", shell_owns_tty(s) is False)
+    os.write(s.fd, b"\x03")
+    s.prompt()
+    r.check("fg-reader-interrupt", probe_foreground(s))
+
+
+def fd_no_growth(s, r):
     if not LINUX:
-        return True
+        return
     before = len(os.listdir(f"/proc/{s.pid}/fd"))
     s.line("/bin/echo hi | /bin/cat | /bin/cat")
     s.until_text("hi")
     s.prompt()
     after = len(os.listdir(f"/proc/{s.pid}/fd"))
-    check("foreground-fd-no-growth", after <= before, f"before={before} after={after}")
-    return after <= before
+    r.check("foreground-fd-no-growth", after <= before, f"before={before} after={after}")
 
 
-def prompt_latency(binary):
-    samples = []
-    for _ in range(3):
-        s = Pty(binary)
-        try:
-            s.prompt()
-            s.transcript += s.buf
-            s.buf = b""
-            start = time.perf_counter()
-            payload = ("/bin/true\r" * 200 + "/bin/echo CP21-MARK\r").encode()
-            os.write(s.fd, payload)
-            s.until_text("CP21-MARK", timeout=10.0)
-            samples.append((time.perf_counter() - start) * 1000.0 / 201)
-        finally:
-            s.close()
-    median = sorted(samples)[len(samples) // 2]
-    check("prompt-latency-<=3ms", median <= 3.0, f"samples={samples} median={median:.4f}")
-    print(f"prompt-latency median={median:.4f} ms/command samples={[round(x, 4) for x in samples]}")
-    return median <= 3.0
+def bg_continue_failure(s, r):
+    s.line("sh -c 'kill -STOP $$; exec sleep 5' &")
+    s.prompt()
+    r.witness("background-started")
+    wait_jobs_state(s, 1, "Stopped")
+    r.witness("background-stopped")
+    s.line("bg 1 && /bin/echo BG-SUCCESS")
+    s.prompt()
+    out = s.output()
+    r.check("bg-error-propagated", "failed to continue job" in out, out)
+    r.check("bg-conditional-not-run", not standalone_line(out, "BG-SUCCESS"), out)
+    s.line("jobs")
+    s.prompt()
+    r.check("bg-failure-state-stopped", "[1] Stopped" in s.output(), s.output())
+    s.line("fg 1 && /bin/echo FG-SUCCESS")
+    s.prompt()
+    out = s.output()
+    r.check("fg-error-propagated", "failed to continue job" in out, out)
+    r.check("fg-conditional-not-run", not standalone_line(out, "FG-SUCCESS"), out)
+    s.line("jobs")
+    s.prompt()
+    r.check("fg-failure-state-stopped", "[1] Stopped" in s.output(), s.output())
 
 
-def run_scenario(binary, name):
-    s = Pty(binary)
+SCENARIOS = {
+    "foreground_pipeline": foreground_pipeline,
+    "background_owner": background_owner,
+    "ctrl_c": ctrl_c,
+    "ctrl_z": ctrl_z,
+    "stop_bg_fg": stop_bg_fg,
+    "jobs_ids": jobs_ids,
+    "fg_reader_race": fg_reader_race,
+    "fd_no_growth": fd_no_growth,
+    "bg_continue_failure": bg_continue_failure,
+}
+
+
+def run_scenario(binary, name, extra_env=None):
+    s = Pty(binary, extra_env)
+    r = Result()
     try:
-        return {
-            "foreground_pipeline": fg_pipeline,
-            "background_owner": background_owner,
-            "ctrl_c": ctrl_c,
-            "ctrl_z": ctrl_z,
-            "stop_bg_fg": stop_bg_fg,
-            "jobs_ids": jobs_ids,
-            "fd_no_growth": fd_no_growth,
-        }[name](s)
+        initial_prompt(s)
+        SCENARIOS[name](s, r)
+        r.completed = True
     except Timeout as exc:
-        check(name, False, f"timeout: {exc}")
-        return False
+        r.setup_error = f"timeout: {exc}"
+    except (OSError, ChildProcessError) as exc:
+        r.setup_error = f"{type(exc).__name__}: {exc}"
     finally:
         s.close()
+    return r
+
+
+def report_setup_error(name, result):
+    print(f"FAIL {name}: {result.setup_error}")
 
 
 def main():
+    global PROBE
     parser = argparse.ArgumentParser()
     parser.add_argument("nift")
-    parser.add_argument("--mutant", type=int, choices=sorted(MUTANT_SCENARIO))
-    parser.add_argument("--skip-latency", action="store_true",
-                        help="sanitizer builds: the <=3 ms gate is a release-build diagnostic")
+    parser.add_argument("--probe", required=True, help="portable foreground-probe binary")
+    parser.add_argument("--mutant", type=int, choices=sorted(MUTANT))
+    parser.add_argument("--fault-delay", action="store_true")
+    parser.add_argument("--fault-cont", action="store_true")
     args = parser.parse_args()
     binary = os.path.abspath(args.nift)
+    PROBE = os.path.abspath(args.probe)
     if not os.access(binary, os.X_OK):
         print(f"FAIL missing binary {binary}")
         return 1
+    if not os.access(PROBE, os.X_OK):
+        print(f"FAIL missing probe {PROBE}")
+        return 1
+
+    if args.fault_delay:
+        result = run_scenario(binary, "fg_reader_race",
+                              {"LD_PRELOAD": os.environ.get("CP21_DELAY_LIB", "")})
+        if result.setup_error:
+            report_setup_error("fault-delay", result)
+            return 1
+        failed = result.failed_checks()
+        print("PASS fault-delay fg reader" if not failed else f"FAIL fault-delay: {failed}")
+        return 1 if failed else 0
+
+    if args.fault_cont:
+        result = run_scenario(binary, "bg_continue_failure",
+                              {"LD_PRELOAD": os.environ.get("CP21_FAIL_CONT_LIB", "")})
+        if result.setup_error:
+            report_setup_error("fault-cont", result)
+            return 1
+        failed = result.failed_checks()
+        print("PASS fault-cont failure propagation" if not failed else f"FAIL fault-cont: {failed}")
+        return 1 if failed else 0
 
     if args.mutant:
-        name = MUTANT_SCENARIO[args.mutant]
-        passed = run_scenario(binary, name)
-        if passed:
-            print(f"FAIL CP21 mutant {args.mutant} not detected by {name}")
+        spec = MUTANT[args.mutant]
+        result = run_scenario(binary, spec["scenario"])
+        if result.setup_error:
+            print(f"FAIL CP21 mutant {args.mutant}: no behavioural evidence ({result.setup_error})")
             return 1
-        print(f"PASS CP21 mutant {args.mutant} detected by {name}")
+        failed = result.failed_checks()
+        if spec["witness"] not in result.witnesses:
+            print(f"FAIL CP21 mutant {args.mutant}: missing witness {spec['witness']}")
+            return 1
+        if failed != [spec["check"]]:
+            print(f"FAIL CP21 mutant {args.mutant}: expected only {spec['check']}, saw {failed}")
+            return 1
+        print(f"PASS CP21 mutant {args.mutant} detected by {spec['check']}")
         return 0
 
-    for name in ("foreground_pipeline", "background_owner", "ctrl_c", "ctrl_z",
-                 "stop_bg_fg", "jobs_ids", "fd_no_growth"):
-        run_scenario(binary, name)
-    if not args.skip_latency:
-        prompt_latency(binary)
+    failures = []
+    for name in SCENARIOS:
+        if name == "bg_continue_failure":
+            continue
+        result = run_scenario(binary, name)
+        if result.setup_error:
+            failures.append((name, result.setup_error))
+            report_setup_error(name, result)
+            continue
+        failures.extend((check, "") for check in result.failed_checks())
     if failures:
         print("FAILED:", ", ".join(name for name, _ in failures))
         return 1

@@ -2577,10 +2577,9 @@ test-v45-concurrency: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
 
 ifneq ($(OS),Windows_NT)
-test-v45-job-control: $(TARGET)
+test-v45-job-control: test-cp21-interactive-host
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_jobs_background.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_job_control.sh
-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/cp21_interactive_host.py "$(CURDIR)/$(TARGET)"; else echo "  (skipped: python3 unavailable)"; fi
 else
 test-v45-job-control:
 	@echo "test-v45-job-control: skipped (POSIX job control unavailable)"
@@ -3327,22 +3326,53 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 	  echo "PASS CP20 mutant $$m: rejected"; \
 	done
 # --- CP21 interactive Host jobs: contract and compiling negative controls ----
-CP21_MUTANT_NIFTS := $(foreach m,1 2 3 4 5,$(TEST_DIR)/cp21-mutants/$(m)/nift$(EXEEXT))
+CP21_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp21-mutants/$(m)/nift$(EXEEXT))
+CP21_PROBE := $(TEST_DIR)/cp21-foreground-probe$(EXEEXT)
+CP21_FAULT_LIBS :=
+ifeq ($(shell uname -s),Linux)
+CP21_FAULT_LIBS := $(TEST_DIR)/cp21-delay-tcsetpgrp.so $(TEST_DIR)/cp21-fail-cont.so
+endif
+$(CP21_PROBE): tests/cp21_foreground_probe.c
+	$(CC) $(CFLAGS) $< -o "$@"
+$(TEST_DIR)/cp21-delay-tcsetpgrp.so: tests/cp21_delay_tcsetpgrp.c
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-cont.so: tests/cp21_fail_cont.c
+	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
 $(TEST_DIR)/cp21-mutants/%/nift$(EXEEXT): $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/%/Spawn.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
-.PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants
-test-cp21-interactive-host: $(TARGET)
-	python3 tests/cp21_interactive_host.py "$(CURDIR)/$(TARGET)"
-test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS)
+CP21_TERMINAL_LEASE := $(TEST_DIR)/cp21-terminal-lease$(EXEEXT)
+$(CP21_TERMINAL_LEASE): tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES) -o "$@"
+.PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease test-cp21-prompt-latency
+test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
+	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)"
+	@if [ "$(shell uname -s)" = "Linux" ]; then \
+	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" $(MAKE) --no-print-directory $(CP21_FAULT_LIBS) >/dev/null; \
+	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-delay "$(CURDIR)/$(TARGET)"; \
+	  CP21_FAIL_CONT_LIB="$(CURDIR)/$(TEST_DIR)/cp21-fail-cont.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-cont "$(CURDIR)/$(TARGET)"; \
+	fi
+	@if [ "$(shell uname -s)" = "Linux" ]; then $(MAKE) --no-print-directory test-cp21-terminal-lease; fi
+test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS) $(CP21_PROBE)
 	@for m in 1 2 3 4 5; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT)"; \
-	  python3 tests/cp21_interactive_host.py "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1; rc=$$?; \
-	  if [ $$rc -ne 0 ]; then echo "FAIL CP21 mutant $$m: not detected"; tail -20 ".build/cp21-mutants/$$m.log"; exit 1; fi; \
-	  echo "PASS CP21 mutant $$m: rejected"; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1; rc=$$?; \
+	  if [ $$rc -ne 0 ]; then echo "FAIL CP21 mutant $$m: not detected"; cat ".build/cp21-mutants/$$m.log"; exit 1; fi; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" /bin/false --mutant $$m > ".build/cp21-mutants/$$m-dead.log" 2>&1; \
+	  if [ $$? -eq 0 ]; then echo "FAIL CP21 mutant $$m: dead binary accepted"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; fi; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant $$m > ".build/cp21-mutants/$$m-normal.log" 2>&1; \
+	  if [ $$? -eq 0 ]; then echo "FAIL CP21 mutant $$m: normal build accepted"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; fi; \
+	  echo "PASS CP21 mutant $$m: rejected with dead/normal controls"; \
 	done
+	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TEST_DIR)/cp21-mutants/6/nift$(EXEEXT)" --mutant 2 > ".build/cp21-mutants/unrelated.log" 2>&1; \
+	if [ $$? -eq 0 ]; then echo "FAIL CP21 unrelated-failure control accepted"; cat ".build/cp21-mutants/unrelated.log"; exit 1; fi; \
+	echo "PASS CP21 unrelated-failure control: rejected"
+test-cp21-terminal-lease: $(CP21_TERMINAL_LEASE)
+	"$(CP21_TERMINAL_LEASE)"
+test-cp21-prompt-latency: $(TARGET)
+	python3 tests/cp21_prompt_latency.py "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp21-prompt-latency.json"
 
 .PHONY: test-cp20-fd-leak
 test-cp20-fd-leak: $(TARGET)
