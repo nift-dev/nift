@@ -3603,9 +3603,17 @@ test-embed: test-runtime2-cp18
 
 CP18_SWITCH_LIB := $(TEST_DIR)/cp18/switch/$(SHARED_LIB)
 CP18_SWITCH_OBJ := $(TEST_DIR)/cp18/vm-switch.o
-$(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS)
+# Compiler-generated dependencies (-MMD): vm.cpp includes far more than
+# RT_VALUE_HEADERS (e.g. rt/handles/table.h through rt/vm.h); a stale object
+# built against an older HandleTable layout crashed the switch build.
+# An object without its dependency file (built before this rule) is rebuilt:
+# the missing .d is "remade" by its empty rule, which makes the object stale.
+CP18_SWITCH_DEP := $(CP18_SWITCH_OBJ:.o=.d)
+$(CP18_SWITCH_DEP): ;
+$(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS) $(CP18_SWITCH_DEP)
 	mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -MMD -MP -c $< -o $@
+-include $(CP18_SWITCH_DEP)
 $(CP18_SWITCH_LIB): $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(SHARED_SYS_LIBS)
