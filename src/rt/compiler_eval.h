@@ -3,5 +3,7 @@
 #include "rt/compiler.h"
 
 namespace nift::rt {
-void normalize_eval_callbacks(Ast& ast, NodeId root);
+struct UnitKinds;
+void normalize_eval_callbacks(Ast& ast, NodeId root, const UnitKinds* kinds = nullptr);
+void normalize_session_callbacks(Ast& ast, NodeId root, const SessionCompileContext& context);
 } // namespace nift::rt

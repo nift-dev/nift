@@ -1,4 +1,6 @@
 #include "rt/session.h"
+#include "rt/session_inventory.h"
+#include "rt/parser.h"
 #include "rt/heap.h"
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
@@ -159,6 +161,20 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::Error && session.value("x").as_int() == 8);
         r = session.evaluate("(x=9)+bytes([65])", "refused-assignment", output);
         CHECK(!r.admitted && session.value("x").as_int() == 8 && output.empty());
+    }
+    {
+        const std::string source = "leaked:=5;bytes([65]);unknown(1)";
+        Ast ast(source); const auto parsed = parse_script(ast);
+        CHECK(parsed.ok);
+        SessionCompileContext original;
+        const auto map = SourceMap::single("inventory-source", source);
+        const auto full = session_inventory_json(ast, parsed.root, parsed.ok, original, map, false);
+        CHECK(full.find("\"inventory_complete\":true") != std::string::npos);
+        CHECK(full.find("builtin-bytes:bytes") != std::string::npos && full.find("callable:unknown") != std::string::npos);
+        CHECK(full.find("session:redeclared") == std::string::npos && original.symbols.empty());
+        const auto bounded = session_inventory_json(ast, parsed.root, parsed.ok, original, map, false, 1);
+        CHECK(bounded.find("\"inventory_complete\":false") != std::string::npos);
+        CHECK(bounded.find("round-limit") != std::string::npos && bounded.find("callable:unknown") == std::string::npos);
     }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");

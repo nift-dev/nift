@@ -3483,7 +3483,7 @@ test-runtime2-cp14b-design-mutants: $(TARGET)
 	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
 
 # D-018c consumers require the independent parser even when invoked separately.
-test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 test-runtime2-closures-s1-mutants test-runtime2-cp14b: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 test-runtime2-closures-s1-mutants test-runtime2-cp14b test-runtime2-cp13b: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 .PHONY: test-rt-vm-policy-tooling
 test-rt-vm-policy-tooling: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	python3 tests/runtime2/vm_policy_tooling_test.py
@@ -3662,3 +3662,5 @@ test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp19/session_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-cli-switch.jsonl"
 	$(PYTHON) tests/runtime2/cp19/session_refusal_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-refusals.json"
 	$(PYTHON) tests/runtime2/cp19/session_refusal_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-refusals-switch.json"
+	$(PYTHON) tests/runtime2/cp19/session_classify_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-classify.json"
+	$(PYTHON) tests/runtime2/cp19/session_classify_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-classify-switch.json"

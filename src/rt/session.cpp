@@ -1,6 +1,7 @@
 #include "rt/session.h"
 #include "rt/session_text.h"
 #include "rt/session_shape.h"
+#include "rt/session_inventory.h"
 #include "rt/cell.h"
 #include "rt/aggregate.h"
 #include "rt/compiler_eval.h"
@@ -161,9 +162,13 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     pending.imported_functions.clear();
     for (const auto& imported : text.imports) pending.imported_functions.insert(imported.first);
     prepare_session_templates(ast, parsed.root, parsed.ok, text, namespace_, pending);
+    if (parsed.ok) normalize_session_callbacks(ast, parsed.root, pending);
     CompileLimits limits; limits.session = &pending;
     const auto parse_done = std::chrono::steady_clock::now();
     stats.parse_us = std::chrono::duration<double, std::micro>(parse_done - begin).count();
+    const auto mode = vm_mode_from_environment();
+    if (mode == VmMode::ClassifyAll)
+        stats.inventory_json = session_inventory_json(ast, parsed.root, parsed.ok, pending, *source_map, expression);
     CompileResult compiled;
     if (parsed.ok && first_opaque_node(ast, parsed.root) == kNoNode)
         compiled = expression ? compile_eval_program(ast, parsed.root, limits) : compile_unit(ast, parsed.root, limits);
@@ -179,7 +184,6 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
         stats.line = at.line; stats.column = at.column;
         detail::report(stats); return result;
     }
-    const auto mode = vm_mode_from_environment();
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
         stats.outcome = "compiled"; detail::report(stats); return result;
     }
