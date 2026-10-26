@@ -1,4 +1,5 @@
 #include "rt/compiler_session.h"
+#include "rt/alias.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/legacy_names.h"
@@ -179,6 +180,9 @@ bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint
     if (ast_.at(callee).kind == NodeKind::Member &&
         legacy_special_method(text(ast_.at(ast_.at(callee).b))))
         return fail(node, "session:legacy-method-precedence");
+    bool phased = false;
+    if (!session_order_call_types(node, callee, base, phased)) return false;
+    if (phased) return true;
     const auto name = ast_.at(callee).kind == NodeKind::Ident ? text(ast_.at(callee)) : std::string_view{};
     for (const auto& symbol : session_->symbols) {
         if (symbol.name != name || !symbol.callable || session_->lambda_templates.count(symbol.name)) continue;
@@ -295,13 +299,14 @@ bool UnitCompiler::session_function(NodeId id) {
     for (const auto& symbol : session_->symbols) if (symbol.name == name && symbol.defined) {
         for (const auto& retained : session_->symbols)
             if (retained.untracked_callables) return fail(node, "session:redefinition-callable-flow");
-        bool prior_statement = false;
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 6
         for (std::uint32_t k = 0; k < ast_.at(root_).count; ++k) {
             const auto statement = ast_.list(ast_.at(root_))[k];
             if (statement == id) break;
-            prior_statement = prior_statement || ast_.at(statement).kind != NodeKind::FnDecl;
+            if (ast_.at(statement).kind != NodeKind::FnDecl) return fail(node, "session:redefinition-order");
         }
-        if (prior_statement) return fail(node, "session:redefinition-order");
+#endif
+
     }
     Binding binding;
     std::uint16_t value = 0;

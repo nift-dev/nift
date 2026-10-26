@@ -5,6 +5,10 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('named-mixed-order','fn(f()){return 1};old:=f;reader:=()=>f()\nbefore:=f();aliasbefore:=old();readbefore:=reader();fn(f()){return 2};after:=f();aliasafter:=old();readafter:=reader()\nbefore\naliasbefore\nreadbefore\nafter\naliasafter\nreadafter\nexit\n',8),
+ ('named-order-arity','fn(f(x)){return x+1};old:=f\nbefore:=f(1);fn(f(x,y)){return x+y};after:=f(2,3);aliasafter:=old(4,5)\nbefore\nafter\naliasafter\nexit\n',5),
+ ('named-order-capture','fn(f(x)){local:=x;return ()=>local};a:=f(1)\nbefore:=f(2);fn(f(x)){local:=x+10;return ()=>local};after:=f(3)\na()\nbefore()\nafter()\nexit\n',5),
+ ('named-order-pre-error','fn(f()){return 1};old:=f\nbefore:=f();print(before);throw error("stop");fn(f()){return 2}\nf()\nold()\nexit\n',4),
  ('lambda-named-alias','f:=()=>1;fn(g()){return 2};old:=f\nf = g\nf()\n(f==g)\nf = ()=>3\nf()\ng()\nold()\nexit\n',8),
  ('lambda-alias-rebind','f:=()=>1;g:=()=>2;old:=f;reader:=()=>f()\nf = g\nf()\nold()\nreader()\n(f==g)\nexit\n',6),
  ('lambda-alias-arity','f:=()=>1;g:=v=>v+2;old:=f\nf = g\nf(3)\nold()\nexit\n',4),
@@ -36,7 +40,7 @@ cases=[
 ]
 for name,source,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-callable-') as td:
-  root=Path(td);baseline=None;errors=1 if name=='const-captured-kind' else 0
+  root=Path(td);baseline=None;errors=1 if name in ('const-captured-kind','named-order-pre-error') else 0
   for mode in ['0','1','require']:
    stats=root/'stats';stats.unlink(missing_ok=True)
    env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')

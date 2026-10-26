@@ -255,6 +255,10 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         if (!fb_->alloc(regs[k])) return builder_ok();
     fb_->set_params(static_cast<std::uint16_t>(node.count + (method ? 1 : 0)));
     std::vector<std::uint16_t> type_regs(node.count);
+    // Session named calls may reach either registry version. Keep their
+    // textual type operands at nparams+k, independently of captured cells.
+    if (session_ && !method) for (auto& reg : type_regs)
+        if (!fb_->alloc(reg)) return builder_ok();
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);
         const std::string_view name = text(param);
@@ -265,8 +269,11 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
         binding.typed = true;
         binding.decl_kinds = kinds(params[k]);
         binding.decl_may_double = may_double_[f].count(name) != 0;
-        if (!fb_->alloc(binding.type_reg)) return builder_ok();
-        type_regs[k] = binding.type_reg;
+        if (session_ && !method) binding.type_reg = type_regs[k];
+        else {
+            if (!fb_->alloc(binding.type_reg)) return builder_ok();
+            type_regs[k] = binding.type_reg;
+        }
         fb_->set_offset(param.begin);
         // Canonical P5: a parameter is typed from the argument's text and
         // value (bind_call_param); the caller leaves the text type in the

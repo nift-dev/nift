@@ -15,11 +15,11 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (callee.kind != NodeKind::Ident) return fail(callee, "callee");
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
-    if (find_binding(name) && !(session_ && plan_.index.count(name))) return call_value(node, node.a, false, dst);
+    if (find_binding(name) && (!(session_ && plan_.index.count(name)) ||
+        session_->phased_functions.count(std::string(name)))) return call_value(node, node.a, false, dst);
     if (name == "error") return error_new(node, dst);  // rt-lint: allow-string-compare reserved Error constructor
     if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
-    const auto fn = plan_.index.find(name);
-    NativeInfo native{};
+    NativeInfo native{}; const auto fn = plan_.index.find(name);
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;

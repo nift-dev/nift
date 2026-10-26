@@ -177,13 +177,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     pending.declarations.clear();
     for (const auto& symbol : pending.symbols)
         pending.declarations.emplace(symbol.name, ast.add(NodeKind::Ident, 0, 0));
-    pending.schema_templates.clear();
-    for (auto& symbol : pending.symbols) {
-        const auto name = text.schema_names.find(symbol.name);
-        if (name != text.schema_names.end()) symbol.struct_name = name->second;
-    }
-    for (const auto& imported : text.imports)
-        if (imported.second->structure) pending.schema_templates.emplace(imported);
+    prepare_session_namespace(pending, text);
     pending.imported_functions.clear();
     for (const auto& imported : text.imports) pending.imported_functions.insert(imported.first);
     prepare_session_templates(ast, parsed.root, parsed.ok, text, namespace_, pending);
@@ -268,6 +262,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_.callable_templates.clear(); namespace_.capture_callable_seeds.clear();
     namespace_.capture_contracts.clear(); namespace_.template_definitions.clear(); namespace_.const_captures.clear();
     namespace_.source_owner.reset(); namespace_.schema_templates.clear();
+    namespace_.named_templates.clear(); namespace_.phased_functions.clear();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2
     if (executions_ == 1) for (const auto& symbol : namespace_.symbols)
         if (symbol.name == "x") cell_put(globals_[symbol.slot], Value::integer(0));  // M2: lose retained state

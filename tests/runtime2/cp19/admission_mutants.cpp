@@ -30,6 +30,12 @@ int main(int argc, char** argv) {
         probe = "struct(Point){v:=2;fn(fail()){throw error(\"new\")}};q:=Point()";
         check = refused ? "p.v" : "p.v*10+q.v";
         expected = refused ? "1" : "12"; reason = "session:struct-redeclared";
+    } else if (test == "order") {
+        seed = "fn(g()){return 1};old:=g;reader:=()=>g()";
+        probe = "before:=g();aliasbefore:=old();readbefore:=reader();fn(g()){return 3};"
+                "after:=g();aliasafter:=old();readafter:=reader()";
+        check = refused ? "g()" : "before+aliasbefore+readbefore+after+aliasafter+readafter";
+        expected = refused ? "1" : "12"; reason = "session:redefinition-order";
     } else return 2;
     VmSession session;
     std::string output;

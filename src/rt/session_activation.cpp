@@ -9,8 +9,7 @@ std::vector<std::pair<std::uint64_t, const Proto*>> VmSession::activation_target
     for (const auto& symbol : namespace_.symbols)
         for (const auto& callable : session_callable_targets(symbol.callable_shape))
             for (const auto& proto : program.protos)
-                if (callable.definition->lambda ? proto->session_definition == callable.definition :
-                    proto->name == callable.definition->name)
+                if (proto->session_definition == callable.definition)
                     targets.emplace_back(callable.identity, proto.get());
     return targets;
 }

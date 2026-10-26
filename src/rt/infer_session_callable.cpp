@@ -22,8 +22,14 @@ TyRef Inference::session_type(const TyRef& bound, const std::shared_ptr<const Se
             if (node != session_->callable_templates.end())
                 out->callables.push_back(static_cast<std::uint32_t>(session_lambda_reference(node->second)));
         } else {
-            const auto node = plan_.index.find(target.definition->name);
+            const auto alias = session_->named_templates.find(target.definition.get());
+            const auto node = plan_.index.find(alias == session_->named_templates.end() ?
+                target.definition->name : alias->second);
             if (node != plan_.index.end()) out->callables.push_back(node->second - 1u);
+            if (alias != session_->named_templates.end()) {
+                const auto current = plan_.index.find(target.definition->name);
+                if (current != plan_.index.end()) out->callables.push_back(current->second - 1u);
+            }
         }
     }
     std::sort(out->callables.begin(), out->callables.end());

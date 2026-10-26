@@ -25,9 +25,24 @@ SessionText session_text(const std::string& source, const std::string& path, con
         available[schema.first].push_back({schema.second, schema.first});
     std::unordered_map<const SessionDefinition*, std::string> schema_names;
     unsigned serial = 0;
+    std::unordered_map<const SessionDefinition*, std::string> named_names;
     for (const auto& symbol : context.symbols) if (symbol.defined) {
-        for (const auto& callable : session_callable_targets(symbol.callable_shape))
-            available[symbol.name].push_back({callable.definition, callable.definition->name});
+        for (const auto& callable : session_callable_targets(symbol.callable_shape)) {
+            auto name = callable.definition->name;
+            if (!callable.definition->lambda && declarations.count(name)) {
+                auto& alias = named_names[callable.definition.get()];
+                if (alias.empty()) {
+                    do { alias = "__cp19_named" + std::to_string(serial++); }
+                    while (source.find(alias) != std::string::npos || available.count(alias) ||
+                        std::any_of(context.symbols.begin(), context.symbols.end(), [&](const auto& other) {
+                            return other.name == alias || (other.definition &&
+                                other.definition->source->find(alias) != std::string::npos);
+                        }));
+                }
+                name = alias;
+            }
+            available[symbol.name].push_back({callable.definition, name});
+        }
         if (!symbol.struct_definition) continue;
         auto& name = schema_names[symbol.struct_definition.get()];
         if (name.empty()) {
@@ -99,13 +114,13 @@ SessionText session_text(const std::string& source, const std::string& path, con
             for (const auto& capture : definition->captures) generated(capture.name + ":=null;");
             generated("return ");
         } else out.imports.emplace(entry.name, definition);
-        if (definition->structure && entry.name != definition->name) {
+        if (!definition->lambda && entry.name != definition->name) {
             Ast schema(*definition->source);
             const auto parsed_schema = parse_script_range(schema, definition->begin, definition->end);
             if (!parsed_schema.ok) throw std::logic_error("session schema source");
             const auto& node = schema.at(schema.list(schema.at(parsed_schema.root))[0]);
             std::vector<NodeId> names{node.a};
-            for (std::uint32_t m = 0; m < node.count; ++m) {
+            for (std::uint32_t m = 0; node.kind == NodeKind::StructDecl && m < node.count; ++m) {
                 const auto& method = schema.at(schema.list(node)[m]);
                 if (method.kind == NodeKind::FnDecl && schema.text(schema.at(method.a)) == definition->name)
                     names.push_back(method.a);
@@ -135,6 +150,20 @@ SessionText session_text(const std::string& source, const std::string& path, con
     out.pieces.push_back({path, std::make_shared<const std::string>(source), 0,
                          static_cast<std::uint32_t>(source.size())});
     return out;
+}
+void prepare_session_namespace(SessionCompileContext& pending, const SessionText& text) {
+    pending.schema_templates.clear(); pending.named_templates.clear(); pending.phased_functions.clear();
+    for (const auto& imported : text.imports)
+        if (!imported.second->lambda && !imported.second->structure && imported.first != imported.second->name) {
+            pending.named_templates.emplace(imported.second.get(), imported.first);
+            pending.phased_functions.insert(imported.second->name);
+        }
+    for (auto& symbol : pending.symbols) {
+        const auto name = text.schema_names.find(symbol.name);
+        if (name != text.schema_names.end()) symbol.struct_name = name->second;
+    }
+    for (const auto& imported : text.imports)
+        if (imported.second->structure) pending.schema_templates.emplace(imported);
 }
 void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, const SessionText& text,
                                const SessionCompileContext& current, SessionCompileContext& pending) {
@@ -179,7 +208,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
 }
 void session_definitions(const Ast& ast, NodeId root, const SessionText& text, const std::string& path,
                          const SessionCompileContext& pending, Program& program, std::uint64_t executions) {
-    const auto plan = plan_unit(ast, root);
+    const auto plan = plan_unit(ast, root, &pending.phased_functions);
     for (std::size_t f = 0; f < plan.functions.size(); ++f) {
         const auto& fn = ast.at(plan.functions[f]);
         const auto name = std::string(ast.text(ast.at(fn.a)));

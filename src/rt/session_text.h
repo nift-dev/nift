@@ -11,6 +11,7 @@ struct SessionText {
     std::unordered_map<std::string, std::string> schema_names;
     std::uint32_t unit_begin = 0;
 };
+void prepare_session_namespace(SessionCompileContext&, const SessionText&);
 void prepare_session_templates(const Ast&, NodeId, bool, const SessionText&,
                                const SessionCompileContext&, SessionCompileContext&);
 void session_structures(const Ast&, NodeId, const SessionText&, const std::string&, SessionCompileContext&);

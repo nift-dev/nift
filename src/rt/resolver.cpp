@@ -80,7 +80,8 @@ void direct_callees(const Ast& ast, NodeId node, const UnitPlan& plan, std::vect
 // directly or through other functions; a unit where one can is refused
 // (`fn-called-before-declaration`, at the statement). Conservative: every
 // call in the statement counts, executed or not.
-bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const std::vector<std::uint32_t>& position) {
+bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const std::vector<std::uint32_t>& position,
+                             const std::unordered_set<std::string>* existing) {
     const std::size_t n = plan.functions.size();
     std::vector<std::vector<std::size_t>> edges(n);
     for (std::size_t f = 0; f < n; ++f) direct_callees(ast, ast.at(plan.functions[f]).b, plan, edges[f]);
@@ -96,7 +97,9 @@ bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const 
             work.pop_back();
             if (seen[f]) continue;
             seen[f] = 1;
-            if (position[f] > k) return reject(plan, ast.at(statements[k]), "fn-called-before-declaration");
+            const auto name = ast.text(ast.at(ast.at(plan.functions[f]).a));
+            if (position[f] > k && (!existing || !existing->count(std::string(name))))
+                return reject(plan, ast.at(statements[k]), "fn-called-before-declaration");
             for (std::size_t g : edges[f]) work.push_back(g);
         }
     }
@@ -105,7 +108,7 @@ bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const 
 
 } // namespace
 
-UnitPlan plan_unit(const Ast& ast, NodeId root) {
+UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::string>* existing_functions) {
     UnitPlan plan;
     const Node& program = ast.at(root);
     const NodeId* statements = ast.list(program);
@@ -119,7 +122,7 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
         position.push_back(k);
     }
     // Declarations after statements: admitted when no call can run first.
-    if (late && !check_declaration_order(ast, root, plan, position)) return plan;
+    if (late && !check_declaration_order(ast, root, plan, position, existing_functions)) return plan;
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");

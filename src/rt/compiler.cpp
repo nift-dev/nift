@@ -274,7 +274,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         result.offset = shape.offset;
         return result;
     }
-    const UnitPlan plan = plan_unit(ast, root);
+    const UnitPlan plan = plan_unit(ast, root, limits.session ? &limits.session->phased_functions : nullptr);
     if (!plan.ok) {
         result.reason = plan.reason;
         result.offset = plan.offset;

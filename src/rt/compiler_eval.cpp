@@ -57,7 +57,7 @@ void normalize_session_callbacks(Ast& ast, NodeId root, const SessionCompileCont
         for (std::uint32_t k = 0; k < node.count; ++k) pending.push_back(ast.list(node)[k]);
     }
     if (!quoted) return;  // ordinary commands pay no second inference pass
-    const auto plan = plan_unit(ast, root);
+    const auto plan = plan_unit(ast, root, &context.phased_functions);
     if (!plan.ok) return;
     const auto globals = plan_globals(ast, root, plan);
     const auto kinds = infer_unit_kinds(ast, root, plan, 0, &globals, &context);

@@ -129,7 +129,8 @@ TyRef* Inference::find(std::string_view name) {
     const std::size_t slot = globals_.find(owner, name, persist_index_, vars_, ast_.size());
     if (slot != GlobalSlots::kNone) return &vars_[slot];
     const auto external = external_.find(name);
-    if (external != external_.end() && !plan_.index.count(name)) return &vars_[external->second];
+    if (external != external_.end() && (!plan_.index.count(name) ||
+        (session_ && session_->phased_functions.count(std::string(name))))) return &vars_[external->second];
     if (current_ < 0 || static_cast<std::size_t>(current_) <= plan_.functions.size()) return nullptr;
     const auto top = top_level_slots_.find(name);
     return top == top_level_slots_.end() ? nullptr : &vars_[top->second];

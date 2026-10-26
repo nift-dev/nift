@@ -137,7 +137,8 @@ struct UnitPlan {
 // B) when no earlier top-level statement can reach that function through
 // calls (else `fn-called-before-declaration`): legacy registers a function
 // when its declaration runs, and compile-time binding is exact then.
-UnitPlan plan_unit(const Ast& ast, NodeId root);
+UnitPlan plan_unit(const Ast& ast, NodeId root,
+                   const std::unordered_set<std::string>* existing_functions = nullptr);
 
 // Every name that is the target of `=`, a compound assignment or `++`/`--`
 // anywhere inside the statements of `node`.

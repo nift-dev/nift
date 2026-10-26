@@ -44,7 +44,8 @@ struct SessionSymbol {
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
-    std::unordered_set<std::string> imported_functions;
+    std::unordered_set<std::string> imported_functions, phased_functions;
+    std::unordered_map<const SessionDefinition*, std::string> named_templates;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> schema_templates;
     std::unordered_map<std::string, NodeId> declarations;
     std::unordered_map<std::string, NodeId> lambda_templates;
