@@ -125,6 +125,7 @@ struct ProcessResult {
     int exit_code = -1;
     std::string out, err;
     std::string error;
+    bool host_fault = false;  // a Host operation failed after the child outcome
     std::vector<StageResult> stages;
     // New-option fields (only shown when the call used the new options, §11.10).
     GroupState state = GroupState::Running;

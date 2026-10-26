@@ -161,10 +161,26 @@ std::string exec_failure_message(const SpawnStage& stage, const PreparedExec& pr
                 case SetupStderr: return "cannot open stderr " + stage.stderr_path + ": " + std::strerror(error);
                 case SetupGroup:
                     return "cannot create process group for " + stage.program + ": " + std::strerror(error);
+                case SetupTerminal:
+                    return "cannot take terminal for " + stage.program + ": " + std::strerror(error);
                 default: return "redirection setup failed for " + stage.program + ": " + std::strerror(error);
             }
         default: return "cannot execute " + stage.program + ": " + std::strerror(error);
     }
+}
+
+void child_take_terminal(int report_fd) {
+    struct sigaction ign {};
+    ign.sa_handler = SIG_IGN;
+    sigemptyset(&ign.sa_mask);
+    struct sigaction prev {};
+    ::sigaction(SIGTTOU, &ign, &prev);
+    if (::tcsetpgrp(STDIN_FILENO, ::getpid()) != 0)
+        child_fail(report_fd, ExecSetup, errno, 126, SetupTerminal);
+    struct sigaction dfl {};
+    dfl.sa_handler = SIG_DFL;
+    sigemptyset(&dfl.sa_mask);
+    ::sigaction(SIGTTOU, &dfl, nullptr);
 }
 
 bool child_dup2(int source, int target) {

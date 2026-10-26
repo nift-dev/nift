@@ -34,11 +34,13 @@ enum SetupStep : int {
     SetupStdout = 3,
     SetupStderr = 4,
     SetupRedirect = 5,
-    SetupGroup = 6
+    SetupGroup = 6,
+    SetupTerminal = 7
 };
 
 [[noreturn]] void child_fail(int report_fd, int kind, int error, int code, int detail = 0);
 bool child_dup2(int source, int target);
+void child_take_terminal(int report_fd);
 void child_open_onto(int report, const std::string& path, int flags, int target, int step);
 
 struct PreparedExec {

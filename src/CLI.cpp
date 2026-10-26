@@ -2222,6 +2222,7 @@ static int run_external_words(Parser& parser,
             if (print_errors) console::error(result.error);
             return status < 0 ? 2 : status;
         }
+        if (result.host_fault) return status == 0 ? 1 : status;
         auto list = jobs->jobs(false);
         if (!list.empty()) {
             const auto& job = list.back();
@@ -2239,6 +2240,7 @@ static int run_external_words(Parser& parser,
         result = nift::shell::run_pipeline(stages, line, direct);
     }
     if (!result.error.empty() && print_errors) console::error(result.error);
+    if (result.host_fault) return result.exit_code == 0 ? 1 : result.exit_code;
     return result.exit_code;
 }
 static int execute_shell_command(Parser& parser,

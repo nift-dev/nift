@@ -66,6 +66,7 @@ using nift::rt::host::SpawnStage;
     out.err = host.err;
     out.launched = host.launched;
     out.error = host.error;
+    out.host_fault = host.host_fault;
     out.stages.reserve(host.stages.size());
     for (const auto& stage : host.stages) {
         ProcessStageResult item;
@@ -271,7 +272,10 @@ ProcessResult JobTable::launch(const std::vector<ProcessSpec>& specs, const std:
             if (job_wait == ProcessGroup::JobWait::Stopped) {
                 entry.info.state = ShellJobState::Stopped;
 #if !defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 4
-                if (!entry.group->reclaim_terminal()) out.error = "failed to restore terminal";
+                if (!entry.group->reclaim_terminal()) {
+                    out.error = "failed to restore terminal";
+                    out.host_fault = true;
+                }
 #endif
                 out.launched = true;
                 out.exit_code = 128 + SIGTSTP;
@@ -360,8 +364,13 @@ ProcessResult JobTable::foreground(int job_id) {
                 if (!entry->group) {
                     out.launched = true;
                     out.exit_code = entry->info.exit_code;
+                    if (!restored) {
+                        out.error = "failed to restore terminal";
+                        out.host_fault = true;
+                    }
                     return out;
                 }
+                if (!restored) out.host_fault = true;
                 out.error = restored ? "failed to continue job"
                                      : "failed to continue job; terminal not restored";
                 return out;
@@ -373,7 +382,10 @@ ProcessResult JobTable::foreground(int job_id) {
             entry->info.state = ShellJobState::Stopped;
 #if !defined(NIFT_CP21_MUTANT) || NIFT_CP21_MUTANT != 4
             const bool restored = entry->group->reclaim_terminal();
-            if (!restored) out.error = "failed to restore terminal";
+            if (!restored) {
+                out.error = "failed to restore terminal";
+                out.host_fault = true;
+            }
 #endif
             out.launched = true;
             out.exit_code = 128 + SIGTSTP;

@@ -13,8 +13,10 @@ namespace nift::rt::host::posix {
 // disposition cannot be changed; no state is changed on failure.
 bool terminal_acquire(const void* owner);
 // Returns the terminal to the shell and restores the saved SIGTTOU disposition.
-// Only the current owner can release; false leaves ownership unchanged or
-// reports a failed tcsetpgrp/sigaction after clearing the lease.
+// A failed step is retained as coordinator-owned pending state; the original
+// disposition is kept until it is restored, and a later release or acquire
+// retries recovery. Only the current owner starts a release; a pending release
+// can be retried by any caller because it never transfers ownership.
 bool terminal_release(const void* owner);
 bool terminal_owned_by(const void* owner);
 

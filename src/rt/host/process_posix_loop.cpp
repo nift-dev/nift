@@ -239,8 +239,10 @@ bool read_file_bounded(int fd, std::uint64_t limit, std::string& out) {
 
 bool restore_terminal(State& s) {
     if (!s.handoff) return false;
-    s.handoff = false;
+    // Keep handoff set on failure so destruction and explicit retries know
+    // there is still a coordinator-owned restoration obligation.
     const bool ok = terminal_release(&s);
+    if (ok) s.handoff = false;
     runtime::test_event(&s, "terminal-restore", ok ? 1 : 0);
     return ok;
 }
@@ -309,8 +311,10 @@ void finish(State& s, const void* key) {
             }
         }
     }
-    if (had_handoff && !terminal_restored && r.error.empty())
-        r.error = "failed to restore terminal";
+    if (had_handoff && !terminal_restored) {
+        r.host_fault = true;
+        if (r.error.empty()) r.error = "failed to restore terminal";
+    }
     r.stdin_total = s.stdin_total;
     r.stdin_written = s.stdin_written;
     r.stdin_complete = !s.stdin_incomplete && s.stdin_written == s.stdin_total;

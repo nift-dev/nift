@@ -52,18 +52,7 @@ std::string pipe_error() { return std::string("cannot create pipe: ") + std::str
         ::close(pid_pipe[1]);
     } else {
         if (s.req.own_group && ::setpgid(0, target_pgid) != 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
-        if (l.want_handoff && i == 0) {
-            struct sigaction ign {};
-            ign.sa_handler = SIG_IGN;
-            sigemptyset(&ign.sa_mask);
-            struct sigaction prev {};
-            ::sigaction(SIGTTOU, &ign, &prev);
-            ::tcsetpgrp(STDIN_FILENO, ::getpid());
-            struct sigaction dfl {};
-            dfl.sa_handler = SIG_DFL;
-            sigemptyset(&dfl.sa_mask);
-            ::sigaction(SIGTTOU, &dfl, nullptr);
-        }
+        if (l.want_handoff && i == 0) child_take_terminal(report[1]);
 #ifdef __linux__
         if (s.req.die_with_parent) {
             ::prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
@@ -142,7 +131,9 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
             if (i == 0) s.pgid = pid;
             ::setpgid(pid, s.pgid);  // both sides set it: no window where the child is outside its group
         }
-        if (l.want_handoff && i == 0) ::tcsetpgrp(STDIN_FILENO, pid);
+        if (l.want_handoff && i == 0 && ::tcsetpgrp(STDIN_FILENO, pid) != 0) {
+            l.fail("cannot take terminal for " + s.req.stages[i].program + ": " + std::strerror(errno));
+        }
     }
     auto& stage = s.st[i];
     runtime::test_event(&s, "spawn", stage_pid, s.pgid, static_cast<long>(i), "");  // a = pid, b = pgid, c = stage
