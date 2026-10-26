@@ -128,7 +128,7 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     return true;
 }
 
-bool UnitCompiler::assign(const Node& node) {
+bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
     const Node& target = ast_.at(node.a);
     if (target.kind == NodeKind::Member) {
         bool is_this = false;  // CP12b: a struct field
@@ -173,6 +173,7 @@ bool UnitCompiler::assign(const Node& node) {
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
             if (!store_indexed_binding(held, reg)) return false;
         }
+        if (result && *result != value) fb_->emit(OpCode::Move, *result, value);
         return true;
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");

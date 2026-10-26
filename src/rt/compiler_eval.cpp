@@ -40,7 +40,7 @@ void normalize_eval_callbacks(Ast& ast, NodeId root) {
 NodeId make_eval_program(Ast& ast, NodeId expression) {
     const auto begin = ast.at(expression).begin, end = ast.at(expression).end;
     const auto kind = ast.at(expression).kind;
-    const bool assignment = kind == NodeKind::Declare || kind == NodeKind::Assign;
+    const bool assignment = kind == NodeKind::Declare;
     const auto value = assignment ? ast.at(expression).a : expression;
     const NodeId returned = ast.add(NodeKind::Return, begin, end);
     ast.at(returned).a = value;

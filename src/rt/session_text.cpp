@@ -2,6 +2,7 @@
 #include "rt/lexer.h"
 #include "rt/unit_check.h"
 #include "rt/infer.h"
+#include "rt/parser.h"
 #include <stdexcept>
 
 // rt-lint: cold-file immutable declaration linking, never executable history replay
@@ -11,13 +12,21 @@ SessionText session_text(const std::string& source, const std::string& path, con
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> available;
     for (const auto& symbol : context.symbols)
         if (symbol.defined && symbol.definition) available.emplace(symbol.name, symbol.definition);
+    std::unordered_set<std::string> declarations;
+    Ast original(source);
+    const auto parsed = parse_script(original);
+    if (parsed.ok) for (std::uint32_t k = 0; k < original.at(parsed.root).count; ++k) {
+        const auto& node = original.at(original.list(original.at(parsed.root))[k]);
+        if (node.kind == NodeKind::FnDecl) declarations.emplace(original.text(original.at(node.a)));
+    }
     std::vector<std::shared_ptr<const SessionDefinition>> selected;
     auto scan = [&](std::string_view text) {
         Lexer lexer(text, 0, static_cast<std::uint32_t>(text.size()));
         for (auto token = lexer.next(); token.kind != Tok::End; token = lexer.next()) {
             if (token.kind != Tok::Ident) continue;
             const auto found = available.find(std::string(text.substr(token.begin, token.end - token.begin)));
-            if (found != available.end() && out.imports.emplace(found->second->name, found->second).second)
+            if (found != available.end() && !declarations.count(found->second->name) &&
+                out.imports.emplace(found->second->name, found->second).second)
                 selected.push_back(found->second);
         }
     };

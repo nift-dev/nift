@@ -57,7 +57,7 @@ struct Proto {
     std::shared_ptr<const SourceMap> session_source;
     std::weak_ptr<const Program> session_owner;
     std::shared_ptr<const SessionDefinition> session_definition;
-    std::vector<std::pair<const void*, const Proto*>> session_targets;
+    std::vector<std::pair<std::uint64_t, const Proto*>> session_targets;
     std::uint16_t session_returns = 0;
     std::vector<std::uint16_t> session_params, session_param_types;
     const Proto* collection_entry = nullptr;  // owned by Program::protos

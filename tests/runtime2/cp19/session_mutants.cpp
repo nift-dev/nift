@@ -45,6 +45,12 @@ int main(int argc, char** argv) {
         CHECK(error.heap_as<ErrorObject>()->source == (expect == "source" ? "catcher" : "original-source"));
         CHECK(error.heap_as<ErrorObject>()->message == "cross");
     }
+    r = session.execute("a:=[0,0];tick:=0", "assignment-state", output);
+    CHECK(r.admitted && r.execution.reason == StopReason::None);
+    r = session.evaluate("(a[1]=(tick+=1))", "assignment-value", output);
+    CHECK(r.admitted && r.execution.reason == StopReason::None);
+    const int assigned = expect == "assignment" ? 2 : 1;
+    CHECK(r.value.as_int() == assigned && session.value("tick").as_int() == assigned);
     std::weak_ptr<const Program> owner;
     CHECK(f.is(Kind::Function));
     if (f.is(Kind::Function)) owner = f.heap_as<FunctionObject>()->program_owner;

@@ -16,10 +16,26 @@ const Note* note_at(const Proto* proto, const Instr* pc) {
 bool Vm::op_load_function(const Instr& in, Value* R, Fault& fault) {
     if (in.b >= protos_.size()) return internal(fault, "function proto");
     Value& value = named_functions_[in.b];
+    if (value.is_null() && protos_[in.b]->session_source && options_.session_globals) {
+        // Named aliases denote the registry entry. Replacing its code keeps
+        // the Function identity seen by aliases and equality unchanged.
+        for (const auto& cell : *options_.session_globals) {
+            if (!is_cell(cell)) continue;
+            const auto candidate = cell_load(cell);
+            if (!candidate.is(Kind::Function)) continue;
+            auto* function = candidate.heap_as<FunctionObject>();
+            if (function->is_lambda || function->name != protos_[in.b]->name) continue;
+            function->code = protos_[in.b];
+            function->program_owner = protos_[in.b]->session_owner.lock();
+            value = candidate;
+            break;
+        }
+    }
     if (value.is_null()) {
         auto* function = new FunctionObject();
         function->name = protos_[in.b]->name;
         function->code = protos_[in.b];
+        if (protos_[in.b]->session_source) function->session_identity = next_session_callable_id_++;
 #if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
     if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
 #endif
@@ -115,6 +131,7 @@ bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     auto* function = new FunctionObject();
     function->name = protos_[in.b]->name;
     function->code = protos_[in.b];
+    if (protos_[in.b]->session_source) function->session_identity = next_session_callable_id_++;
 #if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
     if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
 #endif

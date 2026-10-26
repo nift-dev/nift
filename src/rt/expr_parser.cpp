@@ -239,6 +239,7 @@ NodeId ExprParser::unit_body() {
         return id;
     }
     const NodeId value = parse(kTernary);
+    if (is(Tok::Assign) || compound_op(tok_.kind) != Op::None) return lambda_assignment(value);
     if (value == kNoNode || !(is(Tok::Increment) || is(Tok::Decrement))) return value;
     if (!assignable(ast_.at(value).kind)) return fail(OpaqueReason::LegacyRuntimeError);
     const Op op = is(Tok::Increment) ? Op::PostInc : Op::PostDec;
@@ -379,10 +380,7 @@ NodeId parse_eval_expression(Ast& ast, std::uint32_t begin, std::uint32_t end) {
     OpaqueReason why = OpaqueReason::None;
     const NodeId statement = detail::parse_statement_text(ast, begin, end, why);
     if (statement == kNoNode) return expression;
-    // Returning an indexed/member target would evaluate that target twice.
-    // Keep the original refusal until lowering can preserve the assigned value.
-    if (ast.at(statement).kind == NodeKind::Assign &&
-        ast.at(ast.at(statement).a).kind != NodeKind::Ident) return expression;
+    // Assigned-value lowering owns index operands and does not reread them.
     return ast.at(statement).kind == NodeKind::ExprStmt ? ast.at(statement).a : statement;
 }
 

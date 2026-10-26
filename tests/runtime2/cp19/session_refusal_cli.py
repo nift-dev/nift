@@ -6,6 +6,7 @@ cases=[
  ('transaction','x:=5;f:=()=>x\nleaked:=77;print("FORBIDDEN");bytes([65])\nf()\nx\nexit\n','5\n5\n','builtin-bytes:bytes'),
  ('receiver','a:=[3,1,2]\nfn(cmpv(a0,b0)){a.push(9);return a0<b0}\na.sort(cmpv)\na.stringify()\nexit\n','[3,1,2]\n','method:sort'),
  ('dynamic-flow','o:={"set":v=>v+1};x:=5\nprint("FORBIDDEN");o.set(4)\nx\nexit\n','5\n','session:callable-flow'),
+ ('redefinition-flow','fn(g0()){return 1};o:={"invoke":()=>g0()}\nprint("FORBIDDEN");fn(g0()){return 2}\no.invoke()\nexit\n','1\n','session:redefinition-callable-flow'),
  ('first-refusal','leaked:=77;print("FORBIDDEN");bytes([65])\nx:=5\nx\nexit\n','5\n','builtin-bytes:bytes'),
 ]
 for name,source,expected,reason in cases:

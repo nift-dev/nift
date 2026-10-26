@@ -121,6 +121,45 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 15);
         CHECK(session.value("c").heap() == closure.heap());
     }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("fn(g0()){return 1};f:=g0", "old-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        auto alias = session.value("f");
+        std::weak_ptr<const Program> old = alias.heap_as<FunctionObject>()->program_owner;
+        const auto identity = alias.heap_as<FunctionObject>()->session_identity;
+        r = session.execute("fn(g0()){return 2}", "new-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        CHECK(session.value("g0").heap() == alias.heap());
+        CHECK(alias.heap_as<FunctionObject>()->session_identity == identity && identity != 0);
+        CHECK(old.expired());
+        r = session.evaluate("f()", "alias-after-redefinition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
+        r = session.execute("fn(g0()){return 3};bytes([65])", "refused-redefinition", output);
+        CHECK(!r.admitted && output.empty());
+        r = session.evaluate("f()", "alias-after-refusal", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("a:=[0,0];tick:=0;x:=1", "assignment-state", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        auto snapshot = session.value("a");
+        r = session.evaluate("(a[1]=(tick+=1))", "index-assignment", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+        CHECK(session.value("tick").as_int() == 1 && array_items(session.value("a"))[1].as_int() == 1);
+        CHECK(array_items(snapshot)[1].as_int() == 0);
+        r = session.evaluate("1+(x=7)", "nested-assignment", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 8);
+        r = session.evaluate("false && (x=8)", "skipped-assignment", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && session.value("x").as_int() == 7);
+        r = session.evaluate("(x=8)+a[9]", "runtime-assignment-error", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && session.value("x").as_int() == 8);
+        r = session.evaluate("(x=9)+bytes([65])", "refused-assignment", output);
+        CHECK(!r.admitted && session.value("x").as_int() == 8 && output.empty());
+    }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");
 }

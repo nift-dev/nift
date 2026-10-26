@@ -29,6 +29,7 @@ public:
 
 private:
     void enqueue(std::size_t unit);
+    TyRef session_expression_seed(NodeId id);
     void seed_session();
     void export_session();
     TyRef session_call(const Node& n);

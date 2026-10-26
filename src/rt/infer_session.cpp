@@ -3,6 +3,11 @@
 
 // rt-lint: cold-file incremental namespace facts in the shared kind inference
 namespace nift::rt::infer_detail {
+TyRef Inference::session_expression_seed(NodeId id) {
+    if (!session_) return {};
+    const auto seed = session_->capture_seeds.find(id);
+    return seed == session_->capture_seeds.end() ? TyRef{} : seed->second;
+}
 TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
 
 void Inference::seed_session() {

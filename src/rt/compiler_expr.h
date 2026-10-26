@@ -99,7 +99,8 @@ private:
     bool statements(const Node& block);
     bool statement(NodeId id);
     bool declare(const Node& node);
-    bool assign(const Node& node);
+    bool assignment_expr(const Node& node, std::uint16_t dst);
+    bool assign(const Node& node, const std::uint16_t* result = nullptr);
     bool compound_assign(const Node& node);
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);

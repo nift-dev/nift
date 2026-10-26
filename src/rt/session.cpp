@@ -2,6 +2,7 @@
 #include "rt/session_text.h"
 #include "rt/session_shape.h"
 #include "rt/cell.h"
+#include "rt/aggregate.h"
 #include "rt/compiler_eval.h"
 #include "rt/script_runner.h"
 #include "rt/script_runner_stats.h"
@@ -67,12 +68,26 @@ void VmSession::refresh(SessionCompileContext& pending) {
         // current value never silently narrows old code's assumptions.
         symbol.kinds = symbol.contract;
         symbol.structure = session_shape(symbol.structure);
+        symbol.untracked_callables = false;
+        if (v.is(Kind::Object) || v.is(Kind::Array)) {
+            std::vector<Value> pending{v};
+            std::unordered_set<const HeapObject*> seen;
+            while (!pending.empty()) {
+                const auto value = std::move(pending.back()); pending.pop_back();
+                if (!value.is_heap() || !seen.insert(value.heap()).second) continue;
+                if (value.is(Kind::Function)) { symbol.untracked_callables = true; break; }
+                if (value.is(Kind::Array)) for (const auto& item : array_items(value)) pending.push_back(item);
+                if (value.is(Kind::Object))
+                    for (const auto& item : object_entries(value)) pending.push_back(item.second);
+            }
+        }
         symbol.callable = v.is(Kind::Function);
         if (symbol.callable) {
             const auto* proto = static_cast<const Proto*>(v.template heap_as<FunctionObject>()->code);
             symbol.arity = proto->nparams;
             symbol.returns = proto->session_returns;
-            symbol.definition = proto->session_definition; symbol.code = proto;
+            symbol.definition = proto->session_definition;
+            symbol.identity = v.template heap_as<FunctionObject>()->session_identity;
             symbol.params = proto->session_params; symbol.param_types = proto->session_param_types;
         }
     }
@@ -183,14 +198,14 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
         }
         linked[slots[k]] = program.protos[k].get();
     }
-    std::vector<std::pair<const void*, const Proto*>> targets;
-    for (const auto& symbol : namespace_.symbols) if (symbol.definition && symbol.code) {
+    std::vector<std::pair<std::uint64_t, const Proto*>> targets;
+    for (const auto& symbol : namespace_.symbols) if (symbol.definition && symbol.identity) {
         if (symbol.definition->lambda) {
             for (const auto& proto : program.protos) if (proto->session_definition == symbol.definition)
-                targets.emplace_back(symbol.code, proto.get());
+                targets.emplace_back(symbol.identity, proto.get());
         } else {
             const auto target = plan.index.find(symbol.definition->name);
-            if (target != plan.index.end()) targets.emplace_back(symbol.code, program.protos[target->second].get());
+            if (target != plan.index.end()) targets.emplace_back(symbol.identity, program.protos[target->second].get());
         }
     }
     for (auto& proto : program.protos) {

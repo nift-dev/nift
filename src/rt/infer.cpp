@@ -130,10 +130,7 @@ int Inference::function_index(const Node& callee) const {
 
 TyRef Inference::expr(NodeId id) {
     const Node& n = ast_.at(id);
-    if (session_) {
-        const auto seed = session_->capture_seeds.find(id);
-        if (seed != session_->capture_seeds.end()) return record(id, seed->second);
-    }
+    if (const auto seed = session_expression_seed(id)) return record(id, seed);
     TyRef t;
     switch (n.kind) {
         case NodeKind::Number: t=number_literal(id);break;
@@ -272,6 +269,8 @@ TyRef Inference::expr(NodeId id) {
             if (!t) t = o;
             break;
         }
+        case NodeKind::Assign: case NodeKind::CompoundAssign:
+            statement(id); t = expr(n.a); break;
         case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
         case NodeKind::Call: t = call(n); break;
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)

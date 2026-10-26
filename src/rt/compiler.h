@@ -33,9 +33,10 @@ struct SessionSymbol {
     std::string name;
     std::shared_ptr<const SessionDefinition> definition;
     std::shared_ptr<const infer_detail::Ty> structure;
-    const void* code = nullptr;
+    std::uint64_t identity = 0;
     std::uint16_t slot = 0, kinds = 0, returns = 0, arity = 0, contract = 0;
     bool callable = false, const_array = false, defined = true, readonly = false;
+    bool untracked_callables = false;
     std::vector<std::uint16_t> params, param_types;
 };
 struct SessionCompileContext {

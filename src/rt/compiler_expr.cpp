@@ -65,33 +65,6 @@ bool ordering_kinds_ok(KindSet l, KindSet r) {
 
 bool UnitCompiler::temp(std::uint16_t& reg) { return fb_->alloc(reg) || builder_ok(); }
 
-bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
-    const Binding* binding = find_binding(text(node));
-    if (!binding) {
-        if (const StructFieldInfo* field = own_field(text(node))) {  // CP12b: an implicit field
-            if (field_in_loop_code()) return fail(node, "context:struct-field");
-            return temp(reg) && field_read(node, kNoNode, *field, reg);
-        }
-        const auto fn = plan_.index.find(text(node));
-        if (fn != plan_.index.end()) {
-            if (!temp(reg)) return false;
-            fb_->emit(OpCode::LoadFunction, reg, fn->second);
-            return true;
-        }
-        if (in_lambda_ && !declared_names_.count(text(node))) {
-            if (!temp(reg)) return false;
-            fb_->note(fb_->emit(OpCode::Undefined, reg), std::string(text(node)));
-            return true;
-        }
-        return fail(node, in_function_ ? "free-name" : "unresolved-name");
-    }
-    if (binding->struct_id >= 0) return fail(node, "struct-value");  // CP12b: instances are never copied
-    if (binding->lazy_for) return for_lazy_read(*binding, reg);
-    if (binding->global && !binding->cell)
-        return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);
-    return read_binding(*binding, reg);
-}
-
 bool UnitCompiler::has_call(NodeId id) const {
     if (id == kNoNode) return false;
     const Node& n = ast_.at(id);
@@ -185,6 +158,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         case NodeKind::Coalesce: return coalesce(node, dst);
         case NodeKind::Ternary: return ternary(node, dst);
         case NodeKind::Unary: return unary(node, dst);
+        case NodeKind::Assign: case NodeKind::CompoundAssign: return assignment_expr(node, dst);
         case NodeKind::IncDec: return inc_dec_expr(node, dst);
         case NodeKind::Call: return call(node, dst);
         case NodeKind::Member: return member(node, dst);

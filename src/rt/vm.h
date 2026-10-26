@@ -130,7 +130,7 @@ private:
     }
     const Proto* callable_code(const FunctionObject* function, const Proto* caller) const {
         for (const auto& target : caller->session_targets)
-            if (target.first == function->code) return target.second;
+            if (target.first == function->session_identity) return target.second;
         return static_cast<const Proto*>(function->code);
     }
     struct Frame {
@@ -237,6 +237,7 @@ private:
     std::vector<Handler> handlers_;
     std::vector<const Proto*> protos_;
     std::uint64_t next_callable_display_id_ = 1;
+    std::uint64_t next_session_callable_id_ = 1;
     std::vector<Value> named_functions_;  // canonical named-function values (LoadFunction)
     const FunctionObject* closure_ = nullptr;  // the running closure
     CycleGraph cycle_graph_;

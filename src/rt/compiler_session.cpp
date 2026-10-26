@@ -166,7 +166,8 @@ bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint
 bool UnitCompiler::session_publish(std::string_view name, const Binding& binding) {
     const auto existing = std::find_if(session_->symbols.begin(), session_->symbols.end(),
         [&](const auto& symbol) { return symbol.name == name; });
-    if (existing != session_->symbols.end() && existing->defined)
+    if (existing != session_->symbols.end() && existing->defined &&
+        !(binding.readonly && binding.decl_kinds == kKindFunction && existing->readonly && existing->callable))
         return fail(ast_.at(root_), "session:redeclared");
     if (session_->slots > 65532) return fail(ast_.at(root_), "limit:session-bindings");
     Binding global = binding;
@@ -197,6 +198,17 @@ bool UnitCompiler::session_function(NodeId id) {
     const Node& node = ast_.at(id);
     const auto name = text(ast_.at(node.a));
     if (session_->imported_functions.count(std::string(name))) return true;
+    for (const auto& symbol : session_->symbols) if (symbol.name == name && symbol.defined) {
+        for (const auto& retained : session_->symbols)
+            if (retained.untracked_callables) return fail(node, "session:redefinition-callable-flow");
+        bool prior_statement = false;
+        for (std::uint32_t k = 0; k < ast_.at(root_).count; ++k) {
+            const auto statement = ast_.list(ast_.at(root_))[k];
+            if (statement == id) break;
+            prior_statement = prior_statement || ast_.at(statement).kind != NodeKind::FnDecl;
+        }
+        if (prior_statement) return fail(node, "session:redefinition-order");
+    }
     Binding binding;
     std::uint16_t value = 0;
     if (!temp(value) || !temp(binding.type_reg) || !temp(binding.reg)) return false;
