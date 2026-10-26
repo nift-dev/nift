@@ -5,6 +5,7 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('lambda-named-alias','f:=()=>1;fn(g()){return 2};old:=f\nf = g\nf()\n(f==g)\nf = ()=>3\nf()\ng()\nold()\nexit\n',8),
  ('lambda-alias-rebind','f:=()=>1;g:=()=>2;old:=f;reader:=()=>f()\nf = g\nf()\nold()\nreader()\n(f==g)\nexit\n',6),
  ('lambda-alias-arity','f:=()=>1;g:=v=>v+2;old:=f\nf = g\nf(3)\nold()\nexit\n',4),
  ('replacement-loop-capture','fn(g()){return 1};fn(makec()){caparr:=[[1]];return v=>{for(row:caparr){row.push(v)};return caparr.stringify()}};c:=makec();warm:=c(0)\nfn(g()){return 3}\ng()\nc(2)\nexit\n',4),

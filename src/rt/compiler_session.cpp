@@ -122,7 +122,7 @@ bool UnitCompiler::session_admit() {
                     return fail(n, "session:callable-rebind");
 #endif
                 if (symbol.callable && n.kind != NodeKind::Declare &&
-                    !(symbol.definition && symbol.definition->lambda &&
+                    !(!symbol.readonly &&
                       (ast_.at(n.b).kind == NodeKind::Lambda ||
                        (kinds(n.b) == kKindFunction && kinds_.callable_targets.count(n.b) &&
                         !kinds_.callable_targets.at(n.b).empty()))))
