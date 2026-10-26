@@ -129,7 +129,7 @@ CASES = [
         "name": "fn-flags-module",
         "files": {
             "main.f": 'import("m.nft")\nprint(af())\n',
-            "m.nft": "fn[async](af()) { return 1 }\nexport(af)\n",
+            "m.nft": "@fn(af()) { return 1 }\nexport(af)\n",  # CP22: fn[async] compiles
         },
         "first": "fn-flags",
         "certain": {"fn-flags"},

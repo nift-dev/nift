@@ -1,0 +1,1 @@
+error: $ROOT/err_nested_fatal.f:1:39: future: future: JSON array index 5 is out of range in 'x[5]'

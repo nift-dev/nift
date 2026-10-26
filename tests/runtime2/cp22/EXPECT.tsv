@@ -1,0 +1,5 @@
+# CP22 VM fixtures whose VM result differs from the legacy golden by an approved
+# policy: <fixture>\t<policy>; the VM must then equal <fixture>.r2.*.
+err_fatal_await.f	D-009#5-future
+err_nested_fatal.f	D-009#5-future
+err_task_runtime_in_fn.f	D-009#5-future

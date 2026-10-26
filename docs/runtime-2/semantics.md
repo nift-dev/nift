@@ -122,6 +122,23 @@ The "Category" column says which applies: **Unchanged** (Runtime 2.0 = legacy),
 | Environment | `getenv` of an unset name is `null` | `getenv_unset.f` | `ParserExpression.cpp:2544` (`getenv`) | Unchanged |
 | Processes | `run(...)` returns an object | `process_run.f` | `Process.cpp` (`nift_run_pipeline`) | Unchanged |
 
+## Concurrency (CP22)
+
+Probes: `tests/runtime2/cp22/cases/*.f` (legacy goldens) and `vm-only/*.f`;
+record `checkpoints/cp22-coroutines.md`.
+
+| Area | Legacy behaviour | Probe | Source | Runtime 2.0 / Category |
+| --- | --- | --- | --- | --- |
+| Async call | `fn[async]` / `async (…) =>` returns a future at once; the body runs on a pool thread | `a01_basic.f` | `spawn_future` (`ParserExpression.cpp`) | VM coroutine (Spawn); Unchanged |
+| Isolation | The task sees a snapshot taken at the call; writes on either side are invisible to the other | `iso_*.f` | `clone_worker_binding` | Unchanged (per-task global snapshot) |
+| Completion | A task completes after its body and every task it spawned; the run waits for all tasks (normal end, top-level `return`, main error) | `drain_*.f` | `finalize_execution_workers` | Unchanged |
+| `await` | Value; thrown Error re-raised unchanged (catchable, original origin); fatal task error `future: <message>` at the task's position; non-future `await: expected future` | `err_*.f` | `await_future` | Unchanged; the task's own message follows D-009#5 (`future: division by zero` at the division, legacy `future: return: …` at the `return`): **Approved change (D-009#5)**, `err_fatal_await.r2.*` |
+| Ordering | Interleaving of task output is nondeterministic (threads) | `t3` probe | pool threads | Deterministic FIFO run queue, timers by deadline: one of legacy's behaviours (VM-only fixtures `vm-only/*.f`) |
+| `sleep` | Blocks the calling thread | `sleep_*.f` | `sleep_for` | In coroutine units the task suspends (same validation and trace); elsewhere unchanged |
+| Futures | `type` `future`; identity equality; truthy; binding type string; `done()`, `status()` | `fut_*.f` | async handle tags | Unchanged where admitted; other uses refused before execution (`coro-future-flow:*`) |
+| Async named function as a value | The future fails with `invalid async callable` (defect) | `refuse/r_async_value.f` | `set_named_callable_async` | Refused before execution (`coro-async-value`) |
+| Threads, mutexes, atomics | OS threads with the snapshot rule | `v45_threads.sh` etc. | `thread()` | Stay on legacy until CP23 isolates |
+
 ## D-009#3 compatibility scan
 
 Programs that define a top-level function named like a built-in, found by

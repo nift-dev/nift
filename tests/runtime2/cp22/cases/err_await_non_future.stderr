@@ -1,0 +1,1 @@
+error: $ROOT/err_await_non_future.f:3:7: await: expected future

@@ -3592,6 +3592,70 @@ test-rt-vm: test-runtime2-cp14b-profile
 test-rt-vm-sanitize: test-runtime2-cp14b-sanitize
 certify-targets: test-runtime2-cp14b-mutants
 
+# CP22 VM coroutines (docs/runtime-2/checkpoints/cp22-coroutines.md). Functional
+# tier (in test-rt-vm): the in-process unit (tasks, futures, scheduler, wake
+# source, exactly-once release, 10k sleeps / 100k spawns), the legacy oracle,
+# the VM differential corpus, refusals before execution, VM-determinism and
+# per-task Host-op trace fixtures on both dispatch builds, generated
+# adversarial programs on both builds, and the harness negative controls.
+# Sanitizer tier (in test-rt-vm-sanitize): ASan/UBSan unit and corpus, TSan
+# wake source with the CP16 host loop. Certification tier: compiled mutants.
+RT_CORO_UNIT := $(TEST_DIR)/rt/coro-unit$(EXEEXT)
+$(RT_CORO_UNIT): tests/rt/coro_unit.cpp $(RT_VM_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+CP22_RUN = $(PYTHON) tests/runtime2/cp22/run.py
+.PHONY: test-runtime2-cp22 test-runtime2-cp22-sanitize test-runtime2-cp22-tsan test-runtime2-cp22-mutants
+test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
+	"$(RT_CORO_UNIT)"
+	$(CP22_RUN) --nift "$(CURDIR)/$(TARGET)" --mode legacy
+	set -e; for b in "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(CP13B_SWITCH_NIFT)"; do \
+	  for m in vm refuse vm-only trace; do $(CP22_RUN) --nift "$$b" --mode $$m; done; \
+	done
+	$(PYTHON) tests/runtime2/cp22/adversarial.py --nift "$(CURDIR)/$(TARGET)" --switch "$(CURDIR)/$(CP13B_SWITCH_NIFT)" \
+		--seed $${RT_VM_SEED:-1} --count $${CP22_ADV:-80}
+	$(PYTHON) tests/runtime2/cp22/controls.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-cp22-sanitize: $(SAN_TARGET)
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp \
+		-o "$(TEST_DIR)/rt-san/coro-unit"
+	ulimit -f 100000; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
+	set -e; for m in vm refuse vm-only; do env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+	  UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 $(CP22_RUN) --nift "$(CURDIR)/$(SAN_TARGET)" --mode $$m; done
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/cp22/adversarial.py --nift "$(CURDIR)/$(SAN_TARGET)" --seed $${RT_VM_SEED:-2} --count $${CP22_ADV_SAN:-30}
+test-runtime2-cp22-tsan:
+	mkdir -p "$(TEST_DIR)/rt-tsan"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/coro_wake_unit.cpp src/rt/coro_wake.cpp $(RT_HOST_SOURCES) \
+		-o "$(TEST_DIR)/rt-tsan/coro-wake"
+	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-tsan/coro-wake"
+# Mutants: the three scheduler objects compiled -DNIFT_CORO_MUTANT=n, linked
+# with the normal objects; tests/runtime2/cp22/run.py --mutant checks each
+# against its named witness (provenance manifest: binary and oracle sha256).
+CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_run.cpp
+CP22_MUTANT_DIR := $(TEST_DIR)/coro-mutants
+$(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CP22_CORO_SOURCES) $(RT_VALUE_HEADERS) $(LIBFFI_A)
+	mkdir -p "$(CP22_MUTANT_DIR)/$*"
+	set -e; for f in $(CP22_CORO_SOURCES); do \
+	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MUTANT=$* -c $$f -o "$(CP22_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJECTS)) \
+		$(addprefix $(CP22_MUTANT_DIR)/$*/,$(notdir $(CP22_CORO_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
+test-runtime2-cp22-mutants: $(TARGET)
+	set -e; normal=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
+	for n in 1 2 3 4 5 6 7 8 9 10; do \
+	  $(MAKE) "$(CP22_MUTANT_DIR)/nift-$$n" >/dev/null; \
+	  sha=$$(sha256sum "$(CP22_MUTANT_DIR)/nift-$$n" | cut -d' ' -f1); \
+	  printf '{"mutant": %s, "sha256": "%s", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal" \
+	    > "$(CP22_MUTANT_DIR)/nift-$$n.json"; \
+	  $(CP22_RUN) --nift "$(CURDIR)/$(CP22_MUTANT_DIR)/nift-$$n" --mutant $$n --oracle "$(CURDIR)/$(TARGET)" \
+	    --mutant-info "$(CURDIR)/$(CP22_MUTANT_DIR)/nift-$$n.json"; \
+	done
+test-rt-vm: test-runtime2-cp22
+test-rt-vm-sanitize: test-runtime2-cp22-sanitize
+test-rt-vm-sanitize: test-runtime2-cp22-tsan
+certify-targets: test-runtime2-cp22-mutants
+
 # CP18 compiled-program interface: separate from legacy Engine execution.
 CP18_C_TEST := $(TEST_DIR)/cp18/program$(EXEEXT)
 $(CP18_C_TEST): tests/runtime2/cp18/program.c $(SHARED_LIB) include/nift/c_abi.h
