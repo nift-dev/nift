@@ -191,9 +191,13 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
         if (coro.timers.empty()) {
             // Unreachable by construction (a future only refers to an earlier
             // task, so waits form no cycle): an internal stop, never a hang.
-            return internal(fault, "coroutine deadlock") ? 1 : 0;
+            return raise(fault, StopReason::Internal, "coroutine deadlock") ? 1 : 0;
         }
+#if NIFT_CORO_MUTANT == 3
+        coro.wake->wait_until(coro.timers.top().at - std::chrono::milliseconds(150));  // M3: early wake-up
+#else
         coro.wake->wait_until(coro.timers.top().at);
+#endif
         fire_due(coro, Clock::now());
     }
 }
