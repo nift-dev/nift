@@ -1,5 +1,6 @@
 #include "rt/session.h"
 #include "rt/heap.h"
+#include "rt/string.h"
 #include "rt_test.h"
 #include <iostream>
 using namespace nift::rt;
@@ -15,6 +16,28 @@ int main(int argc, char** argv) {
         if (f.is(Kind::Function)) CHECK(!f.heap_as<FunctionObject>()->program_owner);
         const auto status = rt_test::finish("CP19 session negative-control witness");
         if (!status) std::cout << "WITNESS owner\n";
+        return status;
+    }
+    if (expect == "contract") {
+        r = session.execute("nested:=[[1]]", "nested-state", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")}", "nested-effect", output);
+        if (!r.admitted || r.execution.reason != StopReason::None) std::cerr << "contract refusal=" << r.refusal << " runtime=" << r.execution.message << " output=" << output << '\n';
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
+        CHECK(output == "FORBIDDEN\n");
+        const auto nested = session.value("nested");
+        CHECK(nested.is(Kind::Array));
+        if (nested.is(Kind::Array)) {
+            const auto& outer = nested.heap_as<ArrayObject>()->items;
+            CHECK(outer.size() == 1 && outer[0].is(Kind::Array));
+            if (outer.size() == 1 && outer[0].is(Kind::Array)) {
+                const auto& inner = outer[0].heap_as<ArrayObject>()->items;
+                CHECK(inner.size() == 2);
+                if (inner.size() == 2) CHECK(inner[1].is(Kind::String) && string_view_of(inner[1]) == "bad");
+            }
+        }
+        const auto status = rt_test::finish("CP19 structural contract negative-control witness");
+        if (!status) std::cout << "WITNESS contract\n";
         return status;
     }
     const auto count = session.binding_count();

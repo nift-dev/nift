@@ -5,6 +5,7 @@ from pathlib import Path
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text('')
 cases=[
+ ('invocation_readonly_number',['-i'],'x:=5\nprint("ONCE");args.push(3)\nx\nargs.stringify()\nexit\n','',4),
  ('invocation_readonly',['-i'],'x:=5\nprint("ONCE");args.push("bad")\nx\nargs.stringify()\nexit\n','',4),
  ('invocation',['-i'],'cmd\nargs.stringify()\nexit\n','',2),
  ('invocation_inline',['-i','-c','x:=2','--','hello','-literal'],'cmd\nargs.stringify()\nx\nexit\n','',4),
@@ -69,6 +70,6 @@ for name,argv,stdin,rc,units in cases:
     assert channels == (0,'3\n[1,2]\n[1,2,3]\n',''),r
    else: assert channels==baseline,(name,baseline,r)
    assert len(rows)==units,(name,units,r)
-   assert len([s for s in rows if s['outcome']=='vm-error']) == (1 if name=='invocation_readonly' else 0),r
+   assert len([s for s in rows if s['outcome']=='vm-error']) == (1 if name in ('invocation_readonly','invocation_readonly_number') else 0),r
    assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome'] in ('vm','vm-error') for s in rows),r
 print(f'PASS real session entry checks (parity and explicit D-040 witness): {count} observations')

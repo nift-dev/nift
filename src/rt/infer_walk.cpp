@@ -1,6 +1,7 @@
 #include "rt/infer_walk.h"
 
 #include "rt/number.h"
+#include "rt/session_mutation_shape.h"
 
 #include <memory>
 
@@ -74,16 +75,27 @@ void Inference::statements(const Node& b) {
     for (std::uint32_t k = 0; k < b.count; ++k) statement(list[k]);
 }
 
-void Inference::add_element(const Node& receiver, const TyRef& value) {
+void Inference::add_element(NodeId receiver_id, const TyRef& value) {
+    const auto& receiver = ast_.at(receiver_id);
+    if (session_) {
+        const auto root = session_mutation_root(ast_, receiver_id);
+        if (root == kNoNode) return;
+        auto* var = find(ast_.text(ast_.at(root)));
+        if (!var || (*var)->any) return;
+        const auto slot = static_cast<std::size_t>(var - vars_.data());
+        if (root == receiver_id && const_arrays_.count(slot)) return;  // native const guard cannot mutate
+        const auto next = session_mutation_shape(ast_, receiver_id, *var, value);
+        merge_local(*var, next);
+        propagate_session_alias(slot);
+        return;
+    }
     if (receiver.kind != NodeKind::Ident) return;
     TyRef* var = find(ast_.text(receiver));
     if (!var || (*var)->any) return;
     auto updated = std::make_shared<Ty>(**var);
-    updated->elem = unite((*var)->elem, value);
+    updated->elem = unite(updated->elem, value);
     updated->tuple = false;
     updated->items.clear();
-    // The variable's type loses its positions for good (merge would keep
-    // the old tuple): replace it, monotonically larger.
     TyRef next = unite(TyRef(updated), TyRef(updated));
     if (!same(next, *var)) { *var = next; self_changed_ = true; }
 }
@@ -104,7 +116,7 @@ void Inference::statement(NodeId id) {
                 if (TyRef* var = find(ast_.text(target))) { merge_local(*var, v); record(n.a, *var); }
             } else if (target.kind == NodeKind::Index) {
                 expr(target.b);
-                add_element(ast_.at(target.a), v);
+                add_element(target.a, v);
                 expr(target.a);
             } else if (target.kind == NodeKind::Member) {  // CP12b: a struct field
                 if (TyRef* field = struct_field(receiver_struct(target.a), ast_.text(ast_.at(target.b)))) {
@@ -160,44 +172,7 @@ void Inference::statement(NodeId id) {
             break;
         }
         case NodeKind::While: expr(n.a); block(n.b); break;
-        case NodeKind::For: {
-            const Node& header = ast_.at(n.a);
-            const NodeId iterable = header.a;
-            const TyRef source = expr(iterable);
-            const bool pair = (header.flags & kFlagPairBinding) != 0;
-            const bool array = (source->kinds & kKindArray) != 0;
-            const bool object = (source->kinds & kKindObject) != 0;
-            // The compiler refuses an unknown/union source before executing;
-            // these loops either raise at their header (known non-iterable or
-            // the wrong form) or are compiled as a normal array/object loop.
-            const bool normal = !(source->kinds & kKindUnknown) && !(array && object) &&
-                                ((pair && object) || (!pair && array));
-            TyRef value = kinds_ty(kKindScalar);
-            if (normal) {
-                value = pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
-                if (!value || value->kinds == 0) value = kinds_ty(kKindUnknown);
-                result_.elements[iterable] |= value->kinds;
-            }
-            const NodeId* names = ast_.list(header);
-            scopes_.emplace_back();
-            if (pair && header.count >= 2) {
-                declare(ast_.text(ast_.at(names[0])), names[0], kinds_ty(kKindString));
-                declare(ast_.text(ast_.at(names[1])), names[1], value);
-            } else if (!pair && header.count >= 1) {
-                declare(ast_.text(ast_.at(names[0])), names[0], value);
-            }
-            auto loop = std::make_shared<Ty>();
-            loop->kinds = kKindObject;
-            loop->fields.emplace("index", kinds_ty(kKindInt));
-            loop->fields.emplace("index0", kinds_ty(kKindInt));
-            loop->fields.emplace("first", kinds_ty(kKindBool));
-            loop->fields.emplace("last", kinds_ty(kKindBool));
-            loop->fields.emplace("length", kinds_ty(kKindInt));
-            declare("loop", header.a, loop);
-            if (normal) statements(ast_.at(n.b));
-            scopes_.pop_back();
-            break;
-        }
+        case NodeKind::For: for_statement(n); break;
         case NodeKind::Try:
             block(n.a);
             scopes_.emplace_back();
@@ -224,7 +199,7 @@ void Inference::statement(NodeId id) {
                 TyRef v = empty_ty();
                 for (std::uint32_t k = 0; k < e.count; ++k) v = expr(args[k]);
                 expr(ast_.at(e.a).a);
-                if (e.count == 1) add_element(ast_.at(ast_.at(e.a).a), v);
+                if (e.count == 1) add_element(ast_.at(e.a).a, v);
                 expr(ast_.at(e.a).a);
                 break;
             }

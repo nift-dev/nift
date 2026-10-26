@@ -251,7 +251,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_.declarations.clear();
     namespace_.lambda_templates.clear(); namespace_.capture_seeds.clear();
     namespace_.callable_templates.clear(); namespace_.capture_callable_seeds.clear();
-    namespace_.capture_contracts.clear(); namespace_.template_definitions.clear();
+    namespace_.capture_contracts.clear(); namespace_.template_definitions.clear(); namespace_.const_captures.clear();
     namespace_.source_owner.reset();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2
     if (executions_ == 1) for (const auto& symbol : namespace_.symbols)

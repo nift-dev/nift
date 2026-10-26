@@ -102,9 +102,11 @@ private:
 
     void statements(const Node& b);
 
-    void add_element(const Node& receiver, const TyRef& value);
+    void add_element(NodeId receiver, const TyRef& value);
+    void propagate_session_alias(std::size_t slot);
 
     void statement(NodeId id);
+    void for_statement(const Node&);
 
     void walk_main();
 
@@ -122,6 +124,8 @@ private:
     std::vector<TyRef> returns_;
     std::vector<TyRef> vars_;
     std::unordered_map<std::size_t,NodeId> binding_decls_;
+    std::unordered_set<std::size_t> const_arrays_;
+    std::unordered_map<std::size_t, std::pair<std::size_t, NodeId>> session_for_aliases_;
     std::vector<std::size_t> persist_index_;
     Constants constants_;
     std::vector<Scope> scopes_;

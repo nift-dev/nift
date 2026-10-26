@@ -78,7 +78,9 @@ bool UnitCompiler::for_declare_binding(std::string_view name, const Node& at, bo
     binding.decl_text_double = false;
     // The type register first so the value register is the newest one.
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(binding.reg)) return builder_ok();
-    if (captured) {
+    // Persistent aggregate iteration can retain or mutate its source location.
+    // Use the existing selector-cell path rather than an unmaterialised lazy register.
+    if (captured || (session_ && (decl_kinds & kKindAggregate))) {
         if (!fb_->alloc(binding.cell_reg)) return builder_ok();
         binding.cell = true;
         binding.reg = binding.cell_reg;

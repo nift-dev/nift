@@ -17,6 +17,7 @@ TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(
 void Inference::seed_session() {
     if (session_) for (const auto& symbol : session_->symbols) {
         external_.emplace(symbol.name, vars_.size());
+        if (symbol.const_array) const_arrays_.insert(vars_.size());
         const auto declaration = session_->declarations.find(symbol.name);
         if (declaration != session_->declarations.end()) binding_decls_[vars_.size()] = declaration->second;
         TyRef type = session_type(symbol.structure ? symbol.structure : kinds_ty(symbol.kinds), symbol.callable_shape);

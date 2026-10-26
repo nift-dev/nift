@@ -5,6 +5,16 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('nested-loop-mutation','a:=[[1],[2]]\nfor(v:a){v.push(2.5)}\na.stringify()\nexit\n',3),
+ ('nested-loop-snapshot','a:=[[1],[2]];old:=a\nfor(v:a){v.push(2)}\na.stringify()\nold.stringify()\nexit\n',4),
+
+ ('captured-lexical-shadow','n:="GLOBAL";fn(makec()){n:=10;return ()=>n+1};c:=makec()\nc()\nn\nexit\n',3),
+ ('captured-array-numeric','fn(makec()){a:=[1];return v=>{a.push(v);return a.stringify()}};c:=makec();c(0)\nc(2.5)\nc(3)\nexit\n',3),
+ ('const-captured-kind','fn(makec()){const a:=[1];return v=>a.push(v)};c:=makec()\nprint("ONCE");c("bad")\nexit\n',2),
+ ('lambda-rebind-collection','f:=()=>1\nprint("ONCE");f = v=>v+1;[1,2].map(f).stringify()\nf(3)\nexit\n',3),
+ ('lambda-rebind','f:=()=>1;oldf:=f;readf:=()=>f()\nf = ()=>2\nf()\noldf()\nreadf()\n(f==oldf)\nexit\n',6),
+ ('lambda-rebind-param','f:=v=>v+1;oldf:=f\nf = v=>v*2\nf(3)\noldf(3)\nexit\n',4),
+ ('lambda-rebind-capture','f:=()=>1;fn(setf()){n:=7;f = ()=>n}\nsetf()\nf()\nexit\n',3),
  ('textually-double-binding','x:=1e0;fn(readv()){return x}\n(x=2.5)\nreadv()\nexit\n',3),
  ('numeric-global-contract','x:=1.5;fn(readv()){return x}\n(x=3)\nreadv()\n(x=5.5)\nreadv()\nexit\n',5),
  ('numeric-array-contract','a:=[1,2]\na.push(2.5)\na.stringify()\nexit\n',3),
@@ -21,7 +31,7 @@ cases=[
 ]
 for name,source,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-callable-') as td:
-  root=Path(td);baseline=None;errors=0
+  root=Path(td);baseline=None;errors=1 if name=='const-captured-kind' else 0
   for mode in ['0','1','require']:
    stats=root/'stats';stats.unlink(missing_ok=True)
    env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')
@@ -32,7 +42,12 @@ for name,source,units in cases:
    channels=(r.returncode,r.stdout,r.stderr)
    if baseline is None:
     baseline=channels;assert r.returncode==0 and bool(r.stderr)==bool(errors),record;continue
-   assert channels==baseline, (baseline,record)
+   if name=='nested-loop-snapshot':
+    # D-040 ordinary values copy on write; legacy's outer alias is deliberately different.
+    assert baseline==(0,'[[1,2],[2,2]]\n[[1,2],[2,2]]\n',''),baseline
+    assert channels==(0,'[[1,2],[2,2]]\n[[1],[2]]\n',''),record
+   else:
+    assert channels==baseline, (baseline,record)
    assert len(rows)==units and all(x['outcome'] in ('vm','vm-error') and x['vm_executions']==1 and x['legacy_executions']==0 for x in rows),record
    assert len([x for x in rows if x['outcome']=='vm-error'])==errors,record
 print(f'PASS retained aggregate/captured callable flow: {len(records)} observations, affirmative VM execution')

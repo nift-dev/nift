@@ -50,6 +50,7 @@ struct SessionCompileContext {
     std::unordered_map<const SessionDefinition*, NodeId> callable_templates;
     std::unordered_map<NodeId, std::shared_ptr<const SessionCallableShape>> capture_callable_seeds;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> capture_seeds, capture_contracts;
+    std::unordered_set<NodeId> const_captures;
     std::unordered_map<NodeId, std::shared_ptr<const SessionDefinition>> template_definitions;
     std::shared_ptr<const std::string> source_owner;
     std::uint16_t slots = 0;

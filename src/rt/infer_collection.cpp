@@ -39,10 +39,12 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
     if(element->legacy_text_number)result_.collection_text_numbers.insert(receiver_id);
     else result_.collection_text_numbers.erase(receiver_id);
     if(m<M::Map) {
-        const Node& receiver = ast_.at(ast_.at(n.a).a);
+        const auto receiver = ast_.at(n.a).a;
         if (m == M::Push && !values.empty()) add_element(receiver, values[0]);
         if (m == M::Insert && values.size() > 1) add_element(receiver, values[1]);
         if (m == M::Splice && values.size() > 2) add_element(receiver, element_of(values[2], nullptr, false));
+        if (session_ && m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))
+            add_element(receiver, empty_ty());  // any mutation invalidates positional facts
         if (m == M::Sort && !values.empty()) {
             bool grew = false;
             const auto argument=collection_value(element);

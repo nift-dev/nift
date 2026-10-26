@@ -95,7 +95,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
     pending.source_owner = std::make_shared<const std::string>(text.text);
     pending.lambda_templates.clear(); pending.capture_seeds.clear();
     pending.callable_templates.clear(); pending.capture_callable_seeds.clear();
-    pending.capture_contracts.clear(); pending.template_definitions.clear();
+    pending.capture_contracts.clear(); pending.template_definitions.clear(); pending.const_captures.clear();
     if (parsed_ok) for (std::uint32_t k = 0; k < ast.at(root).count; ++k) {
         const auto& fn = ast.at(ast.list(ast.at(root))[k]);
         if (fn.kind != NodeKind::FnDecl) continue;
@@ -113,6 +113,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
             const auto& declaration = ast.at(ast.list(body)[c]);
             pending.capture_seeds.emplace(declaration.b, imported->second->captures[c].shape);
             pending.capture_contracts.emplace(declaration.a, imported->second->captures[c].shape);
+            if (imported->second->captures[c].const_array) pending.const_captures.insert(declaration.a);
             for (const auto& symbol : current.symbols)
                 for (const auto& target : session_callable_targets(symbol.callable_shape))
                     if (target.definition == imported->second && c < target.captures.size()) {

@@ -3,6 +3,7 @@
 #include "rt/session_shape.h"
 #include "rt/legacy_names.h"
 #include "rt/compiler_session_scope.h"
+#include "rt/compiler_session_contract.h"
 #include <algorithm>
 
 // rt-lint: cold-file incremental compiler namespace publication
@@ -45,15 +46,8 @@ bool UnitCompiler::session_admit() {
         const auto id = ast_.list(ast_.at(root_))[k];
         if (ast_.at(id).kind == NodeKind::Declare) top_level.insert(id);
     }
-    // Other retained readers share these cells and keep their original
-    // inferred bounds, even when this command specializes a new caller.
-    for (const auto& binding : kinds_.bindings) {
-        const auto bound = session_->capture_contracts.find(binding.second);
-        if (bound == session_->capture_contracts.end()) continue;
-        const auto shape = kinds_.session_shapes.find(binding.first);
-        if (shape != kinds_.session_shapes.end() && !session_shape_within(shape->second, bound->second))
-            return fail(ast_.at(binding.first), "session:capture-contract");
-    }
+    const auto contract = session_shape_contract(*session_, kinds_);
+    if (contract.reason) return fail(ast_.at(contract.node), contract.reason);
     // Legacy named functions can see caller-local bindings. Only names read
     // freely by a named function need the D-038 shadow guard; ordinary lexical
     // shadowing that cannot influence such a reader remains admitted.
@@ -114,7 +108,11 @@ bool UnitCompiler::session_admit() {
                 }
                 if (n.kind == NodeKind::Declare && symbol.defined)
                     return fail(n, "session:shadow-or-redeclare");
-                if (symbol.callable && n.kind != NodeKind::Declare) return fail(n, "session:callable-rebind");
+                if (symbol.callable && n.kind != NodeKind::Declare &&
+                    !(symbol.definition && symbol.definition->lambda && ast_.at(n.b).kind == NodeKind::Lambda))
+                    return fail(n, "session:callable-rebind");
+                if (symbol.callable && n.kind == NodeKind::Assign &&
+                    !session_lambda_assignment_spelling(ast_, n)) return fail(n, "session:lambda-assignment-spelling");
                 if (kinds(n.b) & ~symbol.contract) return fail(n, "session:binding-contract");
                 const auto shape = kinds_.session_shapes.find(n.b);
                 if (shape != kinds_.session_shapes.end() &&
@@ -134,7 +132,11 @@ bool UnitCompiler::session_admit() {
         }
         if (receiver != kNoNode && ast_.at(receiver).kind == NodeKind::Ident) {
             for (const auto& symbol : session_->symbols)
-                if (symbol.name == text(ast_.at(receiver)) && symbol.structure) {
+                if (symbol.name == text(ast_.at(receiver)) && symbol.structure && !symbol.const_array) {
+                const auto ref = kinds_.bindings.find(receiver);
+                const auto external = session_->declarations.find(symbol.name);
+                if (ref != kinds_.bindings.end() && external != session_->declarations.end() &&
+                    ref->second != external->second) continue;
                 const auto shape = kinds_.session_shapes.find(value);
                 if (shape != kinds_.session_shapes.end()) {
                     auto added = shape->second;
@@ -232,6 +234,9 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
     if (existing != session_->symbols.end() && !existing->defined &&
         (binding.readonly != existing->readonly || binding.const_array != existing->const_array))
         return fail(ast_.at(root_), "session:reserved-binding-contract");
+    if (existing != session_->symbols.end() && !existing->defined && !existing->struct_name.empty() &&
+        (binding.struct_id < 0 || existing->struct_name != plan_.structs.at(binding.struct_id).name))
+        return fail(ast_.at(root_), "session:binding-struct-contract");
     if (session_->slots > 65532) return fail(ast_.at(root_), "limit:session-bindings");
     Binding global = binding;
     global.global = global.cell = true;

@@ -58,6 +58,11 @@ UnitKinds Inference::run(std::size_t max_walks) {
 }
 
 void Inference::enqueue(std::size_t unit) {
+    if (session_ && unit > plan_.functions.size()) {
+        const auto index = unit - plan_.functions.size() - 1;
+        if (index < lambdas_.size() && lambdas_[index].scopes.empty() &&
+            session_->template_definitions.count(lambdas_[index].node)) return;
+    }
     if (unit >= queued_.size()) queued_.resize(unit + 1, false);
     if (!queued_[unit]) queue_.push_back(unit);
     queued_[unit] = true;
@@ -77,7 +82,9 @@ bool Inference::merge(TyRef& into, const TyRef& value) {
 void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (!merge(into, value)) return;
     self_changed_ = true;  // a global's slot is shared by every unit using it (CP12b):
-    for (std::size_t u = 0; globals_.shared(vars_, &into) && u <= plan_.functions.size(); ++u) enqueue(u);
+    if (session_) {
+        for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
+    } else for (std::size_t u = 0; globals_.shared(vars_, &into) && u <= plan_.functions.size(); ++u) enqueue(u);
 }
 
 void Inference::merge_return(const TyRef& value) {  // the callers read the return
@@ -98,8 +105,11 @@ void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
-    if (session_ && top_level_decls_.count(at)) {
-        const auto type = infer_text_type(ast_.text(ast_.at(ast_.at(at).b)));
+    if (session_ && ((ast_.at(at).kind == NodeKind::Declare && (ast_.at(at).flags & kFlagConst)) ||
+        session_->const_captures.count(binding_decls_[slot]))) const_arrays_.insert(slot);
+    if (session_ && (top_level_decls_.count(at) || (value->kinds & (kKindArray | kKindObject)))) {
+        const auto type = ast_.at(at).kind == NodeKind::Declare ?
+            infer_text_type(ast_.text(ast_.at(ast_.at(at).b))) : TextType{};
         merge_local(vars_[slot], session_global_shape(value,
             type.kind == TextType::Kind::Known && type.known == 3));
     } else merge_local(vars_[slot], value);

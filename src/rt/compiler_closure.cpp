@@ -93,6 +93,10 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
         if (binding->global) continue;
+        // CP12b methods use locations, not a first-class struct receiver.
+        // A captured struct cell has no proved receiver-lifetime lowering;
+        // do not admit it through the new persistent session route.
+        if (session_ && binding->struct_id >= 0) return fail(node, "session:captured-struct");
         // The lexical capture pass is scope-aware: an inner declaration does
         // not hide an outer binding used outside its block, and member keys
         // are not variable references.

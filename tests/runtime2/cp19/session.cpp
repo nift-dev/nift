@@ -3,6 +3,7 @@
 #include "rt/session_callable.h"
 #include "rt/parser.h"
 #include "rt/heap.h"
+#include "rt/string.h"
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
 #include "rt_test.h"
@@ -12,7 +13,7 @@ using namespace nift::rt;
 int main() {
     // Atom storage belongs to the thread (CP23); pre-intern fixture keys so
     // the exact final heap comparison measures owned runtime values.
-    atom("left"); atom("right"); atom("f"); atom("Counter"); atom("Kept"); atom("v");
+    atom("left"); atom("right"); atom("f"); atom("Counter"); atom("Kept"); atom("v"); atom("First"); atom("Second");
     const auto before = live_heap_bytes();
     {
         VmSession session;
@@ -292,6 +293,53 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && session.value("k").is(Kind::Struct));
     }
     {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("f:=()=>1;oldf:=f;reader:=()=>f()", "lambda-original", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto old = session.value("f"), reader = session.value("reader");
+        const auto code = old.heap_as<FunctionObject>()->code;
+        const auto owner = old.heap_as<FunctionObject>()->program_owner;
+        const auto last_id = reader.heap_as<FunctionObject>()->session_identity;
+        r = session.execute("f = ()=>9;print(\"FORBIDDEN\");bytes([65])", "refused-rebind", output);
+        CHECK(!r.admitted && output.empty() && session.value("f").heap() == old.heap());
+        CHECK(old.heap_as<FunctionObject>()->code == code && old.heap_as<FunctionObject>()->program_owner == owner);
+        r = session.execute("f = ()=>2", "new-lambda", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        CHECK(session.value("f").heap() != old.heap() && session.value("oldf").heap() == old.heap());
+        CHECK(session.value("f").heap_as<FunctionObject>()->session_identity == last_id + 1);
+        r = session.evaluate("f()", "new-lambda-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
+        r = session.evaluate("oldf()", "old-lambda-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+        r = session.evaluate("reader()", "cell-reader-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
+        CHECK(session.value("reader").heap() == reader.heap());
+        r = session.execute("f = ()=>3;print(\"ONCE\");throw error(\"stop\")", "runtime-rebind", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && output == "ONCE\n");
+        output.clear();
+        r = session.evaluate("reader()", "reader-after-runtime", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.execute("f = ()=>{throw error(\"new\")}", "new-error-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.evaluate("f()", "new-error-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && r.execution.error_origin);
+        CHECK(r.execution.origin_source == "new-error-definition");
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("struct(First){v:=1};struct(Second){v:=2};throw error(\"stop\");p:=First()", "reserved-instance", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::Error && !session.contains("p"));
+        r = session.execute("print(\"FORBIDDEN\");p:=Second()", "incompatible-instance", output);
+        CHECK(!r.admitted && r.refusal == "session:binding-struct-contract" && output.empty());
+        CHECK(!session.contains("p"));
+        r = session.execute("p:=First()", "compatible-instance", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.evaluate("p.v", "reserved-instance-read", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+    }
+    {
         struct State { VmSession* session = nullptr; SessionResult nested; std::string output, nested_output; } state;
         VmOptions options; options.flush_threshold = 1; options.flush_context = &state;
         options.flush = [](std::string& output, void* context) {
@@ -335,6 +383,25 @@ int main() {
         result = session.execute("print(\"A\");print(\"B\")", "render-success", output, true);
         CHECK(result.admitted && result.execution.reason == StopReason::None && output == "A\nB\n");
         CHECK(result.execution.statement_text == "nullnull");
+    }
+    {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("nested:=[[1],[2]];saved:=nested", "nested-state", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto saved = session.value("saved");
+        r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")}", "nested-refusal", output);
+        CHECK(!r.admitted && r.refusal == "session:binding-shape-contract");
+        CHECK(r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
+        CHECK(session.value("nested").heap() == saved.heap());
+        r = session.execute("for(row:nested){row.push(2.5)}", "nested-numeric", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
+        r = session.evaluate("nested.stringify()", "nested-result", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        CHECK(string_view_of(r.value) == "[[1,2.5],[2,2.5]]");
+        r = session.evaluate("saved.stringify()", "nested-snapshot", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        CHECK(string_view_of(r.value) == "[[1],[2]]");
     }
     CHECK(live_heap_bytes() == before);
     return rt_test::finish("CP19 real eight-unit session");

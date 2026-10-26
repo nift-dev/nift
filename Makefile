@@ -3652,9 +3652,14 @@ $(TEST_DIR)/cp19/session-m6.o: src/rt/compiler_assign_expr.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=6 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m6$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m7.o: src/rt/compiler_session_contract.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=7 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m7$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o $(LDLIBS) -o $@
 -include $(wildcard $(TEST_DIR)/cp19/session-m*.d)
 .PHONY: test-cp19-session-mutants
-test-cp19-session-mutants: $(TEST_DIR)/cp19/session-control$(EXEEXT) $(TEST_DIR)/cp19/session-m1$(EXEEXT) $(TEST_DIR)/cp19/session-m2$(EXEEXT) $(TEST_DIR)/cp19/session-m3$(EXEEXT) $(TEST_DIR)/cp19/session-m4$(EXEEXT) $(TEST_DIR)/cp19/session-m5$(EXEEXT) $(TEST_DIR)/cp19/session-m6$(EXEEXT)
+test-cp19-session-mutants: $(TEST_DIR)/cp19/session-control$(EXEEXT) $(TEST_DIR)/cp19/session-m1$(EXEEXT) $(TEST_DIR)/cp19/session-m2$(EXEEXT) $(TEST_DIR)/cp19/session-m3$(EXEEXT) $(TEST_DIR)/cp19/session-m4$(EXEEXT) $(TEST_DIR)/cp19/session-m5$(EXEEXT) $(TEST_DIR)/cp19/session-m6$(EXEEXT) $(TEST_DIR)/cp19/session-m7$(EXEEXT)
 	$(PYTHON) tests/runtime2/cp19/session_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --out "$(TEST_DIR)/cp19/session-mutants.json"
 .PHONY: test-cp19-session-cli
 test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)

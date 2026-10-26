@@ -37,6 +37,11 @@ original structural bounds; observed values cannot narrow those bounds.
 Plain-data aggregates use the existing identity summary and need no deep scan.
 Immutable sanitized type graphs are shared across commands. Double-binding and aggregate-element numeric bounds are widened before initial
 inference/compilation, not after publication. Int binding bounds remain integral.
+Nested mutation effects, including loop-location aliases and captured arrays,
+are compared with original structural bounds before execution. Session aggregate
+loop bindings use the existing selector-cell path, avoiding an unmaterialised
+lazy register. D-040 copies remain independent of the mutated source. Const
+receiver checks retain their runtime error and preceding effects.
 The runtime int/double binding checks still decide whether an assignment is
 valid; a compiled type error retains any preceding explicit output/effects.
 
@@ -45,6 +50,11 @@ statements are never replayed. Lambda wrappers seed capture bounds and are never
 executed. Referencing a lambda template cannot install the caller's lexical
 scope. Actual template traversal restores its original capture environment.
 Named redefinition preserves the registry Function identity seen by aliases.
+A mutable lambda binding can be rebound to a proven new lambda through its same
+cell. Existing Function aliases retain the old identity; retained readers see
+the cell's new value. Refusal consumes no callable identity and changes no code
+owner; a runtime failure retains an executed rebind. Named/mixed-signature
+rebinding and unproved textual arrow-assignment spellings remain refused.
 Retained readers, including captured functions and object fields, are compiled
 against a replacement before it can be admitted. Replacement takes effect at
 its registration instruction. A mixed-order unit with executable statements
@@ -68,12 +78,14 @@ the same instance cell and preserve independent snapshots.
 Schema publication follows successful whole-unit compilation. Refusal publishes
 no schema; an admitted runtime failure retains schemas whose declarations
 preceded executable statements under the existing CP12b ordering rule. Original
-method source maps survive later construction/invocation. Schema replacement,
+method source maps survive later construction/invocation. Reserved instance slots retain their original schema contract. Schema replacement,
 name conflicts and unproved dynamic field shadowing refuse before effects.
 Parameters/locals in a method with no call cannot expose a caller binding to a
 second reader; ordinary constructor parameter names remain usable. Unrelated
 callback parameters do not acquire a false struct dependency. Existing CP12b
 struct sharing, alias, private-field and prepared-loop limits remain in force.
+Capturing a local struct into a persistent closure is refused before effects;
+the compiler cannot yet prove that field-access path.
 
 Shell routes and presentation
 .niftrc, interactive statements, file/stdin/inline -i continuation and selected
@@ -110,7 +122,7 @@ The compiler's established unsupported syntax, builtins, alias/handle and
 prepared-context refusals remain. CP19 additionally refuses widening an older
 binding/capture contract, unsupported callable rebinding, unproved callable
 flow, mixed-order named replacement, dynamic named-function shadowing and
-persistent struct schemas. These are coverage limitations, not execution
+unproved struct capture/schema replacement. These are coverage limitations, not execution
 passes, compatibility waivers or justification to switch a VM session engine.
 The final traceability/refusal inventory must identify their release impact.
 
