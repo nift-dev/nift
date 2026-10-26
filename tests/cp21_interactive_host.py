@@ -367,12 +367,29 @@ def stop_bg_fg(s, r):
     bg_out = s.output()
     if not r.check("bg-continues-job", "failed to continue job" not in bg_out, bg_out):
         return
-    try:
-        wait_jobs_state(s, 1, "Running")
-        running = True
-    except Timeout:
-        running = False
-    if not r.check("bg-state-running", running, s.output()):
+    observed = None
+    end = time.time() + 4.0
+    while time.time() < end:
+        s.line("jobs")
+        s.prompt()
+        out = s.output()
+        if "[1] Running" in out:
+            observed = "Running"
+            break
+        if "[1] Stopped" in out:
+            observed = "Stopped"
+            break
+        if "[1] Done" in out:
+            observed = "Done"
+            break
+        time.sleep(0.02)
+    r.check("bg-state-observed", observed is not None, out if "out" in locals() else "")
+    if observed is None:
+        return
+    # A missing SIGCONT leaves the exact child stopped. Done/signaled is an
+    # unrelated termination and must not satisfy mutant detection.
+    r.check("bg-state-live", observed in ("Running", "Stopped"), out)
+    if not r.check("bg-state-running", observed == "Running", out):
         return
     s.line("fg 1")
     time.sleep(0.2)
@@ -440,6 +457,34 @@ def fd_no_growth(s, r):
     r.check("foreground-fd-no-growth", after <= before, f"before={before} after={after}")
 
 
+def fg_handoff_failure(s, r):
+    s.line("sh -c 'kill -STOP $$; exec sleep 5' &")
+    s.prompt()
+    r.witness("background-started")
+    wait_jobs_state(s, 1, "Stopped")
+    r.witness("background-stopped")
+    s.line("fg 1 && /bin/echo FG-SUCCESS")
+    s.prompt()
+    out = s.output()
+    r.check("fg-handoff-error", "cannot take terminal" in out, out)
+    r.check("fg-handoff-conditional-not-run", not standalone_line(out, "FG-SUCCESS"), out)
+    s.line("jobs")
+    s.prompt()
+    r.check("fg-handoff-state-stopped", "[1] Stopped" in s.output(), s.output())
+
+
+def restore_failure(s, r):
+    s.line("/bin/true && /bin/sh -c 'printf \"RESTORE-%s\\n\" SUCCESS'")
+    s.prompt()
+    out = s.output()
+    r.check("restore-error-reported", "failed to restore terminal" in out, out)
+    r.check("restore-conditional-not-run", not standalone_line(out, "RESTORE-SUCCESS"), out)
+    s.line("/bin/sh -c 'printf \"RECOVERED-%s\\n\" OK'")
+    s.until_text("RECOVERED-OK")
+    s.prompt()
+    r.check("restore-recovery", "RECOVERED-OK" in s.output(), s.output())
+
+
 def bg_continue_failure(s, r):
     s.line("sh -c 'kill -STOP $$; exec sleep 5' &")
     s.prompt()
@@ -474,6 +519,8 @@ SCENARIOS = {
     "fg_reader_race": fg_reader_race,
     "fd_no_growth": fd_no_growth,
     "bg_continue_failure": bg_continue_failure,
+    "fg_handoff_failure": fg_handoff_failure,
+    "restore_failure": restore_failure,
 }
 
 
@@ -505,6 +552,8 @@ def main():
     parser.add_argument("--mutant", type=int, choices=sorted(MUTANT))
     parser.add_argument("--fault-delay", action="store_true")
     parser.add_argument("--fault-cont", action="store_true")
+    parser.add_argument("--fault-handoff", action="store_true")
+    parser.add_argument("--fault-restore", action="store_true")
     args = parser.parse_args()
     binary = os.path.abspath(args.nift)
     PROBE = os.path.abspath(args.probe)
@@ -535,6 +584,28 @@ def main():
         print("PASS fault-cont failure propagation" if not failed else f"FAIL fault-cont: {failed}")
         return 1 if failed else 0
 
+    if args.fault_handoff:
+        result = run_scenario(binary, "fg_handoff_failure",
+                              {"LD_PRELOAD": os.environ.get("CP21_RESTORE_LIB", ""),
+                               "CP21_FAIL_HANDOFF": "1"})
+        if result.setup_error:
+            report_setup_error("fault-handoff", result)
+            return 1
+        failed = result.failed_checks()
+        print("PASS fault-handoff acquisition failure" if not failed else f"FAIL fault-handoff: {failed}")
+        return 1 if failed else 0
+
+    if args.fault_restore:
+        result = run_scenario(binary, "restore_failure",
+                              {"LD_PRELOAD": os.environ.get("CP21_RESTORE_LIB", ""),
+                               "CP21_FAIL_RESTORE": "1"})
+        if result.setup_error:
+            report_setup_error("fault-restore", result)
+            return 1
+        failed = result.failed_checks()
+        print("PASS fault-restore exit status and recovery" if not failed else f"FAIL fault-restore: {failed}")
+        return 1 if failed else 0
+
     if args.mutant:
         spec = MUTANT[args.mutant]
         result = run_scenario(binary, spec["scenario"])
@@ -553,7 +624,7 @@ def main():
 
     failures = []
     for name in SCENARIOS:
-        if name == "bg_continue_failure":
+        if name in ("bg_continue_failure", "fg_handoff_failure", "restore_failure"):
             continue
         result = run_scenario(binary, name)
         if result.setup_error:

@@ -3329,14 +3329,21 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 CP21_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp21-mutants/$(m)/nift$(EXEEXT))
 CP21_PROBE := $(TEST_DIR)/cp21-foreground-probe$(EXEEXT)
 CP21_FAULT_LIBS :=
+CP21_RECOVERY_LIBS :=
 ifeq ($(shell uname -s),Linux)
-CP21_FAULT_LIBS := $(TEST_DIR)/cp21-delay-tcsetpgrp.so $(TEST_DIR)/cp21-fail-cont.so
+CP21_FAULT_LIBS := $(TEST_DIR)/cp21-delay-tcsetpgrp.so $(TEST_DIR)/cp21-fail-cont.so \
+	$(TEST_DIR)/cp21-restore-fault.so $(TEST_DIR)/cp21-child-death.so
+CP21_RECOVERY_LIBS := $(TEST_DIR)/cp21-restore-fault.so
 endif
 $(CP21_PROBE): tests/cp21_foreground_probe.c
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-delay-tcsetpgrp.so: tests/cp21_delay_tcsetpgrp.c
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-cont.so: tests/cp21_fail_cont.c
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-restore-fault.so: tests/cp21_restore_fault.c
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-child-death.so: tests/cp21_unrelated_child_death.c
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
@@ -3346,33 +3353,52 @@ $(TEST_DIR)/cp21-mutants/%/nift$(EXEEXT): $(filter-out src/shell/Spawn.o,$(CLI_O
 CP21_TERMINAL_LEASE := $(TEST_DIR)/cp21-terminal-lease$(EXEEXT)
 $(CP21_TERMINAL_LEASE): tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES) -o "$@"
-.PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease test-cp21-prompt-latency
+CP21_TERMINAL_RECOVERY := $(TEST_DIR)/cp21-terminal-recovery$(EXEEXT)
+$(CP21_TERMINAL_RECOVERY): tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES) -o "$@"
+.PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease \
+	test-cp21-terminal-recovery test-cp21-prompt-latency test-cp21-make-failure-control
 test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
 	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)"
 	@if [ "$(shell uname -s)" = "Linux" ]; then \
-	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" $(MAKE) --no-print-directory $(CP21_FAULT_LIBS) >/dev/null; \
+	  set -e; \
+	  $(MAKE) --no-print-directory $(CP21_FAULT_LIBS) >/dev/null; \
 	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-delay "$(CURDIR)/$(TARGET)"; \
 	  CP21_FAIL_CONT_LIB="$(CURDIR)/$(TEST_DIR)/cp21-fail-cont.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-cont "$(CURDIR)/$(TARGET)"; \
+	  CP21_RESTORE_LIB="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-handoff "$(CURDIR)/$(TARGET)"; \
+	  CP21_RESTORE_LIB="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-restore "$(CURDIR)/$(TARGET)"; \
 	fi
 	$(MAKE) --no-print-directory test-cp21-terminal-lease
+	@if [ "$(shell uname -s)" = "Linux" ]; then $(MAKE) --no-print-directory test-cp21-terminal-recovery; fi
 test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS) $(CP21_PROBE)
-	@for m in 1 2 3 4 5; do \
+	@set -e; \
+	for m in 1 2 3 4 5; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT)"; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1; rc=$$?; \
-	  if [ $$rc -ne 0 ]; then echo "FAIL CP21 mutant $$m: not detected"; cat ".build/cp21-mutants/$$m.log"; exit 1; fi; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" /bin/false --mutant $$m > ".build/cp21-mutants/$$m-dead.log" 2>&1; \
-	  if [ $$? -eq 0 ]; then echo "FAIL CP21 mutant $$m: dead binary accepted"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; fi; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant $$m > ".build/cp21-mutants/$$m-normal.log" 2>&1; \
-	  if [ $$? -eq 0 ]; then echo "FAIL CP21 mutant $$m: normal build accepted"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; fi; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1 || { echo "FAIL CP21 mutant $$m: not detected"; cat ".build/cp21-mutants/$$m.log"; exit 1; }; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" /bin/false --mutant $$m > ".build/cp21-mutants/$$m-dead.log" 2>&1 && { echo "FAIL CP21 mutant $$m: dead binary accepted"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; }; \
+	  grep -q "no behavioural evidence" ".build/cp21-mutants/$$m-dead.log" || { echo "FAIL CP21 mutant $$m: dead control failed for the wrong reason"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; }; \
+	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant $$m > ".build/cp21-mutants/$$m-normal.log" 2>&1 && { echo "FAIL CP21 mutant $$m: normal build accepted"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; }; \
+	  grep -q "expected only" ".build/cp21-mutants/$$m-normal.log" || { echo "FAIL CP21 mutant $$m: normal control failed for the wrong reason"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; }; \
 	  echo "PASS CP21 mutant $$m: rejected with dead/normal controls"; \
-	done
-	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TEST_DIR)/cp21-mutants/6/nift$(EXEEXT)" --mutant 2 > ".build/cp21-mutants/unrelated.log" 2>&1; \
-	if [ $$? -eq 0 ]; then echo "FAIL CP21 unrelated-failure control accepted"; cat ".build/cp21-mutants/unrelated.log"; exit 1; fi; \
+	done; \
+	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TEST_DIR)/cp21-mutants/6/nift$(EXEEXT)" --mutant 2 > ".build/cp21-mutants/unrelated.log" 2>&1 && { echo "FAIL CP21 unrelated-failure control accepted"; cat ".build/cp21-mutants/unrelated.log"; exit 1; }; \
+	grep -q "expected only" ".build/cp21-mutants/unrelated.log" || { echo "FAIL CP21 unrelated-failure control failed for the wrong reason"; cat ".build/cp21-mutants/unrelated.log"; exit 1; }; \
 	echo "PASS CP21 unrelated-failure control: rejected"
+	@if [ "$(shell uname -s)" = "Linux" ]; then \
+	  set -e; \
+	  $(MAKE) --no-print-directory $(TEST_DIR)/cp21-child-death.so >/dev/null; \
+	  LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-child-death.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant 2 > ".build/cp21-mutants/unrelated-child-death.log" 2>&1 && { echo "FAIL CP21 unrelated-child-death control accepted"; cat ".build/cp21-mutants/unrelated-child-death.log"; exit 1; }; \
+	  grep -q "expected only bg-state-running" ".build/cp21-mutants/unrelated-child-death.log" || { echo "FAIL CP21 unrelated-child-death control failed for the wrong reason"; cat ".build/cp21-mutants/unrelated-child-death.log"; exit 1; }; \
+	  echo "PASS CP21 unrelated-child-death control: rejected"; \
+	fi
 test-cp21-terminal-lease: $(CP21_TERMINAL_LEASE)
 	"$(CP21_TERMINAL_LEASE)"
+test-cp21-terminal-recovery: $(CP21_TERMINAL_RECOVERY) $(CP21_RECOVERY_LIBS)
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_TERMINAL_RECOVERY)"
 test-cp21-prompt-latency: $(TARGET)
 	python3 tests/cp21_prompt_latency.py "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp21-prompt-latency.json"
+test-cp21-make-failure-control: $(TARGET) $(CP21_PROBE)
+	bash tests/cp21_make_failure_control.sh "$(CURDIR)"
 
 .PHONY: test-cp20-fd-leak
 test-cp20-fd-leak: $(TARGET)

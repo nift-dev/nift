@@ -1,5 +1,7 @@
 # CP21 slice 1 (R1) — interactive Host job control
 
+**Superseded by `cp21-interactive-host.md` (full checkpoint candidate).**
+
 **Status:** R1 corrected implementation candidate; **not integrated**, not
 pushed, no CI dispatched. The frozen S1 candidate remains
 `0bd13b2b` / tree `3bff9c23`; R1 is on branch `cp21-interactive-host-r1`.
