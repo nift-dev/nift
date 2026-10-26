@@ -247,6 +247,34 @@ built-in is refused (`coro-handle`, conservative; in the base the VM has no
 such built-in, so the rule is a tripwire). Reconciliation steps are listed in
 the handover (§11) for the integrated CP17 tip.
 
+### 6.1 Reconciliation steps with the integrated CP17 tip
+
+Read from `integ-cp17-bd` `eeb3bead` (not a base):
+
+1. `opcodes.h`: CP17 appends `StmtMark` after `ArrayMutate`; the CP22
+   opcodes are re-appended after `StmtMark` (no reordering).
+2. `Vm::Vm`: `open_handle_runtime()` before `coro_init()`. `Vm::run`'s
+   `done:`: `coro_teardown(result)` **before** `close_handle_runtime(result)`,
+   so handle boxes held by abandoned tasks are released before the script
+   context closes. `Vm::run` must stay within rt-lint's 150 lines (both
+   branches compact lines).
+3. Abandoned frames: CP17 adds `Handler::creation_mark` and a handle-release
+   step in `Vm::unwind`'s frame-pop loop. `Vm::Coro::release` drops a task's
+   whole frame stack (end of body, failure, teardown); it must run the same
+   release step for every frame and handler it drops (a task that ends by an
+   uncaught failure is the abandoned-frame case), and `end_body` must not
+   free storage before that step.
+4. W13 (`check_handle_flow`) and the coroutine flow check run in sequence
+   in `compile_unit`; the flow check must additionally refuse a value whose
+   kinds include `kKindHandle` as a spawn argument, in a task's result, and in
+   a global slot of an async proto's snapshot (`coro-handle`), until per-task
+   handle contexts and result transfer exist (§6).
+5. Per-task handle contexts: spawn opens a child context of the spawner's
+   (`open_context`), `end_body` closes it after the children complete, and a
+   handle returned by a task is `transfer`red to the awaiting context.
+6. `HandleBoxObject` values are heap values: the snapshot copy and argument
+   moves need no change (refcounts are per isolate, one isolate here).
+
 ## 7. Requirements → tests
 
 | Requirement | Test (all new under `tests/runtime2/cp22/` unless noted) |
@@ -278,25 +306,39 @@ two CPU-bound tasks); cancellation/teardown latency (100k pending tasks);
 idle CPU while all tasks sleep (process CPU time during a 1 s sleep ≈ 0);
 resource growth (`heap_peak`, RSS, fds before/after drain).
 
-## 9. Scope reconciliation (for the architect; not blocking)
+## 9. Scope reconciliation (architect answers, 2026-10-27)
 
-* **"Work-stealing".** Work stealing across OS threads would run one isolate's
-  coroutines on several threads, which D-001 #7 rules out (non-atomic
-  refcounts, isolate-owned heaps). CP22 therefore delivers a per-isolate
+* **"Work-stealing" (proposed roadmap amendment for the owner; the roadmap
+  text is not edited here).** Work stealing across OS threads would run one
+  isolate's coroutines on several threads, which D-001 #7 rules out
+  (non-atomic refcounts, isolate-owned heaps). CP22 delivers a per-isolate
   scheduler; stealing between isolates belongs with CP23's capture-only
-  isolates. Recommendation: amend the roadmap title, keep CP22's gates
-  (neither gate needs parallelism).
-* **CPU parallelism vs legacy.** Legacy async tasks run in parallel on a
-  thread pool; VM tasks of one isolate interleave on one thread. CPU-bound
-  async programs can be slower on the VM until CP23 isolates; sleeping and
-  waiting programs are far faster. Recorded as a known performance difference
-  of the opt-in VM, not a semantic change.
-* **`Kind::Future`** takes the last free 4-bit value tag. Alternative after
-  CP17 lands: futures as CP17 boxed handles (`HandleKind::Future`, the box's
-  `release` hook pointing at the scheduler). All future operations are in the
-  new files, so the switch is local. Recommendation: keep `Kind::Future`
-  (futures are VM values, not Host resources; D-001 #5 lists them apart from
-  handles) unless the tag is needed for something else.
+  isolates. The CP22 gates are unchanged. Architect: agreed.
+* **CPU parallelism vs legacy: open owner decision.** Legacy async tasks run
+  in parallel on a thread pool; VM tasks of one isolate interleave on one
+  thread, so a CPU-bound async program can be slower on the (opt-in) VM. This
+  is a potential regression only the owner can accept. Measured on the same
+  binary, legacy vs VM (`benchmarks/runtime2/cp22_coro.py --cpu-n`, four
+  tasks of a tight arithmetic loop, exploratory 2-vCPU numbers in the
+  handover). Options: (a) accept until CP23 isolates (CP23 runs tasks whose
+  captures are copyable in parallel isolates); (b) refuse CPU-heavy async
+  units on the VM (no static criterion exists; not recommended); (c) bring
+  isolate-parallel tasks forward into CP22 (CP23 scope). Recommendation: (a).
+* **`Kind::Future`** takes the last free 4-bit value tag (owner-visible: after
+  this no value tag remains; a further kind must reuse a tag with a subkind).
+  Alternative after CP17 lands: futures as CP17 boxed handles
+  (`HandleKind::Future`, the box's `release` hook pointing at the scheduler);
+  all future operations are in the new files, so the switch stays local.
+  Architect: acceptable as recommended. `kKindFuture = 1u << 14` does not
+  collide with CP17's handle bits 11-13 (checked against `integ-cp17-bd`
+  `eeb3bead`).
+* **Gates, pre-registered by the architect.** Linear spawn scaling passes
+  when the per-spawn cost at 100,000 spawns is at most 1.25x the per-spawn
+  cost at 1,000 spawns; cost = callgrind instructions of spawn plus completion
+  of a trivial task, the fixed startup removed with a 0-spawn baseline run;
+  wall clock and peak RSS at 1k/10k/100k reported as exploratory. "10k sleeps
+  of 10 ms in < 0.2 s" is a wall-clock gate only the reference platform can
+  pass; local numbers are exploratory, never passes.
 
 ## 10. Commit strategy
 
@@ -313,6 +355,37 @@ resource growth (`heap_peak`, RSS, fds before/after drain).
    `test-rt-vm-sanitize`, certification guard and plan.
 7. Benchmarks + exploratory evidence; this record's Evidence section.
 
-## Evidence
+## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 
-(Filled in as the implementation lands.)
+Raw logs: the handover's evidence directory. Same-model work; not an
+independent review.
+
+* `make test-runtime2-cp22` (goto and portable switch builds): legacy oracle
+  67/67, VM differential 48/48 (3 under the D-009#5-future policy with `.r2`
+  goldens), refusals 19/19 before execution, VM-determinism 6/6, per-task
+  Host-op traces 3/3, adversarial 80 generated programs x 2 builds (0
+  differences, 1,740 tasks), negative controls (dead binary, unrelated
+  failure, timeout, unmutated "mutant") rejected.
+* `make test-runtime2-cp22-mutants`: 10/10 mutants detected by their named
+  witnesses.
+* `tests/rt/coro_unit.cpp`: 76/76 (also under ASan+UBSan+LSan);
+  `coro_wake_unit.cpp` 124/124 under TSan (posts from threads and the CP16
+  host loop).
+* `make -k test-rt-vm` (whole VM regression including CP13B, CP14B, CP16 N1,
+  closures, `for`, corpus, generators, guard controls): exit 0.
+* rt-lint, test-integrity, header-name collisions, certification guard and
+  its self-test: pass.
+
+Exploratory performance (`benchmarks/runtime2/cp22_coro.py`; not the
+reference platform, so none of these is a gate result):
+
+| Workload | Result |
+| --- | --- |
+| 10k tasks x `sleep(10)` | 0.024-0.027 s wall (in-process unit: 0.022 s); legacy 1k sleeps: 5.18 s |
+| spawn+await, callgrind instructions per spawn | 1k: 5,208; 10k: 5,076; 100k: 4,927; ratio 100k/1k = 0.95 (criterion <= 1.25) |
+| spawn wall / peak RSS | 1k 3.3 ms / 14.5 MiB; 10k 8.9 ms / 14.5 MiB; 100k 70 ms / 29.8 MiB |
+| yield (two interleaved CPU tasks vs sequential) | +4.9 % wall, 1,954 preemptions per 4M iterations |
+| wake-up latency (100 x `sleep(10)`) | 0.27 ms mean beyond the deadline |
+| idle (10 tasks sleeping 1 s) | 3 ms CPU over 1.0 s |
+| teardown at a 64 MiB memory budget | 78,187 suspended tasks abandoned, run stopped in 0.13 s |
+| CPU-bound async (4 tasks, 700k iterations) | legacy 1.25 s wall / 2.34 s CPU (thread pool); VM 0.27 s wall / 0.27 s CPU (one thread) |
