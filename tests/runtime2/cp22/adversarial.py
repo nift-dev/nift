@@ -68,6 +68,10 @@ class Gen:
                 terms.append(f"(await {n})")
         if r.random() < 0.3:
             body.append(f"extra := leaf{r.randrange(leaves)}(x, x)")  # never awaited: drained at the end
+        if r.random() < 0.35:  # a thread inside the task (CP22 thread()), joined, or left to drain
+            body.append(f"th{k} := thread(syncw, x, {r.randint(0, 9)})")
+            if r.random() < 0.8:
+                terms.append(f"th{k}.join()")
         body.append("return " + " + ".join(terms) + " + g0")
         return f"fn[async](mid{k}(x)) {{ " + "; ".join(body) + " }"
 
@@ -76,7 +80,9 @@ class Gen:
         leaves = r.randint(1, 4)
         mids = r.randint(1, 3)
         out = [f"g0 := {r.randint(0, 50)}", f"g1 := {r.randint(0, 50)}",
-               "fn(helper(p)) { return await p }"]
+               "fn(helper(p)) { return await p }",
+               f"fn(syncw(a, b)) {{ i := 0; while(i < {r.randint(0, 3000)}) {{ i += 1 }}; "
+               f"if (a % {r.randint(3, 9)} == 1) {{ throw error(\"sync \" + a, \"user.sync\") }}; return a * 3 + b + g1 }}"]
         out += [self.leaf(k) for k in range(leaves)]
         out += [self.mid(k, leaves) for k in range(mids)]
         if r.random() < 0.5:
@@ -100,6 +106,12 @@ class Gen:
             out.append(f"while(j < {n}) {{ k := {n} - 1 - j; try {{ s += await hs[k] }} catch(e) {{ print(e.code); s += 2 }}; j += 1 }}")
         if r.random() < 0.4:
             out.append("try { s += await hs[0] } catch(e) { s += 3 }")  # awaited twice
+        if r.random() < 0.4:  # threads from main, joined in reverse, one joined twice
+            m = r.randint(1, 5)
+            out.append("ts := []")
+            out.append(f"q := 0; while(q < {m}) {{ ts.push(thread(syncw, q + g0, q)); q += 1 }}")
+            out.append(f"q = {m} - 1; while(q >= 0) {{ try {{ s += ts[q].join() }} catch(e) {{ print(e.code) }}; q -= 1 }}")
+            out.append("try { s += ts[0].join() } catch(e) { s += 4 }")
         out.append("print(s)")
         out.append("print(g0)")
         if r.random() < 0.3:

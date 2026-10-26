@@ -126,7 +126,8 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
         const Node& n = ast.at(id);
         plan.coroutines = (n.kind == NodeKind::Lambda && (n.flags & kFlagAsync)) ||
                           (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
-                           ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"));
+                           ast.text(ast.at(n.a)) == "thread" &&  // rt-lint: allow-string-compare compile time
+                           !plan.index.count("thread"));
     }
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
