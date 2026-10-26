@@ -155,6 +155,7 @@ std::int64_t binding_tag(const Value& value) {
         case Kind::Double: case Kind::Decimal: return number_is_integer(value) ? 2 : 3;
         case Kind::String: return 4;
         case Kind::Function: return 4;  // legacy callables are tagged strings
+        case Kind::Future: return 4;    // so are legacy futures (CP22, probe s6)
         case Kind::Array: return 5;
         case Kind::Object: return 6;
         case Kind::Bytes: return 7;

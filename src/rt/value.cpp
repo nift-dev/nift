@@ -1,5 +1,6 @@
 #include "rt/value.h"
 
+#include "rt/future.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
 
@@ -23,6 +24,7 @@ const char* kind_name(Kind kind) {
         case Kind::Handle: return "handle";
         case Kind::Error: return "error";
         case Kind::Cell: return "cell";  // internal only
+        case Kind::Future: return "future";
     }
     return "unknown";
 }
@@ -50,13 +52,14 @@ void delete_object(HeapObject* object) noexcept {
             return;
         }
         case Kind::Cell: delete static_cast<CellObject*>(object); return;
+        case Kind::Future: delete static_cast<FutureObject*>(object); return;
         default: return;  // immediate kinds never reach the heap
     }
 }
 
 bool has_children(Kind kind) noexcept {
     return kind == Kind::Array || kind == Kind::Object || kind == Kind::Function || kind == Kind::Struct ||
-           kind == Kind::Error || kind == Kind::Cell;
+           kind == Kind::Error || kind == Kind::Cell || kind == Kind::Future;
 }
 
 std::size_t child_count(const HeapObject* o) noexcept {
@@ -67,6 +70,7 @@ std::size_t child_count(const HeapObject* o) noexcept {
         case Kind::Struct: return static_cast<const StructObject*>(o)->fields.size();
         case Kind::Error: return 1;
         case Kind::Cell: return 1;
+        case Kind::Future: return 2;  // result, error
         default: return 0;
     }
 }
@@ -78,6 +82,8 @@ Value& child_at(HeapObject* o, std::size_t i) noexcept {
         case Kind::Function: return static_cast<FunctionObject*>(o)->upvalues[i];
         case Kind::Struct: return static_cast<StructObject*>(o)->fields[i].second;
         case Kind::Cell: return static_cast<CellObject*>(o)->value;
+        case Kind::Future:
+            return i == 0 ? static_cast<FutureObject*>(o)->result : static_cast<FutureObject*>(o)->error;
         default: return static_cast<ErrorObject*>(o)->cause;
     }
 }
@@ -186,6 +192,12 @@ struct Worklist {
                 break;
             case Kind::Error: take(static_cast<ErrorObject*>(o)->cause); break;
             case Kind::Cell: take(static_cast<CellObject*>(o)->value); break;
+            case Kind::Future: {
+                auto* f = static_cast<FutureObject*>(o);
+                if (f->result.is_heap()) take(f->result);
+                if (f->error.is_heap()) take(f->error);
+                break;
+            }
             default: break;
         }
         delete_object(o);
