@@ -2580,6 +2580,7 @@ ifneq ($(OS),Windows_NT)
 test-v45-job-control: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_jobs_background.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_job_control.sh
+	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/cp21_interactive_host.py "$(CURDIR)/$(TARGET)"; else echo "  (skipped: python3 unavailable)"; fi
 else
 test-v45-job-control:
 	@echo "test-v45-job-control: skipped (POSIX job control unavailable)"
@@ -3325,6 +3326,24 @@ test-cp20-shell-spawn-mutants: $(TARGET) $(CP20_MUTANT_NIFTS)
 	  fi; \
 	  echo "PASS CP20 mutant $$m: rejected"; \
 	done
+# --- CP21 interactive Host jobs: contract and compiling negative controls ----
+CP21_MUTANT_NIFTS := $(foreach m,1 2 3 4 5,$(TEST_DIR)/cp21-mutants/$(m)/nift$(EXEEXT))
+$(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
+$(TEST_DIR)/cp21-mutants/%/nift$(EXEEXT): $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/%/Spawn.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
+.PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants
+test-cp21-interactive-host: $(TARGET)
+	python3 tests/cp21_interactive_host.py "$(CURDIR)/$(TARGET)"
+test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS)
+	@for m in 1 2 3 4 5; do \
+	  bin="$(CURDIR)/$(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT)"; \
+	  python3 tests/cp21_interactive_host.py "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1; rc=$$?; \
+	  if [ $$rc -ne 0 ]; then echo "FAIL CP21 mutant $$m: not detected"; tail -20 ".build/cp21-mutants/$$m.log"; exit 1; fi; \
+	  echo "PASS CP21 mutant $$m: rejected"; \
+	done
+
 .PHONY: test-cp20-fd-leak
 test-cp20-fd-leak: $(TARGET)
 	$(PYTHON) tests/cp20_fd_leak.py "$(CURDIR)/$(TARGET)" 20
