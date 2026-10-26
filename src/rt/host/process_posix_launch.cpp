@@ -5,6 +5,7 @@
 
 #include "rt/host/process_posix_lifecycle.h"
 #include "rt/host/process_posix_loop.h"
+#include "rt/host/process_terminal.h"
 #include "rt/host/process_runtime.h"
 
 #include "ProcessEnvironment.h"  // nift_environment_mutex: consistent environ snapshots
@@ -247,10 +248,10 @@ void prepare_stages(Launch& l) {
     l.parent_pid = ::getpid();
     runtime::index_add(l.key, runtime::IndexedGroup{-1, {}, l.detached});
     if (l.want_handoff) {
-        struct sigaction ign {};
-        ign.sa_handler = SIG_IGN;
-        sigemptyset(&ign.sa_mask);
-        ::sigaction(SIGTTOU, &ign, &s.old_ttou);
+        if (!terminal_acquire(&s)) {
+            l.fail("cannot take terminal ownership");
+            return;
+        }
         s.handoff = true;
     }
 }

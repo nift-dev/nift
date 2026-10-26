@@ -40,6 +40,7 @@ src/rt/host/process_posix_sys.cpp
 src/rt/host/process_reaper.cpp
 src/rt/host/process_runtime.cpp
 src/rt/host/process_signals.cpp
+src/rt/host/process_terminal.cpp
 src/rt/host/process_win.cpp
 src/rt/host/run_options.cpp
 src/rt/host/run_request.cpp

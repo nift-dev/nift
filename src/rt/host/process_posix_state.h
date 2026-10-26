@@ -63,7 +63,6 @@ struct ProcessGroup::State {
     bool launch_failed = false;
     std::string parent_error;
     bool handoff = false;
-    struct sigaction old_ttou {};
     bool pidfds_ok = true;
     // Cleanup of leftover group members after the stages are reaped (C1).
     bool cleanup_requested = false;

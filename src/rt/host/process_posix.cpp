@@ -54,6 +54,7 @@ ProcessGroup::~ProcessGroup() {
             finish(s, this);
         }
     }
+    if (s.handoff) restore_terminal(s);  // never leave a dead group holding the lease
     close_fd(s.out_fd);
     close_fd(s.err_fd);
     close_fd(s.in_fd);

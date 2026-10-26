@@ -9,6 +9,7 @@
 #include "rt/host/process_posix_lifecycle.h"
 #include "rt/host/process_posix_loop.h"
 #include "rt/host/process_posix_state.h"
+#include "rt/host/process_terminal.h"
 
 #include <csignal>
 #include <sys/wait.h>
@@ -78,33 +79,20 @@ bool ProcessGroup::give_terminal() {
     State& s = *s_;
     OpLock op(s);
     if (s.detached || s.finished || s.pgid <= 0 || !::isatty(STDIN_FILENO)) return false;
-    const bool already_handed = s.handoff;
-    if (!already_handed) {
-        struct sigaction ign {};
-        ign.sa_handler = SIG_IGN;
-        sigemptyset(&ign.sa_mask);
-        // Keep SIGTTOU ignored until restore_terminal(): the shell is in the
-        // background while the job runs, so tcsetpgrp() back to the shell
-        // must not stop it.
-        ::sigaction(SIGTTOU, &ign, &s.old_ttou);
-        s.handoff = true;
-    }
+    if (!terminal_acquire(&s)) return false;
     if (::tcsetpgrp(STDIN_FILENO, static_cast<pid_t>(s.pgid)) != 0) {
-        if (!already_handed) {
-            ::sigaction(SIGTTOU, &s.old_ttou, nullptr);
-            s.handoff = false;
-        }
+        s.handoff = false;
+        terminal_release(&s);
         return false;
     }
+    s.handoff = true;
     return true;
 }
 
 bool ProcessGroup::reclaim_terminal() {
     State& s = *s_;
     OpLock op(s);
-    if (!s.handoff) return false;
-    restore_terminal(s);
-    return true;
+    return restore_terminal(s);
 }
 
 } // namespace nift::rt::host

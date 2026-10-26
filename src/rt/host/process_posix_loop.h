@@ -22,7 +22,7 @@ void drain(State& s, int& fd, Buffer& b, bool is_out);
 void write_stdin(State& s);
 void check_file_limits(State& s);
 bool read_file_bounded(int fd, std::uint64_t limit, std::string& out);
-void restore_terminal(State& s);
+bool restore_terminal(State& s);
 void finish(State& s, const void* key);
 // One pass of state transitions (no blocking). Returns finished.
 bool step(State& s, const void* key);
