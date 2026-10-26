@@ -51,6 +51,7 @@ struct Proto {
     const Proto* collection_entry = nullptr;  // owned by Program::protos
     bool collection_expression_view = false;
     std::string name;
+    bool is_async = false;  // CP22: calling it spawns a task (fn[async], async lambdas)
     std::uint16_t nparams = 0;
     std::uint16_t nregs = 0;
     std::vector<Instr> code;
@@ -63,6 +64,7 @@ struct Proto {
 
 struct Program {
     bool has_collection_boundaries = false;
+    bool has_coroutines = false;  // CP22: some proto is async (the VM creates its scheduler)
     std::vector<std::unique_ptr<Proto>> protos;  // protos[0] is the top-level program
     const Proto& main() const { return *protos.front(); }
 };

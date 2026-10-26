@@ -56,6 +56,7 @@ Vm::Vm(const Program& program, VmOptions options)
     frames_.reserve(64);
     if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
     update_heap_limit();
+    if (program.has_coroutines) coro_init();  // CP22 (vm_coro.cpp)
 }
 
 void Vm::update_heap_limit() {
@@ -170,6 +171,9 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
         store;                                                                                       \
     }
 #define SET_RESULT { R[pc->a] = Value::boolean(res); NEXT(); }
+// CP22: a coroutine step faults (0), continues, maybe in another task (1), or ends the run (2).
+#define CORO_STEP(call) { const int step = (call); if (step == 0) FAIL(); if (step == 2) goto done; DISPATCH(); }
+#define CORO_END CORO_STEP(coro_ ? coro_main_end(R, K, proto, base, pc, output, result, fault) : 2)
 #define JUMP_UNLESS { pc += res ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 4
 #define RESTORE_CLOSURE(f) ((void)(f))  /* M4: leave the callee closure installed */
@@ -316,8 +320,8 @@ VmResult Vm::run(std::string& output) {
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
         if (!op_top_return(*pc, R, result, fault) || !pop_handlers_for_frame(0, fault)) FAIL();
-        goto done; }
-    OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
+        CORO_END }
+    OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); CORO_END }
     OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
@@ -333,9 +337,9 @@ VmResult Vm::run(std::string& output) {
         NOTE_LARGE NEXT();
     }
     OP(GetGlobal) OP(GetGlobalChecked) OP(SetGlobal) OP(MarkGlobal) OP(CheckGlobal) {
-        if (!op_meta_global(*pc, R, fault, proto)) FAIL();
-        NEXT();
-    }
+        if (op_meta_global(*pc, R, fault, proto)) NEXT(); FAIL(); }
+    OP(Spawn) OP(CallValueAny) OP(Await) OP(FutureOp) OP(Sleep) OP(Yield) OP(TaskEnd)
+        CORO_STEP(op_coro(*pc, R, K, proto, base, pc, output, result, fault))
 #if !NIFT_RT_COMPUTED_GOTO
     default: raise(fault, StopReason::Internal, "bad opcode"); FAIL();
     }
@@ -347,7 +351,7 @@ bail:
     }
 #endif
 done:
-    close_handle_runtime(result); result_stats(result); return result;
+    if (coro_) { coro_teardown(result); } close_handle_runtime(result); result_stats(result); return result;
 }
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     if (in.b >= global_ready_.size() || !global_ready_[in.b]) {

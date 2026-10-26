@@ -39,6 +39,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,11 @@ struct VmOptions {
     // CP13B: origins for Error values. Null is allowed for runs that cannot
     // raise an Error; an origin requested without a map is an internal stop.
     const SourceMap* source_map = nullptr;
+    // CP22: a top-level `return` value is appended to the output where it
+    // happens (legacy prints it before tasks still running then finish) rather
+    // than returned in VmResult::return_text. The CLI sets it; embedders keep
+    // the value separate.
+    bool return_in_output = false;
 };
 
 struct VmResult {
@@ -100,6 +106,10 @@ struct VmResult {
     bool error_origin = false;
     std::string origin_source;
     std::uint32_t origin_line = 0, origin_column = 0;
+    // CP22 coroutine statistics (`coro` false for programs without async code).
+    bool coro = false;
+    std::uint64_t coro_spawned = 0, coro_switches = 0, coro_preemptions = 0, coro_wakeups = 0;
+    std::size_t coro_live_peak = 0;
 };
 
 // The stop's reason, message, code and catchability.
@@ -114,6 +124,10 @@ class Vm {
 public:
     Vm(const Program& program, VmOptions options = VmOptions());
     VmResult run(std::string& output);
+
+    // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
+    struct Coro;
+    struct CoroDelete { void operator()(Coro* coro) const noexcept; };
 
 private:
     struct Frame {
@@ -214,6 +228,23 @@ private:
 #endif
     bool memory_exceeded(Fault& fault);
     void update_heap_limit();
+
+    // CP22 (vm_coro*.cpp). op_coro runs the coroutine opcodes and may switch
+    // tasks (it reloads R/K/proto/base/pc): 0 = fault, 1 = dispatch, 2 = the run
+    // ended. coro_uncaught completes a task's future with an uncaught stop (or
+    // starts the drain after main's) and switches; coro_main_end does the same
+    // for main's normal end; coro_teardown abandons what is left (exactly once).
+    void coro_init();
+    int op_coro(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                const Instr*& pc, std::string& output, VmResult& result, Fault& fault);
+    bool coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
+                       std::size_t& base, const Instr*& pc);
+    int coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc,
+                      std::string& output, VmResult& result, Fault& fault);
+    void coro_teardown(VmResult& result);
+    int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                        const Instr*& pc, Fault& fault);
+    std::unique_ptr<Coro, CoroDelete> coro_;
 
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
                                       const Proto*, std::size_t base, const Instr* pc);

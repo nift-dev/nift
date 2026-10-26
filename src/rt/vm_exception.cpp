@@ -61,6 +61,8 @@ bool Vm::handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K,
             return true;
         }
     }
+    // CP22: an uncaught stop of a task completes its future; main's starts the drain.
+    if (coro_) return coro_uncaught(fault, result, R, K, proto, base, pc);
     error_result(result, fault, proto, pc);
     return false;
 }

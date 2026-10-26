@@ -108,7 +108,14 @@ namespace nift::rt {
     X(CollectionSort) /* resumable callback sorter */ \
     X(CollectionStep) /* private CP14B state-window operation */ \
     X(CollectionCall) /* checked ordinary-frame collection callback */ \
-    X(ArrayMutate) /* synchronous bare-binding mutation */
+    X(ArrayMutate) /* synchronous bare-binding mutation */ \
+    X(Spawn)      /* R[a] = future of protos[b](R[a] .. ); c: argc, bit 15: + argc type regs (CP22) */ \
+    X(CallValueAny) /* CallValue that spawns when the callee is async (coroutine units, CP22) */ \
+    X(Await)      /* R[a] = await R[b] (suspends while R[b] is pending; CP22)              */ \
+    X(FutureOp)   /* R[a] = R[b].done() (c = 0) or R[b].status() (c = 1) (CP22)            */ \
+    X(Sleep)      /* R[a] = sleep(R[a]): suspends the task until its deadline (CP22)       */ \
+    X(Yield)      /* preemption safepoint at a loop back-edge (coroutine units, CP22)      */ \
+    X(TaskEnd)    /* a task's trampoline: complete its future with R[0] (CP22)             */
 
 enum class OpCode : std::uint8_t {
 #define NIFT_RT_OPCODE_ENUM(name) name,
