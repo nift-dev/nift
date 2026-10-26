@@ -81,9 +81,11 @@ const char* default_failure_message(LifeState state) {
 }
 
 CleanupFailure make_failure(const LifeRecord& base, LifeState state, CleanupOutcome&& outcome) {
-    return CleanupFailure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {},
-                          outcome.code.empty() ? default_failure_code(state) : std::move(outcome.code),
-                          outcome.message.empty() ? default_failure_message(state) : std::move(outcome.message)};
+    CleanupFailure failure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {},
+                           outcome.code.empty() ? default_failure_code(state) : std::move(outcome.code),
+                           outcome.message.empty() ? default_failure_message(state) : std::move(outcome.message)};
+    failure.sequence = base.sequence;
+    return failure;
 }
 
 bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed) {

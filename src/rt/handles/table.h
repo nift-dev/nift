@@ -30,6 +30,7 @@
 #include "rt/handles/types.h"
 
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -155,6 +156,24 @@ public:
     // table: status ReentrantClose, nothing done.
     CloseReport shutdown();
 
+    // CP17 x CP13B statement rollback (owner decision, 2026-10-27). The number
+    // of handles this table has created; a handle's LifeRecord::sequence (and
+    // so its CleanupFailure::sequence) is this count just after its creation.
+    // Lock-free, for a VM marking the start of each evaluation a handler may
+    // abort.
+    std::uint64_t creation_count() const noexcept { return created_.load(std::memory_order_relaxed); }
+    // Withdraws, from `owner`'s pending CloseReport failures, exactly those of
+    // kind `kind` whose handle was created after `since` (sequence > since),
+    // whose last counted reference was dropped (reason Abandoned: no owner
+    // survived) and whose cleanup hook ended the resource and reported a
+    // failed step (CleanupOutcome::failure, state CleanupIncomplete: a file
+    // left open). Explicit closes, context-end and shutdown releases, Lost
+    // (hook threw or unresolved) and Failed (alive after kill) cleanups,
+    // detached handles and older handles are never withdrawn. The
+    // lifecycle itself is untouched (each cleanup already ran exactly once).
+    // Returns the number withdrawn.
+    std::size_t withdraw_abandoned_failures(ContextId owner, HandleKind kind, std::uint64_t since);
+
     TableStats stats() const;
     const KindSpec* kind_spec(HandleKind kind) const;
     std::uint32_t capacity() const { return store_.capacity(); }
@@ -203,7 +222,9 @@ private:
     OwnerList detached_;
     std::size_t detached_in_flight_ = 0, detached_obligations_ = 0, obligations_ = 0;
     std::vector<CleanupFailure> detached_failures_;
-    std::uint64_t created_ = 0, cleaned_ = 0, settled_ = 0, next_closer_ = 1;
+    // created_: also read without mu_ by creation_count() (written only under mu_).
+    std::atomic<std::uint64_t> created_{0};
+    std::uint64_t cleaned_ = 0, settled_ = 0, next_closer_ = 1;
 };
 
 } // namespace nift::rt::handles

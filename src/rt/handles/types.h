@@ -149,6 +149,9 @@ struct CleanupFailure {
     std::string context_label;                        // the owner's label at settle time (empty: detached)
     std::string code;
     std::string message;
+    // Creation order of the failed handle in its table (LifeRecord::sequence);
+    // 0 when unknown (a failure reported without its lifecycle record).
+    std::uint64_t sequence = 0;
 };
 
 struct CloseReport {

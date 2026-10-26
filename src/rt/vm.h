@@ -130,7 +130,16 @@ private:
         std::uint32_t catch_pc = 0;
         std::uint16_t catch_reg = 0;
         std::uint16_t reg_top = 0;
+        // CP17 x CP13B: the handle table's creation count when the
+        // evaluation this handler would abort began (StmtMark).
+        std::uint64_t creation_mark = 0;
     };
+    // StmtMark: only ever inside a try body of the running frame, where that
+    // try's handler is the innermost one.
+    void op_stmt_mark() noexcept {
+        if (!handlers_.empty() && handlers_.back().frame_depth == frames_.size())
+            handlers_.back().creation_mark = handle_table_.creation_count();
+    }
     bool reserve_registers(std::size_t needed);
     void open_handle_runtime();
     void close_handle_runtime(VmResult& result);

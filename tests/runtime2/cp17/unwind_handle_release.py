@@ -23,11 +23,9 @@ Modes, all run on the same binary (legacy NIFT_VM=0, VM NIFT_VM=require):
   both-reported both exit 1 with "managed file left open" (the try-body local
                 and normal-return cases B must NOT silence); stdout equal.
   refused       the VM refuses before execution with host-handle-flow.
-  divergence    a classified, reported divergence, pinned so any change is seen:
-                legacy forgives a file leaked by a function that RETURNED
-                normally earlier in the same failing statement; the VM reports
-                it (the leaking frame was not unwound). Owner-visible
-                qualification, not silently accepted.
+  divergence    a classified, reported divergence, pinned so any change is seen
+                (none at present: the statement rollback closed the two found
+                by decision B's matrix).
 Every case also requires: no internal failure (exit 70 / "internal"), and
 for files written then abandoned, nothing written to disk in either engine.
 """
@@ -40,6 +38,8 @@ import tempfile
 from pathlib import Path
 
 OPEN = 'f := file("p"); f.open("r")'
+LEAK = 'fn(leak()) { g := file("q"); g.open("r"); return 1 }\n'
+THROW = 'fn(work()) { throw error("stop") }\n'
 CASES = [
     ("reproducer", f'fn(work()) {{ {OPEN}; throw error("stop") }}\ntry {{ work() }} catch(e) {{ print(e.message) }}\n', "same"),
     ("closed-before-throw", f'fn(work()) {{ {OPEN}; f.close(); throw error("stop") }}\n'
@@ -81,16 +81,55 @@ CASES = [
      'try { work() } catch(e) { print(e.message) }\n', "refused"),
     ("outer-handle-in-callee", 'f := file("p")\nfn(work()) { f.open("r"); throw error("s") }\n'
      'try { work() } catch(e) { print(e.message) }\n', "refused"),
-    ("leak-in-unwound-frame", 'fn(leak()) { g := file("q"); g.open("r"); return 1 }\n'
-     'fn(work()) { leak(); throw error("stop") }\ntry { work() } catch(e) { print(e.message) }\n', "divergence"),
-    ("leak-earlier-in-statement", 'fn(leak()) { g := file("q"); g.open("r"); return 1 }\n'
-     'fn(work()) { throw error("stop") }\ntry { x := leak() + work() } catch(e) { print(e.message) }\n', "divergence"),
+    # Statement rollback (owner decision, 2026-10-27): files a callee leaked by
+    # RETURNING NORMALLY inside the aborted evaluation are discarded too.
+    ("leak-in-unwound-frame", LEAK + 'fn(work()) { leak(); throw error("stop") }\n'
+     'try { work() } catch(e) { print(e.message) }\n', "same"),
+    ("leak-earlier-in-statement", LEAK + THROW + 'try { x := leak() + work() } catch(e) { print(e.message) }\n', "same"),
+    ("leak-in-call-argument", LEAK + THROW + 'fn(id(a, b)) { return a }\n'
+     'try { x := id(leak(), work()) } catch(e) { print(e.message) }\n', "same"),
+    ("nested-multiple-leaks", LEAK + THROW + 'fn(two()) { leak(); leak(); return 2 }\n'
+     f'fn(deep()) {{ two(); {OPEN}; return leak() + work() }}\n'
+     'try { deep() } catch(e) { print(e.message) }\n', "same"),
+    ("leak-closed-before-throw", 'fn(lc()) { g := file("q"); g.open("r"); g.close(); return 1 }\n' + THROW +
+     'try { x := lc() + work() } catch(e) { print(e.message) }\n', "same"),
+    ("handler-in-function", LEAK + THROW + 'fn(h()) { try { x := leak() + work() } catch(e) { print(e.message) }; return 0 }\n'
+     'print(h())\n', "same"),
+    ("caught-by-outer-from-catch-block", LEAK + THROW +
+     'try { try { throw error("a") } catch(e) { x := leak() + work() } } catch(e) { print("outer " + e.message) }\n',
+     "same"),
+    ("assignment-statement", LEAK + THROW + 'try { x := 1; x = leak() + work() } catch(e) { print(e.message) }\n', "same"),
+    ("repeated-statement-rollback", LEAK + THROW +
+     'n := 0\nwhile (n < 40) { try { x := leak() + work() } catch(e) { }; n = n + 1 }\nprint(n)\n', "same"),
+    ("uncaught-statement", LEAK + THROW + 'x := leak() + work()\n', "same"),
+    ("stream-leak-in-statement", 'fn(wstream()) { o := ofstream("out.txt"); o.write("abc"); return 1 }\n' + THROW +
+     'try { x := wstream() + work() } catch(e) { print(e.message) }\n', "same"),
+    # Boundaries legacy keeps: an evaluation that COMPLETED stays reported.
+    ("owner-example-separate-statements", 'fn(open_file()) {\n    f := file("p")\n    f.open("r")\n}\n'
+     'try {\n    open_file()\n    throw error("stop")\n} catch(e) {\n    print(e.message)\n}\n', "both-reported"),
+    ("if-condition-completed", LEAK + THROW + 'try { if (leak() > 0) { work() } } catch(e) { print(e.message) }\n',
+     "both-reported"),
+    ("if-condition-after-leak-statement", LEAK + THROW +
+     'try { leak(); if (work() > 0) { print("no") } } catch(e) { print(e.message) }\n', "both-reported"),
+    ("else-if-condition-completed", LEAK + THROW +
+     'try { if (leak() < 0) { print("no") } else if (work() > 0) { print("no") } } catch(e) { print(e.message) }\n',
+     "both-reported"),
+    ("while-condition-completed", LEAK + THROW +
+     'i := 0\ntry { while (leak() > 0 && i < 1) { i = i + 1; work() } } catch(e) { print(e.message) }\n',
+     "both-reported"),
+    ("while-condition-after-body-leak", LEAK + THROW +
+     'i := 0\ntry { while (i < 1 || work() > 0) { i = i + 1; leak() } } catch(e) { print(e.message) }\n',
+     "both-reported"),
+    ("while-body-earlier-statement", LEAK + THROW +
+     'i := 0\ntry { while (i < 2) { leak(); i = i + 1 }; work() } catch(e) { print(e.message) }\n', "both-reported"),
+    ("earlier-statement-in-try", LEAK + 'try { leak(); throw error("x") } catch(e) { print(e.message) }\n',
+     "both-reported"),
 ]
 
 
 def run(nift, root, source, vm):
     (root / "case.f").write_text(source)
-    for name in ("w.txt", "stats.jsonl"):
+    for name in ("w.txt", "out.txt", "stats.jsonl"):
         if (root / name).exists():
             (root / name).unlink()
     env = dict(os.environ)
@@ -105,7 +144,7 @@ def run(nift, root, source, vm):
     if vm and (root / "stats.jsonl").exists():
         lines = [json.loads(line) for line in (root / "stats.jsonl").read_text().splitlines() if line.strip()]
         record = lines[-1] if lines else {}
-    written = (root / "w.txt").read_text() if (root / "w.txt").exists() else None
+    written = tuple((root / n).read_text() if (root / n).exists() else None for n in ("w.txt", "out.txt"))
     return proc.stdout, proc.stderr, proc.returncode, record, written
 
 

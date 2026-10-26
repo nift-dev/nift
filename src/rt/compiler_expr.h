@@ -353,6 +353,13 @@ private:
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;
     std::vector<int> try_scopes_;  // CP13B: loop depth at each active try entry
+    // CP17 x CP13B statement rollback: inside a try body of this function, each
+    // evaluation legacy rolls back as a unit (a statement, an if/else-if or
+    // while condition) starts with StmtMark, which records the handle table's
+    // creation count in the innermost handler. Nothing is emitted elsewhere.
+    void stmt_mark() {
+        if (!try_scopes_.empty()) fb_->emit(OpCode::StmtMark);
+    }
     std::uint32_t error_call_offset_ = kNoNode;  // `throw error(...)`: report the throw
     std::uint32_t error_call_offset_saved_ = kNoNode;
 

@@ -73,6 +73,7 @@ bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, con
     handler.catch_pc = static_cast<std::uint32_t>(pc - proto->code.data()) + 1u + jump_offset(in.c);
     handler.catch_reg = in.a;
     handler.reg_top = in.b;
+    handler.creation_mark = handle_table_.creation_count();
     handlers_.push_back(handler);
     update_heap_limit();  // A15: handler storage is charged on reallocation
     return memory_ok(fault);
@@ -225,6 +226,14 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
     handlers_.pop_back();
 #endif
     for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();
+    // CP17 x CP13B statement rollback: legacy discards the files created by an
+    // evaluation that fails (Parser::rollback_file_operation), including files
+    // a callee leaked by returning normally earlier in that evaluation. Every
+    // reference to them from the aborted evaluation is dead now; withdraw the
+    // left-open reports their last drop recorded. Only files created since the
+    // aborted evaluation began (StmtMark) and abandoned are eligible.
+    if (handle_context_open_)
+        handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);
     R[handler.catch_reg] = std::move(fault.error);
     fault = Fault{};
     pc = proto->code.data() + handler.catch_pc;

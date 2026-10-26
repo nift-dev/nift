@@ -22,6 +22,7 @@ struct LifeRecord {
     bool obligation = false;          // closed but not yet settled: the owner must wait for it
     bool ticket_issued = false;
     bool in_use = false;              // pool bookkeeping
+    std::uint64_t sequence = 0;       // creation order in its table (1-based; HandleTable::creation_count)
 };
 
 bool is_settled(LifeState state);

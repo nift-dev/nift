@@ -89,7 +89,9 @@ HandleStatus HandleTable::create(ContextId owner, HandleKind kind, std::shared_p
         std::uint32_t index = 0;
         store_.classify(out, kind, index);
         store_.slot(index).record = records_.add(kind, out, owner);
-        ++created_;
+        const std::uint64_t sequence = created_.load(std::memory_order_relaxed) + 1;
+        records_.find(store_.slot(index).record)->sequence = sequence;
+        created_.store(sequence, std::memory_order_relaxed);  // written only under mu_
     }
     lock.unlock();  // a refused resource is destroyed without the lock
     return status;
@@ -379,7 +381,7 @@ TableStats HandleTable::stats() const {
     s.contexts = contexts_.size();
     s.records = records_.size();
     s.pending_obligations = obligations_;
-    s.created = created_;
+    s.created = created_.load(std::memory_order_relaxed);
     s.cleaned = cleaned_;
     s.settled = settled_;
     return s;

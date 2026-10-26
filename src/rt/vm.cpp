@@ -321,7 +321,7 @@ VmResult Vm::run(std::string& output) {
     OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
-    OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }
+    OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); } OP(StmtMark) { op_stmt_mark(); NEXT(); }
     OP(Throw) { if (!op_throw(*pc, R, proto, pc, fault)) FAIL(); NEXT(); }
     OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
     OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }

@@ -119,6 +119,8 @@ bool UnitCompiler::statement(NodeId id) {
     }
     update_flags();
     fb_->set_offset(node.begin);
+    // `if` and `while` mark before each condition evaluation instead.
+    if (node.kind != NodeKind::If && node.kind != NodeKind::While) stmt_mark();
     bool ok = false;
     switch (node.kind) {
         case NodeKind::Comment: ok = fail(node, "shebang-statement"); break;  // only `#!` statements reach the AST
@@ -149,6 +151,7 @@ bool UnitCompiler::statement(NodeId id) {
 
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
+    stmt_mark();  // each `if` / `else if` condition is its own evaluation (legacy)
     if (!false_jump(node.a, to_else)) return false;
     const Node& body = ast_.at(node.b);
     scopes_.push();
@@ -187,6 +190,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     update_flags();
     Loop loop;
     loop.start = fb_->here();
+    stmt_mark();  // each evaluation of the condition is its own evaluation (legacy)
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;

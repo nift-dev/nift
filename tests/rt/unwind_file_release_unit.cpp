@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 
 using namespace nift::rt;
@@ -145,8 +146,10 @@ int main() {
         const std::string path = temp_path("cp17-b-write", nullptr);
         Value v = f.file(path);
         f.open(v, "w");
-        Value args[2] = {v, make_string("data")}, out;
-        CHECK(natives::file_write(f.context, args, 2, out, f.error) == natives::Status::Ok);
+        {
+            Value args[2] = {v, make_string("data")}, out;
+            CHECK(natives::file_write(f.context, args, 2, out, f.error) == natives::Status::Ok);
+        }  // the call's argument copy is gone: `v` is the last reference again
         CHECK(f.resource(v)->dirty);
         CHECK(natives::abandon_file_on_unwind(f.table, f.ctx, v));
         v = Value();
@@ -231,6 +234,73 @@ int main() {
         CHECK(left_open_reported(f));  // context close reports and closes it
         CHECK(!natives::abandon_file_on_unwind(f.table, f.ctx, v));
         v = Value();
+    }
+    // Statement rollback (owner decision, 2026-10-27): HandleTable::withdraw_abandoned_failures.
+    {
+        HandleTable table;
+        KindSpec fails;
+        fails.name = "custom";
+        fails.cleanup = [](CleanupEvent&) { return CleanupOutcome::failure("test.left_open", "left open"); };
+        table.register_kind(HandleKind::Custom, fails);
+        KindSpec throws;
+        throws.name = "timer";
+        throws.cleanup = [](CleanupEvent&) -> CleanupOutcome { throw std::runtime_error("hook threw"); };
+        table.register_kind(HandleKind::Timer, throws);
+        KindSpec alive;
+        alive.name = "process";
+        alive.cleanup = [](CleanupEvent&) { return CleanupOutcome::alive_after_kill("test.alive", "still alive"); };
+        table.register_kind(HandleKind::Process, alive);
+        ContextId ctx = 0, other = 0;
+        CHECK(table.open_context(ContextKind::Script, kDetached, ctx, "script") == HandleStatus::Ok);
+        CHECK(table.open_context(ContextKind::Script, kDetached, other, "other") == HandleStatus::Ok);
+        auto make = [&](HandleKind kind, ContextId owner) {
+            Value v;
+            CHECK(table.create(owner, kind, std::make_shared<int>(1), v, CreateOptions{true}) == HandleStatus::Ok);
+            return v;
+        };
+        CHECK(table.creation_count() == 0);
+        Value older = make(HandleKind::Custom, ctx);        // created before the mark
+        const std::uint64_t mark = table.creation_count();
+        CHECK(mark == 1);
+        Value abandoned = make(HandleKind::Custom, ctx);    // after the mark, last reference dropped
+        Value closed = make(HandleKind::Custom, ctx);       // after the mark, explicitly closed
+        Value survivor = make(HandleKind::Custom, ctx);     // after the mark, still referenced
+        Value lost = make(HandleKind::Timer, ctx);          // after the mark, hook threw (Lost)
+        Value foreign_owner = make(HandleKind::Custom, other);
+        Value still_alive = make(HandleKind::Process, ctx);  // after the mark, Failed (alive after kill)
+        CHECK(table.creation_count() == 7);
+        CHECK(table.drop(older) == HandleStatus::Ok);
+        CHECK(table.drop(abandoned) == HandleStatus::Ok);
+        CHECK(table.close(closed, HandleKind::Custom, ctx) == HandleStatus::CleanupFailed);  // reported, Explicit
+        CHECK(table.drop(lost) == HandleStatus::Ok);
+        CHECK(table.drop(foreign_owner) == HandleStatus::Ok);
+        CHECK(table.drop(still_alive) == HandleStatus::Ok);
+        const auto cleaned = table.stats().cleaned;
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::File, mark) == 0);  // another kind
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::Timer, mark) == 0);  // Lost: never withdrawn
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::Process, mark) == 0);  // Failed: never withdrawn
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::Custom, 7) == 0);   // nothing newer
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::Custom, mark) == 1);
+        CHECK(table.withdraw_abandoned_failures(ctx, HandleKind::Custom, mark) == 0);  // exactly once
+        CHECK(table.withdraw_abandoned_failures(kDetached, HandleKind::Custom, 0) == 0);
+        CHECK(table.stats().cleaned == cleaned);  // no cleanup ran or re-ran
+        const CloseReport report = table.close_context(ctx);
+        // older (sequence 1 <= mark), explicit close, Lost hook, and the survivor
+        // released at context end stay reported; only `abandoned` was withdrawn.
+        CHECK(report.failures.size() == 5);
+        std::uint64_t seen = 0;
+        for (const CleanupFailure& f : report.failures) {
+            seen |= std::uint64_t(1) << f.sequence;
+            if (f.sequence == 1) CHECK(f.reason == ReleaseReason::Abandoned && f.state == LifeState::CleanupIncomplete);
+            if (f.sequence == 3) CHECK(f.reason == ReleaseReason::Explicit);
+            if (f.sequence == 4) CHECK(f.reason == ReleaseReason::ContextEnd);
+            if (f.sequence == 5) CHECK(f.state == LifeState::Lost);
+            if (f.sequence == 7) CHECK(f.state == LifeState::Failed);
+        }
+        CHECK(seen == ((1u << 1) | (1u << 3) | (1u << 4) | (1u << 5) | (1u << 7)));
+        const CloseReport other_report = table.close_context(other);
+        CHECK(other_report.failures.size() == 1 && other_report.failures.front().sequence == 6);
+        survivor = Value();
     }
     std::remove(read_path.c_str());
     return rt_test::finish("rt unwind file release (CP17 x CP13B decision B)");

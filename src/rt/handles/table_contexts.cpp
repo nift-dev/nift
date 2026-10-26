@@ -1,5 +1,7 @@
 #include "rt/handles/table_contexts.h"
 
+#include <algorithm>
+
 namespace nift::rt::handles {
 
 namespace {
@@ -52,6 +54,22 @@ void HandleTable::close_subtree(ContextId id, bool on_error, CloseReport& report
         return true;
     });
     for (const ContextId each : order) close_one(each, report, lock);
+}
+
+// CP17 x CP13B statement rollback (table.h).
+std::size_t HandleTable::withdraw_abandoned_failures(ContextId owner, HandleKind kind, std::uint64_t since) {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (owner == kDetached) return 0;
+    ExecContext* c = contexts_.find(owner);
+    if (!c) return 0;
+    auto& failures = c->failures;
+    const auto before = failures.size();
+    const auto withdrawn = [&](const CleanupFailure& f) {
+        return f.kind == kind && f.owner == owner && f.sequence > since &&
+               f.reason == ReleaseReason::Abandoned && f.state == LifeState::CleanupIncomplete;
+    };
+    failures.erase(std::remove_if(failures.begin(), failures.end(), withdrawn), failures.end());
+    return before - failures.size();
 }
 
 CloseReport HandleTable::close_context(ContextId id, bool on_error) {
