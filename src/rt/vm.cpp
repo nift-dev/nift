@@ -347,8 +347,7 @@ bail:
     }
 #endif
 done:
-    close_handle_runtime(result); result_stats(result);
-    return result;
+    close_handle_runtime(result); result_stats(result); return result;
 }
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     if (in.b >= global_ready_.size() || !global_ready_[in.b]) {
