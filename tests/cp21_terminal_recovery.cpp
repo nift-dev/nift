@@ -19,6 +19,8 @@ namespace {
 
 int failures = 0;
 using ArmFn = void (*)(int);
+using ParentArmFn = void (*)(int);
+using ChildArmFn = void (*)(int);
 
 void check(const char* name, bool ok) {
     std::printf("%s %s\n", ok ? "PASS" : "FAIL", name);
@@ -141,6 +143,162 @@ void launch_handoff_failure(ArmFn arm) {
     check("launch-handoff-disposition", default_ttou());
 }
 
+void launch_parent_only_failure(ParentArmFn parent_arm) {
+    char effect[] = "/tmp/cp21-parent-effect-XXXXXX";
+    const int effect_fd = ::mkstemp(effect);
+    if (effect_fd >= 0) ::close(effect_fd);
+    parent_arm(2);
+    SpawnRequest request;
+    SpawnStage stage;
+    stage.program = "/bin/sh";
+    stage.args = {"-c", "printf 'PARENT-FAIL-CHILD-EFFECT\\n'"};
+    stage.stdout_path = effect;
+    request.stages = {stage};
+    request.mode = OutputMode::Inherit;
+    request.terminal = TerminalPolicy::Auto;
+    request.own_group = true;
+    HostStatus status = HostStatus::Ok;
+    HostError error;
+    auto group = ProcessGroup::start_for_wait(std::move(request), status, error);
+    ProcessResult result;
+    if (group) result = group->wait();
+    parent_arm(0);
+    std::string effect_text;
+    if (effect_fd >= 0) {
+        std::ifstream in(effect);
+        std::getline(in, effect_text);
+        ::unlink(effect);
+    }
+    check("parent-only-child-not-executed", effect_text.find("PARENT-FAIL-CHILD-EFFECT") == std::string::npos);
+    check("parent-only-launch-fails", !group || !result.launched || !result.error.empty() ||
+                                          result.state == GroupState::LaunchFailed);
+    if (group) group->terminate(CancelReason::Cleanup);
+    auto healthy = spawn("/bin/true", {}, TerminalPolicy::Auto);
+    const bool ok = healthy && healthy->wait().exit_code == 0;
+    if (healthy) healthy->terminate(CancelReason::Cleanup);
+    check("parent-only-recovers", ok);
+    check("parent-only-disposition", default_ttou());
+}
+
+void launch_child_only_failure(ChildArmFn child_arm) {
+    char effect[] = "/tmp/cp21-child-effect-XXXXXX";
+    const int effect_fd = ::mkstemp(effect);
+    if (effect_fd >= 0) ::close(effect_fd);
+    child_arm(1);
+    SpawnRequest request;
+    SpawnStage stage;
+    stage.program = "/bin/sh";
+    stage.args = {"-c", "printf 'CHILD-ONLY-EFFECT\\n'"};
+    stage.stdout_path = effect;
+    request.stages = {stage};
+    request.mode = OutputMode::Inherit;
+    request.terminal = TerminalPolicy::Auto;
+    request.own_group = true;
+    HostStatus status = HostStatus::Ok;
+    HostError error;
+    auto group = ProcessGroup::start_for_wait(std::move(request), status, error);
+    ProcessResult result;
+    if (group) result = group->wait();
+    child_arm(0);
+    std::string effect_text;
+    if (effect_fd >= 0) {
+        std::ifstream in(effect);
+        std::getline(in, effect_text);
+        ::unlink(effect);
+    }
+    check("child-only-child-not-executed", effect_text.find("CHILD-ONLY-EFFECT") == std::string::npos);
+    check("child-only-launch-fails", !group || !result.launched || !result.error.empty() ||
+                                         result.state == GroupState::LaunchFailed);
+    if (group) group->terminate(CancelReason::Cleanup);
+    auto healthy = spawn("/bin/true", {}, TerminalPolicy::Auto);
+    const bool ok = healthy && healthy->wait().exit_code == 0;
+    if (healthy) healthy->terminate(CancelReason::Cleanup);
+    check("child-only-recovers", ok);
+    check("child-only-disposition", default_ttou());
+}
+
+void tty_closed_stdin() {
+    const int saved = ::dup(STDIN_FILENO);
+    auto group = spawn("/bin/sleep", {"5"});
+    check("closed-stdin-group", group != nullptr && saved >= 0);
+    if (!group || saved < 0) return;
+    check("closed-stdin-give", group->give_terminal());
+    ::close(STDIN_FILENO);
+    check("closed-stdin-reclaim", group->reclaim_terminal());
+    check("closed-stdin-actual-shell-owns", ::tcgetpgrp(saved) == ::getpgrp());
+    ::dup2(saved, STDIN_FILENO);
+    ::close(saved);
+    check("closed-stdin-disposition", default_ttou());
+    group->terminate(CancelReason::Cleanup);
+}
+
+void tty_replaced_stdin() {
+    const int saved = ::dup(STDIN_FILENO);
+    auto group = spawn("/bin/sleep", {"5"});
+    check("replaced-stdin-group", group != nullptr && saved >= 0);
+    if (!group || saved < 0) return;
+    check("replaced-stdin-give", group->give_terminal());
+    const int nullfd = ::open("/dev/null", O_RDONLY);
+    if (nullfd >= 0) { ::dup2(nullfd, STDIN_FILENO); ::close(nullfd); }
+    check("replaced-stdin-reclaim", group->reclaim_terminal());
+    check("replaced-stdin-actual-shell-owns", ::tcgetpgrp(saved) == ::getpgrp());
+    ::dup2(saved, STDIN_FILENO);
+    ::close(saved);
+    check("replaced-stdin-disposition", default_ttou());
+    group->terminate(CancelReason::Cleanup);
+}
+
+void tty_persistent_restore(ArmFn arm) {
+    auto group = spawn("/bin/sleep", {"5"});
+    check("tty-persistent-group", group != nullptr);
+    if (!group) return;
+    check("tty-persistent-give", group->give_terminal());
+    arm(5);
+    check("tty-persistent-release-fails", !group->reclaim_terminal());
+    check("tty-persistent-retry-fails", !group->reclaim_terminal());
+    int sentinel = 0;
+    check("tty-persistent-blocks-acquire", !nift::rt::host::posix::terminal_acquire(&sentinel));
+    arm(0);
+    check("tty-persistent-recovers", group->reclaim_terminal());
+    check("tty-persistent-shell-owns", ::tcgetpgrp(STDIN_FILENO) == ::getpgrp());
+    check("tty-persistent-disposition", default_ttou());
+    group->terminate(CancelReason::Cleanup);
+}
+
+void destruction_after_tty_failure(ArmFn arm) {
+    auto group = spawn("/bin/sleep", {"5"});
+    check("tty-destruction-group", group != nullptr);
+    if (!group) return;
+    check("tty-destruction-give", group->give_terminal());
+    arm(5);
+    group.reset();
+    int sentinel = 0;
+    check("tty-destruction-pending-blocks-acquire", !nift::rt::host::posix::terminal_acquire(&sentinel));
+    arm(0);
+    check("tty-destruction-recovers", nift::rt::host::posix::terminal_acquire(&sentinel));
+    check("tty-destruction-release", nift::rt::host::posix::terminal_release(&sentinel));
+    check("tty-destruction-disposition", default_ttou());
+}
+
+int count_fds() {
+    int count = 0;
+    for (int fd = 0; fd < 1024; ++fd) if (::fcntl(fd, F_GETFD) != -1) ++count;
+    return count;
+}
+
+void lease_fd_no_growth() {
+    const int before = count_fds();
+    for (int i = 0; i < 64; ++i) {
+        int owner = 0;
+        if (!nift::rt::host::posix::terminal_acquire(&owner) ||
+            !nift::rt::host::posix::terminal_release(&owner)) {
+            check("lease-fd-cycles", false);
+            return;
+        }
+    }
+    check("lease-fd-no-growth", count_fds() == before);
+}
+
 void destruction_after_failure(ArmFn arm) {
     auto group = spawn("/bin/sleep", {"5"});
     check("destruction-group", group != nullptr);
@@ -175,11 +333,25 @@ int main() {
     sigemptyset(&dfl.sa_mask);
     ::sigaction(SIGTTOU, &dfl, nullptr);
 
+    auto parent_arm = reinterpret_cast<ParentArmFn>(::dlsym(RTLD_DEFAULT, "cp21_parent_arm"));
+    auto child_arm = reinterpret_cast<ChildArmFn>(::dlsym(RTLD_DEFAULT, "cp21_child_arm"));
+    if (!parent_arm || !child_arm) {
+        std::printf("FAIL launch fault arms not loaded\n");
+        return 1;
+    }
+
     one_shot_signal_restore(arm);
     persistent_signal_restore(arm);
     tty_restore_recovery(arm);
     launch_handoff_failure(arm);
     destruction_after_failure(arm);
+    launch_parent_only_failure(parent_arm);
+    launch_child_only_failure(child_arm);
+    tty_closed_stdin();
+    tty_replaced_stdin();
+    tty_persistent_restore(arm);
+    destruction_after_tty_failure(arm);
+    lease_fd_no_growth();
 
     ::sigaction(SIGTTOU, &original, nullptr);
     std::printf("%s\n", failures ? "FAIL CP21 terminal recovery" : "PASS CP21 terminal recovery");

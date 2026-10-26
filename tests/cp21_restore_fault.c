@@ -14,6 +14,10 @@
 static int armed;
 static pid_t shell_pgrp;
 static pid_t injecting_pid;
+static int parent_mode;
+static int child_mode;
+static pid_t parent_owner;
+static pid_t child_owner;
 
 __attribute__((constructor)) static void init(void) {
     if (getenv("CP21_FAIL_RESTORE")) {
@@ -31,6 +35,16 @@ void cp21_arm(int value) {
     injecting_pid = getpid();
 }
 
+void cp21_parent_arm(int value) {
+    parent_mode = value;
+    parent_owner = getpid();
+}
+
+void cp21_child_arm(int value) {
+    child_mode = value;
+    child_owner = getpid();
+}
+
 int sigaction(int sig, const struct sigaction* act, struct sigaction* old) {
     static int (*real)(int, const struct sigaction*, struct sigaction*);
     if (!real) real = dlsym(RTLD_NEXT, "sigaction");
@@ -46,6 +60,15 @@ int sigaction(int sig, const struct sigaction* act, struct sigaction* old) {
 int tcsetpgrp(int fd, pid_t pgid) {
     static int (*real)(int, pid_t);
     if (!real) real = dlsym(RTLD_NEXT, "tcsetpgrp");
+    if (parent_mode && getpid() == parent_owner && pgid != getpgrp()) {
+        if (parent_mode == 2) usleep(50000);
+        errno = EIO;
+        return -1;
+    }
+    if (child_mode && getpid() != child_owner) {
+        errno = EIO;
+        return -1;
+    }
     if ((armed == 2 || armed == 5) && pgid == getpgrp()) {
         if (armed == 2) armed = 0;
         errno = EIO;

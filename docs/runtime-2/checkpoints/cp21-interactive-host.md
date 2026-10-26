@@ -34,6 +34,26 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 | CP20 switches removed | `NIFT_CP20_FORCE_*` no longer read | CP20 tests updated |
 | Failure semantics | restore recovery, launch handoff checks, shell status, detector and Make controls | N1–N5 recovery/controls |
 
+## Full-review D1/D2 corrections
+
+- **D1 terminal-sensitive launch barrier:** when a foreground launch needs a
+  terminal handoff, the child may set up its group and take the tty but waits
+  on a dedicated pipe before exec. The parent performs the authoritative
+  `tcsetpgrp`, then commits or aborts. A parent-only handoff failure therefore
+  prevents child execution; child-only failure is reported through the exec
+  report. Non-handoff launches pay no extra descriptor. Parent-only,
+  child-only, stage-attribution, low-fd and recovery controls are included.
+- **D2 stable tty reference:** the lease opens and retains `/dev/tty` (or a
+  dup of a tty stdin) independently of fd 0. Give/restore use that reference,
+  so closing or replacing stdin cannot turn an unverified restoration into
+  success. The reference is closed on successful release and retained only
+  for pending recovery. Closed/replaced stdin, one-shot/persistent failure,
+  destruction and fd-growth controls are included.
+- **Certification reachability:** `test-v45-job-control` now depends on the
+  CP21 contract, compiled mutants, Make failure-control and the Linux
+  recovery/mutant units. The certification guard records those edges and
+  removal controls fail if any is disconnected.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
@@ -86,6 +106,20 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 | completion, history, rc execution | unchanged |
 | failure paths | improved and explicitly nonzero where a Host operation fails |
 
+## Launch and tty failure controls
+
+| Control | Expected |
+|---|---|
+| parent-only handoff failure (50 ms window or immediate) | no child effect; failed launch; healthy retry |
+| child-only handoff failure | no child effect; failed launch; healthy retry |
+| closed stdin while a group owns the tty | reclaim succeeds and the shell actually owns the saved tty |
+| replaced stdin (`/dev/null`) | same |
+| one-shot/persistent tty restore failure | pending, blocked acquisition, then recovery |
+| destruction with pending tty recovery | no dangling owner; recovery after fault clears |
+| lease descriptor cycles | no fd growth |
+| compiled D1 mutant (no barrier) | parent-only check fails for the intended reason |
+| compiled D2 mutant (isatty-gated restore) | closed-stdin ownership check fails for the intended reason |
+
 ## Mutants and controls
 
 | Mutant | Intended failure | Control |
@@ -122,7 +156,8 @@ ownership of `.niftrc` compilation and the shared compiler front end.
    classification **UNVERIFIED** (local pipeline observations exceed it).
 4. **Reference-platform jobs:** background launch, fg return and prompt tails.
 5. **Inherited Host lifecycle:** `managed_pgid_cleanup` remains
-   **UNRESOLVED / POSSIBLY FLAKY**; reviewer reproduced it on the exact base.
+   **UNRESOLVED / POSSIBLY FLAKY**; reviewer reproduced it on the exact base
+   and it failed again in the final sanitizer run (`before=0 after=1`).
 6. **Integration:** CP17/CP18 combined-tree certification. Preserve CP20's F6
    ESRCH fast path during CP17 reconciliation; CP21 did not change that
    destructor.

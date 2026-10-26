@@ -2578,6 +2578,13 @@ test-v45-concurrency: $(TARGET)
 
 ifneq ($(OS),Windows_NT)
 test-v45-job-control: test-cp21-interactive-host
+test-v45-job-control: test-cp21-interactive-host-mutants
+test-v45-job-control: test-cp21-make-failure-control
+ifeq ($(shell uname -s),Linux)
+test-v45-job-control: test-cp21-terminal-recovery
+test-v45-job-control: test-cp21-terminal-recovery-mutants
+endif
+test-v45-job-control:
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_jobs_background.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_job_control.sh
 else
@@ -3357,7 +3364,8 @@ CP21_TERMINAL_RECOVERY := $(TEST_DIR)/cp21-terminal-recovery$(EXEEXT)
 $(CP21_TERMINAL_RECOVERY): tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES) -o "$@"
 .PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease \
-	test-cp21-terminal-recovery test-cp21-prompt-latency test-cp21-make-failure-control
+	test-cp21-terminal-recovery test-cp21-terminal-recovery-mutants test-cp21-prompt-latency \
+	test-cp21-make-failure-control
 test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
 	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)"
 	@if [ "$(shell uname -s)" = "Linux" ]; then \
@@ -3369,7 +3377,6 @@ test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
 	  CP21_RESTORE_LIB="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-restore "$(CURDIR)/$(TARGET)"; \
 	fi
 	$(MAKE) --no-print-directory test-cp21-terminal-lease
-	@if [ "$(shell uname -s)" = "Linux" ]; then $(MAKE) --no-print-directory test-cp21-terminal-recovery; fi
 test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS) $(CP21_PROBE)
 	@set -e; \
 	for m in 1 2 3 4 5; do \
@@ -3395,6 +3402,40 @@ test-cp21-terminal-lease: $(CP21_TERMINAL_LEASE)
 	"$(CP21_TERMINAL_LEASE)"
 test-cp21-terminal-recovery: $(CP21_TERMINAL_RECOVERY) $(CP21_RECOVERY_LIBS)
 	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_TERMINAL_RECOVERY)"
+CP21_RECOVERY_D1 := $(TEST_DIR)/cp21-terminal-recovery-d1$(EXEEXT)
+CP21_RECOVERY_D2 := $(TEST_DIR)/cp21-terminal-recovery-d2$(EXEEXT)
+$(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o: src/rt/host/process_posix_launch.cpp \
+	src/rt/host/process_posix_launch.h src/rt/host/process_posix_sys.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_D1_MUTANT=1 -MMD -MP -c $< -o "$@"
+$(TEST_DIR)/cp21-mutants/d2/process_terminal.o: src/rt/host/process_terminal.cpp \
+	src/rt/host/process_terminal.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_D2_MUTANT=1 -MMD -MP -c $< -o "$@"
+$(CP21_RECOVERY_D1): tests/cp21_terminal_recovery.cpp \
+	$(filter-out src/rt/host/process_posix_launch.cpp,$(RT_HOST_SOURCES)) \
+	$(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp \
+		$(filter-out src/rt/host/process_posix_launch.cpp,$(RT_HOST_SOURCES)) \
+		$(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o -ldl -o "$@"
+$(CP21_RECOVERY_D2): tests/cp21_terminal_recovery.cpp \
+	$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
+	$(TEST_DIR)/cp21-mutants/d2/process_terminal.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp \
+		$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
+		$(TEST_DIR)/cp21-mutants/d2/process_terminal.o -ldl -o "$@"
+test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(TEST_DIR)/cp21-restore-fault.so
+	@set -e; \
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_RECOVERY_D1)" > "$(TEST_DIR)/cp21-d1-mutant.log" 2>&1 && \
+	  { echo "FAIL CP21 D1 mutant not detected"; cat "$(TEST_DIR)/cp21-d1-mutant.log"; exit 1; }; \
+	grep -q "FAIL parent-only-child-not-executed" "$(TEST_DIR)/cp21-d1-mutant.log" || \
+	  { echo "FAIL CP21 D1 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d1-mutant.log"; exit 1; }; \
+	echo "PASS CP21 D1 mutant: parent race detected"; \
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_RECOVERY_D2)" > "$(TEST_DIR)/cp21-d2-mutant.log" 2>&1 && \
+	  { echo "FAIL CP21 D2 mutant not detected"; cat "$(TEST_DIR)/cp21-d2-mutant.log"; exit 1; }; \
+	grep -q "FAIL closed-stdin-actual-shell-owns" "$(TEST_DIR)/cp21-d2-mutant.log" || \
+	  { echo "FAIL CP21 D2 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d2-mutant.log"; exit 1; }; \
+	echo "PASS CP21 D2 mutant: lost-stdin ownership detected"
 test-cp21-prompt-latency: $(TARGET)
 	python3 tests/cp21_prompt_latency.py "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp21-prompt-latency.json"
 test-cp21-make-failure-control: $(TARGET) $(CP21_PROBE)
