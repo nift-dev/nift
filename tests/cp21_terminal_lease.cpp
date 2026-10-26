@@ -1,13 +1,17 @@
 // CP21 Host terminal-lease contract on a real PTY.
 #define _XOPEN_SOURCE 700
 #include "rt/host/process.h"
+#include "rt/host/process_terminal.h"
 
+#include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <fcntl.h>
 #include <string>
 #include <sys/ioctl.h>
+#include <thread>
+#include <vector>
 #include <unistd.h>
 
 using namespace nift::rt::host;
@@ -89,6 +93,42 @@ int main() {
         ::sigaction(SIGTTOU, nullptr, &current);
         return current.sa_handler == SIG_DFL;
     }());
+
+    // Concurrent acquisition has one winner; concurrent release has one owner.
+    std::vector<char> owners(8);
+    std::atomic<int> acquired{0};
+    std::vector<std::thread> threads;
+    for (std::size_t i = 0; i < owners.size(); ++i)
+        threads.emplace_back([&, i] {
+            if (nift::rt::host::posix::terminal_acquire(&owners[i])) ++acquired;
+        });
+    for (auto& thread : threads) thread.join();
+    check("concurrent-acquire-single-owner", acquired.load() == 1);
+    const void* winner = nullptr;
+    for (std::size_t i = 0; i < owners.size(); ++i)
+        if (nift::rt::host::posix::terminal_owned_by(&owners[i])) winner = &owners[i];
+    check("concurrent-owner-identifiable", winner != nullptr);
+    std::atomic<int> released{0};
+    threads.clear();
+    for (std::size_t i = 0; i < owners.size(); ++i)
+        threads.emplace_back([&, i] {
+            if (nift::rt::host::posix::terminal_release(&owners[i])) ++released;
+        });
+    for (auto& thread : threads) thread.join();
+    check("concurrent-release-single-owner", released.load() == 1);
+    check("concurrent-release-restores-disposition", [] {
+        struct sigaction current {};
+        ::sigaction(SIGTTOU, nullptr, &current);
+        return current.sa_handler == SIG_DFL;
+    }());
+
+    // Destruction of a live owner must release the process-wide lease.
+    auto c = spawn_sleep();
+    check("destruction-owner-acquires", c && c->give_terminal());
+    if (c) c.reset();
+    int sentinel = 0;
+    check("destruction-releases-lease", nift::rt::host::posix::terminal_acquire(&sentinel));
+    nift::rt::host::posix::terminal_release(&sentinel);
 
     a->terminate(CancelReason::Cleanup);
     b->terminate(CancelReason::Cleanup);
