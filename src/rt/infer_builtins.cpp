@@ -114,6 +114,10 @@ TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv, const std:
     const std::string_view name = ast.text(ast.at(ast.at(n.a).b));
     if ((name == "length" || name == "size") && n.count == 0)  // rt-lint: allow-string-compare compile time
         return kinds_ty(kKindInt);  // the Length opcode
+    if (recv->kinds == kKindFuture && n.count == 0) {  // CP22 FutureOp
+        if (name == "done") return kinds_ty(kKindBool);  // rt-lint: allow-string-compare compile time
+        if (name == "status") return kinds_ty(kKindString);  // rt-lint: allow-string-compare compile time
+    }
     const natives::BuiltinSpec* spec = nullptr;
     switch (bind_method(recv->kinds, name, spec)) {
         case MethodBinding::Bound: return builtin_result(ast, *spec, recv, values, n);

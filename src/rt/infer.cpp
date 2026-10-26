@@ -264,6 +264,7 @@ TyRef Inference::expr(NodeId id) {
         }
         case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
         case NodeKind::Call: t = call(n); break;
+        case NodeKind::Await: t = awaited(expr(n.a)); break;  // CP22
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)
     }
     return record(id, t ? t : empty_ty());
@@ -297,14 +298,14 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
             for (std::size_t k = 0; k < values.size() && k < params.size(); ++k)
                 grew = merge(params[k], values[k]) || grew;
             callers_[unit].insert(current_unit());
-            out = unite(out, returns_[unit]);
+            out = unite(out, async_result(ast_.at(plan_.functions[unit]).flags, returns_[unit]));
         } else if (static_cast<std::size_t>(unit) > plan_.functions.size()) {
             const std::size_t id = static_cast<std::size_t>(unit) - plan_.functions.size() - 1;
             LambdaInfo& info = lambdas_[id];
             for (std::size_t k = 0; k < values.size() && k < info.params.size(); ++k)
                 grew = merge(info.params[k], values[k]) || grew;
             info.callers.insert(current_unit());
-            out = unite(out, info.returns);
+            out = unite(out, async_result(ast_.at(info.node).flags, info.returns));
         }
         if (grew) enqueue(unit);
     }

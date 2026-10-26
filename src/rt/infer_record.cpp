@@ -14,6 +14,8 @@ TyRef Inference::record(NodeId id, TyRef t) {
     else result_.collection_arrays.erase(id);
     if(t->collection_object)result_.collection_objects.insert(id);
     else result_.collection_objects.erase(id);
+    if(plan_.coroutines&&holds_future(t))result_.future_holders.insert(id);  // CP22
+    else result_.future_holders.erase(id);
     auto& targets = result_.callable_targets[id];
     targets.clear();
     result_.callable_unknown[id] = t->any || (t->kinds & kKindUnknown);

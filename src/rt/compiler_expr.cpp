@@ -114,8 +114,7 @@ bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant
             if (node.count != 0) { is_constant = false; return true; }  // interpolation lowering
             if (!decode_string_literal(text(node), value)) return fail(node, "string-literal");
             return true;
-        case NodeKind::True: value = Value::boolean(true); return true;
-        case NodeKind::False: value = Value::boolean(false); return true;
+        case NodeKind::True: case NodeKind::False: value = Value::boolean(node.kind == NodeKind::True); return true;
         case NodeKind::Null: value = Value::null(); return true;
         case NodeKind::Unary: {
             const Node& operand = ast_.at(node.a);
@@ -173,7 +172,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         return true;
     }
     switch (node.kind) {
-        case NodeKind::Ident: {  // a temporary the read needed (a global's) is freed: `[g, x]`
+        case NodeKind::Ident: {  // a temporary the read needed (a global's) is freed: `[g, x]` (CP22 fix)
             std::uint16_t reg = 0, mark = fb_->top();
             if (!local_register(node, reg)) return false;
             if (reg != dst) { fb_->emit(OpCode::Move, dst, reg); if (reg >= mark) fb_->release_to(mark); }
@@ -187,6 +186,7 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         case NodeKind::Unary: return unary(node, dst);
         case NodeKind::IncDec: return inc_dec_expr(node, dst);
         case NodeKind::Call: return call(node, dst);
+        case NodeKind::Await: return await_expr(node, dst);  // CP22 (compiler_coro.cpp)
         case NodeKind::Member: return member(node, dst);
         case NodeKind::Index: return index(node, dst);
         case NodeKind::Array: return array_literal(node, dst);

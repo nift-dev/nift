@@ -39,7 +39,9 @@ bool reject(UnitPlan& plan, const Node& node, std::string reason) {
 
 bool admit_function(const Ast& ast, NodeId id, UnitPlan& plan) {
     const Node& fn = ast.at(id);
-    if (fn.flags & (kFlagAsync | kFlagDeferredBody | kFlagMethod)) return reject(plan, fn, "fn-flags");
+    // CP22: `fn[async]` is admitted (a coroutine unit); `@fn` bodies and methods are not.
+    if (fn.flags & (kFlagDeferredBody | kFlagMethod)) return reject(plan, fn, "fn-flags");
+    if (fn.flags & kFlagAsync) plan.coroutines = true;
     if (fn.a == kNoNode || fn.b == kNoNode) return reject(plan, fn, "fn-shape");
     const std::string_view name = ast.text(ast.at(fn.a));
     if (reserved_name(name)) return reject(plan, fn, "fn-name-reserved");
@@ -120,6 +122,8 @@ UnitPlan plan_unit(const Ast& ast, NodeId root) {
     }
     // Declarations after statements: admitted when no call can run first.
     if (late && !check_declaration_order(ast, root, plan, position)) return plan;
+    for (NodeId id = 0; !plan.coroutines && id < ast.size(); ++id)  // CP22: async lambdas
+        plan.coroutines = ast.at(id).kind == NodeKind::Lambda && (ast.at(id).flags & kFlagAsync);
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");

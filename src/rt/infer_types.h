@@ -62,5 +62,12 @@ struct Constants {
 bool fold_constant(Op op, double l, double r, double& out);
 // Result kinds of `l op r` for an arithmetic operator.
 KindSet arithmetic_kinds(Op op, KindSet l, KindSet r);
+// CP22: the value of calling a unit with these flags whose returns are
+// `returns` (an async unit returns a future of them, kept as its `elem`);
+// the value of `await` on a value of type `t`; whether `t` is or may contain
+// a future at any depth.
+TyRef async_result(std::uint32_t flags, const TyRef& returns);
+TyRef awaited(const TyRef& t);
+bool holds_future(const TyRef& t, int depth = 0);
 
 } // namespace nift::rt::infer_detail

@@ -1,5 +1,6 @@
 #include "rt/compiler.h"
 
+#include "rt/compiler_coro.h"
 #include "rt/compiler_handles.h"
 
 #include "rt/builtin_bind.h"
@@ -193,6 +194,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     update_flags();
     Loop loop;
     loop.start = fb_->here();
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
@@ -324,7 +326,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
     // aggregate value is an error there); only calls are compiled. A call
     // whose value may be an Error is rendered by legacy's template path
     // (`Error values cannot be rendered as text in $[...]`): refuse it.
-    if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
+    if (expr.kind != NodeKind::Call && !(expr.kind == NodeKind::Await && plan_.coroutines))  // CP22: `await f()`
+        return fail(expr, "expression-statement");
     if (kinds(node.a) == kKindError) return fail(expr, "error-result-expression");
     std::uint16_t scratch = 0;
     return temp(scratch) && expr_to(node.a, scratch);
@@ -373,6 +376,8 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
         result.offset = handle_offset;
         return result;
     }
+    // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
+    if (!check_coroutine_unit(ast, root, plan, kinds, limits.linked, result.reason, result.offset)) return result;
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
     auto program = std::make_unique<Program>();
@@ -392,6 +397,10 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
             }
         }
         return result;
+    }
+    if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
+        program->has_coroutines = true;
+        if (!check_coroutine_program(*program, result.reason, result.offset)) return result;
     }
     result.program = std::move(program);
     return result;

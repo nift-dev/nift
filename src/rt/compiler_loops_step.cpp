@@ -80,6 +80,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
 #endif
     state.exits.push_back(fb_->emit(OpCode::JmpNotLt, state.index, state.count));
     state.body_start = fb_->here();
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration
 
     state.reads_first = for_body_reads(body, text(ast_.at(state.names[0])), state.first_read);
     state.reads_second =

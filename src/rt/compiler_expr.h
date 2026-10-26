@@ -103,6 +103,13 @@ private:
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);
+    // CP22 coroutine units (compiler_coro.cpp): Call or Spawn for function f;
+    // `type(future)` and `sleep(ms)` (-1: not handled, 0 refused, 1 compiled);
+    // `.done()`/`.status()` on a future (same convention); `await e`.
+    OpCode call_opcode(std::size_t f) const;
+    int coro_call(const Node& node, std::string_view name, const natives::BuiltinSpec* builtin, std::uint16_t dst);
+    int future_method(const Node& node, std::uint16_t dst);
+    bool await_expr(const Node& node, std::uint16_t dst);
     // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
     bool for_loop(const Node& node);

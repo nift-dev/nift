@@ -31,6 +31,7 @@ struct CompileLimits {
     // imported modules. A user-call argument path rooted at one is refused
     // (`path-in-call-argument:imported`; records20k's stage 4 lift).
     std::vector<std::string_view> module_names;
+    bool linked = false;  // CP22: the unit is a linked module graph (coroutine units refuse it)
 };
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());

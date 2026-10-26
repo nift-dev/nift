@@ -56,6 +56,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         bool saved;
         ~Restore() { c.textual_statement_ = saved; c.update_flags(); }
     } restore{*this, saved_textual};
+    if (const int r = builtin ? coro_call(node, name, builtin, dst) : -1; r >= 0) return r == 1;  // CP22
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
     if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
@@ -76,10 +77,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!(in_place && k == 0) && !temp(reg)) return false;
         if (!expr_to(args[k], reg)) return false;
     }
-    path_arg_ = saved_path;
-    path_chain_ = saved_chain;
-    print_arg_ = saved_print;
-    if (!is_native) --call_args_;
+    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; if (!is_native) --call_args_;
     if (!is_native && loop_reachable()) {
         // Legacy's prepared call types a parameter from the value only, the
         // canonical one from the argument's text and value (P5): refused where
@@ -95,8 +93,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         fb_->emit(OpCode::CallNative, base, static_cast<std::uint16_t>(native.id),
                   static_cast<std::uint16_t>(node.count));
     } else {
-        const std::size_t at =
-            fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
+        const std::size_t at =  // CP22: Spawn for an async function
+            fb_->emit(call_opcode(f), base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
         fb_->note(at, std::string(name));
     }
     std::uint16_t slot = base;
@@ -194,6 +192,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;
+    if (int r = future_method(node, dst); r >= 0) return r == 1;  // CP22
     if (error_method_call(node, dst, name, callee.a)) return true;
     // `length()`/`size()` keep the CP11/CP12 Length opcode (the fast path,
     // with its own kind checks and the context:object-length refusal, Q3).

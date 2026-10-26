@@ -13,6 +13,7 @@
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
+#include "rt/vm_coro_run.h"
 
 #include <algorithm>
 #include <chrono>
@@ -55,6 +56,7 @@ struct Stats {
     bool error_origin = false;  // vm-error: the stop carries an Error origin
     std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
     std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
+    std::string coro_json;  // CP22: coroutine statistics (programs with async code only)
 };
 
 std::string json_escape(const std::string& text) {
@@ -90,7 +92,7 @@ void report(const Stats& s) {
     list("large_lines", s.large_lines);
     list("derived_lines", s.derived_lines);
     line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false")
-         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json
+         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json << s.coro_json
          << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {
@@ -285,7 +287,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         unit_root = relinked.root;
     }
     CompileLimits limits;
-    limits.module_names = link.module_names;
+    limits.module_names = link.module_names; limits.linked = link.linked;  // CP22: coroutine units refuse links
     CompileResult compiled = compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
@@ -321,6 +323,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     VmOptions options;
     limits_from_environment(options);
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
+    options.return_in_output = true;  // CP22: a top-level return prints where legacy prints it
     const SourceMap source_map = source_map_for(link, source_path, source);  // owns source positions
     options.source_map = &source_map;
     // From here on the unit runs on the VM and only on the VM: whatever
@@ -347,6 +350,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.evidence_truncated = result.evidence_truncated;
     stats.heap_peak = result.heap_peak;
     stats.heap_live = result.heap_live;
+    if (result.coro) stats.coro_json = coro_stats_json(result);
     write_stdout(output, nullptr);
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {
