@@ -1,0 +1,151 @@
+## 🦍 CP19 S1 — Independent review: REJECT accepted
+
+This is a good independent review. **I agree with Codex's rejection of `378d231f`, but I wouldn't reconsider the architecture.**
+
+The reviewer found three concrete regressions, reproduced on both VM dispatches, while independently confirming that the shared compiler, execution routing and result-ownership mechanisms work.
+
+That's exactly why we wanted the second review.
+
+### Findings
+
+| Finding | Severity | Recommended correction |
+|---|---|---|
+| Error values nested in aggregate formatting | **Blocking** | Support nested Errors correctly or refuse the entire expression before effects |
+| Synthetic `return:` prefix in collection errors | **Blocking** | Make the synthetic eval boundary diagnostically transparent |
+| Null Error-cause member diagnostics | **Blocking** | Preserve legacy diagnostics or conservatively refuse unsupported expressions |
+
+The most serious is the first:
+
+```bash
+NIFT_VM=0 nift eval '[error("x")].stringify()'
+# Valid JSON result, exit 0
+
+NIFT_VM=require nift eval '[error("x")].stringify()'
+# Internal compiler failure, exit 70
+```
+
+The reviewer also confirmed that preceding side effects can occur before the internal failure. That rules out recovering by replaying the expression through legacy. Pasted text
+
+### What the review established positively
+
+The independent reviewer reproduced the original 242 observations on both dispatches, extended result-ownership testing to **1,561 checks**, and independently detected the routing-bypass mutant even though its output matched the correct implementation.
+
+It also established that the synthetic AST adapter genuinely shares the compiler rather than implementing a second expression evaluator.
+
+The CP18 and CP17 integration conflicts remain reconciliation work, not demonstrated architectural incompatibilities. Pasted text Pasted text Pasted text
+
+**My decision: authorise one narrowly bounded CP19 S1 correction round.** No broad expansion of CP19 until these issues pass independent review.
+
+---
+
+## Forwardable response to the implementing Codex
+
+# 🦍 CP19 S1 — R1 Corrections Authorised
+
+**OWNER DECISION: REWORK REQUIRED.**
+
+The independent review of `378d231f` / `829fcf2f` is accepted.
+
+Preserve the frozen candidate and reviewer evidence.
+
+Review report:
+`/home/nick/Repositories/nift/CP19-S1-INDEPENDENT-REVIEW.txt`
+
+Reviewer evidence:
+`/home/nick/Repositories/nift/.claude-linode-runs/codex/cp19-s1-review/`
+
+## Required corrections
+
+### R1 — Nested Error presentation
+
+Reproduce and correct:
+
+- `[error("x")].stringify()`
+- `[error("x")].prettify()`
+- `{"e":error("x")}.highlight()`
+
+Also test deeper nesting and preceding Host/print effects.
+
+Preferred outcome: exact legacy-compatible rendering.
+
+If this cannot be implemented safely within S1, conservatively refuse the unsupported expression before execution.
+
+Under `NIFT_VM=1`, select legacy before effects. Under `require`, refuse with zero executions and zero effects.
+
+Never replay following partial VM execution.
+
+### R2 — Synthetic Return diagnostics
+
+The synthetic eval Return node must not introduce `return:` into public diagnostics.
+
+Cover:
+
+- `map(1)`
+- `filter(true)`
+- `find(null)`
+- `sort_by(null)`
+- `find_index(false)`
+- `group_by(null)`
+- `map("x")`
+
+The quoted callback case has an additional validation difference. Removing `return:` alone is insufficient.
+
+Preserve the diagnostic behaviour of genuine script/function returns.
+
+Test multiline error locations.
+
+Do not globally remove `return:` from diagnostics.
+
+### R3 — Nullable Error-cause access
+
+Correct or conservatively refuse:
+
+`error("x").cause.message`
+
+Also test nullable `code` and `source` access, present causes, successful Error metadata access and the accepted nullable presentation cases.
+
+Preserve exact diagnostics, exit statuses, source locations and Error origins.
+
+## Evidence requirements
+
+- Both computed-goto and portable-switch VM dispatches.
+- Exact legacy/VM parity for every newly admitted case.
+- Affirmative VM execution counts.
+- Correct refusal-before-effect accounting for unsupported cases.
+- Existing CP19 242-observation suite.
+- Independent review's additional regression cases.
+- CP13B, CP14B, shell/classifier and ownership regressions.
+- Targeted sanitizers.
+- Relevant real mutants and test-integrity controls.
+
+Do not weaken or rewrite existing goldens.
+
+Preserve the shared compiler and result-capture architecture.
+
+Do not expand into persistent shell execution, callbacks, rc compilation or broader CP19 scope.
+
+Return a new exact candidate commit/tree, correction inventory and raw evidence for a focused independent R1 review.
+
+No integration, push, CI, release or infrastructure spending.
+
+🦍🍌💚
+
+### One additional instruction for the reviewer
+
+Once the developer supplies R1, I would ask the independent Codex reviewer to **rerun its original 135-observation matrix against both dispatches**, not merely the developer's new fixtures.
+
+The reviewer should also add a negative control showing that the synthetic `return:` prefix would still be detected if reintroduced.
+
+Importantly, the reviewer identified that the 820-entry differential corpus uses the same binary for both sides. That corpus is legitimate differential evidence, but **not proof of VM coverage**. Keep the affirmative routing controls separate. Pasted text
+
+### What I'd do next
+
+Have the implementing Codex address these three findings. The independent reviewer can move to CP21 S1 while that happens, then return to CP19 R1.
+
+That keeps both sessions productive without changing frozen candidates or involving Claude unnecessarily.
+
+**We haven't lost the CP19 work. We've found three specific places where the new entry point exposes semantics the VM wasn't previously required to handle.**
+
+That's a manageable correction round, and considerably better than discovering the regressions after integration.
+
+The silverback reviewer earned its bananas. 🦍🍌💚

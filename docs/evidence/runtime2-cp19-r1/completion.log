@@ -1,0 +1,6 @@
+PASS completion PATH command
+PASS completion built-in call form
+PASS completion prefers call form
+PASS completion does not insert bare builtin
+PASS completion user function
+PASS CP19 completion categories

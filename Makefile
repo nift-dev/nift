@@ -2394,6 +2394,46 @@ test-cp19-shared-eval: $(TARGET) $(CP13B_SWITCH_NIFT) $(CP19_EVAL_MUTANT) $(CP19
 	$(PYTHON) tests/runtime2/cp19/eval_entry.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --report "$(TEST_DIR)/cp19/switch.jsonl"
 	$(PYTHON) tests/runtime2/cp19/eval_entry.py --nift "$(CURDIR)/$(CP19_EVAL_MUTANT)" --expect-bypass --report "$(TEST_DIR)/cp19/bypass.jsonl"
 
+# CP19 R1: frozen reviewer regressions and real synthetic-prefix negative control.
+CP19_RETURN_MUTANT := $(TEST_DIR)/cp19/nift-return-prefix$(EXEEXT)
+$(TEST_DIR)/cp19/compiler-return.o: src/rt/compiler.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP19_EVAL_MUTANT_RETURN=1 -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/cp19/compiler-return.d
+$(CP19_RETURN_MUTANT): $(filter-out src/rt/compiler.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/compiler-return.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/compiler.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/compiler-return.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/ownership-review$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(CP19_EXPR_OBJECTS) tests/runtime2/cp19/ownership_env.h
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/ownership-review-sanitize$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(CP19_EXPR_SAN_OBJECTS) tests/runtime2/cp19/ownership_env.h
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+$(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o tests/runtime2/cp19/ownership_env.h
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/vm-switch-sanitize.o: src/rt/vm.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -DNIFT_RT_VM_SWITCH -c $< -o $@
+$(TEST_DIR)/cp19/ownership-review-switch-sanitize$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o tests/runtime2/cp19/ownership_env.h
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+.PHONY: test-cp19-r1 test-cp19-r1-sanitize
+test-cp19-r1: test-cp19-shared-eval $(CP19_RETURN_MUTANT) $(TEST_DIR)/cp19/ownership-review$(EXEEXT) $(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT)
+	$(TEST_DIR)/cp19/ownership-review$(EXEEXT)
+	$(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT)
+	$(PYTHON) tests/runtime2/cp19/eval_r1.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/r1-threaded.jsonl"
+	$(PYTHON) tests/runtime2/cp19/eval_r1.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/r1-switch.jsonl"
+	$(PYTHON) tests/runtime2/cp19/eval_r1.py --nift "$(CURDIR)/$(CP19_RETURN_MUTANT)" --out "$(TEST_DIR)/cp19/return-mutant.jsonl" --expect-return-prefix
+	$(PYTHON) tests/runtime2/cp19/reviewer_matrix.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/review-threaded.json"
+	$(PYTHON) tests/runtime2/cp19/check_review_matrix.py "$(TEST_DIR)/cp19/review-threaded.json"
+	$(PYTHON) tests/runtime2/cp19/reviewer_matrix.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/review-switch.json"
+	$(PYTHON) tests/runtime2/cp19/check_review_matrix.py "$(TEST_DIR)/cp19/review-switch.json"
+test-cp19-r1-sanitize: test-cp19-expression-sanitize $(TEST_DIR)/cp19/ownership-review-sanitize$(EXEEXT) $(TEST_DIR)/cp19/ownership-review-switch-sanitize$(EXEEXT)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 120 $(TEST_DIR)/cp19/ownership-review-sanitize$(EXEEXT)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 120 $(TEST_DIR)/cp19/ownership-review-switch-sanitize$(EXEEXT)
+test: test-cp19-r1
+test-rt-vm-sanitize: test-cp19-r1-sanitize
+
 # CP19 Slice 1 (D-042): pure classifier unit test and the durable shell
 # dispatch regression suite. Three test-only mutant binaries are built below:
 # M1 restores call-then-fallback, M2 discards quote/escape provenance, and M3

@@ -1,0 +1,36 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/mutations.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --out "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp14b/mutants"
+DETECTED 1 logical-drain-failure
+DETECTED 2 escaping-drain-bad-alloc
+DETECTED 3 live-source-instead-of-snapshot
+DETECTED 4 core-factory-reevaluated
+DETECTED 5 truthy-predicate
+DETECTED 6 no-short-circuit
+DETECTED 7 unstable-sort-by-ties
+DETECTED 8 group-each-duplicate-membership
+DETECTED 9 skip-caught-sort-drain
+DETECTED 10 duplicate-callback-prefix
+DETECTED 11 missing-const-guard
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): named mutants comparator cases ran on the VM
+make test-runtime2-cp14b-design-mutants
+make[1]: Entering directory '/home/nick/Repositories/nift/.cp19-development/worktree'
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/design_mutations.py --legacy "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --out "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp14b/design-mutants"
+make[2]: Entering directory '/home/nick/Repositories/nift/.cp19-development/worktree'
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+make[2]: '.build/cp13b/nift-switch' is up to date.
+make[2]: Leaving directory '/home/nick/Repositories/nift/.cp19-development/worktree'
+DETECTED 1 ignored-callback-result
+DETECTED 2 truthy-non-bool
+DETECTED 3 unstable-record-ties
+DETECTED 4 ignored-direction
+DETECTED 5 copied-mutation-receiver
+DETECTED 6 removed-const-guard
+DETECTED 7 callback-frame-budget-bypass
+DETECTED 8 missing-callback-report-frame
+DETECTED 9 live-source-not-snapshot
+DETECTED 10 selector-factory-hoisted
+DETECTED 11 splice-replacement-early
+DETECTED 12 premature-comparator-unwind
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): design mutants comparator cases ran on the VM
+make[1]: Leaving directory '/home/nick/Repositories/nift/.cp19-development/worktree'

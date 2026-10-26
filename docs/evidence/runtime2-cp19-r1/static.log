@@ -1,0 +1,10 @@
+python3 tools/rt-lint.py --self-test
+PASS rt-lint self-test: 6 fixtures
+python3 tools/rt-lint.py src/rt
+PASS rt-lint: 0 problem(s)
+python3 scripts/test_integrity_check.py tests scripts --output ".build/bh2/test-integrity-report.json"
+test-integrity clean: 535 files scanned, 0 findings
+report=.build/bh2/test-integrity-report.json
+python3 scripts/check_header_name_collisions.py
+header-name collisions: none
+legacy_names: 208 names, up to date

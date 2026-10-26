@@ -1,0 +1,6351 @@
+{
+  "comparator_profile": "verified",
+  "unverified_comparator_cases": 0,
+  "results": [
+    {
+      "name": "map",
+      "source": "print([1,2,3].map(x=>x*2).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[2,4,6]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[2,4,6]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 46.002,
+            "compile_us": 175.442,
+            "execute_us": 50.204,
+            "protos": 2,
+            "instructions": 46,
+            "source_bytes": 39,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "filter",
+      "source": "print([1,2,3].filter(x=>x>1).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 44.142,
+            "compile_us": 166.246,
+            "execute_us": 50.403,
+            "protos": 2,
+            "instructions": 46,
+            "source_bytes": 42,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reduce",
+      "source": "print([1,2,3].reduce((a,x)=>a+x,0))",
+      "pass_": true,
+      "legacy": {
+        "out": "6\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "6\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 64.003,
+            "compile_us": 187.03,
+            "execute_us": 51.496,
+            "protos": 2,
+            "instructions": 46,
+            "source_bytes": 36,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "any",
+      "source": "print([1,2,3].any(x=>x>1))",
+      "pass_": true,
+      "legacy": {
+        "out": "true\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "true\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 50.89,
+            "compile_us": 164.468,
+            "execute_us": 64.31,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 27,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "all",
+      "source": "print([1,2,3].all(x=>x>1))",
+      "pass_": true,
+      "legacy": {
+        "out": "false\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "false\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 43.918,
+            "compile_us": 167.893,
+            "execute_us": 48.562,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 27,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "find",
+      "source": "print([1,2,3].find(x=>x>1))",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 42.937,
+            "compile_us": 195.677,
+            "execute_us": 48.847,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 28,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "find_index",
+      "source": "print([1,2,3].find_index(x=>x>1))",
+      "pass_": true,
+      "legacy": {
+        "out": "1\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "1\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 48.929,
+            "compile_us": 170.008,
+            "execute_us": 48.584,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 34,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "count",
+      "source": "print([1,2,3].count(x=>x>1))",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 67.442,
+            "compile_us": 175.903,
+            "execute_us": 50.453,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by",
+      "source": "print([3,1,2].sort_by(x=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 46.562,
+            "compile_us": 174.856,
+            "execute_us": 53.877,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 41,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "group_by",
+      "source": "g := [1,2,3].group_by(x=>x%2); print(g[\"1\"].join(\",\"))",
+      "pass_": true,
+      "legacy": {
+        "out": "1,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "1,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 51.381,
+            "compile_us": 217.269,
+            "execute_us": 55.787,
+            "protos": 2,
+            "instructions": 50,
+            "source_bytes": 55,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 544,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 800,
+            "heap_live": 544,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "index_by",
+      "source": "g := [1,2,3].index_by(x=>x); print(g[\"2\"]+1)",
+      "pass_": true,
+      "legacy": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 65.59,
+            "compile_us": 189.752,
+            "execute_us": 59.333,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 45,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 576,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 832,
+            "heap_live": 576,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "partition",
+      "source": "g := [1,2,3].partition(x=>x>1); print(g.matched.join(\",\"))",
+      "pass_": true,
+      "legacy": {
+        "out": "2,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 65.259,
+            "compile_us": 346.792,
+            "execute_us": 67.954,
+            "protos": 2,
+            "instructions": 50,
+            "source_bytes": 59,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 544,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 928,
+            "heap_live": 544,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unique_by",
+      "source": "print([1,2,1].unique_by(x=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 42.679,
+            "compile_us": 167.384,
+            "execute_us": 54.229,
+            "protos": 2,
+            "instructions": 46,
+            "source_bytes": 43,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 832,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "min_by",
+      "source": "print([1,2,3].min_by(x=>0-x))",
+      "pass_": true,
+      "legacy": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 42.532,
+            "compile_us": 163.176,
+            "execute_us": 60.154,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 30,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "max_by",
+      "source": "print([1,2,3].max_by(x=>0-x))",
+      "pass_": true,
+      "legacy": {
+        "out": "1\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "1\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 39.8,
+            "compile_us": 165.273,
+            "execute_us": 46.088,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 30,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "count_by",
+      "source": "g := [1,2,3].count_by(x=>x%2); print(g[\"1\"]+1)",
+      "pass_": true,
+      "legacy": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 60.432,
+            "compile_us": 260.505,
+            "execute_us": 82.75,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 47,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 416,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 800,
+            "heap_live": 416,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "group_by_each",
+      "source": "g := [1,2,3].group_by_each(x=>[x%2,x%2]); print(g[\"1\"].join(\",\"))",
+      "pass_": true,
+      "legacy": {
+        "out": "1,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "1,3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 41.211,
+            "compile_us": 183.782,
+            "execute_us": 53.741,
+            "protos": 2,
+            "instructions": 52,
+            "source_bytes": 66,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 608,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 928,
+            "heap_live": 608,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "push",
+      "source": "a := [1,2,3]; print(a.push(4)); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "4\n[1,2,3,4]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "4\n[1,2,3,4]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 44.632,
+            "compile_us": 173.926,
+            "execute_us": 43.623,
+            "protos": 1,
+            "instructions": 43,
+            "source_bytes": 53,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pop",
+      "source": "a := [1,2,3]; print(a.pop()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "3\n[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "3\n[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 48.073,
+            "compile_us": 160.094,
+            "execute_us": 46.604,
+            "protos": 1,
+            "instructions": 42,
+            "source_bytes": 51,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "insert",
+      "source": "a := [1,2,3]; print(a.insert(1,4)); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "4\n[1,4,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "4\n[1,4,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 37.806,
+            "compile_us": 126.393,
+            "execute_us": 40.868,
+            "protos": 1,
+            "instructions": 44,
+            "source_bytes": 57,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "remove",
+      "source": "a := [1,2,3]; print(a.remove(1)); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n[1,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2\n[1,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 43.277,
+            "compile_us": 157.546,
+            "execute_us": 43.043,
+            "protos": 1,
+            "instructions": 43,
+            "source_bytes": 55,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clear",
+      "source": "a := [1,2,3]; print(a.clear()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "null\n[]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "null\n[]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 41.722,
+            "compile_us": 135.82,
+            "execute_us": 41.464,
+            "protos": 1,
+            "instructions": 42,
+            "source_bytes": 53,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "splice",
+      "source": "a := [1,2,3]; print(a.splice(1,1,[4,5]).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[2]\n[1,4,5,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[2]\n[1,4,5,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 69.138,
+            "compile_us": 263.947,
+            "execute_us": 57.919,
+            "protos": 1,
+            "instructions": 54,
+            "source_bytes": 75,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reverse",
+      "source": "a := [1,2,3]; print(a.reverse().stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[3,2,1]\n[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[3,2,1]\n[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 53.714,
+            "compile_us": 202.549,
+            "execute_us": 47.97,
+            "protos": 1,
+            "instructions": 44,
+            "source_bytes": 67,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort",
+      "source": "a := [3,1,2]; print(a.sort().stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 47.405,
+            "compile_us": 184.537,
+            "execute_us": 45.891,
+            "protos": 1,
+            "instructions": 44,
+            "source_bytes": 64,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator",
+      "source": "a := [3,1,2]; print(a.sort((x,y)=>x<y).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.352,
+            "compile_us": 211.292,
+            "execute_us": 62.706,
+            "protos": 2,
+            "instructions": 63,
+            "source_bytes": 74,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1024,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "captured",
+      "source": "fn(f()) { a := [1,2]; g := () => a.pop(); print(g()); print(a.stringify()) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n[1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2\n[1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 66.286,
+            "compile_us": 247.237,
+            "execute_us": 76.259,
+            "protos": 3,
+            "instructions": 54,
+            "source_bytes": 82,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 320,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_map",
+      "source": "print([].map(x=>x*2).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 40.068,
+            "compile_us": 135.604,
+            "execute_us": 45.657,
+            "protos": 2,
+            "instructions": 42,
+            "source_bytes": 34,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_bad_core",
+      "source": "print([].map(1).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: transformation: callback must be callable\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: transformation: callback must be callable\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "transformation: callback must be callable",
+            "line": 1,
+            "column": 7,
+            "parse_us": 57.93,
+            "compile_us": 111.855,
+            "execute_us": 35.909,
+            "protos": 1,
+            "instructions": 40,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_bad_extra",
+      "source": "print([].index_by(1).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "{}\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "{}\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 47.571,
+            "compile_us": 135.667,
+            "execute_us": 51.964,
+            "protos": 1,
+            "instructions": 40,
+            "source_bytes": 34,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_min",
+      "source": "print([].min_by(1))",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: min_by: cannot select from an empty array\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: min_by: cannot select from an empty array\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "min_by: cannot select from an empty array",
+            "line": 1,
+            "column": 7,
+            "parse_us": 48.183,
+            "compile_us": 113.582,
+            "execute_us": 38.991,
+            "protos": 1,
+            "instructions": 38,
+            "source_bytes": 20,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "predicate_error",
+      "source": "print([1].filter(x=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "filter: callback must return bool",
+            "line": 1,
+            "column": 7,
+            "parse_us": 43.15,
+            "compile_us": 173.223,
+            "execute_us": 37.779,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 36,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity",
+      "source": "print([1].map((x,y)=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: callback argument count mismatch\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: callback argument count mismatch\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "callback argument count mismatch",
+            "line": 1,
+            "column": 7,
+            "parse_us": 50.028,
+            "compile_us": 193.827,
+            "execute_us": 40.415,
+            "protos": 2,
+            "instructions": 43,
+            "source_bytes": 37,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "group_key_error",
+      "source": "print([1].group_by(x=>[x]).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: group_by: key must be scalar\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: group_by: key must be scalar\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "group_by: key must be scalar",
+            "line": 1,
+            "column": 7,
+            "parse_us": 54.476,
+            "compile_us": 169.928,
+            "execute_us": 40.867,
+            "protos": 2,
+            "instructions": 45,
+            "source_bytes": 40,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 320,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 320,
+            "heap_live": 320,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "index_duplicate",
+      "source": "print([1,1].index_by(x=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: index_by: duplicate generated key '1'\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: index_by: duplicate generated key '1'\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "index_by: duplicate generated key '1'",
+            "line": 1,
+            "column": 7,
+            "parse_us": 58.624,
+            "compile_us": 217.166,
+            "execute_us": 72.555,
+            "protos": 2,
+            "instructions": 45,
+            "source_bytes": 40,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 640,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "group_each_error",
+      "source": "print([1].group_by_each(x=>x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: group_by_each: selector must return an array\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: group_by_each: selector must return an array\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "group_by_each: selector must return an array",
+            "line": 1,
+            "column": 7,
+            "parse_us": 53.52,
+            "compile_us": 155.592,
+            "execute_us": 48.405,
+            "protos": 2,
+            "instructions": 44,
+            "source_bytes": 43,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unique_structural",
+      "source": "print([1,2,3,4].unique_by(x=>[x%2]).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 56.503,
+            "compile_us": 195.539,
+            "execute_us": 72.825,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 49,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 960,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by_direction",
+      "source": "print([1,3,2].sort_by(x=>x,\"desc\").stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 60.235,
+            "compile_us": 199.445,
+            "execute_us": 53.702,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 48,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "block_assignment",
+      "source": "n := 0; print([1,2].map(x=>{ n += x }).stringify()); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,3]\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,3]\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.575,
+            "compile_us": 183.131,
+            "execute_us": 54.246,
+            "protos": 3,
+            "instructions": 66,
+            "source_bytes": 62,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "block_error",
+      "source": "n := 0; print([1].map(x=>{ n += x/0 }).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: division by zero",
+            "line": 1,
+            "column": 15,
+            "parse_us": 58.77,
+            "compile_us": 197.461,
+            "execute_us": 53.193,
+            "protos": 3,
+            "instructions": 65,
+            "source_bytes": 52,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "block_return",
+      "source": "print([1].map(x=>{ return x+1 }).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: lambda body error: unknown value or malformed expression: return x\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: lambda body error: unknown value or malformed expression: return x\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: unknown value or malformed expression: return x",
+            "line": 1,
+            "column": 7,
+            "parse_us": 80.641,
+            "compile_us": 230.952,
+            "execute_us": 74.665,
+            "protos": 3,
+            "instructions": 48,
+            "source_bytes": 46,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 384,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 384,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "explicit_error",
+      "source": "fn(boom(x)) { throw error(\"boom\") }; try { [1].map(boom) } catch(e) { print(e.message); print(e.line); print(e.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "boom\n1\n15\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "boom\n1\n15\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 50.237,
+            "compile_us": 203.303,
+            "execute_us": 52.751,
+            "protos": 2,
+            "instructions": 52,
+            "source_bytes": 121,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 768,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1088,
+            "heap_live": 768,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "splice_throw",
+      "source": "a := [1,2,3]; fn(boom()) { throw error(\"boom\") }; try { a.splice(1,1,boom()) } catch(e) { print(e.message); print(a.stringify()) }",
+      "pass_": true,
+      "legacy": {
+        "out": "boom\n[1,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "boom\n[1,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 60.783,
+            "compile_us": 205.622,
+            "execute_us": 66.507,
+            "protos": 2,
+            "instructions": 59,
+            "source_bytes": 131,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 576,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 832,
+            "heap_live": 576,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ordinary_block_error",
+      "source": "n:=0; f:=x=>{ n+=x/0 }; f(1)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "division by zero",
+            "line": 1,
+            "column": 18,
+            "parse_us": 69.537,
+            "compile_us": 170.064,
+            "execute_us": 45.263,
+            "protos": 2,
+            "instructions": 21,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_callback_error",
+      "source": "print([1].map(x=>[x].map(y=>y/0)[0]).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: lambda body error: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: lambda body error: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: lambda body error: division by zero",
+            "line": 1,
+            "column": 7,
+            "parse_us": 50.747,
+            "compile_us": 212.443,
+            "execute_us": 57.767,
+            "protos": 3,
+            "instructions": 84,
+            "source_bytes": 50,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_uncaught",
+      "source": "a:=[3,2,1]; fn(cmp(x,y)) { throw error(\"stop\") }; a.sort(cmp)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:28: stop\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:28: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 28,
+            "parse_us": 78.269,
+            "compile_us": 257.722,
+            "execute_us": 66.808,
+            "protos": 2,
+            "instructions": 58,
+            "source_bytes": 62,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 1088,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1344,
+            "heap_live": 1344,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_internal_catch",
+      "source": "a:=[3,2,1]; fn(cmp(x,y)) { try { throw error(\"inside\") } catch(e) { }; return x<y }; a.sort(cmp); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 56.163,
+            "compile_us": 315.292,
+            "execute_us": 72.8,
+            "protos": 2,
+            "instructions": 67,
+            "source_bytes": 119,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1344,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "callback_rethrow",
+      "source": "fn(cb(x)) { try { throw error(\"stop\") } catch(e) { throw e } }; try { [1].map(cb) } catch(e) { print(e.message); print(e.code); print(e.line); print(e.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "stop\nuser.raised\n1\n19\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "stop\nuser.raised\n1\n19\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 62.31,
+            "compile_us": 184.582,
+            "execute_us": 64.473,
+            "protos": 2,
+            "instructions": 59,
+            "source_bytes": 161,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 864,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1184,
+            "heap_live": 864,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "callback_rethrow_uncaught",
+      "source": "fn(cb(x)) { try { throw error(\"stop\") } catch(e) { throw e } }; [1].map(cb)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:19: stop\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:19: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 19,
+            "parse_us": 53.545,
+            "compile_us": 173.783,
+            "execute_us": 57.825,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 76,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_sort_internal",
+      "source": "a:=[3,2,1]; b:=[6,5,4]; fn(inside(x,y)) { throw error(\"inner\") }; fn(outer(x,y)) { try { b.sort(inside) } catch(e) { print(b.stringify()) }; return x<y }; a.sort(outer); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[6,5,4]\n[6,5,4]\n[6,5,4]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[6,5,4]\n[6,5,4]\n[6,5,4]\n[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 59.268,
+            "compile_us": 277.597,
+            "execute_us": 74.265,
+            "protos": 3,
+            "instructions": 127,
+            "source_bytes": 191,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 2240,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_sort_escape",
+      "source": "a:=[3,2,1]; b:=[6,5,4]; fn(inside(x,y)) { throw error(\"inner\") }; fn(outer(x,y)) { b.sort(inside); return x<y }; try { a.sort(outer) } catch(e) { print(e.message); print(b.stringify()); print(a.stringify()) }",
+      "pass_": true,
+      "legacy": {
+        "out": "inner\n[6,5,4]\n[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "inner\n[6,5,4]\n[3,2,1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 67.687,
+            "compile_us": 280.554,
+            "execute_us": 73.37,
+            "protos": 3,
+            "instructions": 128,
+            "source_bytes": 209,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 960,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 2432,
+            "heap_live": 960,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "snapshot_mutation",
+      "source": "a:=[1,2,3]; fn(cb(x)) { a[1]=99; return x }; print(a.map(cb).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,99,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[1,99,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 55.896,
+            "compile_us": 198.046,
+            "execute_us": 56.615,
+            "protos": 2,
+            "instructions": 60,
+            "source_bytes": 96,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "snapshot_growth",
+      "source": "a:=[1,2,3]; fn(cb(x)) { a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,2,3,9,9,9]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[1,2,3,9,9,9]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 85.376,
+            "compile_us": 304.959,
+            "execute_us": 62.639,
+            "protos": 2,
+            "instructions": 59,
+            "source_bytes": 98,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "snapshot_rebind",
+      "source": "a:=[1,2,3]; fn(cb(x)) { a=[9]; return x }; print(a.map(cb).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[9]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[9]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.839,
+            "compile_us": 202.589,
+            "execute_us": 49.024,
+            "protos": 2,
+            "instructions": 60,
+            "source_bytes": 94,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "core_factory",
+      "source": "n:=0; fn(mk()) { n+=1; return x=>x }; print([1,2,3].map(mk()).stringify()); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n1\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n1\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 54.3,
+            "compile_us": 235.444,
+            "execute_us": 51.875,
+            "protos": 3,
+            "instructions": 62,
+            "source_bytes": 85,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "extra_factory",
+      "source": "n:=0; fn(mk()) { n+=1; return x=>x }; print([1,2,3].index_by(mk()).stringify()); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "{\"1\":1,\"2\":2,\"3\":3}\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "{\"1\":1,\"2\":2,\"3\":3}\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 54.66,
+            "compile_us": 240.502,
+            "execute_us": 58.893,
+            "protos": 3,
+            "instructions": 62,
+            "source_bytes": 90,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 832,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by_factories",
+      "source": "n:=0; fn(mk()) { n+=1; return x=>x }; print([3,1,2].sort_by(mk(),\"asc\",mk(),\"desc\").stringify()); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n6\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n6\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 47.966,
+            "compile_us": 201.245,
+            "execute_us": 49.119,
+            "protos": 3,
+            "instructions": 70,
+            "source_bytes": 107,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "short_any",
+      "source": "n:=0; fn(cb(x)) { n+=1; return x>1 }; print([1,2,3].any(cb)); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "true\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "true\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 48.216,
+            "compile_us": 171.679,
+            "execute_us": 53.17,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 71,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "short_all",
+      "source": "n:=0; fn(cb(x)) { n+=1; return x<2 }; print([1,2,3].all(cb)); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "false\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "false\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 55.392,
+            "compile_us": 184.335,
+            "execute_us": 48.887,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 71,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "const_precedence",
+      "source": "const a:=[1]; fn(arg()) { print(\"ARG\"); return 9 }; print(a.push(arg()))",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:59: cannot mutate const array: a\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:59: cannot mutate const array: a\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "cannot mutate const array: a",
+            "line": 1,
+            "column": 59,
+            "parse_us": 55.237,
+            "compile_us": 205.189,
+            "execute_us": 41.448,
+            "protos": 2,
+            "instructions": 45,
+            "source_bytes": 73,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "const_pop_empty",
+      "source": "const a:=[]; a.pop()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: pop: array is empty\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: pop: array is empty\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "pop: array is empty",
+            "line": 1,
+            "column": 14,
+            "parse_us": 48.061,
+            "compile_us": 132.248,
+            "execute_us": 45.007,
+            "protos": 1,
+            "instructions": 36,
+            "source_bytes": 21,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "const_capture",
+      "source": "fn(f()) { const a:=[1]; g:=()=>a.pop(); g() }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:32: lambda body error: cannot mutate const array: a\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:32: lambda body error: cannot mutate const array: a\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: cannot mutate const array: a",
+            "line": 1,
+            "column": 32,
+            "parse_us": 60.036,
+            "compile_us": 209.533,
+            "execute_us": 61.908,
+            "protos": 3,
+            "instructions": 50,
+            "source_bytes": 51,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by_stable",
+      "source": "print([3,1,2].sort_by(x=>0).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[3,1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[3,1,2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 49.24,
+            "compile_us": 184.946,
+            "execute_us": 52.757,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 41,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "plain_single_bool",
+      "source": "a:=[true]; a.sort(); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[true]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[true]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 54.825,
+            "compile_us": 186.741,
+            "execute_us": 52.601,
+            "protos": 1,
+            "instructions": 39,
+            "source_bytes": 42,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "plain_bad_bool",
+      "source": "a:=[true,false]; a.sort()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: sort: incomparable values\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: sort: incomparable values\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort: incomparable values",
+            "line": 1,
+            "column": 18,
+            "parse_us": 97.403,
+            "compile_us": 184.125,
+            "execute_us": 46.541,
+            "protos": 1,
+            "instructions": 36,
+            "source_bytes": 26,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_singleton",
+      "source": "a:=[1]; a.sort(1); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 58.875,
+            "compile_us": 204.059,
+            "execute_us": 64.168,
+            "protos": 1,
+            "instructions": 55,
+            "source_bytes": 40,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 576,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_bad_result",
+      "source": "a:=[2,1]; a.sort((x,y)=>x+y)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: sort: comparator must return bool\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: sort: comparator must return bool\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort: comparator must return bool",
+            "line": 1,
+            "column": 11,
+            "parse_us": 51.976,
+            "compile_us": 162.237,
+            "execute_us": 45.88,
+            "protos": 2,
+            "instructions": 55,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_factory",
+      "source": "a:=[3,2,1]; n:=0; fn(mk()) { n+=1; return (x,y)=>x<y }; a.sort(mk()); print(a.stringify()); print(n)",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 57.565,
+            "compile_us": 276.55,
+            "execute_us": 55.064,
+            "protos": 3,
+            "instructions": 76,
+            "source_bytes": 101,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1024,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_named_failure",
+      "source": "fn(g(y)) { return y/0 }; print([1].map(x=>[x].map(g)[0]).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: lambda body error: return: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: lambda body error: return: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: return: division by zero",
+            "line": 1,
+            "column": 12,
+            "parse_us": 62.31,
+            "compile_us": 232.83,
+            "execute_us": 68.399,
+            "protos": 3,
+            "instructions": 85,
+            "source_bytes": 70,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_return_failure",
+      "source": "fn(f(x)) { return [x].map(y=>y/0)[0] }; print([1].map(f).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: return: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: return: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: lambda body error: division by zero",
+            "line": 1,
+            "column": 12,
+            "parse_us": 47.764,
+            "compile_us": 204.223,
+            "execute_us": 46.767,
+            "protos": 3,
+            "instructions": 85,
+            "source_bytes": 70,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_push",
+      "source": "a:=[1,2]; r:=a.push()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: push: expected one argument\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: push: expected one argument\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "push: expected one argument",
+            "line": 1,
+            "column": 14,
+            "parse_us": 70.555,
+            "compile_us": 201.361,
+            "execute_us": 59.026,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 22,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_pop",
+      "source": "a:=[1,2]; r:=a.pop(1)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: pop: expected no arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: pop: expected no arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "pop: expected no arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 60.356,
+            "compile_us": 183.478,
+            "execute_us": 47.746,
+            "protos": 1,
+            "instructions": 13,
+            "source_bytes": 22,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_insert",
+      "source": "a:=[1,2]; r:=a.insert(1)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: insert: expected index and value\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: insert: expected index and value\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "insert: expected index and value",
+            "line": 1,
+            "column": 14,
+            "parse_us": 47.795,
+            "compile_us": 146.603,
+            "execute_us": 40.347,
+            "protos": 1,
+            "instructions": 13,
+            "source_bytes": 25,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_remove",
+      "source": "a:=[1,2]; r:=a.remove()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: remove: expected index\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: remove: expected index\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "remove: expected index",
+            "line": 1,
+            "column": 14,
+            "parse_us": 94.244,
+            "compile_us": 151.717,
+            "execute_us": 44.224,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_clear",
+      "source": "a:=[1,2]; r:=a.clear(1)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: clear: expected no arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: clear: expected no arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "clear: expected no arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 42.162,
+            "compile_us": 133.509,
+            "execute_us": 37.094,
+            "protos": 1,
+            "instructions": 13,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_splice",
+      "source": "a:=[1,2]; r:=a.splice()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: splice: expected start, delete_count, optional replacement array\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: splice: expected start, delete_count, optional replacement array\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "splice: expected start, delete_count, optional replacement array",
+            "line": 1,
+            "column": 14,
+            "parse_us": 51.957,
+            "compile_us": 150.635,
+            "execute_us": 45.988,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_reverse",
+      "source": "a:=[1,2]; r:=a.reverse(1)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: reverse: expected no arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: reverse: expected no arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "reverse: expected no arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 55.803,
+            "compile_us": 150.438,
+            "execute_us": 42.155,
+            "protos": 1,
+            "instructions": 13,
+            "source_bytes": 26,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_sort",
+      "source": "a:=[1,2]; r:=a.sort(1,2)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort: expected zero or one comparator\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort: expected zero or one comparator\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort: expected zero or one comparator",
+            "line": 1,
+            "column": 14,
+            "parse_us": 69.137,
+            "compile_us": 178.914,
+            "execute_us": 58.978,
+            "protos": 1,
+            "instructions": 14,
+            "source_bytes": 25,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_map",
+      "source": "a:=[1,2]; r:=a.map()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: map: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: map: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "map: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 46.366,
+            "compile_us": 184.188,
+            "execute_us": 49.172,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 21,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_filter",
+      "source": "a:=[1,2]; r:=a.filter()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: filter: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: filter: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "filter: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 57.892,
+            "compile_us": 144.542,
+            "execute_us": 42.45,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_reduce",
+      "source": "a:=[1,2]; r:=a.reduce(x=>x)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: reduce: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: reduce: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "reduce: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 52.016,
+            "compile_us": 183.889,
+            "execute_us": 39.376,
+            "protos": 2,
+            "instructions": 16,
+            "source_bytes": 28,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_any",
+      "source": "a:=[1,2]; r:=a.any()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: any: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: any: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "any: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 50.572,
+            "compile_us": 136.089,
+            "execute_us": 33.818,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 21,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_all",
+      "source": "a:=[1,2]; r:=a.all()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: all: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: all: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "all: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 74.948,
+            "compile_us": 210.242,
+            "execute_us": 40.234,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 21,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_find",
+      "source": "a:=[1,2]; r:=a.find()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: find: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: find: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "find: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 63.891,
+            "compile_us": 182.679,
+            "execute_us": 47.42,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 22,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_find_index",
+      "source": "a:=[1,2]; r:=a.find_index()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: find_index: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: find_index: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "find_index: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 56.643,
+            "compile_us": 214.27,
+            "execute_us": 46.592,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 28,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_count",
+      "source": "a:=[1,2]; r:=a.count()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: count: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: count: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "count: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 47.059,
+            "compile_us": 144.796,
+            "execute_us": 36.265,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 23,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_sort_by",
+      "source": "a:=[1,2]; r:=a.sort_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort_by: expected selector or selector/direction pairs\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort_by: expected selector or selector/direction pairs\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort_by: expected selector or selector/direction pairs",
+            "line": 1,
+            "column": 14,
+            "parse_us": 64.262,
+            "compile_us": 159.507,
+            "execute_us": 56.189,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 25,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_group_by",
+      "source": "a:=[1,2]; r:=a.group_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: group_by: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: group_by: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "group_by: invalid arguments",
+            "line": 1,
+            "column": 14,
+            "parse_us": 82.196,
+            "compile_us": 133.539,
+            "execute_us": 42.152,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 26,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_index_by",
+      "source": "a:=[1,2]; r:=a.index_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: index_by: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: index_by: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "index_by: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 51.402,
+            "compile_us": 167.273,
+            "execute_us": 44.688,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 26,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_partition",
+      "source": "a:=[1,2]; r:=a.partition()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: partition: expected one predicate\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: partition: expected one predicate\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "partition: expected one predicate",
+            "line": 1,
+            "column": 14,
+            "parse_us": 56.792,
+            "compile_us": 152.566,
+            "execute_us": 56.915,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 27,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_unique_by",
+      "source": "a:=[1,2]; r:=a.unique_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: unique_by: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: unique_by: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "unique_by: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 57.211,
+            "compile_us": 151.688,
+            "execute_us": 38.707,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 27,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_min_by",
+      "source": "a:=[1,2]; r:=a.min_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: min_by: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: min_by: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "min_by: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 47.941,
+            "compile_us": 130.761,
+            "execute_us": 37.516,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_max_by",
+      "source": "a:=[1,2]; r:=a.max_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: max_by: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: max_by: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "max_by: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 59.347,
+            "compile_us": 142.805,
+            "execute_us": 44.138,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 24,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_count_by",
+      "source": "a:=[1,2]; r:=a.count_by()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: count_by: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: count_by: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "count_by: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 50.807,
+            "compile_us": 146.76,
+            "execute_us": 45.169,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 26,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arity_guard_group_by_each",
+      "source": "a:=[1,2]; r:=a.group_by_each()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: group_by_each: expected one selector\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: group_by_each: expected one selector\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "group_by_each: expected one selector",
+            "line": 1,
+            "column": 14,
+            "parse_us": 69.389,
+            "compile_us": 140.689,
+            "execute_us": 46.112,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 31,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "direction_variable_guard",
+      "source": "d:=\"asc\"; a:=[2,1]; r:=a.sort_by(x=>x,d)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:24: sort_by: direction must be quoted 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:24: sort_by: direction must be quoted 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort_by: direction must be quoted 'asc' or 'desc'",
+            "line": 1,
+            "column": 24,
+            "parse_us": 47.766,
+            "compile_us": 164.323,
+            "execute_us": 43.611,
+            "protos": 2,
+            "instructions": 20,
+            "source_bytes": 41,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "direction_bad_guard",
+      "source": "a:=[2,1]; r:=a.sort_by(x=>x,\"up\")",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort_by: direction must be 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:14: sort_by: direction must be 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort_by: direction must be 'asc' or 'desc'",
+            "line": 1,
+            "column": 14,
+            "parse_us": 63.76,
+            "compile_us": 222.374,
+            "execute_us": 69.637,
+            "protos": 2,
+            "instructions": 17,
+            "source_bytes": 34,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "escaped_direction",
+      "source": "print([2,1].sort_by(x=>x,\"\\u0061sc\").stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: sort_by: direction must be 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: sort_by: direction must be 'asc' or 'desc'\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort_by: direction must be 'asc' or 'desc'",
+            "line": 1,
+            "column": 7,
+            "parse_us": 46.527,
+            "compile_us": 170.86,
+            "execute_us": 48.995,
+            "protos": 2,
+            "instructions": 15,
+            "source_bytes": 50,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "iterator_mutation",
+      "source": "a:=[[1,2],[3]]; for(v:a) { v.push(9) }; print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1,2,9],[3,9]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1,2,9],[3,9]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 46.7,
+            "compile_us": 172.327,
+            "execute_us": 49.531,
+            "protos": 1,
+            "instructions": 99,
+            "source_bytes": 61,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 512,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 512,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "captured_snapshot",
+      "source": "fn(f()) { a:=[1,2,3]; g:=x=>{ a.push(x) }; print(a.map(g).stringify()); print(a.stringify()) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,2,3,1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n[1,2,3,1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 60.416,
+            "compile_us": 235.359,
+            "execute_us": 85.33,
+            "protos": 4,
+            "instructions": 96,
+            "source_bytes": 100,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 576,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "user_prefix_caught",
+      "source": "fn(boom(x)) { throw error(\"lambda body error: user\") }; try { [1].map(x=>boom(x)) } catch(e) { print(e.message); print(e.code) }",
+      "pass_": true,
+      "legacy": {
+        "out": "lambda body error: user\nuser.raised\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "lambda body error: user\nuser.raised\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 53.05,
+            "compile_us": 242.559,
+            "execute_us": 66.9,
+            "protos": 3,
+            "instructions": 53,
+            "source_bytes": 129,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 672,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1120,
+            "heap_live": 672,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "user_prefix_uncaught",
+      "source": "fn(boom(x)) { throw error(\"lambda body error: user\") }; [1].map(x=>boom(x))",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: lambda body error: user\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: lambda body error: user\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: lambda body error: user",
+            "line": 1,
+            "column": 15,
+            "parse_us": 70.495,
+            "compile_us": 258.123,
+            "execute_us": 66.271,
+            "protos": 3,
+            "instructions": 46,
+            "source_bytes": 76,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 576,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 832,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "recursive_sort_rethrow",
+      "source": "fn(work(n)) { a:=[3,2,1]; try { a.sort((x,y)=>{ if(n>0) { work(n-1) }; throw error(\"stop\") }) } catch(e) { print(n); print(a.stringify()); throw e } }; try { work(2) } catch(e) { print(e.message) }",
+      "pass_": true,
+      "legacy": {
+        "out": "0\n[3,2,1]\n1\n[3,2,1]\n2\n[3,2,1]\nstop\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "0\n[3,2,1]\n1\n[3,2,1]\n2\n[3,2,1]\nstop\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 69.452,
+            "compile_us": 282.245,
+            "execute_us": 83.679,
+            "protos": 3,
+            "instructions": 84,
+            "source_bytes": 198,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 448,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 3520,
+            "heap_live": 448,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_mutation_fault",
+      "source": "a:=[1]; print([0,a.insert(9,2)].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: insert: index out of range\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: insert: index out of range\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "insert: index out of range",
+            "line": 1,
+            "column": 15,
+            "parse_us": 48.683,
+            "compile_us": 169.426,
+            "execute_us": 44.31,
+            "protos": 1,
+            "instructions": 42,
+            "source_bytes": 45,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_nested_mutation_fault",
+      "source": "a:=[1]; print([[a.insert(9,2)]].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: insert: index out of range\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: insert: index out of range\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "insert: index out of range",
+            "line": 1,
+            "column": 15,
+            "parse_us": 52.195,
+            "compile_us": 197.394,
+            "execute_us": 47.737,
+            "protos": 1,
+            "instructions": 42,
+            "source_bytes": 45,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_callback_fault",
+      "source": "a:=[1]; print([a.map(x=>x/0)].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: division by zero",
+            "line": 1,
+            "column": 15,
+            "parse_us": 54.413,
+            "compile_us": 201.02,
+            "execute_us": 52.241,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 43,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_named_callback_fault",
+      "source": "fn(cb(x)) { throw error(\"wrapped\") }; print([[1].map(cb)].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:13: wrapped\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:13: wrapped\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "wrapped",
+            "line": 1,
+            "column": 13,
+            "parse_us": 67.388,
+            "compile_us": 254.076,
+            "execute_us": 84.978,
+            "protos": 2,
+            "instructions": 47,
+            "source_bytes": 71,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 448,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_loop_mutation",
+      "source": "a:=[1]; i:=0; while(i<1) { print([a.insert(9,2)].stringify()); i+=1 }",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:35: insert: index out of range\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:35: insert: index out of range\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "insert: index out of range",
+            "line": 1,
+            "column": 35,
+            "parse_us": 59.662,
+            "compile_us": 242.655,
+            "execute_us": 58.154,
+            "protos": 1,
+            "instructions": 48,
+            "source_bytes": 70,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": true,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_loop_callback",
+      "source": "i:=0; while(i<1) { print([[1].map(x=>x/0)].stringify()); i+=1 }",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:38: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:38: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: division by zero",
+            "line": 1,
+            "column": 38,
+            "parse_us": 57.472,
+            "compile_us": 272.818,
+            "execute_us": 60.592,
+            "protos": 2,
+            "instructions": 52,
+            "source_bytes": 64,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": true,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wrapped_caught_callback",
+      "source": "try { print([[1].map(x=>x/0)].stringify()) } catch(e) { print(e.message); print(e.code); print(e.line); print(e.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:13: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:13: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: division by zero",
+            "line": 1,
+            "column": 13,
+            "parse_us": 64.227,
+            "compile_us": 236.93,
+            "execute_us": 74.347,
+            "protos": 2,
+            "instructions": 56,
+            "source_bytes": 122,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 736,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 736,
+            "heap_live": 736,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nested_lambda_inference",
+      "source": "fn(f()) { g:=x=>{ h:=y=>y+1; return h(x) }; print(g(1)); print([1].map(x=>x+1).stringify()) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n[2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "2\n[2]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 71.219,
+            "compile_us": 269.108,
+            "execute_us": 60.589,
+            "protos": 5,
+            "instructions": 63,
+            "source_bytes": 99,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "caught_error_identity",
+      "source": "e:=error(\"identity\",\"user.identity\"); fn(cb(x)) { throw e }; try { [1].map(cb) } catch(c) { print(c==e); print(c.message); print(c.code); print(c.category); print(c.cause==null); print(c.line); print(c.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "false\nidentity\nuser.identity\nuser\ntrue\n1\n51\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "false\nidentity\nuser.identity\nuser\ntrue\n1\n51\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 69.244,
+            "compile_us": 220.223,
+            "execute_us": 75.725,
+            "protos": 2,
+            "instructions": 66,
+            "source_bytes": 212,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1248,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1376,
+            "heap_live": 1248,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "caught_comparator_identity",
+      "source": "e:=error(\"identity\",\"user.identity\"); fn(cmp(x,y)) { throw e }; a:=[2,1]; try { a.sort(cmp) } catch(c) { print(c==e); print(c.message); print(c.code); print(c.category); print(c.cause==null); print(c.line); print(c.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "false\nidentity\nuser.identity\nuser\ntrue\n1\n54\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "false\nidentity\nuser.identity\nuser\ntrue\n1\n54\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 78.812,
+            "compile_us": 306.02,
+            "execute_us": 101.279,
+            "protos": 2,
+            "instructions": 80,
+            "source_bytes": 225,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1312,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1824,
+            "heap_live": 1312,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rethrow_error_identity",
+      "source": "e:=error(\"identity\",\"user.identity\"); fn(cb(x)) { try { throw e } catch(c) { print(c==e); throw c } }; try { [1].map(cb) } catch(c) { print(c==e); print(c.message); print(c.code); print(c.line); print(c.column) }",
+      "pass_": true,
+      "legacy": {
+        "out": "false\nfalse\nidentity\nuser.identity\n1\n57\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "false\nfalse\nidentity\nuser.identity\n1\n57\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 65.072,
+            "compile_us": 242.302,
+            "execute_us": 62.598,
+            "protos": 2,
+            "instructions": 69,
+            "source_bytes": 213,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1056,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1184,
+            "heap_live": 1056,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by_unused_heterogeneous_secondary",
+      "source": "print([1,2,3].sort_by(x=>x,\"asc\",x=>x==2 ? \"x\" : x,\"asc\").stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[1,2,3]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.417,
+            "compile_us": 220.88,
+            "execute_us": 55.307,
+            "protos": 3,
+            "instructions": 59,
+            "source_bytes": 71,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort_by_heterogeneous_keys",
+      "source": "print([1,2,3].sort_by(x=>x==2 ? \"x\" : x).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: sort_by: keys must be comparable and homogeneous\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:7: sort_by: keys must be comparable and homogeneous\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "sort_by: keys must be comparable and homogeneous",
+            "line": 1,
+            "column": 7,
+            "parse_us": 61.338,
+            "compile_us": 203.288,
+            "execute_us": 62.389,
+            "protos": 2,
+            "instructions": 51,
+            "source_bytes": 54,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_lambda_uncaught",
+      "source": "a:=[2,1]; a.sort((x,y)=>x/0)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: lambda body error: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: division by zero",
+            "line": 1,
+            "column": 11,
+            "parse_us": 50.544,
+            "compile_us": 211.134,
+            "execute_us": 69.049,
+            "protos": 2,
+            "instructions": 55,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_named_callback_return",
+      "source": "fn(cb(x)) { return x }; print([[1],[2]].map(cb).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1],[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1],[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 62.749,
+            "compile_us": 286.097,
+            "execute_us": 52.216,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 61,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_callback_wrap",
+      "source": "print([[1],[2]].map(x=>[x]).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[[1]],[[2]]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[[1]],[[2]]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 62.892,
+            "compile_us": 211.329,
+            "execute_us": 61.146,
+            "protos": 2,
+            "instructions": 48,
+            "source_bytes": 41,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_callback_mutation",
+      "source": "a:=[[1],[2]]; fn(cb(x)) { x.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1,9],[2,9]]\n[[1],[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1,9],[2,9]]\n[[1],[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 46.835,
+            "compile_us": 213.749,
+            "execute_us": 58.772,
+            "protos": 2,
+            "instructions": 56,
+            "source_bytes": 100,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 384,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 512,
+            "heap_live": 384,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "object_callback_return",
+      "source": "fn(cb(x)) { return x }; print([{\"k\":1},{\"k\":2}].map(cb).stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[{\"k\":1},{\"k\":2}]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[{\"k\":1},{\"k\":2}]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 58.354,
+            "compile_us": 230.693,
+            "execute_us": 51.493,
+            "protos": 2,
+            "instructions": 46,
+            "source_bytes": 69,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_pop_result",
+      "source": "a:=[[1],[2]]; r:=a.pop(); print([r].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 50.006,
+            "compile_us": 176.398,
+            "execute_us": 43.942,
+            "protos": 1,
+            "instructions": 45,
+            "source_bytes": 49,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_reduce_result",
+      "source": "fn(cb(a,x)) { a.push(x); return a }; r:=[1,2].reduce(cb,[]); print([r].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1,2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1,2]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 58.895,
+            "compile_us": 261.18,
+            "execute_us": 59.784,
+            "protos": 2,
+            "instructions": 53,
+            "source_bytes": 84,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 320,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_find_result",
+      "source": "r:=[[1],[2]].find(x=>x.size()==1); print([r].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 66.985,
+            "compile_us": 237.109,
+            "execute_us": 71.183,
+            "protos": 2,
+            "instructions": 52,
+            "source_bytes": 58,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 320,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_find_null",
+      "source": "r:=[[1],[2]].find(x=>false); print([r].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[null]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[null]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 77.902,
+            "compile_us": 198.604,
+            "execute_us": 54.416,
+            "protos": 2,
+            "instructions": 51,
+            "source_bytes": 52,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 0,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 320,
+            "heap_live": 0,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate_min_result",
+      "source": "r:=[[1],[2,3]].min_by(x=>x.size()); print([r].stringify())",
+      "pass_": true,
+      "legacy": {
+        "out": "[[1]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "vm": {
+        "out": "[[1]]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 47.091,
+            "compile_us": 166.899,
+            "execute_us": 55.19,
+            "protos": 2,
+            "instructions": 52,
+            "source_bytes": 59,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 448,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "return_comparator_result_error",
+      "source": "fn(f()) { a:=[2,1]; return a.sort((x,y)=>x+y) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:21: return: sort: comparator must return bool\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:21: return: sort: comparator must return bool\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: sort: comparator must return bool",
+            "line": 1,
+            "column": 21,
+            "parse_us": 53.678,
+            "compile_us": 182.61,
+            "execute_us": 37.398,
+            "protos": 3,
+            "instructions": 56,
+            "source_bytes": 53,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "return_collection_predicate_error",
+      "source": "fn(f()) { return [1].filter(x=>x) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: filter: callback must return bool",
+            "line": 1,
+            "column": 11,
+            "parse_us": 49.638,
+            "compile_us": 191.707,
+            "execute_us": 42.109,
+            "protos": 3,
+            "instructions": 44,
+            "source_bytes": 41,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "return_mutator_error",
+      "source": "fn(f()) { a:=[]; return a.pop() }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: return: pop: array is empty\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:18: return: pop: array is empty\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: pop: array is empty",
+            "line": 1,
+            "column": 18,
+            "parse_us": 57.772,
+            "compile_us": 177.943,
+            "execute_us": 49.2,
+            "protos": 2,
+            "instructions": 35,
+            "source_bytes": 39,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "return_callback_arity_error",
+      "source": "fn(f()) { return [1].map((x,y)=>x) }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: callback argument count mismatch\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: callback argument count mismatch\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: callback argument count mismatch",
+            "line": 1,
+            "column": 11,
+            "parse_us": 57.627,
+            "compile_us": 167.119,
+            "execute_us": 45.936,
+            "protos": 3,
+            "instructions": 43,
+            "source_bytes": 42,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "return_method_arity_error",
+      "source": "fn(f()) { return [1].map() }; f()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: map: invalid arguments\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:11: return: map: invalid arguments\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: map: invalid arguments",
+            "line": 1,
+            "column": 11,
+            "parse_us": 58.415,
+            "compile_us": 146.077,
+            "execute_us": 35.92,
+            "protos": 2,
+            "instructions": 9,
+            "source_bytes": 34,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 128,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fast_named_helper_error",
+      "source": "fn(g(x)) { return x/0 }; fn(cb(x)) { return g(x) }; [1].map(cb)",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: return: return: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:12: return: return: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: return: division by zero",
+            "line": 1,
+            "column": 12,
+            "parse_us": 51.786,
+            "compile_us": 178.078,
+            "execute_us": 49.394,
+            "protos": 3,
+            "instructions": 46,
+            "source_bytes": 64,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparator_block_return_error",
+      "source": "a:=[2,1]; a.sort((x,y)=>{ return x/0 })",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: return: division by zero\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: return: division by zero\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: division by zero",
+            "line": 1,
+            "column": 2,
+            "parse_us": 47.133,
+            "compile_us": 181.648,
+            "execute_us": 54.96,
+            "protos": 2,
+            "instructions": 56,
+            "source_bytes": 40,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "script_return_kernel_error",
+      "source": "a:=[]; return a.pop()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:8: return: pop: array is empty\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:8: return: pop: array is empty\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "return: pop: array is empty",
+            "line": 1,
+            "column": 8,
+            "parse_us": 53.078,
+            "compile_us": 162.474,
+            "execute_us": 51.607,
+            "protos": 1,
+            "instructions": 35,
+            "source_bytes": 22,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 64,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 64,
+            "heap_live": 64,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ordinary_lambda_collection_error",
+      "source": "g:=()=>[1].filter(x=>x); g()",
+      "pass_": true,
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:8: lambda body error: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": []
+      },
+      "vm": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:8: lambda body error: filter: callback must return bool\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "lambda body error: filter: callback must return bool",
+            "line": 1,
+            "column": 8,
+            "parse_us": 49.717,
+            "compile_us": 170.249,
+            "execute_us": 49.923,
+            "protos": 3,
+            "instructions": 49,
+            "source_bytes": 29,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 384,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 384,
+            "path": "/tmp/cp14b-functional-lwzzvs16/case.f"
+          }
+        ]
+      }
+    }
+  ]
+}

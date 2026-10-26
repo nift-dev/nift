@@ -3,6 +3,7 @@
 
 #include "HostTrace.h"
 #include "rt/compiler.h"
+#include "rt/eval_admission.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
 #include "rt/module_host_op.h"
@@ -18,11 +19,8 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 
 // rt-lint: cold-file process-level setup and reporting, once per script
 
@@ -336,6 +334,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     limits.module_names = link.module_names;
     CompileResult compiled = eval ? compile_expression_unit(ast, parsed.root)
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
+    if (eval) refuse_eval_error_presentation(compiled);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {

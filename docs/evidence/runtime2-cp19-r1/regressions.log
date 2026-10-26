@@ -1,0 +1,511 @@
+.build/shell-dispatch-unit
+PASS shell dispatch unit: 86 checks
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --selftest
+mkdir -p ".build/cp14b/evidence"
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/functional.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --legacy "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/functional.json"
+PASS harness self-test: one return type; checked/ASan/control rules; policy mapping; fallback-to-execution detection; fallback statuses and resource-limit classifications
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --trace-selftest
+PASS trace self-test: fd-based NIFT_TRACE_HOST captured 1 Host entries
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode legacy
+PASS 80, FAIL 0 (legacy)
+PASS map
+PASS filter
+PASS reduce
+PASS any
+PASS all
+PASS find
+PASS find_index
+PASS count
+PASS sort_by
+PASS group_by
+PASS index_by
+PASS partition
+PASS unique_by
+PASS min_by
+PASS max_by
+PASS count_by
+PASS group_by_each
+PASS push
+PASS pop
+PASS insert
+PASS remove
+PASS clear
+PASS splice
+PASS reverse
+PASS sort
+PASS comparator
+PASS captured
+PASS empty_map
+PASS empty_bad_core
+PASS empty_bad_extra
+PASS empty_min
+PASS predicate_error
+PASS arity
+PASS group_key_error
+PASS index_duplicate
+PASS group_each_error
+PASS unique_structural
+PASS sort_by_direction
+PASS block_assignment
+PASS block_error
+PASS block_return
+PASS explicit_error
+PASS splice_throw
+PASS ordinary_block_error
+PASS nested_callback_error
+PASS comparator_uncaught
+PASS comparator_internal_catch
+PASS callback_rethrow
+PASS callback_rethrow_uncaught
+PASS nested_sort_internal
+PASS nested_sort_escape
+PASS snapshot_mutation
+PASS snapshot_growth
+PASS snapshot_rebind
+PASS core_factory
+PASS extra_factory
+PASS sort_by_factories
+PASS short_any
+PASS short_all
+PASS const_precedence
+PASS const_pop_empty
+PASS const_capture
+PASS sort_by_stable
+PASS plain_single_bool
+PASS plain_bad_bool
+PASS comparator_singleton
+PASS comparator_bad_result
+PASS comparator_factory
+PASS nested_named_failure
+PASS nested_return_failure
+PASS arity_guard_push
+PASS arity_guard_pop
+PASS arity_guard_insert
+PASS arity_guard_remove
+PASS arity_guard_clear
+PASS arity_guard_splice
+PASS arity_guard_reverse
+PASS arity_guard_sort
+PASS arity_guard_map
+PASS arity_guard_filter
+PASS arity_guard_reduce
+PASS arity_guard_any
+PASS arity_guard_all
+PASS arity_guard_find
+PASS arity_guard_find_index
+PASS arity_guard_count
+PASS arity_guard_sort_by
+PASS arity_guard_group_by
+PASS arity_guard_index_by
+PASS arity_guard_partition
+PASS arity_guard_unique_by
+PASS arity_guard_min_by
+PASS arity_guard_max_by
+PASS arity_guard_count_by
+PASS arity_guard_group_by_each
+PASS direction_variable_guard
+PASS direction_bad_guard
+PASS escaped_direction
+PASS iterator_mutation
+PASS captured_snapshot
+PASS user_prefix_caught
+PASS user_prefix_uncaught
+PASS recursive_sort_rethrow
+PASS wrapped_mutation_fault
+PASS wrapped_nested_mutation_fault
+PASS wrapped_callback_fault
+PASS wrapped_named_callback_fault
+PASS wrapped_loop_mutation
+PASS wrapped_loop_callback
+PASS wrapped_caught_callback
+PASS nested_lambda_inference
+PASS caught_error_identity
+PASS caught_comparator_identity
+PASS rethrow_error_identity
+PASS sort_by_unused_heterogeneous_secondary
+PASS sort_by_heterogeneous_keys
+PASS comparator_lambda_uncaught
+PASS aggregate_named_callback_return
+PASS aggregate_callback_wrap
+PASS aggregate_callback_mutation
+PASS object_callback_return
+PASS aggregate_pop_result
+PASS aggregate_reduce_result
+PASS aggregate_find_result
+PASS aggregate_find_null
+PASS aggregate_min_result
+PASS return_comparator_result_error
+PASS return_collection_predicate_error
+PASS return_mutator_error
+PASS return_callback_arity_error
+PASS return_method_arity_error
+PASS fast_named_helper_error
+PASS comparator_block_return_error
+PASS script_return_kernel_error
+PASS ordinary_lambda_collection_error
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): functional comparator cases ran on the VM
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode current
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/functional.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --legacy "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/functional-switch.json"
+PASS map
+PASS filter
+PASS reduce
+PASS any
+PASS all
+PASS find
+PASS find_index
+PASS count
+PASS sort_by
+PASS group_by
+PASS index_by
+PASS partition
+PASS unique_by
+PASS min_by
+PASS max_by
+PASS count_by
+PASS group_by_each
+PASS push
+PASS pop
+PASS insert
+PASS remove
+PASS clear
+PASS splice
+PASS reverse
+PASS sort
+PASS comparator
+PASS captured
+PASS empty_map
+PASS empty_bad_core
+PASS empty_bad_extra
+PASS empty_min
+PASS predicate_error
+PASS arity
+PASS group_key_error
+PASS index_duplicate
+PASS group_each_error
+PASS unique_structural
+PASS sort_by_direction
+PASS block_assignment
+PASS block_error
+PASS block_return
+PASS explicit_error
+PASS splice_throw
+PASS ordinary_block_error
+PASS nested_callback_error
+PASS comparator_uncaught
+PASS comparator_internal_catch
+PASS callback_rethrow
+PASS callback_rethrow_uncaught
+PASS nested_sort_internal
+PASS nested_sort_escape
+PASS snapshot_mutation
+PASS snapshot_growth
+PASS snapshot_rebind
+PASS core_factory
+PASS extra_factory
+PASS sort_by_factories
+PASS short_any
+PASS short_all
+PASS const_precedence
+PASS const_pop_empty
+PASS const_capture
+PASS sort_by_stable
+PASS plain_single_bool
+PASS plain_bad_bool
+PASS comparator_singleton
+PASS comparator_bad_result
+PASS comparator_factory
+PASS nested_named_failure
+PASS nested_return_failure
+PASS arity_guard_push
+PASS arity_guard_pop
+PASS arity_guard_insert
+PASS arity_guard_remove
+PASS arity_guard_clear
+PASS arity_guard_splice
+PASS arity_guard_reverse
+PASS arity_guard_sort
+PASS arity_guard_map
+PASS arity_guard_filter
+PASS arity_guard_reduce
+PASS arity_guard_any
+PASS arity_guard_all
+PASS arity_guard_find
+PASS arity_guard_find_index
+PASS arity_guard_count
+PASS arity_guard_sort_by
+PASS arity_guard_group_by
+PASS arity_guard_index_by
+PASS arity_guard_partition
+PASS arity_guard_unique_by
+PASS arity_guard_min_by
+PASS arity_guard_max_by
+PASS arity_guard_count_by
+PASS arity_guard_group_by_each
+PASS direction_variable_guard
+PASS direction_bad_guard
+PASS escaped_direction
+PASS iterator_mutation
+PASS captured_snapshot
+PASS user_prefix_caught
+PASS user_prefix_uncaught
+PASS recursive_sort_rethrow
+PASS wrapped_mutation_fault
+PASS wrapped_nested_mutation_fault
+PASS wrapped_callback_fault
+PASS wrapped_named_callback_fault
+PASS wrapped_loop_mutation
+PASS wrapped_loop_callback
+PASS wrapped_caught_callback
+PASS nested_lambda_inference
+PASS caught_error_identity
+PASS caught_comparator_identity
+PASS rethrow_error_identity
+PASS sort_by_unused_heterogeneous_secondary
+PASS sort_by_heterogeneous_keys
+PASS comparator_lambda_uncaught
+PASS aggregate_named_callback_return
+PASS aggregate_callback_wrap
+PASS aggregate_callback_mutation
+PASS object_callback_return
+PASS aggregate_pop_result
+PASS aggregate_reduce_result
+PASS aggregate_find_result
+PASS aggregate_find_null
+PASS aggregate_min_result
+PASS return_comparator_result_error
+PASS return_collection_predicate_error
+PASS return_mutator_error
+PASS return_callback_arity_error
+PASS return_method_arity_error
+PASS fast_named_helper_error
+PASS comparator_block_return_error
+PASS script_return_kernel_error
+PASS ordinary_lambda_collection_error
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): functional comparator cases ran on the VM
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/effects.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --legacy "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/effects.json"
+PASS self-structural
+PASS receiver-write
+PASS unknown-effects
+PASS exact-number-profile
+PASS decimal-profile
+PASS error-profile
+PASS disjoint-counter
+PASS safe-helper
+PASS safe-recursive-helper
+PASS recursive-same-site
+PASS future-boundary
+PASS completed-boundary
+PASS disjoint-value-copy
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): effects comparator cases ran on the VM
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/effects.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --legacy "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/effects-switch.json"
+PASS self-structural
+PASS receiver-write
+PASS unknown-effects
+PASS exact-number-profile
+PASS decimal-profile
+PASS error-profile
+PASS disjoint-counter
+PASS safe-helper
+PASS safe-recursive-helper
+PASS recursive-same-site
+PASS future-boundary
+PASS completed-boundary
+PASS disjoint-value-copy
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): effects comparator cases ran on the VM
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/origins.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/origins.json"
+PASS 80, FAIL 0 (current)
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode future
+PASS declared_comparator-uncaught
+PASS declared_comparator-caught
+PASS inline_padded-uncaught
+PASS inline_padded-caught
+PASS inline_shifted-uncaught
+PASS inline_shifted-caught
+PASS inline_multiline-uncaught
+PASS inline_multiline-caught
+PASS declared_multiline-uncaught
+PASS declared_multiline-caught
+PASS internal_catch-uncaught
+PASS internal_catch-caught
+PASS rethrow-uncaught
+PASS rethrow-caught
+PASS ordinary_named_caught
+PASS ordinary_lambda_internal
+PASS named_comparator_caught
+PASS helper_inline_caught
+PASS existing_unoriginated
+PASS existing_originated
+PASS inline_identity_rethrow
+PASS nested_inline_caught
+PASS ordinary_rethrow
+PASS factory_error
+PASS local_construct_then_throw
+PASS comparator_cause
+PASS ordinary_cause
+PASS original_caught
+PASS original_uncaught
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): origins comparator cases ran on the VM
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/origins.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/origins-switch.json"
+PASS declared_comparator-uncaught
+PASS declared_comparator-caught
+PASS inline_padded-uncaught
+PASS inline_padded-caught
+PASS inline_shifted-uncaught
+PASS inline_shifted-caught
+PASS inline_multiline-uncaught
+PASS inline_multiline-caught
+PASS declared_multiline-uncaught
+PASS declared_multiline-caught
+PASS internal_catch-uncaught
+PASS internal_catch-caught
+PASS rethrow-uncaught
+PASS rethrow-caught
+PASS ordinary_named_caught
+PASS ordinary_lambda_internal
+PASS named_comparator_caught
+PASS helper_inline_caught
+PASS existing_unoriginated
+PASS existing_originated
+PASS inline_identity_rethrow
+PASS nested_inline_caught
+PASS ordinary_rethrow
+PASS factory_error
+PASS local_construct_then_throw
+PASS comparator_cause
+PASS ordinary_cause
+PASS original_caught
+PASS original_uncaught
+COMPARATOR PROFILE verified (__GLIBCXX__ 20260321): origins comparator cases ran on the VM
+mkdir -p ".build/cp14b/evidence"
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/sort_replay.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --oracle "tests/runtime2/cp14b/fixtures/d4-traces.json.gz" --output ".build/cp14b/evidence/sort.json"
+PASS 80, FAIL 0 (future)
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --mode future
+PASS 234 production VM traces
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/sort_replay.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --oracle "tests/runtime2/cp14b/fixtures/d4-traces.json.gz" --output ".build/cp14b/evidence/sort-switch.json"
+PASS 80, FAIL 0 (future)
+/usr/bin/python3 tests/runtime2/cp13b/adversarial/selftest.py
+PASS 234 production VM traces
+mkdir -p ".build/cp14b/evidence"
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/push_admission.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/push-admission.json"
+PASS "abc" top
+PASS "abc" function
+PASS "abc" loop_function
+PASS 5 top
+PASS 5 function
+PASS 5 loop_function
+PASS true top
+PASS true function
+PASS true loop_function
+PASS null top
+PASS null function
+PASS null loop_function
+PASS {"k":1} top
+PASS {"k":1} function
+PASS {"k":1} loop_function
+PASS [1,2] top
+PASS [1,2] function
+PASS [1,2] loop_function
+PASS [] top
+PASS [] function
+PASS [] loop_function
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/copy_witnesses.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/copy-witnesses.json"
+PASS cp11-alias
+PASS semantics-alias
+PASS generated-102
+PASS generated-151
+PASS generated-162
+PASS generated-176
+PASS adversarial-copy-top
+PASS adversarial-copy-function
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/copy_witnesses.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/copy-witnesses-switch.json"
+PASS cp11-alias
+PASS semantics-alias
+PASS generated-102
+PASS generated-151
+PASS generated-162
+PASS generated-176
+PASS adversarial-copy-top
+PASS adversarial-copy-function
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/const_admission.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/const-admission.json"
+PASS 6 const admission checks
+NIFT_CP14B_CXX="g++" /usr/bin/python3 tests/runtime2/cp14b/const_admission.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --base "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --output ".build/cp14b/evidence/const-admission-switch.json"
+PASS 6 const admission checks
+ok   fake baseline: PASS 80, FAIL 0
+ok   positive control: detect_req PASS
+ok   negative control: ideal rejected
+ok   negative control: fallback_all rejected
+ok   negative control: refuse_all rejected
+ok   negative control: nostats rejected
+ok   negative control: malformed rejected
+ok   negative control: missing_exec_field rejected
+ok   negative control: both_engines rejected
+ok   negative control: crash_after rejected
+ok   negative control: asan_after rejected
+ok   negative control: exit70_after rejected
+ok   negative control: nonreq_harness rejected
+ok   negative control: nonreq_fallback rejected
+ok   negative control: timeout rejected
+ok   negative control: detect_control rejected
+ok   R2-1 control fallback_exec_2: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_3: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_69: unexpected executed fallback rejected as harness
+ok   checked positive: stale exception handler accepted
+ok   checked negative: wrong internal reason rejected
+ok   ASan positive: heap-use-after-free in op_get_upvalue accepted
+ok   ASan negative: clean run rejected
+ok   --oracle mandatory in mutant mode
+PASS adversarial harness self-test: 24 checks, 0 failure(s)
+/usr/bin/python3 tests/runtime2/cp13b/adversarial/mutant_build_selftest.py
+PASS isolated mutant build self-test: clean builds differ and do not reuse stale products 
+bash tests/runtime2/cp13b/harness_selftest.sh "/home/nick/Repositories/nift/.cp19-development/worktree/nift"
+== H1/H2/H4: unit self-test ==
+PASS harness self-test: one return type; checked/ASan/control rules; policy mapping; fallback-to-execution detection; fallback statuses and resource-limit classifications
+== H3: fd-based Host trace positive control ==
+PASS trace self-test: fd-based NIFT_TRACE_HOST captured 1 Host entries
+== H1: a tampering wrapper must not make mutant 6 PASS ==
+== H1/H4: a no-statistics wrapper must not make mutant 6 PASS ==
+== end-to-end adversarial mutation harness ==
+ok   fake baseline: PASS 80, FAIL 0
+ok   positive control: detect_req PASS
+ok   negative control: ideal rejected
+ok   negative control: fallback_all rejected
+ok   negative control: refuse_all rejected
+ok   negative control: nostats rejected
+ok   negative control: malformed rejected
+ok   negative control: missing_exec_field rejected
+ok   negative control: both_engines rejected
+ok   negative control: crash_after rejected
+ok   negative control: asan_after rejected
+ok   negative control: exit70_after rejected
+ok   negative control: nonreq_harness rejected
+ok   negative control: nonreq_fallback rejected
+ok   negative control: timeout rejected
+ok   negative control: detect_control rejected
+ok   R2-1 control fallback_exec_2: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_3: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_69: unexpected executed fallback rejected as harness
+ok   checked positive: stale exception handler accepted
+ok   checked negative: wrong internal reason rejected
+ok   ASan positive: heap-use-after-free in op_get_upvalue accepted
+ok   ASan negative: clean run rejected
+ok   --oracle mandatory in mutant mode
+PASS adversarial harness self-test: 24 checks, 0 failure(s)
+== isolated mutant build selftest ==
+PASS isolated mutant build self-test: clean builds differ and do not reuse stale products 
+== mutant mode requires --oracle ==
+PASS harness self-test: genuine detections, policy mapping, trace, fallback/harness separation
+/usr/bin/python3 tests/runtime2/cp13b/nullable_error_presentation.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --switch-nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch"
+ok   default stringify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default stringify present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   default prettify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default prettify present: legacy=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0) vm=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0)
+ok   default highlight absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default highlight present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   switch stringify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch stringify present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   switch prettify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch prettify present: legacy=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0) vm=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0)
+ok   switch highlight absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch highlight present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+PASS nullable Error presentation: 12 cases, 0 failure(s)

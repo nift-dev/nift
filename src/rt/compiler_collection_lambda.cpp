@@ -7,6 +7,8 @@ bool UnitCompiler::collection_callback_shape(const Node& site,NodeId callback,st
     const auto kind=kinds_.of(callback);
     const std::string reason="method:"+std::string(text(ast_.at(ast_.at(site.a).b)));
     if(kind&kKindUnknown)return fail(site,reason);
+    // Quoted selectors use legacy expression validation; not admitted by S1.
+    if(expression_result_&&(kind&kKindString))return fail(site,"eval:quoted-callback");
     if(!(kind&kKindFunction))return true;
     const auto targets=kinds_.callable_targets.find(callback);
     if(targets==kinds_.callable_targets.end()||targets->second.empty())return fail(site,reason);

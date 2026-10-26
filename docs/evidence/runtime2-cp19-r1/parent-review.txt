@@ -1,0 +1,325 @@
+CP19 S1 — INDEPENDENT ADVERSARIAL REVIEW
+Disposition: REJECT / REWORK REQUIRED
+Review date: 2026-10-26 (Australia/Melbourne)
+
+Base: 45b22cdcc8fa2e70c2ce44a2a5244c0f8a4b555e
+Base tree: bf44b84f06eea823dcf9cf4b80518899f62da059
+Implementation: 7ea143205934d349738985ba09eef909913d6751
+Final candidate: 378d231f0487e2c22cb55fe1f72d9f236da26633
+Final tree: 829fcf2f6382ddf27501b4ba9b27daaf8bece89a
+
+The shared-entry implementation is structurally small and its ownership and
+routing evidence is substantial. Three observable eval regressions remain,
+including valid aggregate/Error presentation terminating with internal exit
+70 and a diagnostic prefix introduced by the synthetic Return adapter.
+Request bounded corrections and regressions, not another compiler or a full
+CP19 implementation round. This verdict covers S1 only, not CP25.
+
+The frozen candidate, developer checkout and integration branches were not
+modified. Source references below are relative to the isolated clean checkout:
+/tmp/codex-cp19-s1-review
+Review evidence:
+/home/nick/Repositories/nift/.claude-linode-runs/codex/cp19-s1-review/
+
+FINDINGS, ORDERED BY SEVERITY
+
+1. [P2] Newly VM-routed eval admits Error-bearing aggregate presentation that
+   terminates internally instead of producing legacy's valid result
+
+Admission route: src/rt/script_runner.cpp:278-299 and the subsequent shared
+compile_expression_unit call; src/CLI.cpp:1710-1719.
+Underlying serializer: src/rt/natives/format_methods.cpp:54-62, 92-99.
+
+Reproducer:
+  NIFT_VM=0       nift eval '[error("x")].stringify()'
+  NIFT_VM=require nift eval '[error("x")].stringify()'
+
+Legacy: exit 0, stdout:
+  [{"message":"x","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}]
+VM: exit 70, no stdout, stderr:
+  error: <eval>: NIFT_VM internal failure: unexpected operands (compiler defect): built-in stringify (the script was not run on the legacy engine)
+
+Also reproduced for [error("x")].prettify() and
+{"e":error("x")}.highlight(). With
+  [print("once"),error("x")].stringify()
+both engines print once, but only legacy then produces the JSON result;
+the VM terminates internally after that preceding effect.
+
+Both computed-goto and portable switch builds reproduce this. NIFT_VM=1 also
+fails internally. Statistics show exactly one VM execution and zero legacy
+executions, so this is not a routing-evidence ambiguity.
+
+The serializer's lack of nested Error handling predates CP19, but exposing it
+through native eval is a regression of THIS newly selected entry path. The
+documented S1 eligibility rule admits compiler-supported lambda-free
+expressions, including Error and collection presentation. A successful legacy
+expression cannot be counted as an acceptable internal VM failure.
+
+Minimal correction: either correctly support Error values recursively in
+these presentation paths, or refuse unsupported combinations before executing
+the eval unit. If coverage is deliberately bounded, mode 1 must select legacy
+before effects, and require must refuse with zero executions/effects. Do not
+replay on legacy after the observed VM failure. Add array/object/nested cases
+for all three methods and a preceding-effect control; retain direct Error
+presentation and ordinary aggregate formatting.
+
+2. [P2] Collection diagnostics expose synthetic Return context and unsupported
+   callback validation through the new eval route
+
+Sources: src/rt/compiler.cpp:230-234 and 385-394;
+src/rt/vm_collection_report.cpp:55-58.
+
+Reproducer:
+  NIFT_VM=0       nift eval '[1].map(1)'
+  NIFT_VM=require nift eval '[1].map(1)'
+
+Both exit 2 with empty stdout. Exact stderr differs:
+  legacy: eval: transformation: callback must be callable
+  VM:     eval: return: transformation: callback must be callable
+
+filter(true), find(null), sort_by(null), find_index(false) and group_by(null)
+exhibit the same synthetic prefix. A multiline expression also reproduces it.
+Both dispatches and NIFT_VM=1 are affected; each failure genuinely executes
+once on the VM without legacy replay.
+
+compile_expression_unit adds a real Return node. expression_result_ lifts its
+scalar-return restriction but does not make its diagnostic context synthetic:
+return_statement still attaches kInstrReturnCall to the entire expression.
+The existing collection error projector consequently adds "return: ".
+This is a direct semantic effect of the new adapter, not merely an existing
+VM-versus-legacy message discrepancy. No callback lambda is involved here;
+the current compiler admits these malformed-argument expressions as runtime
+errors, so the lambda exclusion does not protect them.
+
+There is an additional validation mismatch in this admitted family:
+  [1].map("x")
+Legacy reports "eval: unknown value or malformed expression: x"; the VM
+reports "eval: return: transformation: callback must be callable". Removing
+the synthetic prefix alone does not fix that underlying callback-validation
+discrepancy. The latter is inherited VM behavior newly exposed by eval, and
+is recorded separately as invalid_callback_string in the independent matrix.
+
+Minimal correction: make the synthetic result boundary transparent to return
+diagnostic projection. Preserve flags and behavior for actual script/function
+return statements; do not globally strip a message prefix. Add exact-message
+and multiline-location controls for these admitted collection failures.
+Also cover the quoted callback case; match legacy validation or refuse it
+before execution rather than silently changing its error contract.
+If a callable-method family is instead excluded from S1, enforce that explicit
+whole-unit policy before effects and test its accounting honestly.
+
+3. [P2] Nullable Error member access changes eval's existing runtime diagnostic
+
+Sources: src/rt/compiler_error.cpp:28-29, 38-42;
+src/rt/vm_ops.cpp:245-251; new eval admission in script_runner.cpp.
+
+Reproducer:
+  nift eval 'error("x").cause.message'
+
+NIFT_VM=0: exit 2, empty stdout, stderr:
+  eval: cannot access member 'message' because the current JSON value is not an object
+NIFT_VM=1/require: exit 2, empty stdout, stderr:
+  eval: value has no member: message
+
+The code/source members give the corresponding mismatch too. Both dispatches
+show one VM execution and no legacy execution. This is distinct from nullable
+Error stringify/prettify/highlight, which remain correct and pass their
+12-case regression.
+
+As in finding 1, the underlying generic member behavior predates CP19; the
+newly selected eval route exposes it to a command whose exact diagnostic was
+previously supplied by legacy. No approved eval diagnostic exception covering
+this mismatch was supplied. It is not an Error-origin or synthetic-offset
+finding; the demonstrated failure is the public diagnostic text.
+
+Minimal correction: preserve the established nullable member diagnostic or
+conservatively refuse the unsupported eval flow before effects. Add present
+and absent causes, relevant members and both dispatches. Keep successful Error
+metadata access and the separately accepted nullable presentation behavior.
+
+WHAT PASSED / ARCHITECTURE ASSESSMENT
+
+All ten changed production files were inspected against the exact base:
+CLI.cpp; compiler.cpp/.h; compiler_expr.h; script_runner.cpp/.h;
+script_runner_stats.cpp/.h; vm.h; vm_report.cpp.
+
+- The expression parser consumes the original source. The adapter appends
+  Program/Return AST nodes at the original expression offsets; it does not
+  prepend text or introduce a second operator/literal evaluator. Planning,
+  inference, prepared refusal checks and lowering remain shared. Finding 2
+  is the specific point where structural wrapping is not yet semantically
+  transparent.
+- run_unit is shared by script/eval entry policies. Entry-specific parsing,
+  module policy, result bridging and CLI serialization remain explicit.
+  CLI result conversion through RuntimeValue is a cold boundary, not legacy
+  expression evaluation or an instruction-level bridge.
+- TopReturn's optional Value capture copies ownership through the existing
+  Value refcount/COW rules. With return_value=nullptr, ordinary script return
+  rendering is unchanged. No opcode, frame layout or dispatch/call-entry
+  branch was added; only the cold TopReturn handler gained an optional path.
+- Error construction retains empty source/zero line/column until raised.
+  Successful and failing multiline observations retain unwrapped <eval>
+  positions. CP13B's existing caught/uncaught behavior passes its 80-case
+  future suite; no additional Error-identity/origin defect was established.
+- Unsupported/lambda-containing units refuse before execution. Independent
+  [touch("marker"), x => x] runs have no marker under require/classification,
+  while mode 1 selects legacy before evaluation. Parse/trailing-token cases
+  are separately recorded, not counted as VM successes.
+- After VM selection, runtime/internal/bridge failures return as handled.
+  Source review and effect-before-error tests establish no legacy replay.
+  An internal failure is still a defect when the input should work, as in 1;
+  the no-replay behavior itself is correct.
+- Existing script, shell external-command and interactive/native-target
+  gates remain separate. run_script_source's !interactive_after and native
+  target condition is unchanged. Eval did not gain a new target option;
+  existing invalid CLI arity/capability controls do not execute an engine.
+  No production shell classifier, process spawning, job or completion source
+  changed in S1.
+
+INDEPENDENT EXECUTION AND MUTANT EVIDENCE
+
+1. Built the isolated candidate independently using make -j2 nift under the
+   existing heavy-lane lock. Fresh CLI SHA256:
+   56ef94f51d53872e7d4605e03e39ffdaeecc33f178e3d2215c48edc18ff193ed
+   This exactly matches the supplied CLI hash.
+2. Independently built the switch executable, ownership unit and real compiled
+   legacy-routing bypass mutant. All their hashes exactly match the supplied
+   verification manifest; full values are in provenance.json.
+3. Supplied eval_entry.py: 242 observations pass on EACH fresh dispatch.
+   These include affirmative VM counts, not output parity alone. They miss
+   the three findings above.
+4. Independent review_eval.py: 27 expressions x 5 modes = 135 observations per
+   dispatch. Results include scalar/collection/nested values, Errors, Host
+   effects, invalid syntax, refusals and classification. The three findings
+   reproduce on both fresh binaries; raw stdout/stderr/status/engine records
+   and marker state are retained.
+5. Fresh existing ownership unit: 1,426 checks, zero failures. Added independent
+   tests for array COW, nested object/array COW after VM/program teardown,
+   copied-result retention and 40 repeated eval_expression_on_vm calls in one
+   process. Extended total: 1,561 checks, zero failures. A probe assertion was
+   corrected to compare numeric Values semantically rather than treating a
+   Double payload as an Int; no production/oracle change was made.
+6. Deliberately compiled CLI with NIFT_CP19_EVAL_MUTANT_BYPASS=1. Independent
+   assertion compares normal and mutant `eval 1+2`: BOTH exit 0 and produce
+   exactly "3\n" with empty stderr. Normal has one VM execution and zero
+   legacy executions; mutant has no VM record. The positive execution gate
+   specifically rejects the missing VM route, not a crash/output change.
+   The supplied mutant detector independently reports the same intended
+   missing-route signature.
+7. Targeted supplied ASan/LSan/UBSan ownership binary was hash-verified and
+   rerun outside ptrace with ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 and
+   UBSAN_OPTIONS=halt_on_error=1: 1,426 checks, zero failures, exit 0. This is
+   an independent rerun of the supplied instrumented build, not a fresh full
+   sanitizer campaign. The extra 1,561-check probe used fresh normal objects.
+8. Fresh CP13B future: 80/80; nullable Error presentation: 12/12 across the
+   two dispatches. The first corpus invocation lacked its parser-tool
+   prerequisite; the parser was built and the rerun passed.
+9. Fresh shell classifier: 86 checks pass. Existing shell dispatch regression
+   passes on the fresh candidate. PTY completion and remaining CP13B modes/
+   harness controls were audited in retained logs rather than all repeated.
+
+No established fixture/golden/refusal policy was weakened. Only two new test
+sources and their Makefile wiring were added. The 820-entry differential log
+is authentic and reports zero differing/unused policies, but runs the same
+binary as both sides: it is not an independent legacy-versus-VM coverage
+certificate. The new affirmative routing tests supply the relevant entry
+evidence. Integrity reports 532 files/zero findings, and lint/header/extraction
+logs pass; these static gates were audited, not presented as an exhaustive
+independent certification rerun.
+
+PROVENANCE / FINAL EVIDENCE-ONLY COMMIT
+
+Independently checked exact commit/tree/base in a separate clone. Applying
+the delivered complete patch to the base through a separate index reproduced
+829fcf2f6382ddf27501b4ba9b27daaf8bece89a exactly. Patch SHA256:
+94d57f47cd354812701353b16e7fbb407f13d02e38ea8d84eedf518a039fa0de
+
+The diff from implementation 7ea14320 to final 378d231f contains 13 raw log
+files only. Production, tests and Makefile are byte-for-byte unchanged.
+All candidate-source and raw-log hashes in verification.json were recomputed
+and match. Thus the evidence-only final commit does not invalidate the
+implementation-build results. The review checkout's tracked status is clean.
+
+CP18 / CP17 COMPATIBILITY ASSESSMENT
+
+Compared accepted CP18 8f921d7dd6e9ccfc8477238d15749c5d8e9f2f10,
+particularly src/embed/program_api.cpp, and accepted CP17 R4
+88c5424be1885909a6fd30f717563e56d50c1175 and its VM/compiler/handle interfaces.
+
+CP18's program owns bytecode and SourceMap. Its run API leaves the new result
+pointer null, so it continues to own copied output, returned_text and error
+strings independently of program lifetime. CP19's data Value capture uses the
+existing refcount/COW model and converts while Program/VM/SourceMap are alive.
+The two entry points have different explicit result representations, not two
+new lifetime implementations. No public C ABI layout changed here. Callable
+Values still depend on Program lifetime; the eval lambda exclusion must remain
+until that ownership contract is implemented deliberately.
+
+CP17's one-table/context-per-run and W13 checks must survive integration.
+Expression compilation must not bypass its handle-flow pass: a handle result
+or an aggregate containing handles must refuse before effects rather than
+reach the legacy result bridge. The current bridge deliberately has no generic
+typed-handle conversion. Error origins and caller-owned resources must survive
+exceptions on the actual combined runtime.
+
+Performed isolated git merge-tree analysis ONLY, with no branch/worktree
+integration or speculative conflict resolution:
+- CP18 comparison: conflicts in Makefile and certification_guard.sh. Its
+  embedding implementation and VmOptions merge textually; this is not a
+  combined-build or ownership-certification result.
+- CP17 comparison: conflicts in Makefile, vm.cpp and vm_builtin.cpp. vm.h and
+  compiler/return changes merge textually, but the VM/Host/CP13B reconciliation
+  still needs the integration owner. These are shared-baseline reconciliation
+  risks, not an independently demonstrated CP19 source incompatibility.
+- The supplied CP18 proposed combined identity 8fb9bb9f is not available as a
+  local Git object, so that proposed combined tree was not inspected/built.
+
+On the owner-resolved combined tree, require CP18 program/result-after-free,
+COW allocation/semantic/sanitizer witnesses; CP17 W13/native/lifetime/N2 and
+routing controls; CP13B abandoned-frame handle release, Error identity/cause/
+origin; and CP14B collection/COW/diagnostic regressions. In particular retest
+the corrected synthetic-expression boundary against real script/function
+returns. No unnecessary architecture unification is requested.
+
+SCOPE / REMAINING CP19 WORK
+
+This slice remains opt-in and native eval only within its explicit admission
+policy. It does not finish assignments/callable-containing expressions,
+callback expression coverage, expression classify-all inventory, persistent
+shell bindings/functions/interpolation, interactive continuation or rc
+compilation. Stateful shell work stays CP19; jobs/history/completion migration
+stays with its existing owner. CP24 website routing/write guards and CP25's
+release-wide coverage/fallback requirements remain separate. Do not describe
+242 passing observations or 820 differential entries as full CP19/CP25.
+
+REPRODUCTION / ARTIFACTS
+
+From /home/nick/Repositories/nift (REVIEW_DIR is the evidence directory named
+above):
+  python3 "$REVIEW_DIR/review_eval.py" \
+    --nift /tmp/codex-cp19-s1-review/nift --out /tmp/cp19-review-results.json
+  python3 "$REVIEW_DIR/review_eval.py" \
+    --nift /tmp/codex-cp19-s1-review/.build/cp13b/nift-switch \
+    --out /tmp/cp19-switch-review-results.json
+
+Key files: independent-default.json/log, independent-switch.json/log,
+entry-default.jsonl, entry-switch.jsonl, bypass.jsonl,
+independent-mutant-witness.json, independent_ownership.cpp,
+independent-ownership.log, ownership-sanitize.log, cp13b-future.log,
+nullable-errors.log, classifier.log, shell-dispatch.log, provenance.json,
+fresh-build.log, focused-build.log, switch-build.log,
+cp18-merge-tree.txt and cp17-merge-tree.txt.
+
+The three minimal reproducer expressions are also directly usable with
+`nift eval`, NIFT_VM=0/1/require and optional NIFT_VM_STATS=<file>.
+No golden output or policy amendment is needed to reproduce them.
+
+OWNER RECOMMENDATION
+
+Correct the three narrow eval issues, add both-dispatch regressions and
+deliver an exact new candidate/tree. Preserve the working shared compiler,
+result capture and no-replay design. Integration compatibility evidence remains
+qualified until the owner reconciles and tests the actual combined tree.
+
+No production edits to any candidate, integration, push, CI, tag, release,
+provisioning or contact with the implementing session/Claude occurred.

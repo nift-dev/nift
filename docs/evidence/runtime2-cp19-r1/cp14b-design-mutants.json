@@ -1,0 +1,2046 @@
+{
+  "comparator_profile": "verified",
+  "unverified_comparator_mutants": 0,
+  "results": [
+    {
+      "number": 1,
+      "name": "ignored-callback-result",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "b80f0b0a403489da1d491b8bc681252edbf53dfc5e9012dee88f9ff4e9198d18",
+        "source_sha256": "e5fa883f9c8bbe41aa7a9ffab246ba574ce725622a2cc632440842276ef7db6d",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "ignored-callback-result"
+      },
+      "witnesses": [
+        {
+          "source": "print([1,2,3].map(x=>x*2).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[2,4,6]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[2,4,6]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "ignored-callback-result"
+              }
+            ]
+          }
+        },
+        {
+          "source": "print([1,2,3].reduce((a,x)=>a+x,10))",
+          "status": "DETECTED",
+          "normal": {
+            "out": "16\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "16\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "3\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "ignored-callback-result"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "ignored-callback-result"
+          }
+        ]
+      }
+    },
+    {
+      "number": 2,
+      "name": "truthy-non-bool",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "7a4307bb9570dcd7780a06371aafb1aaa14953c71b023e22896197cb4986da8d",
+        "source_sha256": "1c9ab948437d882844f296932ec7e39a8e736cd770c0113cf0baee0c4b7e5e48",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 5,
+        "marker": "truthy-non-bool"
+      },
+      "witnesses": [
+        {
+          "source": "print([1].filter(x=>1).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: filter: callback must return bool\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "filter: callback must return bool",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: filter: callback must return bool\n",
+            "exit": 1,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "truthy-non-bool"
+              }
+            ]
+          }
+        },
+        {
+          "source": "print([1].any(x=>1))",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: any: callback must return bool\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "any: callback must return bool",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: any: callback must return bool\n",
+            "exit": 1,
+            "stats": []
+          },
+          "mutant": {
+            "out": "true\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "truthy-non-bool"
+              }
+            ]
+          }
+        },
+        {
+          "source": "print([1].partition(x=>1).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: partition: callback must return bool\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "partition: callback must return bool",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:7: partition: callback must return bool\n",
+            "exit": 1,
+            "stats": []
+          },
+          "mutant": {
+            "out": "{\"matched\":[1],\"unmatched\":[]}\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "truthy-non-bool"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "truthy-non-bool"
+          }
+        ]
+      }
+    },
+    {
+      "number": 3,
+      "name": "unstable-record-ties",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "1460a13397e216d91e72a9a6e5175029c3ec5637850f96826b71408c44a0f043",
+        "source_sha256": "1c9ab948437d882844f296932ec7e39a8e736cd770c0113cf0baee0c4b7e5e48",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 7,
+        "marker": "unstable-record-ties"
+      },
+      "witnesses": [
+        {
+          "source": "print([{\"k\":0,\"id\":1},{\"k\":0,\"id\":2}].sort_by(x=>x.k).map(x=>x.id).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[2,1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "unstable-record-ties"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "unstable-record-ties"
+          }
+        ]
+      }
+    },
+    {
+      "number": 4,
+      "name": "ignored-direction",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "4fe8f31213364fe12c97398d4a69ffda1191f1afae76721ddb15e15118d27d97",
+        "source_sha256": "6474a68b24660ccae59b5e24a41e3e14be5ff5746c3595b60a0bb91eae151c78",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "ignored-direction"
+      },
+      "witnesses": [
+        {
+          "source": "print([{\"k\":1,\"v\":2,\"id\":1},{\"k\":1,\"v\":1,\"id\":2},{\"k\":2,\"v\":1,\"id\":3}].sort_by(x=>x.k,\"asc\",x=>x.v,\"desc\").map(x=>x.id).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[2,1,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "ignored-direction"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "ignored-direction"
+          }
+        ]
+      }
+    },
+    {
+      "number": 5,
+      "name": "copied-mutation-receiver",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "117c8afb435dc7e0a42bf924034160da054b147ae32aa7b18861e5c2730d4d4f",
+        "source_sha256": "227f6a91adfb6742d195518c5328da1633e2027dcb1c769d8e9eb5b0cc797212",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "copied-mutation-receiver"
+      },
+      "witnesses": [
+        {
+          "source": "a:=[1,2]; a.pop(); print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "copied-mutation-receiver"
+              }
+            ]
+          }
+        },
+        {
+          "source": "fn(f()) { a:=[1,2]; a.pop(); print(a.stringify()) }; f()",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "copied-mutation-receiver"
+              }
+            ]
+          }
+        },
+        {
+          "source": "fn(f()) { a:=[1,2]; g:=()=>a.pop(); g(); print(a.stringify()) }; f()",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "copied-mutation-receiver"
+              }
+            ]
+          }
+        },
+        {
+          "source": "a:=[[1,2]]; for(v:a) { v.pop() }; print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[[1]]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[[1]]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[[1,2]]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "copied-mutation-receiver"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "copied-mutation-receiver"
+          }
+        ]
+      }
+    },
+    {
+      "number": 6,
+      "name": "removed-const-guard",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "86f575c728fd1f3e3f9030985a56d3176c175cfb75ccf70651326f3c49ff949e",
+        "source_sha256": "492359c8a72b5e0695146f0f59dc5e4e1c37e24ea3f16604e56729c7939d7b6f",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 11,
+        "marker": "removed-const-guard"
+      },
+      "witnesses": [
+        {
+          "source": "const a:=[1]; fn(arg()) { print(\"ARG\"); return 9 }; print(a.push(arg()))",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:59: cannot mutate const array: a\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "cannot mutate const array: a",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:59: cannot mutate const array: a\n",
+            "exit": 1,
+            "stats": []
+          },
+          "mutant": {
+            "out": "ARG\n9\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "removed-const-guard"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "removed-const-guard"
+          }
+        ]
+      }
+    },
+    {
+      "number": 7,
+      "name": "callback-frame-budget-bypass",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "06345791bf18086fa4ff75bb6ba4a732c38032b2b39957d6e4549bd595afa1aa",
+        "source_sha256": "b1220ec0a8acbf758d7cf26392022d5877a7e5b63bc6b5278740013c73ed9994",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "callback-frame-budget-bypass"
+      },
+      "witnesses": [
+        {
+          "source": "fn(cb(x)) { if(x>0) { return [x-1].map(cb)[0] }; return 1 }; print([1].map(cb).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:30: callable recursion depth exceeded: cb\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "callable recursion depth exceeded: cb",
+                "callback_frames": 1,
+                "beyond_legacy_depth": true,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": null,
+          "mutant": {
+            "out": "[1]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "callback-frame-budget-bypass"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "callback-frame-budget-bypass"
+          }
+        ]
+      }
+    },
+    {
+      "number": 8,
+      "name": "missing-callback-report-frame",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "714966609bd5d6482de15fba31384f35275eb273e8853e683b11da97be87f6ab",
+        "source_sha256": "2cea44d6a7507456cfac6d1f695fd7c24920fa897dc3b06b0e7d5a1db12fc792",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "missing-callback-report-frame"
+      },
+      "witnesses": [
+        {
+          "source": "n := 0; print([1].map(x=>{ n += x/0 }).stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "lambda body error: division by zero",
+                "callback_frames": 1,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+            "exit": 1,
+            "stats": []
+          },
+          "mutant": {
+            "out": "",
+            "err": "error: $CASE/case.f:1:15: lambda body error: division by zero\n",
+            "exit": 1,
+            "stats": [
+              {
+                "outcome": "vm-error",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "lambda body error: division by zero",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "missing-callback-report-frame"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "missing-callback-report-frame"
+          }
+        ]
+      }
+    },
+    {
+      "number": 9,
+      "name": "live-source-not-snapshot",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "26b8e70879608f23ac9bc01ae9fde6bedef4def97af321c5524cee9c727e9beb",
+        "source_sha256": "88a82af59d5bcd6d092971dd0a441a1a244faee77dc2679c7d23f47d962f2604",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 3,
+        "marker": "live-source-not-snapshot"
+      },
+      "witnesses": [
+        {
+          "source": "a:=[1,2,3]; fn(cb(x)) { a[1]=99; return x }; print(a.map(cb).stringify()); print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2,3]\n[1,99,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2,3]\n[1,99,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,99,3]\n[1,99,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "live-source-not-snapshot"
+              }
+            ]
+          }
+        },
+        {
+          "source": "a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2,3]\n[1,2,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2,3]\n[1,2,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2,9]\n[1,2,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "live-source-not-snapshot"
+              }
+            ]
+          }
+        },
+        {
+          "source": "a:=[1,2,3]; fn(cb(x)) { a=[9,9,9]; return x }; print(a.map(cb).stringify()); print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2,3]\n[9,9,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2,3]\n[9,9,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,9,9]\n[9,9,9]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "live-source-not-snapshot"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "live-source-not-snapshot"
+          }
+        ]
+      }
+    },
+    {
+      "number": 10,
+      "name": "selector-factory-hoisted",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "8160f2098d0eb209a6aba95d5013a9912ce370172fa700f9e767eb908c10f965",
+        "source_sha256": "da3a77aeb99a4497bbff8af7c12c71d8aae67240abb8312b2110d6b5952571f6",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "selector-factory-hoisted"
+      },
+      "witnesses": [
+        {
+          "source": "n:=0; fn(mk()) { n+=1; return x=>x }; print([1,2,3].index_by(mk()).stringify()); print(n)",
+          "status": "DETECTED",
+          "normal": {
+            "out": "{\"1\":1,\"2\":2,\"3\":3}\n3\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "{\"1\":1,\"2\":2,\"3\":3}\n3\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "{\"1\":1,\"2\":2,\"3\":3}\n1\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "selector-factory-hoisted"
+              }
+            ]
+          }
+        },
+        {
+          "source": "n:=0; fn(mk()) { n+=1; return x=>x }; print([3,1,2].sort_by(mk(),\"asc\",mk(),\"desc\").stringify()); print(n)",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,2,3]\n6\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,2,3]\n6\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2,3]\n1\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "selector-factory-hoisted"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "selector-factory-hoisted"
+          }
+        ]
+      }
+    },
+    {
+      "number": 11,
+      "name": "splice-replacement-early",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "f91d79bc1fdcf3fdbf66015c42ab3a16ddc7fd019316439e4985c22a133451ea",
+        "source_sha256": "528d3a880ed83aa4be3f6105e327fb4c5381d70b6fc580a69b0142b1b8fb86b0",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 0,
+        "marker": "splice-replacement-early"
+      },
+      "witnesses": [
+        {
+          "source": "a:=[1,2,3]; fn(repl()) { print(a.stringify()); return [9] }; a.splice(1,1,repl()); print(a.stringify())",
+          "status": "DETECTED",
+          "normal": {
+            "out": "[1,3]\n[1,9,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "[1,3]\n[1,9,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "[1,2,3]\n[1,9,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "splice-replacement-early"
+              }
+            ]
+          }
+        },
+        {
+          "source": "a := [1,2,3]; fn(boom()) { throw error(\"boom\") }; try { a.splice(1,1,boom()) } catch(e) { print(e.message); print(a.stringify()) }",
+          "status": "DETECTED",
+          "normal": {
+            "out": "boom\n[1,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "boom\n[1,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "boom\n[1,2,3]\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "splice-replacement-early"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "splice-replacement-early"
+          }
+        ]
+      }
+    },
+    {
+      "number": 12,
+      "name": "premature-comparator-unwind",
+      "detected": true,
+      "identity": {
+        "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+        "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+        "binary_sha256": "f65fb9a0c3f5f60b416e2ee5d1409d45f75e9260903c1fae824f9f614016a8a5",
+        "source_sha256": "4dcb83ad214146ac18f54f07c7bfc3f8d57168f8a44177436c4e78156b3f823d",
+        "flags": [
+          "-Isrc",
+          "-Iinclude",
+          "-Itests/rt",
+          "-std=c++17",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-pedantic",
+          "-pthread"
+        ],
+        "macro": 9,
+        "marker": "premature-comparator-unwind"
+      },
+      "witnesses": [
+        {
+          "source": "a:=[{\"k\":3},{\"k\":1},{\"k\":2}]; n:=0; fn(cmp(x,y)) { n+=1; if(n==2) { throw error(\"stop\") }; return x.k<y.k }; try { a.sort(cmp) } catch(e) { print(\"CATCH\"); print(a.stringify()) }; print(\"AFTER\"); print(n)",
+          "status": "DETECTED",
+          "normal": {
+            "out": "CATCH\n[{\"k\":1},{\"k\":3},{\"k\":2}]\nAFTER\n2\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "control"
+              }
+            ]
+          },
+          "oracle": {
+            "out": "CATCH\n[{\"k\":1},{\"k\":3},{\"k\":2}]\nAFTER\n2\n",
+            "err": "",
+            "exit": 0,
+            "stats": []
+          },
+          "mutant": {
+            "out": "CATCH\n[{\"k\":1},{\"k\":3},{}]\nAFTER\n2\n",
+            "err": "",
+            "exit": 0,
+            "stats": [
+              {
+                "outcome": "vm",
+                "vm_executions": 1,
+                "legacy_executions": 0,
+                "reason": "",
+                "callback_frames": 0,
+                "beyond_legacy_depth": false,
+                "error_origin": false,
+                "marker": "premature-comparator-unwind"
+              }
+            ]
+          }
+        }
+      ],
+      "unaffected_control": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "outcome": "vm",
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "reason": "",
+            "callback_frames": 0,
+            "beyond_legacy_depth": false,
+            "error_origin": false,
+            "marker": "premature-comparator-unwind"
+          }
+        ]
+      }
+    }
+  ],
+  "negative_controls": [
+    {
+      "mutant": "ignored-callback-result",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-callback-result",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "truthy-non-bool",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "unstable-record-ties",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "ignored-direction",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "copied-mutation-receiver",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "removed-const-guard",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "callback-frame-budget-bypass",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "missing-callback-report-frame",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "live-source-not-snapshot",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "selector-factory-hoisted",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "splice-replacement-early",
+      "case": "wrong-marker",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "missing-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "malformed-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "duplicate-stats",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "fallback",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "stale-normal",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "post-statistics-crash",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "unrelated-error",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "timeout",
+      "pass_": true
+    },
+    {
+      "mutant": "premature-comparator-unwind",
+      "case": "wrong-marker",
+      "pass_": true
+    }
+  ],
+  "normal_identity": {
+    "intended_commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+    "driver_sha256": "ae1f7856fea50bc1e27c92be96cab55b6e5f36d72702439e81a63cc7172aa13e",
+    "binary_sha256": "6de304b68b17d80cf07268ed2fde33beb7a287bf857ff66b556e4d2c93a2b93d",
+    "source_sha256": null,
+    "flags": [
+      "-Isrc",
+      "-Iinclude",
+      "-Itests/rt",
+      "-std=c++17",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-pthread"
+    ],
+    "macro": 0,
+    "marker": "control"
+  }
+}

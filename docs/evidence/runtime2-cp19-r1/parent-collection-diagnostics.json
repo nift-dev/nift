@@ -1,0 +1,206 @@
+[
+  {
+    "expression": "[1].map(1)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":55.319,\"compile_us\":121.367,\"execute_us\":44.002,\"protos\":1,\"instructions\":39,\"source_bytes\":10,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].map(null)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":57.051,\"compile_us\":142.595,\"execute_us\":49.956,\"protos\":1,\"instructions\":39,\"source_bytes\":13,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].filter(true)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":42.328,\"compile_us\":128.416,\"execute_us\":37.879,\"protos\":1,\"instructions\":39,\"source_bytes\":16,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].find(0)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":52.982,\"compile_us\":140.386,\"execute_us\":60.617,\"protos\":1,\"instructions\":39,\"source_bytes\":11,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].sort_by(null)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":44.255,\"compile_us\":128.711,\"execute_us\":45.738,\"protos\":1,\"instructions\":41,\"source_bytes\":17,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":256,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":256,\"heap_live\":256,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].find_index(false)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":37.371,\"compile_us\":97.452,\"execute_us\":45.729,\"protos\":1,\"instructions\":39,\"source_bytes\":21,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].group_by(null)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: transformation: callback must be callable\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: return: transformation: callback must be callable\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"return: transformation: callback must be callable\",\"line\":1,\"column\":1,\"parse_us\":36.675,\"compile_us\":106.065,\"execute_us\":32.04,\"protos\":1,\"instructions\":39,\"source_bytes\":18,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "null.map(1)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: unknown value or malformed expression: null.map(1)\n",
+        "stats": ""
+      },
+      {
+        "exit": 1,
+        "stdout": "",
+        "stderr": "error: <eval>:1:1: NIFT_VM=require: not compiled for the VM (opaque:legacy-runtime-error)\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"require-error\",\"reason\":\"opaque:legacy-runtime-error\",\"line\":1,\"column\":1,\"parse_us\":31.166,\"compile_us\":0,\"execute_us\":0,\"protos\":0,\"instructions\":0,\"source_bytes\":11,\"beyond_legacy_depth\":false,\"vm_executions\":0,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":0,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":0,\"heap_live\":0,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].slice(-3)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: slice: invalid start\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: slice: invalid start\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"slice: invalid start\",\"line\":1,\"column\":1,\"parse_us\":44.38,\"compile_us\":137.028,\"execute_us\":45.196,\"protos\":1,\"instructions\":7,\"source_bytes\":13,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].take(-1)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: take: count must be a non-negative integer\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: take: count must be a non-negative integer\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"take: count must be a non-negative integer\",\"line\":1,\"column\":1,\"parse_us\":48.775,\"compile_us\":118.341,\"execute_us\":45.993,\"protos\":1,\"instructions\":7,\"source_bytes\":12,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].chunk(0)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: chunk: count must be a positive integer\n",
+        "stats": ""
+      },
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: chunk: count must be a positive integer\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"vm-error\",\"reason\":\"chunk: count must be a positive integer\",\"line\":1,\"column\":1,\"parse_us\":43.772,\"compile_us\":124.093,\"execute_us\":45.016,\"protos\":1,\"instructions\":7,\"source_bytes\":12,\"beyond_legacy_depth\":false,\"vm_executions\":1,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":64,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":64,\"heap_live\":64,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  },
+  {
+    "expression": "[1].sort(1)",
+    "results": [
+      {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "eval: unknown value or malformed expression: [1].sort(1)\n",
+        "stats": ""
+      },
+      {
+        "exit": 1,
+        "stdout": "",
+        "stderr": "error: <eval>:1:1: NIFT_VM=require: not compiled for the VM (opaque:legacy-runtime-error)\n",
+        "stats": "{\"nift_vm\":1,\"outcome\":\"require-error\",\"reason\":\"opaque:legacy-runtime-error\",\"line\":1,\"column\":1,\"parse_us\":56.86,\"compile_us\":0,\"execute_us\":0,\"protos\":0,\"instructions\":0,\"source_bytes\":11,\"beyond_legacy_depth\":false,\"vm_executions\":0,\"legacy_executions\":0,\"large_numbers\":0,\"large_in_loop_path\":0,\"error_in_loop_path\":false,\"code\":\"\",\"catchable\":false,\"error_origin\":false,\"heap_bytes\":0,\"large_lines\":[],\"derived_lines\":[],\"evidence_truncated\":false,\"heap_peak\":0,\"heap_live\":0,\"path\":\"<eval>\"}\n"
+      }
+    ]
+  }
+]

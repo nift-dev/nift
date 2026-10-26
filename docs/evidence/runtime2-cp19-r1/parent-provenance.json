@@ -1,0 +1,82 @@
+{
+  "commit": "378d231f0487e2c22cb55fe1f72d9f236da26633",
+  "tree": "829fcf2f6382ddf27501b4ba9b27daaf8bece89a",
+  "replay": [
+    {
+      "command": [
+        "git",
+        "read-tree",
+        "45b22cdcc8fa2e70c2ce44a2a5244c0f8a4b555e"
+      ],
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--cached",
+        "/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch"
+      ],
+      "stdout": "",
+      "stderr": "/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch:109: trailing whitespace.\nPASS isolated mutant build self-test: clean builds differ and do not reuse stale products \n/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch:144: trailing whitespace.\nPASS isolated mutant build self-test: clean builds differ and do not reuse stale products \n/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch:167: trailing whitespace.\nFAIL completion PATH command: fix\t\n/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch:168: trailing whitespace.\nFAIL completion built-in call form: exist\t\n/home/nick/Repositories/nift/.cp19-development/delivery/cp19-shared-eval.patch:169: trailing whitespace.\nFAIL completion prefers call form: ope\t\nwarning: squelched 3 whitespace errors\nwarning: 8 lines add whitespace errors.\n",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "write-tree"
+      ],
+      "stdout": "829fcf2f6382ddf27501b4ba9b27daaf8bece89a\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ],
+  "patch_sha256": "94d57f47cd354812701353b16e7fbb407f13d02e38ea8d84eedf518a039fa0de",
+  "source_hash_checks": {
+    "Makefile": true,
+    "src/CLI.cpp": true,
+    "src/rt/compiler.cpp": true,
+    "src/rt/compiler.h": true,
+    "src/rt/compiler_expr.h": true,
+    "src/rt/script_runner.cpp": true,
+    "src/rt/script_runner.h": true,
+    "src/rt/script_runner_stats.cpp": true,
+    "src/rt/script_runner_stats.h": true,
+    "src/rt/vm.h": true,
+    "src/rt/vm_report.cpp": true,
+    "tests/rt/vm_expression.cpp": true,
+    "tests/runtime2/cp19/eval_entry.py": true
+  },
+  "raw_hash_checks": {
+    "bypass.jsonl": true,
+    "completion.log": true,
+    "cp13b-functional.log": true,
+    "earlier-attempts/completion.log": true,
+    "earlier-attempts/expression-sanitize.log": true,
+    "earlier-attempts/initial-cases.jsonl": true,
+    "earlier-attempts/regression-gates-rerun.log": true,
+    "earlier-attempts/regression-gates.log": true,
+    "earlier-attempts/sanitizer-ptrace.log": true,
+    "earlier-attempts/second-cases.jsonl": true,
+    "earlier-attempts/shared-eval-gate.log": true,
+    "expression-sanitize.log": true,
+    "rt-diff.log": true,
+    "shared-eval.log": true,
+    "shell-dispatch.log": true,
+    "static-gates.log": true,
+    "switch.jsonl": true,
+    "test-integrity-report.json": true,
+    "threaded.jsonl": true
+  },
+  "binary_hashes": {
+    "/tmp/codex-cp19-s1-review/nift": "56ef94f51d53872e7d4605e03e39ffdaeecc33f178e3d2215c48edc18ff193ed",
+    "/tmp/codex-cp19-s1-review/.build/cp13b/nift-switch": "75c09aaffeaaec5001e5a4506e28a47e45b76635f8353715ee04e5398fbce184",
+    "/tmp/codex-cp19-s1-review/.build/cp19/nift-eval-bypass": "fe531574347df55b1184b656841a97f6caf34077a7561f79cd86f4a334074071",
+    "/tmp/codex-cp19-s1-review/.build/cp19/expression-unit": "cbc4e4102e82cb05b43d56e46fcb684e36dbff6301e8f46ff64694491a549e39",
+    "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp19/expression-sanitize": "4e94abfbe7cb8a30b2db4622199596e68501701a844f62c7b0cbae0ba8ac7af4"
+  },
+  "production_test_diff_implementation_to_final": "",
+  "status": ""
+}

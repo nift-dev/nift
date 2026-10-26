@@ -1,0 +1,62 @@
+PASS rm -i keeps the file on n
+PASS rm missing fails
+PASS rm a d1 removes a once
+PASS rm a d1 reports d1 once
+PASS rm a d1 does not re-run rm externally
+PASS rm [ab].txt expands once
+PASS cp -r external
+PASS mv -n external
+PASS cat -n external
+PASS ls -l external
+PASS quoted bracket stays literal
+PASS escaped bracket stays literal
+PASS quoted star stays literal
+PASS quoted operator stays literal
+PASS escaped semicolon stays literal
+PASS mixed quoted/unquoted glob
+PASS quoted prefix with unquoted glob
+PASS pipeline
+PASS stdout redirection
+PASS stderr redirection
+PASS false chains
+PASS user function side effect once
+PASS failed user function status non-zero
+PASS failed user function does not reach PATH
+PASS mkdir reaches PATH stub
+PASS touch reaches PATH stub
+PASS mkdir native did not run
+PASS touch native did not run
+PASS user function shadows PATH
+PASS command bypasses user function
+PASS print command form is native
+PASS pwd command form is native
+PASS command print is external
+PASS explicit path executes
+PASS $[...] evaluated once
+PASS $[...] result dispatched
+PASS skipped && interpolation
+PASS skipped || interpolation
+PASS executed || interpolation once
+PASS skipped pipeline interpolation
+PASS executed pipeline interpolation once
+PASS interpolation left-to-right
+PASS interpolation cannot reclassify
+PASS syntax rejects leading &&
+PASS syntax rejects dangling >
+PASS syntax rejects leading |
+PASS syntax rejects dangling &&
+PASS syntax rejects dangling ||
+PASS syntax rejects double ;;
+PASS syntax rejects double pipe
+PASS syntax rejects connector before pipe
+PASS syntax rejects non-final &
+PASS syntax validates whole line before side effects
+PASS syntax validates skipped segment
+PASS syntax validates before interpolation
+PASS valid trailing semicolon
+PASS quoted operators remain words
+PASS failed interpolation prevents dispatch
+PASS failed interpolation is reported
+PASS cd changes shell directory
+PASS env assignment preserved
+PASS shell dispatch regression

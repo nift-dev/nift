@@ -1,0 +1,1371 @@
+{
+  "status": "PASS",
+  "comparator_profile": "verified",
+  "unverified_comparator_cases": 0,
+  "binary_sha256": "9238faa32685590543af0b0629ed5e68f4aae61d12117a183fe5309f110237bb",
+  "results": [
+    {
+      "name": "declared_comparator-uncaught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:25: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 25,
+            "parse_us": 70.759,
+            "compile_us": 229.179,
+            "execute_us": 79.112,
+            "protos": 2,
+            "instructions": 60,
+            "source_bytes": 59,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:25: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "declared_comparator-caught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n31\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 54.729,
+            "compile_us": 218.385,
+            "execute_us": 79.226,
+            "protos": 2,
+            "instructions": 69,
+            "source_bytes": 159,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n31\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_padded-uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:31: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 31,
+            "parse_us": 51.705,
+            "compile_us": 171.164,
+            "execute_us": 45.613,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 53,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:6: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_padded-caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n37\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 49.819,
+            "compile_us": 209.366,
+            "execute_us": 46.335,
+            "protos": 2,
+            "instructions": 68,
+            "source_bytes": 153,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n6\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_shifted-uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:43: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 43,
+            "parse_us": 59.347,
+            "compile_us": 245.08,
+            "execute_us": 65.146,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 65,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_shifted-caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n49\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 66.711,
+            "compile_us": 249.915,
+            "execute_us": 74.39,
+            "protos": 2,
+            "instructions": 68,
+            "source_bytes": 165,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_multiline-uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 3,
+            "column": 5,
+            "parse_us": 64.242,
+            "compile_us": 274.982,
+            "execute_us": 55.5,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 53,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:2:5: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_multiline-caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.691,
+            "compile_us": 175.934,
+            "execute_us": 37.934,
+            "protos": 2,
+            "instructions": 68,
+            "source_bytes": 153,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n2\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "declared_multiline-uncaught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 3,
+            "column": 5,
+            "parse_us": 47.572,
+            "compile_us": 194.187,
+            "execute_us": 58.738,
+            "protos": 2,
+            "instructions": 60,
+            "source_bytes": 63,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:3:5: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "declared_multiline-caught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 58.521,
+            "compile_us": 186.414,
+            "execute_us": 48.547,
+            "protos": 2,
+            "instructions": 69,
+            "source_bytes": 163,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n3\n5\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "internal_catch-uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n33\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 70.784,
+            "compile_us": 275.87,
+            "execute_us": 65.916,
+            "protos": 2,
+            "instructions": 72,
+            "source_bytes": 161,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 640,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 640,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "internal_catch-caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n39\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 67.372,
+            "compile_us": 289.259,
+            "execute_us": 68.191,
+            "protos": 2,
+            "instructions": 83,
+            "source_bytes": 261,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 640,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 640,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "rethrow-uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "1\n33\n",
+        "err": "error: $CASE/case.f:1:33: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 33,
+            "parse_us": 73.175,
+            "compile_us": 255.54,
+            "execute_us": 56.054,
+            "protos": 2,
+            "instructions": 66,
+            "source_bytes": 108,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 1248,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1440,
+            "heap_live": 1248,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "1\n8\n",
+        "err": "error: $CASE/case.f:1:8: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    },
+    {
+      "name": "rethrow-caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "1\n39\nstop\n1\n39\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 66.14,
+            "compile_us": 266.001,
+            "execute_us": 52.374,
+            "protos": 2,
+            "instructions": 77,
+            "source_bytes": 208,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "1\n8\nstop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "ordinary_named_caught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 56.869,
+            "compile_us": 178.474,
+            "execute_us": 52.217,
+            "protos": 2,
+            "instructions": 19,
+            "source_bytes": 137,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 832,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1024,
+            "heap_live": 832,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "ordinary_lambda_internal",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 62.252,
+            "compile_us": 197.331,
+            "execute_us": 48.6,
+            "protos": 2,
+            "instructions": 25,
+            "source_bytes": 136,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "named_comparator_caught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 62.545,
+            "compile_us": 261.838,
+            "execute_us": 62.584,
+            "protos": 2,
+            "instructions": 70,
+            "source_bytes": 160,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1024,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 1024,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n16\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "helper_inline_caught",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 73.012,
+            "compile_us": 306.987,
+            "execute_us": 45.506,
+            "protos": 3,
+            "instructions": 73,
+            "source_bytes": 173,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 896,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "existing_unoriginated",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n57\nuser.raised\nuser\n0\n0\nfalse\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 72.994,
+            "compile_us": 239.659,
+            "execute_us": 65.092,
+            "protos": 2,
+            "instructions": 80,
+            "source_bytes": 227,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1088,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 1088,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n0\n0\nfalse\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "existing_originated",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\n1\n11\nuser.raised\nuser\ntrue\ntrue\ntrue\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 34.453,
+            "compile_us": 180.773,
+            "execute_us": 39.289,
+            "protos": 3,
+            "instructions": 94,
+            "source_bytes": 290,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 960,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1600,
+            "heap_live": 960,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n11\nuser.raised\nuser\ntrue\ntrue\ntrue\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "inline_identity_rethrow",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "true\ntrue\ntrue\nstop\n1\n33\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 71.102,
+            "compile_us": 235.763,
+            "execute_us": 63.282,
+            "protos": 2,
+            "instructions": 87,
+            "source_bytes": 285,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 640,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 640,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "true\ntrue\ntrue\nstop\n1\n8\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "nested_inline_caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n44\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 67.323,
+            "compile_us": 238.395,
+            "execute_us": 59.197,
+            "protos": 3,
+            "instructions": 110,
+            "source_bytes": 161,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1984,
+            "heap_live": 896,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "ordinary_rethrow",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "true\ntrue\ntrue\nstop\n1\n17\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 45.584,
+            "compile_us": 187.106,
+            "execute_us": 43.785,
+            "protos": 2,
+            "instructions": 34,
+            "source_bytes": 261,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 576,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1024,
+            "heap_live": 576,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "true\ntrue\ntrue\nstop\n1\n17\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "factory_error",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n67\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 84.349,
+            "compile_us": 292.772,
+            "execute_us": 56.312,
+            "protos": 3,
+            "instructions": 73,
+            "source_bytes": 173,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 896,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n2\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "local_construct_then_throw",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n57\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 73.402,
+            "compile_us": 257.127,
+            "execute_us": 78.292,
+            "protos": 2,
+            "instructions": 71,
+            "source_bytes": 167,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1728,
+            "heap_live": 896,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n26\nuser.raised\nuser\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "comparator_cause",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n55\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 49.706,
+            "compile_us": 219.944,
+            "execute_us": 52.437,
+            "protos": 2,
+            "instructions": 84,
+            "source_bytes": 249,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1184,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 2016,
+            "heap_live": 1184,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "ordinary_cause",
+      "pass_": true,
+      "approved_origin_difference": false,
+      "actual": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n32\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.89,
+            "compile_us": 207.992,
+            "execute_us": 47.868,
+            "protos": 2,
+            "instructions": 39,
+            "source_bytes": 236,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 1248,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1440,
+            "heap_live": 1248,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\nuser.test\nuser\ntrue\n0\n0\n1\n32\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "original_caught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "stop\n1\n33\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 61.255,
+            "compile_us": 244.74,
+            "execute_us": 61.884,
+            "protos": 2,
+            "instructions": 66,
+            "source_bytes": 117,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 704,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1536,
+            "heap_live": 704,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "stop\n1\n2\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      }
+    },
+    {
+      "name": "original_uncaught",
+      "pass_": true,
+      "approved_origin_difference": true,
+      "actual": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:27: stop\n",
+        "exit": 1,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm-error",
+            "reason": "stop",
+            "line": 1,
+            "column": 27,
+            "parse_us": 51.394,
+            "compile_us": 209.366,
+            "execute_us": 49.899,
+            "protos": 2,
+            "instructions": 57,
+            "source_bytes": 49,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "user.raised",
+            "catchable": true,
+            "error_origin": true,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 1152,
+            "heap_live": 1152,
+            "path": "/tmp/cp14b-origin-u4kn11ih/case.f"
+          }
+        ]
+      },
+      "legacy": {
+        "out": "",
+        "err": "error: $CASE/case.f:1:2: stop\n",
+        "exit": 1,
+        "stats": []
+      }
+    }
+  ]
+}

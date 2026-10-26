@@ -228,7 +228,12 @@ bool UnitCompiler::return_statement(const Node& node) {
     // selector reads in a lambda preserve the legacy return statement site.
     std::uint16_t value = 0;
     const std::uint8_t saved_flags = fb_->flags();
-    fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrReturnCall));
+#if defined(NIFT_CP19_EVAL_MUTANT_RETURN) // test-only: expose synthetic return again
+    const bool real_return = true;
+#else
+    const bool real_return = !expression_result_ || in_function_;
+#endif
+    fb_->set_flags(static_cast<std::uint8_t>(saved_flags | (real_return ? kInstrReturnCall : 0)));
     const std::uint32_t saved_return_offset = return_read_offset_;
     if (in_lambda_) return_read_offset_ = node.begin;
     const bool value_ok = temp(value) && expr_to(node.a, value);
@@ -381,7 +386,6 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
     return compile_unit_impl(ast, root, limits, false);
 }
-
 CompileResult compile_expression_unit(Ast& ast, NodeId expression) {
     // Synthetic structure only: never prepend source text or shift offsets.
     // The ordinary script-return scalar restriction is unchanged; eval owns
@@ -393,5 +397,4 @@ CompileResult compile_expression_unit(Ast& ast, NodeId expression) {
     ast.set_list(root, {returned});
     return compile_unit_impl(ast, root, CompileLimits(), true);
 }
-
 } // namespace nift::rt

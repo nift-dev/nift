@@ -1,0 +1,27 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+.build/cp19/expression-unit
+CP19 expression ownership: 1426 checks, 0 failures
+/usr/bin/python3 tests/runtime2/cp19/eval_entry.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --report ".build/cp19/threaded.jsonl"
+PASS CP19 expression parity/routing: 242 process observations
+/usr/bin/python3 tests/runtime2/cp19/eval_entry.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --report ".build/cp19/switch.jsonl"
+PASS CP19 expression parity/routing: 242 process observations
+/usr/bin/python3 tests/runtime2/cp19/eval_entry.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp19/nift-eval-bypass" --expect-bypass --report ".build/cp19/bypass.jsonl"
+PASS compiled legacy-bypass mutant detected: correct output without VM execution
+.build/cp19/ownership-review
+CP19 expression ownership: 1561 checks, 0 failures
+.build/cp19/ownership-review-switch
+CP19 expression ownership: 1561 checks, 0 failures
+/usr/bin/python3 tests/runtime2/cp19/eval_r1.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --out ".build/cp19/r1-threaded.jsonl"
+PASS R1 parity/refusal/return-context: 183 observations
+/usr/bin/python3 tests/runtime2/cp19/eval_r1.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --out ".build/cp19/r1-switch.jsonl"
+PASS R1 parity/refusal/return-context: 183 observations
+/usr/bin/python3 tests/runtime2/cp19/eval_r1.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp19/nift-return-prefix" --out ".build/cp19/return-mutant.jsonl" --expect-return-prefix
+PASS real synthetic-return-prefix mutant detected by exact diagnostic gate
+/usr/bin/python3 tests/runtime2/cp19/reviewer_matrix.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --out ".build/cp19/review-threaded.json"
+Recorded 135 observations
+/usr/bin/python3 tests/runtime2/cp19/check_review_matrix.py ".build/cp19/review-threaded.json"
+PASS original reviewer matrix: 135 observations, exact admitted parity and pre-effect refusal accounting
+/usr/bin/python3 tests/runtime2/cp19/reviewer_matrix.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --out ".build/cp19/review-switch.json"
+Recorded 135 observations
+/usr/bin/python3 tests/runtime2/cp19/check_review_matrix.py ".build/cp19/review-switch.json"
+PASS original reviewer matrix: 135 observations, exact admitted parity and pre-effect refusal accounting

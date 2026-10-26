@@ -1,0 +1,578 @@
+[
+  {
+    "name": "self-structural",
+    "source": "a:=[2,1]; print(\"SIDE\"); a.sort((x,y)=>a.push(3)<y)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:26: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 26,
+          "parse_us": 65.02,
+          "compile_us": 215.183,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 52,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "receiver-write",
+    "source": "a:=[2,1]; print(\"SIDE\"); fn(cmp(x,y)) { a=[1]; return x<y }; a.sort(cmp)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:62: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 62,
+          "parse_us": 56.184,
+          "compile_us": 198.949,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 73,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "unknown-effects",
+    "source": "a:=[2,1]; print(\"SIDE\"); fn(cmp(x,y)) { for(v:a) { v+=1 }; return x<y }; a.sort(cmp)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:74: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 74,
+          "parse_us": 41.395,
+          "compile_us": 181.779,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 85,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "exact-number-profile",
+    "source": "a:=[9007199254740993,9007199254740992]; print(\"SIDE\"); a.sort((x,y)=>x<y)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:56: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 56,
+          "parse_us": 27.62,
+          "compile_us": 119.641,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 74,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "decimal-profile",
+    "source": "a:=[-1,0.0,2]; print(\"SIDE\"); a.sort((x,y)=>x<y)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:31: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 31,
+          "parse_us": 42.41,
+          "compile_us": 146.811,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 49,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "error-profile",
+    "source": "a:=[error(\"a\"),error(\"b\")]; print(\"SIDE\"); a.sort((x,y)=>false)",
+    "pass_": true,
+    "vm": {
+      "out": "",
+      "err": "error: $CASE/case.f:1:44: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+      "exit": 1,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "require-error",
+          "reason": "method:sort",
+          "line": 1,
+          "column": 44,
+          "parse_us": 41.989,
+          "compile_us": 137.117,
+          "execute_us": 0,
+          "protos": 0,
+          "instructions": 0,
+          "source_bytes": 64,
+          "beyond_legacy_depth": false,
+          "vm_executions": 0,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 0,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  },
+  {
+    "name": "disjoint-counter",
+    "source": "a:=[3,1,2]; n:=0; fn(cmp(x,y)) { n+=1; return x<y }; a.sort(cmp); print(a.stringify()); print(n)",
+    "pass_": true,
+    "vm": {
+      "out": "[1,2,3]\n3\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 44.98,
+          "compile_us": 208.142,
+          "execute_us": 51.164,
+          "protos": 2,
+          "instructions": 73,
+          "source_bytes": 97,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 256,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 896,
+          "heap_live": 256,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "[1,2,3]\n3\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "safe-helper",
+    "source": "fn(less(x,y)) { return x<y }; a:=[3,1,2]; a.sort((x,y)=>less(x,y)); print(a.stringify())",
+    "pass_": true,
+    "vm": {
+      "out": "[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 38.119,
+          "compile_us": 203.061,
+          "execute_us": 43.705,
+          "protos": 3,
+          "instructions": 65,
+          "source_bytes": 89,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 128,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 1024,
+          "heap_live": 128,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "safe-recursive-helper",
+    "source": "fn(less(x,y,n)) { if(n>0) { return less(x,y,n-1) }; return x<y }; a:=[3,1,2]; a.sort((x,y)=>less(x,y,2)); print(a.stringify())",
+    "pass_": true,
+    "vm": {
+      "out": "[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 98.638,
+          "compile_us": 378.674,
+          "execute_us": 66.233,
+          "protos": 3,
+          "instructions": 72,
+          "source_bytes": 127,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 128,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 1024,
+          "heap_live": 128,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "recursive-same-site",
+    "source": "fn(work(n)) { a:=[3,2,1]; a.sort((x,y)=>{ if(n>0) { work(n-1) }; return x<y }); print(a.stringify()); return true }; work(2)",
+    "pass_": true,
+    "vm": {
+      "out": "[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 67.301,
+          "compile_us": 267.954,
+          "execute_us": 80.366,
+          "protos": 3,
+          "instructions": 72,
+          "source_bytes": 125,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 0,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 3008,
+          "heap_live": 0,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "future-boundary",
+    "source": "fn(boom(x)) { throw error(\"stop\") }; try { [1].unique_by(boom) } catch(e) { print(e.message) }; a:=[2,1]; a.sort((x,y)=>x<y); print(a.stringify())",
+    "pass_": true,
+    "vm": {
+      "out": "stop\n[1,2]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 56.551,
+          "compile_us": 269.894,
+          "execute_us": 72.016,
+          "protos": 3,
+          "instructions": 106,
+          "source_bytes": 147,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 384,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 1152,
+          "heap_live": 384,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "stop\n[1,2]\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "completed-boundary",
+    "source": "a:=[2,1]; a.sort((x,y)=>x<y); fn(boom(x)) { throw error(\"stop\") }; try { [1].unique_by(boom) } catch(e) { print(e.message) }; print(a.stringify())",
+    "pass_": true,
+    "vm": {
+      "out": "stop\n[1,2]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 64.611,
+          "compile_us": 226.163,
+          "execute_us": 46.938,
+          "protos": 3,
+          "instructions": 106,
+          "source_bytes": 147,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 384,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 1216,
+          "heap_live": 384,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": {
+      "out": "stop\n[1,2]\n",
+      "err": "",
+      "exit": 0,
+      "stats": []
+    }
+  },
+  {
+    "name": "disjoint-value-copy",
+    "source": "a:=[3,1,2]; b:=a; fn(cmp(x,y)) { b.push(9); return x<y }; a.sort(cmp); print(a.stringify())",
+    "pass_": true,
+    "vm": {
+      "out": "[1,2,3]\n",
+      "err": "",
+      "exit": 0,
+      "stats": [
+        {
+          "nift_vm": 1,
+          "outcome": "vm",
+          "reason": "",
+          "line": 0,
+          "column": 0,
+          "parse_us": 84.318,
+          "compile_us": 271.54,
+          "execute_us": 72.314,
+          "protos": 2,
+          "instructions": 69,
+          "source_bytes": 92,
+          "beyond_legacy_depth": false,
+          "vm_executions": 1,
+          "legacy_executions": 0,
+          "large_numbers": 0,
+          "large_in_loop_path": 0,
+          "error_in_loop_path": false,
+          "code": "",
+          "catchable": false,
+          "error_origin": false,
+          "heap_bytes": 384,
+          "large_lines": [],
+          "derived_lines": [],
+          "evidence_truncated": false,
+          "heap_peak": 1024,
+          "heap_live": 384,
+          "path": "/tmp/cp14b-effects-s8pdfhpg/case.f"
+        }
+      ]
+    },
+    "legacy": null
+  }
+]

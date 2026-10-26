@@ -1,0 +1,381 @@
+{
+  "binary_sha256": "9238faa32685590543af0b0629ed5e68f4aae61d12117a183fe5309f110237bb",
+  "results": [
+    {
+      "name": "cp11-alias",
+      "source_sha256": "958e68ecd988feb3eee0774084ef5921c84216eff6574e22a1dcebdfe69c4313",
+      "pass_": true,
+      "legacy": {
+        "out": "3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "2\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 60.355,
+            "compile_us": 175.9,
+            "execute_us": 50.748,
+            "protos": 1,
+            "instructions": 12,
+            "source_bytes": 48,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 192,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 192,
+            "heap_live": 192,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "semantics-alias",
+      "source_sha256": "63ca2419b730409a0d90d7299113e875719aa6ed1edfaf952a4aeb4efcab66de",
+      "pass_": true,
+      "legacy": {
+        "out": "[1,2,3]\n[1,2,3]\n[7]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "[1,2]\n[1,2]\n[7]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 63.012,
+            "compile_us": 252.774,
+            "execute_us": 55.607,
+            "protos": 1,
+            "instructions": 26,
+            "source_bytes": 101,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 128,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 256,
+            "heap_live": 128,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "generated-102",
+      "source_sha256": "8e859bf290991ef459e63d107bb17fc0317af91b53e54e6cb207151692ddb6fa",
+      "pass_": true,
+      "legacy": {
+        "out": "14\n4\n[-4,4,3,5,8]\n[-4,4,3,5,8]\n[-4,4,3,5,8]\n[0]\n3\n[1,2]\n$\n[-4,4,3,5,8]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "14\n4\n[-4,4,3,5]\n[-4,4,3,5,8]\n[-4,4,3,5]\n[0]\n3\n[1,2]\n$\n[-4,4,3,5]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 72.047,
+            "compile_us": 316.862,
+            "execute_us": 50.864,
+            "protos": 4,
+            "instructions": 73,
+            "source_bytes": 453,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 256,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 384,
+            "heap_live": 256,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "generated-151",
+      "source_sha256": "8a16e4d11a486b24f1cdb0235ccef2806f0286d3c22ec427c6eaad3a207258b6",
+      "pass_": true,
+      "legacy": {
+        "out": "2\n[0,0,7,100,9]\n[0,0,7,100,9]\n[0,0,7,100,9]\n[0]\n[0,0,7,100,9,9]\n[0,0,7,100,9,9]\n[0,0,7,100,9,9]\n[0]\n[0,0,7,100,9,9,9]\n[0,0,7,100,9,9,9]\n[0,0,7,100,9,9,9]\n[0]\n2\nPQ\nfalse\nfalse\n[\"pq\"]\n-q\n10\n1\n1\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "2\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n[0,0,7,100]\n[0,0,7,100,9]\n[0,0,7,100]\n[0]\n2\nPQ\nfalse\nfalse\n[\"pq\"]\n-q\n10\n1\n1\n3\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 99.121,
+            "compile_us": 491.275,
+            "execute_us": 74.903,
+            "protos": 2,
+            "instructions": 126,
+            "source_bytes": 775,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 448,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 704,
+            "heap_live": 448,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "generated-162",
+      "source_sha256": "dc97d140ce3202925e1383f2d1a30db510881c1ab5a6856a7ec46bf4817b51f6",
+      "pass_": true,
+      "legacy": {
+        "out": "false\ntrue\n3\n[1,2]\nfalse\ntrue\nfalse\ntrue\n[42,10,0,-4,2]\n[42,10,0,-4,2]\n[42,10,0,-4,2]\n[0]\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "false\ntrue\n3\n[1,2]\nfalse\ntrue\nfalse\ntrue\n[42,10,0,-4]\n[42,10,0,-4,2]\n[42,10,0,-4]\n[0]\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 92.076,
+            "compile_us": 457.159,
+            "execute_us": 64.826,
+            "protos": 2,
+            "instructions": 196,
+            "source_bytes": 1063,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 448,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 448,
+            "heap_live": 448,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "generated-176",
+      "source_sha256": "bcfcb75a69ba21c732359e0c0e2d9c994fb5b8a96a4704d5d91f345a956f6cf4",
+      "pass_": true,
+      "legacy": {
+        "out": "8\nq\n{\"k\":8,\"s\":\"q\"}\n2\n0\n[0,15]\n10\n-\n{\"k\":10,\"s\":\"-\"}\n[0,15,4]\n[0,15,4]\n[0,15,4]\n[0]\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "8\nq\n{\"k\":8,\"s\":\"q\"}\n2\n0\n[0,15]\n10\n-\n{\"k\":10,\"s\":\"-\"}\n[0,15]\n[0,15,4]\n[0,15]\n[0]\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 85.176,
+            "compile_us": 497.898,
+            "execute_us": 59.106,
+            "protos": 1,
+            "instructions": 151,
+            "source_bytes": 816,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 672,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 800,
+            "heap_live": 672,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "adversarial-copy-top",
+      "source_sha256": "b1fb57089539a629921eb65162d4372b79e170b33ffdf57d0f793c440e8b2d18",
+      "pass_": true,
+      "legacy": {
+        "out": "1\n2\n1\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "1\n1\n1\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 75.326,
+            "compile_us": 227.539,
+            "execute_us": 42.447,
+            "protos": 1,
+            "instructions": 28,
+            "source_bytes": 124,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 896,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 896,
+            "heap_live": 896,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    },
+    {
+      "name": "adversarial-copy-function",
+      "source_sha256": "b7657064d81dd5ab858df288d45135fc4813a551527059275e9a65febf22664d",
+      "pass_": true,
+      "legacy": {
+        "out": "1\n2\n1\n0\n",
+        "err": "",
+        "exit": 0,
+        "stats": []
+      },
+      "actual": {
+        "out": "1\n1\n1\n0\n",
+        "err": "",
+        "exit": 0,
+        "stats": [
+          {
+            "nift_vm": 1,
+            "outcome": "vm",
+            "reason": "",
+            "line": 0,
+            "column": 0,
+            "parse_us": 52.43,
+            "compile_us": 242.521,
+            "execute_us": 43.943,
+            "protos": 2,
+            "instructions": 24,
+            "source_bytes": 158,
+            "beyond_legacy_depth": false,
+            "vm_executions": 1,
+            "legacy_executions": 0,
+            "large_numbers": 0,
+            "large_in_loop_path": 0,
+            "error_in_loop_path": false,
+            "code": "",
+            "catchable": false,
+            "error_origin": false,
+            "heap_bytes": 640,
+            "large_lines": [],
+            "derived_lines": [],
+            "evidence_truncated": false,
+            "heap_peak": 896,
+            "heap_live": 640,
+            "path": "/tmp/cp14b-copy-witnesses-ammsf49y/case.f"
+          }
+        ]
+      }
+    }
+  ]
+}
