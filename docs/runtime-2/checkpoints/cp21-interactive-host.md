@@ -54,6 +54,20 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   recovery/mutant units. The certification guard records those edges and
   removal controls fail if any is disconnected.
 
+## R2-review D3 correction
+
+- **D3 atomic fallback descriptor:** when `/dev/tty` is unavailable and stdin
+  is a tty, the lease now duplicates stdin with `F_DUPFD_CLOEXEC` (or refuses
+  the fallback on a platform without it). It never uses `dup()` followed by a
+  separate `fcntl()`, which allowed a concurrent fork/exec to inherit the
+  terminal between the calls.
+- A compiled D3 mutant restores the non-atomic fallback. The regression forks
+  an exec child during the controlled duplicate window and scans descriptors
+  3–511 in that child; the mutant leaks the tty, the corrected candidate does
+  not. A dead/unsuitable child cannot satisfy the scan prerequisite.
+- The D3 normal and mutant tests are permanent `test-v45-job-control`
+  dependencies with certification-guard removal controls.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
@@ -119,6 +133,8 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 | lease descriptor cycles | no fd growth |
 | compiled D1 mutant (no barrier) | parent-only check fails for the intended reason |
 | compiled D2 mutant (isatty-gated restore) | closed-stdin ownership check fails for the intended reason |
+| compiled D3 mutant (dup then fcntl) | exec child inherits the tty and `exec-child-no-extra-fds` fails |
+| dead D3 exec child | setup failure, never counted as detection |
 
 ## Mutants and controls
 

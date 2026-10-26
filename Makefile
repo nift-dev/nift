@@ -2583,6 +2583,8 @@ test-v45-job-control: test-cp21-make-failure-control
 ifeq ($(shell uname -s),Linux)
 test-v45-job-control: test-cp21-terminal-recovery
 test-v45-job-control: test-cp21-terminal-recovery-mutants
+test-v45-job-control: test-cp21-fd-inheritance
+test-v45-job-control: test-cp21-fd-inheritance-mutants
 endif
 test-v45-job-control:
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_jobs_background.sh
@@ -3352,6 +3354,8 @@ $(TEST_DIR)/cp21-restore-fault.so: tests/cp21_restore_fault.c
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-child-death.so: tests/cp21_unrelated_child_death.c
 	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fallback-fault.so: tests/cp21_fallback_fault.c
+	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
@@ -3364,8 +3368,8 @@ CP21_TERMINAL_RECOVERY := $(TEST_DIR)/cp21-terminal-recovery$(EXEEXT)
 $(CP21_TERMINAL_RECOVERY): tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES) -o "$@"
 .PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease \
-	test-cp21-terminal-recovery test-cp21-terminal-recovery-mutants test-cp21-prompt-latency \
-	test-cp21-make-failure-control
+	test-cp21-terminal-recovery test-cp21-terminal-recovery-mutants test-cp21-fd-inheritance \
+	test-cp21-fd-inheritance-mutants test-cp21-prompt-latency test-cp21-make-failure-control
 test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
 	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)"
 	@if [ "$(shell uname -s)" = "Linux" ]; then \
@@ -3424,6 +3428,39 @@ $(CP21_RECOVERY_D2): tests/cp21_terminal_recovery.cpp \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp \
 		$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
 		$(TEST_DIR)/cp21-mutants/d2/process_terminal.o -ldl -o "$@"
+CP21_FD_CHILD := $(TEST_DIR)/cp21-fd-child$(EXEEXT)
+CP21_FD_INHERITANCE := $(TEST_DIR)/cp21-fd-inheritance$(EXEEXT)
+CP21_FD_INHERITANCE_D3 := $(TEST_DIR)/cp21-fd-inheritance-d3$(EXEEXT)
+$(CP21_FD_CHILD): tests/cp21_fd_child.c
+	$(CC) $(CFLAGS) $< -o "$@"
+$(CP21_FD_INHERITANCE): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp \
+	src/rt/host/process_terminal.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp -ldl -o "$@"
+$(TEST_DIR)/cp21-mutants/d3/process_terminal.o: src/rt/host/process_terminal.cpp \
+	src/rt/host/process_terminal.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_D3_MUTANT=1 -MMD -MP -c $< -o "$@"
+$(CP21_FD_INHERITANCE_D3): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.h \
+	$(TEST_DIR)/cp21-mutants/d3/process_terminal.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp \
+		$(TEST_DIR)/cp21-mutants/d3/process_terminal.o -ldl -o "$@"
+test-cp21-fd-inheritance: $(CP21_FD_INHERITANCE) $(CP21_FD_CHILD) $(TEST_DIR)/cp21-fallback-fault.so
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE)" "$(CURDIR)/$(CP21_FD_CHILD)"
+test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
+	$(TEST_DIR)/cp21-fallback-fault.so
+	@set -e; \
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE_D3)" "$(CURDIR)/$(CP21_FD_CHILD)" > "$(TEST_DIR)/cp21-d3-mutant.log" 2>&1 && \
+	  { echo "FAIL CP21 D3 mutant not detected"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
+	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-mutant.log" || \
+	  { echo "FAIL CP21 D3 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
+	echo "PASS CP21 D3 mutant: non-atomic duplicate detected"; \
+	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE)" /bin/true > "$(TEST_DIR)/cp21-d3-dead-child.log" 2>&1 && \
+	  { echo "FAIL CP21 D3 dead-child control accepted"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
+	grep -q "SETUP_FAIL exec child did not scan descriptors" "$(TEST_DIR)/cp21-d3-dead-child.log" || \
+	  { echo "FAIL CP21 D3 dead-child control failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
+	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-dead-child.log" && \
+	  { echo "FAIL CP21 D3 dead-child control reported the intended defect"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
+	echo "PASS CP21 D3 dead-child control: rejected as missing evidence"
 test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(TEST_DIR)/cp21-restore-fault.so
 	@set -e; \
 	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_RECOVERY_D1)" > "$(TEST_DIR)/cp21-d1-mutant.log" 2>&1 && \

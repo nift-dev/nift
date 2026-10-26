@@ -111,7 +111,8 @@ edges=("test-rt-host: test-runtime2-f6-cleanup" \
        "test-v45-job-control: test-cp21-interactive-host-mutants" \
        "test-v45-job-control: test-cp21-make-failure-control")
 if [ "$(uname -s)" = Linux ]; then
-    edges+=("test-v45-job-control: test-cp21-terminal-recovery" "test-v45-job-control: test-cp21-terminal-recovery-mutants")
+    edges+=("test-v45-job-control: test-cp21-terminal-recovery" "test-v45-job-control: test-cp21-terminal-recovery-mutants" \
+            "test-v45-job-control: test-cp21-fd-inheritance" "test-v45-job-control: test-cp21-fd-inheritance-mutants")
 fi
 for edge in "${edges[@]}"; do
     name="${edge##* }"
