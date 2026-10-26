@@ -12,6 +12,7 @@
 // differences (D-018: exactly-once evaluation, keys of print(path) evaluated
 // once, errors reported where they occur; D-009#1/#5).
 #include "rt/ast.h"
+#include "rt/compiler.h"
 #include "rt/codegen.h"
 #include "rt/globals.h"
 #include "rt/natives/builtin.h"
@@ -46,10 +47,18 @@ public:
     // program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
+    void set_session(SessionCompileContext* session);
     void expression_result() { expression_result_ = true; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 
 private:
+    SessionCompileContext* session_ = nullptr;
+    std::unordered_map<std::string, Binding> session_bindings_;
+    bool session_function(NodeId id);
+    bool session_admit();
+    bool session_tail(NodeId id);
+    bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);
+    bool session_publish(std::string_view name, const Binding& binding);
     bool expression_result_ = false;
     struct Loop {
         std::size_t start = 0;

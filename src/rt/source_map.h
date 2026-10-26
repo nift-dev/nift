@@ -31,6 +31,13 @@ struct SourceOrigin {  // 1-based line/byte-column, as rt::locate
 
 class SourceMap {
 public:
+    struct Piece {
+        std::string path;
+        std::shared_ptr<const std::string> source;
+        std::uint32_t source_begin = 0, length = 0;
+    };
+    // Immutable virtual source assembled from owned original source ranges.
+    static SourceMap pieces(const std::vector<Piece>& pieces);
     // Owns a copy of `source`; `path` is reported unchanged.
     static SourceMap single(std::string path, std::string_view source);
     // Owns copies of the entry and every linked module source. `link` must stay
@@ -52,6 +59,7 @@ private:
     struct Impl {
         std::vector<std::string> paths;
         std::vector<std::string> sources;
+        std::vector<LinkSegment> pieces;
         const LinkedUnit* link = nullptr;  // borrowed; only locate() is used
         mutable std::once_flag built;
         mutable std::vector<std::vector<std::uint32_t>> line_starts;

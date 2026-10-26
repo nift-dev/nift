@@ -9,6 +9,7 @@
 #include "PackageTransaction.h"
 #include <minify/Minify.h>
 #include <map>
+#include <memory>
 #include "ProjectInfo.h"
 #include "ProjectRead.h"
 #include "ProjectModel.h"
@@ -31,6 +32,8 @@
 #include "rt/parser.h"
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
+#include "rt/session.h"
+#include "rt/eval_result.h"
 #include "shell/CommandDispatch.h"
 #include "shell/Spawn.h"
 
@@ -1605,7 +1608,61 @@ bool initialise_project(const InitOptions& options) {
 }
 
 
-static int run_script_shell_loop(Parser& parser, bool load_rc);
+static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSession* session = nullptr);
+
+enum class SessionDisplay { Repl, Script, Rc };
+static nift::rt::VmOptions session_options() {
+    nift::rt::VmOptions options;
+    options.flush = [](std::string& output, void*) {
+        std::cout.write(output.data(), static_cast<std::streamsize>(output.size())); output.clear();
+    };
+    if (const auto* threshold = std::getenv("NIFT_VM_FLUSH")) {
+        char* end = nullptr; const auto value = std::strtoull(threshold, &end, 10);
+        if (end && *end == 0 && value) options.flush_threshold = static_cast<std::size_t>(value);
+    }
+    return options;
+}
+static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
+                                    const std::string& path, bool inspect = true,
+                                    SessionDisplay display = SessionDisplay::Repl) {
+    bool expression = false;
+    if (inspect) {
+        nift::rt::Ast ast(source);
+        const auto parsed = nift::rt::parse_script(ast);
+        if (parsed.ok && ast.at(parsed.root).count == 1)
+            expression = ast.at(ast.list(ast.at(parsed.root))[0]).kind == nift::rt::NodeKind::ExprStmt;
+    }
+    std::string output;
+    const auto result = expression ? session.evaluate(source, path, output) : session.execute(source, path, output, inspect);
+    if (!output.empty()) std::cout << output;
+    const auto mode = nift::rt::vm_mode_from_environment();
+    if (mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) return 0;
+    if (!result.admitted) { console::error("NIFT_VM session refused: " + result.refusal); return 1; }
+    if (result.execution.reason != nift::rt::StopReason::None) {
+        std::string message = result.execution.message;
+        if (display == SessionDisplay::Rc) message = "niftrc: " + message;
+        if (display == SessionDisplay::Script) {
+            const auto origin = result.execution.error_origin ? nift::rt::SourceOrigin{
+                result.execution.origin_source, result.execution.origin_line, result.execution.origin_column} :
+                result.execution.report_origin;
+            if (!origin.path.empty() && origin.line)
+                message = origin.path + ':' + std::to_string(origin.line) + ':' +
+                          std::to_string(origin.column) + ": " + message;
+        }
+        console::error(message);
+        return result.execution.reason == nift::rt::StopReason::Internal ? 70 : 1;
+    }
+    if (!expression && result.execution.returned && !result.execution.return_inspection && result.value.is_null())
+        std::cout << "null\n";
+    if ((expression || result.execution.returned) && !result.value.is_null()) {
+        nift::RuntimeValue value;
+        std::string error;
+        if (!nift::rt::eval_result_to_legacy(result.value, value, error)) { console::error(error); return 70; }
+        if (!(value.is_string() && value.string.empty()))
+            std::cout << ((!expression || result.presentation) && value.is_string() ? value.string : value.dump()) << '\n';
+    }
+    return 0;
+}
 
 static int run_script_source(const std::string& source, const fs::path& source_path,
                              const std::string& cmd, const std::vector<std::string>& script_args,
@@ -1631,6 +1688,15 @@ static int run_script_source(const std::string& source, const fs::path& source_p
             return validate_only ? 65 : 1;
         }
         if (validate_only) return 0;
+    }
+    if (interactive_after && target == "native" && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
+        nift::rt::VmSession session(session_options());
+        const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
+                                                    SessionDisplay::Script);
+        if (status != 0) return status;
+        ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host, info);
+        parser.set_script_invocation(cmd, script_args);
+        return run_script_shell_loop(parser, false, &session);
     }
     // Runtime 2.0 CP11: opt-in VM (NIFT_VM=1); returns false to run legacy unchanged.
     if (!interactive_after && target == "native") {
@@ -1901,7 +1967,8 @@ static bool shell_glob_expand_word(const ShellWord& word, std::vector<std::strin
 
 // Interpolate $[expr] inside one command word using the live parser. The
 // replacement inherits the quote provenance of the `$` that opened it.
-static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std::string& error) {
+static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std::string& error,
+                                            nift::rt::VmSession* session = nullptr) {
     if (word.quoted.size() != word.text.size()) word.quoted.resize(word.text.size(), 0);
     std::size_t i = 0;
     while ((i = word.text.find("$[", i)) != std::string::npos) {
@@ -1913,7 +1980,16 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
         const std::string expression = word.text.substr(i + 2, close - i - 2);
         nift::RuntimeValue value;
         std::string eval_error;
-        if (!parser.eval_expression(expression, value, eval_error)) {
+        bool evaluated = false;
+        if (session) {
+            std::string output;
+            const auto result = session->evaluate(expression, "<interpolation>", output);
+            if (!output.empty()) std::cout << output;
+            if (!result.admitted) eval_error = "NIFT_VM session refused: " + result.refusal;
+            else if (result.execution.reason != nift::rt::StopReason::None) eval_error = result.execution.message;
+            else evaluated = nift::rt::eval_result_to_legacy(result.value, value, eval_error);
+        } else evaluated = parser.eval_expression(expression, value, eval_error);
+        if (!evaluated) {
             error = "command interpolation failed: $[" + expression + "]: " + eval_error;
             return false;
         }
@@ -1946,7 +2022,8 @@ static void add_shell_words(std::set<std::string>& target, const std::string& wo
     while (input >> word) target.insert(word);
 }
 
-static nift::shell::ShellSnapshot make_shell_snapshot(const Parser& parser) {
+static nift::shell::ShellSnapshot make_shell_snapshot(const Parser& parser,
+                                                     nift::rt::VmSession* session = nullptr) {
     nift::shell::ShellSnapshot snapshot;
     add_shell_words(snapshot.shell_builtins, "cd exit quit jobs fg bg wait");
     add_shell_words(snapshot.command_builtins, "print pwd");
@@ -1959,7 +2036,8 @@ static nift::shell::ShellSnapshot make_shell_snapshot(const Parser& parser) {
         "secure_random_bytes sha256 sha256_file sleep timer platform getenv "
         "setenv unsetenv exists file open open_bytes which run len range filter "
         "map sum keys values entries type string int float bool array object");
-    for (const auto& name : parser.shell_completions("")) snapshot.user_functions.insert(name);
+    if (session) for (const auto& name : session->namespace_names()) snapshot.user_functions.insert(name);
+    else for (const auto& name : parser.shell_completions("")) snapshot.user_functions.insert(name);
     snapshot.executable_exists = [](const std::string& name) {
         std::string resolved;
         return nift_find_executable(name, resolved);
@@ -2092,7 +2170,7 @@ static int dispatch_shell_state(Parser& parser,
                                 bool interactive,
                                 bool print_errors,
                                 bool& exit_requested,
-                                int& exit_code) {
+                                int& exit_code, nift::rt::VmSession* session = nullptr) {
     if (builtin == "exit" || builtin == "quit") {
         if (args.size() > 1) {
             if (print_errors) console::error(builtin + ": expected at most one status");
@@ -2125,7 +2203,8 @@ static int dispatch_shell_state(Parser& parser,
             if (print_errors) console::error("cd: too many arguments");
             return 2;
         }
-        auto result = parser.run_statement(expression, "<repl>");
+        if (session) return run_vm_session_statement(*session, expression, "<repl>");
+    auto result = parser.run_statement(expression, "<repl>");
         if (!result.ok) {
             if (print_errors) console::error(result.error.message);
             return 1;
@@ -2138,13 +2217,14 @@ static int dispatch_shell_state(Parser& parser,
 
 static int run_nift_command(Parser& parser,
                             const std::vector<std::string>& tokens,
-                            bool print_errors) {
+                            bool print_errors, nift::rt::VmSession* session = nullptr) {
     const std::size_t name_index = shell_name_index(tokens);
     if (name_index >= tokens.size()) {
         if (print_errors) console::error("nift: empty command");
         return 2;
     }
     const std::string expression = shell_nift_call(tokens, name_index);
+    if (session) return run_vm_session_statement(*session, expression, "<repl>");
     auto result = parser.run_statement(expression, "<repl>");
     if (result.ok) {
         if (!result.output.empty()) std::cout << result.output << '\n';
@@ -2286,13 +2366,14 @@ static int execute_shell_command(Parser& parser,
                                  bool interactive,
                                  const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
                                  bool* exit_requested_out = nullptr,
-                                 int* exit_code_out = nullptr) {
+                                 int* exit_code_out = nullptr,
+                                 nift::rt::VmSession* session = nullptr) {
     auto words = shell_words(line);
     if (words.empty()) return 0;
     const auto texts = shell_texts(words);
     const auto operator_flags = shell_operator_flags(words);
     const nift::shell::ShellSnapshot snapshot =
-        supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser);
+        supplied_snapshot ? *supplied_snapshot : make_shell_snapshot(parser, session);
     nift::shell::LinePlan plan = nift::shell::classify_line(texts, operator_flags, snapshot);
 
 #ifndef NIFT_SHELL_DISPATCH_MUTANT_SYNTAX
@@ -2311,13 +2392,15 @@ static int execute_shell_command(Parser& parser,
     for (auto& word : words) {
         if (word.operator_token) continue;
         std::string error;
-        if (!command_token_interpolate_word(parser, word, error)) {
+        if (!command_token_interpolate_word(parser, word, error, session)) {
             if (print_errors) console::error(error);
             return 2;
         }
     }
 #endif
 
+    const auto vm_mode = nift::rt::vm_mode_from_environment();
+    if (session && (vm_mode == nift::rt::VmMode::Classify || vm_mode == nift::rt::VmMode::ClassifyAll)) return 0;
     bool exit_requested = false;
     int exit_code = 0;
     int last = 0;
@@ -2351,7 +2434,7 @@ static int execute_shell_command(Parser& parser,
         for (auto& word : segment_words) {
             if (word.operator_token) continue;
             std::string error;
-            if (!command_token_interpolate_word(parser, word, error)) {
+            if (!command_token_interpolate_word(parser, word, error, session)) {
                 if (print_errors) console::error(error);
                 interpolation_failed = true;
                 last = 2;
@@ -2411,12 +2494,12 @@ static int execute_shell_command(Parser& parser,
                                 segment_texts.end());
                 }
                 last = dispatch_shell_state(parser, segment.first.name, args, jobs, legacy_jobs, interactive, print_errors,
-                                            exit_requested, exit_code);
+                                            exit_requested, exit_code, session);
                 break;
             }
             case nift::shell::CommandKind::UserFunction:
             case nift::shell::CommandKind::NiftBuiltin:
-                last = run_nift_command(parser, segment_texts, print_errors);
+                last = run_nift_command(parser, segment_texts, print_errors, session);
                 break;
             case nift::shell::CommandKind::External:
                 last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
@@ -2643,7 +2726,11 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 }
 #endif
-static int run_script_shell_loop(Parser& parser, bool load_rc) {
+static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSession* session) {
+    std::unique_ptr<nift::rt::VmSession> owned_session;
+    if (!session && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
+        owned_session = std::make_unique<nift::rt::VmSession>(session_options()); session = owned_session.get();
+    }
     std::string pending; nift::shell::JobTable jobs; ShellJobTable legacy_jobs;
     auto history=load_nift_history();
 #ifndef _WIN32
@@ -2652,7 +2739,15 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
 #endif
-    if(load_rc) if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
+    if (load_rc) if (const char* home = std::getenv("HOME")) {
+        fs::path rc = fs::path(home) / ".niftrc";
+        if (filesystem::file_exists(rc)) {
+            if (session) {
+                if (run_vm_session_statement(*session, filesystem::read_file(rc), rc.generic_string(), false, SessionDisplay::Rc)) return 1;
+            } else { auto rr = parser.run_statement(filesystem::read_file(rc), rc);
+                if (!rr.ok) { console::error("niftrc: " + rr.error.message); return 1; } }
+        }
+    }
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());
 #ifndef _WIN32
         std::string line;ShellRead r;
@@ -2676,7 +2771,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);
         auto shell_line_words=shell_words(trimmed);
         auto toks=shell_texts(shell_line_words);
-        const auto snapshot=make_shell_snapshot(parser);
+        const auto snapshot=make_shell_snapshot(parser, session);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
 #ifndef _WIN32
@@ -2686,13 +2781,19 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             const bool forced_interactive = std::getenv("NIFT_CP20_FORCE_INTERACTIVE") != nullptr;
             const bool interactive_shell = _isatty(_fileno(stdin)) != 0 || forced_interactive;
 #endif
-            execute_shell_command(parser,trimmed,true,&jobs,&legacy_jobs,interactive_shell,&snapshot,&exit_requested,&exit_code);
+            const auto status = execute_shell_command(parser,trimmed,true,&jobs,&legacy_jobs,interactive_shell,
+                                                      &snapshot,&exit_requested,&exit_code,session);
+            if (status == 70) return status;
             pending.clear();
             if(exit_requested) return exit_code;
             continue;
         }
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
+        if (session) {
+            const auto status = run_vm_session_statement(*session, pending, "<repl>");
+            pending.clear(); if (status == 70) return status; continue;
+        }
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
         if(!rr.ok){ console::error(rr.error.message);continue; }
         if(!rr.output.empty())std::cout<<rr.output<<'\n';

@@ -15,7 +15,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (callee.kind != NodeKind::Ident) return fail(callee, "callee");
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
-    if (const Binding* binding = find_binding(name); binding != nullptr) return call_value(node, node.a, false, dst);
+    if (find_binding(name) && !(session_ && plan_.index.count(name))) return call_value(node, node.a, false, dst);
     if (name == "error") return error_new(node, dst);  // rt-lint: allow-string-compare reserved Error constructor
     if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
     const auto fn = plan_.index.find(name);

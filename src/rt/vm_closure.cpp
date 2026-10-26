@@ -20,6 +20,9 @@ bool Vm::op_load_function(const Instr& in, Value* R, Fault& fault) {
         auto* function = new FunctionObject();
         function->name = protos_[in.b]->name;
         function->code = protos_[in.b];
+#if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
+    if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
+#endif
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 8)
         heap_retally(function);
 #endif
@@ -112,6 +115,9 @@ bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     auto* function = new FunctionObject();
     function->name = protos_[in.b]->name;
     function->code = protos_[in.b];
+#if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
+    if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
+#endif
     function->is_lambda = true;
     function->display_id = next_callable_display_id_++;
     function->expression_body = (in.flags & kInstrLambdaExprBody) != 0;
@@ -203,7 +209,7 @@ bool Vm::op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*
             raise(fault, StopReason::Error, "undefined callable: " + std::string(note ? note->text : ""));
         return false;
     }
-    const Proto* code = static_cast<const Proto*>(f->code);
+    const Proto* code = callable_code(f, proto);
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 6
 #define CALL_ARITY_OK true
 #else

@@ -19,7 +19,8 @@ namespace nift::rt::infer_detail {
 
 class Inference {
 public:
-    Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals);
+    Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
+              const SessionCompileContext* session = nullptr);
 
     // Monotone unions over a finite (depth-capped) lattice. Worklist over the call graph (review D1): a unit
     // is re-walked only when its bindings, a parameter or a callee's return grew; its last walk sees its final
@@ -28,6 +29,9 @@ public:
 
 private:
     void enqueue(std::size_t unit);
+    void seed_session();
+    void export_session();
+    TyRef session_call(const Node& n);
 
     std::size_t current_unit() const;
 
@@ -106,6 +110,8 @@ private:
     NodeId root_;
     const UnitPlan& plan_;
     GlobalSlots globals_;
+    const SessionCompileContext* session_ = nullptr;
+    std::unordered_map<std::string_view, std::size_t> external_;
     UnitKinds result_;
     std::vector<std::vector<TyRef>> params_;
     std::vector<TyRef> returns_;

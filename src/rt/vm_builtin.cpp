@@ -81,7 +81,7 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
             fault.catchable = true;
             raise(fault, StopReason::Error, std::move(message));
             SourceOrigin origin;
-            if (!origin_at(report_offset(fault, proto, &in), origin, fault)) {
+            if (!origin_at(proto, report_offset(fault, proto, &in), origin, fault)) {
                 fault.catchable = false;
                 fault.error = Value();
                 return false;

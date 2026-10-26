@@ -7,6 +7,9 @@
 // compilation (reported by NIFT_VM_STATS) and `offset` its source position.
 #include "rt/ast.h"
 #include "rt/proto.h"
+#include "rt/session_definition.h"
+#include <unordered_set>
+#include <unordered_map>
 
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +19,7 @@
 #include <vector>
 
 namespace nift::rt {
+namespace infer_detail { struct Ty; }
 
 struct CompileResult {
     std::unique_ptr<Program> program;  // null when the unit must fall back
@@ -25,7 +29,24 @@ struct CompileResult {
 
 // `root` must be the Program node of a successful parse_script.
 // Analysis limits (tests lower them to exercise the refusal).
+struct SessionSymbol {
+    std::string name;
+    std::shared_ptr<const SessionDefinition> definition;
+    std::shared_ptr<const infer_detail::Ty> structure;
+    const void* code = nullptr;
+    std::uint16_t slot = 0, kinds = 0, returns = 0, arity = 0, contract = 0;
+    bool callable = false, const_array = false, defined = true, readonly = false;
+    std::vector<std::uint16_t> params, param_types;
+};
+struct SessionCompileContext {
+    std::vector<SessionSymbol> symbols;
+    std::unordered_set<std::string> imported_functions;
+    std::unordered_map<std::string, NodeId> declarations;
+    std::uint16_t slots = 0;
+    bool inspect_tail = false;
+};
 struct CompileLimits {
+    SessionCompileContext* session = nullptr;  // private compile transaction, never the live namespace
     std::size_t kind_walks = 0;  // infer_unit_kinds max_walks (0: automatic)
     // CP12b modules (rt/module_link.h): names declared outside functions in
     // imported modules. A user-call argument path rooted at one is refused
@@ -41,6 +62,6 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
 // Front ends must enforce their own admissible result/serialization surface.
 CompileResult compile_expression_unit(Ast& ast, NodeId expression);
 NodeId make_eval_program(Ast& ast, NodeId expression);
-CompileResult compile_eval_program(const Ast& ast, NodeId program);
+CompileResult compile_eval_program(const Ast& ast, NodeId program, const CompileLimits& limits = CompileLimits());
 
 } // namespace nift::rt

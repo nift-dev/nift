@@ -3596,3 +3596,64 @@ test-runtime2-cp18-cow: $(CP18_COW) $(CP18_COW_SWITCH) $(SHARED_LIB) $(CP18_SWIT
 	$(PYTHON) tests/runtime2/cp18/cow_semantics.py "$(abspath $(CP18_SWITCH_LIB))"
 	$(PYTHON) tests/runtime2/cp18/cow_negative.py --out "$(CURDIR)/$(TEST_DIR)/cp18/cow-negative" --libffi "$(CURDIR)/$(LIBFFI_A)"
 test-runtime2-cp18: test-runtime2-cp18-cow
+
+# CP19 persistent VM production witness (one VM and stable cells, no Parser bridge).
+$(TEST_DIR)/cp19/session$(EXEEXT): tests/runtime2/cp19/session.cpp $(CP19_EXPR_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-switch$(EXEEXT): tests/runtime2/cp19/session.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
+.PHONY: test-cp19-session
+test-cp19-session: $(TEST_DIR)/cp19/session$(EXEEXT) $(TEST_DIR)/cp19/session-switch$(EXEEXT)
+	$(TEST_DIR)/cp19/session$(EXEEXT)
+	$(TEST_DIR)/cp19/session-switch$(EXEEXT)
+$(TEST_DIR)/cp19/session-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(CP19_EXPR_SAN_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+$(TEST_DIR)/cp19/session-switch-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+.PHONY: test-cp19-session-sanitize
+test-cp19-session-sanitize: $(TEST_DIR)/cp19/session-sanitize$(EXEEXT) $(TEST_DIR)/cp19/session-switch-sanitize$(EXEEXT)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 120 $(TEST_DIR)/cp19/session-sanitize$(EXEEXT)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 120 $(TEST_DIR)/cp19/session-switch-sanitize$(EXEEXT)
+
+# Real session mutation controls, each swapping one production object.
+$(TEST_DIR)/cp19/session-control$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(CP19_EXPR_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m1.o: src/rt/session.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=1 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m1$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m2.o: src/rt/session.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=2 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m2$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m3.o: src/rt/vm_session.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=3 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m3$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m4.o: src/rt/session.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=4 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m4$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/session-m5.o: src/rt/vm_closure.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=5 -MMD -MP -c $< -o $@
+$(TEST_DIR)/cp19/session-m5$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o $(LDLIBS) -o $@
+-include $(wildcard $(TEST_DIR)/cp19/session-m*.d)
+.PHONY: test-cp19-session-mutants
+test-cp19-session-mutants: $(TEST_DIR)/cp19/session-control$(EXEEXT) $(TEST_DIR)/cp19/session-m1$(EXEEXT) $(TEST_DIR)/cp19/session-m2$(EXEEXT) $(TEST_DIR)/cp19/session-m3$(EXEEXT) $(TEST_DIR)/cp19/session-m4$(EXEEXT) $(TEST_DIR)/cp19/session-m5$(EXEEXT)
+	$(PYTHON) tests/runtime2/cp19/session_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --out "$(TEST_DIR)/cp19/session-mutants.json"
+.PHONY: test-cp19-session-cli
+test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
+	$(PYTHON) tests/runtime2/cp19/session_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-cli.jsonl"
+	$(PYTHON) tests/runtime2/cp19/session_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-cli-switch.jsonl"
+	$(PYTHON) tests/runtime2/cp19/session_refusal_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-refusals.json"
+	$(PYTHON) tests/runtime2/cp19/session_refusal_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-refusals-switch.json"

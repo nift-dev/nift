@@ -5,11 +5,13 @@
 #include "rt/value.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace nift::rt {
+struct Program;
 
 // Immutable text; strings longer than Value::kInlineStringCapacity live here.
 struct StringObject : HeapObject {
@@ -69,6 +71,7 @@ struct ObjectObject : HeapObject {
 // closures do not). `code` and `environment` are opaque until the compiler
 // (CP11) defines protos; natives use `native_id`.
 struct FunctionObject : HeapObject {
+    std::shared_ptr<const Program> program_owner;  // session code lifetime, never a state bridge
     std::string name;
     const void* code = nullptr;
     std::uint32_t native_id = 0;

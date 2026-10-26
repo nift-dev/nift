@@ -9,7 +9,7 @@ bool UnitCompiler::binding_cell(const Binding& b, std::uint16_t& reg) {
         if (!temp(reg)) return false;
         fb_->emit(OpCode::GetUpvalueCell, reg, b.upvalue_index);
     } else if (b.global) {
-        if (!global_read(b.reg, reg)) return false;
+        if (!(session_ ? global_read_value(b.reg, reg, b.session_name) : global_read(b.reg, reg))) return false;
     } else reg = b.reg;
     return true;
 }

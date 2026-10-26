@@ -42,6 +42,8 @@ struct Location {
 
 // Parses a whole script. `ast` must have been constructed over the same text.
 ParseResult parse_script(Ast& ast);
+// Parse a source range into the same arena; offsets remain in the original source.
+ParseResult parse_script_range(Ast& ast, std::uint32_t begin, std::uint32_t end);
 
 // Parses one expression (used by tests and later front ends).
 NodeId parse_expression(Ast& ast, std::uint32_t begin, std::uint32_t end);

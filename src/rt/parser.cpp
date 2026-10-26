@@ -28,13 +28,20 @@ NodeId make_opaque(Ast& ast, std::uint32_t begin, std::uint32_t end, OpaqueReaso
 } // namespace detail
 
 ParseResult parse_script(Ast& ast) {
+    return parse_script_range(ast, 0, static_cast<std::uint32_t>(ast.source().size()));
+}
+ParseResult parse_script_range(Ast& ast, std::uint32_t begin, std::uint32_t end) {
     ParseResult result;
+    if (begin > end || end > ast.source().size()) {
+        result.ok = false; result.error.offset = begin; result.error.message = "invalid script source range";
+        return result;
+    }
     std::vector<NodeId> statements;
-    const auto size = static_cast<std::uint32_t>(ast.source().size());
+    const auto size = end;
     ast.reserve(size / 3 + 16);
-    result.ok = detail::parse_block(ast, 0, size, detail::Mode::Strict, statements, result.error);
+    result.ok = detail::parse_block(ast, begin, size, detail::Mode::Strict, statements, result.error);
     if (!result.ok) return result;
-    result.root = ast.add(NodeKind::Program, 0, size);
+    result.root = ast.add(NodeKind::Program, begin, size);
     ast.set_list(result.root, statements);
     return result;
 }

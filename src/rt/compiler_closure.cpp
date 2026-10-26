@@ -231,6 +231,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     reason_.clear();
     offset_ = 0;
     begin("lambda", lambda.b);
+    if (!(lambda.flags & kFlagBlockBody)) fb_->session_returns |= kinds(lambda.b);
     // Incoming arguments occupy the first registers, before descriptor locals.
     std::vector<std::uint16_t> regs(lambda.count);
     for (std::uint32_t k = 0; k < lambda.count; ++k)
@@ -298,7 +299,13 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     if (ok) {
         fb_->drop_unread_types();
         ok = finish(out);
-        if(ok)out->collection_expression_view=collection_view;
+        if (ok) {
+            out->collection_expression_view = collection_view;
+            if (session_) for (std::uint32_t k = 0; k < lambda.count; ++k) {
+                out->session_params.push_back(kinds(params[k]));
+                out->session_param_types.push_back(0xffff);
+            }
+        }
     }
     if (!ok) {
         // Keep the failure reason/offset from the lambda body; the unit is
@@ -346,6 +353,7 @@ bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, s
         std::uint16_t result = 0;
         if (!temp(result)) return false;
     }
+    if (session_ && !session_call_types(node, callee_id, base)) return false;
     fb_->set_offset(site(node));
     const std::uint8_t saved = fb_->flags();
     if (member) fb_->set_flags(static_cast<std::uint8_t>(fb_->flags() | kInstrCallMember));

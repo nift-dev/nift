@@ -11,9 +11,11 @@
 
 namespace nift::rt {
 
-bool Vm::origin_at(std::uint32_t offset, SourceOrigin& out, Fault& fault) const {
-    if (options_.source_map == nullptr) return internal(fault, "exception origin without source map");
-    out = options_.source_map->at(offset);
+bool Vm::origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const {
+    const auto* owner = fault.use_call_site && !frames_.empty() ? frames_.front().proto : proto;
+    const SourceMap* map = owner->session_source ? owner->session_source.get() : options_.source_map;
+    if (map == nullptr) return internal(fault, "exception origin without source map");
+    out = map->at(offset);
     return true;
 }
 
@@ -38,7 +40,7 @@ bool Vm::handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K,
 #if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)
     if (fault.reason == StopReason::Error && !fault.catchable) {
         SourceOrigin origin;
-        if (origin_at(report_offset(fault, proto, pc), origin, fault)) {
+        if (origin_at(proto, report_offset(fault, proto, pc), origin, fault)) {
             fault.error = make_user_error(fault.message);
             fault.catchable = true;
         }
@@ -107,7 +109,7 @@ bool Vm::op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc
 #elif NIFT_EXC_MUTANT == 8
     if (error->source.empty() || error->line == 0 || error->column == 0) {
         SourceOrigin origin;
-        if (!origin_at(proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
+        if (!origin_at(proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
             return false;
         auto* shared = const_cast<ErrorObject*>(error);
         shared->source = origin.path;
@@ -129,7 +131,7 @@ bool Vm::op_throw(const Instr& in, Value* R, const Proto* proto, const Instr* pc
 #if !defined(NIFT_EXC_MUTANT) || NIFT_EXC_MUTANT != 8
     if (stamp) {
         SourceOrigin origin;
-        if (!origin_at(proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
+        if (!origin_at(proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
             return false;
         value = clone_error_with_origin(value, origin);
         if (!memory_ok(fault)) return false;

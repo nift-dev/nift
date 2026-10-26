@@ -3,6 +3,7 @@
 namespace nift::rt::infer_detail {
 TyRef Inference::record(NodeId id, TyRef t) {
     result_.kinds[id] = t->kinds;
+    if (session_) result_.session_shapes[id] = t;
     if(ast_.at(id).kind==NodeKind::Ident) {
         if(TyRef* binding=find(ast_.text(ast_.at(id)))) {
             const auto slot=static_cast<std::size_t>(binding-vars_.data());

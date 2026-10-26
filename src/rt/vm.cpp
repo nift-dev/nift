@@ -183,12 +183,12 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 
 bool Vm::op_meta_global(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     switch (in.op) {
-        case OpCode::GetGlobal: R[in.a] = stack_[in.b]; return true;
+        case OpCode::GetGlobal: R[in.a] = global_slot(in.b); return true;
         case OpCode::GetGlobalChecked: return op_get_global_checked(in, R, fault, proto);
         case OpCode::SetGlobal:
             if (in.flags & kInstrGlobalTake) ++global_taken_;
             else if (in.flags & kInstrGlobalPut) { if (global_taken_ != 0) --global_taken_; }
-            stack_[in.a] = R[in.b];
+            global_slot(in.a) = R[in.b];
             return true;
         case OpCode::MarkGlobal: op_mark_global(in); return true;
         case OpCode::CheckGlobal: return op_check_global(in, fault, proto);
@@ -312,7 +312,7 @@ VmResult Vm::run(std::string& output) {
     OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(TopReturn) {
-        if (!op_top_return(*pc, R, result, fault) || !pop_handlers_for_frame(0, fault)) FAIL();
+        if (!op_top_return(*pc, R, result, fault, proto) || !pop_handlers_for_frame(0, fault)) FAIL();
         goto done; }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }
     OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
@@ -354,7 +354,7 @@ bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Pr
         if (in.flags & kInstrIndexKey) fault.use_call_site = true;
         return false;
     }
-    R[in.a] = stack_[in.b];
+    R[in.a] = global_slot(in.b);
     return true;
 }
 void Vm::op_mark_global(const Instr& in) {

@@ -47,7 +47,9 @@ bool UnitCompiler::begin(std::string name, NodeId body, const std::unordered_set
 
 bool UnitCompiler::finish(std::unique_ptr<Proto>& out) {
     if (!builder_ok()) return false;
+    const auto returns = fb_->session_returns;
     out = fb_->finish();
+    out->session_returns = returns;
     return true;
 }
 
@@ -75,8 +77,12 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     const NodeId* list = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
         if (ast_.at(list[k]).kind == NodeKind::FnDecl || ast_.at(list[k]).kind == NodeKind::StructDecl)
-            continue;  // planned by plan_unit (CP12b: struct declarations too)
-        if (!statement(list[k])) return false;
+            { if (session_ && ast_.at(list[k]).kind == NodeKind::FnDecl && !session_function(list[k])) return false;
+              continue; }  // planned by plan_unit (CP12b: struct declarations too)
+        if (session_ && session_->inspect_tail && k + 1 == node.count &&
+            ast_.at(list[k]).kind == NodeKind::ExprStmt) {
+            if (!session_tail(list[k])) return false;
+        } else if (!statement(list[k])) return false;
     }
     fb_->emit(OpCode::Halt);
     fb_->drop_unread_types();
@@ -212,6 +218,7 @@ bool UnitCompiler::while_loop(const Node& node) {
 }
 
 bool UnitCompiler::return_statement(const Node& node) {
+    fb_->session_returns |= node.a == kNoNode ? kKindNull : kinds(node.a);
     const auto end_tries = [this, &node] {
         fb_->set_offset(node.begin);
         for (std::size_t k = 0; k < try_scopes_.size(); ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
@@ -345,7 +352,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     // copy); the order of the refusals is unchanged.
     // CP12b: free names of functions that resolve to top-level bindings.
     const GlobalPlan globals = plan_globals(ast, root, plan);
-    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks, &globals);
+    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks, &globals, limits.session);
     const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
@@ -359,12 +366,13 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
+    compiler.set_session(limits.session);
     if (expression_result) compiler.expression_result();
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
         result.offset = compiler.offset();
-        if (compiler.unknown_hit()) {
+        if (compiler.unknown_hit() && !limits.session) {
             // Unknown kinds come from something refused anyway: report that
             // refusal when the probe finds one (the unit is refused either way).
             detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called, &globals);
@@ -386,7 +394,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
     return compile_unit_impl(ast, root, limits, false);
 }
-CompileResult compile_eval_program(const Ast& ast, NodeId program) {
-    return compile_unit_impl(ast, program, CompileLimits(), true);
+CompileResult compile_eval_program(const Ast& ast, NodeId program, const CompileLimits& limits) {
+    return compile_unit_impl(ast, program, limits, true);
 }
 } // namespace nift::rt

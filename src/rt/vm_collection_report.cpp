@@ -30,6 +30,7 @@ bool block_view(VmResult& result,const Note* note,const SourceMap* map) {
     auto& display=result.diagnostic_frames.front().site;
     display.source=failure.path;display.line=failure.line-body.line+1;
     display.column=failure.column-(failure.line==body.line?body.column-1:0);
+    result.report_origin = {display.source, static_cast<std::uint32_t>(display.line), static_cast<std::uint32_t>(display.column)};
     return true;
 }
 }
@@ -48,7 +49,7 @@ void Vm::collection_error_context(VmResult& result,const Fault& fault,const Prot
     if(result.reason!=StopReason::Error||fault.message.rfind("callable recursion depth exceeded",0)==0)return;
     result.message=fault.catchable&&fault.error.is(Kind::Error)?
         fault.error.heap_as<ErrorObject>()->message:fault.message;
-    bool own_origin=source_view(closure_,proto,&program_.main(),frames_.empty()?nullptr:frames_.back().ret-1);
+    bool own_origin=source_view(closure_,proto,protos_.front(),frames_.empty()?nullptr:frames_.back().ret-1);
     bool missing_view=closure_&&closure_->selector_call_site;
     if(closure_&&closure_->is_lambda&&(closure_->expression_body||proto->collection_expression_view))
         result.message="lambda body error: "+result.message;
@@ -63,7 +64,8 @@ void Vm::collection_error_context(VmResult& result,const Fault& fault,const Prot
             !result.diagnostic_frames.front().site.source.empty();
         if(!result.error_origin&&!display&&call->op==OpCode::CollectionCall) {
             const auto at=static_cast<std::size_t>(call-it->proto->code.data());
-            if(block_view(result,it->proto->note(at),options_.source_map)) {
+            if(block_view(result,it->proto->note(at),
+                it->proto->session_source ? it->proto->session_source.get() : options_.source_map)) {
                 own_origin=true;result.offset=it->proto->offsets[at];
             }else if(!own_origin&&((call->c&0x4000)||missing_view)) {
                 result.offset=it->proto->offsets[at];moved=true;
@@ -73,9 +75,11 @@ void Vm::collection_error_context(VmResult& result,const Fault& fault,const Prot
             result.message="return: "+result.message;
             if(!result.error_origin&&!own_origin){result.offset=return_site(it->proto,call,result.offset);moved=true;}
         }
+        if (moved && it->proto->session_source)
+            result.report_origin = it->proto->session_source->at(result.offset);
         if(moved) {
             auto parent=it;++parent;
-            own_origin=source_view(it->closure,it->proto,&program_.main(),
+            own_origin=source_view(it->closure,it->proto,protos_.front(),
                 parent==frames_.rend()?nullptr:parent->ret-1);
             missing_view=it->closure&&it->closure->selector_call_site;
         }

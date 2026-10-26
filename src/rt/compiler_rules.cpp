@@ -92,6 +92,10 @@ bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint1
         return fb_->constant(Value::integer(type.known), operand) || builder_ok();
     if (type.kind == TextType::Kind::Binding) {
         if (const Binding* b = find_binding(type.binding)) {
+            // An uncaptured catch binding has no runtime type register: its
+            // fixed CP13B Error type must not be read from the Error value.
+            if (b->readonly && b->decl_kinds == kKindError)
+                return fb_->constant(Value::integer(9), operand) || builder_ok();
             if (b->cell || b->upvalue) return fb_->constant(Value::integer(-1), operand) || builder_ok();
             if (b->global) return global_read(b->type_reg, operand);  // CP12b
             operand = b->type_reg;
@@ -274,6 +278,7 @@ bool UnitCompiler::no_alias(NodeId value, const Node& at) {
     if (kind != NodeKind::Ident && kind != NodeKind::Member && kind != NodeKind::Index) return true;
     const Binding* binding=kind==NodeKind::Ident?find_binding(text(ast_.at(value))):nullptr;
     const bool ordinary=kind==NodeKind::Ident&&binding&&!binding->selector&&!binding->loop_binding;
+    if (session_ && ordinary && kinds(value) == kKindArray) return true;  // D-040 stable binding copies
     if(ordinary&&(kinds(value)&kKindAggregate)&&
        (!(kinds(value)&kKindArray)||kinds_.collection_arrays.count(value))&&
        (!(kinds(value)&kKindObject)||kinds_.collection_objects.count(value)))return true;

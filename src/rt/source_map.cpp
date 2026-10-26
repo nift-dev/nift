@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
+#include <unordered_map>
 
 namespace nift::rt {
 
@@ -39,6 +40,27 @@ SourceMap SourceMap::linked(const LinkedUnit& link, std::string entry_path, std:
     return map;
 }
 
+SourceMap SourceMap::pieces(const std::vector<Piece>& pieces) {
+    SourceMap map;
+    map.impl_ = std::make_shared<Impl>();
+    std::unordered_map<const std::string*, std::size_t> modules;
+    std::uint32_t position = 0;
+    for (const auto& piece : pieces) {
+        if (!piece.source || piece.source_begin > piece.source->size())
+            throw std::invalid_argument("invalid source map piece");
+        if (piece.length > 0xffffffffu - position) throw std::length_error("source map offset limit");
+        const auto inserted = modules.emplace(piece.source.get(), modules.size());
+        const auto module = inserted.first->second;
+        if (inserted.second) {
+            map.impl_->paths.push_back(piece.path);
+            map.impl_->sources.push_back(*piece.source);
+        }
+        map.impl_->pieces.push_back(LinkSegment{position, position + piece.length, module, piece.source_begin});
+        position += piece.length;
+    }
+    return map;
+}
+
 #ifdef NIFT_SOURCEMAP_COUNTER
 std::uint64_t SourceMap::lookup_count() const {
     return impl_ ? impl_->lookups.load(std::memory_order_relaxed) : 0;
@@ -63,7 +85,13 @@ SourceOrigin SourceMap::at(std::uint32_t linked_offset) const {
     });
     std::size_t module = 0;
     std::uint32_t offset = linked_offset;
-    if (impl_->link != nullptr) {
+    if (!impl_->pieces.empty()) {
+        const auto it = std::upper_bound(impl_->pieces.begin(), impl_->pieces.end(), linked_offset,
+            [](std::uint32_t position, const LinkSegment& piece) { return position < piece.begin; });
+        const auto& piece = *(it == impl_->pieces.begin() ? it : it - 1);
+        module = piece.module;
+        offset = static_cast<std::uint32_t>(piece.source_begin + linked_offset - piece.begin);
+    } else if (impl_->link != nullptr) {
         const LinkedUnit::Location where = impl_->link->locate(linked_offset);
         module = where.module;
         offset = static_cast<std::uint32_t>(where.offset);

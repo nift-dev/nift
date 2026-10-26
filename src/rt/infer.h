@@ -35,6 +35,8 @@
 #include <vector>
 
 namespace nift::rt {
+struct SessionCompileContext;
+namespace infer_detail { struct Ty; }
 
 using KindSet = std::uint16_t;
 inline constexpr KindSet kKindNull = 1u << 0;
@@ -71,6 +73,8 @@ static_assert(kKindUnknown == (1u << 10));
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 
 struct UnitKinds {
+    std::unordered_map<std::string, std::shared_ptr<const infer_detail::Ty>> binding_shapes;
+    std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_shapes;
     std::vector<KindSet> kinds;  // per NodeId (expressions)
     // CP12C slice 2: for an iterable expression node, the kinds of the values
     // the default `for` binds (array elements, or object values for the pair
@@ -100,6 +104,6 @@ struct UnitKinds {
 // top-level binding reads that binding's kinds, and its writes widen them for
 // every unit (one shared slot); nullptr: free names are unknown, as before.
 UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks = 0,
-                           const GlobalPlan* globals = nullptr);
+                           const GlobalPlan* globals = nullptr, const SessionCompileContext* session = nullptr);
 
 } // namespace nift::rt

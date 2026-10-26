@@ -81,7 +81,12 @@ bool UnitCompiler::compile_lambda_body(const Node& lambda,const NodeId* params,b
         if(ok)fb_->emit(OpCode::Return,value);
     } else if (lambda.flags & kFlagBlockBody) {
         ok = statements(ast_.at(lambda.b));
-        if (ok) fb_->emit(OpCode::ReturnNull);
+        if (ok) {
+            const auto& body = ast_.at(lambda.b);
+            if (body.count == 0 || ast_.at(ast_.list(body)[body.count - 1]).kind != NodeKind::Return)
+                fb_->session_returns |= kKindNull;
+            fb_->emit(OpCode::ReturnNull);
+        }
     } else {
         std::uint16_t value = 0;
         const Node& body=ast_.at(lambda.b);

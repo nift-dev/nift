@@ -13,6 +13,8 @@ namespace nift::rt::detail {
 
 const Binding* UnitCompiler::find_binding(std::string_view name) const {
     if (const Binding* local = scopes_.find(name)) return local;
+    const auto external = session_bindings_.find(std::string(name));
+    if (external != session_bindings_.end()) return &external->second;
     if (in_lambda_) {
         const auto top = top_level_bindings_.find(name);
         return top == top_level_bindings_.end() ? nullptr : &top->second;
@@ -32,6 +34,10 @@ const Binding* UnitCompiler::find_binding(std::string_view name) const {
 void UnitCompiler::note_global_declaration(const Node& node, const Binding& binding) {
     if (in_function_) return;
     const std::string_view name = text(ast_.at(node.a));
+    if (session_ && top_level_decl_ids_.count(node_id(node))) {
+        if (!session_publish(name, binding)) return;
+        return;
+    }
     if (!top_level_decl_ids_.count(node_id(node))) return;
     Binding global = binding;
     global.global = true;

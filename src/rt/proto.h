@@ -9,11 +9,13 @@
 // it is only read on the cold error path.
 #include "rt/opcodes.h"
 #include "rt/value.h"
+#include "rt/session_definition.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace nift::rt {
 
@@ -46,9 +48,18 @@ enum : std::uint8_t {
 struct Note {
     bool eval_nullable_error = false;  // cold nullable Error member diagnostic, CP19
     std::string text;
+    bool session_inspection = false;
 };
 
+class SourceMap;
+struct Program;
 struct Proto {
+    std::shared_ptr<const SourceMap> session_source;
+    std::weak_ptr<const Program> session_owner;
+    std::shared_ptr<const SessionDefinition> session_definition;
+    std::vector<std::pair<const void*, const Proto*>> session_targets;
+    std::uint16_t session_returns = 0;
+    std::vector<std::uint16_t> session_params, session_param_types;
     const Proto* collection_entry = nullptr;  // owned by Program::protos
     bool collection_expression_view = false;
     std::string name;

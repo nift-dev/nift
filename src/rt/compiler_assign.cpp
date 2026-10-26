@@ -20,7 +20,7 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(reg)) return builder_ok();
     binding.reg = reg;
     binding.decl_node = node_id(at);
-    if (captured_binding(node_id(at)) || selector_roots_.count(node_id(at))) {
+    if ((session_ && !in_function_) || captured_binding(node_id(at)) || selector_roots_.count(node_id(at))) {
         binding.selector_root_only = !captured_binding(node_id(at));
         binding.location_source = selector_roots_.count(binding.decl_node);
         if (!fb_->alloc(binding.cell_reg)) return builder_ok();
@@ -68,7 +68,7 @@ bool UnitCompiler::declare(const Node& node) {
     // would derive differently was refused (rt/prepared.h, prepared-decl-type).
     if (!scopes_.declare(name, binding)) return fail(node, "static-error:redeclared");
     note_global_declaration(node, binding);  // CP12b: a global some function reaches
-    return true;
+    return reason_.empty();
 }
 
 // `x = e`: the canonical check of the type legacy derives from the text and
@@ -182,7 +182,8 @@ bool UnitCompiler::assign(const Node& node) {
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->readonly) return fail(target, "assign-catch-binding");
+    if (binding->readonly) return fail(target,
+        session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
@@ -265,7 +266,8 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->readonly) return fail(target, "assign-catch-binding");
+    if (binding->readonly) return fail(target,
+        session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     // `+=` on two numbers or two strings, the others on numbers (legacy
@@ -298,7 +300,8 @@ bool UnitCompiler::inc_dec(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->readonly) return fail(target, "assign-catch-binding");
+    if (binding->readonly) return fail(target,
+        session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
@@ -320,7 +323,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     bool lazy_temp = false;
     if (b.lazy_for) {
         if (!for_read_source(b, work, lazy_temp)) return false;
-    } else if (b.global) {
+    } else if (b.global && !b.cell) {
         if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) return false;
         if (!global_read_value(b.reg, work, text(target))) return false;
     } else if (!read_binding(b, work)) {

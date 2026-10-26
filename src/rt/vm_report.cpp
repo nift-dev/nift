@@ -97,6 +97,10 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
     }
     result.offset = report_offset(fault, proto, pc);
     collection_error_context(result, fault, proto, pc);
+    if (result.report_origin.path.empty()) {
+        const auto* owner = fault.use_call_site && !frames_.empty() ? frames_.front().proto : proto;
+        if (owner->session_source) result.report_origin = owner->session_source->at(result.offset);
+    }
     result.main_offset = main_offset(result.offset);  // CP12b (vm_frames.cpp)
     result.error_in_loop_path = in_loop_path(pc);
 }
@@ -154,7 +158,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
     return true;
 }
 
-bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault) {
+bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto) {
+    if (const auto* note = note_at(proto, &in)) result.return_inspection = note->session_inspection;
     if (options_.return_value) *options_.return_value = R[in.a];
     else if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
     result.returned = true;

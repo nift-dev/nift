@@ -1,4 +1,6 @@
 #include "rt/infer.h"
+#include "rt/compiler.h"
+#include "rt/session_shape.h"
 
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
@@ -16,8 +18,10 @@ namespace nift::rt {
 
 namespace infer_detail {
 
-Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals)
-    : ast_(ast), root_(root), plan_(plan), globals_(globals) {
+Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
+                     const SessionCompileContext* session)
+    : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
+    seed_session();
     result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));
     const Node& program = ast.at(root);
     const NodeId* top = ast.list(program);
@@ -47,6 +51,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         ++result_.walks;
         if (self_changed_) enqueue(unit);
     }
+    export_session();
     result_.converged = true;
     return std::move(result_);
 }
@@ -92,7 +97,7 @@ void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
-    merge_local(vars_[slot], value);
+    merge_local(vars_[slot], session_ && top_level_decls_.count(at) ? session_global_shape(value) : value);
     scopes_.back().emplace_back(name, slot);
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }
@@ -108,12 +113,13 @@ TyRef* Inference::find(std::string_view name) {
                           : owner_function_;
     const std::size_t slot = globals_.find(owner, name, persist_index_, vars_, ast_.size());
     if (slot != GlobalSlots::kNone) return &vars_[slot];
+    const auto external = external_.find(name);
+    if (external != external_.end() && !plan_.index.count(name)) return &vars_[external->second];
     if (current_ < 0 || static_cast<std::size_t>(current_) <= plan_.functions.size()) return nullptr;
     const auto top = top_level_slots_.find(name);
     return top == top_level_slots_.end() ? nullptr : &vars_[top->second];
 }
 
-TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
 
 
 int Inference::function_index(const Node& callee) const {
@@ -313,6 +319,7 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
 
 TyRef Inference::call(const Node& n) {
     const Node& callee = ast_.at(n.a);
+    if (const auto external = session_call(n)) return external;
     const NodeId* args = ast_.list(n);
     // CP13B: the reserved Error constructor.
     if (callee.kind == NodeKind::Ident && ast_.text(callee) == "error" && find(ast_.text(callee)) == nullptr &&
@@ -389,10 +396,5 @@ TyRef Inference::call(const Node& n) {
 }
 
 } // namespace infer_detail
-
-UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks,
-                           const GlobalPlan* globals) {
-    return infer_detail::Inference(ast, root, plan, globals).run(max_walks);
-}
 
 } // namespace nift::rt

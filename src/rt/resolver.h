@@ -23,6 +23,7 @@
 namespace nift::rt {
 
 struct Binding {
+    std::string session_name;  // compiler-only diagnostic name for a stable session cell
     // Loop reads use the source location until explicit reassignment. The
     // per-iteration cache is a separate slot (indexed selector writes use it).
     // Captures copy the live descriptor or share the detached/held slot; they

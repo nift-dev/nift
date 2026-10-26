@@ -206,6 +206,7 @@ void UnitCompiler::compute_may_double() {
 }
 
 bool UnitCompiler::compile_program(NodeId root, Program& program) {
+    if (session_ && !session_admit()) return false;
     program_ = &program;
     lambda_tasks_.clear();
     prepare_captures();
@@ -290,9 +291,16 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     }
     // The body shares the parameters' scope: `p := ...` redeclares a parameter.
     if (!statements(ast_.at(node.b))) return false;
+    const auto& body = ast_.at(node.b);
+    if (body.count == 0 || ast_.at(ast_.list(body)[body.count - 1]).kind != NodeKind::Return)
+        fb_->session_returns |= kKindNull;
     fb_->emit(OpCode::ReturnNull);
     fb_->drop_unread_types();
     if (!finish(out)) return false;
+    if (session_) for (std::uint32_t k = 0; k < node.count; ++k) {
+        out->session_params.push_back(kinds(params[k]));
+        out->session_param_types.push_back(observable_[f][k] ? type_regs[k] : 0xffff);
+    }
     // A parameter type read in the body that the analysis did not predict
     // would not be passed by the callers: refuse instead.
     for (const Instr& in : out->code)
