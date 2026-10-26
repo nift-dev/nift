@@ -2,15 +2,25 @@
 
 // rt-lint: cold-file bounded immutable type-graph contract adaptation
 namespace nift::rt {
-infer_detail::TyRef session_global_shape(const infer_detail::TyRef& type) {
+namespace {
+infer_detail::TyRef global_shape(const infer_detail::TyRef& type, bool number_binding, bool contents) {
     if (!type) return {};
     auto out = std::make_shared<infer_detail::Ty>(*type);
+    // Int bindings cannot later hold a double. Double bindings and untyped
+    // aggregate elements can hold either numeric kind. Widen before initial
+    // compilation, never after a reader has been published.
+    if ((number_binding || contents || (out->kinds & kKindFrac)) && (out->kinds & kKindNumber))
+        out->kinds |= kKindNumber;
     out->tuple = false; out->items.clear();
-    out->elem = session_global_shape(type->elem);
+    out->elem = global_shape(type->elem, false, true);
     if ((out->kinds & kKindArray) && out->elem && out->elem->kinds == 0)
         out->elem = infer_detail::any_ty();
-    for (auto& field : out->fields) field.second = session_global_shape(field.second);
+    for (auto& field : out->fields) field.second = global_shape(field.second, false, true);
     return out;
+}
+} // namespace
+infer_detail::TyRef session_global_shape(const infer_detail::TyRef& type, bool number_binding) {
+    return global_shape(type, number_binding, false);
 }
 infer_detail::TyRef session_shape(const infer_detail::TyRef& type) {
     if (!type) return {};

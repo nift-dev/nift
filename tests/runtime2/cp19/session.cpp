@@ -246,6 +246,23 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 8);
     }
     {
+        VmSession session;
+        std::string output;
+        auto r = session.execute("x:=1.5;fn(readv()){return x}", "numeric-definition", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.evaluate("(x=3)", "integer-in-double-binding", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.evaluate("readv()", "numeric-old-reader", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
+        r = session.execute("print(\"FORBIDDEN\");fn(caller()){x:=7;return readv()}", "dynamic-shadow", output);
+        CHECK(!r.admitted && r.refusal == "session:dynamic-shadow" && output.empty());
+        CHECK(!session.contains("caller") && session.value("x").as_int() == 3);
+        r = session.execute("fn(localv()){x:=7;return x}", "unrelated-shadow", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.evaluate("localv()", "lexical-local", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 7);
+    }
+    {
         struct State { VmSession* session = nullptr; SessionResult nested; std::string output, nested_output; } state;
         VmOptions options; options.flush_threshold = 1; options.flush_context = &state;
         options.flush = [](std::string& output, void* context) {

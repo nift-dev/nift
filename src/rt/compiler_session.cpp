@@ -44,6 +44,14 @@ bool UnitCompiler::session_admit() {
         if (shape != kinds_.session_shapes.end() && !session_shape_within(shape->second, bound->second))
             return fail(ast_.at(binding.first), "session:capture-contract");
     }
+    // Legacy named functions can see caller-local bindings. Only names read
+    // freely by a named function need the D-038 shadow guard; ordinary lexical
+    // shadowing that cannot influence such a reader remains admitted.
+    std::unordered_set<std::string_view> dynamic_reads;
+    if (globals_) for (const auto& function : globals_->free)
+        for (const auto& ref : function)
+            for (const auto& symbol : session_->symbols)
+                if (symbol.name == ref.first) dynamic_reads.insert(ref.first);
     std::vector<NodeId> pending{root_};
     while (!pending.empty()) {
         const auto id = pending.back(); pending.pop_back();
@@ -96,11 +104,11 @@ bool UnitCompiler::session_admit() {
                 }
             }
         }
-        // Named functions use legacy dynamic name resolution. Do not let a
-        // later caller shadow an existing global read by an older callable.
-        if (n.kind == NodeKind::Param)
-            for (const auto& symbol : session_->symbols)
-                if (symbol.name == text(n)) return fail(n, "session:dynamic-shadow");
+        const Node* declared = n.kind == NodeKind::Param ? &n :
+            n.kind == NodeKind::Declare && n.a != kNoNode && ast_.at(n.a).kind == NodeKind::Ident &&
+            !top_level_decl_ids_.count(id) ? &ast_.at(n.a) : nullptr;
+        if (declared && dynamic_reads.count(text(*declared)))
+            return fail(n, "session:dynamic-shadow");
         for (auto child : {n.a, n.b, n.c}) pending.push_back(child);
         for (std::uint32_t k = 0; k < n.count; ++k) pending.push_back(ast_.list(n)[k]);
     }
@@ -200,7 +208,10 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
     symbol.slot = global.reg;
     symbol.kinds = symbol.contract = binding.decl_kinds;
     const auto shape = kinds_.binding_shapes.find(std::string(name));
-    if (shape != kinds_.binding_shapes.end()) symbol.structure = session_shape(shape->second);
+    if (shape != kinds_.binding_shapes.end()) {
+        symbol.structure = session_shape(shape->second);
+        symbol.kinds = symbol.contract = symbol.structure->kinds;
+    }
     symbol.const_array = binding.const_array; symbol.readonly = binding.readonly;
     if (existing == session_->symbols.end()) session_->symbols.push_back(std::move(symbol));
     else {

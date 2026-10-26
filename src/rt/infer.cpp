@@ -1,6 +1,7 @@
 #include "rt/infer.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
+#include "rt/text_type.h"
 
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
@@ -97,7 +98,11 @@ void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
-    merge_local(vars_[slot], session_ && top_level_decls_.count(at) ? session_global_shape(value) : value);
+    if (session_ && top_level_decls_.count(at)) {
+        const auto type = infer_text_type(ast_.text(ast_.at(ast_.at(at).b)));
+        merge_local(vars_[slot], session_global_shape(value,
+            type.kind == TextType::Kind::Known && type.known == 3));
+    } else merge_local(vars_[slot], value);
     scopes_.back().emplace_back(name, slot);
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }

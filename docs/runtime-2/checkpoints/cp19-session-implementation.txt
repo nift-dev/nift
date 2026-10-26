@@ -35,7 +35,10 @@ locations and graph back edges are explicitly incomplete facts. Metadata
 collection never resolves a selector. Callable facts overlay the compiler's
 original structural bounds; observed values cannot narrow those bounds.
 Plain-data aggregates use the existing identity summary and need no deep scan.
-Immutable sanitized type graphs are shared across commands.
+Immutable sanitized type graphs are shared across commands. Double-binding and aggregate-element numeric bounds are widened before initial
+inference/compilation, not after publication. Int binding bounds remain integral.
+The runtime int/double binding checks still decide whether an assignment is
+valid; a compiled type error retains any preceding explicit output/effects.
 
 Only needed declarations are imported into fresh compilation; executable
 statements are never replayed. Lambda wrappers seed capture bounds and are never
@@ -47,6 +50,10 @@ against a replacement before it can be admitted. Replacement takes effect at
 its registration instruction. A mixed-order unit with executable statements
 before an existing named replacement remains refused rather than observing
 the replacement prematurely.
+
+Named-reader admission checks parameters and local declarations that can shadow
+an external free name. D-038 caller-dependent lookup is refused before effects;
+unrelated lexical shadowing without a named free reader remains admitted.
 
 Shell routes and presentation
 .niftrc, interactive statements, file/stdin/inline -i continuation and selected
