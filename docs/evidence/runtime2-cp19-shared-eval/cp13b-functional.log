@@ -1,0 +1,92 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --selftest
+PASS harness self-test: one return type; checked/ASan/control rules; policy mapping; fallback-to-execution detection; fallback statuses and resource-limit classifications
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --trace-selftest
+PASS trace self-test: fd-based NIFT_TRACE_HOST captured 1 Host entries
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode legacy
+PASS 80, FAIL 0 (legacy)
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode current
+PASS 80, FAIL 0 (current)
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --mode future
+PASS 80, FAIL 0 (future)
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch" --mode future
+PASS 80, FAIL 0 (future)
+/usr/bin/python3 tests/runtime2/cp13b/adversarial/selftest.py
+ok   fake baseline: PASS 80, FAIL 0
+ok   positive control: detect_req PASS
+ok   negative control: ideal rejected
+ok   negative control: fallback_all rejected
+ok   negative control: refuse_all rejected
+ok   negative control: nostats rejected
+ok   negative control: malformed rejected
+ok   negative control: missing_exec_field rejected
+ok   negative control: both_engines rejected
+ok   negative control: crash_after rejected
+ok   negative control: asan_after rejected
+ok   negative control: exit70_after rejected
+ok   negative control: nonreq_harness rejected
+ok   negative control: nonreq_fallback rejected
+ok   negative control: timeout rejected
+ok   negative control: detect_control rejected
+ok   R2-1 control fallback_exec_2: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_3: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_69: unexpected executed fallback rejected as harness
+ok   checked positive: stale exception handler accepted
+ok   checked negative: wrong internal reason rejected
+ok   ASan positive: heap-use-after-free in op_get_upvalue accepted
+ok   ASan negative: clean run rejected
+ok   --oracle mandatory in mutant mode
+PASS adversarial harness self-test: 24 checks, 0 failure(s)
+/usr/bin/python3 tests/runtime2/cp13b/adversarial/mutant_build_selftest.py
+PASS isolated mutant build self-test: clean builds differ and do not reuse stale products 
+bash tests/runtime2/cp13b/harness_selftest.sh "/home/nick/Repositories/nift/.cp19-development/worktree/nift"
+== H1/H2/H4: unit self-test ==
+PASS harness self-test: one return type; checked/ASan/control rules; policy mapping; fallback-to-execution detection; fallback statuses and resource-limit classifications
+== H3: fd-based Host trace positive control ==
+PASS trace self-test: fd-based NIFT_TRACE_HOST captured 1 Host entries
+== H1: a tampering wrapper must not make mutant 6 PASS ==
+== H1/H4: a no-statistics wrapper must not make mutant 6 PASS ==
+== end-to-end adversarial mutation harness ==
+ok   fake baseline: PASS 80, FAIL 0
+ok   positive control: detect_req PASS
+ok   negative control: ideal rejected
+ok   negative control: fallback_all rejected
+ok   negative control: refuse_all rejected
+ok   negative control: nostats rejected
+ok   negative control: malformed rejected
+ok   negative control: missing_exec_field rejected
+ok   negative control: both_engines rejected
+ok   negative control: crash_after rejected
+ok   negative control: asan_after rejected
+ok   negative control: exit70_after rejected
+ok   negative control: nonreq_harness rejected
+ok   negative control: nonreq_fallback rejected
+ok   negative control: timeout rejected
+ok   negative control: detect_control rejected
+ok   R2-1 control fallback_exec_2: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_3: unexpected executed fallback rejected as harness
+ok   R2-1 control fallback_exec_69: unexpected executed fallback rejected as harness
+ok   checked positive: stale exception handler accepted
+ok   checked negative: wrong internal reason rejected
+ok   ASan positive: heap-use-after-free in op_get_upvalue accepted
+ok   ASan negative: clean run rejected
+ok   --oracle mandatory in mutant mode
+PASS adversarial harness self-test: 24 checks, 0 failure(s)
+== isolated mutant build selftest ==
+PASS isolated mutant build self-test: clean builds differ and do not reuse stale products 
+== mutant mode requires --oracle ==
+PASS harness self-test: genuine detections, policy mapping, trace, fallback/harness separation
+/usr/bin/python3 tests/runtime2/cp13b/nullable_error_presentation.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --switch-nift "/home/nick/Repositories/nift/.cp19-development/worktree/.build/cp13b/nift-switch"
+ok   default stringify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default stringify present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   default prettify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default prettify present: legacy=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0) vm=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0)
+ok   default highlight absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   default highlight present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   switch stringify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch stringify present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+ok   switch prettify absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch prettify present: legacy=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0) vm=('{\n  "message": "inner",\n  "code": "user.raised",\n  "category": "user",\n  "source": "",\n  "line": 0,\n  "column": 0,\n  "cause": null\n}\n', '', 0)
+ok   switch highlight absent: legacy=('null\n', '', 0) vm=('null\n', '', 0)
+ok   switch highlight present: legacy=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0) vm=('{"message":"inner","code":"user.raised","category":"user","source":"","line":0,"column":0,"cause":null}\n', '', 0)
+PASS nullable Error presentation: 12 cases, 0 failure(s)

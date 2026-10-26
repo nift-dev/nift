@@ -1,0 +1,7 @@
+FAIL completion PATH command: fix	
+FAIL completion built-in call form: exist	
+FAIL completion prefers call form: ope	
+FAIL completion does not insert bare builtin: ope	
+
+FAIL completion user function: gre	
+FAILED: completion PATH command, completion built-in call form, completion prefers call form, completion does not insert bare builtin, completion user function

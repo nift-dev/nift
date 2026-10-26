@@ -1,0 +1,5 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+python3 tools/rt-diff/rt-diff --a "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --b "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --corpus tests/runtime2/rt-diff-corpus --corpus tests/runtime2/vm-corpus --corpus tests/runtime2/semantics --corpus docs/evidence/cp410-competitiveness/probes --corpus tests/conformance/cases --corpus bindings/python/app --corpus bindings/node/app --corpus bindings/csharp/apps \
+	--extract-smoke tests --ignore tools/rt-diff/ignore.txt --gen ${RT_DIFF_GEN:-200} --seed ${RT_DIFF_SEED:-1} \
+	--min-entries 600
+rt-diff: 820 entries {"eval": 1, "script": 787, "site": 28, "workspace": 4}, 0 differing, 0 approved; 273 entries traced (1817 Host ops); combined order unstable (not compared) in 0; 0 unused policies

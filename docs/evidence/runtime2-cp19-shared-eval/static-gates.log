@@ -1,0 +1,18 @@
+COMMAND ['python3', 'tools/rt-lint.py', '--self-test']
+PASS rt-lint self-test: 6 fixtures
+EXIT 0
+COMMAND ['python3', 'tools/rt-lint.py', 'src/rt']
+PASS rt-lint: 0 problem(s)
+EXIT 0
+COMMAND ['python3', 'scripts/test_integrity_check.py', 'tests', 'scripts', '--output', '.build/bh2/test-integrity-report.json']
+test-integrity clean: 532 files scanned, 0 findings
+report=.build/bh2/test-integrity-report.json
+EXIT 0
+COMMAND ['python3', 'scripts/check_header_name_collisions.py']
+header-name collisions: none
+EXIT 0
+COMMAND ['python3', 'tools/rt-vm/legacy_names.py', '--check']
+legacy_names: 208 names, up to date
+EXIT 0
+COMMAND ['git', 'diff', '--check']
+EXIT 0

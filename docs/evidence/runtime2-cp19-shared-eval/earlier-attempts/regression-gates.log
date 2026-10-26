@@ -1,0 +1,6 @@
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp -o .build/shell-dispatch-unit
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+/usr/bin/python3 tests/runtime2/cp13b/run.py --nift "/home/nick/Repositories/nift/.cp19-development/worktree/nift" --selftest
+HARNESS INFRASTRUCTURE FAILURE: D-018c requires executable parser: /home/nick/Repositories/nift/.cp19-development/worktree/.build/rt-parse-dump (build make .build/rt-parse-dump or set VM_PARSE_DUMP)
+make: *** [Makefile:367: test-runtime2-cp13b] Error 2
+make: *** Waiting for unfinished jobs....
