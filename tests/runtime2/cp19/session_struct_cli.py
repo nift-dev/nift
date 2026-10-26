@@ -6,6 +6,8 @@ p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argumen
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 schema='struct(Counter){v:=0;fn(add(n)){v+=n} fn(get()){return v}};c:=Counter()'
 cases=[
+ ('explicit-field-global','v:=99\nstruct(Point){v:=1;fn(get()){return this.v}};p:=Point()\np.get()\nv\nexit\n',4,0),
+ ('explicit-field-later-global','struct(Point){v:=1;fn(get()){return this.v}};p:=Point()\nv:=99\np.get()\nv\nexit\n',4,0),
  ('rc-schema','c.add(3)\nc.get()\nexit\n',3,0,['-i'],schema),
  ('file-schema','c.add(3)\nc.get()\nexit\n',3,0,['-i','@script']),
  ('inline-schema','c.add(3)\nc.get()\nexit\n',3,0,['-i','-c',schema]),

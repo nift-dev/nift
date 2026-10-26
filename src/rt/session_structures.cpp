@@ -1,4 +1,5 @@
 #include "rt/session_structures.h"
+#include "rt/compiler_session_scope.h"
 // rt-lint: cold-file immutable session schema publication after whole-unit admission
 namespace nift::rt {
 void session_structures(const Ast& ast, NodeId root, const SessionText& text,
@@ -18,7 +19,9 @@ void session_structures(const Ast& ast, NodeId root, const SessionText& text,
             methods = methods || ast.at(ast.list(node)[m]).kind == NodeKind::FnDecl;
         if (methods) for (std::uint32_t m = 0; m < node.count; ++m) {
             const auto& field = ast.at(ast.list(node)[m]);
-            if (field.kind == NodeKind::StructField) definition->dynamic_fields.emplace_back(ast.text(ast.at(field.a)));
+            if (field.kind == NodeKind::StructField &&
+                detail::session_method_uses_bare_field(ast, ast.list(body)[k], ast.text(ast.at(field.a))))
+                definition->dynamic_fields.emplace_back(ast.text(ast.at(field.a)));
         }
         pending.structures.emplace(definition->name, std::move(definition));
     }

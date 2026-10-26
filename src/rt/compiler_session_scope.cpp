@@ -3,6 +3,26 @@
 #include <cctype>
 // rt-lint: cold-file bounded method-local admission under D-038
 namespace nift::rt::detail {
+bool session_method_uses_bare_field(const Ast& ast, NodeId schema, std::string_view field) {
+    std::vector<NodeId> pending;
+    const auto& declaration = ast.at(schema);
+    for (std::uint32_t k = 0; k < declaration.count; ++k) {
+        const auto& member = ast.at(ast.list(declaration)[k]);
+        if (member.kind == NodeKind::FnDecl) pending.push_back(member.b);
+    }
+    while (!pending.empty()) {
+        const auto id = pending.back(); pending.pop_back();
+        if (id == kNoNode) continue;
+        const auto& node = ast.at(id);
+        if (node.kind == NodeKind::Ident && ast.text(node) == field) return true;
+        // A member key denotes a property, not a caller-visible binding.
+        pending.push_back(node.a);
+        if (node.kind != NodeKind::Member) pending.push_back(node.b);
+        pending.push_back(node.c);
+        for (std::uint32_t k = 0; k < node.count; ++k) pending.push_back(ast.list(node)[k]);
+    }
+    return false;
+}
 bool session_lambda_assignment_spelling(const Ast& ast, const Node& node) {
     const auto begin = ast.at(node.a).end, end = ast.at(node.b).begin;
     if (end <= begin) return false;

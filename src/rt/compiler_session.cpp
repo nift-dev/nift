@@ -54,6 +54,7 @@ bool UnitCompiler::session_admit() {
     std::unordered_set<std::string_view> dynamic_struct_fields;
     for (const auto& schema : plan_.structs) if (!schema.methods.empty())
         for (const auto& field : schema.fields) {
+            if (!session_method_uses_bare_field(ast_, schema.decl, field.name)) continue;
             dynamic_struct_fields.insert(field.name);
             if (session_->structures.count(std::string(field.name)))
                 return fail(ast_.at(schema.decl), "session:struct-dynamic-shadow");
