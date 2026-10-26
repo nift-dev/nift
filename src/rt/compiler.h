@@ -35,4 +35,10 @@ struct CompileLimits {
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());
 
+// Compile one parsed expression as an owned-result unit. Adds synthetic
+// Program/Return nodes to the arena, preserving every source byte offset.
+// Execute with VmOptions::return_value; ordinary script returns are unchanged.
+// Front ends must enforce their own admissible result/serialization surface.
+CompileResult compile_expression_unit(Ast& ast, NodeId expression);
+
 } // namespace nift::rt

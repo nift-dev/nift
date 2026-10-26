@@ -1,0 +1,2 @@
+{"argv": ["eval", "1+2"], "mode": "0", "rc": 0, "stdout": "3\n", "stderr": "", "rows": []}
+{"argv": ["eval", "1+2"], "mode": "require", "rc": 0, "stdout": "3\n", "stderr": "", "rows": []}

@@ -1,8 +1,10 @@
 #include "rt/script_runner.h"
+#include "rt/script_runner_stats.h"
 
 #include "HostTrace.h"
 #include "rt/compiler.h"
 #include "rt/heap_account.h"
+#include "rt/legacy_bridge.h"
 #include "rt/module_host_op.h"
 #include "rt/module_link.h"
 #include "rt/native.h"
@@ -34,72 +36,9 @@ double micros(Clock::time_point from, Clock::time_point to) {
     return std::chrono::duration<double, std::micro>(to - from).count();
 }
 
-struct Stats {
-    std::string outcome;  // vm | vm-error | fallback | require-error | internal-error | compiled
-    std::string reason;
-    std::size_t line = 0, column = 0;
-    double parse_us = 0, compile_us = 0, execute_us = 0;
-    std::size_t protos = 0, instructions = 0, source_bytes = 0;
-    bool beyond_legacy_depth = false;
-    int executions = 0;         // times the unit started executing on the VM (0 or 1)
-    int legacy_executions = 0;  // 1 when the unit was handed to legacy (before anything executed)
-    // Evidence for the D-018 difference policies (rt/vm.h).
-    std::uint64_t large_numbers = 0, large_in_loop_path = 0;
-    bool error_in_loop_path = false;
-    std::vector<std::uint64_t> large_lines, derived_lines;
-    bool evidence_truncated = false;
-    std::size_t heap_peak = 0, heap_live = 0;
-    std::string path;
-    std::string code;        // vm-error: the diagnostic code when the stop has one (CP15)
-    bool catchable = false;  // vm-error: legacy raises it as a catchable Error
-    bool error_origin = false;  // vm-error: the stop carries an Error origin
-    std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
-    std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
-};
-
-std::string json_escape(const std::string& text) {
-    std::string out;
-    for (char c : text) {
-        if (c == '"' || c == '\\') out += '\\';
-        if (static_cast<unsigned char>(c) < 0x20) { out += ' '; continue; }
-        out += c;
-    }
-    return out;
-}
-
-void report(const Stats& s) {
-    const char* target = std::getenv("NIFT_VM_STATS");
-    if (!target || !*target || std::string(target) == "0") return;
-    std::ostringstream line;
-    line << "{\"nift_vm\":1,\"outcome\":\"" << s.outcome << "\",\"reason\":\"" << json_escape(s.reason)
-         << "\",\"line\":" << s.line << ",\"column\":" << s.column << ",\"parse_us\":" << s.parse_us
-         << ",\"compile_us\":" << s.compile_us << ",\"execute_us\":" << s.execute_us << ",\"protos\":" << s.protos
-         << ",\"instructions\":" << s.instructions << ",\"source_bytes\":" << s.source_bytes
-         << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
-         << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
-         << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path
-         << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false")
-         << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false")
-         << ",\"error_origin\":" << (s.error_origin ? "true" : "false")
-         << ",\"heap_bytes\":" << s.heap_bytes;
-    const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
-        line << ",\"" << name << "\":[";
-        for (std::size_t k = 0; k < values.size(); ++k) line << (k ? "," : "") << values[k];
-        line << "]";
-    };
-    list("large_lines", s.large_lines);
-    list("derived_lines", s.derived_lines);
-    line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false")
-         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json
-         << ",\"path\":\""
-         << json_escape(s.path) << "\"}\n";
-    if (std::string(target) == "1") {
-        std::cerr << line.str() << std::flush;
-    } else {
-        std::ofstream file(target, std::ios::app);
-        file << line.str();
-    }
-}
+using detail::Stats;
+using detail::json_escape;
+using detail::report;
 
 void write_stdout(std::string& output, void*) {
     std::cout.write(output.data(), static_cast<std::streamsize>(output.size()));
@@ -169,8 +108,10 @@ void limits_from_environment(VmOptions& options) {
     size_from_environment("NIFT_VM_FLUSH", options.flush_threshold);
 }
 
+struct EvalResult { nift::RuntimeValue& value; std::string& error; };
+
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
-              int& exit_code);
+              int& exit_code, EvalResult* eval = nullptr);
 
 SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& path, const std::string& source) {
     return link.linked ? SourceMap::linked(link, path.generic_string(), source)
@@ -206,6 +147,26 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
     return true;
 }
 
+bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
+                           std::string& error, int& exit_code) {
+    const VmMode mode = vm_mode_from_environment();
+    if (mode == VmMode::Off) return false;
+    Stats stats;
+    stats.source_bytes = source.size();
+    stats.path = "<eval>";
+    EvalResult result{value, error};
+    try {
+        return run_unit(source, "<eval>", mode, stats, exit_code, &result);
+    } catch (const std::bad_alloc&) {
+        internal_failure(stats, "<eval>", "out of memory (std::bad_alloc)", exit_code);
+    } catch (const std::exception& exception) {
+        internal_failure(stats, "<eval>", std::string("exception: ") + exception.what(), exit_code);
+    } catch (...) {
+        internal_failure(stats, "<eval>", "unknown exception", exit_code);
+    }
+    return true;
+}
+
 namespace {
 
 // The source line containing `offset` (at most 160 bytes), for the inventory.
@@ -237,18 +198,105 @@ void add_inventory(const std::string& source, const std::filesystem::path& sourc
     stats.inventory_json = out;
 }
 
+bool finish_run(const std::string& source, const std::filesystem::path& source_path,
+                const LinkedUnit& link, const VmResult& result, const Value& returned,
+                Stats& stats, EvalResult* eval, int& exit_code) {
+    std::filesystem::path report_path = source_path;
+    const auto locate_linked = [&](std::uint32_t offset) {
+        if (!link.linked) return locate_into(stats, source, offset);
+        const LinkedUnit::Location at = link.locate(offset);
+        report_path = at.module == 0 ? source_path : link.graph.modules[at.module]->path;
+        locate_into(stats, at.module == 0 ? source : link.graph.modules[at.module]->source,
+                    static_cast<std::uint32_t>(at.offset));
+    };
+    stats.beyond_legacy_depth = result.beyond_legacy_depth;
+    stats.large_numbers = result.large_numbers;
+    stats.large_in_loop_path = result.large_in_loop_path;
+    stats.error_in_loop_path = result.error_in_loop_path;
+    stats.large_lines = result.large_lines;
+    stats.derived_lines = result.derived_lines;
+    stats.evidence_truncated = result.evidence_truncated;
+    stats.heap_peak = result.heap_peak;
+    stats.heap_live = result.heap_live;
+    stats.heap_bytes = live_heap_bytes();
+    if (result.reason == StopReason::None) {
+        if (eval && !to_legacy(returned, eval->value, eval->error)) {
+            stats.outcome = "vm-error";
+            stats.reason = eval->error;
+            report(stats);
+            exit_code = 2;
+            return true;
+        }
+        if (!eval && result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
+        std::cout.flush();
+        stats.outcome = "vm";
+        report(stats);
+        exit_code = 0;
+        return true;
+    }
+    if (result.error_origin) {
+        report_path = result.origin_source;
+        stats.line = result.origin_line;
+        stats.column = result.origin_column;
+    } else if(!result.diagnostic_frames.empty()&&!result.diagnostic_frames.front().site.source.empty()) {
+        const auto& display=result.diagnostic_frames.front().site;
+        report_path=display.source;stats.line=display.line;stats.column=display.column;
+    } else {
+        locate_linked(result.offset);
+    }
+    if (result.reason == StopReason::Error) {
+        // A program error, in legacy's format, at the failing expression;
+        // while a module initialises, legacy prefixes `import: ` per level.
+        std::string message = result.message;
+        if (link.linked)
+            for (int k = link.depth[link.locate(result.main_offset).module]; k > 0; --k) message = "import: " + message;
+        stats.outcome = "vm-error";
+        stats.reason = message;
+        stats.code = result.code;
+        stats.catchable = result.catchable;
+        stats.error_origin = result.error_origin;
+        report(stats);
+        if (eval) eval->error = message;
+        else error_line(report_path, stats, message);
+        exit_code = eval ? 2 : 1;
+        return true;
+    }
+    internal_failure(stats, source_path, result.message, exit_code);
+    return true;
+}
+
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
-              int& exit_code) {
-    if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats);
+              int& exit_code, EvalResult* eval) {
+    if (mode == VmMode::ClassifyAll) {
+        if (!eval) add_inventory(source, source_path, stats);
+        else stats.inventory_json = ",\"reasons\":[],\"inventory_complete\":false,"
+                                    "\"inventory_stop\":\"expression-inventory-not-implemented\","
+                                    "\"inventory_rounds\":0";
+    }
     const auto t0 = Clock::now();
     Ast ast(source);
-    const ParseResult parsed = parse_script(ast);
+    ParseResult parsed;
+    if (eval) parsed.root = parse_expression(ast, 0, static_cast<std::uint32_t>(source.size()));
+    else parsed = parse_script(ast);
     const auto t1 = Clock::now();
     stats.parse_us = micros(t0, t1);
     if (!parsed.ok) {
         stats.reason = "parse-error";  // legacy reports the identical diagnostic (CP10)
         locate_into(stats, source, parsed.error.offset);
         return not_compiled(stats, mode, source_path, exit_code);
+    }
+    if (eval) {
+        // Slice boundary: callable values have no RuntimeValue bridge. Refuse
+        // lambda-containing expressions before any instruction/Host effect,
+        // including aggregates containing callables. Later coverage can lift
+        // this independently of the shared entry and result-lifetime work.
+        for (NodeId id = 0; id < ast.size(); ++id) {
+            if (ast.at(id).kind == NodeKind::Lambda) {
+                stats.reason = "eval:callable";
+                locate_into(stats, source, ast.at(id).begin);
+                return not_compiled(stats, mode, source_path, exit_code);
+            }
+        }
     }
     const NodeId opaque = first_opaque_node(ast, parsed.root);
     if (opaque != kNoNode) {
@@ -258,7 +306,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     // CP12b modules: a unit with imports compiles as its linked text
     // (rt/module_link.h); positions map back to the module they came from.
-    const LinkedUnit link = link_unit(ast, parsed.root, source, source_path);
+    const LinkedUnit link = eval ? LinkedUnit() : link_unit(ast, parsed.root, source, source_path);
     std::filesystem::path report_path = source_path;
     const auto locate_linked = [&](std::uint32_t offset) {
         if (!link.linked) return locate_into(stats, source, offset);
@@ -286,7 +334,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     CompileLimits limits;
     limits.module_names = link.module_names;
-    CompileResult compiled = compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
+    CompileResult compiled = eval ? compile_expression_unit(ast, parsed.root)
+                                  : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
@@ -323,6 +372,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
     const SourceMap source_map = source_map_for(link, source_path, source);  // owns source positions
     options.source_map = &source_map;
+    Value returned;
+    if (eval) options.return_value = &returned;
     // From here on the unit runs on the VM and only on the VM: whatever
     // happens, the legacy engine never runs it (engine selection is final).
     stats.executions = 1;
@@ -338,53 +389,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     std::string output;
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
-    stats.beyond_legacy_depth = result.beyond_legacy_depth;
-    stats.large_numbers = result.large_numbers;
-    stats.large_in_loop_path = result.large_in_loop_path;
-    stats.error_in_loop_path = result.error_in_loop_path;
-    stats.large_lines = result.large_lines;
-    stats.derived_lines = result.derived_lines;
-    stats.evidence_truncated = result.evidence_truncated;
-    stats.heap_peak = result.heap_peak;
-    stats.heap_live = result.heap_live;
     write_stdout(output, nullptr);
-    stats.heap_bytes = live_heap_bytes();
-    if (result.reason == StopReason::None) {
-        if (result.returned && !result.return_text.empty()) std::cout << result.return_text << '\n';
-        std::cout.flush();
-        stats.outcome = "vm";
-        report(stats);
-        exit_code = 0;
-        return true;
-    }
-    if (result.error_origin) {
-        report_path = result.origin_source;
-        stats.line = result.origin_line;
-        stats.column = result.origin_column;
-    } else if(!result.diagnostic_frames.empty()&&!result.diagnostic_frames.front().site.source.empty()) {
-        const auto& display=result.diagnostic_frames.front().site;
-        report_path=display.source;stats.line=display.line;stats.column=display.column;
-    } else {
-        locate_linked(result.offset);
-    }
-    if (result.reason == StopReason::Error) {
-        // A program error, in legacy's format, at the failing expression;
-        // while a module initialises, legacy prefixes `import: ` per level.
-        std::string message = result.message;
-        if (link.linked)
-            for (int k = link.depth[link.locate(result.main_offset).module]; k > 0; --k) message = "import: " + message;
-        stats.outcome = "vm-error";
-        stats.reason = message;
-        stats.code = result.code;
-        stats.catchable = result.catchable;
-        stats.error_origin = result.error_origin;
-        report(stats);
-        error_line(report_path, stats, message);
-        exit_code = 1;
-        return true;
-    }
-    internal_failure(stats, source_path, result.message, exit_code);
-    return true;
+    return finish_run(source, source_path, link, result, returned, stats, eval, exit_code);
 }
 
 } // namespace

@@ -46,9 +46,11 @@ public:
     // program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
+    void expression_result() { expression_result_ = true; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 
 private:
+    bool expression_result_ = false;
     struct Loop {
         std::size_t start = 0;
         std::vector<std::size_t> breaks;

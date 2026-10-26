@@ -222,7 +222,8 @@ bool UnitCompiler::return_statement(const Node& node) {
         return true;
     }
     if (!no_alias(node.a, node)) return false;
-    if (!in_function_ && !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
+    if (!in_function_ && !expression_result_ &&
+        !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
     // Other expression errors retain D-009#5 / D-018 attribution. Missing
     // selector reads in a lambda preserve the legacy return statement site.
     std::uint16_t value = 0;
@@ -316,7 +317,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
 
 } // namespace detail
 
-CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
+static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const CompileLimits& limits,
+                                       bool expression_result) {
     CompileResult result;
     // Every later pass may recurse along the tree: bound its depth first,
     // iteratively (review round 3, F3).
@@ -352,6 +354,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
+    if (expression_result) compiler.expression_result();
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -361,6 +364,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
             // refusal when the probe finds one (the unit is refused either way).
             detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called, &globals);
             probe.probe_unknown();
+            if (expression_result) probe.expression_result();
             probe.set_module_names(&limits.module_names);
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
@@ -372,6 +376,22 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     }
     result.program = std::move(program);
     return result;
+}
+
+CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
+    return compile_unit_impl(ast, root, limits, false);
+}
+
+CompileResult compile_expression_unit(Ast& ast, NodeId expression) {
+    // Synthetic structure only: never prepend source text or shift offsets.
+    // The ordinary script-return scalar restriction is unchanged; eval owns
+    // its result's serialization, including bytes/Error/timer rejection.
+    const auto begin = ast.at(expression).begin, end = ast.at(expression).end;
+    const NodeId returned = ast.add(NodeKind::Return, begin, end);
+    ast.at(returned).a = expression;
+    const NodeId root = ast.add(NodeKind::Program, begin, end);
+    ast.set_list(root, {returned});
+    return compile_unit_impl(ast, root, CompileLimits(), true);
 }
 
 } // namespace nift::rt

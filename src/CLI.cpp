@@ -1702,8 +1702,21 @@ static int run_eval(int argc, char** argv) {
     for(int i=2;i<argc;++i){std::string a=argv[i];if(a=="--json")json_output=true;else if(a=="--capabilities")capabilities=true;else if(expression.empty())expression=a;else{std::cerr<<"eval: expected one expression\n";return 2;}}
     if(capabilities){if(!expression.empty()){std::cerr<<"eval: --capabilities does not take an expression\n";return 2;}std::cout<<"{\"command\":\"eval\",\"contract\":1,\"json_output\":true,\"project_context\":true,\"value_methods\":[\"keys\",\"values\",\"entries\",\"has\",\"get\",\"merge\",\"map\",\"filter\",\"find\",\"find_index\",\"sort_by\",\"unique\",\"flatten\",\"sum\",\"min\",\"max\",\"group_by\"]}\n";return 0;}
     if(expression.empty()){std::cerr<<"eval: expression required\n";return 2;}
-    ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);nift::RuntimeValue value;std::string error;
-    if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
+    nift::RuntimeValue value;std::string error;
+    int vm_exit=0;
+    const auto vm_mode=nift::rt::vm_mode_from_environment();
+#if defined(NIFT_CP19_EVAL_MUTANT_BYPASS) // test-only deliberate legacy misrouting
+    const bool vm_handled=false;
+#else
+    const bool vm_handled=nift::rt::eval_expression_on_vm(expression,value,error,vm_exit);
+#endif
+    if(vm_handled) {
+        if(vm_exit!=0){if(!error.empty())std::cerr<<"eval: "<<error<<'\n';return vm_exit;}
+        if(vm_mode==nift::rt::VmMode::Classify||vm_mode==nift::rt::VmMode::ClassifyAll)return 0;
+    } else {
+        ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);
+        if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
+    }
     if(cli_contains_bytes(value)){std::cerr<<"eval: bytes values are not serializable; decode as UTF-8 first\n";return 2;}
     if(nift::runtime_contains_error(value)){std::cerr<<"eval: Error values are not serializable\n";return 2;}
     if(nift::runtime_contains_timer(value)){std::cerr<<"eval: timer values are not serializable\n";return 2;}

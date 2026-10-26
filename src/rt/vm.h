@@ -60,6 +60,10 @@ struct VmOptions {
     // CP13B: origins for Error values. Null is allowed for runs that cannot
     // raise an Error; an origin requested without a map is an internal stop.
     const SourceMap* source_map = nullptr;
+    // Optional owned result capture (CP19 expression entry). Cold TopReturn
+    // path only; caller keeps the Value alive through run and serialization.
+    // Callable values still require their Program lifetime, as elsewhere.
+    Value* return_value = nullptr;
 };
 
 struct VmResult {

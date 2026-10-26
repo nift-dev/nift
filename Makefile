@@ -2363,6 +2363,37 @@ test-v44-shell-restricted: $(TARGET)
 	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
+CP19_EXPR_UNIT := $(TEST_DIR)/cp19/expression-unit$(EXEEXT)
+CP19_EXPR_OBJECTS := $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+CP19_EXPR_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(RT_VALUE_SOURCES) src/RuntimeValue.cpp)
+$(CP19_EXPR_UNIT): tests/rt/vm_expression.cpp $(CP19_EXPR_OBJECTS) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/expression-sanitize$(EXEEXT): tests/rt/vm_expression.cpp $(CP19_EXPR_SAN_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+.PHONY: test-cp19-expression-sanitize
+test-cp19-expression-sanitize: $(TEST_DIR)/cp19/expression-sanitize$(EXEEXT)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 120 $<
+
+# CP19 shared-entry slice: real eval result/parity and affirmative routing on
+# both dispatches, plus a compiled mutant restoring the legacy-only bypass.
+CP19_EVAL_MUTANT := $(TEST_DIR)/cp19/nift-eval-bypass$(EXEEXT)
+$(TEST_DIR)/cp19/CLI-bypass.o: src/CLI.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP19_EVAL_MUTANT_BYPASS=1 -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/cp19/CLI-bypass.d
+$(CP19_EVAL_MUTANT): $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/CLI-bypass.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/CLI-bypass.o $(LDLIBS) -o $@
+.PHONY: test-cp19-shared-eval
+test: test-cp19-shared-eval
+test-rt-vm-sanitize: test-cp19-expression-sanitize
+test-cp19-shared-eval: $(TARGET) $(CP13B_SWITCH_NIFT) $(CP19_EVAL_MUTANT) $(CP19_EXPR_UNIT)
+	$(CP19_EXPR_UNIT)
+	$(PYTHON) tests/runtime2/cp19/eval_entry.py --nift "$(CURDIR)/$(TARGET)" --report "$(TEST_DIR)/cp19/threaded.jsonl"
+	$(PYTHON) tests/runtime2/cp19/eval_entry.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --report "$(TEST_DIR)/cp19/switch.jsonl"
+	$(PYTHON) tests/runtime2/cp19/eval_entry.py --nift "$(CURDIR)/$(CP19_EVAL_MUTANT)" --expect-bypass --report "$(TEST_DIR)/cp19/bypass.jsonl"
+
 # CP19 Slice 1 (D-042): pure classifier unit test and the durable shell
 # dispatch regression suite. Three test-only mutant binaries are built below:
 # M1 restores call-then-fallback, M2 discards quote/escape provenance, and M3

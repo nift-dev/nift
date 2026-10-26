@@ -16,7 +16,8 @@
 //   NIFT_VM=classify-all  as classify, and the statistics line also lists every
 //                    refusal reason the unit would hit (`reasons`, CP12 phase B
 //                    inventory, rt/refusal_inventory.h); outcome and reason
-//                    are classify's. Nothing executes.
+//                    are classify's. Nothing executes. Expression entry reports
+//                    inventory_complete=false (inventory is script-only).
 //   NIFT_VM_FLUSH=<bytes>  test-only: the output streaming threshold (64 KiB).
 //   An unexpected VM failure (internal error, std::bad_alloc, any C++
 //   exception) is reported as "NIFT_VM internal failure" with exit status 70;
@@ -28,6 +29,8 @@
 //   NIFT_VM_STATS=<path>  the same line appended to <path> instead.
 //   NIFT_VM_DUMP=1   the compiled bytecode on stderr.
 // Unset (or 0), nothing here runs and nift behaves exactly as before.
+#include "RuntimeValue.h"
+
 #include <filesystem>
 #include <string>
 
@@ -41,5 +44,12 @@ VmMode vm_mode_from_environment();
 // `source` is the program text after shebang removal; `source_path` is the
 // path legacy diagnostics name.
 bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code);
+
+// eval entry: true means selected/handled here; false means the caller must
+// evaluate the untouched expression on legacy. A VM failure never retries.
+// Execution success fills value. Classification never executes or fills value.
+// A handled failure sets exit_code; runtime expression errors also fill error.
+bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
+                           std::string& error, int& exit_code);
 
 } // namespace nift::rt

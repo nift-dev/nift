@@ -155,7 +155,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
 }
 
 bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault) {
-    if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
+    if (options_.return_value) *options_.return_value = R[in.a];
+    else if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
     result.returned = true;
     return true;
 }
