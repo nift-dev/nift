@@ -3636,4 +3636,25 @@ test-runtime2-cp18-cow: $(CP18_COW) $(CP18_COW_SWITCH) $(SHARED_LIB) $(CP18_SWIT
 test-runtime2-cp18: test-runtime2-cp18-cow
 
 test-rt-host: test-runtime2-cp17-n2
-test-rt-vm: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
+test-rt-vm: test-runtime2-cp17-n2
+test-rt-vm: test-runtime2-cp17-tripwire
+
+# CP17 + N2 integration (2026-10-27): every CP17 suite is reached by
+# certification through exactly one tier edge (functional, sanitizer or
+# mutation), each protected by a guard removal control.
+.PHONY: test-runtime2-cp17-handle-mutants test-runtime2-cp17-unwind-mutants
+test-runtime2-cp17-handle-mutants:
+	python3 tests/runtime2/cp17/handle_mutants.py "$(CURDIR)/$(TEST_DIR)/cp17-handle-mutants"
+test-runtime2-cp17-unwind-mutants:
+	python3 tests/runtime2/cp17/unwind_mutants.py
+test-rt-host: test-rt-handles
+test-rt-host: test-rt-handles-guards
+test-rt-host: test-runtime2-cp17-handles
+test-rt-host: test-runtime2-cp17-n2-rebuild
+test-rt-host-sanitize: test-rt-handles-sanitize
+test-rt-host-sanitize: test-rt-handles-tsan
+test-rt-host-sanitize: test-runtime2-cp17-sanitize
+test-rt-host-mutants: test-runtime2-cp17-routing-mutants
+test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant
+test-rt-host-mutants: test-runtime2-cp17-handle-mutants
+test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
