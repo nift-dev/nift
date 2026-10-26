@@ -173,10 +173,10 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         return true;
     }
     switch (node.kind) {
-        case NodeKind::Ident: {
-            std::uint16_t reg = 0;
+        case NodeKind::Ident: {  // a temporary the read needed (a global's) is freed: `[g, x]`
+            std::uint16_t reg = 0, mark = fb_->top();
             if (!local_register(node, reg)) return false;
-            if (reg != dst) fb_->emit(OpCode::Move, dst, reg);
+            if (reg != dst) { fb_->emit(OpCode::Move, dst, reg); if (reg >= mark) fb_->release_to(mark); }
             return true;
         }
         case NodeKind::Lambda: return lambda_value(node, dst);
