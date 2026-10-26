@@ -28,7 +28,8 @@ accepted but not present at this base.
   original SIGTTOU disposition is saved once and restored exactly. Launcher
   handoff and the public give/reclaim API use the same coordinator. A real-PTY
   overlap test covers competing acquire, non-owner reclaim, former-owner
-  reclaim, teardown and disposition restoration.
+  reclaim, concurrent acquisition/release, destruction of a live owner and
+  disposition restoration.
 - **F3 failure propagation.** `bg` returns `failed to continue job` when
   SIGCONT fails and keeps the job Stopped. `fg` handles terminal/SIGCONT
   failure, does not wait on an unresumed job, and distinguishes a concurrent
