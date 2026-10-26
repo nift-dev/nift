@@ -4,6 +4,9 @@
 // rt-lint: cold-file bounded method-local admission under D-038
 namespace nift::rt::detail {
 bool session_method_uses_bare_field(const Ast& ast, NodeId schema, std::string_view field) {
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 2
+    (void)ast; (void)schema; (void)field; return true;
+#endif
     std::vector<NodeId> pending;
     const auto& declaration = ast.at(schema);
     for (std::uint32_t k = 0; k < declaration.count; ++k) {

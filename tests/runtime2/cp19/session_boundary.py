@@ -11,6 +11,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--nift', required=True)
 p.add_argument('--base', required=True)
 p.add_argument('--out', type=Path, required=True)
+p.add_argument('--resolved', action='append', default=[], help='A-gap corrected by this candidate; preserve original classification')
 a = p.parse_args()
 cases = [
     ('array-number', 'a:=[1]', 'a.push(2.5)', 'a.stringify()', '[1]\n', 'positive'),
@@ -81,7 +82,11 @@ for name, seed, operation, check, preserved, classification in cases:
                 assert counters[0]['outcome'] == 'vm', row
                 assert counters[2]['outcome'] == 'vm' and counters[2]['vm_executions'] == 1, row
                 refused = counters[1]['outcome'] == 'require-error'
-                if classification == 'positive':
+                if name in a.resolved:
+                    assert classification == 'A' and not refused and counters[1]['outcome'] == 'vm', row
+                    oracle = next(x for x in records if x['case'] == name and x['lane'] == 'legacy')
+                    assert (r.returncode, r.stdout, r.stderr) == (oracle['status'], oracle['stdout'], oracle['stderr']), row
+                elif classification == 'positive':
                     assert not refused and counters[1]['outcome'] in ('vm', 'vm-error'), row
                 else:
                     assert refused and counters[1]['vm_executions'] == 0 and counters[1]['legacy_executions'] == 0, row

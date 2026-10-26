@@ -22,6 +22,9 @@ const CellObject* cell_plain_capture(const Value& cell) {
     const CellObject* current = cell_of(cell);
     for (unsigned depth = 0; current && depth < 64; ++depth) {
         if (current->binding_type >= 0) return current;
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 3
+        return nullptr;
+#endif
         if (current->binding_type != kSourceSlot) return nullptr;
         current = cell_of(current->value);
     }

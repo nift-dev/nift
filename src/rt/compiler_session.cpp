@@ -68,7 +68,9 @@ bool UnitCompiler::session_admit() {
     if (globals_) for (std::size_t f = 0; f < globals_->free.size(); ++f) {
         // Imported lambda wrappers only seed inference. Their free names never
         // participate in legacy named-function caller lookup.
+#if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 1
         if (session_->template_wrappers.count(plan_.functions[f])) continue;
+#endif
         for (const auto& ref : globals_->free[f])
             for (const auto& symbol : session_->symbols)
                 if (symbol.name == ref.first) dynamic_reads.insert(ref.first);
@@ -113,6 +115,10 @@ bool UnitCompiler::session_admit() {
                 }
                 if (n.kind == NodeKind::Declare && symbol.defined)
                     return fail(n, "session:shadow-or-redeclare");
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 4
+                if (symbol.callable && ast_.at(n.b).kind != NodeKind::Lambda)
+                    return fail(n, "session:callable-rebind");
+#endif
                 if (symbol.callable && n.kind != NodeKind::Declare &&
                     !(symbol.definition && symbol.definition->lambda &&
                       (ast_.at(n.b).kind == NodeKind::Lambda ||
