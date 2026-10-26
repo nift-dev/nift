@@ -65,6 +65,55 @@ c := work({n})
 d := work({n})
 print((await a) + (await b) + (await c) + (await d))
 """
+# CPU-bound scaling (owner request, 2026-10-27): k concurrent tasks, the same
+# work per task (weak scaling), k = 1, 2, 4, 8; two task bodies: integer
+# arithmetic, and string/array work that spends more of its time in natives.
+SCALE_BODIES = {
+    "arith": "i := 0; x := 0; while(i < n) {{ x = (x * 31 + i) % 1000003; i += 1 }}; return x",
+    "string": 'i := 0; s := ""; c := 0; while(i < n) {{ s += "ab"; if (s.length() > 64) {{ c += s.length(); s = "" }};'
+              ' i += 1 }}; return c',
+    # Time spent in one native (the same C++ code on both engines): the VM's
+    # interpretive advantage is small, so legacy's parallelism shows.
+    "native": 'big := ""; j := 0; while(j < 4096) {{ big += "0123456789abcdef"; j += 1 }}; i := 0; h := "x";'
+              ' while(i < n) {{ h = sha256(big + h); i += 1 }}; return h.length()',
+}
+
+
+def scale_program(body, k, n):
+    lines = ["fn[async](work(n)) { " + SCALE_BODIES[body].format() + " }"]
+    lines += [f"t{j} := work({n})" for j in range(k)]
+    lines.append("s := 0")
+    lines += [f"s += await t{j}" for j in range(k)]
+    lines.append("print(s)")
+    return "\n".join(lines) + "\n"
+
+
+def cpu_scale(nift, d, runs, n_by_body):
+    """Legacy (thread pool, max(2, hw) workers) vs VM (one thread, cooperative)."""
+    rows = []
+    for body, n in n_by_body.items():
+        for k in (1, 2, 4, 8):
+            p = write(d, f"scale-{body}-{k}.f", scale_program(body, k, n))
+            res = {}
+            for engine, env in (("legacy", dict(os.environ, NIFT_VM="0")),
+                                ("vm", vm_env(os.path.join(d, f"scale-{body}-{k}.jsonl")))):
+                walls, cpus, outs = [], [], set()
+                for _ in range(runs):
+                    wall, cpu, _, pr = timed([nift, p], env)
+                    walls.append(wall)
+                    cpus.append(cpu)
+                    outs.add(pr.stdout.decode().strip() if pr.returncode == 0 else f"exit {pr.returncode}")
+                res[engine] = {"wall_median_s": statistics.median(walls), "wall_min_s": min(walls),
+                               "cpu_median_s": statistics.median(cpus), "outputs": sorted(outs)}
+            st_path = Path(d, f"scale-{body}-{k}.jsonl")
+            st = json.loads(st_path.read_text().splitlines()[-1]) if st_path.exists() else {}
+            rows.append({"workload": f"scale-{body}", "tasks": k, "n_per_task": n, **res,
+                         "vm_outcome": st.get("outcome"), "same_output": res["legacy"]["outputs"] == res["vm"]["outputs"],
+                         "legacy_over_vm_wall": res["legacy"]["wall_median_s"] / res["vm"]["wall_median_s"],
+                         "legacy_parallelism": res["legacy"]["cpu_median_s"] / res["legacy"]["wall_median_s"]})
+    return rows
+
+
 TEARDOWN = """fn[async](f(i)) { x := [i, i, i, i]; sleep(100000); return x.size() }
 hs := []
 i := 0
@@ -142,10 +191,20 @@ def main():
     ap.add_argument("--callgrind", action="store_true")
     ap.add_argument("--legacy-sleeps", type=int, default=0, help="also time N legacy sleeps (slow)")
     ap.add_argument("--cpu-n", type=int, default=0, help="CPU-bound parallelism (legacy vs VM): loop size per task")
+    ap.add_argument("--scale-only", action="store_true", help="only the CPU-bound scaling matrix (1/2/4/8 tasks)")
+    ap.add_argument("--scale-n", default="arith=600000,string=300000", help="iterations per task, per body")
     a = ap.parse_args()
     nift = os.path.abspath(a.nift)
     rows = [{"host": base.host(), "loadavg": open("/proc/loadavg").read().split()[:3],
+             "cores": {"nproc": os.cpu_count(), "sched_affinity": len(os.sched_getaffinity(0))},
              "label": "exploratory: not the reference platform unless stated by the operator"}]
+    if a.scale_only:
+        n_by_body = {kv.split("=")[0]: int(kv.split("=")[1]) for kv in a.scale_n.split(",")}
+        with tempfile.TemporaryDirectory(prefix="cp22-scale-") as d:
+            rows += cpu_scale(nift, d, a.runs, n_by_body)
+        for row in rows:
+            print(json.dumps(row, sort_keys=True))
+        return 0
     with tempfile.TemporaryDirectory(prefix="cp22-bench-") as d:
         p = write(d, "sleeps10k.f", SLEEPS.format(n=10000, ms=10))
         rows.append({"workload": "sleeps10k", **measure(nift, p, "10000", a.runs, d)})
