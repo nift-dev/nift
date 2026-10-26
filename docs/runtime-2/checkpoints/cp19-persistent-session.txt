@@ -1,0 +1,125 @@
+CP19 persistent-session refinement — 2026-10-27
+Status: owner policy resolved; implementation incomplete; CP17 reconciliation pending.
+
+Authority
+D-054 records the owner's approved VM-owned-session policy. No new owner
+permission is required for ordinary CP19 work. This record does not propose
+another slice for acceptance and does not defer any CP19 requirement.
+
+Exact available foundations
+Authoritative integration observed: 8e65196b7f67abef317e7cfecb1eb97c227c5d96.
+The local ledger queues CP17/N2 and CP19; no reconciled CP17 VM is present.
+CP19 development has been replayed on that exact CP18 tip, in its own branch.
+The original b4d40e74 accepted foundation and 703afc40 internal increment remain
+unchanged; replay identities are recorded in the local status evidence.
+Accepted CP17 R4 inspected read-only: 88c5424be1885909a6fd30f717563e56d50c1175.
+
+Initial session admission
+For the proposed release-supported shell/interactive VM route, select a
+VM-owned session explicitly before compiling .niftrc or the initial script,
+including when the first unit refuses. Thus no legacy state is created and
+then migrated. Explicit VM-off selects compatibility execution for the entire
+session. Stateless eval/file/script units retain their existing separate
+selection rules. Classification-only tooling does not execute or establish a
+live session. This is the implementation choice for the initial boundary
+required by D-054, not a new semantic exception.
+
+Persistent namespace and code ownership
+Each admitted unit needs its own immutable Program and owned source-map data.
+A session must retain every Program reachable from a named function or closure;
+raw Proto pointers cannot outlive their owning Program. The CLI callable result
+codec is presentation only and must not be used to move executable state.
+
+Compile each new unit against explicit stable binding/callable metadata, not
+the current register contents. Bindings need stable locations and binding-type
+semantics across units. Future captures must not change an earlier binding's
+storage layout. In particular, the current compiler selects cells by analysing
+one complete unit; recompiling old declarations after seeing future captures
+would change register allocation. Copying raw stack slots would then corrupt
+state. Existing numeric/textual binding checks and CP14B COW must survive.
+
+The existing kind/callable analysis is whole-unit and derives parameter kinds
+from its callers. Do not reuse a previously compiled specialization for a new
+argument shape without checking its admission assumptions. Do not infer global
+kinds from one observed value when later assignments can change that value.
+Persistent callable admission must retain exact alias and handle-flow facts,
+including CP17 W13, rather than broadening unknown values into a guessed type.
+
+A compile refusal is transactional with respect to session metadata and live
+state: parse, resolve, infer, compile and validate in private scratch storage;
+publish only a fully admitted unit. No Host calls, cell updates, function
+replacement, callable-ID consumption or namespace mutation during compilation.
+A runtime Error is different: preserve effects already performed according to
+the existing VM rules; discard abandoned execution temporaries, retain the
+persistent namespace, and report without retrying on legacy.
+
+Source mapping
+An old closure called by a later unit must report the original definition's
+source origin and the appropriate current call-site diagnostics. The current
+VmOptions supplies a single SourceMap and offsets are local to one Program.
+Replacing that map with the newest line's map would silently misattribute old
+code. Keep unit-specific source ownership or link offsets with an exact owned
+map. Do not concatenate/replay executable history or alter Error origins after
+creation. No Frame-layout or extra fault-slot workaround is proposed.
+
+Resource/execution boundary dependency
+The accepted CP17 constructor opens a Script context in its own handle table.
+vm_handles.cpp close_handle_runtime closes it; vm.cpp routes both done and bail
+through that call. Returning from Vm::run therefore ends resource ownership,
+even if the Vm or a Value alias remains alive. A fresh VM has a different table.
+Retaining values, reopening an unrelated context, or cloning handles cannot
+restore the original identity/ownership. Automatic detach changes the cleanup
+contract and is not an acceptable workaround.
+
+A production table probe retained an alias across closing the owning Script
+context and opened a subsequent context. It observed one cleanup and
+runtime.handle_closed for both resolve and attempted transfer. This is evidence
+of the existing lifecycle boundary, not a multi-unit VM execution witness.
+
+A single long Vm::run with an input callback at Halt was considered. It avoids
+closing the context between successful units, but by itself does not handle
+TopReturn, uncaught Error unwinding, control-command failure, cancellation or
+session teardown. Installing it only at Halt would leave failures closing all
+session resources. Suppressing cleanup would weaken CP17. The actual integrated
+CP13B/CP14B/CP17 error and collection-drain path must be the foundation for the
+session boundary. Do not invent a temporary keepalive/borrowed-context API on
+the older base, or replace CP17's lifecycle implementation in a parallel patch.
+
+Required reconciliation once the CP17 integrated base is available
+- Rebase the isolated CP19 branch; preserve CP18 program/Host lifetime rules.
+- Inspect the landed constructor/run/destructor, natives context plumbing,
+  W13 admission and abandoned-frame resource cleanup, not just candidate files.
+- Implement a session execution lifetime with unit-local temporaries/frames and
+  session-owned bindings/resources; close once at actual session teardown.
+- Define deterministic cleanup failure reporting on EOF, exit, -i completion,
+  uncaught unit Error and fatal VM failure; retain established classifications.
+- Admit no resource-capable persistent route before lifetime witnesses pass.
+
+Front-end routing dependent on that shared state
+.niftrc must initialize the same session used by later commands. Script -i must
+continue its initial unit's VM state without replay or Parser mirroring. Shell
+classification must see session declarations; existing D-042 precedence and
+exactly-once native/external dispatch remain. Interpolation is a compiled unit
+on that session and executes once in the selected command's existing order.
+Do not use Parser::eval_expression as a state bridge. CP21 owns jobs, completion
+and history; CP24 remains deferred. Unsupported interpolation must preserve
+state and avoid launching the selected external/native command.
+
+Completion evidence required
+Use affirmative multi-unit VM counters for variables, named functions,
+closures with mutable captures, COW arrays, caught/rethrown Errors and handles.
+Include .niftrc -> shell, initial file/stdin/inline script -> -i, interpolation
+and native-command classification. Refusal witnesses need effects-before and
+state-after checks, including a session with no visible bindings and one whose
+first unit refuses. Runtime-failure witnesses must prove no replay while
+preserving earlier effects and the defined surviving namespace/resources.
+Use real compiled routing/state/source/lifetime mutants and precise expected
+witnesses, both dispatches, affected CP13B/14B/17/18 gates and sanitizers.
+Performance must include startup, eval and real interactive responsiveness;
+stateless microprobes cannot qualify the missing persistent path.
+
+This is not CP19 completion. The remaining assignment-expression and callback
+coverage, stateful routing, resource ownership, mutants and platform obligations
+remain CP19 work. The semantic fallback question has been answered and must no
+longer be presented as an owner blocker. The outstanding prerequisite is the
+reconciled CP17 execution/resource foundation, not permission to continue.
