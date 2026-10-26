@@ -283,8 +283,14 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
         r = session.execute("struct(Ghost){v:=0};print(\"FORBIDDEN\");bytes([65])", "refused-schema", output);
         CHECK(!r.admitted && !session.contains("Ghost") && output.empty());
-        r = session.execute("struct(Counter){v:=99}", "refused-schema-replacement", output);
-        CHECK(!r.admitted && r.refusal == "session:struct-redeclared" && output.empty());
+        r = session.execute("struct(Counter){v:=88};print(\"FORBIDDEN\");bytes([65])", "refused-schema-replacement", output);
+        CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
+        r = session.execute("struct(Counter){v:=99};d:=Counter()", "schema-replacement", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && output.empty());
+        r = session.evaluate("d.v", "new-schema-instance", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 99);
+        r = session.evaluate("c.get()", "retained-schema-method", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
         r = session.evaluate("c.v", "after-refusals", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
         r = session.execute("struct(Kept){v:=0};throw error(\"stop\")", "runtime-schema", output);
