@@ -1239,3 +1239,35 @@ warning and dependency tracking.
    (P1/vfork) and remains visible for CP27 reporting. CP20 does not optimise
    for it and must not claim Bash parity.
 3. The Bash comparison is reported for information only.
+
+## D-054 — VM-owned stateful sessions do not fall back (owner, 2026-10-27; CP19)
+
+Once a shell or interactive session becomes VM-owned, all subsequent script
+units use that session's persistent VM state. Ownership is an explicit session
+invariant, independent of the current contents of visible variables. Emptying
+the namespace does not permit an engine change.
+
+1. Compile refusal occurs before execution, produces no Host effects or partial
+   namespace changes, and preserves all existing bindings, closures, Errors,
+   handles and other live state. The session remains VM-owned after refusal.
+2. No unit in a VM-owned session falls back to legacy. No cross-engine transfer
+   of live closures, handles or executable values is required or authorised.
+3. Runtime errors retain the established VM exception and side-effect semantics.
+   They are not compile refusals and never cause replay on legacy.
+4. Independent stateless `NIFT_VM=1` execution retains its separately approved
+   pre-effect engine-selection policy. `NIFT_VM=require` continues to refuse
+   unsupported code before effects.
+5. Initial session admission must be explicit and stable. Explicit VM-off
+   compatibility execution must remain distinguishable from release-supported
+   VM-owned entry points and must never count as VM execution coverage.
+
+This is an observable compatibility change for stateful mode-1 sessions:
+unsupported later units are refused rather than evaluated on legacy. Test
+witnesses must verify state preservation as well as the absence of effects,
+including a refusal after the visible namespace becomes empty. This decision
+does not change Error identity, provenance, handler selection or resource
+cleanup obligations, and does not authorise temporary CP17 Host-context APIs.
+
+Identifier check: D-054 was absent from both this register and the authoritative
+integration tip `8e65196b` when the owner decision was recorded. D-053 remains
+unassigned here; the owner's requested available identifier D-054 is used.
