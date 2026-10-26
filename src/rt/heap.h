@@ -82,6 +82,12 @@ struct FunctionObject : HeapObject {
     std::uint64_t session_identity = 0;  // stable across session named-function redefinition
     std::uint64_t display_id = 0;  // CLI presentation only; callable identity remains the Value
     FunctionObject() : HeapObject(Kind::Function) {}
+    // Keep optional Program-owner cleanup in the existing destruction path;
+    // an out-of-line default destructor adds cost even for ordinary closures.
+#if defined(__GNUC__)
+    __attribute__((always_inline))
+#endif
+    ~FunctionObject() = default;
 };
 
 // CP12C: a captured binding. Internal only: never reachable from script values,

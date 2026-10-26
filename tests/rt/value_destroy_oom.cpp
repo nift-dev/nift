@@ -17,6 +17,8 @@
 #include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/heap_account.h"
+#include "rt/proto.h"
+#include "rt/cell.h"
 #include "rt/string.h"
 #include "rt/value.h"
 #include "rt_test.h"
@@ -364,6 +366,24 @@ int main(int argc, char** argv) {
     (void)atom("a"), (void)atom("b"), (void)atom("c"), (void)atom("next"), (void)atom("leaf"), (void)atom("num"),
         (void)atom("Node");
 
+    if (want(only, "function-owner")) {
+        // Releasing a session Function can release its last Program owner
+        // while the Value graph worklist is already draining captured cells.
+        for (long allow = 0; allow < 4; ++allow) {
+            Baseline base;
+            auto program = std::make_shared<Program>();
+            auto proto = std::make_unique<Proto>();
+            proto->constants.push_back(wide(1000));
+            program->protos.push_back(std::move(proto));
+            auto* function = new FunctionObject();
+            function->code = &program->main();
+            function->program_owner = std::move(program);
+            function->upvalues.push_back(make_cell(wide(200), 5));
+            heap_retally(function);
+            Value root = Value::adopt(function);
+            release_failing(root, base, allow, "function-owner");
+        }
+    }
     if (want(only, "leaf")) {
         Baseline base;
         Value root = make_string(long_text("leaf", 0));
