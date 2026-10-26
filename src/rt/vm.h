@@ -222,6 +222,7 @@ private:
     std::vector<Frame> frames_;
     std::vector<Handler> handlers_;
     std::vector<const Proto*> protos_;
+    std::uint64_t next_callable_display_id_ = 1;
     std::vector<Value> named_functions_;  // canonical named-function values (LoadFunction)
     const FunctionObject* closure_ = nullptr;  // the running closure
     CycleGraph cycle_graph_;

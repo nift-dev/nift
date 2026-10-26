@@ -27,10 +27,6 @@ bool UnitCompiler::error_method_call(const Node& node, std::uint16_t dst, std::s
 
 bool UnitCompiler::error_member_access(const Node& node, std::uint16_t dst, NodeId receiver) {
     if (!((kinds(receiver) & kKindError) && (kinds(receiver) & ~(kKindError | kKindNull)) == 0)) return false;
-    // The legacy nullable-member diagnostic differs from generic GetMember.
-    // S1 refuses this flow before effects, without changing script semantics.
-    if (expression_result_ && (kinds(receiver) & kKindNull))
-        return fail(node, "eval:nullable-error-member");
     const std::string_view member = text(ast_.at(node.b));
     const bool message = member == "message";   // rt-lint: allow-string-compare
     const bool code = member == "code";         // rt-lint: allow-string-compare
@@ -47,7 +43,8 @@ bool UnitCompiler::error_member_access(const Node& node, std::uint16_t dst, Node
     const Atom key = atom(member);
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(site(node));
-    fb_->emit(OpCode::GetMember, dst, reg, static_cast<std::uint16_t>(key.id));
+    const auto at = fb_->emit(OpCode::GetMember, dst, reg, static_cast<std::uint16_t>(key.id));
+    if (expression_result_ && (kinds(receiver) & kKindNull)) fb_->note(at, "", true);
     fb_->release_to(mark);
     return true;
 }

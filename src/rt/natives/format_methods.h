@@ -34,9 +34,9 @@ Status fn_is_collection(const Context&, const Value* args, std::uint32_t argc, V
 Status fn_is_enum(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 
 // Legacy serialize_value for plain values (null, bool, numbers, strings,
-// arrays, objects; bytes are an error). False with `error` set on failure;
-// Status::Internal kinds (functions, structs, handles, errors) are reported
-// through `internal`.
+// arrays, objects and Errors; bytes and functions are serialization errors).
+// False with `error` set on failure; unsupported runtime kinds (structs and
+// handles) are reported through `internal`.
 bool serialize(const Value& value, bool pretty, std::string& out, std::string& error, bool& internal);
 
 // Legacy public_type for the value kinds rt has ("int"/"float" by value).

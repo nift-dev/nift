@@ -36,7 +36,7 @@ public:
     std::uint8_t flags() const { return flags_; }
     // Attaches a note (error-message text) to the instruction at `at`;
     // returns the note's index.
-    std::size_t note(std::size_t at, std::string text);
+    std::size_t note(std::size_t at, std::string text, bool eval_nullable_error = false);
     std::size_t note_index(std::size_t at) const { return proto_->notes[at] - 1u; }
     Instr& at(std::size_t index) { return proto_->code[index]; }
     void set_params(std::uint16_t count) { proto_->nparams = count; }

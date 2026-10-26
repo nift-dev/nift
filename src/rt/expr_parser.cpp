@@ -364,4 +364,26 @@ NodeId parse_expression(Ast& ast, std::uint32_t begin, std::uint32_t end) {
     return id != kNoNode ? id : detail::make_opaque(ast, begin, end, why);
 }
 
+NodeId parse_eval_expression(Ast& ast, std::uint32_t begin, std::uint32_t end) {
+    const NodeId expression = parse_expression(ast, begin, end);
+    if (ast.at(expression).kind != NodeKind::Opaque) return expression;
+    while (begin < end && detail::is_space(ast.source()[begin])) ++begin;
+    while (begin < end && detail::is_space(ast.source()[end - 1])) --end;
+    std::uint32_t close = 0;
+    while (begin < end && ast.source()[begin] == '(' &&
+           detail::find_balanced(ast.source(), begin, end, '(', ')', close) && close + 1 == end) {
+        ++begin; end = close;
+        while (begin < end && detail::is_space(ast.source()[begin])) ++begin;
+        while (begin < end && detail::is_space(ast.source()[end - 1])) --end;
+    }
+    OpaqueReason why = OpaqueReason::None;
+    const NodeId statement = detail::parse_statement_text(ast, begin, end, why);
+    if (statement == kNoNode) return expression;
+    // Returning an indexed/member target would evaluate that target twice.
+    // Keep the original refusal until lowering can preserve the assigned value.
+    if (ast.at(statement).kind == NodeKind::Assign &&
+        ast.at(ast.at(statement).a).kind != NodeKind::Ident) return expression;
+    return ast.at(statement).kind == NodeKind::ExprStmt ? ast.at(statement).a : statement;
+}
+
 } // namespace nift::rt

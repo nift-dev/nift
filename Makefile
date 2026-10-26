@@ -2417,7 +2417,10 @@ $(TEST_DIR)/cp19/vm-switch-sanitize.o: src/rt/vm.cpp $(RT_VALUE_HEADERS)
 $(TEST_DIR)/cp19/ownership-review-switch-sanitize$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o tests/runtime2/cp19/ownership_env.h
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
-.PHONY: test-cp19-r1 test-cp19-r1-sanitize
+.PHONY: test-cp19-r1 test-cp19-r1-sanitize test-cp19-expression-development
+test-cp19-expression-development: $(TARGET) $(CP13B_SWITCH_NIFT)
+	$(PYTHON) tests/runtime2/cp19/expressions_complete.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/expressions-threaded.jsonl"
+	$(PYTHON) tests/runtime2/cp19/expressions_complete.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/expressions-switch.jsonl"
 test-cp19-r1: test-cp19-shared-eval $(CP19_RETURN_MUTANT) $(TEST_DIR)/cp19/ownership-review$(EXEEXT) $(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT)
 	$(TEST_DIR)/cp19/ownership-review$(EXEEXT)
 	$(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT)

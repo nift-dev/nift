@@ -62,7 +62,7 @@ def main():
         executed(rows)
 
         expressions = [
-            'null', 'true', 'false', '1+2*3', '-2.5+1', 'true ? 3 : 4',
+            'x := 1', '[1,2].map(x => x+1)', 'null', 'true', 'false', '1+2*3', '-2.5+1', 'true ? 3 : 4',
             'null ?? "fallback"', '"hello".to_upper()', '""',
             '"quote\\\"\\ntext"', '"a"+"b"', '[1,2,3]',
             '{"a":1,"b":[true,null,"x"]}',
@@ -106,7 +106,7 @@ def main():
 
         # Unsupported expression units select legacy BEFORE any evaluation.
         # They are never called VM coverage, and require never evaluates them.
-        for expression in ['x := 1', '[1,2].map(x => x+1)', 'missing', '1 +',
+        for expression in ['missing', '1 +',
                            '[3,1,2].sort()', 'bytes([65,66])', '{"nested":bytes([65])}',
                            'timer()', 'bytes("hi")']:
             expected, _ = run(['eval', expression], '0')
@@ -120,7 +120,7 @@ def main():
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 0), rows
 
         # Host side effects inside a refused unit must not occur during classification.
-        expression = '[touch("marker"), x => x]'
+        expression = '[touch("marker"), bytes([65])]'
         for mode in ('require', 'classify', 'classify-all'):
             result, rows = run(['eval', expression], mode)
             assert not (root / 'marker').exists(), (mode, result, rows)
@@ -135,7 +135,7 @@ def main():
             assert rows[0]['outcome'] == 'compiled', rows
             assert rows[0]['vm_executions'] == rows[0]['legacy_executions'] == 0, rows
             if mode == 'classify-all':
-                assert rows[0]['inventory_complete'] is False, rows
+                assert rows[0]['inventory_complete'] is True and rows[0]['reasons'] == [], rows
 
         # Existing standalone entries still share the same runner and source sites.
         script = 'print("SCRIPT-VM")'

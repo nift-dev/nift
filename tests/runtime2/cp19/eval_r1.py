@@ -97,6 +97,20 @@ def main():
         baseline = run(expression, '0')
         row = run(expression, '1')
         assert channels(row) == channels(baseline), (baseline, row)
+        # Complete CP19 promotes the previously conservative R1 cases to
+        # genuine VM execution. Quoted unresolved names remain refusals.
+        if '.map("x")' not in expression and '.sort_by("a")' not in expression:
+            execution(row, 'vm-error' if row['exit'] else 'vm')
+            required = run(expression, 'require')
+            assert channels(required) == channels(baseline), (baseline,required)
+            execution(required, 'vm-error' if required['exit'] else 'vm')
+            for mode in ['classify','classify-all']:
+                classified = run(expression, mode)
+                assert classified['exit'] == 0 and classified['stdout'] == '' and not classified['marker'], classified
+                assert len(classified['stats']) == 1, classified
+                stat = classified['stats'][0]
+                assert stat['outcome'] == 'compiled' and stat['vm_executions'] == stat['legacy_executions'] == 0, classified
+            continue
         assert len(row['stats']) == 1, row
         assert (row['stats'][0]['vm_executions'], row['stats'][0]['legacy_executions']) == (0,1), row
         assert row['stats'][0]['outcome'] == 'fallback', row

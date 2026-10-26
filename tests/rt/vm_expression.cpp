@@ -2,6 +2,7 @@
 #include "rt/aggregate.h"
 #include "rt/compiler.h"
 #include "rt/error.h"
+#include "rt/eval_result.h"
 #include "rt/legacy_bridge.h"
 #include "rt/parser.h"
 #include "rt/source_map.h"
@@ -69,6 +70,37 @@ void check_error_origin() {
     CHECK(string_view_of(source).empty() && line.as_int() == 0 && column.as_int() == 0);
 }
 
+void check_cli_result_codec() {
+    nift::RuntimeValue presented;
+    {
+        const std::string source = "[x=>x,{\"callback\":y=>y}]";
+        Ast ast(source);
+        const auto expression = parse_expression(ast, 0, source.size());
+        auto compiled = compile_expression_unit(ast, expression);
+        CHECK(compiled.program != nullptr);
+        if (!compiled.program) return;
+        Value captured;
+        VmOptions options;
+        options.return_value = &captured;
+        Vm vm(*compiled.program, options);
+        std::string output, error;
+        CHECK(vm.run(output).reason == StopReason::None);
+        CHECK(eval_result_to_legacy(captured, presented, error));
+        CHECK(error.empty());
+        // Presentation must not expand the generic executable-state bridge.
+        nift::RuntimeValue rejected;
+        CHECK(!to_legacy(captured, rejected, error));
+    }
+    CHECK(presented.array.size() == 2);
+    CHECK(presented.array[0].string == std::string("\x1fnift:callable:lambda:1"));
+    CHECK(presented.array[1].object[0].second.string == std::string("\x1fnift:callable:lambda:2"));
+    auto formatted = evaluate("[error(\"outer\",\"user.outer\",error(\"inner\"))].prettify()");
+    CHECK(formatted.is(Kind::String));
+    const auto text = string_view_of(formatted);
+    CHECK(text.find("\n  {\n    \"message\": \"outer\"") != std::string_view::npos);
+    CHECK(text.find("\n    \"cause\": {\n      \"message\": \"inner\"") != std::string_view::npos);
+}
+
 void check_script_return_unchanged() {
     const std::string source = "return [1,2]";
     Ast ast(source);
@@ -91,6 +123,7 @@ void check_script_return_unchanged() {
 int main() {
     check_owned_result();
     check_error_origin();
+    check_cli_result_codec();
     check_script_return_unchanged();
     return rt_test::finish("CP19 expression ownership");
 }

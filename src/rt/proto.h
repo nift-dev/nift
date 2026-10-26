@@ -44,6 +44,7 @@ enum : std::uint8_t {
 // Per-instruction note (cold): text used by error messages (an expression's
 // source, a binding or function name).
 struct Note {
+    bool eval_nullable_error = false;  // cold nullable Error member diagnostic, CP19
     std::string text;
 };
 

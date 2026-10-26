@@ -2,8 +2,9 @@
 #include "rt/script_runner_stats.h"
 
 #include "HostTrace.h"
-#include "rt/compiler.h"
-#include "rt/eval_admission.h"
+#include "rt/compiler_eval.h"
+#include "rt/eval_result.h"
+#include "rt/eval_refusal_inventory.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
 #include "rt/module_host_op.h"
@@ -176,8 +177,8 @@ std::string line_text(const std::string& source, std::uint32_t offset) {
 }
 
 // NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
-void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats) {
-    const RefusalInventory inventory = inventory_refusals(source, source_path);
+void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats, bool eval) {
+    const RefusalInventory inventory = eval ? inventory_eval_refusals(source) : inventory_refusals(source, source_path);
     std::string out = ",\"reasons\":[";
     for (std::size_t k = 0; k < inventory.items.size(); ++k) {
         const InventoryItem& item = inventory.items[k];
@@ -218,7 +219,7 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
     stats.heap_live = result.heap_live;
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {
-        if (eval && !to_legacy(returned, eval->value, eval->error)) {
+        if (eval && !eval_result_to_legacy(returned, eval->value, eval->error)) {
             stats.outcome = "vm-error";
             stats.reason = eval->error;
             report(stats);
@@ -265,36 +266,19 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code, EvalResult* eval) {
-    if (mode == VmMode::ClassifyAll) {
-        if (!eval) add_inventory(source, source_path, stats);
-        else stats.inventory_json = ",\"reasons\":[],\"inventory_complete\":false,"
-                                    "\"inventory_stop\":\"expression-inventory-not-implemented\","
-                                    "\"inventory_rounds\":0";
-    }
+    if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats, eval != nullptr);
     const auto t0 = Clock::now();
     Ast ast(source);
     ParseResult parsed;
-    if (eval) parsed.root = parse_expression(ast, 0, static_cast<std::uint32_t>(source.size()));
+    if (eval) parsed.root = parse_eval_expression(ast, 0, static_cast<std::uint32_t>(source.size()));
     else parsed = parse_script(ast);
+    if (eval) normalize_eval_callbacks(ast, parsed.root);
     const auto t1 = Clock::now();
     stats.parse_us = micros(t0, t1);
     if (!parsed.ok) {
         stats.reason = "parse-error";  // legacy reports the identical diagnostic (CP10)
         locate_into(stats, source, parsed.error.offset);
         return not_compiled(stats, mode, source_path, exit_code);
-    }
-    if (eval) {
-        // Slice boundary: callable values have no RuntimeValue bridge. Refuse
-        // lambda-containing expressions before any instruction/Host effect,
-        // including aggregates containing callables. Later coverage can lift
-        // this independently of the shared entry and result-lifetime work.
-        for (NodeId id = 0; id < ast.size(); ++id) {
-            if (ast.at(id).kind == NodeKind::Lambda) {
-                stats.reason = "eval:callable";
-                locate_into(stats, source, ast.at(id).begin);
-                return not_compiled(stats, mode, source_path, exit_code);
-            }
-        }
     }
     const NodeId opaque = first_opaque_node(ast, parsed.root);
     if (opaque != kNoNode) {
@@ -334,7 +318,6 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     limits.module_names = link.module_names;
     CompileResult compiled = eval ? compile_expression_unit(ast, parsed.root)
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
-    if (eval) refuse_eval_error_presentation(compiled);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {

@@ -40,5 +40,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
 // Execute with VmOptions::return_value; ordinary script returns are unchanged.
 // Front ends must enforce their own admissible result/serialization surface.
 CompileResult compile_expression_unit(Ast& ast, NodeId expression);
+NodeId make_eval_program(Ast& ast, NodeId expression);
+CompileResult compile_eval_program(const Ast& ast, NodeId program);
 
 } // namespace nift::rt

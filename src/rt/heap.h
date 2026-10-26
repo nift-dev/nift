@@ -72,6 +72,7 @@ struct FunctionObject : HeapObject {
     std::string name;
     const void* code = nullptr;
     std::uint32_t native_id = 0;
+    std::uint64_t display_id = 0;  // CLI presentation only; callable identity remains the Value
     bool is_lambda = false;
     bool expression_body = false;
     bool selector_call_site = false;  // returned expression body lacks a legacy source view

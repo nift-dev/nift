@@ -113,6 +113,7 @@ bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     function->name = protos_[in.b]->name;
     function->code = protos_[in.b];
     function->is_lambda = true;
+    function->display_id = next_callable_display_id_++;
     function->expression_body = (in.flags & kInstrLambdaExprBody) != 0;
     function->selector_call_site = function->expression_body &&
         ((in.flags & kInstrLambdaReturnOrigin) || (closure_ && closure_->selector_call_site));

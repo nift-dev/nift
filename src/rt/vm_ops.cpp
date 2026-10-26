@@ -247,8 +247,12 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
         if (error_member(object, atom_text(key), out)) return true;
         return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
     }
-    if (object.is_null())
+    if (object.is_null()) {
+        if (note && note->eval_nullable_error)
+            return raise(fault, StopReason::Error, "cannot access member '" + std::string(atom_text(key)) +
+                         "' because the current JSON value is not an object");
         return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
+    }
     if (!object.is(Kind::Object)) return internal(fault, "member");
     if (const Value* member = object_get(object, key)) {
         out = *member;

@@ -221,7 +221,7 @@ bool UnitCompiler::return_statement(const Node& node) {
         fb_->emit(in_function_ ? OpCode::ReturnNull : OpCode::Halt);
         return true;
     }
-    if (!no_alias(node.a, node)) return false;
+    if ((!expression_result_ || in_function_) && !no_alias(node.a, node)) return false;
     if (!in_function_ && !expression_result_ &&
         !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
     // Other expression errors retain D-009#5 / D-018 attribution. Missing
@@ -386,15 +386,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits) {
     return compile_unit_impl(ast, root, limits, false);
 }
-CompileResult compile_expression_unit(Ast& ast, NodeId expression) {
-    // Synthetic structure only: never prepend source text or shift offsets.
-    // The ordinary script-return scalar restriction is unchanged; eval owns
-    // its result's serialization, including bytes/Error/timer rejection.
-    const auto begin = ast.at(expression).begin, end = ast.at(expression).end;
-    const NodeId returned = ast.add(NodeKind::Return, begin, end);
-    ast.at(returned).a = expression;
-    const NodeId root = ast.add(NodeKind::Program, begin, end);
-    ast.set_list(root, {returned});
-    return compile_unit_impl(ast, root, CompileLimits(), true);
+CompileResult compile_eval_program(const Ast& ast, NodeId program) {
+    return compile_unit_impl(ast, program, CompileLimits(), true);
 }
 } // namespace nift::rt

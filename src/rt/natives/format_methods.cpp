@@ -2,6 +2,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/atom.h"
+#include "rt/error.h"
 #include "rt/natives/support.h"
 #include "rt/number.h"
 #include "rt/string.h"
@@ -47,6 +48,24 @@ void append_json_string(std::string_view text, std::string& out) {
 
 constexpr int kMaxDepth = 128;  // legacy: "value serialization depth exceeded" beyond
 
+// Error presentation shares CP13B's canonical field/cause encoding. Its
+// pretty indentation is relative to the containing aggregate, and the depth
+// budget includes each Error object's scalar fields and cause.
+bool serialize_error(const Value& value, bool pretty, int depth, std::string& out, std::string& error) {
+    const Value* cause = &value;
+    int levels = 0;
+    while (cause->is(Kind::Error)) {
+        if (depth + ++levels > kMaxDepth) { error = "value serialization depth exceeded"; return false; }
+        cause = &cause->heap_as<ErrorObject>()->cause;
+    }
+    const std::string text = error_to_json(value, pretty);
+    for (char c : text) {
+        out += c;
+        if (pretty && c == '\n') out.append(static_cast<std::size_t>(depth * 2), ' ');
+    }
+    return true;
+}
+
 // Legacy serialize_value: compact ("," and ":") or pretty (two-space indent,
 // one element per line, ": " after keys; empty containers stay "[]"/"{}").
 // Recursion is bounded by kMaxDepth + 1 levels.
@@ -58,6 +77,8 @@ bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, 
             return true;
         case Kind::String: append_json_string(string_view_of(value), out); return true;
         case Kind::Bytes: error = "bytes values are not serializable"; return false;
+        case Kind::Error: return serialize_error(value, pretty, depth, out, error);
+        case Kind::Function: error = "opaque runtime value is not serializable"; return false;
         case Kind::Array: case Kind::Object: break;
         default: bad_kind = true; error = "stringify argument kind"; return false;
     }

@@ -46,6 +46,9 @@ ParseResult parse_script(Ast& ast);
 // Parses one expression (used by tests and later front ends).
 NodeId parse_expression(Ast& ast, std::uint32_t begin, std::uint32_t end);
 
+// eval accepts declaration/assignment forms as values as well as expressions.
+NodeId parse_eval_expression(Ast& ast, std::uint32_t begin, std::uint32_t end);
+
 Location locate(std::string_view source, std::uint32_t offset);
 
 } // namespace nift::rt
