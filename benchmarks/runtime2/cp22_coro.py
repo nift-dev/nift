@@ -105,6 +105,9 @@ def cpu_scale(nift, d, runs, n_by_body, kind="async"):
             p = write(d, f"scale-{kind}-{body}-{k}.f", scale_program(body, k, n, kind))
             res = {}
             vm = dict(vm_env(os.path.join(d, f"scale-{kind}-{body}-{k}.jsonl")), NIFT_VM_COOPERATIVE_THREADS="1")
+            # Since the round-3 admission rule (record §12.1) these CPU-bound VM
+            # runs are refused before execution (NIFT_VM=require then fails):
+            # the matrix documents what cooperative execution would cost.
             for engine, env in (("legacy", dict(os.environ, NIFT_VM="0")), ("vm", vm)):
                 walls, cpus, outs = [], [], set()
                 for _ in range(runs):
@@ -238,15 +241,21 @@ def main():
         n = 2000000
         one = write(d, "spin1.f", SPIN.format(body=f"a := spin({n})\nb := spin({n})\nprint((await a) + (await b))"))
         seq = write(d, "spin0.f", SPIN.format(body=f"a := await spin({n})\nb := await spin({n})\nprint(a + b)"))
-        both = measure(nift, one, str(2 * n), a.runs, d)
-        alone = measure(nift, seq, str(2 * n), a.runs, d)
-        rows.append({"workload": "yield", "interleaved": both, "sequential": alone,
-                     "overhead": both["wall_median_s"] / alone["wall_median_s"] - 1.0})
+        try:  # CPU-bound tasks: refused since the round-3 admission rule (record §12.1)
+            both = measure(nift, one, str(2 * n), a.runs, d)
+            alone = measure(nift, seq, str(2 * n), a.runs, d)
+            rows.append({"workload": "yield", "interleaved": both, "sequential": alone,
+                         "overhead": both["wall_median_s"] / alone["wall_median_s"] - 1.0})
+        except RuntimeError as refused:
+            rows.append({"workload": "yield", "refused": str(refused)[:300]})
         p = write(d, "wakeup.f", WAKEUP.format(n=100))
         w = measure(nift, p, "100", max(1, a.runs // 2), d)
         rows.append({"workload": "wakeup", **w, "mean_latency_ms": (w["wall_median_s"] - 1.0) * 10.0})
         p = write(d, "fair.f", SPIN.format(body=f"a := spin({n})\nb := spin({n // 2})\nprint(await b)\nprint(await a)"))
-        rows.append({"workload": "fairness", **measure(nift, p, f"{n // 2}\n{n}", a.runs, d)})
+        try:
+            rows.append({"workload": "fairness", **measure(nift, p, f"{n // 2}\n{n}", a.runs, d)})
+        except RuntimeError as refused:
+            rows.append({"workload": "fairness", "refused": str(refused)[:300]})
         p = write(d, "idle.f", SLEEPS.format(n=10, ms=1000))
         rows.append({"workload": "idle", **measure(nift, p, "10", 3, d)})
         if a.cpu_n:

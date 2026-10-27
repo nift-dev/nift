@@ -212,6 +212,7 @@ reports it:
 | `coro-thread-arity` | `thread(f, …)` with the wrong argument count (legacy reports it against its internal `__thread_callable` at 1:1) |
 | existing `callable:mutex`, `atomic…` | mutexes and atomics stay on legacy (CP23; D-036 assigns `mutex` to CP22/CP23, the CP12B inventory to CP23) |
 | `fn-flags` | unchanged for deferred bodies and methods |
+| `coro-blocking-host:<name>`, `coro-task-recursion`, `coro-task-loop`, `coro-task-native:<name>` | the cooperative admission rule (§12.1, owner decision 2026-10-27): cooperative execution must be provably legacy-equal |
 
 Admission is measured by the D-016 suites: async programs move from the
 unsupported suite to the supported suite only for the admitted subset; each
@@ -359,6 +360,10 @@ resource growth (`heap_peak`, RSS, fds before/after drain).
 7. Benchmarks + exploratory evidence; this record's Evidence section.
 
 ## 11. Owner decisions, round 2 (2026-10-27) — new proposal, not accepted
+
+*Round 3 (§12) supersedes the provisional acceptance below: parallel
+`async` and `thread()` keep real parallelism; the scheduler runs only
+programs admitted by §12.1.*
 
 The owner's answers on candidate e06ea42d: the cooperative single-threaded
 scheduler is accepted **provisionally** as the implementation architecture
@@ -570,7 +575,7 @@ The D-009#5 location rule applies to `thread: ` exactly as to `future: `
 (policy `D-009#5-thread`, EXPECT.tsv). The CPU parallelism of legacy threads
 is the §11.1 question.
 
-### 11.7 `thread()` execution model — owner decision required
+### 11.7 `thread()` execution model (decided: option (b), §12)
 
 **Contract.** Legacy and its documentation promise actual concurrency:
 `ReleaseNotes.md` (v4.5) "Real native concurrency: `thread(...)`, replayable
@@ -680,6 +685,147 @@ Evidence (opt-in build path; legacy is the same binary with `NIFT_VM=0`):
 
 Recommendation: (b) now, (a) in CP23. The same contract text should be
 weighed against the provisional acceptance of cooperative `async`.
+
+## 12. Owner decisions, round 3 (2026-10-27): parallelism is preserved
+
+**Decision 1 — `thread()` keeps real parallelism.** Option (b) is approved:
+`thread()` is refused before execution on the VM (`callable:thread`) until
+CP23 isolates provide genuine parallel execution. Cooperative `thread()` is
+never the default.
+
+The test switch `NIFT_VM_COOPERATIVE_THREADS=1` is kept and is
+**non-contractual**. It exists only to run the evidence fixtures of §11.6
+and §11.7. No user-facing behaviour, documentation or support depends on it,
+and it may be removed at any time. CP23 replaces it with isolate-backed
+parallel threads.
+
+**Decision 2 — parallel `async` keeps real parallelism.**
+* The coroutine scheduler stays as internal Runtime 2.0 infrastructure
+  (suspension, resumption, futures, timers, the event-loop wait point).
+* The VM runs an `async` program cooperatively only when the compiler
+  establishes, by the rule below, that cooperative execution cannot differ
+  observably from legacy's parallel execution.
+* Every other `async` program is refused before execution, with no effects,
+  and runs on legacy unchanged.
+* No coroutine syntax is added and `async` is not redefined.
+
+### 12.1 Cooperative admission rule (`compiler_coro_admit.{h,cpp}`)
+
+The rule is checked at compile time, after the §5 refusals and the future
+flow check, for every unit containing `fn[async]` or `async (…) =>`. It
+uses two sets.
+
+**Task code (T)** is every async function and async lambda, plus every
+function and lambda reachable from them:
+* by a direct call or by naming it;
+* lambdas nested inside them;
+* when task code calls through a value: every lambda in the unit and every
+  function named other than as a direct callee.
+
+**Allowlists:**
+* `HOST_OK` = {`sleep`, `epoch`, `getenv`, `os`, `arch`, `platform`,
+  `hardware_concurrency`}. `sleep` suspends; the others read process state in
+  constant time.
+* `TASK_FN` = {`print`, `sleep`, `error`, `type`, `epoch`, `getenv`, `os`,
+  `arch`, `platform`, `hardware_concurrency`, `thread`}. `thread` is
+  reachable only with the non-contractual switch.
+* `TASK_METHOD` = {`done`, `status`, `size`, `length`, `push`, `join`}.
+
+The unit is admitted only if every one of these holds (first violation
+reported):
+
+| # | Criterion | Refusal reason |
+| --- | --- | --- |
+| A1 | No call anywhere in the unit (main included) of a CP16 Host built-in outside `HOST_OK`. While a Host call blocks, legacy's other threads keep running; on the VM nothing else does. | `coro-blocking-host:<name>` |
+| A2 | No call cycle among T, counting calls through values as reaching every value target. A recursive task does unbounded CPU work. | `coro-task-recursion` |
+| A3 | Every `while`/`for` loop in T has, at the top level of its body, a statement `sleep(<integer literal ≥ 1>)`, so every iteration suspends. `sleep(0)` and `await` do not count: neither is guaranteed to suspend. | `coro-task-loop` |
+| A4 | Every built-in function called in T is the unit's own function, a call through a value (itself task code), or in `TASK_FN`. Every method called in T is in `TASK_METHOD`. Data-proportional built-ins such as hashing, sorting, string/JSON/number methods, collection callbacks and file reads are refused. | `coro-task-native:<name>` |
+
+The existing §5 refusals still apply (captures, modules, structs, async
+values, future flow, async recursion).
+
+**Why this establishes parity.** Under A1–A4, every task's work between two
+suspension points is a bounded sequence of operations:
+* no loops, except loops that suspend on every iteration;
+* no recursion;
+* only constant-time or output-only built-ins.
+
+Its CPU time is therefore at most proportional to program size times the
+size of the values it receives. Legacy spends work of the same order
+serially on the caller's thread when it clones the task's snapshot and
+arguments at the call. So legacy's parallel execution gains no speed-up
+beyond a factor bounded by program size, and nothing can starve a task.
+
+Tasks only wait, sleep and do bounded work. Output order stays within
+legacy's own nondeterminism, because the FIFO run queue and the timer order
+are one of legacy's interleavings. Errors, completion and drain follow §3.
+
+Main-program code may do CPU work. Legacy runs main on one thread as well,
+and main's loops are VM safepoints, so timers are polled at least every
+1,024 iterations.
+
+**Residuals, stated rather than claimed away:**
+* A single main-program built-in call (one large sort) delays due task
+  timers until it returns. Legacy would wake the task meanwhile. This
+  changes latency, not output or order beyond legacy's own nondeterminism.
+* Output writes (`print`) are treated as non-blocking: the VM buffers
+  output, and legacy serialises output under one lock.
+
+**Witnesses:**
+* Refusals (all before execution, legacy output unchanged):
+  `refuse/r_ca_cpu_loop`, `r_ca_cpu_native`, `r_ca_cpu_helper`,
+  `r_ca_recursion`, `r_ca_blocking_host`, `r_ca_main_blocking`,
+  `r_ca_for_await`, `r_ca_lambda_loop`, `r_ca_sleep_zero_loop`,
+  `r_ca_string_method`.
+* Admitted and legacy-equal: `cases/ca_sleep_loop`, `ca_light_tasks`, and
+  every remaining `cases/*.f`.
+* Former VM fixtures that the rule now refuses moved to `refuse/` with their
+  reasons (`spawn_tree` → `coro-task-loop`; `tr_exists`, `tr_thread` → `coro-blocking-host:exists`; `tr_fs` → `coro-blocking-host:is_dir`; replaced by the admitted `spawn_tree_light`, `tr_env`, `tr_thread_env`).
+* The adversarial generator emits only admitted shapes (task loops suspend).
+
+### 12.2 Nonblocking Host integration
+
+Only `sleep` suspends today. Making other Host built-ins suspend needs
+three things:
+* each native split into a VM-thread *prepare* step (validate, resolve the
+  path, v1 trace), a worker-thread *attempt* step on plain data with no
+  `rt::Value`, refcount or heap accounting, and a VM-thread *complete* step
+  (classify, v2 trace, record, build the Value);
+* the attempt step completing through `WakeSource::post`;
+* the Host layer's observer, trace channel and path policy made safe across
+  the overlap. `cd` changes the process working directory, which every
+  concurrent attempt observes.
+
+The natives live in `src/rt/natives`, owned by CP21/CP19 and outside this
+checkpoint's edit rights. This is therefore **blocked**: the design above is
+the proposal, and A1 refuses blocking Host calls until it lands. The
+scheduler side (suspend, post, resume, error routing) exists and is tested
+through `sleep` and the TSan wake-path tests.
+
+### 12.3 What depends on CP23 (proposed roadmap reconciliation)
+
+| Requirement | Today (CP22 candidate) | Delivered by |
+| --- | --- | --- |
+| `thread()` with real parallel execution, `join`/`done`/`status` | refused (`callable:thread`), runs on legacy | CP23: an isolate per thread (values copied in, results copied out) |
+| `mutex()`, `atomic<…>` shared across threads | refused, runs on legacy | CP23: host-shared mutex/atomic objects usable from isolates; lock waits as suspension points |
+| CPU-bound or blocking `async` with real parallelism | refused by A1–A4, runs on legacy | CP23: async tasks on isolates (or an isolate pool) when their captures are copyable; plus §12.2 suspending Host ops |
+| Blocking Host ops inside cooperative tasks | refused (A1) | §12.2 (natives owner) — may land before CP23 |
+| Work-stealing | not needed for semantics | optional CP23 implementation choice for the isolate pool |
+
+Proposed reconciliation, which the owner decides; `checkpoints.md` is not
+edited here:
+* CP22's row becomes "VM coroutine infrastructure, scheduler and event loop;
+  cooperative execution only where admitted (§12.1)".
+* CP23's row takes "parallel `thread()`, parallel `async` for CPU-bound or
+  blocking tasks, mutex/atomics".
+* The CP22 gates (10k sleeps, spawn scaling) stay on CP22.
+* The parallel-async regression gate moves to CP23: "no async/thread
+  program refused for parallelism; legacy-vs-VM CPU scaling within the
+  agreed factor".
+* CP25's zero-fallback gate depends on CP23 for these refusals.
+
+None of these requirements is optional, and **CP22 is not complete while
+they remain open**.
 
 ## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 
