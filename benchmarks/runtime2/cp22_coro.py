@@ -79,7 +79,15 @@ SCALE_BODIES = {
 }
 
 
-def scale_program(body, k, n):
+def scale_program(body, k, n, kind="async"):
+    """k tasks of one body: `fn[async]` + await, or `thread(work, n)` + join()."""
+    if kind == "thread":
+        lines = ["fn(work(n)) { " + SCALE_BODIES[body].format() + " }"]
+        lines += [f"t{j} := thread(work, {n})" for j in range(k)]
+        lines.append("s := 0")
+        lines += [f"s += t{j}.join()" for j in range(k)]
+        lines.append("print(s)")
+        return "\n".join(lines) + "\n"
     lines = ["fn[async](work(n)) { " + SCALE_BODIES[body].format() + " }"]
     lines += [f"t{j} := work({n})" for j in range(k)]
     lines.append("s := 0")
@@ -88,15 +96,16 @@ def scale_program(body, k, n):
     return "\n".join(lines) + "\n"
 
 
-def cpu_scale(nift, d, runs, n_by_body):
-    """Legacy (thread pool, max(2, hw) workers) vs VM (one thread, cooperative)."""
+def cpu_scale(nift, d, runs, n_by_body, kind="async"):
+    """Legacy (async: pool of max(2, hw) workers; thread(): one OS thread each)
+    vs VM (one thread, cooperative; thread() only with the opt-in)."""
     rows = []
     for body, n in n_by_body.items():
         for k in (1, 2, 4, 8):
-            p = write(d, f"scale-{body}-{k}.f", scale_program(body, k, n))
+            p = write(d, f"scale-{kind}-{body}-{k}.f", scale_program(body, k, n, kind))
             res = {}
-            for engine, env in (("legacy", dict(os.environ, NIFT_VM="0")),
-                                ("vm", vm_env(os.path.join(d, f"scale-{body}-{k}.jsonl")))):
+            vm = dict(vm_env(os.path.join(d, f"scale-{kind}-{body}-{k}.jsonl")), NIFT_VM_COOPERATIVE_THREADS="1")
+            for engine, env in (("legacy", dict(os.environ, NIFT_VM="0")), ("vm", vm)):
                 walls, cpus, outs = [], [], set()
                 for _ in range(runs):
                     wall, cpu, _, pr = timed([nift, p], env)
@@ -105,9 +114,9 @@ def cpu_scale(nift, d, runs, n_by_body):
                     outs.add(pr.stdout.decode().strip() if pr.returncode == 0 else f"exit {pr.returncode}")
                 res[engine] = {"wall_median_s": statistics.median(walls), "wall_min_s": min(walls),
                                "cpu_median_s": statistics.median(cpus), "outputs": sorted(outs)}
-            st_path = Path(d, f"scale-{body}-{k}.jsonl")
+            st_path = Path(d, f"scale-{kind}-{body}-{k}.jsonl")
             st = json.loads(st_path.read_text().splitlines()[-1]) if st_path.exists() else {}
-            rows.append({"workload": f"scale-{body}", "tasks": k, "n_per_task": n, **res,
+            rows.append({"workload": f"scale-{kind}-{body}", "tasks": k, "n_per_task": n, **res,
                          "vm_outcome": st.get("outcome"), "same_output": res["legacy"]["outputs"] == res["vm"]["outputs"],
                          "legacy_over_vm_wall": res["legacy"]["wall_median_s"] / res["vm"]["wall_median_s"],
                          "legacy_parallelism": res["legacy"]["cpu_median_s"] / res["legacy"]["wall_median_s"]})
@@ -193,6 +202,7 @@ def main():
     ap.add_argument("--cpu-n", type=int, default=0, help="CPU-bound parallelism (legacy vs VM): loop size per task")
     ap.add_argument("--scale-only", action="store_true", help="only the CPU-bound scaling matrix (1/2/4/8 tasks)")
     ap.add_argument("--scale-n", default="arith=600000,string=300000", help="iterations per task, per body")
+    ap.add_argument("--scale-kind", default="async", choices=("async", "thread"), help="fn[async] tasks or thread()")
     a = ap.parse_args()
     nift = os.path.abspath(a.nift)
     rows = [{"host": base.host(), "loadavg": open("/proc/loadavg").read().split()[:3],
@@ -201,7 +211,7 @@ def main():
     if a.scale_only:
         n_by_body = {kv.split("=")[0]: int(kv.split("=")[1]) for kv in a.scale_n.split(",")}
         with tempfile.TemporaryDirectory(prefix="cp22-scale-") as d:
-            rows += cpu_scale(nift, d, a.runs, n_by_body)
+            rows += cpu_scale(nift, d, a.runs, n_by_body, a.scale_kind)
         for row in rows:
             print(json.dumps(row, sort_keys=True))
         return 0
