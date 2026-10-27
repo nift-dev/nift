@@ -166,6 +166,10 @@ bool size_from_environment(const char* name, std::size_t& out) {
     return true;
 }
 
+// CP22: coroutine units refuse linked modules; thread() compiles as a
+// cooperative task only with NIFT_VM_COOPERATIVE_THREADS=1 (owner decision pending).
+bool coop_threads() { const char* v = std::getenv("NIFT_VM_COOPERATIVE_THREADS"); return v && v[0] == '1' && !v[1]; }
+
 void limits_from_environment(VmOptions& options) {
     size_from_environment("NIFT_VM_HEAP_BUDGET", options.heap_budget);
     size_from_environment("NIFT_VM_FLUSH", options.flush_threshold);
@@ -287,7 +291,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         unit_root = relinked.root;
     }
     CompileLimits limits;
-    limits.module_names = link.module_names; limits.linked = link.linked;  // CP22: coroutine units refuse links
+    limits.module_names = link.module_names; limits.linked = link.linked; limits.cooperative_threads = coop_threads();
     CompileResult compiled = compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);

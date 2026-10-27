@@ -86,6 +86,10 @@ def run(nift, folder, name, vm=None, extra=None, trace=None):
                "LC_ALL": "C", "TZ": "UTC", "NIFT_PREVALIDATE": "off"}
         if vm:
             env.update({"NIFT_VM": vm, "NIFT_VM_STATS": str(stats)})
+            # thread() compiles only with the cooperative opt-in (owner decision
+            # pending); `*_default.f` fixtures check the default refusal.
+            if not name.endswith("_default.f"):
+                env["NIFT_VM_COOPERATIVE_THREADS"] = "1"
         env.update(extra or {})
         fds = ()
         if trace is not None:

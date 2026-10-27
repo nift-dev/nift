@@ -377,7 +377,7 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
         return result;
     }
     // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
-    if (!check_coroutine_unit(ast, root, plan, kinds, limits.linked, result.reason, result.offset)) return result;
+    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset)) return result;
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
     auto program = std::make_unique<Program>();

@@ -126,7 +126,7 @@ def run(nift, path, vm):
     if stats.exists():
         stats.unlink()
     if vm:
-        env.update({"NIFT_VM": "require", "NIFT_VM_STATS": str(stats)})
+        env.update({"NIFT_VM": "require", "NIFT_VM_STATS": str(stats), "NIFT_VM_COOPERATIVE_THREADS": "1"})
     try:
         p = subprocess.run([nift, path.name], cwd=path.parent, env=env, capture_output=True, timeout=TIMEOUT,
                            stdin=subprocess.DEVNULL)

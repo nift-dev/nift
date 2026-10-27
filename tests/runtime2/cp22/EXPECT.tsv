@@ -4,3 +4,4 @@ err_fatal_await.f	D-009#5-future
 err_nested_fatal.f	D-009#5-future
 err_task_runtime_in_fn.f	D-009#5-future
 th_error_fatal.f	D-009#5-thread
+th_self_join.f	D-009#5-thread

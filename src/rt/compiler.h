@@ -32,6 +32,10 @@ struct CompileLimits {
     // (`path-in-call-argument:imported`; records20k's stage 4 lift).
     std::vector<std::string_view> module_names;
     bool linked = false;  // CP22: the unit is a linked module graph (coroutine units refuse it)
+    // CP22: compile `thread(f, …)` as a cooperative VM task. Off by default:
+    // legacy threads execute in parallel, and until the owner decides the
+    // execution model a unit calling thread() is refused (`callable:thread`).
+    bool cooperative_threads = false;
 };
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());

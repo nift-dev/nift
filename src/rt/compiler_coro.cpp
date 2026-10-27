@@ -69,42 +69,6 @@ int UnitCompiler::future_method(const Node& node, std::uint16_t dst) {
     return builder_ok() ? 1 : 0;
 }
 
-// `thread(f, args…)` in a coroutine unit (legacy's thread built-in): f, a
-// synchronous top-level function named directly with matching arity, runs as
-// a task with the arguments (CallValueAny with the thread bit, c & 0x8000);
-// the value is its thread handle. Other forms are refused (legacy reports a
-// wrong count against its internal `__thread_callable` at 1:1, a defect).
-bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uint16_t dst) {
-    const Node& callee = ast_.at(node.a);
-    if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));
-    if (node.count == 0) return fail(node, "coro-thread-callee");
-    const NodeId* args = ast_.list(node);
-    const Node& f = ast_.at(args[0]);
-    const bool named = f.kind == NodeKind::Ident && find_binding(text(f)) == nullptr;
-    const auto fn = named ? plan_.index.find(text(f)) : plan_.index.end();
-    if (fn == plan_.index.end() || (ast_.at(plan_.functions[fn->second - 1]).flags & kFlagAsync))
-        return fail(f, "coro-thread-callee");
-    if (ast_.at(plan_.functions[fn->second - 1]).count != node.count - 1) return fail(node, "coro-thread-arity");
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t callee_reg = 0;
-    if (!temp(callee_reg) || !expr_to(args[0], callee_reg)) return false;
-    const std::uint16_t base = fb_->top();
-    for (std::uint32_t k = 1; k < node.count; ++k) {
-        if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        std::uint16_t reg = 0;
-        if (!temp(reg) || !expr_to(args[k], reg)) return false;
-    }
-    std::uint16_t result = 0;
-    if (node.count == 1 && !temp(result)) return false;
-    fb_->set_offset(site(node));
-    const std::size_t at = fb_->emit(OpCode::CallValueAny, base, callee_reg,
-                                     static_cast<std::uint16_t>((node.count - 1u) | 0x8000u));
-    fb_->note(at, std::string(text(f)));
-    if (dst != base) fb_->emit(OpCode::Move, dst, base);
-    fb_->release_to(mark);
-    return builder_ok();
-}
-
 bool UnitCompiler::await_expr(const Node& node, std::uint16_t dst) {
     if (!plan_.coroutines) return fail(node, "await-outside-coroutine-unit");
     if (node.a == kNoNode) return fail(node, "await-shape");
@@ -349,11 +313,17 @@ bool async_recursion(const Ast& ast, NodeId root, const UnitPlan& plan, std::uin
 
 }  // namespace
 
-bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds, bool linked,
-                          std::string& reason, std::uint32_t& offset) {
+bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
+                          const CompileLimits& limits, std::string& reason, std::uint32_t& offset) {
     if (!plan.coroutines) return true;
+    for (NodeId id = 0; !limits.cooperative_threads && id < ast.size(); ++id) {  // legacy threads run in parallel
+        const Node& n = ast.at(id);
+        if (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
+            ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"))
+            return reason = "callable:thread", offset = ast.at(n.a).begin, false;
+    }
     offset = ast.at(root).begin;
-    if (linked) { reason = "coro-module"; return false; }
+    if (limits.linked) { reason = "coro-module"; return false; }
     if (!plan.structs.empty()) {
         reason = "coro-struct";
         offset = ast.at(plan.structs.front().decl).begin;

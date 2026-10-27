@@ -1,0 +1,1 @@
+error: $ROOT/th_self_join.f:1:11: thread: return: unknown value or malformed expression: t
