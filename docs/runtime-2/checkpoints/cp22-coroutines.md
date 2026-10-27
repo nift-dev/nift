@@ -749,44 +749,90 @@ isolate-backed parallel threads.
   and runs on legacy unchanged.
 * No coroutine syntax is added and `async` is not redefined.
 
-### 12.1 Cooperative admission rule (`compiler_coro_admit.{h,cpp}`)
+### 12.1 Cooperative admission rule (`compiler_coro_admit.{h,cpp}`) — round 6
 
-The rule is checked at compile time, after the §5 refusals and the future
-flow check, for every unit containing `fn[async]` or `async (…) =>`. It
-uses two sets.
+**Round 6 (owner rejection of cf1ce940, independent review F1–F6).** The
+rule is now checked on the **compiled bytecode** of the whole program, after
+the §5 refusals and the coroutine bytecode checks, in `compile_unit`, before
+any `Vm` exists.
 
-**Task code (T)** is every async function and async lambda, plus every
-function and lambda reachable from them:
-* by a direct call or by naming it;
-* lambdas nested inside them;
-* when task code calls through a value: every lambda in the unit and every
-  function named other than as a direct callee.
+The bytecode identifies every operation exactly:
+* a built-in is a `CallNative` with its built-in id;
+* a callable stored in an object field is a `GetMember` followed by a
+  `CallValueAny`, i.e. a call through a value;
+* a thread `join` is `Await` with c = 1;
+* `Array.join` is the native with the `join` id;
+* a user method is a call through a value.
 
-**Allowlists:**
-* `HOST_OK` = {`sleep`, `epoch`, `getenv`, `os`, `arch`, `platform`,
-  `hardware_concurrency`}. `sleep` suspends; the others read process state in
-  constant time.
-* `TASK_FN` = {`print`, `sleep`, `error`, `type`, `epoch`, `getenv`, `os`,
-  `arch`, `platform`, `hardware_concurrency`, `thread`}. `thread` is
-  reachable only with the non-contractual switch.
-* `TASK_METHOD` = {`done`, `status`, `size`, `length`, `push`, `join`}.
+So the round-5 defects caused by name matching (F3 callable fields, F5
+`join`) cannot recur. Any instruction the rule does not classify is
+refused.
 
-The unit is admitted only if every one of these holds (first violation
-reported):
+**Task code (T).** T is computed over protos:
+* every async proto;
+* every proto reachable from them by `Call` or `Spawn`;
+* when a task proto calls through a value (`CallValue`, `CallValueAny`),
+  every proto that is ever a function value anywhere in the program
+  (`LoadFunction`, `Closure`).
 
-| # | Criterion | Refusal reason |
+Under the non-contractual `NIFT_VM_COOPERATIVE_THREADS=1` switch,
+`thread(f, …)` compiles to a `CallValueAny` with the thread bit whose
+callee register the compiler loads with `LoadFunction f` (possibly through
+`Move`s). That call is an exact edge to f. Any other shape is a call
+through a value and widens as above.
+
+The VM cannot call anything else: a built-in is never a value, and an
+unresolved callee is refused by the base compiler. So T contains every
+target, including targets reached through object fields, aliases,
+higher-order arguments and futures.
+
+**Allowlists, by identity:**
+* `HOST_OK` = Host built-ins {sleep, epoch, getenv, os, arch, platform,
+  hardware_concurrency}.
+* `TASK_BUILTIN` = `HOST_OK` ∪ {type}.
+* `TASK_OP` = the instructions in `task_op_allowed`:
+  * constants and moves;
+  * arithmetic, comparison and concatenation;
+  * jumps and calls;
+  * array and object construction, indexing and member reads;
+  * `Push`, `Length`;
+  * global reads and writes;
+  * frame-local cells and loop selectors;
+  * try/throw and `ErrorNew`;
+  * `Spawn`, `Await`, `Sleep`, `Yield`, `TaskEnd`, `FutureOp`.
+
+  Refused in task code: collection callbacks, in-place collection mutation
+  (`ArrayMutate`), Error JSON, struct instructions, top-level instructions.
+
+| # | Criterion (first violation reported) | Refusal reason |
 | --- | --- | --- |
-| A1 | No call anywhere in the unit (main included) of a CP16 Host built-in outside `HOST_OK`. While a Host call blocks, legacy's other threads keep running; on the VM nothing else does. | `coro-blocking-host:<name>` |
-| A2 | No call cycle among T, counting calls through values as reaching every value target. A recursive task does unbounded CPU work. | `coro-task-recursion` |
-| A3 | Every `while`/`for` loop in T has, at the top level of its body, a statement `sleep(<integer literal ≥ 1>)`, so every iteration suspends. `sleep(0)` and `await` do not count: neither is guaranteed to suspend. | `coro-task-loop` |
-| A4 | Every built-in function called in T is the unit's own function, a call through a value (itself task code), or in `TASK_FN`. Every method called in T is in `TASK_METHOD`. Data-proportional built-ins such as hashing, sorting, string/JSON/number methods, collection callbacks and file reads are refused. | `coro-task-native:<name>` |
-| A5 | No observation of scheduling: no `print` in T; no `epoch` and no `done()` / `status()` call anywhere in the unit. (Round 4, owner request: output and clock and poll results depend on the schedule, see the proof.) | `coro-observe:<name>` |
+| A1 | No `CallNative` of a CP16 Host built-in outside `HOST_OK`, in any proto, main included | `coro-blocking-host:<name>` |
+| A2 | No cycle among T, where edges are `Call`, `Spawn`, and calls through values reaching every function value | `coro-task-recursion` |
+| A3 | Every loop in T suspends on every iteration. The compiler marks a loop's `Yield` (a = 1) only when the loop body's **first statement** is `sleep(<integer literal ≥ 1>)` with the built-in `sleep`. A `continue`, a branch, a nested loop or an early exit therefore cannot skip it: every iteration starts with the suspension, and each nested loop carries its own mark. Any unmarked `Yield` in T is refused. | `coro-task-loop` |
+| A4 | Every instruction in T is in `TASK_OP`, and every `CallNative` in T is a `TASK_BUILTIN` (by id) or `print`, which falls under A5 | `coro-task-op:<opcode>`, `coro-task-native:<name>` |
+| A5 | No observation of scheduling: no `print` in T; no `epoch`, no `done()` or `status()` (`FutureOp`) anywhere | `coro-observe:<name>` |
 
-The existing §5 refusals still apply (captures, modules, structs, async
-values, future flow, async recursion). A5 is skipped only under the
-non-contractual test switch `NIFT_VM_COOPERATIVE_OBSERVE=1` (VM-only scheduler
-tests and the differential corpus that predates A5); it is never on by
-default.
+The existing §5 refusals still apply: captures, main cells, modules,
+structs, async values, future flow and async recursion. A5 is skipped only
+under the non-contractual test switch `NIFT_VM_COOPERATIVE_OBSERVE=1`.
+
+**Round-6 decisions applied** (classification in §13):
+* **F1, lexical scoping.** A free name in a function resolves lexically: to
+  the unit's global, read from the executing task's snapshot. It never
+  resolves to a caller's local or parameter. This is a deliberate
+  correction, so the programs are not refused. Witnesses: `sem_lexical_*`
+  (policy `correction:lexical-scope`).
+* **F2, escaping lambdas.** A lambda without captures carries no state, so
+  it may leave the task that created it: through a return value, an array,
+  an object or a future, or as a higher-order argument. Its global reads
+  resolve in the context that runs it. Legacy's per-worker lambda table
+  (`invalid lambda`) is a legacy limitation and is not reproduced. Lambdas
+  with captures stay refused (`coro-capture`), because their safety is not
+  shown. Witnesses: `sem_lambda_*` (policy `correction:lambda-registry`).
+* **F3, F4, F5.** Fixed by the bytecode rule above. Refusal witnesses
+  `r_f3_*`, `r_f4_*`, `r_f5_*`; mutants M19 (old A3) and M20 (no
+  value-call widening).
+* **F6.** An inherited compatibility finding, outside CP22 (§13).
 
 #### 12.1.1 Proof of equivalence (round 4)
 
@@ -889,7 +935,12 @@ legacy (any P, any timing) and on the VM.
    * Neither can deadlock: the VM's scheduler raises an internal stop
      instead (M1 witness).
 
-So VM result = legacy result. Legacy's runtime errors in task code follow
+So VM result = legacy result, **except** where Runtime 2.0 deliberately
+defines different semantics (§13): D-009#5 error locations, D-040 value
+semantics, lexical scoping of free names (F1; legacy reads a caller's local
+by dynamic scope), and escaping lambdas (F2; legacy's per-worker lambda table
+fails with `invalid lambda`). Step 1's "inputs" are therefore the Runtime 2.0
+lexical inputs; each correction has `.r2` witnesses. Legacy's runtime errors in task code follow
 D-009#5 exactly as §3 records, with policies in EXPECT.tsv.
 
 **Residuals that remain.**
@@ -948,7 +999,7 @@ upvalues.
 | Object or index element written | `o["n"] = 5` | refused by the base VM (`index-target`) in these positions; otherwise COW | covered by the base VM's own refusal suite; COW as above |
 | `splice`, `sort`, other collection or native mutators in task code | — | A4 (only `push`, `size`, `length`, `done`, `status`, `join` are methods task code may call) | `refuse/r_ca_string_method.f`, `r_ca_cpu_native.f` |
 | Collection callbacks | `xs.map(f)` | `coro-collection-callback` (and A4 in tasks) | `refuse/r_collection.f` |
-| Captured mutable cell shared through a closure | `make()` returns a counter closure passed to two tasks | `coro-capture` (any closure with captures in a coroutine unit); mutant M18 (coro-capture off) runs the program on the VM, where the cell is shared and the result differs from legacy | `refuse/r_share_closure.f` (M18), `r_share_async_capture.f`, `r_capture.f` |
+| Captured mutable cell shared through a closure | `make()` returns a counter closure passed to two tasks | `coro-capture` (any closure with captures in a coroutine unit). Since round 6 a capturing closure that runs as task code is also refused by A4 (`coro-task-op:GetUpvalue`), so with M18 (coro-capture off) `r_share_closure` is still refused. M18's witness is `r_share_closure_ret`: tasks return capturing lambdas that only main calls; with M18 it runs on the VM (32, 12), legacy fails with `invalid lambda` | `refuse/r_share_closure.f`, `refuse/r_share_closure_ret.f` (M18), `r_share_async_capture.f`, `r_capture.f` |
 | Cells or location references in main (globals that are cells) | `g := () => n` in a block of main | `coro-main-cell` | `refuse/r_main_cell.f` |
 | Struct instances and fields | `struct (P) …` | `coro-struct` | `refuse/r_struct.f` |
 | Module state | `import` | `coro-module` | `refuse/r_module.f` |
@@ -956,7 +1007,8 @@ upvalues.
 | Futures shared between tasks | two tasks await one future | a future is written only by the scheduler, once; `await` returns the same Value to every awaiter | `cases/share_future.f` (admitted, legacy-equal) |
 | Error values shared by repeated awaits | two tasks catch the same failure | `await` re-raises the stored original Error (CP13B A2); script code cannot mutate an Error | `cases/share_error.f`, `err_thrown_twice_equal.f` (M8) |
 | Threads, mutexes, atomics (legacy shared state) | `mutex(0)` | `callable:thread`, `callable:mutex`, `callable:atomic<int>` | `refuse/r_thread_default.f`, `r_thread_mutex.f`, `r_thread_atomic.f` |
-| Function values | a lambda stored in a global, called by a task | no captures (above), so a function value carries no state; its global reads use the calling task's snapshot | `iso_lambda_global.f` |
+| Function values (round 6, F2 corrected) | a lambda created in a task and returned, stored in an array, object or future, or passed on | a lambda without captures carries code only, no state; its global reads resolve in the executing context (main's globals, or the executing task's snapshot). Legacy fails on lambdas that leave their worker (`invalid lambda`): a legacy limitation, not reproduced (§13). Lambdas with captures stay refused (`coro-capture`) | `sem_lambda_*` (`.r2`), `iso_lambda_global.f` |
+| Callable stored in an object field, called as a method (round 6, F3) | `o := {"push": say}`; `io.push(1)` in a task | compiled as `GetMember` + `CallValueAny`, i.e. a call through a value: every function value becomes task code and is checked by A2–A5 | `r_f3_member_print_default`, `r_f3_member_loop` (M20), `r_f3_member_join_default`, `r_f3_member_alias_default`, `r_f3_higher_order_default`, `r_f3_member_recursion` |
 
 **Conclusion.** No admitted program lets a task mutate, or observe the
 mutation of, state shared with another task or with main. Every sharing path
@@ -972,19 +1024,19 @@ that each refusal is load-bearing.
 
 | Item | Where to check (code) | Witnesses |
 | --- | --- | --- |
-| Transitive task code: nested, indirect, higher-order calls | `Admission::collect_tasks` (direct calls, functions named as values, nested lambdas, calls through values widen to every lambda and every function named as a value) | `r_ca_cpu_helper` (indirect), `r_ca_nested_call_chain` (three levels), `r_ca_higher_order` (function passed as a value), `r_ca_global_lambda` (lambda in a global), `r_ca_lambda_loop` |
-| Unknown callable targets | A function value can only be created by naming a unit function (LoadFunction) or by a lambda (`compiler_expr.cpp` `local_register`; a built-in name used as a value is refused: `unresolved-name`/`free-name`); the widening covers both sets, and an unresolved callee is refused by the base compiler (`callable:<name>`) | `r_ca_higher_order`, `r_ca_global_lambda` |
-| Recursion, including mutual recursion and recursion through values | `Admission::cyclic` | `r_ca_recursion` (M15), `r_ca_mutual_recursion` |
-| Loops must suspend | `Admission::suspending_loop` | `r_ca_cpu_loop` (M16), `r_ca_sleep_zero_loop`, `r_ca_for_await`, `ca_sleep_loop` (admitted) |
-| Built-ins and methods | `kTaskFunctions`, `kTaskMethods` | `r_ca_cpu_native` (M17), `r_ca_string_method`, `r_ca_nested_call_chain` |
-| Blocking Host calls | `Admission::host_calls`, `kHostAllowed` | `r_ca_main_blocking` (M14), `r_ca_blocking_host`, `tr_fs`, `tr_exists` |
-| Observations of scheduling | `Admission::observations`, `print` in `task_body` | `r_obs_*_default` (M13), print_order.py |
+| Transitive task code: nested, indirect, higher-order calls, callable fields | `Admission::collect_tasks` on bytecode: `Call`/`Spawn` edges; any `CallValue`/`CallValueAny` in task code (direct value calls, callable object fields, aliases, higher-order arguments, futures holding functions) adds every `LoadFunction`/`Closure` target in the program | `r_ca_cpu_helper`, `r_ca_nested_call_chain`, `r_ca_higher_order`, `r_ca_global_lambda`, `r_ca_lambda_loop`, `r_f3_*` (M20) |
+| Unknown callable targets | a function value can only be created by `LoadFunction` (a unit function) or `Closure` (a lambda): `compiler_expr.cpp` `local_register` refuses a built-in name used as a value (`unresolved-name`/`free-name`), and an unresolved callee is refused (`callable:<name>`); the widening takes every such instruction in the program | `r_ca_higher_order`, `r_ca_global_lambda`, `r_f3_member_alias_default` |
+| Recursion, including mutual recursion and recursion through values or fields | `Admission::cyclic` (bytecode call graph, value calls to every function value) | `r_ca_recursion` (M15), `r_ca_mutual_recursion`, `r_f3_member_recursion` |
+| Loops must suspend on every path (continue, branches, nested loops, early exits) | `suspending_loop_body` (the body's first statement is the qualifying `sleep`) marks the loop's `Yield`; `Admission::task_code` refuses any unmarked `Yield` in T | `r_ca_cpu_loop` (M16), `r_f4_continue` (M19), `r_f4_branch_sleep`, `r_f4_sleep_second`, `r_f4_nested`, `r_ca_sleep_zero_loop`, `r_ca_for_await`; admitted `ca_sleep_loop`, `ca_nested_sleep_loops` |
+| Built-ins and methods, identified exactly | `task_builtin_allowed` (built-in id), `task_op_allowed` (opcode); `print` is NativeId::Print | `r_ca_cpu_native` (M17), `r_ca_string_method`, `r_ca_nested_call_chain`, `r_f5_array_join` (`Array.join` refused; a thread `join` is `Await` c = 1) |
+| Blocking Host calls | `Admission::unit_wide`, `host_allowed` (built-in id) | `r_ca_main_blocking` (M14), `r_ca_blocking_host`, `tr_fs`, `tr_exists` |
+| Observations of scheduling | `Admission::unit_wide` (`FutureOp`, `epoch`), `task_code` (`print`) | `r_obs_*_default` (M13), `r_f3_member_print_default`, print_order.py |
 | Shared mutable state | §12.1.2 | §12.1.2 table (M6, M8, M18) |
 | Error identity, ordering, propagation | `Coro::await` (stored original Error; fatal `future: …` at the task's position); main awaits in program order | `err_thrown`, `err_thrown_twice_equal` (M8), `err_rethrow_arg`, `err_fatal_await`, `err_nested_fatal`, `err_unawaited`, `share_error` |
 | Cancellation, progress, future lifetime | `coro_teardown` (abandon once), `end_body`/`finish` (structured completion), deadlock raised as an internal stop | coro_unit teardown and heap-baseline checks, `v_heap_baseline` (M4), `drain_*` (M7, M9), `a02_nested_many` (M1) |
 | Positive sleeps, timers, starvation | timer heap (deadline, sequence), `wait_until` never early, A3 | `v_timer_not_early` (M3), `v_double_resume` (M2), `sleep_order`, `v_preempt` (M10) |
 | Refusal before any effect | admission runs in `compile_unit`, before a `Vm` exists; refuse mode checks `vm_executions == 0` and that the output equals legacy's | every `refuse/*.f`, `--mode default` |
-| Per-rule mutation controls | `-DNIFT_CORO_MUTANT=n`, sources in `CP22_CORO_SOURCES` | M12 (A1–A4 off), M13 (A5), M14 (A1), M15 (A2), M16 (A3), M17 (A4), M18 (coro-capture) |
+| Per-rule mutation controls | `-DNIFT_CORO_MUTANT=n`, sources in `CP22_CORO_SOURCES` | M12 (all off), M13 (A5), M14 (A1), M15 (A2), M16 (A3), M17 (A4), M18 (coro-capture), M19 (A3: the rejected sleep-anywhere rule), M20 (value calls not followed) |
 
 ### 12.2 Nonblocking Host integration
 
@@ -1046,6 +1098,40 @@ zero-fallback gate depends on CP23 for these refusals.
 
 None of these requirements is optional, and **CP22 is not complete while
 nonblocking Host integration remains open**.
+
+## 13. Classification of every legacy/VM mismatch (owner policy, round 6)
+
+Legacy is evidence of legitimate behaviour and genuine errors. It does not
+define correctness for its implementation quirks. Every difference between
+legacy and the VM that a CP22 program can reach is classified below. Each
+deliberate departure has behavioural tests. A mismatch is never
+automatically a VM failure, and never automatically a quirk.
+
+| # | Mismatch | Class | Runtime 2.0 behaviour | Evidence |
+| --- | --- | --- | --- | --- |
+| 1 | Fatal task error reported at the failing expression, without legacy's `return:` prefix, after `future:` / `thread:` | approved semantic correction (D-009#5) | location of the failing expression | `EXPECT.tsv` `D-009#5-future`, `D-009#5-thread` and their `.r2` goldens |
+| 2 | `alias := arr`, then a mutation through either name (legacy aliases some shapes, in tasks too) | approved semantic correction (D-040) | value semantics; shapes the VM cannot yet decide are refused (`aliasing`) | `r_share_alias`, `r_share_alias_task`; base D-040 suites |
+| 3 | A free name in a function read through a caller's local or parameter (legacy's dynamic scope); the async shapes are F1 | deliberate semantic correction (owner, round 6): lexical scoping | the unit's global, from the executing task's snapshot | `sem_lexical_dyn12`, `_dyn14`, `_dyn16`, `_dyn18` (`correction:lexical-scope`, `.r2`) |
+| 3a | The same with no async code (`p/dyn8s.f`, `p/dyn17.f`: VM 1, legacy 9) | inherited finding in the base VM: its dynamic-scope refusal (`globals.cpp` G2) misses lambda and value-call callers. Recorded, **not repaired by CP22** | (base) | review `logs/findings-repro.log`; reproduced on cf1ce940 (`logs/repro-cf1ce940.log`) |
+| 4 | A lambda created in a task and used outside it (return, array, object, future, sibling task, parent) | legacy limitation (per-worker lambda table, `invalid lambda`); not reproduced | the lambda works anywhere; lambdas with captures stay refused | `sem_lambda_*` (`correction:lambda-registry`, `.r2`) |
+| 5 | A future created in a task and returned to its parent (legacy: `await: invalid future`) | unresolved specification question; refused before any effect (`coro-future-flow:Return`) | refused until the owner defines future escape semantics | `r_future_result`, `r_return_top` |
+| 6 | A named async function used as a value (legacy: `invalid async callable`) | legacy bug; the Runtime 2.0 meaning (a call through the value spawns) is not yet specified; refused (`coro-async-value`) | refused | `r_async_value` |
+| 7 | Async self-recursion (legacy runs it synchronously inside the task) | legacy quirk; specification question (a recursive call should return a future); refused (`coro-async-recursion`) | refused | `deep_chain` |
+| 8 | `thread()`, `mutex`, `atomic` | legitimately unsupported until CP23 (real parallelism required, D-055); refused before any effect | runs on legacy | `r_thread_default`, `r_thread_mutex`, `r_thread_atomic` |
+| 9 | Async programs with blocking Host calls, CPU-bound task code or observation of scheduling | legitimately unsupported for cooperative execution (§12.1 A1–A5); refused before any effect | runs on legacy's parallel pool (CP23 for VM parallelism) | `r_ca_*`, `r_obs_*`, `r_f3_*`, `r_f4_*`, `r_f5_*`, `--mode default` |
+| 10 | A forward reference to a function used as a value before its declaration (`p/ho3.f`: VM 5, legacy `unknown value`) | inherited compatibility finding in the base VM (`fn-called-before-declaration` covers direct calls only), outside CP22 scope (owner, F6) | (base; unchanged) | reproduced on cf1ce940 |
+| 11 | A catch binding used as an assignment's text type reads register 0 (`got = e`) | genuine VM correctness regression, inherited from CP13B; handled separately | (base defect) | handover notes |
+| 12 | Scheduling-dependent output (task `print`, `done`/`status`, `epoch`) under the non-contractual observe switch | not contractual: FIFO is one of legacy's interleavings on large pools, not on P = 2 | refused by default (A5) | print_order.py |
+| 13 | 300 000 tasks (`p/many.f`): legacy exceeds 40 s; the VM prints 45599850000 | legacy implementation limitation (performance); the value is the arithmetic result | the VM result | `logs/sweep-r6-classified.tsv` |
+
+**Unresolved dependencies** (all mandatory, none optional):
+* nonblocking Host-operation integration, which waits for the
+  CP17/CP19/CP21 interfaces (§12.2);
+* CP17 reconciliation (§6.1);
+* future lifetimes across handles, which come with CP17;
+* the platform obligations: Windows and macOS runs, and reference-platform
+  gates;
+* the CP23 parallelism requirements (D-055).
 
 ## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 
@@ -1239,3 +1325,71 @@ had left the heavy queue. Raw logs are named `*-r8`.
   detection by the deliberate `NIFT_KIND_MUTANT` binary.
 * rt-lint, test-integrity, certification guard and self-test: pass.
 * MinGW-w64 syntax check: 27/27 files, 0 warnings.
+
+### Evidence, round 6 (bytecode admission; code commit caff57af, tree c09a6add)
+
+All results below were run on the candidate's code through heavy.sh. Raw
+logs are in the Opus scratchpad, `logs/*-r12` unless named otherwise. The
+commit after caff57af changes this record only.
+
+* **F1–F6 reproduced on the rejected candidate** cf1ce940 (tree 87b70c5b),
+  built in a separate scratch worktree (`logs/repro-cf1ce940.log`):
+  * F3: `mc5` admitted, VM prints `3 1 2 6` where legacy prints `1 3 2 6`;
+    `mc1` admitted (CPU loop through a callable field);
+  * F4: `a3c` admitted (`continue` skips the sleep);
+  * F5: a task calling `Array.join` was admitted as if it were a thread
+    `join`;
+  * F1 (`dyn12`, `dyn14`, `dyn16`, `dyn18`, and the non-async `dyn8s`,
+    `dyn17`), F2 (`fl1`, `fl4`, `lm2`, `lm3`) and F6 (`ho3`) as described in
+    the review.
+* **Every review witness rerun and classified** (`logs/sweep-r6.tsv`,
+  `logs/sweep-r6-classified.tsv`). There are 100 witnesses under the
+  review's `p/`. Each one was run three times: on legacy, on cf1ce940 with
+  `NIFT_VM=require`, and on this candidate with `NIFT_VM=require`.
+  * F3 and F4 (`mc5`, `mc1`, `a3c`) are now refused before any effect:
+    `coro-observe:print` for `mc5`, `coro-task-loop` for `mc1` and `a3c`.
+  * Each remaining difference falls under §13:
+    * #3 lexical scope: `dyn8`, `dyn12`, `dyn14`, `dyn15`, `dyn16`, `dyn18`;
+    * #3a inherited, not repaired: `dyn8s`, `dyn17`;
+    * #4 lambda registry: `fl1`, `fl4`, `lm2`, `lm3`;
+    * #10 inherited F6: `ho3`, `ho5`, `ho6`;
+    * #13 legacy performance: `many`.
+  * `st1` does not terminate on either engine.
+  * Every other witness is equal to legacy or refused, as on cf1ce940.
+    None is unclassified.
+* **`make test-runtime2-cp22`** (goto and switch builds), exit 0:
+
+  | Check | Result |
+  | --- | --- |
+  | coro-unit | 80/80 |
+  | Legacy oracle | 146/146 |
+  | VM | 80/80 |
+  | Refusals | 66/66 |
+  | `--mode default` | 80/80 per build: 53 admitted; refused 16 `callable:thread`, 5 `coro-observe:done`, 5 `coro-observe:print`, 1 `coro-observe:status` |
+  | VM-only | 7/7 |
+  | Traces | 3/3 |
+  | Adversarial | seed 1, 80 × 2 builds, 0 differences |
+  | Controls | rejected |
+
+  `print_order.py` passed: 6 distinct legacy orders in 30 runs; on P = 2,
+  legacy prints `a c b` where the VM prints `c a b`; 201 ms on legacy,
+  100 ms on the VM; 40 programs, 0 happens-before violations.
+* **Mutants:** **20/20** caught by their named witnesses.
+  * M19 (the rejected sleep-anywhere A3) is caught by `r_f4_continue`.
+  * M20 (value calls not followed) is caught by `r_f3_member_loop`.
+  * M18 is now caught by `r_share_closure_ret`. Under M18,
+    `r_share_closure` is still refused, by A4 (`coro-task-op:GetUpvalue`):
+    a second, independent line of defence.
+* **ASan+UBSan+LSan:** coro_unit 80/80; corpus VM 80, refusals 66,
+  default 80, vm-only 7; adversarial seed 2 (30 programs).
+* **TSan:** 127/127 on the POSIX host loop and 127/127 on the portable loop.
+* **`make -k test-rt-vm`:** exit 0. The only "FAIL" line is the expected
+  detection by the deliberate `NIFT_KIND_MUTANT` binary.
+* rt-lint, test-integrity, certification guard and self-test: pass.
+* MinGW-w64 syntax check: 27/27 files, 0 warnings.
+* **Found and fixed during this round:**
+  * `cyclic()` reported the cycle but returned false, so A2 never refused.
+    `r_ca_recursion` and M15 now cover it.
+  * Under the thread switch, `thread(f)` widened to every function value,
+    which refused `tr_thread_env` as recursion. It is now an exact edge
+    (§12.1).
