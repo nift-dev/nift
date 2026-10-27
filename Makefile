@@ -792,9 +792,12 @@ $(N2_REBUILD_MUTANT_BIN): tests/rt/n2_rebuild_decision.cpp $(filter-out src/rt/n
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp \
 		$(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) $(N2_REBUILD_MUTANT_DIR)/host_fs_write.o $(LDLIBS) -o "$@"
+# CP17 rework (F4): the certification edge runs the real N2 mutants 15 and 16
+# against the production rebuild-decision witness, with compile provenance and
+# a NIFT_HOST_MUTANT=0 control (tests/runtime2/cp17/n2_rebuild_mutants.sh).
 .PHONY: test-runtime2-cp17-n2-rebuild-mutant
-test-runtime2-cp17-n2-rebuild-mutant: $(N2_REBUILD_MUTANT_BIN)
-	NIFT_N2_MUTANT=$(N2_REBUILD_MUTANT) "$(N2_REBUILD_MUTANT_BIN)"
+test-runtime2-cp17-n2-rebuild-mutant:
+	bash tests/runtime2/cp17/n2_rebuild_mutants.sh "$(MAKE)"
 
 .PHONY: test-runtime2-cp17-n2-rebuild
 test-runtime2-cp17-n2-rebuild: $(N2_REBUILD_UNIT)

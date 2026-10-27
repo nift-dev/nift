@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
-"""CP17 combined-tree corrections (decision B, the statement rollback and the
-CP17 x CP18 close-under-allocation-failure fix): real compiled mutants.
+"""CP17 combined-tree corrections: real compiled mutants for the unwind
+release contract (owner decision, 2026-10-28), the left-open summary (F3),
+teardown under persistent allocation failure (F2) and the CP17 x CP18
+allocation-failure fixes.
 
 Each mutant applies one exact textual change (which must match exactly once)
 to a private copy of the tree, rebuilds the named artefact there and requires
-the named witness to FAIL with the expected case named in its output. A
-control copy with no change must PASS the same witnesses (dead-harness
-control), and a witness run against a missing binary must fail (dead-binary
-control). The copy keeps the source tree's build outputs, so only the mutated
-translation unit and its links are rebuilt.
+the named witness to FAIL with the expected text in its output. A control copy
+with no change must PASS every witness (dead-harness control), and the program
+witness run against a missing binary must fail (dead-binary control). The copy
+keeps the source tree's build outputs, so only the mutated translation unit
+and its links are rebuilt.
 
-  unit witness   tests/rt/unwind_file_release_unit.cpp (make RT unit)
-  vm witness     tests/runtime2/cp17/unwind_handle_release.py (make nift)
+Provenance (independent review, mutation integrity): the witness artefact,
+and for a .cpp in an object build that file's object, must be rebuilt after
+the mutation AND differ in content (sha256) from the control copy's; a
+mutation that compiles to the control's bytes is reported, never counted.
+
+  unit witness     tests/rt/unwind_file_release_unit.cpp (make RT unit)
+  oom witness      tests/rt/handle_close_oom.cpp
+  vm witness       tests/runtime2/cp17/unwind_handle_release.py (make nift)
+  persist:PROGRAM  tests/runtime2/cp17/handle_allocation_persistent.cpp, one program
 
 Usage: unwind_mutants.py [--keep] [--only NAME]
 """
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -27,40 +37,81 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 UNIT = ".build/rt/unwind-file-release"
 OOM_UNIT = ".build/rt/handle-close-oom"
+PERSIST = ".build/cp17/handle-allocation-persistent"
 FILE_NATIVES = "src/rt/natives/host_file_handles.cpp"
 GUARD = ("if (!value.boxed_handle() || value.refcount() != 1 || value.handle_kind() != HandleKind::File) "
          "return false;")
 OWNER = "if (table.owner_of(value, HandleKind::File, slot_owner) != HandleStatus::Ok || slot_owner != owner) return false;"
-# Retired with decision B's per-frame release (owner, 2026-10-27): its mutants
-# (ignore-surviving-alias, ignore-owner, not-discarded, no-release-on-unwind,
-# release-on-return, release-handler-frame) targeted code that no longer
-# exists. no-release-on-unwind had survived: under the statement rollback the
-# per-frame release was observationally equivalent, which is why it was removed;
-# it is not counted as killed. Ownership and aliasing are witnessed at the
-# withdrawal (unwind_file_release_unit R2, R5, R6) and by the program cases.
+# History: decision B's six mutants were retired with B's removal
+# (2026-10-27) and the statement rollback's eight with the rollback
+# (2026-10-28: the owner replaced both by the unwind release contract after
+# the independent review's F1). B's release function is back in the rework, so
+# its ownership mutants are active again; release-handler-frame is inverted
+# (no-try-body-release): the try body's registers are now released.
 MUTANTS = [
     # (name, file, old, new, kind, expected failing witness text)
-    ("no-statement-rollback", "src/rt/vm_exception.cpp",
-     "        handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);",
-     "        (void)handler.creation_mark;", "vm", "FAIL leak-earlier-in-statement (same)"),
-    ("no-statement-marks", "src/rt/vm.h",
-     "            handlers_.back().creation_mark = handle_table_.creation_count();", "            (void)0;", "vm",
-     "FAIL earlier-statement-in-try (both-reported)"),
-    ("no-condition-mark", "src/rt/compiler.cpp",
-     "    stmt_mark();  // each `if` / `else if` condition is its own evaluation (legacy)\n", "", "vm",
-     "FAIL if-condition-after-leak-statement (both-reported)"),
-    ("no-while-condition-mark", "src/rt/compiler.cpp",
-     "    stmt_mark();  // each evaluation of the condition is its own evaluation (legacy)\n", "", "vm",
-     "FAIL while-condition-after-body-leak (both-reported)"),
-    ("withdraw-any-reason", "src/rt/handles/table_contexts.cpp",
-     "f.sequence > since &&\n               f.reason == ReleaseReason::Abandoned && ",
-     "f.sequence > since &&\n               ", "unit", "unwind_file_release_unit.cpp:"),
-    ("withdraw-any-sequence", "src/rt/handles/table_contexts.cpp", "f.owner == owner && f.sequence > since &&",
-     "f.owner == owner &&", "unit", "unwind_file_release_unit.cpp:"),
-    ("withdraw-any-kind", "src/rt/handles/table_contexts.cpp", "return f.kind == kind && f.owner == owner",
-     "return f.owner == owner", "unit", "unwind_file_release_unit.cpp:"),
-    ("withdraw-any-state", "src/rt/handles/table_contexts.cpp", " && f.state == LifeState::CleanupIncomplete;", ";", "unit",
+    # natives::abandon_file_on_unwind: exclusive ownership and silent discard.
+    ("ignore-surviving-alias", FILE_NATIVES, GUARD,
+     GUARD.replace(" || value.refcount() != 1", ""), "unit", "unwind_file_release_unit.cpp:"),
+    ("ignore-owner", FILE_NATIVES, OWNER,
+     "if (table.owner_of(value, HandleKind::File, slot_owner) != HandleStatus::Ok) return false;", "unit",
      "unwind_file_release_unit.cpp:"),
+    ("not-discarded", FILE_NATIVES, "    file->open = false;\n    file->dirty = false;\n    file->mode.clear();",
+     "    file->dirty = false;\n    file->mode.clear();", "unit", "unwind_file_release_unit.cpp:"),
+    # Vm::unwind: what the Error unwound.
+    ("no-release-on-unwind", "src/rt/vm_exception.cpp",
+     "            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);\n", "", "vm", "FAIL reproducer (legacy)"),
+    ("no-try-body-release", "src/rt/vm_exception.cpp",
+     "        if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);  // CP17 unwind release\n", "", "vm",
+     "FAIL try-body-local (correction)"),
+    ("release-on-return", "src/rt/vm.cpp",
+     "    for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) R[k] = Value();",
+     "    for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) { if (R[k].is(Kind::Handle)) "
+     "abandon_unwound_handle(R[k]); R[k] = Value(); }", "vm", "FAIL normal-return-leak (legacy)"),
+    # Compiler: a block left normally clears its registers (completed code is reported).
+    ("no-block-handles", "src/rt/compiler_blocks.cpp", "        if (kinds(id) & kKindHandle) return true;\n", "", "vm",
+     "FAIL c-block-completed-then-throw (legacy)"),
+    ("no-if-clear", "src/rt/compiler.cpp", "    if (!ok) return false;\n    block_clear(body_regs);\n",
+     "    if (!ok) return false;\n", "vm", "FAIL c-block-completed-then-throw (legacy)"),
+    ("no-else-clear", "src/rt/compiler.cpp", "        if (other_ok) block_clear(else_regs);\n", "", "vm",
+     "FAIL c-else-completed-then-throw (legacy)"),
+    ("no-while-iteration-clear", "src/rt/compiler.cpp",
+     "        const std::size_t iteration_end = fb_->here();\n        block_clear(body_regs);\n",
+     "        const std::size_t iteration_end = fb_->here();\n", "vm", "FAIL c-while-throw-first (legacy)"),
+    ("continue-skips-clear", "src/rt/compiler.cpp",
+     "        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);",
+     "        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);", "vm",
+     "FAIL c-continue-throw-first (legacy)"),
+    ("no-while-break-clear", "src/rt/compiler.cpp",
+     "        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());\n        block_clear(body_regs);\n",
+     "        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());\n", "vm",
+     "FAIL c-break-then-throw (legacy)"),
+    ("no-for-iteration-clear", "src/rt/compiler_loops.cpp",
+     "    block_clear(state.body_regs);  // CP17 unwind release: the end of an iteration (also `continue`)\n", "", "vm",
+     "FAIL c-for-throw-first (legacy)"),
+    ("no-for-break-clear", "src/rt/compiler_loops.cpp",
+     "    block_clear(state.body_regs);  // `break` leaves the body without its iteration end\n", "", "vm",
+     "FAIL c-for-break-then-throw (legacy)"),
+    ("no-try-body-clear", "src/rt/compiler_try.cpp",
+     "    block_clear(body_regs);  // CP17 unwind release: the try body completed normally\n", "", "vm",
+     "FAIL c-completed-inner-try-body (legacy)"),
+    ("no-catch-clear", "src/rt/compiler_try.cpp", "    block_clear(catch_regs);\n", "", "vm",
+     "FAIL c-completed-catch-body (legacy)"),
+    # F3: the left-open summary (count, and the most recently created file named).
+    ("no-left-open-count", "src/rt/vm_handles.cpp", "    if (count < 2) return;\n", "    return;\n", "vm",
+     "FAIL c-two-completed-names (legacy)"),
+    ("left-open-names-first", "src/rt/vm_handles.cpp",
+     "        if (newest == nullptr || f.sequence > newest->sequence) newest = &f;",
+     "        if (newest == nullptr) newest = &f;", "vm", "FAIL c-two-completed-names (legacy)"),
+    # F2: teardown under persistent allocation failure (never std::terminate).
+    ("table-dtor-throws", "src/rt/handles/table_teardown.cpp",
+     "        shutdown();\n        return;\n    } catch (...) {",
+     "        shutdown();\n        return;\n    } catch (int) {", "persist:plain-no-handles",
+     "CRASH plain-no-handles"),
+    ("hostcall-dtor-throws", "src/rt/host/host_call.cpp",
+     "        emit_v2(\"error\", e.code);\n    } catch (...) {",
+     "        emit_v2(\"error\", e.code);\n    } catch (const std::logic_error&) {", "persist:environment",
+     "CRASH environment"),
     # CP17 x CP18: close_context under allocation failure.
     ("close-mark-in-walk", "src/rt/handles/context_tree.cpp",
      "    const auto self = contexts_.find(id);\n    if (self == contexts_.end()) return;\n",
@@ -86,11 +137,6 @@ MUTANTS = [
     ("release-allocates", "src/rt/handles/slot_store.cpp",
      "        if (free_.capacity() < slots_.size() + 1)\n", "        if (false)\n", "oom",
      "CHECK failed: !threw && !injected"),
-
-    ("rollback-all-files", "src/rt/vm_exception.cpp",
-     "handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);",
-     "handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, 0);", "vm",
-     "FAIL try-body-local (both-reported)"),
 ]
 
 
@@ -106,23 +152,46 @@ def copy_tree(dest):
         if Path(directory) == ROOT:
             return [".git"]
         if Path(directory) == ROOT / ".build":
-            return [n for n in names if n not in ("libffi", "rt")]
+            return [n for n in names if n not in ("libffi", "rt", "pic")]
         return []
     shutil.copytree(ROOT, dest, symlinks=True, ignore=ignore, copy_function=shutil.copy2)
 
 
-def fresh(tree, kind, path, start):
-    """Proof that the mutant's own production code was compiled: the witness
-    artifact (and, for a .cpp in the VM build, that file's object) is newer
-    than the mutation. The reduced tree copy keeps unmutated build outputs, so
-    a stale artifact would otherwise test the original code."""
-    artifact = tree / (OOM_UNIT if kind == "oom" else UNIT if kind == "unit" else "nift")
-    stale = [str(artifact.relative_to(tree))] if not artifact.exists() or artifact.stat().st_mtime < start else []
-    if kind == "vm" and path.endswith(".cpp"):
-        obj = tree / (path[:-4] + ".o")
-        if not obj.exists() or obj.stat().st_mtime < start:
-            stale.append(str(obj.relative_to(tree)))
-    return stale
+def artifact_of(kind):
+    if kind == "oom":
+        return OOM_UNIT
+    if kind == "unit":
+        return UNIT
+    return PERSIST if kind.startswith("persist") else "nift"
+
+
+def object_of(kind, path):
+    """The object the mutated .cpp compiles to in the witness's build, or None."""
+    if not path.endswith(".cpp"):
+        return None
+    if kind == "vm":
+        return path[:-4] + ".o"
+    if kind.startswith("persist"):
+        return ".build/pic/" + path[:-4] + ".o"
+    return None  # unit/oom binaries compile the sources directly
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+
+def provenance(tree, kind, path, start, control):
+    """Proof that the mutant's own production code was compiled into the
+    witness: rebuilt after the mutation (mtime) and different from the
+    control copy's bytes (sha256). Returns the problems."""
+    problems = []
+    for rel in filter(None, (artifact_of(kind), object_of(kind, path))):
+        f = tree / rel
+        if not f.exists() or f.stat().st_mtime < start:
+            problems.append(f"{rel} not rebuilt after the mutation")
+        elif control.get(rel) is not None and sha(f) == control[rel]:
+            problems.append(f"{rel} identical to the control's (no compiled mutation)")
+    return problems
 
 
 def witness(tree, kind):
@@ -140,12 +209,21 @@ def witness(tree, kind):
             def text(x):
                 return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
             return 124, text(e.stdout) + text(e.stderr)
+    elif kind.startswith("persist"):
+        build = run(["make", "-j2", PERSIST], tree, 3600)
+        if build.returncode != 0:
+            return None, build.stdout[-2000:] + build.stderr[-2000:]
+        env = dict(os.environ)
+        if ":" in kind:
+            env["ONLY_PROG"] = kind.split(":", 1)[1]
+        result = subprocess.run([str(tree / PERSIST)], cwd=tree, env=env, capture_output=True, text=True,
+                                timeout=1800)
     else:
         build = run(["make", "-j2", "nift"], tree, 3600)
         if build.returncode != 0:
             return None, build.stdout[-2000:] + build.stderr[-2000:]
         result = run([sys.executable, "tests/runtime2/cp17/unwind_handle_release.py", "--nift", str(tree / "nift")],
-                     tree, 900)
+                     tree, 1800)
     return result.returncode, result.stdout + result.stderr
 
 
@@ -166,12 +244,17 @@ def main():
         print("ok   dead-binary control: the witness fails without a binary")
         control = work / "control"
         copy_tree(control)
-        for kind in ("unit", "oom", "vm"):
+        kinds = sorted({m[4] for m in MUTANTS if not args.only or m[0] == args.only})
+        for kind in kinds:
             rc, out = witness(control, kind)
             if rc != 0:
                 print(f"FAIL control ({kind}): unmutated tree does not pass: rc={rc}\n{out[-1500:]}")
                 return 1
             print(f"ok   control ({kind}): unmutated tree passes")
+        hashes = {}
+        for _, path, _, _, kind, _ in MUTANTS:
+            for rel in filter(None, (artifact_of(kind), object_of(kind, path))):
+                hashes[rel] = sha(control / rel)
         shutil.rmtree(control)
         for name, path, old, new, kind, expected in MUTANTS:
             if args.only and name != args.only:
@@ -187,9 +270,9 @@ def main():
             (tree / path).write_text(source.replace(old, new, 1))
             start = time.time()
             rc, out = witness(tree, kind)
-            stale = fresh(tree, kind, path, start)
+            stale = provenance(tree, kind, path, start, hashes) if rc is not None else []
             if stale:
-                print(f"FAIL {name}: stale build output {stale}: the mutated source was not compiled into the witness")
+                print(f"FAIL {name}: provenance: {'; '.join(stale)}")
                 failures += 1
             elif rc is None:
                 print(f"FAIL {name}: mutant did not build (a build failure is not a kill)\n{out}")
