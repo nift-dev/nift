@@ -45,3 +45,11 @@ r_obs_epoch_default.f	coro-observe:epoch
 r_obs_done_default.f	coro-observe:done
 r_obs_status_default.f	coro-observe:status
 r_obs_task_epoch_default.f	coro-observe:epoch
+r_share_closure.f	coro-capture
+r_share_async_capture.f	coro-capture
+r_ca_higher_order.f	coro-task-loop
+r_ca_global_lambda.f	coro-task-loop
+r_ca_nested_call_chain.f	coro-task-native:sha256
+r_ca_mutual_recursion.f	coro-task-recursion
+r_share_alias.f	aliasing
+r_share_alias_task.f	aliasing

@@ -15,7 +15,8 @@
 // rt-lint: cold-file compile-time cooperative admission, once per coroutine unit
 
 // Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
-// 12 the admission rule admits everything; 13 A5 is off. Normal builds contain none.
+// 12 the admission rule admits everything; 13 A5 is off; 14 A1, 15 A2, 16 A3,
+// 17 A4 is off (one rule each). Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -54,11 +55,15 @@ public:
 #if NIFT_CORO_MUTANT == 13
         observe_ = true;  // M13: scheduling observations admitted (A5 off)
 #endif
+#if NIFT_CORO_MUTANT != 14
         if (!host_calls(root, reason, offset)) return false;
+#endif
         if (!observe_ && !observations(root, reason, offset)) return false;
         collect_tasks();
         if (tasks_.empty()) return true;
+#if NIFT_CORO_MUTANT != 15
         if (cyclic(reason, offset)) return false;
+#endif
         for (NodeId fn : tasks_)
             if (!task_body(fn, reason, offset)) return false;
         return true;
@@ -251,7 +256,8 @@ private:
     bool task_body(NodeId fn, std::string& reason, std::uint32_t& offset) const {
         bool ok = true;
         walk(ast_.at(fn).b, [&](NodeId, const Node& n) {
-            if ((n.kind == NodeKind::While || n.kind == NodeKind::For) && !suspending_loop(n)) {
+            const bool loop = n.kind == NodeKind::While || n.kind == NodeKind::For;
+            if (loop && !suspending_loop(n) && NIFT_CORO_MUTANT != 16) {  // M16: A3 off
                 reason = "coro-task-loop";
                 offset = n.begin;
                 return ok = false;
@@ -273,6 +279,7 @@ private:
             } else {
                 return true;  // a call through a value: its target is task code too
             }
+            if (NIFT_CORO_MUTANT == 17) return true;  // M17: A4 off
             reason = "coro-task-native:" + std::string(name);
             offset = n.begin;
             return ok = false;

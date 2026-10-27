@@ -3638,7 +3638,7 @@ test-runtime2-cp22-tsan:
 # Mutants: the three scheduler objects compiled -DNIFT_CORO_MUTANT=n, linked
 # with the normal objects; tests/runtime2/cp22/run.py --mutant checks each
 # against its named witness (provenance manifest: binary and oracle sha256).
-CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_run.cpp src/rt/compiler_coro_admit.cpp
+CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_run.cpp src/rt/compiler_coro_admit.cpp src/rt/compiler_coro.cpp
 CP22_MUTANT_DIR := $(TEST_DIR)/coro-mutants
 $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CP22_CORO_SOURCES) $(RT_VALUE_HEADERS) $(LIBFFI_A)
 	mkdir -p "$(CP22_MUTANT_DIR)/$*"
@@ -3648,7 +3648,7 @@ $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJEC
 		$(addprefix $(CP22_MUTANT_DIR)/$*/,$(notdir $(CP22_CORO_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
 test-runtime2-cp22-mutants: $(TARGET)
 	set -e; normal=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
-	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13; do \
+	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do \
 	  $(MAKE) "$(CP22_MUTANT_DIR)/nift-$$n" >/dev/null; \
 	  sha=$$(sha256sum "$(CP22_MUTANT_DIR)/nift-$$n" | cut -d' ' -f1); \
 	  printf '{"mutant": %s, "sha256": "%s", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal" \

@@ -69,6 +69,13 @@ MUTANTS = {
     12: ("cooperative admission disabled", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"},
                                            "refuse/r_ca_blocking_host.f": {"stdout": b"false\n", "exit": 0,
                                                                            "outcome": "vm"}}),
+    14: ("A1 off (blocking Host calls admitted)", {"refuse/r_ca_main_blocking.f": {"stdout": b"true\n1\n", "exit": 0,
+                                                                                "outcome": "vm"}}),
+    15: ("A2 off (task recursion admitted)", {"refuse/r_ca_recursion.f": {"stdout": b"610\n", "exit": 0,
+                                                                          "outcome": "vm"}}),
+    16: ("A3 off (non-suspending task loops admitted)", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"}}),
+    17: ("A4 off (data-proportional built-ins admitted)", {"refuse/r_ca_cpu_native.f": {"exit": 0, "outcome": "vm"}}),
+    18: ("captured cells admitted (coro-capture off)", {"refuse/r_share_closure.f": {"exit": 0, "outcome": "vm"}}),
     13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
                                                                               "outcome": "vm"}}),
 }

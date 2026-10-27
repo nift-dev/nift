@@ -909,6 +909,83 @@ D-009#5 exactly as §3 records, with policies in EXPECT.tsv.
 | Mutants | M12 (A1–A4 disabled) and M13 (A5 disabled) are each caught by their refusal witnesses |
 | Fixtures moved to `refuse/` by A1–A4 | `spawn_tree` → `coro-task-loop`; `tr_exists`, `tr_thread` → `coro-blocking-host:exists`; `tr_fs` → `coro-blocking-host:is_dir`; replaced by the admitted `spawn_tree_light`, `tr_env`, `tr_thread_env` |
 
+#### 12.1.2 Shared mutable state (round 5, owner's soundness question)
+
+The claim under review is that tasks have no visible side effects and that
+their results depend only on their call. It must hold for every path by
+which a task could mutate state that another task or main can see, or see
+such a mutation. Every path is listed below with the rule or VM mechanism
+that excludes it and a witness.
+
+**How a task obtains its state at the VM level.**
+* Its argument window: copied Values (`Coro::spawn`).
+* Its global snapshot: a copy of the reachable global slots
+  (`build_snapshot`, `spawn`).
+* Its own frames.
+
+There is no other channel into a task's registers:
+* no upvalues, because closures with captures are refused;
+* no module state, because modules are refused.
+
+D-040 (owner) makes ordinary values value-semantic in both engines ("nested
+values never share mutation"; "async boundaries … defined and tested";
+storage sharing is never exposed, `same()` is identity-only). Where today's
+legacy engine still aliases (certain syntactic shapes), the base VM refuses
+the program (`aliasing`), so no aliasing difference can reach a task.
+
+Values are copy-on-write (D-040): an aggregate shared by two Values is
+copied by the first write through either. Cells (`Kind::Cell`, internal
+only) are never script values; they exist only in frames and as closure
+upvalues.
+
+| Path | Example | Excluded by | Witness |
+| --- | --- | --- | --- |
+| Global written by a task, read by another task or main | `shared += 1` in task A; B returns `shared` | task snapshot: writes stay in the task's copy (§3 item 1); M6 (snapshot write-back) is caught | `cases/share_global.f` (admitted, legacy-equal), `iso_global_snapshot.f` (M6) |
+| Global written by main after the call | `shared = 10` after `peek()` | snapshot taken at the call | `share_global.f`, `iso_late_global.f` |
+| Aggregate passed or snapshotted, then mutated (push, element assignment) | `xs.push(9)` in a task; `arr.push(3)` in main | COW: the first write through either Value copies | `cases/share_array.f` (admitted, legacy-equal), `iso_args_copy.f` |
+| Retained alias or extracted nested element mutated (legacy aliases some shapes) | `inner := nest[1]; inner.push(9)` in main or in a task | value semantics (D-040: nested values never share mutation); the shapes where legacy aliases are refused by the base VM (`aliasing`), before execution | `refuse/r_share_alias.f`, `r_share_alias_task.f` |
+| Nested aggregates passed or snapshotted | `xs.push([5])` in a task; `nest.push([3])` in main after the call | COW, recursively (D-040) | `share_array.f` |
+| Object or index element written | `o["n"] = 5` | refused by the base VM (`index-target`) in these positions; otherwise COW | covered by the base VM's own refusal suite; COW as above |
+| `splice`, `sort`, other collection or native mutators in task code | — | A4 (only `push`, `size`, `length`, `done`, `status`, `join` are methods task code may call) | `refuse/r_ca_string_method.f`, `r_ca_cpu_native.f` |
+| Collection callbacks | `xs.map(f)` | `coro-collection-callback` (and A4 in tasks) | `refuse/r_collection.f` |
+| Captured mutable cell shared through a closure | `make()` returns a counter closure passed to two tasks | `coro-capture` (any closure with captures in a coroutine unit); mutant M18 (coro-capture off) runs the program on the VM, where the cell is shared and the result differs from legacy | `refuse/r_share_closure.f` (M18), `r_share_async_capture.f`, `r_capture.f` |
+| Cells or location references in main (globals that are cells) | `g := () => n` in a block of main | `coro-main-cell` | `refuse/r_main_cell.f` |
+| Struct instances and fields | `struct (P) …` | `coro-struct` | `refuse/r_struct.f` |
+| Module state | `import` | `coro-module` | `refuse/r_module.f` |
+| Process state: environment, cwd, files | `setenv`, `cd`, `touch` | A1 (only `sleep` and constant reads are admitted) | `refuse/r_ca_main_blocking.f`, `r_ca_blocking_host.f`, `tr_fs.f` (M14) |
+| Futures shared between tasks | two tasks await one future | a future is written only by the scheduler, once; `await` returns the same Value to every awaiter | `cases/share_future.f` (admitted, legacy-equal) |
+| Error values shared by repeated awaits | two tasks catch the same failure | `await` re-raises the stored original Error (CP13B A2); script code cannot mutate an Error | `cases/share_error.f`, `err_thrown_twice_equal.f` (M8) |
+| Threads, mutexes, atomics (legacy shared state) | `mutex(0)` | `callable:thread`, `callable:mutex`, `callable:atomic<int>` | `refuse/r_thread_default.f`, `r_thread_mutex.f`, `r_thread_atomic.f` |
+| Function values | a lambda stored in a global, called by a task | no captures (above), so a function value carries no state; its global reads use the calling task's snapshot | `iso_lambda_global.f` |
+
+**Conclusion.** No admitted program lets a task mutate, or observe the
+mutation of, state shared with another task or with main. Every sharing path
+is either:
+* isolated by construction (snapshot copy, COW, write-once futures); or
+* refused before execution (captures, main cells, structs, modules, A1, A4,
+  threads, mutex, atomics).
+
+No new admission condition is needed. The per-rule mutants (§12.1.3) check
+that each refusal is load-bearing.
+
+#### 12.1.3 Reviewer checklist
+
+| Item | Where to check (code) | Witnesses |
+| --- | --- | --- |
+| Transitive task code: nested, indirect, higher-order calls | `Admission::collect_tasks` (direct calls, functions named as values, nested lambdas, calls through values widen to every lambda and every function named as a value) | `r_ca_cpu_helper` (indirect), `r_ca_nested_call_chain` (three levels), `r_ca_higher_order` (function passed as a value), `r_ca_global_lambda` (lambda in a global), `r_ca_lambda_loop` |
+| Unknown callable targets | A function value can only be created by naming a unit function (LoadFunction) or by a lambda (`compiler_expr.cpp` `local_register`; a built-in name used as a value is refused: `unresolved-name`/`free-name`); the widening covers both sets, and an unresolved callee is refused by the base compiler (`callable:<name>`) | `r_ca_higher_order`, `r_ca_global_lambda` |
+| Recursion, including mutual recursion and recursion through values | `Admission::cyclic` | `r_ca_recursion` (M15), `r_ca_mutual_recursion` |
+| Loops must suspend | `Admission::suspending_loop` | `r_ca_cpu_loop` (M16), `r_ca_sleep_zero_loop`, `r_ca_for_await`, `ca_sleep_loop` (admitted) |
+| Built-ins and methods | `kTaskFunctions`, `kTaskMethods` | `r_ca_cpu_native` (M17), `r_ca_string_method`, `r_ca_nested_call_chain` |
+| Blocking Host calls | `Admission::host_calls`, `kHostAllowed` | `r_ca_main_blocking` (M14), `r_ca_blocking_host`, `tr_fs`, `tr_exists` |
+| Observations of scheduling | `Admission::observations`, `print` in `task_body` | `r_obs_*_default` (M13), print_order.py |
+| Shared mutable state | §12.1.2 | §12.1.2 table (M6, M8, M18) |
+| Error identity, ordering, propagation | `Coro::await` (stored original Error; fatal `future: …` at the task's position); main awaits in program order | `err_thrown`, `err_thrown_twice_equal` (M8), `err_rethrow_arg`, `err_fatal_await`, `err_nested_fatal`, `err_unawaited`, `share_error` |
+| Cancellation, progress, future lifetime | `coro_teardown` (abandon once), `end_body`/`finish` (structured completion), deadlock raised as an internal stop | coro_unit teardown and heap-baseline checks, `v_heap_baseline` (M4), `drain_*` (M7, M9), `a02_nested_many` (M1) |
+| Positive sleeps, timers, starvation | timer heap (deadline, sequence), `wait_until` never early, A3 | `v_timer_not_early` (M3), `v_double_resume` (M2), `sleep_order`, `v_preempt` (M10) |
+| Refusal before any effect | admission runs in `compile_unit`, before a `Vm` exists; refuse mode checks `vm_executions == 0` and that the output equals legacy's | every `refuse/*.f`, `--mode default` |
+| Per-rule mutation controls | `-DNIFT_CORO_MUTANT=n`, sources in `CP22_CORO_SOURCES` | M12 (A1–A4 off), M13 (A5), M14 (A1), M15 (A2), M16 (A3), M17 (A4), M18 (coro-capture) |
+
 ### 12.2 Nonblocking Host integration
 
 Only `sleep` suspends today. Making other Host built-ins suspend needs

@@ -10,6 +10,12 @@
 
 // rt-lint: cold-file compile-time coroutine admission, once per unit
 
+// Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
+// 18 captured cells admitted (coro-capture off). Normal builds contain none.
+#ifndef NIFT_CORO_MUTANT
+#define NIFT_CORO_MUTANT 0
+#endif
+
 namespace nift::rt {
 
 namespace detail {
@@ -346,7 +352,7 @@ bool check_coroutine_program(const Program& program, std::string& reason, std::u
             const Instr& in = proto.code[pc];
             const char* why = nullptr;
             switch (in.op) {
-                case OpCode::Closure: if (in.c != 0) why = "coro-capture"; break;
+                case OpCode::Closure: if (in.c != 0 && NIFT_CORO_MUTANT != 18) why = "coro-capture"; break;
                 case OpCode::NewCell: case OpCode::NewSourceSlot: case OpCode::CopyCellLocation:
                 case OpCode::CellAnchor: case OpCode::CellSlot: case OpCode::CellTake:
                     if (p == 0) why = "coro-main-cell";
