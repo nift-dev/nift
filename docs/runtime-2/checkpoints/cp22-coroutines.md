@@ -892,3 +892,43 @@ the handover's evidence directory, `*-r2`/`*-r3` names):
   3.7 ms / 14.8 MiB, 10k 7.0 ms / 14.8 MiB, 100k 50 ms / 29.7 MiB; yield
   overhead +4.1 %; wake-up latency 0.20 ms; idle 2.4 ms CPU per 1 s;
   teardown of 78,187 suspended tasks at the 64 MiB budget 0.12 s.
+
+### Evidence, round 3 (cooperative admission; same container)
+
+These runs used the final code of this round. Raw logs are under the
+handover's evidence directory, named `*-r4`.
+
+* **`make test-runtime2-cp22`** (goto and switch builds):
+
+  | Check | Result |
+  | --- | --- |
+  | Legacy oracle | 106/106 |
+  | VM differential | 65/65 per build |
+  | Refusals before execution | 41/41 per build |
+  | VM-only | 7/7 |
+  | Traces | 3/3 |
+  | Adversarial | 80 programs × 2 builds, 0 differences, 2,040 tasks |
+  | Negative controls | all rejected |
+
+  The witness counts of round 2 (91/64/27) are kept or exceeded. The four
+  fixtures the rule now refuses remain as legacy witnesses in `refuse/`.
+* **Mutants:** 12/12 caught by their named witnesses. M12 (admission
+  disabled) is caught by `refuse/r_ca_cpu_loop` and `r_ca_blocking_host`.
+* **ASan+UBSan+LSan:** coro_unit 76/76; corpus VM 65, refuse 41, vm-only 7;
+  adversarial seed 2 (30 programs).
+* **TSan:** 127/127 on both the POSIX and the portable host loop.
+* **`make -k test-rt-vm`:** exit 0. Also passing: rt-lint, test-integrity,
+  certification guard and self-test (27). MinGW-w64 syntax check: 27/27
+  changed `.cpp` files, 0 warnings.
+* **Exploratory measurements** (`bench4.jsonl`):
+
+  | Measurement | Result |
+  | --- | --- |
+  | 10k sleeps | 0.029 s |
+  | Callgrind instructions per spawn (1k/10k/100k) | 5,242 / 5,110 / 4,961, ratio 0.95 |
+  | Wake-up latency | 0.20 ms |
+  | Idle | 2.8 ms CPU per s |
+  | Teardown of 78,187 tasks | 0.14 s |
+
+  The CPU-bound `yield` and `fairness` workloads are now refused on the VM
+  (`coro-task-loop`), as the rule requires.
