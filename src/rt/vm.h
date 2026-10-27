@@ -143,6 +143,7 @@ private:
     bool reserve_registers(std::size_t needed);
     void open_handle_runtime();
     void close_handle_runtime(VmResult& result);
+    static void left_open_summary(const handles::CloseReport& close, VmResult& result);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
     std::uint32_t main_offset(std::uint32_t own) const;

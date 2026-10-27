@@ -5,6 +5,8 @@
 #include "rt/natives/host_stream_handles.h"
 
 #include <new>
+#include <string>
+#include <string_view>
 
 namespace nift::rt {
 
@@ -34,7 +36,33 @@ void Vm::close_handle_runtime(VmResult& result) {
         result.reason = StopReason::Error;
         result.message = close.failures.front().message;
         result.code = close.failures.front().code;
+        left_open_summary(close, result);
     }
+}
+
+// CP17 rework (F3): every managed file still open at the end is counted in
+// one message, as legacy does (Parser::finalize_script_resources): "managed
+// file left open (N files): PATH" when N > 1. Which file is named is not part
+// of the contract (legacy names the first of its std::unordered_map, which on
+// libstdc++ is usually the most recently created); the VM names its most
+// recently created left-open file.
+void Vm::left_open_summary(const handles::CloseReport& close, VmResult& result) {
+    static constexpr std::string_view kPrefix = "managed file left open: ";
+    const auto left_open = [](const handles::CleanupFailure& f) {
+        return f.kind == HandleKind::File && std::string_view(f.message).substr(0, kPrefix.size()) == kPrefix;
+    };
+    if (!left_open(close.failures.front())) return;
+    std::size_t count = 0;
+    const handles::CleanupFailure* newest = nullptr;
+    for (const auto& f : close.failures) {
+        if (!left_open(f)) continue;
+        ++count;
+        if (newest == nullptr || f.sequence > newest->sequence) newest = &f;
+    }
+    if (count < 2) return;
+    result.message = "managed file left open (" + std::to_string(count) + " files): " +
+                     newest->message.substr(kPrefix.size());
+    result.code = newest->code;
 }
 
 } // namespace nift::rt
