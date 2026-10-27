@@ -27,6 +27,16 @@ inline bool parse_decimal(const std::string& text, long max_value, long& value) 
     return true;
 }
 
+inline bool valid_target(const std::string& target) {
+    if (target.empty()) return false;
+    for (unsigned char c : target) {
+        // Printable ASCII or non-ASCII UTF-8 bytes; no NUL, C0 controls, DEL
+        // or ASCII whitespace. Unix path bytes cannot contain NUL.
+        if (c <= 0x20 || c == 0x7f) return false;
+    }
+    return true;
+}
+
 inline FdProtocolResult parse_fd_protocol(const std::string& output, bool exited_normally,
                                           int exit_code) {
     FdProtocolResult result;
@@ -93,7 +103,11 @@ inline FdProtocolResult parse_fd_protocol(const std::string& output, bool exited
                 return result;
             }
             const std::string target = line.substr(flags_end + 1 + target_prefix.size());
-            if (target.empty() || target.find_first_of(" \t") != std::string::npos) {
+#if defined(NIFT_CP21_PARSER_MUTANT_TARGET) && NIFT_CP21_PARSER_MUTANT_TARGET
+            if (target.empty()) {
+#else
+            if (!valid_target(target)) {
+#endif
                 result.error = "invalid target field";
                 return result;
             }

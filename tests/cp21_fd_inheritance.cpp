@@ -44,40 +44,34 @@ struct ScannerResult {
     pid_t child = -1;
 };
 
-std::set<pid_t> descendants(pid_t root) {
-    std::map<pid_t, pid_t> parents;
-    if (DIR* dir = ::opendir("/proc")) {
-        while (dirent* entry = ::readdir(dir)) {
-            char* end = nullptr;
-            errno = 0;
-            const long pid = std::strtol(entry->d_name, &end, 10);
-            if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
-            std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
-            std::string text;
-            if (!std::getline(stat, text)) continue;
-            const std::size_t close = text.rfind(')');
-            if (close == std::string::npos) continue;
-            std::istringstream fields(text.substr(close + 1));
-            std::string state;
-            long ppid = 0;
-            if (!(fields >> state >> ppid)) continue;
-            parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
-        }
-        ::closedir(dir);
+bool proc_available() {
+    DIR* dir = ::opendir("/proc");
+    if (!dir) return false;
+    ::closedir(dir);
+    std::ifstream self("/proc/self/stat");
+    std::string line;
+    return static_cast<bool>(std::getline(self, line));
+}
+
+bool tagged_processes(const std::string& tag, std::set<pid_t>& found) {
+    found.clear();
+    DIR* dir = ::opendir("/proc");
+    if (!dir) return false;
+    const std::string needle = "CP21_SCANNER_TAG=" + tag;
+    bool ok = true;
+    while (dirent* entry = ::readdir(dir)) {
+        char* end = nullptr;
+        errno = 0;
+        const long pid = std::strtol(entry->d_name, &end, 10);
+        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
+        if (pid == static_cast<long>(::getpid())) continue;
+        std::ifstream environ("/proc/" + std::to_string(pid) + "/environ", std::ios::binary);
+        if (!environ) continue;
+        std::string bytes((std::istreambuf_iterator<char>(environ)), std::istreambuf_iterator<char>());
+        if (bytes.find(needle) != std::string::npos) found.insert(static_cast<pid_t>(pid));
     }
-    std::set<pid_t> found;
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& [pid, ppid] : parents) {
-            if (pid == root || found.count(pid)) continue;
-            if (ppid == root || found.count(ppid)) {
-                found.insert(pid);
-                changed = true;
-            }
-        }
-    }
-    return found;
+    ::closedir(dir);
+    return ok;
 }
 
 bool reap_bounded(pid_t child, const std::chrono::steady_clock::time_point& end) {
@@ -95,23 +89,29 @@ bool reap_bounded(pid_t child, const std::chrono::steady_clock::time_point& end)
     return direct_reaped;
 }
 
-bool terminate_scanner(pid_t child) {
+bool terminate_scanner(pid_t child, const std::string& tag) {
     if (child <= 0) return true;
-    std::set<pid_t> targets = descendants(child);
-    for (pid_t pid : descendants(::getpid())) targets.insert(pid);
+    std::set<pid_t> targets;
+    if (!tagged_processes(tag, targets)) return false;
     targets.insert(child);
     const pid_t pgid = ::getpgid(child);
-    if (pgid == child) ::kill(-child, SIGKILL);  // only a verified scanner group
-    for (pid_t pid : targets) ::kill(pid, SIGKILL);
+    if (pgid == child) {
+        if (::kill(-child, SIGKILL) != 0 && errno != ESRCH) return false;
+    }
+    for (pid_t pid : targets)
+        if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
     const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     if (!reap_bounded(child, end)) return false;
     while (std::chrono::steady_clock::now() < end) {
+        if (!tagged_processes(tag, targets)) return false;
+        if (targets.empty()) return true;
+        for (pid_t pid : targets)
+            if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
         if (!reap_bounded(child, end)) return false;
-        if (descendants(::getpid()).empty()) return true;
-        for (pid_t pid : descendants(::getpid())) ::kill(pid, SIGKILL);
         ::usleep(2000);
     }
-    return descendants(::getpid()).empty();
+    if (!tagged_processes(tag, targets)) return false;
+    return targets.empty();
 }
 
 ScannerResult run_scanner(const char* path, int timeout_ms) {
@@ -141,7 +141,7 @@ ScannerResult run_scanner(const char* path, int timeout_ms) {
     while (!eof) {
         const auto now = std::chrono::steady_clock::now();
         if (now >= deadline) {
-            const bool reaped = terminate_scanner(child);
+            const bool reaped = terminate_scanner(child, (::getenv("CP21_SCANNER_TAG") ? ::getenv("CP21_SCANNER_TAG") : ""));
             ::close(pipefd[0]);
             result.kind = reaped ? ScannerKind::Timeout : ScannerKind::Setup;
             return result;
@@ -169,7 +169,7 @@ ScannerResult run_scanner(const char* path, int timeout_ms) {
     for (;;) {
         const auto now = std::chrono::steady_clock::now();
         if (now >= deadline) {
-            const bool reaped = terminate_scanner(child);
+            const bool reaped = terminate_scanner(child, (::getenv("CP21_SCANNER_TAG") ? ::getenv("CP21_SCANNER_TAG") : ""));
             result.kind = reaped ? ScannerKind::Timeout : ScannerKind::Setup;
             return result;
         }
@@ -206,7 +206,19 @@ int main(int argc, char** argv) {
     auto arm = reinterpret_cast<ArmFn>(::dlsym(RTLD_DEFAULT, "cp21_fallback_arm"));
     auto seen = reinterpret_cast<SeenFn>(::dlsym(RTLD_DEFAULT, "cp21_dup_fd"));
 #ifdef __linux__
-    ::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+    if (::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0) {
+        std::printf("SETUP_FAIL subreaper unavailable\n");
+        return 2;
+    }
+    if (!proc_available()) {
+        std::printf("SETUP_FAIL proc unavailable\n");
+        return 2;
+    }
+    const std::string tag = "cp21-scanner-" + std::to_string(::getpid());
+    if (::setenv("CP21_SCANNER_TAG", tag.c_str(), 1) != 0) {
+        std::printf("SETUP_FAIL scanner tag unavailable\n");
+        return 2;
+    }
 #endif
     if (!arm || !seen || !make_controlling_tty()) {
         std::printf("SETUP_FAIL fallback arms or PTY unavailable\n");

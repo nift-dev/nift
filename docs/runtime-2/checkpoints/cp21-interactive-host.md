@@ -112,6 +112,27 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   `test-cp21-fd-inheritance -> test-cp21-fd-protocol-unit` in addition to the
   seven existing CP21 edges.
 
+## R5-review D3 harness corrections
+
+- **Cleanup fails closed:** the test requires successful
+  `PR_SET_CHILD_SUBREAPER`, readable `/proc`, and a unique scanner tag. A
+  missing subreaper or process-inspection facility prints
+  `SETUP_FAIL ... unavailable`; it never reports `cleaned=1`. Timeout cleanup
+  signals only the verified scanner group and tagged descendants, reaps them,
+  and reports an uncertain/failed cleanup instead of success when verification
+  fails. Permanent subreaper-denied and `/proc`-unavailable controls are
+  included.
+- **Strict target grammar:** descriptor targets must contain printable
+  non-whitespace bytes only; NUL, C0 controls, DEL, spaces and tabs are
+  rejected. Unit and end-to-end controls cover NUL-only, embedded NUL, spaces,
+  tabs, CR, ESC, whitespace-only and valid UTF-8 targets. A compiled parser
+  mutant that removes target validation is caught.
+- **Mandatory parser unit:** `test-cp21-fd-protocol-unit` is `.PHONY`, cannot
+  be shadowed by a file of that name, and remains a dependency of
+  `test-cp21-fd-inheritance`. Deliberate parser-unit failure propagates to both
+  `test-cp21-fd-inheritance` and `test-v45-job-control`; the guard requires the
+  parent edge.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves

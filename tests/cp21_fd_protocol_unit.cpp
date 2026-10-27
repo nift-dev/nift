@@ -39,6 +39,12 @@ int main() {
     const std::string clean = "exec_extra_fds=0\n";
     const std::string defect =
         "extra_fd=3 flags=0 target=/dev/tty\nexec_extra_fds=1\n";
+    std::string nul_target = "extra_fd=3 flags=0 target=";
+    nul_target.push_back('\0');
+    nul_target += "\nexec_extra_fds=1\n";
+    std::string nul_embedded = "extra_fd=3 flags=0 target=/dev/tty";
+    nul_embedded.push_back('\0');
+    nul_embedded += "junk\nexec_extra_fds=1\n";
     const std::vector<Case> cases = {
         {"clean", clean, true, 0, true, 0, false},
         {"defect", defect, true, 1, true, 1, true},
@@ -68,6 +74,14 @@ int main() {
         {"fd-range", "extra_fd=2 flags=0 target=/dev/tty\nexec_extra_fds=1\n", true, 1, false, 0, false},
         {"bad-flags", "extra_fd=3 flags=2 target=/dev/tty\nexec_extra_fds=1\n", true, 1, false, 0, false},
         {"empty-target", "extra_fd=3 flags=0 target=\nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"nul-target", nul_target, true, 1, false, 0, false},
+        {"nul-embedded", nul_embedded, true, 1, false, 0, false},
+        {"space-target", "extra_fd=3 flags=0 target=/dev/tty junk\nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"tab-target", "extra_fd=3 flags=0 target=/dev/tty\tjunk\nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"cr-target", "extra_fd=3 flags=0 target=/dev/tty\rjunk\nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"esc-target", "extra_fd=3 flags=0 target=/dev/tty\x1bjunk\nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"whitespace-target", "extra_fd=3 flags=0 target=   \nexec_extra_fds=1\n", true, 1, false, 0, false},
+        {"valid-utf8-target", "extra_fd=3 flags=0 target=/dev/\xc3\xa9\nexec_extra_fds=1\n", true, 1, true, 1, true},
         {"clean-extra-text", "exec_extra_fds=0\nnoise\n", true, 0, false, 0, false},
     };
     for (const Case& c : cases) check(c);
