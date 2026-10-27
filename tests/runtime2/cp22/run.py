@@ -75,7 +75,10 @@ MUTANTS = {
                                                                           "outcome": "vm"}}),
     16: ("A3 off (non-suspending task loops admitted)", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"}}),
     17: ("A4 off (data-proportional built-ins admitted)", {"refuse/r_ca_cpu_native.f": {"exit": 0, "outcome": "vm"}}),
-    18: ("captured cells admitted (coro-capture off)", {"refuse/r_share_closure.f": {"exit": 0, "outcome": "vm"}}),
+    # r_share_closure.f is also refused by A4 (GetUpvalue) under M18; this
+    # witness's capturing lambdas never run as task code.
+    18: ("captured cells admitted (coro-capture off)", {"refuse/r_share_closure_ret.f": {"stdout": b"32\n12\n", "exit": 0,
+                                                                                         "outcome": "vm"}}),
     19: ("A3 accepts a sleep anywhere in the body (continue skips it)", {"refuse/r_f4_continue.f": {"exit": 0,
                                                                                               "outcome": "vm"}}),
     20: ("calls through values (callable fields) not followed", {"refuse/r_f3_member_loop.f": {"exit": 0,
