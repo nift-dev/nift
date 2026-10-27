@@ -90,6 +90,28 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   sanitizer runs, including all eight comparator controls. Historical failed
   sanitizer transcripts that were not supplied remain explicitly unresolved.
 
+## R4-review D3 harness corrections
+
+- **Strict scanner grammar:** `tests/cp21_fd_protocol.h` parses complete lines.
+  It requires exactly one canonical `exec_extra_fds=N` record, exactly N
+  well-formed unique `extra_fd=<fd> flags=<0|1> target=<path>` records, valid
+  descriptor ranges, and the documented clean/defect exit status. Embedded
+  markers, `0junk`, `+0`, spaces, duplicates, contradictory records, missing
+  records, partial/blank/unexpected lines and signal death are invalid
+  evidence, never detection.
+- **Self-validating parser table:** `tests/cp21_fd_protocol_unit.cpp` covers
+  valid clean/defect transcripts and the malformed-control corpus; it is a
+  dependency of the D3 target and is wired into the certification aggregate.
+- **Bounded cleanup:** the scanner timeout verifies process-group ownership
+  before `killpg`, kills only the scanner and known descendants, sets the test
+  as a subreaper, sweeps and reaps escaped-group descendants, and reports a
+  failed/uncertain cleanup instead of success. A sleeping-group child, an
+  escaped-group descendant, malformed scanners, dead/missing children and
+  unrelated exit statuses are permanent controls.
+- **PERMANENT parser reachability:** the certification guard requires
+  `test-cp21-fd-inheritance -> test-cp21-fd-protocol-unit` in addition to the
+  seven existing CP21 edges.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
@@ -158,7 +180,9 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 | compiled D3 mutant (dup then fcntl) | exec child inherits the tty and `exec-child-no-extra-fds` fails |
 | dead D3 exec child | setup failure, never counted as detection |
 | D3 timeout child | bounded kill/reap, never counted as detection |
+| D3 escaped-group descendant | subreaper sweep/reap, `cleaned=1` required |
 | D3 unrelated scanner (clean scan, exit 23) | invalid status, never counted as detection |
+| embedded / 0junk / malformed scanner output | strict-line parser rejects as SETUP_FAIL |
 
 ## Mutants and controls
 

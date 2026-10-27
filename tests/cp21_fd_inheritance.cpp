@@ -1,6 +1,7 @@
 // CP21 D3: atomic duplicate-with-CLOEXEC regression on a real PTY.
 #define _XOPEN_SOURCE 700
 #include "rt/host/process_terminal.h"
+#include "cp21_fd_protocol.h"
 
 #include <cerrno>
 #include <chrono>
@@ -9,9 +10,15 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <fstream>
+#include <map>
 #include <poll.h>
+#include <set>
+#include <sstream>
 #include <string>
 #include <sys/ioctl.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
@@ -37,19 +44,74 @@ struct ScannerResult {
     pid_t child = -1;
 };
 
-bool terminate_scanner(pid_t child) {
-    if (child <= 0) return true;
-    ::kill(-child, SIGKILL);
-    ::kill(child, SIGKILL);
-    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+std::set<pid_t> descendants(pid_t root) {
+    std::map<pid_t, pid_t> parents;
+    if (DIR* dir = ::opendir("/proc")) {
+        while (dirent* entry = ::readdir(dir)) {
+            char* end = nullptr;
+            errno = 0;
+            const long pid = std::strtol(entry->d_name, &end, 10);
+            if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
+            std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
+            std::string text;
+            if (!std::getline(stat, text)) continue;
+            const std::size_t close = text.rfind(')');
+            if (close == std::string::npos) continue;
+            std::istringstream fields(text.substr(close + 1));
+            std::string state;
+            long ppid = 0;
+            if (!(fields >> state >> ppid)) continue;
+            parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
+        }
+        ::closedir(dir);
+    }
+    std::set<pid_t> found;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& [pid, ppid] : parents) {
+            if (pid == root || found.count(pid)) continue;
+            if (ppid == root || found.count(ppid)) {
+                found.insert(pid);
+                changed = true;
+            }
+        }
+    }
+    return found;
+}
+
+bool reap_bounded(pid_t child, const std::chrono::steady_clock::time_point& end) {
+    bool direct_reaped = child <= 0;
     while (std::chrono::steady_clock::now() < end) {
         int status = 0;
-        const pid_t got = ::waitpid(child, &status, WNOHANG);
-        if (got == child || (got < 0 && errno == ECHILD)) return true;
-        if (got < 0 && errno != EINTR) return true;  // not ours / already gone
+        const pid_t got = ::waitpid(-1, &status, WNOHANG);
+        if (got == child) direct_reaped = true;
+        if (got > 0) continue;
+        if (got < 0 && errno == EINTR) continue;
+        if (got < 0 && errno == ECHILD) return true;  // no children remain
+        if (got < 0) return false;
         ::usleep(2000);
     }
-    return false;
+    return direct_reaped;
+}
+
+bool terminate_scanner(pid_t child) {
+    if (child <= 0) return true;
+    std::set<pid_t> targets = descendants(child);
+    for (pid_t pid : descendants(::getpid())) targets.insert(pid);
+    targets.insert(child);
+    const pid_t pgid = ::getpgid(child);
+    if (pgid == child) ::kill(-child, SIGKILL);  // only a verified scanner group
+    for (pid_t pid : targets) ::kill(pid, SIGKILL);
+    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    if (!reap_bounded(child, end)) return false;
+    while (std::chrono::steady_clock::now() < end) {
+        if (!reap_bounded(child, end)) return false;
+        if (descendants(::getpid()).empty()) return true;
+        for (pid_t pid : descendants(::getpid())) ::kill(pid, SIGKILL);
+        ::usleep(2000);
+    }
+    return descendants(::getpid()).empty();
 }
 
 ScannerResult run_scanner(const char* path, int timeout_ms) {
@@ -143,6 +205,9 @@ int main(int argc, char** argv) {
     if (argc < 2) return 2;
     auto arm = reinterpret_cast<ArmFn>(::dlsym(RTLD_DEFAULT, "cp21_fallback_arm"));
     auto seen = reinterpret_cast<SeenFn>(::dlsym(RTLD_DEFAULT, "cp21_dup_fd"));
+#ifdef __linux__
+    ::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+#endif
     if (!arm || !seen || !make_controlling_tty()) {
         std::printf("SETUP_FAIL fallback arms or PTY unavailable\n");
         return 2;
@@ -174,7 +239,7 @@ int main(int argc, char** argv) {
     check("fallback-acquired", acquired);
     check("fallback-released", released);
     if (scan.kind == ScannerKind::Timeout) {
-        std::printf("TIMEOUT exec child did not finish and was killed/reaped\n");
+        std::printf("TIMEOUT exec child did not finish and was killed/reaped cleaned=1\n");
         return 2;
     }
     if (scan.kind != ScannerKind::Completed || !WIFEXITED(scan.status)) {
@@ -182,35 +247,14 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    const std::size_t marker = scan.output.find("exec_extra_fds=");
-    if (marker == std::string::npos ||
-        scan.output.find("exec_extra_fds=", marker + 1) != std::string::npos) {
-        std::printf("SETUP_FAIL exec child scan marker missing or duplicated\n");
+    const auto protocol = cp21::parse_fd_protocol(scan.output, true, WEXITSTATUS(scan.status));
+    if (!protocol.valid) {
+        std::printf("SETUP_FAIL protocol: %s\n", protocol.error.c_str());
         return 2;
     }
-    const char* number = scan.output.c_str() + marker + std::string("exec_extra_fds=").size();
-    char* end = nullptr;
-    errno = 0;
-    const long count = std::strtol(number, &end, 10);
-    if (errno != 0 || end == number || count < 0) {
-        std::printf("SETUP_FAIL exec child scan count invalid\n");
-        return 2;
-    }
-    const std::size_t extras = static_cast<std::size_t>(count);
-    std::size_t seen_lines = 0;
-    for (std::size_t at = scan.output.find("extra_fd="); at != std::string::npos;
-         at = scan.output.find("extra_fd=", at + 9))
-        ++seen_lines;
-    if (seen_lines != extras || (extras == 0 && scan.output.find("extra_fd=") != std::string::npos)) {
-        std::printf("SETUP_FAIL exec child descriptor lines disagree with count\n");
-        return 2;
-    }
-
-    const int exit_code = WEXITSTATUS(scan.status);
-    const int expected_exit = count == 0 ? 0 : 1;
     check("exec-child-scanned-fds", true);
-    check("exec-child-valid-status", exit_code == expected_exit);
-    check("exec-child-no-extra-fds", count == 0);
+    check("exec-child-valid-status", true);
+    check("exec-child-no-extra-fds", protocol.count == 0);
     std::printf("%s\n", failures ? "FAIL CP21 fd inheritance" : "PASS CP21 fd inheritance");
     return failures ? 1 : 0;
 }
