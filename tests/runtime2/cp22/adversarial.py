@@ -12,6 +12,10 @@ the main program, in a fixed order, so legacy's output is deterministic
 whatever its thread interleaving; the VM must produce it exactly (stdout,
 stderr, exit) and must run the unit (NIFT_VM=require, one VM execution).
 
+Programs stay inside the cooperative admission rule (record §12): task loops
+suspend, tasks call no blocking Host op and no data-proportional built-in.
+Threads (non-contractual opt-in) are started from main only.
+
 A timeout, a signal, an abnormal exit or missing statistics is a harness
 failure (reported, never a pass). With --switch the same programs also run on
 the portable switch-dispatch build.
@@ -55,7 +59,7 @@ class Gen:
         if r.random() < 0.5:
             body.append(f"g0 = g0 + x")  # a task's own snapshot only
         if r.random() < 0.3:
-            body.append("i := 0; while(i < 3) { i += 1 }")
+            body.append("i := 0; while(i < 3) { sleep(1); i += 1 }")  # task loops must suspend (§12)
         r.shuffle(names)
         terms = []
         for n in names:
@@ -68,10 +72,6 @@ class Gen:
                 terms.append(f"(await {n})")
         if r.random() < 0.3:
             body.append(f"extra := leaf{r.randrange(leaves)}(x, x)")  # never awaited: drained at the end
-        if r.random() < 0.35:  # a thread inside the task (CP22 thread()), joined, or left to drain
-            body.append(f"th{k} := thread(syncw, x, {r.randint(0, 9)})")
-            if r.random() < 0.8:
-                terms.append(f"th{k}.join()")
         body.append("return " + " + ".join(terms) + " + g0")
         return f"fn[async](mid{k}(x)) {{ " + "; ".join(body) + " }"
 

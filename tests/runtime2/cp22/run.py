@@ -62,6 +62,9 @@ MUTANTS = {
                                                                  "outcome": "vm"}}),
     10: ("no preemption", {"vm-only/v_preempt.f": {"stdout": b"false\n", "exit": 0, "outcome": "vm"}}),
     11: ("await accepts a thread handle", {"th_await_thread.f": {"stdout": b"4\n4\n", "exit": 0, "outcome": "vm"}}),
+    12: ("cooperative admission disabled", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"},
+                                           "refuse/r_ca_blocking_host.f": {"stdout": b"false\n", "exit": 0,
+                                                                           "outcome": "vm"}}),
 }
 
 
@@ -276,8 +279,13 @@ def mutant(args):
         return 1
     failures, detected = 0, []
     for key, sig in witnesses.items():
-        folder, name = (VM_ONLY, key.split("/", 1)[1]) if key.startswith("vm-only/") else (CASES, key)
-        base = check_vm_only(args.oracle, name) if folder is VM_ONLY else check_vm(args.oracle, name, None)
+        if key.startswith("refuse/"):  # a refusal witness: the mutant runs what the oracle refuses
+            folder, name = REFUSE, key.split("/", 1)[1]
+            reasons = {r[0]: r[1] for r in table(HERE / "REFUSE.tsv")}
+            base = check_refuse(args.oracle, name, reasons.get(name, ""))
+        else:
+            folder, name = (VM_ONLY, key.split("/", 1)[1]) if key.startswith("vm-only/") else (CASES, key)
+            base = check_vm_only(args.oracle, name) if folder is VM_ONLY else check_vm(args.oracle, name, None)
         if base:
             failures += 1
             print(f"FAIL mutant {n} {key}: oracle build fails its own gate: {base}")

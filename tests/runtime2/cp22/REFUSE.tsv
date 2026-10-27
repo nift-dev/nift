@@ -26,3 +26,17 @@ r_thread_value.f	coro-thread-callee
 r_thread_default.f	callable:thread
 r_thread_mutex.f	callable:mutex
 r_thread_atomic.f	callable:atomic<int>
+r_ca_cpu_loop.f	coro-task-loop
+r_ca_cpu_native.f	coro-task-native:sha256
+r_ca_cpu_helper.f	coro-task-loop
+r_ca_recursion.f	coro-task-recursion
+r_ca_blocking_host.f	coro-blocking-host:exists
+r_ca_main_blocking.f	coro-blocking-host:is_dir
+r_ca_for_await.f	coro-task-loop
+r_ca_lambda_loop.f	coro-task-loop
+r_ca_sleep_zero_loop.f	coro-task-loop
+r_ca_string_method.f	coro-task-native:to_upper
+spawn_tree.f	coro-task-loop
+tr_exists.f	coro-blocking-host:exists
+tr_fs.f	coro-blocking-host:is_dir
+tr_thread.f	coro-blocking-host:exists
