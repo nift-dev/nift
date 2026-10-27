@@ -1,4 +1,5 @@
 #include "rt/compiler_loops_step.h"
+#include "rt/compiler_coro_admit.h"
 #include "rt/string.h"
 
 // Per-iteration and body emission for the default `for` (CP12C slice 2). The
@@ -80,7 +81,8 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
 #endif
     state.exits.push_back(fb_->emit(OpCode::JmpNotLt, state.index, state.count));
     state.body_start = fb_->here();
-    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration
+    if (plan_.coroutines)  // CP22: a safepoint every iteration; a = 1: the body starts with a sleep (A3)
+        fb_->emit(OpCode::Yield, suspending_loop_body(ast_, *state.body, plan_) ? 1 : 0);
 
     state.reads_first = for_body_reads(body, text(ast_.at(state.names[0])), state.first_read);
     state.reads_second =
