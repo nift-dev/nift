@@ -1,5 +1,5 @@
-#include "rt/infer_unit.h"
 #include "rt/infer.h"
+#include "rt/infer_unit.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/text_type.h"
