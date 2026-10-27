@@ -1,4 +1,5 @@
 #include "rt/session.h"
+#include "rt/session_location.h"
 #include "rt/session_text.h"
 #include "rt/session_shape.h"
 #include "rt/session_inventory.h"
@@ -143,12 +144,13 @@ SessionResult VmSession::execute_safe(const std::string& source, const std::stri
     }
 }
 SessionResult VmSession::execute_unit(const std::string& source, std::string path, std::string& output,
-                                      bool expression, bool inspect_tail) {
+                                      bool expression, bool inspect_tail, bool coherent,
+                                      double prior_parse_us, double prior_compile_us) {
     if (closed_) throw std::logic_error("session is closed");
     retire_code();
     const auto begin = std::chrono::steady_clock::now();
     SessionResult result;
-    const auto text = session_text(source, path, namespace_);
+    const auto text = session_text(source, path, namespace_, coherent);
     const auto source_map = std::make_shared<const SourceMap>(SourceMap::pieces(text.pieces));
     Ast ast(text.text);
     ParseResult parsed;
@@ -173,7 +175,8 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     detail::Stats stats;
     stats.path = path; stats.source_bytes = source.size();
     SessionCompileContext pending = namespace_;
-    pending.inspect_tail = inspect_tail;
+    seed_session_locations(pending, globals_);
+    pending.inspect_tail = inspect_tail; pending.coherent_recompile = coherent;
     pending.declarations.clear();
     for (const auto& symbol : pending.symbols)
         pending.declarations.emplace(symbol.name, ast.add(NodeKind::Ident, 0, 0));
@@ -184,7 +187,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     if (parsed.ok) normalize_session_callbacks(ast, parsed.root, pending);
     CompileLimits limits; limits.session = &pending;
     const auto parse_done = std::chrono::steady_clock::now();
-    stats.parse_us = std::chrono::duration<double, std::micro>(parse_done - begin).count();
+    stats.parse_us = prior_parse_us + std::chrono::duration<double, std::micro>(parse_done - begin).count();
     const auto mode = vm_mode_from_environment();
     if (mode == VmMode::ClassifyAll)
         stats.inventory_json = session_inventory_json(ast, parsed.root, parsed.ok, pending, *source_map, expression);
@@ -192,7 +195,12 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     if (parsed.ok && first_opaque_node(ast, parsed.root) == kNoNode)
         compiled = expression ? compile_eval_program(ast, parsed.root, limits) : compile_unit(ast, parsed.root, limits);
     else compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
-    stats.compile_us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - parse_done).count();
+    stats.compile_us = prior_compile_us + std::chrono::duration<double, std::micro>(
+        std::chrono::steady_clock::now() - parse_done).count();
+    if (!compiled.program && !coherent &&
+        (compiled.reason == "session:binding-shape-contract" || compiled.reason == "session:capture-contract" ||
+         compiled.reason == "session:element-contract"))
+        return execute_unit(source, path, output, expression, inspect_tail, true, stats.parse_us, stats.compile_us);
     if (!compiled.program) {
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 1
         namespace_ = pending;  // M1: leak partial compiler publication on refusal
@@ -261,8 +269,9 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     namespace_.lambda_templates.clear(); namespace_.capture_seeds.clear();
     namespace_.callable_templates.clear(); namespace_.capture_callable_seeds.clear();
     namespace_.capture_contracts.clear(); namespace_.template_definitions.clear(); namespace_.const_captures.clear();
+    namespace_.parameter_seeds.clear(); namespace_.coherent_recompile = false; clear_session_locations(namespace_);
     namespace_.source_owner.reset(); namespace_.schema_templates.clear();
-    namespace_.named_templates.clear(); namespace_.phased_functions.clear();
+    namespace_.named_templates.clear(); namespace_.phased_functions.clear(); namespace_.inactive_imports.clear();
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 2
     if (executions_ == 1) for (const auto& symbol : namespace_.symbols)
         if (symbol.name == "x") cell_put(globals_[symbol.slot], Value::integer(0));  // M2: lose retained state

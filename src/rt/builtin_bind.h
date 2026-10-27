@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 namespace nift::rt {
 
@@ -46,6 +47,15 @@ enum class MethodBinding : std::uint8_t {
 // Binds `.name(...)` on a receiver of `kinds`. `length`/`size` without
 // arguments on strings and arrays stay the Length opcode (compiler).
 MethodBinding bind_method(KindSet kinds, std::string_view name, const natives::BuiltinSpec*& spec);
+
+// CP19 closed unions lower to guarded branches, each with one bound native.
+// Script binding tags deliberately exclude Function/Error/Bytes here.
+struct SessionMethodCandidate {
+    KindSet kinds;
+    std::int64_t tag;
+    const natives::BuiltinSpec* spec;
+};
+bool session_method_candidates(KindSet, std::string_view, std::vector<SessionMethodCandidate>&);
 
 // A free built-in function (`range`, `min`, `html_escape`, `type`, ...), or null.
 const natives::BuiltinSpec* bind_function(std::string_view name);

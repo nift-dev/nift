@@ -9,10 +9,59 @@
 
 // rt-lint: cold-file immutable declaration linking, never executable history replay
 namespace nift::rt {
-SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context) {
+namespace {
+std::unordered_set<const std::string*> retained_session_sources(const SessionCompileContext& context) {
+    std::unordered_set<const std::string*> retained_sources;
+    for (const auto& schema : context.structures) retained_sources.insert(schema.second->source.get());
+    for (const auto& symbol : context.symbols) {
+        if (symbol.struct_definition) retained_sources.insert(symbol.struct_definition->source.get());
+        for (const auto& target : session_callable_targets(symbol.callable_shape))
+            retained_sources.insert(target.definition->source.get());
+    }
+    return retained_sources;
+}
+void append_session_definition(SessionText& out, const std::shared_ptr<const SessionDefinition>& definition,
+                               const std::string& alias) {
+    if (!definition->lambda && alias != definition->name) {
+        Ast schema(*definition->source);
+        const auto parsed_schema = parse_script_range(schema, definition->begin, definition->end);
+        if (!parsed_schema.ok) throw std::logic_error("session schema source");
+        const auto& node = schema.at(schema.list(schema.at(parsed_schema.root))[0]);
+        std::vector<NodeId> names{node.a};
+        for (std::uint32_t m = 0; node.kind == NodeKind::StructDecl && m < node.count; ++m) {
+            const auto& method = schema.at(schema.list(node)[m]);
+            if (method.kind == NodeKind::FnDecl && schema.text(schema.at(method.a)) == definition->name)
+                names.push_back(method.a);
+        }
+        auto position = definition->begin;
+        for (const auto id : names) {
+            const auto& name = schema.at(id);
+            out.text.append(*definition->source, position, name.begin - position);
+            out.pieces.push_back({definition->path, definition->source, position, name.begin - position});
+            out.text += alias;
+            out.pieces.push_back({definition->path, definition->source, name.begin,
+                                  static_cast<std::uint32_t>(alias.size())});
+            position = name.end;
+        }
+        out.text.append(*definition->source, position, definition->end - position);
+        out.pieces.push_back({definition->path, definition->source, position, definition->end - position});
+    } else {
+        out.text.append(*definition->source, definition->begin, definition->end - definition->begin);
+        out.pieces.push_back({definition->path, definition->source, definition->begin,
+                             definition->end - definition->begin});
+    }
+}
+} // namespace
+SessionText session_text(const std::string& source, const std::string& path,
+                         const SessionCompileContext& context, bool import_all) {
     SessionText out;
     struct Entry { std::shared_ptr<const SessionDefinition> definition; std::string name; };
     std::unordered_map<std::string, std::vector<Entry>> available;
+    const auto retained_sources = retained_session_sources(context);
+    const auto source_collision = [&](const std::string& name) {
+        return std::any_of(retained_sources.begin(), retained_sources.end(),
+            [&](const auto* text) { return text && text->find(name) != std::string::npos; });
+    };
     std::unordered_set<std::string> declarations;
     Ast original(source);
     const auto parsed = parse_script(original);
@@ -33,7 +82,8 @@ SessionText session_text(const std::string& source, const std::string& path, con
                 auto& alias = named_names[callable.definition.get()];
                 if (alias.empty()) {
                     do { alias = "__cp19_named" + std::to_string(serial++); }
-                    while (source.find(alias) != std::string::npos || available.count(alias) ||
+                    while (source.find(alias) != std::string::npos || source_collision(alias) ||
+                        available.count(alias) ||
                         std::any_of(context.symbols.begin(), context.symbols.end(), [&](const auto& other) {
                             return other.name == alias || (other.definition &&
                                 other.definition->source->find(alias) != std::string::npos);
@@ -52,7 +102,7 @@ SessionText session_text(const std::string& source, const std::string& path, con
                 (name != symbol.struct_definition->name && source.find(name) != std::string::npos) ||
                 (current != context.structures.end() && current->second != symbol.struct_definition)) {
                 do { name = "__cp19_schema" + std::to_string(serial++); }
-                while (source.find(name) != std::string::npos || available.count(name) ||
+                while (source.find(name) != std::string::npos || source_collision(name) || available.count(name) ||
                     std::any_of(context.symbols.begin(), context.symbols.end(),
                         [&](const auto& other) { return other.name == name || other.struct_name == name; }));
             }
@@ -80,11 +130,17 @@ SessionText session_text(const std::string& source, const std::string& path, con
         for (NodeId id = static_cast<NodeId>(prior_nodes); id < original.size(); ++id)
             if (original.at(id).kind == NodeKind::Ident) scan(original.text(original.at(id)));
     }
+    for (std::size_t k = 0; k < selected.size(); ++k) {
+        const auto definition = selected[k].definition;
+        scan(std::string_view(*definition->source).substr(definition->begin, definition->end - definition->begin));
+    }
+    for (const auto& entry : selected) out.required_imports.insert(entry.name);
     // Redefinition changes a registry entry seen by every retained alias.
     // Compile all reachable readers against it, including captured callables.
     bool redefining = false;
     for (const auto& symbol : context.symbols) redefining = redefining || declarations.count(symbol.name);
-    if (redefining) for (const auto& symbol : context.symbols) scan(symbol.name);
+    for (const auto& schema : context.structures) redefining = redefining || declarations.count(schema.first);
+    if (redefining || import_all) for (const auto& symbol : context.symbols) scan(symbol.name);
     for (std::size_t k = 0; k < selected.size(); ++k) {
         const auto definition = selected[k].definition;
         scan(std::string_view(*definition->source).substr(definition->begin, definition->end - definition->begin));
@@ -114,34 +170,7 @@ SessionText session_text(const std::string& source, const std::string& path, con
             for (const auto& capture : definition->captures) generated(capture.name + ":=null;");
             generated("return ");
         } else out.imports.emplace(entry.name, definition);
-        if (!definition->lambda && entry.name != definition->name) {
-            Ast schema(*definition->source);
-            const auto parsed_schema = parse_script_range(schema, definition->begin, definition->end);
-            if (!parsed_schema.ok) throw std::logic_error("session schema source");
-            const auto& node = schema.at(schema.list(schema.at(parsed_schema.root))[0]);
-            std::vector<NodeId> names{node.a};
-            for (std::uint32_t m = 0; node.kind == NodeKind::StructDecl && m < node.count; ++m) {
-                const auto& method = schema.at(schema.list(node)[m]);
-                if (method.kind == NodeKind::FnDecl && schema.text(schema.at(method.a)) == definition->name)
-                    names.push_back(method.a);
-            }
-            auto position = definition->begin;
-            for (const auto id : names) {
-                const auto& name = schema.at(id);
-                out.text.append(*definition->source, position, name.begin - position);
-                out.pieces.push_back({definition->path, definition->source, position, name.begin - position});
-                out.text += entry.name;
-                out.pieces.push_back({definition->path, definition->source, name.begin,
-                                      static_cast<std::uint32_t>(entry.name.size())});
-                position = name.end;
-            }
-            out.text.append(*definition->source, position, definition->end - position);
-            out.pieces.push_back({definition->path, definition->source, position, definition->end - position});
-        } else {
-            out.text.append(*definition->source, definition->begin, definition->end - definition->begin);
-            out.pieces.push_back({definition->path, definition->source, definition->begin,
-                                 definition->end - definition->begin});
-        }
+        append_session_definition(out, definition, entry.name);
         generated(definition->lambda ? ";}\n" : "\n");
     }
     if (out.text.size() + source.size() > 0xffffffffu) throw std::length_error("session source offset limit");
@@ -153,6 +182,10 @@ SessionText session_text(const std::string& source, const std::string& path, con
 }
 void prepare_session_namespace(SessionCompileContext& pending, const SessionText& text) {
     pending.schema_templates.clear(); pending.named_templates.clear(); pending.phased_functions.clear();
+    pending.inactive_imports.clear();
+    for (const auto& imported : text.imports)
+        if (!imported.second->lambda && !text.required_imports.count(imported.first))
+            pending.inactive_imports.insert(imported.first);
     for (const auto& imported : text.imports)
         if (!imported.second->lambda && !imported.second->structure && imported.first != imported.second->name) {
             pending.named_templates.emplace(imported.second.get(), imported.first);
@@ -165,17 +198,61 @@ void prepare_session_namespace(SessionCompileContext& pending, const SessionText
     for (const auto& imported : text.imports)
         if (imported.second->structure) pending.schema_templates.emplace(imported);
 }
+namespace {
+void seed_retained_lambda_parameters(const Ast& ast, const SessionText& text,
+                                     const SessionCompileContext& current, SessionCompileContext& pending) {
+    std::vector<SessionCallable> targets;
+    for (const auto& symbol : current.symbols)
+        for (const auto& target : session_callable_targets(symbol.callable_shape)) targets.push_back(target);
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const auto& node = ast.at(id);
+        if (node.kind != NodeKind::Lambda) continue;
+        std::uint32_t position = 0;
+        for (const auto& piece : text.pieces) {
+            if (node.begin >= position && node.end <= position + piece.length)
+                for (const auto& target : targets) {
+                    const auto& definition = target.definition;
+                    if (!definition->lambda || definition->source != piece.source ||
+                        definition->begin != node.begin - position + piece.source_begin ||
+                        definition->end != node.end - position + piece.source_begin) continue;
+                    for (std::uint32_t p = 0; p < node.count && p < target.parameter_types.size(); ++p) {
+                        auto& seed = pending.parameter_seeds[ast.list(node)[p]];
+                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(), target.parameter_types[p]);
+                    }
+                }
+            position += piece.length;
+        }
+    }
+}
+} // namespace
 void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, const SessionText& text,
                                const SessionCompileContext& current, SessionCompileContext& pending) {
     pending.source_owner = std::make_shared<const std::string>(text.text);
     pending.lambda_templates.clear(); pending.capture_seeds.clear(); pending.template_wrappers.clear();
+    pending.parameter_seeds.clear();
+    pending.capture_locations.clear(); pending.capture_initializers.clear();
+    if (parsed_ok) seed_retained_lambda_parameters(ast, text, current, pending);
     pending.callable_templates.clear(); pending.capture_callable_seeds.clear();
     pending.capture_contracts.clear(); pending.template_definitions.clear(); pending.const_captures.clear();
     if (parsed_ok) for (std::uint32_t k = 0; k < ast.at(root).count; ++k) {
         const auto& fn = ast.at(ast.list(ast.at(root))[k]);
         if (fn.kind != NodeKind::FnDecl) continue;
         const auto imported = text.imports.find(std::string(ast.text(ast.at(fn.a))));
-        if (imported == text.imports.end() || !imported->second->lambda) continue;
+        if (imported == text.imports.end()) continue;
+        NodeId callable = ast.list(ast.at(root))[k];
+        if (imported->second->lambda) {
+            const auto& wrapper = ast.at(fn.b);
+            callable = ast.at(ast.list(wrapper)[wrapper.count - 1]).a;
+        }
+        const auto& parameters = ast.at(callable);
+        for (const auto& symbol : current.symbols)
+            for (const auto& target : session_callable_targets(symbol.callable_shape))
+                if (target.definition == imported->second)
+                    for (std::uint32_t p = 0; p < parameters.count && p < target.parameter_types.size(); ++p) {
+                        auto& seed = pending.parameter_seeds[ast.list(parameters)[p]];
+                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(), target.parameter_types[p]);
+                    }
+        if (!imported->second->lambda) continue;
         const auto& body = ast.at(fn.b);
         if (body.count != imported->second->captures.size() + 1)
             throw std::logic_error("session lambda template shape");
@@ -187,12 +264,20 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
         pending.callable_templates.emplace(imported->second.get(), tail.a);
         for (std::uint32_t c = 0; c + 1 < body.count; ++c) {
             const auto& declaration = ast.at(ast.list(body)[c]);
+            pending.capture_initializers.emplace(declaration.a, declaration.b);
             pending.capture_seeds.emplace(declaration.b, imported->second->captures[c].shape);
             pending.capture_contracts.emplace(declaration.a, imported->second->captures[c].shape);
             if (imported->second->captures[c].const_array) pending.const_captures.insert(declaration.a);
             for (const auto& symbol : current.symbols)
                 for (const auto& target : session_callable_targets(symbol.callable_shape))
                     if (target.definition == imported->second && c < target.captures.size()) {
+                        if (c < target.capture_locations.size())
+                            pending.capture_locations[declaration.a].push_back(target.capture_locations[c]);
+                        if (c < target.capture_types.size() && target.capture_types[c]) {
+                            auto& seed = pending.capture_seeds[declaration.b];
+                            seed = infer_detail::unite(seed, target.capture_types[c]);
+                            pending.capture_contracts[declaration.a] = seed;
+                        }
                         const auto shape = target.captures[c];
                         if (!shape) continue;
                         // Multiple closure instances share a definition, so

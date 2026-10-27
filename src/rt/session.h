@@ -44,7 +44,8 @@ private:
                        const std::shared_ptr<Program>&);
     SessionResult execute_safe(const std::string&, const std::string&, std::string&, bool, bool);
     SessionResult execute_unit(const std::string&, std::string, std::string&, bool expression,
-                               bool inspect_tail = false);
+                               bool inspect_tail = false, bool coherent = false,
+                               double prior_parse_us = 0, double prior_compile_us = 0);
     void refresh(SessionCompileContext& pending);
     Value last_value_;
     void retire_code();

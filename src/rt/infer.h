@@ -73,6 +73,7 @@ static_assert(kKindUnknown == (1u << 10));
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 
 struct UnitKinds {
+    std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_decl_shapes;
     std::unordered_map<std::string, std::shared_ptr<const infer_detail::Ty>> binding_shapes;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_shapes;
     std::vector<KindSet> kinds;  // per NodeId (expressions)

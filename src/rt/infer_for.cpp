@@ -46,7 +46,7 @@ void Inference::for_statement(const Node& n) {
     loop->fields.emplace("first", kinds_ty(kKindBool));
     loop->fields.emplace("last", kinds_ty(kKindBool));
     loop->fields.emplace("length", kinds_ty(kKindInt));
-    declare("loop", header.a, loop);
+    declare("loop", session_ ? n.a : header.a, loop);
     if (normal) statements(ast_.at(n.b));
     scopes_.pop_back();
 }

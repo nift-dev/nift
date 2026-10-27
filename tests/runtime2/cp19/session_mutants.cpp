@@ -18,26 +18,29 @@ int main(int argc, char** argv) {
         if (!status) std::cout << "WITNESS owner\n";
         return status;
     }
-    if (expect == "contract") {
+    if (expect == "contract" || expect == "widened") {
         r = session.execute("nested:=[[1]]", "nested-state", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")}", "nested-effect", output);
-        if (!r.admitted || r.execution.reason != StopReason::None) std::cerr << "contract refusal=" << r.refusal << " runtime=" << r.execution.message << " output=" << output << '\n';
+        r = session.execute("for(row:nested){row.push(()=>7)}", "nested-effect", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
-        CHECK(output == "FORBIDDEN\n");
-        const auto nested = session.value("nested");
-        CHECK(nested.is(Kind::Array));
-        if (nested.is(Kind::Array)) {
-            const auto& outer = nested.heap_as<ArrayObject>()->items;
-            CHECK(outer.size() == 1 && outer[0].is(Kind::Array));
-            if (outer.size() == 1 && outer[0].is(Kind::Array)) {
-                const auto& inner = outer[0].heap_as<ArrayObject>()->items;
-                CHECK(inner.size() == 2);
-                if (inner.size() == 2) CHECK(inner[1].is(Kind::String) && string_view_of(inner[1]) == "bad");
-            }
+        r = session.execute("derived:=nested[0][1];oldderived:=derived", "future-reader", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto original = session.value("derived");
+        r = session.execute("derived = ()=>9;print(\"ONCE\")", "use-widened-bound", output);
+        if (expect == "contract") {
+            CHECK(!r.admitted && r.refusal == "session:binding-contract" && r.vm_executions == 0);
+            CHECK(output.empty() && session.value("derived").heap() == original.heap());
+        } else {
+            CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
+            CHECK(output == "ONCE\n" && session.value("derived").heap() != original.heap());
         }
-        const auto status = rt_test::finish("CP19 structural contract negative-control witness");
-        if (!status) std::cout << "WITNESS contract\n";
+        output.clear();
+        r = session.evaluate("derived()", "future-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == (expect == "contract" ? 7 : 9));
+        r = session.evaluate("oldderived()", "retained-alias", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 7);
+        const auto status = rt_test::finish("CP19 coherent widening negative-control witness");
+        if (!status) std::cout << "WITNESS " << expect << '\n';
         return status;
     }
     const auto count = session.binding_count();

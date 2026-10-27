@@ -7,10 +7,23 @@
 #include <vector>
 namespace nift::rt {
 struct SessionCallableShape;
+struct SessionLocationEdge {
+    std::uintptr_t child = 0, parent = 0;
+    bool element = false;
+    std::string field;
+    bool member = false;  // otherwise !element means lexical forwarding
+};
+struct SessionCaptureLocation {
+    std::uintptr_t key = 0;
+    std::vector<SessionLocationEdge> edges;
+};
+SessionCaptureLocation session_capture_location(const Value&);
 struct SessionCallable {
     std::uint64_t identity = 0;
     std::shared_ptr<const SessionDefinition> definition;
     std::vector<std::shared_ptr<const SessionCallableShape>> captures;
+    std::vector<std::shared_ptr<const infer_detail::Ty>> parameter_types, capture_types;
+    std::vector<SessionCaptureLocation> capture_locations;
 };
 struct SessionCallableShape {
     bool complete = true;

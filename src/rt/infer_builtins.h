@@ -11,7 +11,8 @@ namespace nift::rt::infer_detail {
 // `recv.name(values...)` (call node `n`): int for length()/size(), the bound
 // built-in's result, the empty type when the receiver kinds are empty (never
 // executed), Unknown when not bound (the compiler refuses the call).
-TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv, const std::vector<TyRef>& values);
+TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv,
+                    const std::vector<TyRef>& values, bool session_dispatch = false);
 // `name(values...)` with no user function of that name: print (null), a free
 // built-in's result, or Unknown.
 TyRef function_result(const Ast& ast, const Node& n, const std::vector<TyRef>& values);

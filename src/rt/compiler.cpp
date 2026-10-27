@@ -1,4 +1,6 @@
 #include "rt/compiler.h"
+#include "rt/session_alias.h"
+#include "rt/session_shape.h"
 
 #include "rt/compiler_expr.h"
 #include "rt/globals.h"
@@ -286,7 +288,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     // copy); the order of the refusals is unchanged.
     // CP12b: free names of functions that resolve to top-level bindings.
     const GlobalPlan globals = plan_globals(ast, root, plan);
-    const UnitKinds kinds = infer_unit_kinds(ast, root, plan, limits.kind_walks, &globals, limits.session);
+    const UnitKinds kinds = infer_session_aliases(ast, root, plan, limits.kind_walks, &globals, limits.session);
     const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
@@ -321,6 +323,11 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         }
         return result;
     }
+    if (limits.session && limits.session->coherent_recompile)
+        for (auto& symbol : limits.session->symbols) {
+            const auto shape = kinds.binding_shapes.find(symbol.name);
+            if (shape != kinds.binding_shapes.end()) symbol.structure = session_shape(shape->second);
+        }
     result.program = std::move(program);
     return result;
 }

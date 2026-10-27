@@ -9,6 +9,7 @@ struct SessionText {
     std::vector<SourceMap::Piece> pieces;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> imports;
     std::unordered_map<std::string, std::string> schema_names;
+    std::unordered_set<std::string> required_imports;
     std::uint32_t unit_begin = 0;
 };
 void prepare_session_namespace(SessionCompileContext&, const SessionText&);
@@ -17,5 +18,6 @@ void prepare_session_templates(const Ast&, NodeId, bool, const SessionText&,
 void session_structures(const Ast&, NodeId, const SessionText&, const std::string&, SessionCompileContext&);
 void session_definitions(const Ast&, NodeId, const SessionText&, const std::string&,
                          const SessionCompileContext&, Program&, std::uint64_t);
-SessionText session_text(const std::string& source, const std::string& path, const SessionCompileContext& context);
+SessionText session_text(const std::string& source, const std::string& path,
+                         const SessionCompileContext& context, bool import_all = false);
 } // namespace nift::rt

@@ -5,6 +5,19 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
+ ('shared-capture-native-reader','fn(makeo()){a:=[1];return {"putv":v=>{a[0]=v;return a.stringify()},"readv":()=>a[0].to_string()}};o:=makeo();warm:=o.putv(0)\no.putv("abc")\n(o.readv())\no.putv(1)\n(o.readv())\nexit\n',5),
+ ('selector-reader-unrelated-widening','fn(g()){return 1};fn(makec()){rows:=[[1]];for(row:rows){return ()=>row[0]}};c:=makec();a:=[1]\nfn(g()){return 3};a.push("bad")\ng()\nc()\na.stringify()\nexit\n',5),
+ ('widened-native-scalar-families','a:=[1];f:=()=>a[0].to_string()\na.push("abc")\nf()\na[0] = "abc"\nf()\na[0] = 1.5\nf()\na[0] = true\nf()\na[0] = null\nf()\na[0] = 1e0\nf()\nexit\n',13),
+ ('widened-native-argument-error','a:=[[1]];f:=()=>a[0].contains(42);saved:=error("seed")\na.push("abc")\na[0] = "abc"\ntry{f()}catch(e){saved=e}\n(saved.message)\nexit\n',5),
+ ('widened-native-families','a:=[[1,2]];f:=()=>a[0].contains("b")\na.push("abc")\nf()\na[0] = "abc"\nf()\nexit\n',5),
+ ('widened-native-receiver-once','a:=[[1],[2]];n:=-1;f:=()=>a[(n+=1)].contains("b")\na.push("abc")\nf()\nn\nexit\n',4),
+ ('widening-unrelated-reader-shadow','x:=1;fn(readx()){return x};a:=[1]\nfn(localv()){x:=7;return x};a.push("bad")\nlocalv()\nreadx()\na.stringify()\nexit\n',5),
+ ('replacement-unrelated-reader-shadow','x:=1;fn(readx()){return x};fn(g()){return 1}\nfn(localv()){x:=7;return x};fn(g()){return 2}\nlocalv()\nreadx()\ng()\nexit\n',5),
+ ('array-kind-widening','a:=[1];f:=()=>a.stringify()\na.push("bad")\na.stringify()\nf()\nexit\n',4),
+ ('nested-kind-widening','a:=[[1]];f:=()=>a.stringify()\nfor(v:a){v.push("bad")}\na.stringify()\nf()\nexit\n',4),
+ ('capture-kind-widening','fn(makec()){a:=[1];return v=>{a.push(v);return a.stringify()}};c:=makec();warm:=c(0)\nc("bad")\nc(1)\nexit\n',3),
+ ('capture-nested-kind-widening','fn(makec()){a:=[[1]];return v=>{for(row:a){row.push(v)};return a.stringify()}};c:=makec();warm:=c(0)\nc("bad")\nc(1)\nexit\n',3),
+ ('widened-callable-bound','a:=[[1]]\nfor(row:a){row.push(()=>7)}\nf:=a[0][1];old:=f\nf = ()=>9\nf()\nold()\nexit\n',6),
  ('named-mixed-order','fn(f()){return 1};old:=f;reader:=()=>f()\nbefore:=f();aliasbefore:=old();readbefore:=reader();fn(f()){return 2};after:=f();aliasafter:=old();readafter:=reader()\nbefore\naliasbefore\nreadbefore\nafter\naliasafter\nreadafter\nexit\n',8),
  ('named-order-arity','fn(f(x)){return x+1};old:=f\nbefore:=f(1);fn(f(x,y)){return x+y};after:=f(2,3);aliasafter:=old(4,5)\nbefore\nafter\naliasafter\nexit\n',5),
  ('named-order-capture','fn(f(x)){local:=x;return ()=>local};a:=f(1)\nbefore:=f(2);fn(f(x)){local:=x+10;return ()=>local};after:=f(3)\na()\nbefore()\nafter()\nexit\n',5),
@@ -40,7 +53,7 @@ cases=[
 ]
 for name,source,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-callable-') as td:
-  root=Path(td);baseline=None;errors=1 if name in ('const-captured-kind','named-order-pre-error') else 0
+  root=Path(td);baseline=None;errors=1 if name in ('const-captured-kind','named-order-pre-error','widened-native-argument-error') else 0
   for mode in ['0','1','require']:
    stats=root/'stats';stats.unlink(missing_ok=True)
    env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')

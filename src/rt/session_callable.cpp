@@ -24,6 +24,17 @@ Shape merge(const Shape& a, const Shape& b) {
     out->element = merge(a->element, b->element);
     return out;
 }
+bool may_call(const infer_detail::TyRef& type, unsigned depth = 0) {
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 12
+    return true;
+#endif
+    if (!type || !type->kinds || type->any || depth > 64 ||
+        (type->kinds & ~(kKindScalar | kKindAggregate | kKindError | kKindBytes))) return true;
+    if ((type->kinds & kKindArray) && may_call(type->elem, depth + 1)) return true;
+    if (type->kinds & kKindObject)
+        for (const auto& field : type->fields) if (may_call(field.second, depth + 1)) return true;
+    return false;
+}
 struct Scan {
     std::unordered_map<const HeapObject*, Shape> memo;
     std::unordered_set<const HeapObject*> active;
@@ -40,13 +51,22 @@ struct Scan {
             const auto* function = value.heap_as<FunctionObject>();
             const auto* proto = static_cast<const Proto*>(function->code);
             if (function->session_identity && proto && proto->session_definition) {
-                SessionCallable target{function->session_identity, proto->session_definition, {}};
-                for (const auto& capture : function->upvalues) {
+                SessionCallable target{function->session_identity, proto->session_definition, {},
+                    proto->session_parameter_shapes, proto->session_capture_shapes, {}};
+                for (std::size_t k = 0; k < function->upvalues.size(); ++k) {
+                    const auto& capture = function->upvalues[k];
                     const auto* cell = cell_plain_capture(capture);
                     // Never resolve a selector or read a cached location just to compile metadata.
-                    auto shape = cell ? visit(cell->value, depth + 1) : incomplete();
+                    const auto bound = k < proto->session_capture_shapes.size() ?
+                        proto->session_capture_shapes[k] : infer_detail::TyRef{};
+                    // A compiler-proved non-callable location needs no value
+                    // scan. Do not resolve selectors or inspect cached values.
+                    auto shape = cell ? visit(cell->value, depth + 1) :
+                        is_cell(capture) && !may_call(bound) ? Shape{} : incomplete();
                     if (shape && !shape->complete) out->complete = false;
                     target.captures.push_back(std::move(shape));
+                    target.capture_locations.push_back(session_capture_location(capture));
+                    if (!target.capture_locations.back().key) out->complete = false;
                 }
                 out->targets.push_back(std::move(target));
             } else out->complete = false;

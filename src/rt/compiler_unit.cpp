@@ -1,4 +1,5 @@
 #include "rt/compiler_unit.h"
+#include "rt/session_shape.h"
 
 #include <unordered_set>
 
@@ -306,6 +307,9 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     if (!finish(out)) return false;
     if (session_) for (std::uint32_t k = 0; k < node.count; ++k) {
         out->session_params.push_back(kinds(params[k]));
+                const auto shape = kinds_.session_shapes.find(params[k]);
+                out->session_parameter_shapes.push_back(shape == kinds_.session_shapes.end() ?
+                    infer_detail::kinds_ty(kinds(params[k])) : session_shape(shape->second));
         out->session_param_types.push_back(observable_[f][k] ? type_regs[k] : 0xffff);
     }
     // A parameter type read in the body that the analysis did not predict

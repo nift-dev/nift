@@ -1,4 +1,5 @@
 #include "rt/infer_callable.h"
+#include "rt/compiler.h"
 // rt-lint: cold-file callable inference worklist and lexical environments
 namespace nift::rt::infer_detail {
 std::size_t Inference::lambda_unit(NodeId node) {
@@ -21,6 +22,10 @@ std::size_t Inference::lambda_unit(NodeId node) {
                               ? current_
                               : owner_function_;
     info.params.assign(ast_.at(node).count, empty_ty());
+    if (session_) for (std::uint32_t k = 0; k < ast_.at(node).count; ++k) {
+        const auto seed = session_->parameter_seeds.find(ast_.list(ast_.at(node))[k]);
+        if (seed != session_->parameter_seeds.end()) info.params[k] = seed->second;
+    }
     info.returns = empty_ty();
     info.collection_returns = empty_ty();
     info.scopes = scopes_;

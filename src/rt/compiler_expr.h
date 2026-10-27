@@ -183,6 +183,8 @@ private:
     bool method_call(const Node& node, std::uint16_t dst);
     // CP14: a pure built-in over a fresh window (receiver: kNoNode for a free
     // function); W1, W2/W4 refusals.
+    int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
+    bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);
     bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst);
     bool unobservable_argument(NodeId id);
     bool array_literal(const Node& node, std::uint16_t dst);

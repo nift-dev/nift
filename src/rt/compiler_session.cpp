@@ -49,11 +49,18 @@ bool UnitCompiler::session_admit() {
     }
     const auto contract = session_shape_contract(*session_, kinds_);
     if (contract.reason) return fail(ast_.at(contract.node), contract.reason);
+    if (session_->coherent_recompile) for (const auto& symbol : session_->symbols)
+        if (symbol.untracked_callables) return fail(ast_.at(root_), "session:widening-callable-flow");
+    if (session_) for (const auto& schema : session_->structures)
+        if (!session_->imported_functions.count(schema.first) && plan_.struct_index.count(schema.first))
+            for (const auto& symbol : session_->symbols)
+                if (symbol.untracked_callables) return fail(ast_.at(root_), "session:struct-callable-flow");
     // Legacy named functions can see caller-local bindings. Only names read
     // freely by a named function need the D-038 shadow guard; ordinary lexical
     // shadowing that cannot influence such a reader remains admitted.
     std::unordered_set<std::string_view> dynamic_struct_fields;
-    for (const auto& schema : plan_.structs) if (!schema.methods.empty())
+    for (const auto& schema : plan_.structs) if (!schema.methods.empty() &&
+        !session_->inactive_imports.count(std::string(schema.name)))
         for (const auto& field : schema.fields) {
             if (!session_method_uses_bare_field(ast_, schema.decl, field.name)) continue;
             dynamic_struct_fields.insert(field.name);
@@ -72,6 +79,10 @@ bool UnitCompiler::session_admit() {
 #if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 1
         if (session_->template_wrappers.count(plan_.functions[f])) continue;
 #endif
+        const auto& declaration = ast_.at(plan_.functions[f]);
+        if (session_->inactive_imports.count(std::string(text(ast_.at(declaration.a))))) continue;
+        if (plan_.is_method(f) &&
+            session_->inactive_imports.count(std::string(plan_.structs[plan_.method_of[f]].name))) continue;
         for (const auto& ref : globals_->free[f])
             for (const auto& symbol : session_->symbols)
                 if (symbol.name == ref.first) dynamic_reads.insert(ref.first);
@@ -132,7 +143,7 @@ bool UnitCompiler::session_admit() {
                     !session_lambda_assignment_spelling(ast_, n)) return fail(n, "session:lambda-assignment-spelling");
                 if (kinds(n.b) & ~symbol.contract) return fail(n, "session:binding-contract");
                 const auto shape = kinds_.session_shapes.find(n.b);
-                if (shape != kinds_.session_shapes.end() &&
+                if (!session_->coherent_recompile && shape != kinds_.session_shapes.end() &&
                     !session_shape_within(shape->second, symbol.structure))
                     return fail(n, "session:binding-shape-contract");
             }
@@ -158,7 +169,7 @@ bool UnitCompiler::session_admit() {
                 if (shape != kinds_.session_shapes.end()) {
                     auto added = shape->second;
                     if (n.kind == NodeKind::Call && text(ast_.at(ast_.at(n.a).b)) == "splice") added = added->elem;
-                    if (!session_shape_within(added, symbol.structure->elem))
+                    if (!session_->coherent_recompile && !session_shape_within(added, symbol.structure->elem))
                         return fail(n, "session:element-contract");
                 }
             }
@@ -349,17 +360,27 @@ bool UnitCompiler::session_lambda_definition(const LambdaTask& task, Proto& out)
         auto definition = std::make_shared<SessionDefinition>();
         definition->lambda = true; definition->source = session_->source_owner;
         definition->begin = ast_.at(task.lambda).begin; definition->end = ast_.at(task.lambda).end;
-        for (std::size_t k = 0; k < task.upvalue_names.size(); ++k) {
-            infer_detail::TyRef shape;
-            for (const auto& binding : kinds_.bindings) if (binding.second == task.upvalue_decls[k]) {
-                const auto found = kinds_.session_shapes.find(binding.first);
-                if (found != kinds_.session_shapes.end())
-                    shape = infer_detail::unite(shape ? shape : infer_detail::empty_ty(), found->second);
-            }
-            if (!shape) shape = infer_detail::kinds_ty(kinds(task.upvalue_decls[k]));
-            definition->captures.push_back({std::string(task.upvalue_names[k]), session_shape(shape),
-                task.upvalue_loop[k], task.upvalue_readonly[k], task.upvalue_const_array[k]});
+        out.session_definition = std::move(definition);
+    }
+    for (std::size_t k = 0; k < task.upvalue_names.size(); ++k) {
+        infer_detail::TyRef shape;
+        const auto previous = session_->capture_contracts.find(task.upvalue_decls[k]);
+        if (previous != session_->capture_contracts.end()) shape = previous->second;
+        const auto final = kinds_.session_decl_shapes.find(task.upvalue_decls[k]);
+        if (final != kinds_.session_decl_shapes.end()) shape = infer_detail::unite(shape, final->second);
+        for (const auto& binding : kinds_.bindings) if (binding.second == task.upvalue_decls[k]) {
+            const auto found = kinds_.session_shapes.find(binding.first);
+            if (found != kinds_.session_shapes.end())
+                shape = infer_detail::unite(shape ? shape : infer_detail::empty_ty(), found->second);
         }
+        if (!shape) shape = infer_detail::kinds_ty(kinds(task.upvalue_decls[k]));
+        out.session_capture_shapes.push_back(session_shape(shape));
+    }
+    if (imported == session_->template_definitions.end()) {
+        auto definition = std::make_shared<SessionDefinition>(*out.session_definition);
+        for (std::size_t k = 0; k < task.upvalue_names.size(); ++k)
+            definition->captures.push_back({std::string(task.upvalue_names[k]), out.session_capture_shapes[k],
+                task.upvalue_loop[k], task.upvalue_readonly[k], task.upvalue_const_array[k]});
         out.session_definition = std::move(definition);
     }
     return true;

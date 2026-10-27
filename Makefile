@@ -3675,3 +3675,4 @@ test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp19/session_callable_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-callable-switch.json"
 	$(PYTHON) tests/runtime2/cp19/session_struct_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/session-struct.json"
 	$(PYTHON) tests/runtime2/cp19/session_struct_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-struct-switch.json"
+	$(PYTHON) tests/runtime2/cp19/widening_error_boundary.py --legacy "$(CURDIR)/$(TARGET)" --nift "$(CURDIR)/$(TARGET)" --switch "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/widening-errors.json"

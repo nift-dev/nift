@@ -3,8 +3,9 @@ from pathlib import Path
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True);a=ap.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
- ('loop-nested-contract','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")}\na.stringify()\nexit\n','[[1]]\n','session:binding-shape-contract'),
- ('capture-nested-contract','fn(makec()){a:=[[1]];return v=>{for(row:a){row.push(v)};return a.stringify()}};c:=makec()\nprint("FORBIDDEN");c("bad")\nc(2)\nexit\n','"[[1,2]]"\n','session:capture-contract'),
+ ('literal-type-refusal','x:=5\nprint("FORBIDDEN");1*"bad"\nx\nexit\n','5\n','type:*'),
+ ('loop-nested-compilation-atomicity','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")};bytes([65])\na.stringify()\nexit\n','[[1]]\n','builtin-bytes:bytes'),
+ ('capture-nested-compilation-atomicity','fn(makec()){a:=[[1]];return v=>{for(row:a){row.push(v)};return a.stringify()}};c:=makec()\nprint("FORBIDDEN");c("bad");bytes([65])\nc(2)\nexit\n','"[[1,2]]"\n','builtin-bytes:bytes'),
  ('captured-struct','x:=5\nstruct(Point){x:=1};print("FORBIDDEN");fn(makep()){p:=Point();return ()=>p.x};f:=makep()\nx\nexit\n','5\n','session:captured-struct'),
  ('lambda-rebind-spelling','f:=v=>v+1\nprint("FORBIDDEN");f=v=>v*2\nf(3)\nexit\n','4\n','session:lambda-assignment-spelling'),
  ('struct-outer-shadow','v:=99\nstruct(Counter){v:=0;fn(get()){return v}};print("FORBIDDEN");c:=Counter()\nv\nexit\n','99\n','session:struct-dynamic-shadow'),

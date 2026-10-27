@@ -396,8 +396,8 @@ int main() {
         auto r = session.execute("nested:=[[1],[2]];saved:=nested", "nested-state", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         const auto saved = session.value("saved");
-        r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")}", "nested-refusal", output);
-        CHECK(!r.admitted && r.refusal == "session:binding-shape-contract");
+        r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")};bytes([65])", "nested-refusal", output);
+        CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes");
         CHECK(r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
         CHECK(session.value("nested").heap() == saved.heap());
         r = session.execute("for(row:nested){row.push(2.5)}", "nested-numeric", output);
@@ -417,20 +417,19 @@ int main() {
         const auto count = session.binding_count();
         const auto array = session.value("a"), function = session.value("f"), named = session.value("g");
         for (const char* rejected : {
-            "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(\"bad\")};print(\"FORBIDDEN\")",
+            "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(\"bad\")};print(\"FORBIDDEN\");bytes([65])",
             "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(2)};print(\"FORBIDDEN\");bytes([65])"}) {
             const auto owner = function.heap_as<FunctionObject>()->program_owner;
             const auto* code = function.heap_as<FunctionObject>()->code;
             r = session.execute(rejected, "combined-refusal", output);
             CHECK(!r.admitted && r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
-            CHECK(r.refusal == (std::string(rejected).find("bytes") != std::string::npos ?
-                "builtin-bytes:bytes" : "session:binding-shape-contract"));
+            CHECK(r.refusal == "builtin-bytes:bytes");
             CHECK(!session.contains("leaked") && session.binding_count() == count);
             CHECK(session.value("a").heap() == array.heap() && session.value("f").heap() == function.heap());
             CHECK(session.value("g").heap() == named.heap() && function.heap_as<FunctionObject>()->program_owner == owner &&
                 function.heap_as<FunctionObject>()->code == code);
-            r = session.execute("print(\"FORBIDDEN\");for(row:a){row.push(\"bad\")}", "bounds-still-original", output);
-            CHECK(!r.admitted && r.refusal == "session:binding-shape-contract" && output.empty());
+            r = session.execute("print(\"FORBIDDEN\");for(row:a){row.push(\"bad\")};bytes([65])", "bounds-still-original", output);
+            CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
             r = session.evaluate("g()", "named-still-original", output);
             CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
             r = session.evaluate("old()", "reader-still-original", output);
@@ -458,8 +457,8 @@ int main() {
         output.clear();
         r = session.evaluate("g()", "replacement-with-loop-capture-value", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 4);
-        r = session.execute("print(\"FORBIDDEN\");c(\"bad\")", "capture-still-original", output);
-        CHECK(!r.admitted && r.refusal == "session:capture-contract" && output.empty());
+        r = session.execute("print(\"FORBIDDEN\");c(\"bad\");bytes([65])", "capture-still-original", output);
+        CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
         r = session.evaluate("c(2)", "capture-valid", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,0,2]]");
     }

@@ -47,6 +47,22 @@ MethodBinding bind_method(KindSet kinds, std::string_view name, const BuiltinSpe
     return spec ? MethodBinding::Bound : MethodBinding::Receiver;
 }
 
+bool session_method_candidates(KindSet kinds, std::string_view name, std::vector<SessionMethodCandidate>& out) {
+    out.clear();
+    if (!kinds || (kinds & ~(kKindScalar | kKindAggregate)) || receiver_family(kinds) != Receiver::None)
+        return false;
+    const Receiver families[] = {Receiver::Null, Receiver::Bool, Receiver::Number, Receiver::Number,
+        Receiver::String, Receiver::Array, Receiver::Object};
+    for (unsigned tag = 0; tag < 7; ++tag) {
+        const auto branch = static_cast<KindSet>(kinds & ((tag == 2 || tag == 3) ? kKindNumber : (1u << tag)));
+        if (!branch) continue;
+        const auto* spec = natives::find_builtin(families[tag], name);
+        if (!spec) { out.clear(); return false; }
+        out.push_back({branch, static_cast<std::int64_t>(tag), spec});
+    }
+    return out.size() > 1;
+}
+
 const BuiltinSpec* bind_function(std::string_view name) { return natives::find_builtin(Receiver::None, name); }
 
 bool pure_method_name(std::string_view name) { return first_method(name) != nullptr; }

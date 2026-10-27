@@ -32,7 +32,14 @@ Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const Gl
     const std::size_t n = plan.functions.size();
     params_.resize(n);
     returns_.assign(n, empty_ty());
-    for (std::size_t f = 0; f < n; ++f) params_[f].assign(ast.at(plan.functions[f]).count, empty_ty());
+    for (std::size_t f = 0; f < n; ++f) {
+        const auto& fn = ast.at(plan.functions[f]);
+        params_[f].assign(fn.count, empty_ty());
+        if (session_) for (std::uint32_t k = 0; k < fn.count; ++k) {
+            const auto seed = session_->parameter_seeds.find(ast.list(fn)[k]);
+            if (seed != session_->parameter_seeds.end()) params_[f][k] = seed->second;
+        }
+    }
 }
 
 UnitKinds Inference::run(std::size_t max_walks) {
@@ -351,7 +358,7 @@ TyRef Inference::call(const Node& n) {
         }
         const int collection = collection_method(key);
         if (collection >= 0 && recv->kinds == kKindArray) return collection_result(n, recv, values, collection);
-        TyRef result=method_result(ast_, n, recv, values);
+        TyRef result=method_result(ast_, n, recv, values, session_ != nullptr);
         if((result->kinds&kKindNumber)&&key!="size"&&key!="length") {
             result=with_text_number(result,true);
         }

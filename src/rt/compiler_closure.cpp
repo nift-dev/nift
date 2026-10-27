@@ -1,4 +1,5 @@
 #include "rt/compiler_closure.h"
+#include "rt/session_shape.h"
 
 #include "rt/compiler_capture.h"
 
@@ -311,6 +312,9 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
             if (session_ && !session_lambda_definition(task, *out)) return false;
             if (session_) for (std::uint32_t k = 0; k < lambda.count; ++k) {
                 out->session_params.push_back(kinds(params[k]));
+                const auto shape = kinds_.session_shapes.find(params[k]);
+                out->session_parameter_shapes.push_back(shape == kinds_.session_shapes.end() ?
+                    infer_detail::kinds_ty(kinds(params[k])) : session_shape(shape->second));
                 out->session_param_types.push_back(0xffff);
             }
         }

@@ -44,7 +44,7 @@ struct SessionSymbol {
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
-    std::unordered_set<std::string> imported_functions, phased_functions;
+    std::unordered_set<std::string> imported_functions, phased_functions, inactive_imports;
     std::unordered_map<const SessionDefinition*, std::string> named_templates;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> schema_templates;
     std::unordered_map<std::string, NodeId> declarations;
@@ -52,12 +52,16 @@ struct SessionCompileContext {
     std::unordered_map<const SessionDefinition*, NodeId> callable_templates;
     std::unordered_map<NodeId, std::shared_ptr<const SessionCallableShape>> capture_callable_seeds;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> capture_seeds, capture_contracts;
+    std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> parameter_seeds;
+    std::unordered_map<NodeId, std::vector<SessionCaptureLocation>> capture_locations;
+    std::unordered_map<NodeId, NodeId> capture_initializers;
+    std::unordered_map<std::string, SessionCaptureLocation> global_locations;
     std::unordered_set<NodeId> const_captures;
     std::unordered_set<NodeId> template_wrappers;  // synthetic, never executed named bodies
     std::unordered_map<NodeId, std::shared_ptr<const SessionDefinition>> template_definitions;
     std::shared_ptr<const std::string> source_owner;
     std::uint16_t slots = 0;
-    bool inspect_tail = false;
+    bool inspect_tail = false, coherent_recompile = false;
 };
 struct CompileLimits {
     SessionCompileContext* session = nullptr;  // private compile transaction, never the live namespace

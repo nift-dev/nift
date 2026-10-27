@@ -42,6 +42,10 @@ void Inference::seed_session() {
 }
 void Inference::export_session() {
     if (!session_) return;
+    for (const auto& binding : binding_decls_)
+        result_.session_decl_shapes[binding.second] = vars_[binding.first];
+    if (session_->coherent_recompile) for (const auto& binding : external_)
+        result_.binding_shapes[std::string(binding.first)] = vars_[binding.second];
     for (const auto& binding : top_level_slots_)
         result_.binding_shapes[std::string(binding.first)] = vars_[binding.second];
 }

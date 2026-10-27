@@ -1,0 +1,82 @@
+CP19 admission corrections — development record
+
+Status: implementation work, not checkpoint acceptance. Frozen 1c0b157f and
+a4288846 remain unchanged. No integration or external operations authorised.
+
+The nine original curated A witnesses remain A-class requirements. Positive
+witnesses must execute in the VM with zero legacy replay. Passing those witnesses
+is not proof that every program in the nine categories is implemented.
+
+Widening implementation
+
+An initial session compile retains the existing shape-contract guards. When an
+aggregate/capture/element shape contract fails, one private coherent compilation
+imports the retained readers and retries before any source effect. Both compile
+costs are reported. Root scalar binding tags remain fixed; only compatible
+aggregate contents widen. Every step, including bytecode generation, must finish
+before publication and activation. Runtime Errors preserve earlier effects.
+
+Callables keep their stable identity and captured Cells. Code activation chooses
+an immutable original definition, including private versions of replaced named
+functions; it does not create new script-visible aliases or transfer the capture
+payload. Capture metadata contains pure shape bounds, parameter bounds and
+storage-location identity facts. It holds neither executable Values nor Program
+owners. Only lexical forwarding and selector descriptor structure are inspected.
+Selector caches and selected script values are not read for compilation.
+
+Different closure definitions may capture the same Cell. Treating each synthetic
+capture declaration as independent was unsound: a writer accepted a string while
+a sibling reader retained numeric-only bytecode, causing Internal status 70.
+The compiler now joins bounds using storage identities and selector-parent path
+edges, rerunning inference before code generation until the private bounds stop
+growing. Incomplete callable graphs and nonconvergence still refuse before
+effects. This is a safety boundary, not acceptance of a permanent A refusal.
+Indices conservatively join the array element bound; object keys preserve their
+field identity, including an empty-string key. Distinct factory activations have
+distinct Cell keys. Keys are never dereferenced from stored metadata.
+
+Retained numeric readers can subsequently encounter nonnumeric contents. A
+session-only operand guard for subtraction/multiplication/division/modulo reports
+the existing noncatchable arithmetic diagnostic after evaluating operands once.
+The ordinary arithmetic invariant, Frame, Fault, Error identity/provenance and
+handler selection remain unchanged. Known invalid uniform expressions keep the
+existing pre-effect refusal. The extra opcode is appended, preserving old IDs.
+
+For native methods shared by every member of a closed receiver-family union,
+compiled branches select static native IDs using the existing binding tag.
+Receiver and arguments execute once. There is no dynamic method lookup or
+reentrant VM invocation. Number tags cover both integral and fractional physical
+representations. Every branch gets the existing argument validation policy.
+
+Replacement and lexical refinements
+
+Schema replacement imports retained constructor readers while old instances keep
+their original schema/method source. Private schema and named-function aliases
+avoid collisions with every retained source, including dormant method locals.
+The field-reader analysis tracks lexical scopes, parameters, declarations,
+loop binders and catches. Explicit member keys do not count as bare field reads.
+Synthetic wrappers are identified by AST identity. Inactive imported definitions
+do not create dynamic-shadow refusals simply by being recompiled.
+
+New unresolved architecture boundary
+
+A dormant retained function g(p){return p(0)+a[0]} was previously called with a
+known lambda, but that temporary lambda is no longer present in the live callable
+graph. Recompiling g during unrelated a.push("bad") loses the AST-specific target
+for p. Legacy accepts the widening; the candidate refuses session:callable-flow
+before effects. This remains an A-class implementation gap, not a policy waiver.
+
+D-000 requires escalation for "a significant architecture change". A concrete
+unverified draft outside this production tree proposes immutable call-result
+summaries by owned source/span plus historical-parameter proof markers. This
+would expand the compiler proof boundary to permit a dormant call without a
+current AST target. It needs an owner architecture decision and focused safety
+review before production use. In particular, current unknown arguments must
+never inherit the historical proof, current concrete targets must be inferred
+normally, place/observable argument semantics must remain safe, returned
+callables need recursive tracking, summaries must not pin executable Values or
+Programs, and storage must remain bounded by retained program/source structure.
+The draft is not compiled, accepted, or part of this candidate.
+
+CP17 remains separately pending the owner-relayed exact integrated commit/tree
+and actual interfaces. No provisional resource lifecycle API is implemented.

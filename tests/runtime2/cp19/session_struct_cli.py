@@ -6,6 +6,11 @@ p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argumen
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 schema='struct(Counter){v:=0;fn(add(n)){v+=n} fn(get()){return v}};c:=Counter()'
 cases=[
+ ('explicit-field-parameter','v:=99\nstruct(Point){v:=1;fn(Point(v)){this.v=v} fn(get()){return this.v}};p:=Point(7)\np.get()\nv\nexit\n',4,0),
+ ('explicit-field-local','v:=99\nstruct(Point){v:=1;fn(get()){v:=7;return this.v+v}};p:=Point()\np.get()\nv\nexit\n',4,0),
+ ('explicit-field-native-local','v:=99\nstruct(Point){v:=1;fn(get()){v:=7;print(v);return this.v}};p:=Point()\np.get()\nv\nexit\n',4,0),
+ ('field-native-local','struct(Point){v:=1;fn(localv()){v:=7;print(v);return this.v} fn(get()){return v}};p:=Point()\np.localv()\np.get()\nexit\n',3,0),
+ ('schema-constructor-reader','struct(Point){v:=1};fn(makev()){p:=Point();return p.v};reader:=()=>makev();warm:=makev()\nstruct(Point){v:=2};after:=reader()\nafter\nmakev()\nreader()\nexit\n',5,0),
  ('schema-replacement','struct(Point){v:=1;fn(get()){return v}};p:=Point()\nstruct(Point){v:=2;w:=3;fn(get()){return v+10}}\nq:=Point()\np.get()\nq.get()\n(p.v)\n(q.w)\nexit\n',7,0),
  ('schema-repeated','struct(Point){v:=1};p:=Point()\nstruct(Point){v:=2};q:=Point()\nstruct(Point){v:=3};r:=Point()\n(p.v)\n(q.v)\n(r.v)\nexit\n',6,0),
  ('schema-constructor','struct(Point){v:=1;fn(Point(n)){v=n} fn(get()){return v}};p:=Point(7)\nstruct(Point){v:=2;fn(Point(n)){v=n+1} fn(get()){return v+10}};q:=Point(7)\np.get()\nq.get()\nexit\n',4,0),

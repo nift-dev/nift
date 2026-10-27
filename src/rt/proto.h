@@ -71,6 +71,7 @@ struct Proto {
     std::shared_ptr<const SessionDefinition> session_definition;
     std::uint16_t session_returns = 0;
     std::vector<std::uint16_t> session_params, session_param_types;
+    std::vector<std::shared_ptr<const infer_detail::Ty>> session_parameter_shapes, session_capture_shapes;
 };
 
 struct Program {
