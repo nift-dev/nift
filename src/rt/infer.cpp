@@ -1,3 +1,4 @@
+#include "rt/infer_unit.h"
 #include "rt/infer.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
@@ -12,9 +13,7 @@
 // rt-lint: cold-file compile-time analysis, once per unit
 
 namespace nift::rt {
-
 namespace infer_detail {
-
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
                      const SessionCompileContext* session)
     : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
