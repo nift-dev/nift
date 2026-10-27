@@ -342,24 +342,6 @@ Status file_eof(const Context& context, const Value* args, std::uint32_t argc, V
     return Status::Ok;
 }
 
-bool abandon_file_on_unwind(handles::HandleTable& table, handles::ContextId owner, const Value& value) {
-    if (!value.boxed_handle() || value.refcount() != 1 || value.handle_kind() != HandleKind::File) return false;
-    handles::ContextId slot_owner = 0;
-    if (table.owner_of(value, HandleKind::File, slot_owner) != HandleStatus::Ok || slot_owner != owner) return false;
-    std::shared_ptr<FileResource> file;
-    if (table.resolve_as<FileResource>(value, HandleKind::File, owner, file) != HandleStatus::Ok || !file ||
-        !file->open)
-        return false;
-    file->open = false;
-    file->dirty = false;
-    file->mode.clear();
-    file->working.clear();
-    file->saved.clear();
-    file->saved_is_working = false;
-    file->cursor = 0;
-    return true;
-}
-
 handles::CleanupOutcome cleanup_file(handles::CleanupEvent& event) {
     auto file = std::static_pointer_cast<FileResource>(event.resource);
     if (!file) return handles::CleanupOutcome::completed();

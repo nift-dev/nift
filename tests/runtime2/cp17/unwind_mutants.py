@@ -31,22 +31,15 @@ FILE_NATIVES = "src/rt/natives/host_file_handles.cpp"
 GUARD = ("if (!value.boxed_handle() || value.refcount() != 1 || value.handle_kind() != HandleKind::File) "
          "return false;")
 OWNER = "if (table.owner_of(value, HandleKind::File, slot_owner) != HandleStatus::Ok || slot_owner != owner) return false;"
+# Retired with decision B's per-frame release (owner, 2026-10-27): its mutants
+# (ignore-surviving-alias, ignore-owner, not-discarded, no-release-on-unwind,
+# release-on-return, release-handler-frame) targeted code that no longer
+# exists. no-release-on-unwind had survived: under the statement rollback the
+# per-frame release was observationally equivalent, which is why it was removed;
+# it is not counted as killed. Ownership and aliasing are witnessed at the
+# withdrawal (unwind_file_release_unit R2, R5, R6) and by the program cases.
 MUTANTS = [
     # (name, file, old, new, kind, expected failing witness text)
-    ("ignore-surviving-alias", FILE_NATIVES, GUARD,
-     GUARD.replace(" || value.refcount() != 1", ""), "unit", "unwind_file_release_unit.cpp:"),
-    ("ignore-owner", FILE_NATIVES, OWNER,
-     "if (table.owner_of(value, HandleKind::File, slot_owner) != HandleStatus::Ok) return false;", "unit",
-     "unwind_file_release_unit.cpp:"),
-    ("not-discarded", FILE_NATIVES, "    file->open = false;\n    file->dirty = false;\n    file->mode.clear();",
-     "    file->dirty = false;\n    file->mode.clear();", "unit", "unwind_file_release_unit.cpp:"),
-    ("no-release-on-unwind", "src/rt/vm_exception.cpp",
-     "            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);\n", "", "vm", "FAIL reproducer (same)"),
-    ("release-on-return", "src/rt/vm.cpp",
-     "    for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) R[k] = Value();",
-     "    for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) { if (R[k].is(Kind::Handle)) "
-     "abandon_unwound_handle(R[k]); R[k] = Value(); }", "vm", "FAIL normal-return-leak (both-reported)"),
-    # Statement rollback (owner decision, 2026-10-27).
     ("no-statement-rollback", "src/rt/vm_exception.cpp",
      "        handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);",
      "        (void)handler.creation_mark;", "vm", "FAIL leak-earlier-in-statement (same)"),
@@ -93,10 +86,11 @@ MUTANTS = [
     ("release-allocates", "src/rt/handles/slot_store.cpp",
      "        if (free_.capacity() < slots_.size() + 1)\n", "        if (false)\n", "oom",
      "CHECK failed: !threw && !injected"),
-    ("release-handler-frame", "src/rt/vm_exception.cpp",
-     "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();\n",
-     "    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) { if (R[k].is(Kind::Handle)) "
-     "abandon_unwound_handle(R[k]); R[k] = Value(); }\n", "vm", "FAIL try-body-local (both-reported)"),
+
+    ("rollback-all-files", "src/rt/vm_exception.cpp",
+     "handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);",
+     "handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, 0);", "vm",
+     "FAIL try-body-local (both-reported)"),
 ]
 
 

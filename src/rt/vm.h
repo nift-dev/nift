@@ -143,9 +143,6 @@ private:
     bool reserve_registers(std::size_t needed);
     void open_handle_runtime();
     void close_handle_runtime(VmResult& result);
-    // CP17 x CP13B: a caught Error is abandoning `register_value`'s frame
-    // (natives::abandon_file_on_unwind has the exact rule).
-    void abandon_unwound_handle(const Value& register_value);
     // The source offset of main's active call (vm_frames.cpp); `own` when main
     // itself stopped.
     std::uint32_t main_offset(std::uint32_t own) const;

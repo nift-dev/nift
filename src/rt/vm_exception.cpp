@@ -200,11 +200,7 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
         return false;
     }
     while (frames_.size() > handler.frame_depth) {
-        for (std::uint16_t k = 0; k < proto->nregs; ++k) {
-            // CP17 x CP13B (decision B): before this frame's reference dies.
-            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);
-            R[k] = Value();
-        }
+        for (std::uint16_t k = 0; k < proto->nregs; ++k) R[k] = Value();
         const Frame frame = frames_.back();
         frames_.pop_back();
         base = frame.base;
@@ -231,7 +227,10 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
     // a callee leaked by returning normally earlier in that evaluation. Every
     // reference to them from the aborted evaluation is dead now; withdraw the
     // left-open reports their last drop recorded. Only files created since the
-    // aborted evaluation began (StmtMark) and abandoned are eligible.
+    // aborted evaluation began (StmtMark) and abandoned are eligible. This also
+    // covers the files of every frame the Error unwound (owner decision B): those
+    // frames were entered during the aborted evaluation, so their files are newer
+    // than its mark (B's separate per-frame release was removed as redundant).
     if (handle_context_open_)
         handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);
     R[handler.catch_reg] = std::move(fault.error);

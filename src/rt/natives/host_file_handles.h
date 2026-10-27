@@ -43,17 +43,4 @@ Status file_remove(const Context&, const Value* args, std::uint32_t argc, Value&
 // Cleanup hooks (registered by the VM's table).
 handles::CleanupOutcome cleanup_file(handles::CleanupEvent& event);
 
-// CP17 x CP13B (owner decision B, 2026-10-27): a caught Error is unwinding the
-// frame whose register holds `value`, and that register is about to be
-// cleared. When `value` is the LAST reference (a counted box with refcount 1)
-// to an open managed file owned by `owner`, the file is discarded silently, as
-// legacy's Parser::rollback_file_operation discards the files of a failed
-// evaluation: unsaved changes are dropped, never written, nothing is reported.
-// The table is not touched: the caller's register clear drops the box, and the
-// slot's cleanup then runs exactly once and finds the file closed. Anything
-// else is left alone and returns false: a surviving alias (refcount > 1), an
-// unboxed or non-file handle, a closed or reclaimed handle, a foreign table or
-// another owner, or a file that is not open.
-bool abandon_file_on_unwind(handles::HandleTable& table, handles::ContextId owner, const Value& value);
-
 } // namespace nift::rt::natives

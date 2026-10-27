@@ -9,9 +9,10 @@ are still open when the script ends are reported ("managed file left open",
 exit 1). Before decision B the combined VM reported the unwound function's
 file as left open (exit 1) where legacy exits 0.
 
-The VM rule (natives::abandon_file_on_unwind, called from Vm::unwind for each
-register of each popped frame before it is cleared): the last reference to an
-open file owned by the run is discarded without writing or reporting. W13
+The VM rule (the statement rollback, Vm::unwind): the left-open reports of
+files created during the aborted evaluation (which includes every frame the
+Error unwound) whose last reference died are withdrawn; decision B's separate
+per-frame release was removed as redundant (owner, 2026-10-27). W13
 admission confines handles to the frame that created them (returns, arguments,
 captures, globals, aggregates and throw operands are refused before execution:
 the `refused` cases), so a frame's references are its own; same-frame aliases
@@ -109,6 +110,18 @@ CASES = [
      'try {\n    open_file()\n    throw error("stop")\n} catch(e) {\n    print(e.message)\n}\n', "both-reported"),
     ("if-condition-completed", LEAK + THROW + 'try { if (leak() > 0) { work() } } catch(e) { print(e.message) }\n',
      "both-reported"),
+    # Equivalence of the single rollback with decision B (owner, 2026-10-27).
+    ("leak-in-catch-then-rethrow", LEAK + 'fn(w()) { try { throw error("a") } catch(e) { leak(); throw error("b") } }\n'
+     'try { w() } catch(e) { print(e.message) }\n', "same"),
+    ("nested-try-completed-then-throw", LEAK + THROW +
+     'try { try { leak(); throw error("a") } catch(e) { print("inner") }; work() } catch(e) { print(e.message) }\n',
+     "both-reported"),
+    ("mixed-depths", LEAK + 'fn(d2()) { g := file("p"); g.open("r"); return 1 }\n'
+     'fn(d1()) { d2(); f := file("p"); f.open("r"); throw error("x") }\n'
+     'try { leak(); d1() } catch(e) { print(e.message) }\n', "both-reported"),
+    ("mixed-depths-one-statement", LEAK + 'fn(d2()) { g := file("p"); g.open("r"); return 1 }\n'
+     'fn(d1()) { d2(); f := file("p"); f.open("r"); throw error("x") }\n'
+     'try { x := leak() + d1() } catch(e) { print(e.message) }\n', "same"),
     ("if-condition-after-leak-statement", LEAK + THROW +
      'try { leak(); if (work() > 0) { print("no") } } catch(e) { print(e.message) }\n', "both-reported"),
     ("else-if-condition-completed", LEAK + THROW +
@@ -148,6 +161,12 @@ def run(nift, root, source, vm):
     return proc.stdout, proc.stderr, proc.returncode, record, written
 
 
+def reported(err):
+    """The file names a left-open report names (legacy and the VM word it the same way)."""
+    import re
+    return sorted(Path(m).name for m in re.findall(r"managed file left open(?: \(\d+ files\))?: (\S+)", err))
+
+
 def check(mode, legacy, vm):
     lo, le, lrc, _, lw = legacy
     vo, ve, vrc, st, vw = vm
@@ -170,6 +189,8 @@ def check(mode, legacy, vm):
     elif mode == "both-reported":
         if not (lrc == vrc == 1 and lo == vo and "managed file left open" in le and "managed file left open" in ve):
             problems.append(f"both must report: legacy {(lo, lrc, le)!r} vm {(vo, vrc, ve)!r}")
+        elif reported(le) != reported(ve):
+            problems.append(f"different files reported: legacy {reported(le)} vm {reported(ve)}")
     elif mode == "divergence":
         if not (lrc == 0 and le == "" and vrc == 1 and "managed file left open" in ve and lo == vo):
             problems.append(f"classified divergence changed: legacy {(lo, lrc, le)!r} vm {(vo, vrc, ve)!r}")
