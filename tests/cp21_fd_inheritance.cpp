@@ -1,4 +1,6 @@
 // CP21 D3: atomic duplicate-with-CLOEXEC regression on a real PTY.
+// Scanner execution and cleanup live in cp21_scanner_supervisor; this driver
+// never signals or enumerates its own children.
 #define _XOPEN_SOURCE 700
 #include "rt/host/process_terminal.h"
 #include "cp21_fd_protocol.h"
@@ -8,21 +10,15 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <dirent.h>
 #include <fstream>
-#include <map>
-#include <poll.h>
-#include <set>
-#include <sstream>
 #include <string>
 #include <sys/ioctl.h>
-#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
-#include <vector>
 
 namespace {
 
@@ -33,197 +29,6 @@ using SeenFn = int (*)();
 void check(const char* name, bool ok) {
     std::printf("%s %s\n", ok ? "PASS" : "FAIL", name);
     if (!ok) ++failures;
-}
-
-enum class ScannerKind { Completed, Timeout, Setup };
-
-struct ScannerResult {
-    ScannerKind kind = ScannerKind::Setup;
-    std::string output;
-    int status = 0;
-    pid_t child = -1;
-};
-
-bool proc_available() {
-    DIR* dir = ::opendir("/proc");
-    if (!dir) return false;
-    ::closedir(dir);
-    std::ifstream self("/proc/self/stat");
-    std::string line;
-    return static_cast<bool>(std::getline(self, line));
-}
-
-bool descendants(pid_t root, std::set<pid_t>& found) {
-    found.clear();
-    std::map<pid_t, pid_t> parents;
-    DIR* dir = ::opendir("/proc");
-    if (!dir) return false;
-    while (dirent* entry = ::readdir(dir)) {
-        char* end = nullptr;
-        errno = 0;
-        const long pid = std::strtol(entry->d_name, &end, 10);
-        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
-        std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
-        std::string text;
-        if (!std::getline(stat, text)) continue;
-        const std::size_t close = text.rfind(')');
-        if (close == std::string::npos) continue;
-        std::istringstream fields(text.substr(close + 1));
-        std::string state;
-        long ppid = 0;
-        if (!(fields >> state >> ppid)) continue;
-        parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
-    }
-    ::closedir(dir);
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& [pid, ppid] : parents) {
-            if (pid == root || found.count(pid)) continue;
-            if (ppid == root || found.count(ppid)) {
-                found.insert(pid);
-                changed = true;
-            }
-        }
-    }
-    return true;
-}
-
-bool tagged_processes(const std::string& tag, std::set<pid_t>& found) {
-    found.clear();
-    DIR* dir = ::opendir("/proc");
-    if (!dir) return false;
-    const std::string needle = "CP21_SCANNER_TAG=" + tag;
-    bool ok = true;
-    while (dirent* entry = ::readdir(dir)) {
-        char* end = nullptr;
-        errno = 0;
-        const long pid = std::strtol(entry->d_name, &end, 10);
-        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
-        if (pid == static_cast<long>(::getpid())) continue;
-        std::ifstream environ("/proc/" + std::to_string(pid) + "/environ", std::ios::binary);
-        if (!environ) continue;
-        std::string bytes((std::istreambuf_iterator<char>(environ)), std::istreambuf_iterator<char>());
-        if (bytes.find(needle) != std::string::npos) found.insert(static_cast<pid_t>(pid));
-    }
-    ::closedir(dir);
-    return ok;
-}
-
-bool reap_bounded(pid_t child, const std::chrono::steady_clock::time_point& end) {
-    bool direct_reaped = child <= 0;
-    while (std::chrono::steady_clock::now() < end) {
-        int status = 0;
-        const pid_t got = ::waitpid(-1, &status, WNOHANG);
-        if (got == child) direct_reaped = true;
-        if (got > 0) continue;
-        if (got < 0 && errno == EINTR) continue;
-        if (got < 0 && errno == ECHILD) return true;  // no children remain
-        if (got < 0) return false;
-        ::usleep(2000);
-    }
-    return direct_reaped;
-}
-
-bool terminate_scanner(pid_t child, const std::string& tag) {
-    if (child <= 0) return true;
-    std::set<pid_t> targets;
-    std::set<pid_t> children;
-    if (!tagged_processes(tag, targets) || !descendants(::getpid(), children)) return false;
-    for (pid_t pid : children) targets.insert(pid);
-    targets.insert(child);
-    const pid_t pgid = ::getpgid(child);
-    if (pgid == child) {
-        if (::kill(-child, SIGKILL) != 0 && errno != ESRCH) return false;
-    }
-    for (pid_t pid : targets)
-        if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
-    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    if (!reap_bounded(child, end)) return false;
-    while (std::chrono::steady_clock::now() < end) {
-        std::set<pid_t> tagged;
-        std::set<pid_t> remaining;
-        if (!tagged_processes(tag, tagged) || !descendants(::getpid(), remaining)) return false;
-        if (tagged.empty() && remaining.empty()) return true;
-        for (pid_t pid : tagged) if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
-        for (pid_t pid : remaining) if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
-        if (!reap_bounded(child, end)) return false;
-        ::usleep(2000);
-    }
-    std::set<pid_t> tagged;
-    std::set<pid_t> remaining;
-    if (!tagged_processes(tag, tagged) || !descendants(::getpid(), remaining)) return false;
-    return tagged.empty() && remaining.empty();
-}
-
-ScannerResult run_scanner(const char* path, int timeout_ms) {
-    ScannerResult result;
-    int pipefd[2] = {-1, -1};
-    if (::pipe(pipefd) != 0) return result;
-    ::fcntl(pipefd[0], F_SETFL, ::fcntl(pipefd[0], F_GETFL) | O_NONBLOCK);
-    const pid_t child = ::fork();
-    if (child < 0) {
-        ::close(pipefd[0]);
-        ::close(pipefd[1]);
-        return result;
-    }
-    if (child == 0) {
-        ::setpgid(0, 0);
-        ::close(pipefd[0]);
-        ::dup2(pipefd[1], STDOUT_FILENO);
-        if (pipefd[1] != STDOUT_FILENO) ::close(pipefd[1]);
-        ::execl(path, path, static_cast<char*>(nullptr));
-        ::_exit(127);
-    }
-    ::setpgid(child, child);  // both sides set it; the child may have exited already
-    ::close(pipefd[1]);
-    result.child = child;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
-    bool eof = false;
-    while (!eof) {
-        const auto now = std::chrono::steady_clock::now();
-        if (now >= deadline) {
-            const bool reaped = terminate_scanner(child, (::getenv("CP21_SCANNER_TAG") ? ::getenv("CP21_SCANNER_TAG") : ""));
-            ::close(pipefd[0]);
-            result.kind = reaped ? ScannerKind::Timeout : ScannerKind::Setup;
-            return result;
-        }
-        const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
-        struct pollfd pfd {pipefd[0], POLLIN, 0};
-        const int ready = ::poll(&pfd, 1, static_cast<int>(left));
-        if (ready < 0) {
-            if (errno == EINTR) continue;
-            break;
-        }
-        if (ready == 0) continue;
-        char chunk[256];
-        const ssize_t got = ::read(pipefd[0], chunk, sizeof chunk);
-        if (got > 0) {
-            result.output.append(chunk, static_cast<std::size_t>(got));
-        } else if (got == 0) {
-            eof = true;
-        } else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
-            break;
-        }
-    }
-    ::close(pipefd[0]);
-    int status = 0;
-    for (;;) {
-        const auto now = std::chrono::steady_clock::now();
-        if (now >= deadline) {
-            const bool reaped = terminate_scanner(child, (::getenv("CP21_SCANNER_TAG") ? ::getenv("CP21_SCANNER_TAG") : ""));
-            result.kind = reaped ? ScannerKind::Timeout : ScannerKind::Setup;
-            return result;
-        }
-        const pid_t got = ::waitpid(child, &status, WNOHANG);
-        if (got == child) break;
-        if (got < 0 && errno == ECHILD) return result;  // someone else reaped it
-        if (got < 0 && errno != EINTR) return result;
-        ::usleep(2000);
-    }
-    result.kind = ScannerKind::Completed;
-    result.status = status;
-    return result;
 }
 
 bool make_controlling_tty() {
@@ -241,36 +46,28 @@ bool make_controlling_tty() {
     return true;
 }
 
+std::string temp_path(const char* prefix) {
+    char name[128];
+    std::snprintf(name, sizeof name, "/tmp/%s-XXXXXX", prefix);
+    const int fd = ::mkstemp(name);
+    if (fd >= 0) ::close(fd);
+    return name;
+}
+
+std::string read_file(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2) return 2;
+    if (argc < 3) return 2;
+    const char* scanner = argv[1];
+    const char* supervisor = argv[2];
+    const bool unrelated_flag = argc > 3 && std::string(argv[3]) == "--unrelated-child";
     auto arm = reinterpret_cast<ArmFn>(::dlsym(RTLD_DEFAULT, "cp21_fallback_arm"));
     auto seen = reinterpret_cast<SeenFn>(::dlsym(RTLD_DEFAULT, "cp21_dup_fd"));
-#ifdef __linux__
-    if (::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0) {
-        std::printf("SETUP_FAIL subreaper unavailable\n");
-        return 2;
-    }
-    if (!proc_available()) {
-        std::printf("SETUP_FAIL proc unavailable\n");
-        return 2;
-    }
-    std::set<pid_t> preexisting;
-    if (!descendants(::getpid(), preexisting)) {
-        std::printf("SETUP_FAIL proc unavailable\n");
-        return 2;
-    }
-    if (!preexisting.empty()) {
-        std::printf("SETUP_FAIL preexisting child process\n");
-        return 2;
-    }
-    const std::string tag = "cp21-scanner-" + std::to_string(::getpid());
-    if (::setenv("CP21_SCANNER_TAG", tag.c_str(), 1) != 0) {
-        std::printf("SETUP_FAIL scanner tag unavailable\n");
-        return 2;
-    }
-#endif
     if (!arm || !seen || !make_controlling_tty()) {
         std::printf("SETUP_FAIL fallback arms or PTY unavailable\n");
         return 2;
@@ -280,9 +77,8 @@ int main(int argc, char** argv) {
     bool acquired = false;
     arm();
     std::thread acquire([&] { acquired = nift::rt::host::posix::terminal_acquire(&owner); });
-    const int deadline = 3000;
     int waited = 0;
-    while (seen() < 0 && waited < deadline) {
+    while (seen() < 0 && waited < 3000) {
         ::usleep(1000);
         ++waited;
     }
@@ -293,24 +89,104 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    const ScannerResult scan = run_scanner(argv[1], 5000);
+    pid_t unrelated = -1;
+    if (unrelated_flag) {
+        unrelated = ::fork();
+        if (unrelated == 0) {
+            ::execl("/bin/sleep", "cp21-unrelated-sleep", "60", static_cast<char*>(nullptr));
+            ::_exit(127);
+        }
+        if (unrelated < 0) {
+            acquire.join();
+            std::printf("SETUP_FAIL unrelated child failed\n");
+            return 2;
+        }
+    }
+
+    const std::string output_path = temp_path("cp21-scan-output");
+    const std::string status_path = temp_path("cp21-scan-status");
+    const pid_t supervisor_pid = ::fork();
+    if (supervisor_pid == 0) {
+        ::setpgid(0, 0);
+        ::execl(supervisor, supervisor, scanner, output_path.c_str(), status_path.c_str(), "5000",
+                static_cast<char*>(nullptr));
+        ::_exit(127);
+    }
+    if (supervisor_pid < 0) {
+        acquire.join();
+        std::printf("SETUP_FAIL supervisor fork failed\n");
+        return 2;
+    }
+    ::setpgid(supervisor_pid, supervisor_pid);
+    int status = 0;
+    bool supervisor_ok = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline) {
+        const pid_t got = ::waitpid(supervisor_pid, &status, WNOHANG);
+        if (got == supervisor_pid) {
+            supervisor_ok = true;
+            break;
+        }
+        if (got < 0 && errno == ECHILD) break;
+        if (got < 0 && errno != EINTR) break;
+        ::usleep(2000);
+    }
+    if (!supervisor_ok) {
+        ::kill(-supervisor_pid, SIGKILL);
+        ::kill(supervisor_pid, SIGKILL);
+        ::waitpid(supervisor_pid, &status, 0);
+    }
     acquire.join();
     const bool released = nift::rt::host::posix::terminal_release(&owner);
+    const std::string status_text = read_file(status_path);
+    const std::string output = read_file(output_path);
+    ::unlink(status_path.c_str());
+    ::unlink(output_path.c_str());
 
-    std::printf("duplicated_fd=%d child_kind=%d child_status=%d child_output=%s\n",
-                duplicated, static_cast<int>(scan.kind), scan.status, scan.output.c_str());
+    bool unrelated_survived = true;
+    if (unrelated > 0) {
+        unrelated_survived = (::kill(unrelated, 0) == 0);
+        check("unrelated-child-survived", unrelated_survived);
+        ::kill(unrelated, SIGKILL);
+        int ignored = 0;
+        ::waitpid(unrelated, &ignored, 0);
+    }
+
+    std::printf("duplicated_fd=%d supervisor_status=%s child_output=%s\n", duplicated,
+                status_text.c_str(), output.c_str());
     check("fallback-acquired", acquired);
     check("fallback-released", released);
-    if (scan.kind == ScannerKind::Timeout) {
+    if (!supervisor_ok) {
+        std::printf("SETUP_FAIL supervisor did not complete\n");
+        return 2;
+    }
+    if (status_text.rfind("SETUP_FAIL", 0) == 0) {
+        std::printf("%s", status_text.c_str());
+        return 2;
+    }
+    if (status_text.rfind("TIMEOUT_CLEANUP_FAIL", 0) == 0) {
+        std::printf("SETUP_FAIL cleanup: %s", status_text.c_str());
+        return 2;
+    }
+    if (status_text.find("TIMEOUT_CLEANED") != std::string::npos) {
         std::printf("TIMEOUT exec child did not finish and was killed/reaped cleaned=1\n");
         return 2;
     }
-    if (scan.kind != ScannerKind::Completed || !WIFEXITED(scan.status)) {
-        std::printf("SETUP_FAIL exec child did not complete normally\n");
+    if (status_text.rfind("SIGNALED", 0) == 0) {
+        std::printf("SETUP_FAIL protocol: child did not exit normally\n");
         return 2;
     }
-
-    const auto protocol = cp21::parse_fd_protocol(scan.output, true, WEXITSTATUS(scan.status));
+    if (status_text.rfind("SETUP_FAIL", 0) != 0 &&
+        status_text.rfind("COMPLETED ", 0) != 0) {
+        std::printf("SETUP_FAIL protocol: supervisor result unavailable\n");
+        return 2;
+    }
+    if (status_text.rfind("COMPLETED_CLEANED_DESCENDANTS", 0) == 0) {
+        std::printf("SETUP_FAIL protocol: scanner left descendants\n");
+        return 2;
+    }
+    const int exit_code = std::atoi(status_text.c_str() + std::strlen("COMPLETED "));
+    const auto protocol = cp21::parse_fd_protocol(output, true, exit_code);
     if (!protocol.valid) {
         std::printf("SETUP_FAIL protocol: %s\n", protocol.error.c_str());
         return 2;

@@ -14,5 +14,6 @@ int main(void) {
     }
     printf("exec_extra_fds=0\n");
     fflush(stdout);
+    sleep(30);
     _exit(0);
 }

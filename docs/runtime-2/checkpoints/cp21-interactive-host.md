@@ -135,6 +135,28 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   `test-cp21-fd-inheritance` and `test-v45-job-control`; the guard requires the
   parent edge.
 
+## R6-review D3 cleanup isolation
+
+- **Dedicated scanner supervisor:** scanner execution and cleanup moved out of
+  the test driver into `tests/cp21_scanner_supervisor.cpp`. The supervisor is
+  the only parent of the scanner; it enumerates only its own descendants, so
+  an unrelated child of the test driver is never signalled. The D3 driver only
+  waits for the supervisor and reads its status/output files.
+- **Fail-closed inspection:** the supervisor requires subreaper setup and
+  readable `/proc`; per-process `stat` read failures (other than processes
+  disappearing during enumeration) are reported as cleanup failure. It
+  collects descendants before killing the scanner parent, then kills the
+  verified scanner group, tagged/tree descendants and reaps them. A survivor or
+  unreadable record cannot produce `cleaned=1`.
+- **Adversarial controls:** ordinary clean/D3 mutant, sleeping child,
+  same-group and escaped descendants, environment-clearing descendant,
+  concurrent unrelated child that must survive, dead/missing executable,
+  arbitrary exit, malformed/NUL transcripts, partial-procfs failure,
+  subreaper-denied, `/proc`-unavailable, parser target mutant and Make
+  shadowing/failure propagation are permanent.
+- **Parser/Make corrections retained:** strict target grammar, parser unit
+  mutation, `.PHONY` mandatory execution and guard edge remain unchanged.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
