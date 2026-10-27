@@ -1,7 +1,5 @@
 #include "rt/compiler_coro.h"
 
-#include "rt/compiler_coro_admit.h"
-
 #include "rt/builtin_bind.h"
 #include "rt/compiler_expr.h"
 #include "rt/native.h"
@@ -341,8 +339,7 @@ bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, con
         reason = "coro-async-recursion";
         return false;
     }
-    if (!FutureFlow(ast, plan, kinds).run(root, reason, offset)) return false;
-    return check_cooperative_admission(ast, root, plan, limits.cooperative_observe, reason, offset);
+    return FutureFlow(ast, plan, kinds).run(root, reason, offset);  // cooperative admission: after compiling
 }
 
 bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset) {

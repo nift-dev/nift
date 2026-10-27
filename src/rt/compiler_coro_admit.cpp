@@ -1,22 +1,20 @@
 #include "rt/compiler_coro_admit.h"
 
-#include "rt/builtin_bind.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
 
-#include <array>
 #include <charconv>
 #include <cstdlib>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 // rt-lint: cold-file compile-time cooperative admission, once per coroutine unit
 
 // Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
-// 12 the admission rule admits everything; 13 A5 is off; 14 A1, 15 A2, 16 A3,
-// 17 A4 is off (one rule each). Normal builds contain none.
+// 12 the admission rule admits everything; 13 A5 off; 14 A1 off; 15 A2 off;
+// 16 A3 off; 17 A4 off; 19 A3 accepts a `sleep` anywhere at the top level of
+// the body (the rejected round-5 rule); 20 calls through values are not
+// followed (the rejected round-5 member-call gap). Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -25,284 +23,263 @@ namespace nift::rt {
 
 namespace {
 
-// Host built-ins that neither block nor wait on I/O: `sleep` suspends the
-// task; the rest read process state in constant time.
-constexpr std::array<std::string_view, 7> kHostAllowed = {"sleep", "epoch", "getenv", "os", "arch", "platform",
-                                                         "hardware_concurrency"};
-// Free functions task code may call (besides the unit's own functions):
-// constant-time or output-only, none blocking. `thread` only matters with the
-// non-contractual cooperative-thread switch.
-constexpr std::array<std::string_view, 11> kTaskFunctions = {
-    "print", "sleep", "error", "type", "epoch", "getenv", "os", "arch", "platform", "hardware_concurrency", "thread"};
-// Methods task code may call: future/thread state, array size and append.
-constexpr std::array<std::string_view, 6> kTaskMethods = {"done", "status", "size", "length", "push", "join"};
+using natives::BuiltinId;
 
-template <std::size_t N>
-bool listed(const std::array<std::string_view, N>& list, std::string_view name) {
-    for (std::string_view entry : list)
-        if (entry == name) return true;
-    return false;
+// A1: Host built-ins that neither block nor wait on I/O (sleep suspends).
+bool host_allowed(BuiltinId id) {
+    switch (id) {
+        case BuiltinId::HostSleep: case BuiltinId::HostEpoch: case BuiltinId::HostGetenv: case BuiltinId::HostOs:
+        case BuiltinId::HostArch: case BuiltinId::HostPlatform: case BuiltinId::HostHardwareConcurrency:
+            return true;
+        default: return false;
+    }
+}
+
+// A4: built-ins task code may call: constant-time reads and `type`.
+bool task_builtin_allowed(BuiltinId id) {
+    switch (id) {
+        case BuiltinId::HostSleep: case BuiltinId::HostEpoch: case BuiltinId::HostGetenv: case BuiltinId::HostOs:
+        case BuiltinId::HostArch: case BuiltinId::HostPlatform: case BuiltinId::HostHardwareConcurrency:
+        case BuiltinId::FnType:
+            return true;
+        default: return false;
+    }
+}
+
+// A4: instructions task code may execute. Arithmetic, comparisons and string
+// concatenation are data-proportional operators (record §12.1.1 residual);
+// everything that is not listed (collection callbacks, in-place collection
+// mutation, JSON of Errors, struct and top-level instructions) is refused.
+bool task_op_allowed(OpCode op) {
+    switch (op) {
+        case OpCode::Nop: case OpCode::LoadK: case OpCode::LoadI: case OpCode::LoadNull: case OpCode::LoadBool:
+        case OpCode::Move: case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
+        case OpCode::AddI: case OpCode::AddAssign: case OpCode::Eq: case OpCode::Ne: case OpCode::Lt: case OpCode::Le:
+        case OpCode::Gt: case OpCode::Ge: case OpCode::Not: case OpCode::Truth: case OpCode::Neg: case OpCode::Pos:
+        case OpCode::BindType: case OpCode::CheckType: case OpCode::CheckAssign: case OpCode::TypeMeet:
+        case OpCode::Jmp: case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull: case OpCode::JmpNotLt:
+        case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq:
+        case OpCode::JmpNotNe: case OpCode::JmpIncLt: case OpCode::Call: case OpCode::CallNative:
+        case OpCode::Return: case OpCode::ReturnNull: case OpCode::NewArray: case OpCode::NewObject:
+        case OpCode::ObjectSet: case OpCode::GetIndex: case OpCode::SetIndex: case OpCode::GetMember:
+        case OpCode::Push: case OpCode::Length: case OpCode::GetGlobal: case OpCode::GetGlobalChecked:
+        case OpCode::SetGlobal: case OpCode::MarkGlobal: case OpCode::CheckGlobal: case OpCode::LoadFunction:
+        case OpCode::NewCell: case OpCode::CellLoad: case OpCode::CellStore: case OpCode::Closure:
+        case OpCode::CallValue: case OpCode::CallValueAny: case OpCode::Undefined: case OpCode::IterCheck:
+        case OpCode::ArrayElem: case OpCode::ArrayElemValue: case OpCode::ObjectKeys: case OpCode::ObjectLookup:
+        case OpCode::ObjectLookupValue: case OpCode::IterMissing: case OpCode::CopyCellLocation:
+        case OpCode::CellLoadCached: case OpCode::CellStoreCached: case OpCode::CellTake: case OpCode::NewSourceSlot:
+        case OpCode::CellAnchor: case OpCode::CellSlot: case OpCode::TryBegin: case OpCode::TryEnd:
+        case OpCode::Throw: case OpCode::ErrorNew: case OpCode::Spawn: case OpCode::Await: case OpCode::Sleep:
+        case OpCode::Yield: case OpCode::TaskEnd: case OpCode::FutureOp:
+            return true;
+        default: return false;
+    }
+}
+
+std::string native_name(std::uint16_t b) {
+    if (b < kFirstBuiltin) return "print";
+    return std::string(natives::builtin_spec(static_cast<BuiltinId>(b - kFirstBuiltin)).name);
 }
 
 class Admission {
 public:
-    Admission(const Ast& ast, const UnitPlan& plan, bool observe) : ast_(ast), plan_(plan), observe_(observe) {}
+    Admission(const Program& program, bool observe) : program_(program), observe_(observe) {}
 
-    bool run(NodeId root, std::string& reason, std::uint32_t& offset) {
+    bool run(std::string& reason, std::uint32_t& offset) {
 #if NIFT_CORO_MUTANT == 12
         return true;  // M12: cooperative admission disabled
 #endif
 #if NIFT_CORO_MUTANT == 13
         observe_ = true;  // M13: scheduling observations admitted (A5 off)
 #endif
-#if NIFT_CORO_MUTANT != 14
-        if (!host_calls(root, reason, offset)) return false;
-#endif
-        if (!observe_ && !observations(root, reason, offset)) return false;
+        const std::size_t n = program_.protos.size();
+        for (std::size_t p = 0; p < n; ++p)
+            if (!unit_wide(p, reason, offset)) return false;
         collect_tasks();
-        if (tasks_.empty()) return true;
 #if NIFT_CORO_MUTANT != 15
         if (cyclic(reason, offset)) return false;
 #endif
-        for (NodeId fn : tasks_)
-            if (!task_body(fn, reason, offset)) return false;
+        for (std::size_t p = 0; p < n; ++p)
+            if (task_[p] && !task_code(p, reason, offset)) return false;
         return true;
     }
 
 private:
-    bool user_function(std::string_view name) const { return plan_.index.count(name) != 0; }
-    NodeId function_node(std::string_view name) const {
-        const auto it = plan_.index.find(name);
-        return it == plan_.index.end() ? kNoNode : plan_.functions[it->second - 1];
+    const Proto& proto(std::size_t p) const { return *program_.protos[p]; }
+    bool fail(std::size_t p, std::size_t pc, std::string why, std::string& reason, std::uint32_t& offset) const {
+        reason = std::move(why);
+        offset = pc < proto(p).offsets.size() ? proto(p).offsets[pc] : 0;
+        return false;
     }
-    template <class Visit>
-    void walk(NodeId root, Visit&& visit, bool into_functions) const {
-        std::vector<NodeId> work{root};
-        while (!work.empty()) {
-            const NodeId id = work.back();
-            work.pop_back();
-            if (id == kNoNode) continue;
-            const Node& n = ast_.at(id);
-            if (!visit(id, n)) return;
-            if (!into_functions && id != root && (n.kind == NodeKind::FnDecl || n.kind == NodeKind::Lambda)) continue;
-            for (NodeId child : {n.a, n.b, n.c}) work.push_back(child);
-            const NodeId* list = ast_.list(n);
-            for (std::uint32_t k = 0; k < n.count; ++k) work.push_back(list[k]);
+
+    // A1 and the unit-wide part of A5 (every proto, main included).
+    bool unit_wide(std::size_t p, std::string& reason, std::uint32_t& offset) const {
+        const std::vector<Instr>& code = proto(p).code;
+        for (std::size_t pc = 0; pc < code.size(); ++pc) {
+            const Instr& in = code[pc];
+            if (in.op == OpCode::FutureOp && !observe_)
+                return fail(p, pc, in.c == 0 ? "coro-observe:done" : "coro-observe:status", reason, offset);
+            if (in.op != OpCode::CallNative || in.b < kFirstBuiltin) continue;
+            const auto id = static_cast<BuiltinId>(in.b - kFirstBuiltin);
+            if (id == BuiltinId::HostEpoch && !observe_) return fail(p, pc, "coro-observe:epoch", reason, offset);
+#if NIFT_CORO_MUTANT != 14
+            if (natives::host_builtin(id) && !host_allowed(id))
+                return fail(p, pc, "coro-blocking-host:" + native_name(in.b), reason, offset);
+#endif
         }
+        return true;
     }
 
-    // A blocking Host call anywhere in the unit (main included): while it
-    // blocks, legacy's other threads progress and the VM's tasks cannot.
-    bool host_calls(NodeId root, std::string& reason, std::uint32_t& offset) const {
-        bool ok = true;
-        walk(root, [&](NodeId, const Node& n) {
-            if (n.kind != NodeKind::Call || n.a == kNoNode || ast_.at(n.a).kind != NodeKind::Ident) return true;
-            const std::string_view name = ast_.text(ast_.at(n.a));
-            if (user_function(name) || listed(kHostAllowed, name)) return true;
-            const natives::BuiltinSpec* spec = bind_function(name);
-            if (spec == nullptr || !natives::host_builtin(spec->id)) return true;
-            reason = "coro-blocking-host:" + std::string(name);
-            offset = n.begin;
-            return ok = false;
-        }, true);
-        return ok;
-    }
-
-    // A5: nothing in the unit observes scheduling: no clock read (`epoch`)
-    // and no `done()` / `status()` poll (task printing is checked in task code).
-    // Admitted programs are then schedule-independent (record §12.1).
-    bool observations(NodeId root, std::string& reason, std::uint32_t& offset) const {
-        bool ok = true;
-        walk(root, [&](NodeId, const Node& n) {
-            if (n.kind != NodeKind::Call || n.a == kNoNode) return true;
-            const Node& callee = ast_.at(n.a);
-            std::string_view name;
-            if (callee.kind == NodeKind::Ident && !user_function(ast_.text(callee))) name = ast_.text(callee);
-            if (callee.kind == NodeKind::Member && callee.b != kNoNode) name = ast_.text(ast_.at(callee.b));
-            const bool clock = callee.kind == NodeKind::Ident && name == "epoch";
-            const bool poll = callee.kind == NodeKind::Member && (name == "done" || name == "status");
-            if (!clock && !poll) return true;
-            reason = "coro-observe:" + std::string(name);
-            offset = n.begin;
-            return ok = false;
-        }, true);
-        return ok;
-    }
-
-    // Task code: async functions and async lambdas, every function or lambda
-    // they can reach by name, and, when task code calls through a value,
-    // every lambda and every function named as a value (conservative).
+    // Task code: async protos, then everything reachable by Call/Spawn; a call
+    // through a value reaches every proto that is ever a function value.
     void collect_tasks() {
-        std::vector<NodeId> work;
-        for (NodeId fn : plan_.functions)
-            if (ast_.at(fn).flags & kFlagAsync) work.push_back(fn);
-        for (NodeId id = 0; id < ast_.size(); ++id)
-            if (ast_.at(id).kind == NodeKind::Lambda && (ast_.at(id).flags & kFlagAsync)) work.push_back(id);
-        bool widened = false;
-        while (!work.empty()) {
-            const NodeId fn = work.back();
-            work.pop_back();
-            if (!seen_.insert(fn).second) continue;
-            tasks_.push_back(fn);
-            std::vector<NodeId>& out = callees_[fn];
-            bool by_value = false;
-            walk(ast_.at(fn).b, [&](NodeId id, const Node& n) {
-                if (n.kind == NodeKind::Lambda) out.push_back(id);
-                if (n.kind == NodeKind::Ident) {
-                    const NodeId target = function_node(ast_.text(n));
-                    if (target != kNoNode) out.push_back(target);  // a call, or the function as a value
-                }
-                if (n.kind == NodeKind::Call && n.a != kNoNode) {
-                    const Node& callee = ast_.at(n.a);
-                    by_value = by_value || (callee.kind != NodeKind::Member &&
-                                            (callee.kind != NodeKind::Ident || !known_callee(ast_.text(callee))));
-                }
-                return true;
-            }, true);
-            if (by_value) values_.push_back(fn);
-            if (by_value && !widened) {
-                widened = true;
-                value_targets();
-                work.insert(work.end(), targets_.begin(), targets_.end());
+        const std::size_t n = program_.protos.size();
+        task_.assign(n, false);
+        value_call_.assign(n, false);
+        edges_.assign(n, {});
+        for (std::size_t p = 0; p < n; ++p) {
+            const std::vector<Instr>& code = proto(p).code;
+            for (std::size_t pc = 0; pc < code.size(); ++pc) {
+                const Instr& in = code[pc];
+                if (in.op == OpCode::LoadFunction || in.op == OpCode::Closure) values_.push_back(in.b);
+                if (in.op == OpCode::Call || in.op == OpCode::Spawn) edges_[p].push_back(in.b);
+                if (in.op != OpCode::CallValue && in.op != OpCode::CallValueAny) continue;
+                const int target = (in.op == OpCode::CallValueAny && (in.c & 0x8000u)) ? thread_target(code, pc) : -1;
+                if (target >= 0) edges_[p].push_back(static_cast<std::uint16_t>(target));
+                else value_call_[p] = true;
             }
-            work.insert(work.end(), out.begin(), out.end());
         }
-    }
-    bool known_callee(std::string_view name) const {
-        NativeInfo native{};
-        return user_function(name) || bind_function(name) != nullptr || lookup_native(name, native) ||
-               listed(kTaskFunctions, name);
-    }
-    // What a call through a value may reach: every lambda, and every function
-    // named anywhere other than as a direct callee.
-    void value_targets() {
-        for (NodeId id = 0; id < ast_.size(); ++id) {
-            const Node& n = ast_.at(id);
-            if (n.kind == NodeKind::Lambda) targets_.push_back(id);
-            if (n.kind == NodeKind::Call && n.a != kNoNode) direct_.insert(n.a);
-        }
-        for (NodeId id = 0; id < ast_.size(); ++id) {
-            const Node& n = ast_.at(id);
-            if (n.kind != NodeKind::Ident || direct_.count(id)) continue;
-            const NodeId target = function_node(ast_.text(n));
-            if (target != kNoNode && ast_.at(target).a != id) targets_.push_back(target);
+        std::vector<std::size_t> work;
+        for (std::size_t p = 1; p < n; ++p)
+            if (proto(p).is_async) work.push_back(p);
+        while (!work.empty()) {
+            const std::size_t p = work.back();
+            work.pop_back();
+            if (p >= n || task_[p]) continue;
+            task_[p] = true;
+            for (std::uint16_t q : edges_[p]) work.push_back(q);
+#if NIFT_CORO_MUTANT != 20
+            if (value_call_[p]) work.insert(work.end(), values_.begin(), values_.end());
+#endif
         }
     }
 
-    // A call cycle among task functions (sync recursion inside a task is
-    // unbounded CPU work); a call through a value may reach any of them.
-    bool cyclic(std::string& reason, std::uint32_t& offset) {
-        enum Mark : std::uint8_t { None, Open, Done };
-        std::unordered_map<NodeId, Mark> mark;
-        for (NodeId start : tasks_) {
-            if (mark[start] != None) continue;
-            std::vector<std::pair<NodeId, std::size_t>> stack{{start, 0}};
-            mark[start] = Open;
+    // `thread(f, …)` (non-contractual switch): the compiler loads the named
+    // function f (LoadFunction, possibly through Moves) into the callee
+    // register just before the call (compiler_thread.cpp); any other shape is
+    // treated as an unknown value call.
+    static int thread_target(const std::vector<Instr>& code, std::size_t pc) {
+        std::uint16_t reg = code[pc].b;
+        for (std::size_t k = pc; k-- > 0;) {
+            if (code[k].a != reg) continue;
+            if (code[k].op == OpCode::LoadFunction) return code[k].b;
+            if (code[k].op != OpCode::Move) return -1;
+            reg = code[k].b;
+        }
+        return -1;
+    }
+
+    // A2: a cycle among task code (Call, Spawn, and value calls to every value).
+    bool cyclic(std::string& reason, std::uint32_t& offset) const {
+        const std::size_t n = program_.protos.size();
+        std::vector<std::uint8_t> mark(n, 0);  // 0 new, 1 on the stack, 2 done
+        for (std::size_t start = 0; start < n; ++start) {
+            if (!task_[start] || mark[start]) continue;
+            std::vector<std::pair<std::size_t, std::size_t>> stack{{start, 0}};
+            mark[start] = 1;
             while (!stack.empty()) {
-                auto& [fn, next] = stack.back();
-                const std::vector<NodeId> edges = edges_of(fn);
-                if (next == edges.size()) {
-                    mark[fn] = Done;
+                const std::size_t p = stack.back().first;
+                const std::vector<std::size_t> next = successors(p);
+                if (stack.back().second == next.size()) {
+                    mark[p] = 2;
                     stack.pop_back();
                     continue;
                 }
-                const NodeId to = edges[next++];
-                if (mark[to] == Open) {
-                    reason = "coro-task-recursion";
-                    offset = ast_.at(to).begin;
-                    return true;
+                const std::size_t q = next[stack.back().second++];
+                if (q >= n || !task_[q]) continue;
+                if (mark[q] == 1) {
+                    fail(q, 0, "coro-task-recursion", reason, offset);
+                    return true;  // a cycle
                 }
-                if (mark[to] == None) {
-                    mark[to] = Open;
-                    stack.push_back({to, 0});
+                if (mark[q] == 0) {
+                    mark[q] = 1;
+                    stack.push_back({q, 0});
                 }
             }
         }
         return false;
     }
-    std::vector<NodeId> edges_of(NodeId fn) const {
-        std::vector<NodeId> edges;
-        const auto it = callees_.find(fn);
-        if (it != callees_.end()) edges = it->second;
-        for (NodeId v : values_)
-            if (v == fn) edges.insert(edges.end(), targets_.begin(), targets_.end());
-        return edges;
+    std::vector<std::size_t> successors(std::size_t p) const {
+        std::vector<std::size_t> out(edges_[p].begin(), edges_[p].end());
+        if (value_call_[p]) out.insert(out.end(), values_.begin(), values_.end());
+        return out;
     }
 
-    // A loop is admitted only when every iteration suspends: its body has a
-    // top-level `sleep(<integer literal >= 1>)` statement.
-    bool suspending_loop(const Node& loop) const {
-        const NodeId body = loop.b;
-        if (body == kNoNode) return false;
-        const Node& b = ast_.at(body);
-        const NodeId* list = ast_.list(b);
-        const std::uint32_t count = b.kind == NodeKind::Block ? b.count : 0;
-        for (std::uint32_t k = 0; k < count; ++k) {
-            const Node& s = ast_.at(list[k]);
-            if (s.kind != NodeKind::ExprStmt || s.a == kNoNode) continue;
-            const Node& call = ast_.at(s.a);
-            if (call.kind != NodeKind::Call || call.count != 1 || ast_.at(call.a).kind != NodeKind::Ident) continue;
-            if (ast_.text(ast_.at(call.a)) != "sleep" || user_function("sleep")) continue;
-            const Node& arg = ast_.at(ast_.list(call)[0]);
-            if (arg.kind != NodeKind::Number) continue;
-            const std::string_view text = ast_.text(arg);
-            long long ms = 0;
-            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), ms);
-            if (parsed.ec == std::errc() && parsed.ptr == text.data() + text.size() && ms >= 1) return true;
+    // A3, A4 and the task part of A5.
+    bool task_code(std::size_t p, std::string& reason, std::uint32_t& offset) const {
+        const std::vector<Instr>& code = proto(p).code;
+        for (std::size_t pc = 0; pc < code.size(); ++pc) {
+            const Instr& in = code[pc];
+#if NIFT_CORO_MUTANT != 17
+            if (!task_op_allowed(in.op))
+                return fail(p, pc, std::string("coro-task-op:") + opcode_name(in.op), reason, offset);
+#endif
+#if NIFT_CORO_MUTANT != 16
+            if (in.op == OpCode::Yield && in.a != 1) return fail(p, pc, "coro-task-loop", reason, offset);
+#endif
+            if (in.op != OpCode::CallNative) continue;
+            if (in.b < kFirstBuiltin) {
+                if (!observe_) return fail(p, pc, "coro-observe:print", reason, offset);
+                continue;
+            }
+#if NIFT_CORO_MUTANT != 17
+            if (!task_builtin_allowed(static_cast<BuiltinId>(in.b - kFirstBuiltin)))
+                return fail(p, pc, "coro-task-native:" + native_name(in.b), reason, offset);
+#endif
         }
-        return false;
+        return true;
     }
 
-    bool task_body(NodeId fn, std::string& reason, std::uint32_t& offset) const {
-        bool ok = true;
-        walk(ast_.at(fn).b, [&](NodeId, const Node& n) {
-            const bool loop = n.kind == NodeKind::While || n.kind == NodeKind::For;
-            if (loop && !suspending_loop(n) && NIFT_CORO_MUTANT != 16) {  // M16: A3 off
-                reason = "coro-task-loop";
-                offset = n.begin;
-                return ok = false;
-            }
-            if (n.kind != NodeKind::Call || n.a == kNoNode) return true;
-            const Node& callee = ast_.at(n.a);
-            std::string_view name;
-            if (callee.kind == NodeKind::Member && callee.b != kNoNode) {
-                name = ast_.text(ast_.at(callee.b));
-                if (listed(kTaskMethods, name)) return true;
-            } else if (callee.kind == NodeKind::Ident) {
-                name = ast_.text(callee);
-                if (!observe_ && name == "print" && !user_function(name)) {  // A5: output only from main
-                    reason = "coro-observe:print";
-                    offset = n.begin;
-                    return ok = false;
-                }
-                if (user_function(name) || listed(kTaskFunctions, name) || !known_callee(name)) return true;
-            } else {
-                return true;  // a call through a value: its target is task code too
-            }
-            if (NIFT_CORO_MUTANT == 17) return true;  // M17: A4 off
-            reason = "coro-task-native:" + std::string(name);
-            offset = n.begin;
-            return ok = false;
-        }, false);
-        return ok;
-    }
-
-    const Ast& ast_;
-    const UnitPlan& plan_;
-    bool observe_;  // non-contractual test switch: A5 off (VM-only scheduler tests)
-    std::vector<NodeId> tasks_;
-    std::unordered_set<NodeId> seen_;
-    std::unordered_map<NodeId, std::vector<NodeId>> callees_;
-    std::vector<NodeId> values_;   // task functions that call through a value
-    std::vector<NodeId> targets_;  // what a call through a value may reach
-    std::unordered_set<NodeId> direct_;
+    const Program& program_;
+    bool observe_;
+    std::vector<bool> task_;
+    std::vector<bool> value_call_;
+    std::vector<std::vector<std::uint16_t>> edges_;
+    std::vector<std::uint16_t> values_;  // protos that are ever function values
 };
 
 }  // namespace
 
-bool check_cooperative_admission(const Ast& ast, NodeId root, const UnitPlan& plan, bool observe,
-                                 std::string& reason, std::uint32_t& offset) {
-    return Admission(ast, plan, observe).run(root, reason, offset);
+bool check_cooperative_admission(const Program& program, bool observe, std::string& reason,
+                                 std::uint32_t& offset) {
+    return Admission(program, observe).run(reason, offset);
+}
+
+bool suspending_loop_body(const Ast& ast, const Node& body, const UnitPlan& plan) {
+    if (body.kind != NodeKind::Block || body.count == 0) return false;
+    const Node& first = ast.at(ast.list(body)[0]);
+#if NIFT_CORO_MUTANT == 19
+    // M19: the rejected round-5 rule (a top-level sleep anywhere in the body).
+    for (std::uint32_t k = 0; k < body.count; ++k) {
+        const Node& s = ast.at(ast.list(body)[k]);
+        if (s.kind == NodeKind::ExprStmt && s.a != kNoNode && ast.at(s.a).kind == NodeKind::Call) {
+            const Node& call = ast.at(s.a);
+            if (call.a != kNoNode && ast.text(ast.at(call.a)) == "sleep") return true;
+        }
+    }
+#endif
+    if (first.kind != NodeKind::ExprStmt || first.a == kNoNode) return false;
+    const Node& call = ast.at(first.a);
+    if (call.kind != NodeKind::Call || call.count != 1 || call.a == kNoNode) return false;
+    const Node& callee = ast.at(call.a);
+    if (callee.kind != NodeKind::Ident || ast.text(callee) != "sleep" || plan.index.count("sleep")) return false;
+    const Node& arg = ast.at(ast.list(call)[0]);
+    if (arg.kind != NodeKind::Number) return false;
+    const std::string_view text = ast.text(arg);
+    long long ms = 0;
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), ms);
+    return parsed.ec == std::errc() && parsed.ptr == text.data() + text.size() && ms >= 1;
 }
 
 void cooperative_switches(CompileLimits& limits) {
