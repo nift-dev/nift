@@ -29,9 +29,17 @@ struct Outcome {
     std::string output;
 };
 
+// Scheduler tests observe scheduling (task output, polls, the clock): they
+// compile under the non-contractual observe switch (record §12.1 A5).
+CompileLimits scheduler_limits() {
+    CompileLimits limits;
+    limits.cooperative_observe = true;
+    return limits;
+}
+
 Outcome run(const std::string& source, VmOptions options = VmOptions()) {
     Outcome o;
-    rt_vm_tool::Compiled c = rt_vm_tool::compile(source);
+    rt_vm_tool::Compiled c = rt_vm_tool::compile(source, scheduler_limits());
     o.reason = c.reason;
     if (!c.program) return o;
     const SourceMap map = SourceMap::single("t.f", source);
@@ -84,6 +92,18 @@ void check_programs() {
     expect("fn[async](f()) { return 1 }\np := f()\ni := 0\nseen := false\n"
            "while(i < 5000) { if (p.done()) { seen = true }; i += 1 }\nprint(seen)\n",
            "true\n", "preemption at loop back-edges");
+}
+
+// The contractual default refuses the same programs before execution (A5).
+void check_default_refuses_observation() {
+    const char* print_in_task = "fn[async](f()) { sleep(20); print(\"late\"); return 1 }\np := f()\nprint(\"main\")\n";
+    CHECK(rt_vm_tool::compile(print_in_task).reason == "coro-observe:print");
+    CHECK(rt_vm_tool::compile("fn[async](f()) { return 1 }\np := f()\nprint(p.done())\n").reason ==
+          "coro-observe:done");
+    CHECK(rt_vm_tool::compile("fn[async](f()) { return 1 }\nt := epoch()\nprint(await f())\n").reason ==
+          "coro-observe:epoch");
+    const rt_vm_tool::Compiled pure = rt_vm_tool::compile("fn[async](f(x)) { sleep(5); return x + 1 }\nprint(await f(1))\n");
+    CHECK(pure.reason.empty() && pure.program != nullptr);
 }
 
 void check_return_in_output() {
@@ -198,6 +218,7 @@ void check_refusals() {
 
 int main() {
     check_programs();
+    check_default_refuses_observation();
     check_return_in_output();
     check_fatal_await();
     check_abandonment();

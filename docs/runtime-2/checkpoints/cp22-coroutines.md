@@ -475,6 +475,44 @@ Recommendation: keep (A); treat `Kind::Future` as "the task-handle kind" (heap
 subkinds for thread and later CP23 handles). Nothing irreversible: no ABI,
 serialisation or persisted format depends on the value 14.
 
+#### 11.2.1 Round 4: boundary-by-boundary analysis (Kind::Future stays provisional)
+
+The question is how `Kind::Future`, and one more runtime kind after it,
+cross every boundary. No representation change is proposed.
+
+| Boundary | Today (code reference) | Future (and thread subkind) | One more kind K | Risk / owner-visible point |
+| --- | --- | --- | --- | --- |
+| Value encoding | `rt::Value` byte 15 = `Kind` (`value.h`) | 14 | 15; byte has 241 free values | none |
+| Heap header | `HeapObject::tag`: bits 0-3 kind, bit 7 D-040 identity summary (`heap.h`), bits 4-6 unused; `kind()` masks with `kKindMask` | fits (14) | 15 fits; 16+ needs `kKindMask` = `0x7F` (one constant + two static_asserts; same single `and`, checked by compile) | **identity bit 7 must stay outside the kind mask**: a widened mask of `0x7F`, never `0xFF` |
+| Destruction / children | `destroy_heap_object`, `child_count`, `child_at`, iterative release (`value.cpp`) | cases for Future (2 children) | one case each; the switches have defaults, so a missing case is not a compile error | a missing case leaks or crashes: covered by the heap-baseline tests (M4 style) |
+| Heap accounting | `footprint` (`heap_account.cpp`), `task_bytes` via `heap_retally` | counted | one case | budget checks |
+| Equality / sameness | `compare.cpp` (identity for Function, Future) | identity | decide value vs identity per kind | D-040 V16 identity summary |
+| Identity fast path | `aggregate.cpp`: `kind() < Array` cannot carry identity | appended after Array: identity-capable (correct) | appended: same; a new *scalar* kind must be inserted before Array (renumber; nothing persists `Kind`) | ordering is load-bearing |
+| Text types / bindings | `binding_tag` (`vm_ops.cpp`) | 4 (string, as legacy) | one case | legacy text-type parity |
+| Legacy bridge | `legacy_bridge.cpp convert_to`: `default` → "<kind> values have no legacy representation" | no representation; never crosses (no VM→legacy handoff after execution starts, D-013; modules refused in coroutine units) | same default | a kind that must reach legacy needs a converter |
+| Serialisation (JSON, stringify, render, print) | natives switch on `Kind`; `default` refuses (`json argument kind`, `public_type_name` → null) | unreachable: the flow check (`coro-future-flow:*`) refuses futures in every serialising position | needs the same flow check or a defined serialisation | a new kind must not reach these natives unchecked |
+| Persistence / caches | no persistent bytecode; D-041 module cache is in-memory, keyed by compiler version; `NIFT_VM_STATS` reports no kinds | none | none | none today; a future on-disk cache must version `Kind` |
+| C ABI / public API | `include/nift/c_abi.h` exposes outcomes and copied text only; `nift::Value::Type` (`include/nift/value.h`) is a separate legacy enum | not exposed | not exposed unless a binding needs it | an embedding API for VM values would need its own stable enum, not `rt::Kind` |
+| FFI | CP18 FFI is legacy-side; VM FFI (later) marshals per declared C type, not per `Kind` | not marshallable (refuse) | per kind | FFI must refuse task handles |
+| Compiler inference | `KindSet` `uint16_t`: bits 0-10 base, 11-13 CP17 handles, 14 future, 15 thread: **full** | `kKindFuture`, `kKindThread` | `KindSet` → `uint32_t`: `UnitKinds::kinds` (one per AST node: +2 bytes/node), `Ty::kinds`, every `KindSet` signature (35 uses in headers); compile time only, no run-time cost | owner-visible: the next inferable kind forces the widening |
+| CP23 isolates | values cross isolates by copy or freeze (architecture #7) | a future/thread handle is bound to its isolate's scheduler: copying must **refuse** (or CP23 defines a proxy) | a channel or isolate handle is shared across isolates: refcount must be atomic or the object must live outside the isolate heap | **CP23 types are better modelled as `HandleKind`s** (`HandleKind::{Future, Mutex, Atomic}` already exist in `value.h`, boxed by CP17's `HandleBoxObject`) than as new `Kind` tags; that consumes no tag |
+
+Conclusions:
+
+* Today `Kind::Future` is adequate. It crosses no persistent, ABI, FFI or
+  legacy boundary, and every serialising boundary refuses it by default. The
+  compile-time flow check keeps it away from those boundaries.
+* The scarce resource is the compile-time `KindSet` (full at 16 bits). The
+  heap tag has room in practice (byte plus three free bits), and the value
+  tag has plenty.
+* Cross-isolate CP23 types belong in the handle space. Future and thread
+  handles must be refused at the isolate boundary.
+* The open alternative from §11.2 remains: Future as a CP17 boxed handle,
+  which frees tag 14. It is worth deciding when CP17 is integrated, because
+  CP23's handles will follow whichever model CP17 sets.
+* Status: **provisional**, pending the independent review the owner
+  requested.
+
 ### 11.3 Work-stealing and mandatory CP22 semantics
 
 Checked against `checkpoints.md` (row CP22: "VM coroutines + work-stealing
@@ -693,11 +731,13 @@ weighed against the provisional acceptance of cooperative `async`.
 CP23 isolates provide genuine parallel execution. Cooperative `thread()` is
 never the default.
 
-The test switch `NIFT_VM_COOPERATIVE_THREADS=1` is kept and is
-**non-contractual**. It exists only to run the evidence fixtures of §11.6
-and §11.7. No user-facing behaviour, documentation or support depends on it,
-and it may be removed at any time. CP23 replaces it with isolate-backed
-parallel threads.
+The test switches `NIFT_VM_COOPERATIVE_THREADS=1` and (round 4)
+`NIFT_VM_COOPERATIVE_OBSERVE=1` are kept and are **non-contractual**. They
+exist only to run evidence and scheduler tests: the thread fixtures of §11.6
+and §11.7, and the corpus fixtures that observe scheduling (§12.1 A5). No
+user-facing behaviour, documentation or support depends on them, and they
+may be removed at any time. CP23 replaces the thread switch with
+isolate-backed parallel threads.
 
 **Decision 2 — parallel `async` keeps real parallelism.**
 * The coroutine scheduler stays as internal Runtime 2.0 infrastructure
@@ -740,48 +780,134 @@ reported):
 | A2 | No call cycle among T, counting calls through values as reaching every value target. A recursive task does unbounded CPU work. | `coro-task-recursion` |
 | A3 | Every `while`/`for` loop in T has, at the top level of its body, a statement `sleep(<integer literal ≥ 1>)`, so every iteration suspends. `sleep(0)` and `await` do not count: neither is guaranteed to suspend. | `coro-task-loop` |
 | A4 | Every built-in function called in T is the unit's own function, a call through a value (itself task code), or in `TASK_FN`. Every method called in T is in `TASK_METHOD`. Data-proportional built-ins such as hashing, sorting, string/JSON/number methods, collection callbacks and file reads are refused. | `coro-task-native:<name>` |
+| A5 | No observation of scheduling: no `print` in T; no `epoch` and no `done()` / `status()` call anywhere in the unit. (Round 4, owner request: output and clock and poll results depend on the schedule, see the proof.) | `coro-observe:<name>` |
 
 The existing §5 refusals still apply (captures, modules, structs, async
-values, future flow, async recursion).
+values, future flow, async recursion). A5 is skipped only under the
+non-contractual test switch `NIFT_VM_COOPERATIVE_OBSERVE=1` (VM-only scheduler
+tests and the differential corpus that predates A5); it is never on by
+default.
 
-**Why this establishes parity.** Under A1–A4, every task's work between two
-suspension points is a bounded sequence of operations:
-* no loops, except loops that suspend on every iteration;
-* no recursion;
-* only constant-time or output-only built-ins.
+#### 12.1.1 Proof of equivalence (round 4)
 
-Its CPU time is therefore at most proportional to program size times the
-size of the values it receives. Legacy spends work of the same order
-serially on the caller's thread when it clones the task's snapshot and
-arguments at the call. So legacy's parallel execution gains no speed-up
-beyond a factor bounded by program size, and nothing can starve a task.
+**What is observable.** The observable result of a run is:
+* stdout and stderr: the bytes and their order;
+* the exit status;
+* the Host-op trace, per trace context and in order within each context
+  (rt-diff's rule);
+* the filesystem and environment effects.
 
-Tasks only wait, sleep and do bounded work. Output order stays within
-legacy's own nondeterminism, because the FIFO run queue and the timer order
-are one of legacy's interleavings. Errors, completion and drain follow §3.
+Wall-clock duration is not a program result (§8): legacy guarantees no upper
+bound on any duration. CPU parallelism is a performance property, governed by
+§11.1 and A1–A4.
 
-Main-program code may do CPU work. Legacy runs main on one thread as well,
-and main's loops are VM safepoints, so timers are polled at least every
-1,024 iterations.
+**Legacy's model** (`ParserAsyncPool.cpp`, `ParserExpression.cpp`
+`spawn_future`/`await_future`, `Parser.cpp` `finalize_execution_workers`):
+* Tasks run on a FIFO-fed pool of P = max(2, hardware_concurrency) OS
+  threads.
+* A task blocked in `sleep` holds its worker. An awaiting *worker* helps by
+  running queued tasks (`run_one`); the main thread does not.
+* A task receives its snapshot and arguments at the call.
+* A task's result and Error reach other code only through `await`.
+* A task completes after its children; the run ends after every task.
 
-**Residuals, stated rather than claimed away:**
-* A single main-program built-in call (one large sort) delays due task
-  timers until it returns. Legacy would wake the task meanwhile. This
-  changes latency, not output or order beyond legacy's own nondeterminism.
-* Output writes (`print`) are treated as non-blocking: the VM buffers
-  output, and legacy serialises output under one lock.
+Legacy therefore guarantees only these orderings:
 
-**Witnesses:**
-* Refusals (all before execution, legacy output unchanged):
-  `refuse/r_ca_cpu_loop`, `r_ca_cpu_native`, `r_ca_cpu_helper`,
-  `r_ca_recursion`, `r_ca_blocking_host`, `r_ca_main_blocking`,
-  `r_ca_for_await`, `r_ca_lambda_loop`, `r_ca_sleep_zero_loop`,
-  `r_ca_string_method`.
-* Admitted and legacy-equal: `cases/ca_sleep_loop`, `ca_light_tasks`, and
-  every remaining `cases/*.f`.
-* Former VM fixtures that the rule now refuses moved to `refuse/` with their
-  reasons (`spawn_tree` → `coro-task-loop`; `tr_exists`, `tr_thread` → `coro-blocking-host:exists`; `tr_fs` → `coro-blocking-host:is_dir`; replaced by the admitted `spawn_tree_light`, `tr_env`, `tr_thread_env`).
-* The adversarial generator emits only admitted shapes (task loops suspend).
+| Edge | Ordering |
+| --- | --- |
+| HB1 | program order within main and within each task |
+| HB2 | a call precedes everything its task does |
+| HB3 | everything a task (and its descendants) does precedes the return of an `await` on it |
+| HB4 | `sleep(n)` lasts at least n ms |
+
+Everything else is unordered. Which interleavings are actually reachable
+depends on P and on OS timing: on a 2-worker machine three sleeping tasks
+serialise (witness item 2 below).
+
+**(a) Output from tasks (`print`).**
+* Legacy's task output interleaving is nondeterministic. The print-order
+  tool's item 1 shows several distinct orders across legacy runs of one
+  program on this machine.
+* Every VM order respects HB1–HB3. Item 4 checks this on generated programs,
+  with 0 violations.
+* That is necessary but **not sufficient** for "every VM order is one legacy
+  can produce". Legacy's reachable set also depends on P. Item 2: legacy with
+  P = 2 prints `a c b` every run; the VM prints `c a b`, an order legacy
+  produces only with P ≥ 3.
+* So VM output order is within legacy's results across machines, but not
+  always within legacy's results on the same machine. **`print` in task code
+  is refused** (A5, `coro-observe:print`).
+* Main's own `print`s stay admitted. Main's output order is HB1 program
+  order, and its values come only through `await` (HB3), which is
+  deterministic (next paragraph).
+
+**(b) `sleep(n)` and timing.**
+* `sleep(n ≥ 1)` guarantees a suspension point and HB4 (VM timers never fire
+  early: mutant M3, `v_timer_not_early`). It guarantees nothing about
+  legacy's scheduling.
+* A program could observe timing through:
+  * the clock (`epoch`);
+  * a poll of a task's state (`done()`/`status()`);
+  * the interleaving of task output.
+* All three are refused by A5. The clock witness is item 3: elapsed time
+  main observes is ≥ 200 ms on legacy P = 2 and about 100 ms on the VM, for
+  the same program.
+* The only timing property an admitted program can depend on is HB4, and it
+  has no way to observe even that. `sleep` is equivalent to a pure delay;
+  removing it would not change the result.
+
+**(c) The theorem.** Under A1–A5, an admitted program's observable result is
+the same for every schedule that respects HB1–HB3, and therefore equal on
+legacy (any P, any timing) and on the VM.
+
+1. *Tasks are deterministic functions.*
+   * A task's inputs are its arguments and its global snapshot, fixed at the
+     call (HB2, §3 item 1), plus `getenv` and the other `HOST_OK` reads.
+   * Those reads are constant during the run, because A1 refuses `setenv`,
+     `cd` and every other effecting Host built-in.
+   * Its code has no clock (A5) and no randomness (`secure_random_bytes` is
+     refused by A1).
+   * So its result value or Error is a function of the call.
+2. *Tasks have no observable side effects.*
+   * No `print` (A5) and no effecting Host op (A1).
+   * Global writes stay in the task's snapshot (§3 item 1).
+   * Trace lines for `getenv`/`sleep` go to the task's own context, in task
+     program order. Context labels are assigned at the call (`child_label`,
+     creation order), so each context's sequence is deterministic.
+3. *Main observes tasks only through `await`.*
+   * `await` returns the task's (deterministic) result or Error, after HB3.
+   * There is no `done`/`status`/`epoch` (A5).
+   * Main's own effects are in program order (HB1), and the values it
+     prints are deterministic by 1 and 3.
+4. *End of run.* Drain (structured completion) waits for every task. A
+   task's unawaited failure is ignored (L7) and it printed nothing, so the
+   exit status and output do not depend on when it finished.
+5. *Progress.*
+   * Both engines terminate on admitted programs. Task work is bounded
+     (A2–A4); sleeps are finite; await waits only on earlier tasks (no
+     cycles, §4); legacy's pool makes progress by `run_one` and FIFO order.
+   * Neither can deadlock: the VM's scheduler raises an internal stop
+     instead (M1 witness).
+
+So VM result = legacy result. Legacy's runtime errors in task code follow
+D-009#5 exactly as §3 records, with policies in EXPECT.tsv.
+
+**Residuals that remain.**
+* The `D-009#5-*` diagnostic-location policy.
+* Latency, which is not a program result: a long main-program built-in
+  delays task wake-ups.
+
+**Witnesses for each claim:**
+
+| Claim | Witnesses |
+| --- | --- |
+| A1–A4 refusals | `refuse/r_ca_*` (10 fixtures) |
+| A5 refusals | `refuse/r_obs_print_default`, `r_obs_epoch_default`, `r_obs_task_epoch_default`, `r_obs_done_default`, `r_obs_status_default` (run with no switch) |
+| Default admission of the corpus | `run.py --mode default` runs every `cases/*.f` with no switch; each fixture is either admitted and equal to its golden, or refused for an admission reason before execution with legacy equal to its golden (counts in the Evidence section) |
+| Equivalence on generated admitted programs | the adversarial generator (tasks never print; only main prints, after awaits; no clock or poll), run without the observe switch on both dispatch builds, compared with legacy |
+| (a), (b) claims | `tests/runtime2/cp22/print_order.py` items 1–4 (log `print-order-r5.log`) |
+| Mutants | M12 (A1–A4 disabled) and M13 (A5 disabled) are each caught by their refusal witnesses |
+| Fixtures moved to `refuse/` by A1–A4 | `spawn_tree` → `coro-task-loop`; `tr_exists`, `tr_thread` → `coro-blocking-host:exists`; `tr_fs` → `coro-blocking-host:is_dir`; replaced by the admitted `spawn_tree_light`, `tr_env`, `tr_thread_env` |
 
 ### 12.2 Nonblocking Host integration
 
@@ -797,35 +923,52 @@ three things:
   concurrent attempt observes.
 
 The natives live in `src/rt/natives`, owned by CP21/CP19 and outside this
-checkpoint's edit rights. This is therefore **blocked**: the design above is
-the proposal, and A1 refuses blocking Host calls until it lands. The
+checkpoint's edit rights. This is therefore **blocked**, not dropped: it
+remains CP22 work (owner, round 4) and resumes when the CP17/CP19/CP21
+interface boundaries are supplied. The design above is the proposal; A1
+refuses blocking Host calls until it lands. Interfaces CP22 needs from those
+owners: (1) per-built-in prepare/attempt/complete entry points with the
+attempt on plain data; (2) a thread-safe HostCall completion (trace v2,
+observer record) callable on the VM thread after an off-thread attempt; (3)
+a statement of which Host ops are cwd-sensitive, so `cd` can serialise
+them; (4) for CP17 handles: completion callbacks posting to the
+WakeSource. The
 scheduler side (suspend, post, resume, error routing) exists and is tested
 through `sleep` and the TSan wake-path tests.
 
-### 12.3 What depends on CP23 (proposed roadmap reconciliation)
+### 12.3 Roadmap boundary (approved in principle, round 4) and exact amendment text
 
-| Requirement | Today (CP22 candidate) | Delivered by |
+The owner approved the boundary in principle; the documents are not yet
+edited. No legacy-supported parallel operation may become silently
+cooperative: every one of them is refused before execution today.
+
+| Requirement | Today (CP22 candidate) | Owner |
 | --- | --- | --- |
-| `thread()` with real parallel execution, `join`/`done`/`status` | refused (`callable:thread`), runs on legacy | CP23: an isolate per thread (values copied in, results copied out) |
-| `mutex()`, `atomic<…>` shared across threads | refused, runs on legacy | CP23: host-shared mutex/atomic objects usable from isolates; lock waits as suspension points |
-| CPU-bound or blocking `async` with real parallelism | refused by A1–A4, runs on legacy | CP23: async tasks on isolates (or an isolate pool) when their captures are copyable; plus §12.2 suspending Host ops |
-| Blocking Host ops inside cooperative tasks | refused (A1) | §12.2 (natives owner) — may land before CP23 |
-| Work-stealing | not needed for semantics | optional CP23 implementation choice for the isolate pool |
+| `thread()` with real parallel execution | refused (`callable:thread`), runs on legacy | **CP23** (isolate per thread) |
+| `mutex()`, `atomic<…>` | refused, runs on legacy | **CP23** |
+| Parallel `async` for CPU-bound or blocking work | refused (A1–A4), runs on legacy | **CP23** (isolate pool) |
+| Isolates, channels | absent | **CP23** |
+| Cooperative scheduling, futures, suspension/resumption, timers and cancellation, Error propagation and future lifetimes | implemented (§3, §4, §12.1) | **CP22** |
+| Nonblocking Host-operation integration (Host ops that suspend instead of blocking) | blocked on CP17/CP19/CP21 interface boundaries (§12.2); A1 refuses blocking Host ops meanwhile | **CP22**, must not stay unfinished |
+| Work-stealing | not required for semantics | optional CP23 implementation choice |
 
-Proposed reconciliation, which the owner decides; `checkpoints.md` is not
-edited here:
-* CP22's row becomes "VM coroutine infrastructure, scheduler and event loop;
-  cooperative execution only where admitted (§12.1)".
-* CP23's row takes "parallel `thread()`, parallel `async` for CPU-bound or
-  blocking tasks, mutex/atomics".
-* The CP22 gates (10k sleeps, spawn scaling) stay on CP22.
-* The parallel-async regression gate moves to CP23: "no async/thread
-  program refused for parallelism; legacy-vs-VM CPU scaling within the
-  agreed factor".
-* CP25's zero-fallback gate depends on CP23 for these refusals.
+**Proposed exact text for `docs/runtime-2/checkpoints.md`** (rows 39–40;
+for the owner to approve verbatim):
+
+```
+| CP22 | M7 Concurrency | VM coroutines: cooperative scheduler, futures, suspension/resumption, timers and cancellation, Error propagation and future lifetimes, event loop, nonblocking Host-operation integration; cooperative execution only for programs proven schedule-independent (cp22-coroutines.md §12.1), everything else refused before execution | CP12 (Host integration: CP17, CP19, CP21 interfaces) | 10k sleeps of 10 ms in < 0.2 s; linear spawn scaling to 100k; admitted programs equal legacy (differential corpus, adversarial, mutants); no legacy-supported parallel operation executed cooperatively |
+| CP23 | M7 Concurrency | Capture-only isolates, channels, cancellation; real parallel `thread()`, parallel `async` for CPU-bound or blocking work, `mutex`/`atomic`; isolate pool (work-stealing optional) | CP22 | Labs concurrency suite; no data races under TSan; no async/thread program refused for parallelism; legacy-vs-VM CPU scaling at 1/2/4/8 tasks within the agreed factor |
+```
+
+**Proposed note for `decisions.md`** (new decision, owner wording to be
+supplied): "CP22/CP23 boundary (owner, 2026-10-27): real parallelism of
+`thread()` and `async` is preserved; the VM executes cooperatively only
+programs whose results are schedule-independent; parallel execution arrives
+with CP23 isolates; nonblocking Host integration stays in CP22." CP25's
+zero-fallback gate depends on CP23 for these refusals.
 
 None of these requirements is optional, and **CP22 is not complete while
-they remain open**.
+nonblocking Host integration remains open**.
 
 ## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 
@@ -932,3 +1075,48 @@ handover's evidence directory, named `*-r4`.
 
   The CPU-bound `yield` and `fairness` workloads are now refused on the VM
   (`coro-task-loop`), as the rule requires.
+
+### Evidence, round 4 (A5 and the equivalence proof; same container)
+
+Raw logs: `test-cp22-r6.log`, `mode-*-r5.log`, `print-order-r5.log`,
+`mutant-12/13-r5.log`, `lint/integrity/guard*-r5.log`.
+
+* **`make test-runtime2-cp22`** (goto and switch builds), exit 0:
+
+  | Check | Result |
+  | --- | --- |
+  | coro-unit | 80/80, now including the default-refusal checks |
+  | Legacy oracle | 111/111 |
+  | VM | 65/65 |
+  | Refusals | 46/46 |
+  | VM-only | 7/7 |
+  | Traces | 3/3 |
+  | Adversarial | 80 × 2 builds, with no observe switch, 0 differences |
+  | Controls | all rejected |
+  | `print_order.py` | pass |
+
+* **`--mode default`** (no test switch), all 65 cases pass:
+  * 38 are admitted and equal their golden.
+  * 27 are refused before execution and legacy equals the golden:
+    * 16 `callable:thread`;
+    * 5 `coro-observe:print`;
+    * 4 `coro-observe:done`;
+    * 2 `coro-observe:status`.
+* **`print_order.py`** results:
+
+  | Item | Result |
+  | --- | --- |
+  | 1 | legacy produced 7 and 10 distinct output orders in 30 runs, in two sessions |
+  | 2 | legacy with P = 2 prints `a c b` (10/10 runs); the VM prints `c a b` |
+  | 3 | elapsed time is 201-202 ms on legacy and 100-101 ms on the VM |
+  | 4 | 40 generated programs, 0 happens-before violations |
+
+* **Mutants M12 and M13:** each caught by its refusal witnesses. Only these
+  two were rebuilt this round, to keep heavy use light: the admission code
+  is the only mutated source that changed. M1–M11 were last run in round 3
+  (12/12), and their sources have not changed since.
+* rt-lint, test-integrity, certification guard and self-test: pass.
+* **Not re-run this round** (owner: keep heavy use light): the ASan/UBSan
+  sanitize target, TSan (no scheduler or wake-path change) and the full
+  `test-rt-vm` regression. All three last passed in round 3, before A5 and
+  before the coro-unit and `rt_vm_tool` changes of this round.
