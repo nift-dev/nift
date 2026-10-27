@@ -1,0 +1,498 @@
+{
+  "foundation": "86b7ee16ec32f64a3a4499b2ad8cb3243c64e27c",
+  "status": "Development audit, independent acceptance and CP17 reconciliation pending",
+  "policy": "No new compatibility waiver. Passing named witnesses does not prove an entire semantic category. Source-invariant guards remain explicit.",
+  "sources_include_test_mutants": true,
+  "entries": [
+    {
+      "reason": "limit:session-bindings",
+      "historical_classification": "B",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 276
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "Existing 16-bit operand/storage bound; not a semantic coverage claim.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "limit:session-protos",
+      "historical_classification": "B",
+      "current_locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 247
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "Existing 16-bit Proto index bound; not a semantic coverage claim.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:binding-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 146
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "reserved-scalar, function-to-string, string-to-function",
+      "assessment": "Defined incompatible scalar assignments remain rejected; compatible callable/String tags and fresh reserved declarations execute."
+    },
+    {
+      "reason": "session:binding-shape-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 221
+        },
+        {
+          "file": "src/rt/compiler_session_contract.cpp",
+          "line": 26
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 150
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "exact, returned, field, element, direct/nested/capture admission mutants",
+      "assessment": "Private coherent inference recompiles affected live readers; old bounds never silently change."
+    },
+    {
+      "reason": "session:binding-struct-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 275
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "reserved-schema",
+      "assessment": "A fresh declaration in an unreached slot uses its new schema; defined instance copying retains core rules."
+    },
+    {
+      "reason": "session:call-alias-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 211
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 227
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "named-alias-place, constructor, multiple-named",
+      "assessment": "Known named targets carry argument typing and escape checks. Opaque fallback remains defensive, rather than authorizing unknown current calls."
+    },
+    {
+      "reason": "session:call-kind-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 222
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "exact, returned, field, element, current-effects",
+      "assessment": "Current concrete bodies are reinferred; old signatures do not certify new arguments."
+    },
+    {
+      "reason": "session:call-signature",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 218
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "proof unknown/field/element/return/alias/cell",
+      "assessment": "Missing opaque signatures are blocked by the current proof guard. Source-only metadata invariants still require independent review."
+    },
+    {
+      "reason": "session:callable-flow",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 250
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 255
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "exact, unwarmed-higher-order, unwarmed-returned, comparator, selector",
+      "assessment": "Historical staging is allowed only for dormant bodies; current known targets have ordinary inference."
+    },
+    {
+      "reason": "session:callable-rebind",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 136
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 143
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "function-to-string, string-to-function, saved-function-to-string, reader-function-to-string",
+      "assessment": "Mutable compatible bindings execute. Actual readonly bindings and unknown current callbacks retain their existing boundaries."
+    },
+    {
+      "reason": "session:capture-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 221
+        },
+        {
+          "file": "src/rt/compiler_session_contract.cpp",
+          "line": 18
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "shared-callable-replacement, captured-callable-string, sibling-effects",
+      "assessment": "Full current callable facts propagate across shared storage within one inference instance."
+    },
+    {
+      "reason": "session:capture-layout",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 347
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 349
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 360
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 365
+        }
+      ],
+      "status": "source invariant; not asserted exhaustively exercised",
+      "assessment": "Persistent metadata/layout mismatch guard; if reachable for valid input it is a CP19 correctness gap, not a release exclusion.",
+      "acceptance": "Any valid-input counterexample remains an A-class defect; no waiver or reclassification."
+    },
+    {
+      "reason": "session:captured-struct",
+      "historical_classification": "C",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_closure.cpp",
+          "line": 100
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "CP12b/closure receiver lowering defect reproduced in CP18 stateless execution, status70 member failure; session guard prevents admission. Still a release gap until repaired by its owner.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:dynamic-shadow",
+      "historical_classification": "A/B",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 186
+        }
+      ],
+      "status": "source invariant; not asserted exhaustively exercised",
+      "assessment": "B only for genuinely caller-dependent named lookup under D-038. A for never-executed lambda wrapper false positives; wrapper-shadow-overreach witness.",
+      "acceptance": "Any valid-input counterexample remains an A-class defect; no waiver or reclassification."
+    },
+    {
+      "reason": "session:element-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 222
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 175
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "exact, nested admission witness, native admission witnesses",
+      "assessment": "Nested aggregate updates use coherent private recompilation."
+    },
+    {
+      "reason": "session:function-assignment",
+      "historical_classification": "A/B",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 187
+        },
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 271
+        },
+        {
+          "file": "src/rt/compiler_assign.cpp",
+          "line": 305
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "function-to-string, string-to-function, captured-callable-string",
+      "assessment": "Mutable callable assignments execute; readonly named/catch bindings remain invalid-input exclusions."
+    },
+    {
+      "reason": "session:lambda-assignment-spelling",
+      "historical_classification": "B",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 145
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "Specific unseparated spelling is rejected by legacy textual lambda parsing; measured invalid-input witness, not a valid-language exclusion.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:legacy-method-precedence",
+      "historical_classification": "C",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 195
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "Inherited CP15/native dispatch conflict: CP18 VM accepts a Function field that legacy reserves/rejects. New session guard avoids reproducing the mismatch.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:opaque",
+      "historical_classification": "C",
+      "current_locations": [
+        {
+          "file": "src/rt/session.cpp",
+          "line": 217
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "Shared parser opaque/unsupported syntax; malformed input is B. Actual detailed opaque reasons remain inherited compiler inventory.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:parse",
+      "historical_classification": "B/C",
+      "current_locations": [
+        {
+          "file": "src/rt/session_inventory.cpp",
+          "line": 19
+        },
+        {
+          "file": "src/rt/session.cpp",
+          "line": 217
+        }
+      ],
+      "status": "existing contextual boundary",
+      "assessment": "B malformed input; C valid legacy grammar beyond the shared parser. Not evidence that all parsing failures are acceptable release exclusions.",
+      "acceptance": "Classification applies only to its established witness, not all inputs sharing the reason."
+    },
+    {
+      "reason": "session:redeclared",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 267
+        }
+      ],
+      "status": "source invariant; not asserted exhaustively exercised",
+      "assessment": "Publication/redefinition invariant guard. Valid session redeclarations, if rejected, are an implementation gap; invalid declarations are B.",
+      "acceptance": "Any valid-input counterexample remains an A-class defect; no waiver or reclassification."
+    },
+    {
+      "reason": "session:redefinition-callable-flow",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 320
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "dormant-selector-call, replacement-loop-capture admission witness",
+      "assessment": "Owned per-definition facts cover dormant incomplete captures. Unknown current invocation still refuses."
+    },
+    {
+      "reason": "session:redefinition-order",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 325
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "replacement, order admission witness",
+      "assessment": "Registration order and saved old aliases are covered."
+    },
+    {
+      "reason": "session:reserved-binding-contract",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 271
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "reserved-const, reserved-schema",
+      "assessment": "Fresh reserved declarations can establish their actual readonly/const/schema contract."
+    },
+    {
+      "reason": "session:shadow-or-redeclare",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 132
+        }
+      ],
+      "status": "source invariant; not asserted exhaustively exercised",
+      "assessment": "Top-level existing binding redeclaration; valid cross-command reuse is a gap, while truly illegal redeclarations are B.",
+      "acceptance": "Any valid-input counterexample remains an A-class defect; no waiver or reclassification."
+    },
+    {
+      "reason": "session:struct-dynamic-shadow",
+      "historical_classification": "A/B",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 69
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 71
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 98
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 108
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 117
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 184
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "field admission witness, constructor",
+      "assessment": "Unrelated fields and lambda wrappers no longer trigger the named dynamic-lookup policy."
+    },
+    {
+      "reason": "session:struct-name-conflict",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 104
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 111
+        },
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 119
+        }
+      ],
+      "status": "source invariant; not asserted exhaustively exercised",
+      "assessment": "Separate name namespaces/conflicts need semantic review; no blanket documented exclusion.",
+      "acceptance": "Any valid-input counterexample remains an A-class defect; no waiver or reclassification."
+    },
+    {
+      "reason": "session:struct-redeclared",
+      "historical_classification": "A",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 101
+        }
+      ],
+      "status": "corrected witnessed semantic cases; guard retained where needed",
+      "evidence": "constructor, schema admission witness",
+      "assessment": "Old instances keep old definitions; new construction sees the replacement."
+    },
+    {
+      "reason": "session:active-historical-call",
+      "current_locations": [
+        {
+          "file": "src/rt/session_history.cpp",
+          "line": 57
+        }
+      ],
+      "status": "explicit proof boundary",
+      "assessment": "Current unknown callbacks and reachable historical-only calls refuse before effects. Unknown is not proof."
+    },
+    {
+      "reason": "session:current-callable-proof",
+      "current_locations": [
+        {
+          "file": "src/rt/session_history.cpp",
+          "line": 43
+        }
+      ],
+      "status": "explicit proof boundary",
+      "assessment": "Current unknown callbacks, effect-only Any callees and unknown alternatives in partially known target sets refuse before effects. Explicit unproved historical return markers are not concrete type proofs."
+    },
+    {
+      "reason": "session:struct-callable-flow",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 60
+        }
+      ],
+      "status": "source guard requires contextual review",
+      "assessment": "No automatic release exclusion; a valid-input counterexample remains a defect."
+    },
+    {
+      "reason": "session:widening-callable-flow",
+      "current_locations": [
+        {
+          "file": "src/rt/compiler_session.cpp",
+          "line": 55
+        }
+      ],
+      "status": "source guard requires contextual review",
+      "assessment": "No automatic release exclusion; a valid-input counterexample remains a defect."
+    }
+  ],
+  "cp17": "Blocked pending authoritative accepted integrated handover; 71336f4a/d773f5ee tracking only.",
+  "performance": "All four final matched CP18 instruction comparisons exceed reference; unwaived, not an acceptance pass."
+}

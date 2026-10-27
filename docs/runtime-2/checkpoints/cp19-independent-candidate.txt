@@ -1,0 +1,142 @@
+CP19 independent implementation candidate — 27 October 2026
+
+Status
+The non-resource persistent compiler/session implementation is prepared for
+independent review. CP19 is NOT complete, accepted, integrated or release-ready.
+Resource-capable persistent sessions remain a mandatory blocked requirement.
+The final matched-dispatch instruction results exceed all four CP18 references;
+these regressions are unresolved and unwaived. Earlier smaller results are
+superseded by the exact final-binary observations, not erased.
+
+Owner-relayed CP17 dependency
+CP17 is not yet accepted or integrated. Candidate 71336f4a, tree d773f5ee,
+branch integ-cp17-bd are dependency tracking identities only. They are not an
+implementation foundation. Functional/embedding, 312 allocation-failure points
+and initial sanitizers reportedly passed; remaining sanitizers, mutation gates,
+independent acceptance and authoritative integration are outstanding.
+
+Wait for the exact accepted integrated commit/tree, authoritative header/interface
+locations, handle ownership and cross-unit survival, exactly-once cleanup,
+cancellation and Error semantics, ProcessGroup/lifecycle-ticket ownership,
+required cross-command regression/mutation witnesses and accepted limitations.
+Do not reconstruct final contracts from the candidate or invent compatibility
+APIs. No CP17-specific persistent-resource implementation has been started here.
+
+Implemented independent requirements
+- VM-owned session selection precedes rc/initial-unit execution; D-054 refusal
+  never switches engine, replays history or mirrors executable state in Parser.
+- Stable binding/type Cells, private whole-unit compilation/publication,
+  immutable source maps, original Error origins and surviving runtime effects.
+- .niftrc, initial script/file/stdin/inline -> -i continuity, shell classification,
+  interpolation and command routing retain the existing tested session path.
+- Named functions, saved aliases, mutable closures/captures, aggregate COW,
+  source/Program ownership, registry order and old/new struct versions persist.
+- Dormant higher-order bodies stage using bounded owned pure call-result facts.
+  Open results remain explicitly unproved and can stage only dormant untyped uses.
+  Current targets/effects are inferred anew. Unknown current input has separate
+  taint, including effect-only Any callees and partially known target sets. Every
+  reachable historical-only call refuses before effects.
+- Shared Cell/projection effects exchange full current callable facts within
+  one inference instance; same-kind Function replacement cannot hide new returns
+  or sibling mutations. AST callable IDs never persist between compilations.
+- Unreached declarations can establish a new valid kind, schema and const
+  contract. Mutable String/Function bindings preserve legacy tag compatibility.
+- Array payloads and call/native/Error/constructor operand windows reserve
+  contiguous destinations before evaluating scratch-producing session reads.
+- Cold numeric diagnostics preserve enclosing return/lambda context, including
+  argument calls, without changing ordinary CP13B reporting or caught Errors.
+- Allocation failure before admission preserves the namespace; an admitted
+  internal exception closes the damaged session. No legacy replay occurs.
+
+Proof and ownership boundary
+See cp19-call-summary-proof.txt for invariants, fixed-point/graph conditions,
+source/version validity, adversarial model and lifetime bounds. Fact sets contain
+owned source, original spans and pure structural bounds or explicit unproved-result
+markers, never executable Values,
+captured environments, selector caches or historical Program owners. Existing
+complete callable metadata can refine current inference seeds; historical bounds
+remain separate. No selector cache/value read creates callback proof.
+
+No Frame layout, fault slot, VM instruction dispatch or ordinary runtime call-entry
+change is introduced. Ty remains 136 bytes. The new call-note boolean fits existing
+Note padding. Proto gains a shared proof-set pointer. Stateless compilation records
+no proof sets; unrelated session commands leave retained callable proofs unchanged.
+
+Validation recorded in the frozen delivery
+Normal session suite: 405 checks per dispatch. New CLI differential matrix:
+40 cases x legacy/VM=1/require x two dispatches, preserving all channels and
+requiring affirmative VM execution. It includes the exact earlier widening
+reproducer and the original same-unit Function replacement Internal-error case.
+
+33 distinct compiled mutations are exercised by 34 test variants per dispatch:
+7 original session mutations, 13 admission mutations and 13 new constraints.
+The new proof driver has 14 variants because it also reuses the existing shared
+storage mutation. Normal controls, reciprocal wrong-expectation controls and
+new dead-binary/unrelated-failure controls accompany exact named witnesses.
+Main/indirect/method/constructor/collection reachability and structural/Cell
+laundering are tested, not inferred merely from the primary reproducer.
+
+ASan/LSan/UBSan cover both dispatches, current-proof/source/lifetime cases,
+405 session checks, admission witnesses and an exhaustive one-shot allocation
+sweep (46 proof/allocation observations, plus full 40-case CLI matrices). Leak detection is enabled outside the tracer. Optional standard-library
+scratch-buffer failure is permitted only with full successful semantics/state.
+Normal sweep: 721 points; sanitizer sweep: 722 points. Both distinguish refusal,
+admitted containment, safe optional-buffer recovery and successful execution.
+
+Existing CP13B functional/error-origin gates, E4/E8 controls and affected
+CP14B/CP18/R1 gates are recorded separately in the evidence directory. Test logs
+and raw observations, not this narrative alone, establish which lanes passed.
+
+Performance and memory
+All performance observations are local, with individual samples/binary hashes;
+no portable performance certification, threshold change or waiver is claimed.
+
+Matched CP18 instruction references, 1,000,000 iterations:
+                 ordinary catches      captured-Cell catches
+ default         3,047,691,273           5,382,801,348
+ switch          3,053,689,851           5,386,799,900
+Relative to CP18: default +0.131653%, +0.410559%; switch +0.065802%, +0.167562%.
+All four exceed their references. No instruction gate is declared passed and no
+waiver is claimed. The previous +0.112% Cell obligation has not been resolved;
+these final measurements show a larger outstanding regression. Earlier raw runs
+are retained with their own binary hashes. This audit does not establish the
+cause of the instruction differences; a compiler-only source change by itself
+is not performance evidence. No broad optimization round was performed.
+
+Matched-dispatch compiler timing samples and bootstrap intervals are preserved.
+The final local medians were about 35.0 us (default) and 32.6 us (switch) for
+related commands, 13.6/5.5 us for unrelated commands and 224/252 us for stateless
+compilation. Matched baseline samples, individual medians, bootstrap intervals
+and all raw counters are preserved. The run is noisy and does not establish
+performance neutrality. Structural tests establish that stateless scripts
+allocate no proof sets and unrelated commands leave existing proof sets intact;
+these checks do not waive measured compiler or runtime costs.
+
+10,000 related commands retained one fact (40 bytes of vector payload) and one
+code unit. Allocator live bytes were 130,464 after 1,000 and 130,480 after 10,000;
+the 16-byte difference coincides with a longer current source spelling; fact
+and code-unit counts stay flat. This is allocator evidence, not a total
+process-memory budget claim. Weak-owner tests separately establish reclamation.
+
+Refusal and platform status
+cp19-current-refusals.json preserves the historical classifications and records
+current witnesses/boundaries. No known mandatory session-specific counterexample
+from this audit remains uncorrected. Passing witnesses does not certify whole
+categories: source/layout/resource guards are explicitly not all exhaustively
+exercised, and a new valid-input counterexample remains an A-class defect.
+Unknown current callbacks never acquire proof from history. Existing contextual
+D-038/D-040 and inherited core limitations are not given new blanket waivers.
+Earlier development records are historical; this record supersedes their stale
+claims about reserved declarations, registry order and callable rebinding.
+
+Focused Linux x86_64 evidence, both dispatches, is available. macOS/Windows and
+full combined-runtime platform certification remain unperformed. CP17-dependent
+resource lifetime, cancellation, teardown and lifecycle-ticket gates are blocked,
+not passed or silently reclassified as exclusions. Independent adversarial
+acceptance remains required before integration.
+
+Boundary
+Frozen 86b7ee16, a4288846 and 1c0b157f packages remain byte-identical to their
+manifests. Changes are local to codex/cp19-complete in the isolated worktree.
+No authoritative integration, agent coordination, push, CI dispatch, tag,
+release, provisioning or infrastructure expenditure was performed.
