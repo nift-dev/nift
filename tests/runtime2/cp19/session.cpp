@@ -337,13 +337,13 @@ int main() {
         std::string output;
         auto r = session.execute("struct(First){v:=1};struct(Second){v:=2};throw error(\"stop\");p:=First()", "reserved-instance", output);
         CHECK(r.admitted && r.execution.reason == StopReason::Error && !session.contains("p"));
-        r = session.execute("print(\"FORBIDDEN\");p:=Second()", "incompatible-instance", output);
-        CHECK(!r.admitted && r.refusal == "session:binding-struct-contract" && output.empty());
+        r = session.execute("print(\"FORBIDDEN\");p:=Second();bytes([65])", "failed-instance-publication", output);
+        CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
         CHECK(!session.contains("p"));
-        r = session.execute("p:=First()", "compatible-instance", output);
+        r = session.execute("p:=Second()", "rebind-reserved-instance", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         r = session.evaluate("p.v", "reserved-instance-read", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
     }
     {
         struct State { VmSession* session = nullptr; SessionResult nested; std::string output, nested_output; } state;

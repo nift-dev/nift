@@ -19,7 +19,7 @@ $(eval $(call CP19_ADMISSION_MUTANT,9,compiler_expr))
 $(eval $(call CP19_ADMISSION_MUTANT,10,compiler_session_native))
 $(eval $(call CP19_ADMISSION_MUTANT,11,compiler_session_native))
 $(eval $(call CP19_ADMISSION_MUTANT,12,session_callable))
-$(eval $(call CP19_ADMISSION_MUTANT,13,session_alias))
+$(eval $(call CP19_ADMISSION_MUTANT,13,infer_session_location))
 .PHONY: test-cp19-admission-mutants
 test-cp19-admission-mutants: $(TEST_DIR)/cp19/admission-control $(addprefix $(TEST_DIR)/cp19/admission-m,1 2 3 4 5 6 7 8 9 10 11 12 13)
 	$(PYTHON) tests/runtime2/cp19/admission_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --out "$(TEST_DIR)/cp19/admission-mutants.json"
@@ -50,7 +50,7 @@ $(eval $(call CP19_ADMISSION_SWITCH,9,compiler_expr))
 $(eval $(call CP19_ADMISSION_SWITCH,10,compiler_session_native))
 $(eval $(call CP19_ADMISSION_SWITCH,11,compiler_session_native))
 $(eval $(call CP19_ADMISSION_SWITCH,12,session_callable))
-$(eval $(call CP19_ADMISSION_SWITCH,13,session_alias))
+$(eval $(call CP19_ADMISSION_SWITCH,13,infer_session_location))
 .PHONY: test-cp19-admission-mutants-switch
 test-cp19-admission-mutants-switch: $(TEST_DIR)/cp19/admission-control-switch $(addsuffix -switch,$(addprefix $(TEST_DIR)/cp19/admission-m,1 2 3 4 5 6 7 8 9 10 11 12 13))
 	$(PYTHON) tests/runtime2/cp19/admission_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --suffix=-switch --out "$(TEST_DIR)/cp19/admission-mutants-switch.json"

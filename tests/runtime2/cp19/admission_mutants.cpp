@@ -20,9 +20,9 @@ int main(int argc, char** argv) {
         probe = "struct(Point){v:=1;fn(get()){return this.v}};p:=Point()";
         check = "v"; expected = "99"; reason = "session:struct-dynamic-shadow";
     } else if (test == "loop") {
-        seed = "fn(g()){return 1};fn(makec()){caparr:=[[()=>g()]];return v=>{for(row:caparr){row.push(v)};return 1}};c:=makec();warm:=c(0)";
-        probe = "fn(g()){return 3}";
-        check = "g()"; expected = refused ? "1" : "3"; reason = "session:redefinition-callable-flow";
+        seed = "fn(g()){return 1};fn(makec()){caparr:=[[()=>g()]];return v=>{for(row:caparr){row.push(v)};q:=caparr[0][0];return q()}};c:=makec();warm:=c(0)";
+        probe = "fn(g()){return 3};last:=c(1)";
+        check = "g()"; expected = refused ? "1" : "3"; reason = "session:active-historical-call";
     } else if (test == "alias") {
         seed = "f:=()=>1;g:=()=>2;old:=f";
         probe = "f = g";

@@ -3677,6 +3677,9 @@ test-cp19-session-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp19/session_struct_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/session-struct-switch.json"
 	$(PYTHON) tests/runtime2/cp19/widening_error_boundary.py --legacy "$(CURDIR)/$(TARGET)" --nift "$(CURDIR)/$(TARGET)" --switch "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/widening-errors.json"
 
+include tests/runtime2/cp19/proof.mk
+include tests/runtime2/cp19/admission_mutants.mk
+
 $(TEST_DIR)/cp19/operand-windows: tests/runtime2/cp19/operand_windows.cpp $(CP19_EXPR_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 .PHONY: test-cp19-operand-windows
