@@ -83,6 +83,10 @@ void VmSession::refresh(SessionCompileContext& pending) {
         symbol.callable_shape = session_callable_shape(v);
         symbol.untracked_callables = symbol.callable_shape && !symbol.callable_shape->complete;
         symbol.callable = v.is(Kind::Function);
+        // Current callable metadata refines only the inference seed. The
+        // immutable String/Function admission bound remains separate.
+        if (!(symbol.contract & ~(kKindString | kKindFunction)))
+            symbol.kinds = symbol.callable ? kKindFunction : kKindString;
         if (symbol.callable) {
             const auto* proto = static_cast<const Proto*>(v.template heap_as<FunctionObject>()->code);
             symbol.arity = proto->nparams;
@@ -90,6 +94,9 @@ void VmSession::refresh(SessionCompileContext& pending) {
             symbol.definition = proto->session_definition;
             symbol.identity = v.template heap_as<FunctionObject>()->session_identity;
             symbol.params = proto->session_params; symbol.param_types = proto->session_param_types;
+        } else {
+            symbol.definition.reset(); symbol.identity = 0; symbol.arity = symbol.returns = 0;
+            symbol.params.clear(); symbol.param_types.clear();
         }
     }
 }
@@ -128,6 +135,19 @@ SessionResult VmSession::execute_safe(const std::string& source, const std::stri
         active_ = false;
         if (close_pending_) close();
         return result;
+    }
+    catch (const std::bad_alloc& error) {
+        active_ = false;
+        SessionResult result; result.vm_executions = executions_ != before;
+        result.admitted = result.vm_executions != 0;
+        result.execution.reason = StopReason::Internal;
+        result.execution.message = std::string("NIFT_VM internal failure: ") + error.what();
+        // Before admission all compilation/publication containers are private.
+        // An allocation failure there cannot invalidate the live namespace.
+        if (result.admitted || close_pending_) close();
+        detail::Stats stats; stats.path = path; stats.outcome = "internal-error";
+        stats.reason = result.execution.message; stats.executions = static_cast<int>(result.vm_executions);
+        detail::report(stats); return result;
     }
     catch (const std::exception& error) {
         active_ = false;

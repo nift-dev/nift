@@ -2,6 +2,7 @@
 #include "rt/alias.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
+#include "rt/session_history.h"
 #include "rt/legacy_names.h"
 #include "rt/compiler_session_scope.h"
 #include "rt/compiler_session_contract.h"
@@ -50,14 +51,14 @@ bool UnitCompiler::session_admit() {
     const auto contract = session_shape_contract(*session_, kinds_);
     if (contract.reason) return fail(ast_.at(contract.node), contract.reason);
     if (session_->coherent_recompile) for (const auto& symbol : session_->symbols)
-        if (symbol.untracked_callables) return fail(ast_.at(root_), "session:widening-callable-flow");
+        if (symbol.untracked_callables && !session_staging_covered(symbol.callable_shape))
+            return fail(ast_.at(root_), "session:widening-callable-flow");
     if (session_) for (const auto& schema : session_->structures)
         if (!session_->imported_functions.count(schema.first) && plan_.struct_index.count(schema.first))
             for (const auto& symbol : session_->symbols)
-                if (symbol.untracked_callables) return fail(ast_.at(root_), "session:struct-callable-flow");
-    // Legacy named functions can see caller-local bindings. Only names read
-    // freely by a named function need the D-038 shadow guard; ordinary lexical
-    // shadowing that cannot influence such a reader remains admitted.
+                if (symbol.untracked_callables && !session_staging_covered(symbol.callable_shape))
+                    return fail(ast_.at(root_), "session:struct-callable-flow");
+    // Only actual free named reads need D-038; unrelated lexical shadowing is safe.
     std::unordered_set<std::string_view> dynamic_struct_fields;
     for (const auto& schema : plan_.structs) if (!schema.methods.empty() &&
         !session_->inactive_imports.count(std::string(schema.name)))
@@ -129,13 +130,14 @@ bool UnitCompiler::session_admit() {
                 }
                 if (n.kind == NodeKind::Declare && symbol.defined)
                     return fail(n, "session:shadow-or-redeclare");
+                if (!symbol.defined && session_->reserved_rebindings.count(symbol.name)) continue;
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 4
                 if (symbol.callable && ast_.at(n.b).kind != NodeKind::Lambda)
                     return fail(n, "session:callable-rebind");
 #endif
                 if (symbol.callable && n.kind != NodeKind::Declare &&
                     !(!symbol.readonly &&
-                      (ast_.at(n.b).kind == NodeKind::Lambda ||
+                      (kinds(n.b) == kKindString || ast_.at(n.b).kind == NodeKind::Lambda ||
                        (kinds(n.b) == kKindFunction && kinds_.callable_targets.count(n.b) &&
                         !kinds_.callable_targets.at(n.b).empty()))))
                     return fail(n, "session:callable-rebind");
@@ -194,6 +196,7 @@ bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint
     bool phased = false;
     if (!session_order_call_types(node, callee, base, phased)) return false;
     if (phased) return true;
+    if (!(kinds(callee) & (kKindFunction | kKindUnknown))) return true;  // proven failed call, after arguments
     const auto name = ast_.at(callee).kind == NodeKind::Ident ? text(ast_.at(callee)) : std::string_view{};
     for (const auto& symbol : session_->symbols) {
         if (symbol.name != name || !symbol.callable || session_->lambda_templates.count(symbol.name)) continue;
@@ -263,9 +266,11 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
         !(binding.readonly && binding.decl_kinds == kKindFunction && existing->readonly && existing->callable))
         return fail(ast_.at(root_), "session:redeclared");
     if (existing != session_->symbols.end() && !existing->defined &&
+        !session_->reserved_rebindings.count(std::string(name)) &&
         (binding.readonly != existing->readonly || binding.const_array != existing->const_array))
         return fail(ast_.at(root_), "session:reserved-binding-contract");
     if (existing != session_->symbols.end() && !existing->defined && !existing->struct_name.empty() &&
+        !session_->reserved_rebindings.count(std::string(name)) &&
         (binding.struct_id < 0 || existing->struct_name != plan_.structs.at(binding.struct_id).name))
         return fail(ast_.at(root_), "session:binding-struct-contract");
     if (session_->slots > 65532) return fail(ast_.at(root_), "limit:session-bindings");
@@ -292,13 +297,15 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
         symbol.structure = session_shape(shape->second);
         symbol.kinds = symbol.contract = symbol.structure->kinds;
     }
+    if (!binding.readonly) symbol.contract = session_binding_kinds(symbol.contract);
     symbol.const_array = binding.const_array; symbol.readonly = binding.readonly;
     if (existing == session_->symbols.end()) session_->symbols.push_back(std::move(symbol));
     else {
-        symbol.contract = existing->contract;
+        const bool fresh = !existing->defined && session_->reserved_rebindings.count(std::string(name));
+        if (!fresh) symbol.contract = existing->contract;
         // Older closures were compiled against the reserved slot's complete
         // bounds, including mutations after its original declaration.
-        if (!existing->defined) symbol.structure = existing->structure;
+        if (!existing->defined && !fresh) symbol.structure = existing->structure;
         *existing = std::move(symbol);
     }
     return true;
@@ -309,7 +316,8 @@ bool UnitCompiler::session_function(NodeId id) {
     if (session_->imported_functions.count(std::string(name))) return true;
     for (const auto& symbol : session_->symbols) if (symbol.name == name && symbol.defined) {
         for (const auto& retained : session_->symbols)
-            if (retained.untracked_callables) return fail(node, "session:redefinition-callable-flow");
+            if (retained.untracked_callables && !session_staging_covered(retained.callable_shape))
+                return fail(node, "session:redefinition-callable-flow");
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 6
         for (std::uint32_t k = 0; k < ast_.at(root_).count; ++k) {
             const auto statement = ast_.list(ast_.at(root_))[k];

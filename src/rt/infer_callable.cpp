@@ -40,6 +40,7 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
     for (std::uint32_t unit : callee->callables) {
         if (static_cast<std::size_t>(unit) < plan_.functions.size()) {
             auto& params = params_[unit];
+            if (session_) session_call_edge(unit, params.size(), values.size());
             for (std::size_t k = 0; k < values.size() && k < params.size(); ++k)
                 grew = merge(params[k], values[k]) || grew;
             callers_[unit].insert(current_unit());
@@ -47,6 +48,7 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
         } else if (static_cast<std::size_t>(unit) > plan_.functions.size()) {
             const std::size_t id = static_cast<std::size_t>(unit) - plan_.functions.size() - 1;
             LambdaInfo& info = lambdas_[id];
+            if (session_) session_call_edge(unit, info.params.size(), values.size());
             for (std::size_t k = 0; k < values.size() && k < info.params.size(); ++k)
                 grew = merge(info.params[k], values[k]) || grew;
             info.callers.insert(current_unit());

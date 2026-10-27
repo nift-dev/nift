@@ -1,5 +1,6 @@
 #include "rt/compiler.h"
 #include "rt/session_alias.h"
+#include "rt/session_history.h"
 #include "rt/session_shape.h"
 
 #include "rt/compiler_expr.h"
@@ -289,6 +290,10 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     // CP12b: free names of functions that resolve to top-level bindings.
     const GlobalPlan globals = plan_globals(ast, root, plan);
     const UnitKinds kinds = infer_session_aliases(ast, root, plan, limits.kind_walks, &globals, limits.session);
+    if (limits.session && kinds.converged) {
+        const auto refusal = validate_session_history(kinds, plan.functions.size());
+        if (!refusal.empty()) { result.reason = refusal; result.offset = ast.at(root).begin; return result; }
+    }
     const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
@@ -328,6 +333,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             const auto shape = kinds.binding_shapes.find(symbol.name);
             if (shape != kinds.binding_shapes.end()) symbol.structure = session_shape(shape->second);
         }
+    if (limits.session) record_session_history(ast, kinds, *limits.session, *program);
     result.program = std::move(program);
     return result;
 }

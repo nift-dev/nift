@@ -17,6 +17,7 @@ using TyRef = std::shared_ptr<const Ty>;
 
 struct Ty {
     KindSet kinds = 0;
+    bool historical_callable = false, untracked_callable = false;
     bool legacy_text_number = false;  // may have moved-from StrNumber storage
     bool collection_array = false;  // CP14B array result provenance
     bool collection_object = false;  // CP14B result-container provenance

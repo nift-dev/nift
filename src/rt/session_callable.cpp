@@ -52,7 +52,7 @@ struct Scan {
             const auto* proto = static_cast<const Proto*>(function->code);
             if (function->session_identity && proto && proto->session_definition) {
                 SessionCallable target{function->session_identity, proto->session_definition, {},
-                    proto->session_parameter_shapes, proto->session_capture_shapes, {}};
+                    proto->session_parameter_shapes, proto->session_capture_shapes, {}, proto->session_call_facts};
                 for (std::size_t k = 0; k < function->upvalues.size(); ++k) {
                     const auto& capture = function->upvalues[k];
                     const auto* cell = cell_plain_capture(capture);
@@ -63,6 +63,14 @@ struct Scan {
                     // scan. Do not resolve selectors or inspect cached values.
                     auto shape = cell ? visit(cell->value, depth + 1) :
                         is_cell(capture) && !may_call(bound) ? Shape{} : incomplete();
+                    // Refine scalar seeds from the existing complete callable
+                    // metadata, without another value or selector-cache read.
+                    if (cell && bound && !bound->any && bound->kinds &&
+                        !(bound->kinds & ~(kKindString | kKindFunction)) && (!shape || shape->complete)) {
+                        auto current = std::make_shared<infer_detail::Ty>(*bound);
+                        current->kinds = shape && !shape->targets.empty() ? kKindFunction : kKindString;
+                        target.capture_types[k] = std::move(current);
+                    }
                     if (shape && !shape->complete) out->complete = false;
                     target.captures.push_back(std::move(shape));
                     target.capture_locations.push_back(session_capture_location(capture));

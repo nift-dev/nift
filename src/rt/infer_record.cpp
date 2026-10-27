@@ -1,7 +1,9 @@
 #include "rt/infer_record.h"
+#include "rt/session_shape.h"
 // rt-lint: cold-file compile-time expression kind recording
 namespace nift::rt::infer_detail {
 TyRef Inference::record(NodeId id, TyRef t) {
+    if (session_) t = session_current_shape(t);
     result_.kinds[id] = t->kinds;
     if (session_) result_.session_shapes[id] = t;
     if(ast_.at(id).kind==NodeKind::Ident) {
@@ -17,7 +19,7 @@ TyRef Inference::record(NodeId id, TyRef t) {
     else result_.collection_objects.erase(id);
     auto& targets = result_.callable_targets[id];
     targets.clear();
-    result_.callable_unknown[id] = t->any || (t->kinds & kKindUnknown);
+    result_.callable_unknown[id] = t->any || (t->kinds & kKindUnknown) || t->untracked_callable;
     for (int unit : t->callables) {
         if (unit >= 0 && static_cast<std::size_t>(unit) < plan_.functions.size())
             targets.push_back(plan_.functions[unit]);

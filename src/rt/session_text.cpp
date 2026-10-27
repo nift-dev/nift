@@ -1,4 +1,6 @@
 #include "rt/session_text.h"
+#include "rt/session_history.h"
+#include "rt/session_shape.h"
 #include "rt/lexer.h"
 #include "rt/unit_check.h"
 #include "rt/infer.h"
@@ -67,6 +69,10 @@ SessionText session_text(const std::string& source, const std::string& path,
     const auto parsed = parse_script(original);
     if (parsed.ok) for (std::uint32_t k = 0; k < original.at(parsed.root).count; ++k) {
         const auto& node = original.at(original.list(original.at(parsed.root))[k]);
+        if (node.kind == NodeKind::Declare)
+            for (const auto& symbol : context.symbols)
+                if (!symbol.defined && symbol.name == original.text(original.at(node.a)))
+                    out.reserved_rebindings.insert(symbol.name);
         if (node.kind == NodeKind::FnDecl || node.kind == NodeKind::StructDecl)
             declarations.emplace(original.text(original.at(node.a)));
     }
@@ -137,7 +143,7 @@ SessionText session_text(const std::string& source, const std::string& path,
     for (const auto& entry : selected) out.required_imports.insert(entry.name);
     // Redefinition changes a registry entry seen by every retained alias.
     // Compile all reachable readers against it, including captured callables.
-    bool redefining = false;
+    bool redefining = !out.reserved_rebindings.empty();
     for (const auto& symbol : context.symbols) redefining = redefining || declarations.count(symbol.name);
     for (const auto& schema : context.structures) redefining = redefining || declarations.count(schema.first);
     if (redefining || import_all) for (const auto& symbol : context.symbols) scan(symbol.name);
@@ -217,7 +223,8 @@ void seed_retained_lambda_parameters(const Ast& ast, const SessionText& text,
                         definition->end != node.end - position + piece.source_begin) continue;
                     for (std::uint32_t p = 0; p < node.count && p < target.parameter_types.size(); ++p) {
                         auto& seed = pending.parameter_seeds[ast.list(node)[p]];
-                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(), target.parameter_types[p]);
+                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(),
+                            session_historical_shape(target.parameter_types[p]));
                     }
                 }
             position += piece.length;
@@ -228,8 +235,10 @@ void seed_retained_lambda_parameters(const Ast& ast, const SessionText& text,
 void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, const SessionText& text,
                                const SessionCompileContext& current, SessionCompileContext& pending) {
     pending.source_owner = std::make_shared<const std::string>(text.text);
+    pending.reserved_rebindings = text.reserved_rebindings; pending.unit_begin = text.unit_begin;
     pending.lambda_templates.clear(); pending.capture_seeds.clear(); pending.template_wrappers.clear();
     pending.parameter_seeds.clear();
+    prepare_session_history(ast, text, current, pending);
     pending.capture_locations.clear(); pending.capture_initializers.clear();
     if (parsed_ok) seed_retained_lambda_parameters(ast, text, current, pending);
     pending.callable_templates.clear(); pending.capture_callable_seeds.clear();
@@ -250,7 +259,8 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
                 if (target.definition == imported->second)
                     for (std::uint32_t p = 0; p < parameters.count && p < target.parameter_types.size(); ++p) {
                         auto& seed = pending.parameter_seeds[ast.list(parameters)[p]];
-                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(), target.parameter_types[p]);
+                        seed = infer_detail::unite(seed ? seed : infer_detail::empty_ty(),
+                            session_historical_shape(target.parameter_types[p]));
                     }
         if (!imported->second->lambda) continue;
         const auto& body = ast.at(fn.b);
@@ -262,6 +272,7 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
         pending.template_wrappers.insert(ast.list(ast.at(root))[k]);
         pending.template_definitions.emplace(tail.a, imported->second);
         pending.callable_templates.emplace(imported->second.get(), tail.a);
+        std::unordered_set<NodeId> current_scalar_seeds;
         for (std::uint32_t c = 0; c + 1 < body.count; ++c) {
             const auto& declaration = ast.at(ast.list(body)[c]);
             pending.capture_initializers.emplace(declaration.a, declaration.b);
@@ -275,10 +286,18 @@ void prepare_session_templates(const Ast& ast, NodeId root, bool parsed_ok, cons
                             pending.capture_locations[declaration.a].push_back(target.capture_locations[c]);
                         if (c < target.capture_types.size() && target.capture_types[c]) {
                             auto& seed = pending.capture_seeds[declaration.b];
-                            seed = infer_detail::unite(seed, target.capture_types[c]);
-                            pending.capture_contracts[declaration.a] = seed;
+                            const auto& current_type = target.capture_types[c];
+                            if (!current_type->any && current_type->kinds &&
+                                !(current_type->kinds & ~(kKindString | kKindFunction)) &&
+                                current_scalar_seeds.insert(declaration.b).second) seed = current_type;
+                            else seed = infer_detail::unite(seed, current_type);
+                            auto& contract = pending.capture_contracts[declaration.a];
+                            contract = infer_detail::unite(contract, current_type);
                         }
                         const auto shape = target.captures[c];
+                        if (shape && !shape->complete && target.call_facts)
+                            pending.capture_seeds[declaration.b] =
+                                session_historical_shape(pending.capture_seeds[declaration.b]);
                         if (!shape) continue;
                         // Multiple closure instances share a definition, so
                         // infer every possible callable captured at this slot.
@@ -327,5 +346,6 @@ void session_definitions(const Ast& ast, NodeId root, const SessionText& text, c
         definition->name = "lambda:" + std::to_string(executions) + ":" + std::to_string(p);
         proto->session_definition = std::move(definition);
     }
+    map_session_history(text, program);
 }
 } // namespace nift::rt

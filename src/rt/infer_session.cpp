@@ -1,5 +1,7 @@
 #include "rt/infer_session.h"
 #include "rt/compiler.h"
+#include "rt/session_shape.h"
+#include "rt/collection.h"
 #include <algorithm>
 
 // rt-lint: cold-file incremental namespace facts in the shared kind inference
@@ -38,6 +40,11 @@ void Inference::seed_session() {
             type = std::move(adapted);
         }
         vars_.push_back(type);
+        if (session_locations_) {
+            const auto location = session_->global_locations.find(symbol.name);
+            if (location != session_->global_locations.end())
+                session_location_slot(location->second.key,vars_.size()-1);
+        }
     }
 }
 void Inference::export_session() {
@@ -49,6 +56,49 @@ void Inference::export_session() {
     for (const auto& binding : top_level_slots_)
         result_.binding_shapes[std::string(binding.first)] = vars_[binding.second];
 }
+TyRef Inference::session_bottom_arguments(const Node& node) {
+    for (std::uint32_t k=0;k<node.count;++k) expr(ast_.list(node)[k]);
+    return empty_ty();
+}
+void Inference::session_call_edge(std::size_t target, std::size_t arity, std::size_t arguments) {
+    if (result_.session_proof && arity == arguments)
+        result_.session_proof->call_edges[current_unit()].insert(target);
+}
+TyRef Inference::session_historical_call(const Node& node, const TyRef& callee) {
+    if (!session_) return {};
+    const auto key = (std::uint64_t(node.begin) << 32) | node.end;
+    if (result_.session_proof) {
+        result_.session_proof->historical_calls.erase(key); result_.session_proof->historical_owners.erase(key);
+        result_.session_proof->unproved_current_calls.erase(key);
+    }
+    if (callee->untracked_callable) {
+        if (!result_.session_proof) result_.session_proof = std::make_shared<SessionInferenceProof>();
+        result_.session_proof->unproved_current_calls.insert(key);
+        return any_ty();
+    }
+    if (!callee->historical_callable || !callee->callables.empty() || callee->any ||
+        (callee->kinds & kKindUnknown)) return {};
+    const auto fact = session_->call_result_seeds.find(key);
+    if (fact == session_->call_result_seeds.end() || !session_proved_shape(fact->second)) {
+        if (!result_.session_proof) result_.session_proof = std::make_shared<SessionInferenceProof>();
+        result_.session_proof->unproved_current_calls.insert(key);
+        return any_ty();
+    }
+    result_.session_proof->historical_calls.insert(key);
+    result_.session_proof->historical_owners.emplace(key, current_unit());
+    return session_historical_shape(fact->second);
+}
+TyRef Inference::session_collection_call(const Node& node, const std::vector<TyRef>& values, int id) {
+    const auto method = static_cast<CollectionMethod>(id);
+    if ((method < CollectionMethod::Map && method != CollectionMethod::Sort) || values.empty()) return {};
+    auto proof = std::make_shared<Ty>(); proof->kinds = kKindFunction;
+    for (std::size_t k = 0; k < values.size(); k += method == CollectionMethod::SortBy ? 2 : values.size()) {
+        proof->historical_callable = proof->historical_callable ||
+            (values[k]->historical_callable && values[k]->callables.empty());
+        proof->untracked_callable = proof->untracked_callable || values[k]->untracked_callable;
+    }
+    return session_historical_call(node, proof);
+}
 TyRef Inference::session_call(const Node& n) {
     const Node& callee = ast_.at(n.a);
     if (!session_ || callee.kind != NodeKind::Ident) return {};
@@ -57,7 +107,9 @@ TyRef Inference::session_call(const Node& n) {
             (symbol.definition && plan_.index.count(symbol.definition->name))) return {};
         expr(n.a);
         for (std::uint32_t k = 0; k < n.count; ++k) expr(ast_.list(n)[k]);
-        return kinds_ty(symbol.returns ? symbol.returns : static_cast<KindSet>(kKindAll | kKindUnknown));
+        if (!result_.session_proof) result_.session_proof = std::make_shared<SessionInferenceProof>();
+        result_.session_proof->unproved_current_calls.insert((std::uint64_t(n.begin) << 32) | n.end);
+        return any_ty();
     }
     return {};
 }

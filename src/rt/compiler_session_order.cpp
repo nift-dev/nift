@@ -5,10 +5,11 @@
 // rt-lint: cold-file textual argument types for phase-dependent registry calls
 namespace nift::rt::detail {
 bool UnitCompiler::session_order_call_types(const Node& node, NodeId callee, std::uint16_t base, bool& phased) {
-    phased = false;
+    phased = kinds_.historical_call((std::uint64_t(node.begin) << 32) | node.end);
     const auto targets = kinds_.callable_targets.find(callee);
     if (targets != kinds_.callable_targets.end()) for (const auto target : targets->second) {
         if (ast_.at(target).kind != NodeKind::FnDecl) continue;
+        phased = true;  // every retained named target has canonical text-type slots
         const auto name = std::string(text(ast_.at(ast_.at(target).a)));
         phased = phased || session_->phased_functions.count(name);
         for (const auto& alias : session_->named_templates) phased = phased || alias.second == name;
@@ -16,7 +17,7 @@ bool UnitCompiler::session_order_call_types(const Node& node, NodeId callee, std
     if (phased) {
         for (std::uint32_t k = 0; k < node.count; ++k) {
             const auto argument = ast_.list(node)[k];
-            for (const auto target : targets->second) {
+            if (targets != kinds_.callable_targets.end()) for (const auto target : targets->second) {
                 const auto found = std::find(plan_.functions.begin(), plan_.functions.end(), target);
                 if (found == plan_.functions.end()) continue;
                 const auto f = static_cast<std::size_t>(found - plan_.functions.begin());

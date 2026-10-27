@@ -9,7 +9,7 @@ struct SessionText {
     std::vector<SourceMap::Piece> pieces;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> imports;
     std::unordered_map<std::string, std::string> schema_names;
-    std::unordered_set<std::string> required_imports;
+    std::unordered_set<std::string> required_imports, reserved_rebindings;
     std::uint32_t unit_begin = 0;
 };
 void prepare_session_namespace(SessionCompileContext&, const SessionText&);

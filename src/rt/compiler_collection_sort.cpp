@@ -18,7 +18,8 @@ bool UnitCompiler::comparator_sort(const Node& node,std::uint16_t dst,const Bind
     // Prepared legacy evaluation loses the mutable receiver for an inline
     // callback expression. Named/declared callable bindings retain it.
     if(loop_reachable()&&ast_.at(callback).kind!=NodeKind::Ident)return fail(node,"method:sort");
-    if(!collection_sort_effects(ast_,root_,callback,node_id(receiver),kinds_).empty())return fail(node,"method:sort");
+    if(!(session_ && kinds_.historical_call((std::uint64_t(node.begin) << 32) | node.end)) &&
+       !collection_sort_effects(ast_,root_,callback,node_id(receiver),kinds_).empty())return fail(node,"method:sort");
     const auto mark=fb_->top(),state=mark;
     for(unsigned k=0;k<sort_slot::Count;++k){std::uint16_t reg=0;if(!temp(reg))return false;
     fb_->emit(OpCode::LoadNull,reg);}

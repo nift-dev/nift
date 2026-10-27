@@ -60,6 +60,8 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     }
     auto t = std::make_shared<Ty>();
     t->kinds = a->kinds | b->kinds;
+    t->historical_callable = a->historical_callable || b->historical_callable;
+    t->untracked_callable = a->untracked_callable || b->untracked_callable;
     t->legacy_text_number=a->legacy_text_number||b->legacy_text_number;
     t->collection_array = (t->kinds & kKindArray) && (!(a->kinds & kKindArray) || a->collection_array) &&
                           (!(b->kinds & kKindArray) || b->collection_array);
@@ -91,6 +93,8 @@ bool same(const TyRef& a, const TyRef& b) {
     const bool a_empty = !a || (a->kinds == 0 && !a->elem && a->fields.empty() && !a->any);
     const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
+    if (a->historical_callable != b->historical_callable ||
+        a->untracked_callable != b->untracked_callable) return false;
     if (a->kinds != b->kinds || a->any != b->any || a->fields.size() != b->fields.size()) return false;
     if (a->struct_id != b->struct_id || a->callables != b->callables) return false;
     if (a->tuple != b->tuple || a->items.size() != b->items.size()) return false;

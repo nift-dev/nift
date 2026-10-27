@@ -186,7 +186,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
             if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r)) {
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
-                    (widened(l) || widened(r));
+                    (widened(l) || widened(r) || node.begin < session_->unit_begin);
                 if (!numeric_guard) return fail(node, std::string("type:") + op_name(node.op));
             }
             break;

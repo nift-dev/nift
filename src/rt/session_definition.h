@@ -6,6 +6,11 @@
 #include <vector>
 namespace nift::rt {
 namespace infer_detail { struct Ty; }
+struct SessionCallFact {
+    std::shared_ptr<const std::string> source;
+    std::uint32_t begin = 0, end = 0;
+    std::shared_ptr<const infer_detail::Ty> result;
+};
 struct SessionCapture {
     std::string name;
     std::shared_ptr<const infer_detail::Ty> shape;

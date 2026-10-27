@@ -14,10 +14,11 @@ SessionContractRefusal session_shape_contract(const SessionCompileContext& sessi
         if (shape == kinds.session_shapes.end()) continue;
         const auto capture = session.capture_contracts.find(binding.second);
         if (capture != session.capture_contracts.end() && !session_shape_within(shape->second, capture->second) &&
-            !(widen_captures && !(shape->second->kinds & ~capture->second->kinds)))
+            !(widen_captures && !(shape->second->kinds & ~session_binding_kinds(capture->second->kinds))))
             return {binding.first, "session:capture-contract"};
 #if !defined(NIFT_SESSION_MUTANT) || NIFT_SESSION_MUTANT != 7
         for (const auto& symbol : session.symbols) {
+            if (!symbol.defined && session.reserved_rebindings.count(symbol.name)) continue;
             const auto external = session.declarations.find(symbol.name);
             if (external == session.declarations.end() || external->second != binding.second) continue;
             if (!session_shape_within(shape->second, symbol.structure) &&

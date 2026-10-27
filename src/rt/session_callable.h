@@ -24,6 +24,7 @@ struct SessionCallable {
     std::vector<std::shared_ptr<const SessionCallableShape>> captures;
     std::vector<std::shared_ptr<const infer_detail::Ty>> parameter_types, capture_types;
     std::vector<SessionCaptureLocation> capture_locations;
+    std::shared_ptr<const std::vector<SessionCallFact>> call_facts;
 };
 struct SessionCallableShape {
     bool complete = true;

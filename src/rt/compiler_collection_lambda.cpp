@@ -10,6 +10,7 @@ bool UnitCompiler::collection_callback_shape(const Node& site,NodeId callback,st
     // Quoted selectors use legacy expression validation; not admitted by S1.
     if(expression_result_&&(kind&kKindString))return fail(site,"eval:quoted-callback");
     if(!(kind&kKindFunction))return true;
+    if (session_ && kinds_.historical_call((std::uint64_t(site.begin) << 32) | site.end)) return true;
     const auto targets=kinds_.callable_targets.find(callback);
     if(targets==kinds_.callable_targets.end()||targets->second.empty())return fail(site,reason);
     for(NodeId id:targets->second) {

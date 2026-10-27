@@ -72,7 +72,17 @@ static_assert(kKindError == (1u << 9));
 static_assert(kKindUnknown == (1u << 10));
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 
+struct SessionInferenceProof {
+    std::unordered_set<std::uint64_t> historical_calls;
+    std::unordered_map<std::uint64_t, std::size_t> historical_owners;
+    std::unordered_map<std::size_t, std::unordered_set<std::size_t>> call_edges;
+    std::unordered_set<std::uint64_t> unproved_current_calls;
+};
 struct UnitKinds {
+    std::shared_ptr<SessionInferenceProof> session_proof;  // absent from ordinary analysis
+    bool historical_call(std::uint64_t site) const {
+        return session_proof && session_proof->historical_calls.count(site);
+    }
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_decl_shapes;
     std::unordered_map<std::string, std::shared_ptr<const infer_detail::Ty>> binding_shapes;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_shapes;

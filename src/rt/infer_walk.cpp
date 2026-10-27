@@ -54,6 +54,7 @@ TyRef* Inference::struct_field(int s, std::string_view name) {
 TyRef Inference::method_call(std::size_t f, const Node& n) {
     const NodeId* args = ast_.list(n);
     auto& params = params_[f];
+    if (session_) session_call_edge(f, params.size(), n.count);
     bool grew = false;
     for (std::uint32_t k = 0; k < n.count; ++k) {
         const TyRef v = expr(args[k]);

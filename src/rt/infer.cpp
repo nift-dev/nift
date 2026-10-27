@@ -2,14 +2,11 @@
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/text_type.h"
-
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
 #include "rt/infer_unit.h"
 #include "rt/literal.h"
 #include "rt/number.h"
-
-#include <cmath>
 #include <memory>
 #include <string>
 
@@ -22,6 +19,8 @@ namespace infer_detail {
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
                      const SessionCompileContext* session)
     : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
+    if (session && !session->call_result_seeds.empty())
+        result_.session_proof = std::make_shared<SessionInferenceProof>();
     result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));
     const Node& program = ast.at(root);
     const NodeId* top = ast.list(program);
@@ -46,6 +45,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
     const std::size_t n = plan_.functions.size();
     callers_.assign(n, {});
     queued_.assign(n + 1, false);
+    session_begin_locations();
     seed_session();
     seed_struct_fields();  // CP12b structs: each field starts as its initialiser
     enqueue(n);  // main first: its calls seed the parameters
@@ -56,6 +56,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         queue_.pop_front();
         queued_[unit] = self_changed_ = false;
         walk_unit(unit);
+        if (session_locations_ && !session_locations_converged()) return std::move(result_);
         ++result_.walks;
         if (self_changed_) enqueue(unit);
     }
@@ -88,6 +89,7 @@ bool Inference::merge(TyRef& into, const TyRef& value) {
 
 void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (!merge(into, value)) return;
+    if (session_locations_) session_sync_locations();
     self_changed_ = true;  // a global's slot is shared by every unit using it (CP12b):
     if (session_) {
         for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
@@ -120,6 +122,11 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
         merge_local(vars_[slot], session_global_shape(value,
             type.kind == TextType::Kind::Known && type.known == 3));
     } else merge_local(vars_[slot], value);
+    if (session_locations_) {
+        const auto locations = session_->capture_locations.find(binding_decls_[slot]);
+        if (locations != session_->capture_locations.end())
+            for (const auto& location : locations->second) session_location_slot(location.key,slot);
+    }
     scopes_.back().emplace_back(name, slot);
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }
@@ -314,6 +321,7 @@ TyRef Inference::call(const Node& n) {
     // CP13B: Error JSON presentation methods (ErrorJson), not natives.
     if (callee.kind == NodeKind::Member) {
         const TyRef recv = expr(callee.a);
+        if (session_ && !recv->any && recv->kinds == 0) return session_bottom_arguments(n);
         const std::string_view name = ast_.text(ast_.at(callee.b));
         if ((recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0 &&
             (name == "stringify" || name == "prettify" || name == "highlight") && n.count == 0)
@@ -347,17 +355,21 @@ TyRef Inference::call(const Node& n) {
     if (callee.kind == NodeKind::Member) {  // length()/size(), CP14 methods, or a callable field
         const TyRef recv = expr(callee.a);
         const std::string key(ast_.text(ast_.at(callee.b)));
-        const TyRef field = element_of(recv, &key, true);
-        record(n.a, field);
+        const TyRef field = record(n.a, element_of(recv, &key, true));
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
+        if (const auto historical = session_historical_call(n, field)) return historical;
         if (!field->callables.empty()) {
             bool grew = false;
             const TyRef result = call_callables(field, values, grew);
             return result;
         }
         const int collection = collection_method(key);
-        if (collection >= 0 && recv->kinds == kKindArray) return collection_result(n, recv, values, collection);
+        if (collection >= 0 && recv->kinds == kKindArray) {
+            const auto result = collection_result(n, recv, values, collection);
+            if (session_) if (const auto historical = session_collection_call(n, values, collection)) return historical;
+            return result;
+        }
         TyRef result=method_result(ast_, n, recv, values, session_ != nullptr);
         if((result->kinds&kKindNumber)&&key!="size"&&key!="length") {
             result=with_text_number(result,true);
@@ -367,6 +379,10 @@ TyRef Inference::call(const Node& n) {
     const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
     for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
+    if (session_ && !callee_ty->any && callee_ty->kinds == 0) return empty_ty();
+    if (session_ && !callee_ty->any && !(callee_ty->kinds & (kKindFunction | kKindUnknown)) &&
+        callee.kind == NodeKind::Ident && find(ast_.text(callee))) return empty_ty();
+    if (const auto historical = session_historical_call(n, callee_ty)) return historical;
     if (!callee_ty->callables.empty()) {
         bool grew = false;
         return call_callables(callee_ty, values, grew);

@@ -1,0 +1,116 @@
+CP19 call-summary proof invariants — owner-approved development
+
+Foundation: frozen 86b7ee16 / 7fc77be400babfab72d816e6fa27cdd68292fd76.
+The owner approved compiler-only summaries and full-checkpoint implementation.
+The earlier draft is a starting point, not an accepted implementation.
+
+Proof boundary
+
+A historical result bound is a staging fact for recompiling a dormant body. It
+is never a target, a current callback signature, or proof of current effects.
+Source/span identifies the fact but does not establish present validity.
+
+Every compile reconstructs a concrete call graph rooted in the current unit.
+Edges include direct/indirect functions, struct methods/constructors, and native
+collection callback calls. Wrong-arity entries cannot reach a body. Imported
+synthetic wrappers are not execution roots. A historical call in any reachable
+body refuses before effects. Current known targets are inferred normally; their
+arguments, writes, Cells, aliases, returns and Error paths are not replaced by
+summaries. Current unknown inputs have separate taint, propagated through every
+structural join, field, element, return, Cell and alias, and cannot acquire proof
+from historical markers. Unknown/any result bounds are not usable summaries.
+
+The graph and summary-use decisions are recomputed to the inference fixed point,
+after storage-identity widening. An early walk's historical use must be removed
+when current concrete targets become known. Only the final decisions count.
+Existing admission bounds remain immutable throughout this private computation.
+
+Validity after environment changes
+
+Changing a captured bound, lexical resolution, registry function, constructor,
+parameter constraint or nested dependency triggers fresh whole-unit inference.
+Historical staging remains permissible only for a body unreachable from current
+execution. Thus a stale historical result never certifies a current invocation,
+regardless of whether its source span is unchanged. Any later invocation enters
+through a new session compilation and must re-establish all concrete targets and
+effects. A replacement body has a distinct owned-source identity and cannot use
+its predecessor's call facts. Saved original versions retain their own identity.
+This relies on the existing VM-owned session entry contract: no out-of-band
+invocation can bypass the compilation/admission boundary. CP17 reconciliation
+must explicitly preserve that contract for resource/scheduler callbacks.
+
+Representation and ownership
+
+Per-definition proof sets contain only owned source, original call spans and
+pure depth-bounded structural result bounds. No executable Values, callback
+instances, captured runtime environments, selector caches, Program owners or
+strong historical dependency graphs are retained. Program protos and existing
+live callable metadata own these sets. No permanent source-offset cache exists.
+Sets exclude calls outside their definition. Nested definition overlap is bounded
+by the existing source nesting cap; repeated commands replace live metadata, not
+append to a historical log. Releasing final actual owners reclaims unused sets.
+
+Termination and conservative boundaries
+
+Inference already has a finite AST/unit set, finite kind/callable lattice,
+structural depth cap and walk budget. Storage alias propagation has a 64-round
+limit. Historical facts add at most one bounded result per owned source call
+site. Current graph edges are deduplicated; reachability uses an iterative finite
+worklist. Recursive/mutually recursive flows either converge under these limits
+or refuse before effects with an analysis-limit classification. Unknown is never
+promoted into proof. There is no recursive executable-value retention or graph
+expansion by copying prior proof sets into an accumulating cache.
+
+Adversarial failure model and mandatory witnesses
+
+Attack historical/current taint laundering through parameters, fields, arrays,
+returns and Cells; omission of direct, indirect, method, constructor or collection
+edges; using old effects after a current capture mutation; nested returned
+callbacks; old/new function versions; stale summary-use marks; recursion budgets;
+failed compilation and repeated retries; runtime errors after publication; exact
+callee/argument evaluation and arity; source identity and owner reclamation;
+allocation failures before effects; both VM modes/dispatches and sanitizers.
+Compiled mutants must remove individual proof constraints and have named exact
+witnesses, working controls, wrong-expectation controls, dead-binary and unrelated-
+failure discrimination. Passing the original reproducer alone is insufficient.
+
+Performance boundary
+
+Summary construction, lookup and graph validation are session-only compiler work.
+Stateless scripts allocate no proof sets and run no summary graph. Ordinary VM
+instruction dispatch, call entry, Frame, Error handling and source origin remain
+unchanged. Measure session compilation cost, bounded retained metadata and
+matched-dispatch million-catch instructions. Existing default Cell excess remains
+unwaived. No broad performance optimisation or external operations are authorised.
+
+Current callable effects through shared storage
+
+Kind equality is insufficient: replacing one Function with another can change
+return bounds and captured effects without changing a kind bit. Storage groups
+therefore exchange full types, including current callable IDs, inside a single
+inference instance. All readers and writers sharing a Cell or projection are
+requeued when those bounds grow. IDs never cross inference-instance lifetimes;
+persistent bounds still strip them. This replaces the older kind-only outer
+retry propagation, which could miss same-kind callable replacement in sibling
+closures. A dedicated same-unit writer/reader witness must detect its removal.
+Dormant staging may prepare argument-type operands for places without proving
+an executing callback's aliases; every reachable current call still goes through
+concrete target and effect analysis before admission.
+
+Operand windows and scalar callable bindings
+
+Current session Cell reads can allocate scratch registers. Array payloads and
+call/native/Error/constructor operand windows must reserve contiguous destinations
+before any operand is evaluated; otherwise scratch Cells can be passed as actual
+arguments or array elements. The correction is compiler-only and retains source
+order and exactly-once evaluation. Compiled mutants restore the broken layout.
+
+Legacy mutable callable bindings use the String binding tag. String/Function
+assignment compatibility is therefore a mandatory session case. Admission bounds
+keep both compatible kinds; current root inference seeds distinguish the actual
+published String or Function. This is current metadata, not historical callback
+proof. A non-callable root has no executable target and a call's successful result
+set is bottom; arguments and the VM's existing failed-call diagnostic still run.
+Stale callable source/signature metadata is cleared after a String replaces it.
+Retained original aliases continue to own their actual callable and source.
+

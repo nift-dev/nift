@@ -19,6 +19,7 @@ namespace nift::rt { struct SessionCallableShape; }
 
 namespace nift::rt::infer_detail {
 
+struct SessionLocationInference;
 class Inference {
 public:
     Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
@@ -35,8 +36,16 @@ private:
     TyRef session_type(const TyRef&, const std::shared_ptr<const SessionCallableShape>&);
     std::size_t session_lambda_reference(NodeId);
     void seed_session();
+    void session_begin_locations();
+    void session_location_slot(std::uintptr_t, std::size_t);
+    bool session_sync_locations();
+    bool session_locations_converged() const;
     void export_session();
     TyRef session_call(const Node& n);
+    TyRef session_bottom_arguments(const Node&);
+    TyRef session_collection_call(const Node&, const std::vector<TyRef>&, int);
+    TyRef session_historical_call(const Node&, const TyRef&);
+    void session_call_edge(std::size_t target, std::size_t arity, std::size_t arguments);
 
     std::size_t current_unit() const;
 
@@ -118,6 +127,7 @@ private:
     const UnitPlan& plan_;
     GlobalSlots globals_;
     const SessionCompileContext* session_ = nullptr;
+    std::shared_ptr<SessionLocationInference> session_locations_;
     std::unordered_map<std::string_view, std::size_t> external_;
     UnitKinds result_;
     std::vector<std::vector<TyRef>> params_;
