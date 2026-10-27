@@ -43,7 +43,8 @@ SessionCaptureLocation session_capture_location(const Value& value) {
 }
 void clear_session_locations(SessionCompileContext& context) {
     context.global_locations.clear(); context.capture_locations.clear(); context.capture_initializers.clear();
-    context.call_result_seeds.clear(); context.reserved_rebindings.clear(); context.unit_begin = 0;
+    context.call_result_seeds.clear(); context.opaque_call_seeds.clear();
+    context.reserved_rebindings.clear(); context.unit_begin = 0;
 }
 void seed_session_locations(SessionCompileContext& context, const std::vector<Value>& globals) {
     context.global_locations.clear();

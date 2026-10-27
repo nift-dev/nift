@@ -44,6 +44,7 @@ private:
     TyRef session_call(const Node& n);
     TyRef session_bottom_arguments(const Node&);
     TyRef session_collection_call(const Node&, const std::vector<TyRef>&, int);
+    TyRef session_unknown_call(const Node&, const TyRef&);
     TyRef session_historical_call(const Node&, const TyRef&);
     void session_call_edge(std::size_t target, std::size_t arity, std::size_t arguments);
 

@@ -28,6 +28,7 @@ struct SessionCallable {
 };
 struct SessionCallableShape {
     bool complete = true;
+    bool unknown_target = false;  // incomplete root target, distinct from incomplete captures
     std::vector<SessionCallable> targets;
     std::map<std::string, std::shared_ptr<const SessionCallableShape>, std::less<>> fields;
     std::shared_ptr<const SessionCallableShape> element;

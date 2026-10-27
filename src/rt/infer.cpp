@@ -4,7 +4,6 @@
 #include "rt/text_type.h"
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
-#include "rt/infer_unit.h"
 #include "rt/literal.h"
 #include "rt/number.h"
 #include <memory>
@@ -19,7 +18,7 @@ namespace infer_detail {
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
                      const SessionCompileContext* session)
     : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
-    if (session && !session->call_result_seeds.empty())
+    if (session && (!session->call_result_seeds.empty() || !session->opaque_call_seeds.empty()))
         result_.session_proof = std::make_shared<SessionInferenceProof>();
     result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));
     const Node& program = ast.at(root);
@@ -382,6 +381,7 @@ TyRef Inference::call(const Node& n) {
     if (session_ && !callee_ty->any && callee_ty->kinds == 0) return empty_ty();
     if (session_ && !callee_ty->any && !(callee_ty->kinds & (kKindFunction | kKindUnknown)) &&
         callee.kind == NodeKind::Ident && find(ast_.text(callee))) return empty_ty();
+    if (const auto unknown = session_unknown_call(n, callee_ty)) return unknown;
     if (const auto historical = session_historical_call(n, callee_ty)) return historical;
     if (!callee_ty->callables.empty()) {
         bool grew = false;

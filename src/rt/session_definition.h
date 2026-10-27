@@ -9,6 +9,7 @@ namespace infer_detail { struct Ty; }
 struct SessionCallFact {
     std::shared_ptr<const std::string> source;
     std::uint32_t begin = 0, end = 0;
+    // Null records a compiled call site with an explicitly unproved result.
     std::shared_ptr<const infer_detail::Ty> result;
 };
 struct SessionCapture {

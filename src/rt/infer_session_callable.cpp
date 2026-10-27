@@ -16,6 +16,9 @@ std::size_t Inference::session_lambda_reference(NodeId id) {
 TyRef Inference::session_type(const TyRef& bound, const std::shared_ptr<const SessionCallableShape>& shape) {
     if (!shape || !bound) return bound;
     auto out = std::make_shared<Ty>(*bound);
+#if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 26
+    out->untracked_callable = out->untracked_callable || shape->unknown_target;
+#endif
     for (const auto& target : shape->targets) {
         if (target.definition->lambda) {
             const auto node = session_->callable_templates.find(target.definition.get());

@@ -122,3 +122,18 @@ Nested argument calls can reset ordinary instruction return flags. Session-only
 call-note metadata records the enclosing return for cold SessionNumeric reporting.
 The ordinary return flags and CP13B reporter are preserved. The extra note boolean
 is not a Frame/fault slot and is never read at ordinary dispatch or call entry.
+
+Open results and current target completeness
+
+A null SessionCallFact result records a prior compiled call site without a proved
+return bound. It is not bottom and is not an Any type certificate. Recompilation
+may stage that dormant site with Any, so discarded or otherwise untyped results
+remain usable. Typed consumers still need their own proof. The same reachability
+barrier rejects execution of historical-only call sites before effects. Invalid
+nonnull Any/Unknown facts are never promoted to proved bounds.
+
+Current dynamic Any/Unknown callees require explicit target proof even when their
+return is discarded: their side effects can invalidate retained numeric readers.
+Native identifiers without a dynamic binding retain ordinary builtin resolution.
+Known callable roots with incomplete captures are distinct from sets containing
+an unknown root target. A known member must never hide an unknown alternative.

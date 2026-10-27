@@ -61,18 +61,24 @@ std::string validate_session_history(const UnitKinds& kinds, std::size_t main) {
 void prepare_session_history(const Ast& ast, const SessionText& text, const SessionCompileContext& current,
                              SessionCompileContext& pending) {
     pending.call_result_seeds.clear();
+    pending.opaque_call_seeds.clear();
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 14
     return;
 #endif
     if (text.imports.empty()) return;
-    std::unordered_map<const std::string*, std::unordered_map<std::uint64_t, TyRef>> facts;
+    struct Seed { TyRef result; bool opaque = false, invalid = false; };
+    std::unordered_map<const std::string*, std::unordered_map<std::uint64_t, Seed>> facts;
     std::unordered_set<const void*> seen;
     for (const auto& symbol : current.symbols)
         for (const auto& target : session_callable_targets(symbol.callable_shape))
             if (target.call_facts && seen.insert(target.call_facts.get()).second)
                 for (const auto& fact : *target.call_facts) {
-                    auto& type = facts[source_identity(fact.source)][span(fact.begin, fact.end)];
-                    type = infer_detail::unite(type, fact.result);
+                    auto& seed = facts[source_identity(fact.source)][span(fact.begin, fact.end)];
+                    if (!fact.result) seed.opaque = true;
+                    else if (session_proved_shape(fact.result)) {
+                        seed.result = infer_detail::unite(seed.result, fact.result);
+                        if (!session_proved_shape(seed.result)) seed.opaque = true;
+                    } else seed.invalid = true;
                 }
     if (facts.empty()) return;
     std::vector<std::uint32_t> starts;
@@ -90,7 +96,11 @@ void prepare_session_history(const Ast& ast, const SessionText& text, const Sess
         if (source == facts.end()) continue;
         const auto fact = source->second.find(span(node.begin - starts[at] + piece.source_begin,
                                                    node.end - starts[at] + piece.source_begin));
-        if (fact != source->second.end()) pending.call_result_seeds.emplace(span(node.begin, node.end), fact->second);
+        if (fact != source->second.end() && !fact->second.invalid) {
+            const auto key = span(node.begin, node.end);
+            if (fact->second.opaque) pending.opaque_call_seeds.insert(key);
+            else if (fact->second.result) pending.call_result_seeds.emplace(key, fact->second.result);
+        }
     }
 }
 void record_session_history(const Ast& ast, const UnitKinds& kinds, const SessionCompileContext& context,
@@ -100,8 +110,9 @@ void record_session_history(const Ast& ast, const UnitKinds& kinds, const Sessio
     auto facts = std::make_shared<std::vector<SessionCallFact>>();
     for (NodeId id = 0; id < ast.size(); ++id) if (ast.at(id).kind == NodeKind::Call) {
         const auto type = kinds.session_shapes.find(id);
-        if (type != kinds.session_shapes.end() && session_proved_shape(type->second))
-            facts->push_back({context.source_owner, ast.at(id).begin, ast.at(id).end, session_shape(type->second)});
+        if (type != kinds.session_shapes.end())
+            facts->push_back({context.source_owner, ast.at(id).begin, ast.at(id).end,
+                session_proved_shape(type->second) ? session_shape(type->second) : TyRef{}});
     }
     // Transient staging only; map_session_history distributes facts by definition.
     program.protos.front()->session_call_facts = std::move(facts);

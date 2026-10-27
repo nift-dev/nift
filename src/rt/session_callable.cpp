@@ -10,13 +10,14 @@ namespace nift::rt {
 namespace {
 using Shape = std::shared_ptr<const SessionCallableShape>;
 Shape incomplete() {
-    auto out = std::make_shared<SessionCallableShape>(); out->complete = false; return out;
+    auto out = std::make_shared<SessionCallableShape>(); out->complete = false; out->unknown_target = true; return out;
 }
 Shape merge(const Shape& a, const Shape& b) {
     if (!a) return b;
     if (!b || a == b) return a;
     auto out = std::make_shared<SessionCallableShape>(*a);
     out->complete = a->complete && b->complete;
+    out->unknown_target = a->unknown_target || b->unknown_target;
     for (const auto& target : b->targets)
         if (std::none_of(out->targets.begin(), out->targets.end(),
                 [&](const auto& item) { return item.identity == target.identity; })) out->targets.push_back(target);
@@ -77,7 +78,7 @@ struct Scan {
                     if (!target.capture_locations.back().key) out->complete = false;
                 }
                 out->targets.push_back(std::move(target));
-            } else out->complete = false;
+            } else { out->complete = false; out->unknown_target = true; }
         } else if (value.is(Kind::Array)) {
             for (const auto& item : array_items(value)) out->element = merge(out->element, visit(item, depth + 1));
             if (out->element && !out->element->complete) out->complete = false;

@@ -57,6 +57,7 @@ struct SessionCompileContext {
     std::unordered_map<NodeId, NodeId> capture_initializers;
     std::unordered_map<std::string, SessionCaptureLocation> global_locations;
     std::unordered_map<std::uint64_t, std::shared_ptr<const infer_detail::Ty>> call_result_seeds;
+    std::unordered_set<std::uint64_t> opaque_call_seeds;
     std::unordered_set<NodeId> const_captures;
     std::unordered_set<NodeId> template_wrappers;  // synthetic, never executed named bodies
     std::unordered_map<NodeId, std::shared_ptr<const SessionDefinition>> template_definitions;

@@ -64,6 +64,19 @@ void Inference::session_call_edge(std::size_t target, std::size_t arity, std::si
     if (result_.session_proof && arity == arguments)
         result_.session_proof->call_edges[current_unit()].insert(target);
 }
+TyRef Inference::session_unknown_call(const Node& node, const TyRef& type) {
+#if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 25
+    const auto& callee = ast_.at(node.a);
+    if (session_ && type->callables.empty() && (type->any || (type->kinds & kKindUnknown)) &&
+        (callee.kind != NodeKind::Ident || find(ast_.text(callee)))) {
+        auto unknown = std::make_shared<Ty>(*type); unknown->untracked_callable = true;
+        return session_historical_call(node, unknown);
+    }
+#else
+    (void)node; (void)type;
+#endif
+    return {};
+}
 TyRef Inference::session_historical_call(const Node& node, const TyRef& callee) {
     if (!session_) return {};
     const auto key = (std::uint64_t(node.begin) << 32) | node.end;
@@ -78,6 +91,11 @@ TyRef Inference::session_historical_call(const Node& node, const TyRef& callee) 
     }
     if (!callee->historical_callable || !callee->callables.empty() || callee->any ||
         (callee->kinds & kKindUnknown)) return {};
+    if (session_->opaque_call_seeds.count(key)) {
+        result_.session_proof->historical_calls.insert(key);
+        result_.session_proof->historical_owners.emplace(key, current_unit());
+        return any_ty();
+    }
     const auto fact = session_->call_result_seeds.find(key);
     if (fact == session_->call_result_seeds.end() || !session_proved_shape(fact->second)) {
         if (!result_.session_proof) result_.session_proof = std::make_shared<SessionInferenceProof>();
