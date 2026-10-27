@@ -1197,3 +1197,45 @@ Raw logs: `test-cp22-r6.log`, `mode-*-r5.log`, `print-order-r5.log`,
   sanitize target, TSan (no scheduler or wake-path change) and the full
   `test-rt-vm` regression. All three last passed in round 3, before A5 and
   before the coro-unit and `rt_vm_tool` changes of this round.
+
+### Evidence, round 5 (frozen candidate 3473fbad; shared state, per-rule mutants)
+
+All results below were run on the candidate's code, after the CP17 review
+had left the heavy queue. Raw logs are named `*-r8`.
+
+* **`make test-runtime2-cp22`** (goto and switch builds):
+
+  | Check | Result |
+  | --- | --- |
+  | coro-unit | 80/80 |
+  | Legacy oracle | 123/123 |
+  | VM | 69/69 |
+  | Refusals | 54/54 |
+  | `--mode default` | 69/69 per build |
+  | VM-only | 7/7 |
+  | Traces | 3/3 |
+  | Adversarial | 80 × 2, 0 differences |
+  | Controls | rejected |
+
+  `print_order.py` passed:
+
+  | Item | Result |
+  | --- | --- |
+  | 1 | 8 distinct legacy orders |
+  | 2 | legacy `a c b`, VM `c a b` |
+  | 3 | elapsed 201–202 ms on legacy, 100 ms on the VM |
+  | 4 | 40 programs, 0 violations |
+
+* **Mutants:** **18/18** caught by their named witnesses. This includes the
+  per-rule controls M14 (A1), M15 (A2), M16 (A3) and M17 (A4), and M18
+  (coro-capture off): `r_share_closure` then runs on the VM, which shares the
+  captured cell between the tasks.
+* **ASan+UBSan+LSan:**
+  * coro_unit 80/80;
+  * corpus VM 69, refusals 54, default 69, vm-only 7;
+  * adversarial seed 2 (30 programs).
+* **TSan:** 127/127 on the POSIX host loop and 127/127 on the portable loop.
+* **`make -k test-rt-vm`:** exit 0. The only "FAIL" line is the expected
+  detection by the deliberate `NIFT_KIND_MUTANT` binary.
+* rt-lint, test-integrity, certification guard and self-test: pass.
+* MinGW-w64 syntax check: 27/27 files, 0 warnings.
