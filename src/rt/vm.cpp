@@ -311,6 +311,7 @@ VmResult Vm::run(std::string& output) {
         NEXT(); }
     OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER }
     OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
+    OP(SessionNumeric) { if (!session_numeric(RK(pc->b), RK(pc->c), fault)) FAIL(); NEXT(); }
     OP(SessionRender) { if (!op_session_render(*pc, R, result, fault, proto)) FAIL(); NEXT(); }
     OP(TopReturn) { if (!op_top_return(*pc, R, result, fault, proto)) FAIL(); goto done; }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); goto done; }

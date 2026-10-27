@@ -75,6 +75,11 @@ const std::string& note_text(const Note* note) {
 
 } // namespace
 
+bool session_numeric(const Value& left, const Value& right, Fault& fault) {
+    if (left.is_number() && right.is_number()) return true;
+    return raise(fault, StopReason::Error, "arithmetic operators require numeric operands");
+}
+
 bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
     static_cast<void>(in);
     if (op == OpCode::Add && (left.is(Kind::String) || right.is(Kind::String)))

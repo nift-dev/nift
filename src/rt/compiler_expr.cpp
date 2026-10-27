@@ -175,6 +175,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
     const KindSet l = kinds(node.a), r = kinds(node.b);
+    bool numeric_guard = false;
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
             // Legacy's string + callable is a run-time error with a fixed
@@ -182,8 +183,12 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
             if (op == OpCode::Add && ((l & kKindFunction) || (r & kKindFunction)) &&
                 ((l & kKindString) || (r & kKindString)))
                 break;
-            if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r))
-                return fail(node, std::string("type:") + op_name(node.op));
+            if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r)) {
+                const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
+                numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
+                    (widened(l) || widened(r));
+                if (!numeric_guard) return fail(node, std::string("type:") + op_name(node.op));
+            }
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
             if (!ordering_kinds_ok(l, r) && !unknown_defers(l | r))
@@ -195,6 +200,9 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     std::uint16_t left = 0, right = 0;
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
     fb_->set_offset(site(node));
+#if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 9
+    if (numeric_guard) fb_->emit(OpCode::SessionNumeric, 0, left, right);
+#endif
     fb_->emit(op, dst, left, right);
     fb_->release_to(mark);
     return true;

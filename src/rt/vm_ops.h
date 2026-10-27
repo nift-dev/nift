@@ -64,6 +64,7 @@ bool is_large(const Value& value);
 
 // Add, Sub, Mul, Div, Mod (`op`); string concatenation for Add. `out` may
 // alias an operand.
+bool session_numeric(const Value& left, const Value& right, Fault& fault);
 bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& right, Value& out, Fault& fault);
 // `x += y`: numbers, or two strings (appended in place when unshared).
 bool add_assign_slow(const Instr& in, Value& target, const Value& right, Fault& fault);
