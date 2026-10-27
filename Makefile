@@ -3446,6 +3446,7 @@ $(CP21_RECOVERY_D2): tests/cp21_terminal_recovery.cpp \
 CP21_FD_CHILD := $(TEST_DIR)/cp21-fd-child$(EXEEXT)
 CP21_FD_CHILD_UNRELATED := $(TEST_DIR)/cp21-fd-child-unrelated$(EXEEXT)
 CP21_FD_CHILD_ESCAPE := $(TEST_DIR)/cp21-fd-child-escape$(EXEEXT)
+CP21_FD_CHILD_ESCAPE_UNTAGGED := $(TEST_DIR)/cp21-fd-child-escape-untagged$(EXEEXT)
 CP21_FD_CHILD_MALFORMED := $(TEST_DIR)/cp21-fd-child-embedded$(EXEEXT) $(TEST_DIR)/cp21-fd-child-zero-junk$(EXEEXT) $(TEST_DIR)/cp21-fd-child-embedded-defect$(EXEEXT) $(TEST_DIR)/cp21-fd-child-nul-target$(EXEEXT)
 CP21_FD_INHERITANCE := $(TEST_DIR)/cp21-fd-inheritance$(EXEEXT)
 CP21_FD_INHERITANCE_D3 := $(TEST_DIR)/cp21-fd-inheritance-d3$(EXEEXT)
@@ -3456,6 +3457,9 @@ $(CP21_FD_CHILD_UNRELATED): tests/cp21_fd_child_unrelated.c
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_CHILD_ESCAPE): tests/cp21_fd_child_escape.c
+	mkdir -p "$(dir $@)"
+	$(CC) $(CFLAGS) $< -o "$@"
+$(CP21_FD_CHILD_ESCAPE_UNTAGGED): tests/cp21_fd_child_escape_untagged.c
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-fd-child-embedded$(EXEEXT): tests/cp21_fd_child_embedded.c
@@ -3497,7 +3501,8 @@ test-cp21-fd-inheritance: test-cp21-fd-protocol-unit
 test-cp21-fd-inheritance: $(CP21_FD_INHERITANCE) $(CP21_FD_CHILD) $(TEST_DIR)/cp21-fallback-fault.so
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD))"
 test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
-	$(CP21_FD_CHILD_UNRELATED) $(CP21_FD_CHILD_ESCAPE) $(CP21_FD_CHILD_MALFORMED) \
+	$(CP21_FD_CHILD_UNRELATED) $(CP21_FD_CHILD_ESCAPE) $(CP21_FD_CHILD_ESCAPE_UNTAGGED) \
+	$(CP21_FD_CHILD_MALFORMED) \
 	$(CP21_FD_PROTOCOL_UNIT_MUTANT) $(TEST_DIR)/cp21-fallback-fault.so \
 	$(TEST_DIR)/cp21-fail-subreaper.so $(TEST_DIR)/cp21-fail-proc.so
 	@set -e; \
@@ -3536,6 +3541,11 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	grep -q "FAIL exec-child-no-extra-fds" "$(abspath $(TEST_DIR)/cp21-d3-escape.log)" && \
 	  { echo "FAIL CP21 D3 escaped-descendant control reported the intended defect"; cat "$(abspath $(TEST_DIR)/cp21-d3-escape.log)"; exit 1; }; \
 	echo "PASS CP21 D3 escaped-descendant control: cleaned"; \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE_UNTAGGED))" > "$(abspath $(TEST_DIR)/cp21-d3-escape-untagged.log)" 2>&1 && \
+	  { echo "FAIL CP21 D3 untagged escape control accepted"; cat "$(abspath $(TEST_DIR)/cp21-d3-escape-untagged.log)"; exit 1; }; \
+	grep -q "TIMEOUT exec child did not finish and was killed/reaped cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-escape-untagged.log)" || \
+	  { echo "FAIL CP21 D3 untagged escape cleanup failed"; cat "$(abspath $(TEST_DIR)/cp21-d3-escape-untagged.log)"; exit 1; }; \
+	echo "PASS CP21 D3 untagged escape control: cleaned"; \
 	for malformed in embedded zero-junk embedded-defect nul-target; do \
 	  LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(TEST_DIR)/cp21-fd-child-$$malformed)" > "$(abspath $(TEST_DIR)/cp21-d3-$$malformed.log)" 2>&1 && \
 	    { echo "FAIL CP21 D3 malformed scanner accepted: $$malformed"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$malformed.log)"; exit 1; }; \

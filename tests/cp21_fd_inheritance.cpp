@@ -53,6 +53,42 @@ bool proc_available() {
     return static_cast<bool>(std::getline(self, line));
 }
 
+bool descendants(pid_t root, std::set<pid_t>& found) {
+    found.clear();
+    std::map<pid_t, pid_t> parents;
+    DIR* dir = ::opendir("/proc");
+    if (!dir) return false;
+    while (dirent* entry = ::readdir(dir)) {
+        char* end = nullptr;
+        errno = 0;
+        const long pid = std::strtol(entry->d_name, &end, 10);
+        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
+        std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
+        std::string text;
+        if (!std::getline(stat, text)) continue;
+        const std::size_t close = text.rfind(')');
+        if (close == std::string::npos) continue;
+        std::istringstream fields(text.substr(close + 1));
+        std::string state;
+        long ppid = 0;
+        if (!(fields >> state >> ppid)) continue;
+        parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
+    }
+    ::closedir(dir);
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& [pid, ppid] : parents) {
+            if (pid == root || found.count(pid)) continue;
+            if (ppid == root || found.count(ppid)) {
+                found.insert(pid);
+                changed = true;
+            }
+        }
+    }
+    return true;
+}
+
 bool tagged_processes(const std::string& tag, std::set<pid_t>& found) {
     found.clear();
     DIR* dir = ::opendir("/proc");
@@ -92,7 +128,9 @@ bool reap_bounded(pid_t child, const std::chrono::steady_clock::time_point& end)
 bool terminate_scanner(pid_t child, const std::string& tag) {
     if (child <= 0) return true;
     std::set<pid_t> targets;
-    if (!tagged_processes(tag, targets)) return false;
+    std::set<pid_t> children;
+    if (!tagged_processes(tag, targets) || !descendants(::getpid(), children)) return false;
+    for (pid_t pid : children) targets.insert(pid);
     targets.insert(child);
     const pid_t pgid = ::getpgid(child);
     if (pgid == child) {
@@ -103,15 +141,19 @@ bool terminate_scanner(pid_t child, const std::string& tag) {
     const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     if (!reap_bounded(child, end)) return false;
     while (std::chrono::steady_clock::now() < end) {
-        if (!tagged_processes(tag, targets)) return false;
-        if (targets.empty()) return true;
-        for (pid_t pid : targets)
-            if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
+        std::set<pid_t> tagged;
+        std::set<pid_t> remaining;
+        if (!tagged_processes(tag, tagged) || !descendants(::getpid(), remaining)) return false;
+        if (tagged.empty() && remaining.empty()) return true;
+        for (pid_t pid : tagged) if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
+        for (pid_t pid : remaining) if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) return false;
         if (!reap_bounded(child, end)) return false;
         ::usleep(2000);
     }
-    if (!tagged_processes(tag, targets)) return false;
-    return targets.empty();
+    std::set<pid_t> tagged;
+    std::set<pid_t> remaining;
+    if (!tagged_processes(tag, tagged) || !descendants(::getpid(), remaining)) return false;
+    return tagged.empty() && remaining.empty();
 }
 
 ScannerResult run_scanner(const char* path, int timeout_ms) {
@@ -212,6 +254,15 @@ int main(int argc, char** argv) {
     }
     if (!proc_available()) {
         std::printf("SETUP_FAIL proc unavailable\n");
+        return 2;
+    }
+    std::set<pid_t> preexisting;
+    if (!descendants(::getpid(), preexisting)) {
+        std::printf("SETUP_FAIL proc unavailable\n");
+        return 2;
+    }
+    if (!preexisting.empty()) {
+        std::printf("SETUP_FAIL preexisting child process\n");
         return 2;
     }
     const std::string tag = "cp21-scanner-" + std::to_string(::getpid());

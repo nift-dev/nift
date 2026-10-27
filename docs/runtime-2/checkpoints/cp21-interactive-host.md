@@ -120,8 +120,10 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   `SETUP_FAIL ... unavailable`; it never reports `cleaned=1`. Timeout cleanup
   signals only the verified scanner group and tagged descendants, reaps them,
   and reports an uncertain/failed cleanup instead of success when verification
-  fails. Permanent subreaper-denied and `/proc`-unavailable controls are
-  included.
+  fails. Descendants are cross-checked by both the scanner tag and the
+  test's `/proc` child tree, including a descendant that clears its
+  environment; a pre-existing child is rejected. Permanent subreaper-denied
+  and `/proc`-unavailable controls are included.
 - **Strict target grammar:** descriptor targets must contain printable
   non-whitespace bytes only; NUL, C0 controls, DEL, spaces and tabs are
   rejected. Unit and end-to-end controls cover NUL-only, embedded NUL, spaces,
