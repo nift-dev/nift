@@ -76,6 +76,10 @@ MUTANTS = {
     16: ("A3 off (non-suspending task loops admitted)", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"}}),
     17: ("A4 off (data-proportional built-ins admitted)", {"refuse/r_ca_cpu_native.f": {"exit": 0, "outcome": "vm"}}),
     18: ("captured cells admitted (coro-capture off)", {"refuse/r_share_closure.f": {"exit": 0, "outcome": "vm"}}),
+    19: ("A3 accepts a sleep anywhere in the body (continue skips it)", {"refuse/r_f4_continue.f": {"exit": 0,
+                                                                                              "outcome": "vm"}}),
+    20: ("calls through values (callable fields) not followed", {"refuse/r_f3_member_loop.f": {"exit": 0,
+                                                                                             "outcome": "vm"}}),
     13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
                                                                               "outcome": "vm"}}),
 }
@@ -219,11 +223,27 @@ def check_default(nift, name, policy):
 POLICY_PREFIX = {"D-009#5-future": "future: ", "D-009#5-thread": "thread: "}
 
 
+def correction_ok(policy, legacy, vm):
+    """Deliberate semantic corrections (record §13): the VM's .r2 golden is the
+    defined Runtime 2.0 behaviour; the legacy golden shows the legacy quirk.
+      correction:lexical-scope   legacy resolves a free name in the caller's
+                                 dynamic scope; same exit status, other stdout
+      correction:lambda-registry legacy fails with `invalid lambda` (its per-worker
+                                 lambda table); the VM succeeds"""
+    if policy == "correction:lexical-scope":
+        return legacy[2] == vm[2] == 0 and legacy[0] != vm[0]
+    if policy == "correction:lambda-registry":
+        return legacy[2] == 1 and b"invalid lambda" in legacy[1] and vm[2] == 0
+    return False
+
+
 def policy_ok(policy, legacy, vm):
     """D-009#5 through await (`future: `) or a thread's join (`thread: `):
     legacy reports a task's fatal error at the task's return statement with a
     `return: ` prefix after the task prefix; the VM at the failing expression
     without it. Same stdout and exit, one line."""
+    if policy.startswith("correction:"):
+        return correction_ok(policy, legacy, vm)
     prefix = POLICY_PREFIX.get(policy)
     if prefix is None:
         return False

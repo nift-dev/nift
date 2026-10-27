@@ -5,3 +5,13 @@ err_nested_fatal.f	D-009#5-future
 err_task_runtime_in_fn.f	D-009#5-future
 th_error_fatal.f	D-009#5-thread
 th_self_join.f	D-009#5-thread
+sem_lexical_dyn12.f	correction:lexical-scope
+sem_lexical_dyn14.f	correction:lexical-scope
+sem_lexical_dyn16.f	correction:lexical-scope
+sem_lexical_dyn18.f	correction:lexical-scope
+sem_lambda_return.f	correction:lambda-registry
+sem_lambda_async_return.f	correction:lambda-registry
+sem_lambda_sibling.f	correction:lambda-registry
+sem_lambda_parent.f	correction:lambda-registry
+sem_lambda_containers.f	correction:lambda-registry
+sem_lambda_future_chain.f	correction:lambda-registry

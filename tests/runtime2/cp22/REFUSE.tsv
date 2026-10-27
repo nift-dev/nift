@@ -53,3 +53,14 @@ r_ca_nested_call_chain.f	coro-task-native:sha256
 r_ca_mutual_recursion.f	coro-task-recursion
 r_share_alias.f	aliasing
 r_share_alias_task.f	aliasing
+r_f3_member_print_default.f	coro-observe:print
+r_f3_member_loop.f	coro-task-loop
+r_f3_member_join_default.f	builtin-receiver:join
+r_f3_member_alias_default.f	coro-observe:print
+r_f3_higher_order_default.f	coro-observe:print
+r_f3_member_recursion.f	coro-task-recursion
+r_f5_array_join.f	coro-task-native:join
+r_f4_continue.f	coro-task-loop
+r_f4_branch_sleep.f	coro-task-loop
+r_f4_sleep_second.f	coro-task-loop
+r_f4_nested.f	coro-task-loop
