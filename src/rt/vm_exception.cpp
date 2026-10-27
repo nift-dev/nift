@@ -73,7 +73,6 @@ bool Vm::op_try_begin(const Instr& in, std::size_t base, const Proto* proto, con
     handler.catch_pc = static_cast<std::uint32_t>(pc - proto->code.data()) + 1u + jump_offset(in.c);
     handler.catch_reg = in.a;
     handler.reg_top = in.b;
-    handler.creation_mark = handle_table_.creation_count();
     handlers_.push_back(handler);
     update_heap_limit();  // A15: handler storage is charged on reallocation
     return memory_ok(fault);
@@ -200,7 +199,12 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
         return false;
     }
     while (frames_.size() > handler.frame_depth) {
-        for (std::uint16_t k = 0; k < proto->nregs; ++k) R[k] = Value();
+        for (std::uint16_t k = 0; k < proto->nregs; ++k) {
+            // CP17 unwind release (owner decision, 2026-10-28): before this
+            // frame's reference dies (natives::abandon_file_on_unwind).
+            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);
+            R[k] = Value();
+        }
         const Frame frame = frames_.back();
         frames_.pop_back();
         base = frame.base;
@@ -221,18 +225,12 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
 #else
     handlers_.pop_back();
 #endif
-    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();
-    // CP17 x CP13B statement rollback: legacy discards the files created by an
-    // evaluation that fails (Parser::rollback_file_operation), including files
-    // a callee leaked by returning normally earlier in that evaluation. Every
-    // reference to them from the aborted evaluation is dead now; withdraw the
-    // left-open reports their last drop recorded. Only files created since the
-    // aborted evaluation began (StmtMark) and abandoned are eligible. This also
-    // covers the files of every frame the Error unwound (owner decision B): those
-    // frames were entered during the aborted evaluation, so their files are newer
-    // than its mark (B's separate per-frame release was removed as redundant).
-    if (handle_context_open_)
-        handle_table_.withdraw_abandoned_failures(handle_context_, HandleKind::File, handler.creation_mark);
+    // The try body's own registers (its locals and temporaries, at and above
+    // reg_top): that part of the handler's frame was unwound too.
+    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) {
+        if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);  // CP17 unwind release
+        R[k] = Value();
+    }
     R[handler.catch_reg] = std::move(fault.error);
     fault = Fault{};
     pc = proto->code.data() + handler.catch_pc;

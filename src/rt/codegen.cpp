@@ -15,6 +15,7 @@ bool FunctionBuilder::alloc(std::uint16_t& reg) {
     if (top_ >= kMaxRegisters) { error_ = "too many registers"; return false; }
     reg = top_++;
     if (top_ > proto_->nregs) proto_->nregs = top_;
+    if (top_ > high_) high_ = top_;
     return true;
 }
 

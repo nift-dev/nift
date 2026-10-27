@@ -20,6 +20,11 @@ public:
     bool alloc(std::uint16_t& reg);
     std::uint16_t top() const { return top_; }
     void release_to(std::uint16_t mark) { top_ = mark; }
+    // The highest register allocated since the last reset_high (exclusive):
+    // a block's register range is [its starting top, high()).
+    std::uint16_t high() const { return high_; }
+    std::uint16_t reset_high() { const std::uint16_t was = high_; high_ = top_; return was; }
+    void merge_high(std::uint16_t outer) { if (outer > high_) high_ = outer; }
 
     // Constants (deduplicated). Returns false when the pool is full.
     bool constant(const Value& value, std::uint16_t& index);
@@ -57,6 +62,7 @@ public:
 private:
     std::unique_ptr<Proto> proto_;
     std::uint16_t top_ = 0;
+    std::uint16_t high_ = 0;
     std::uint32_t offset_ = 0;
     std::uint8_t flags_ = 0;
     std::string error_;

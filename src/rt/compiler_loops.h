@@ -5,6 +5,7 @@
 namespace nift::rt::detail {
 
 struct UnitCompiler::ForState {
+    BlockRegs body_regs;  // CP17 unwind release: the body's registers, cleared at each normal exit
     const Node* node = nullptr;
     const Node* header = nullptr;
     const Node* body = nullptr;

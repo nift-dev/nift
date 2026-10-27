@@ -159,12 +159,6 @@ public:
     // table: status ReentrantClose, nothing done.
     CloseReport shutdown();
 
-    // CP17 x CP13B statement rollback (owner decision, 2026-10-27). The number
-    // of handles this table has created; a handle's LifeRecord::sequence (and
-    // so its CleanupFailure::sequence) is this count just after its creation.
-    // Lock-free, for a VM marking the start of each evaluation a handler may
-    // abort.
-    std::uint64_t creation_count() const noexcept { return created_.load(std::memory_order_relaxed); }
     // CP17 x CP18: true once a cleanup's report was lost to an allocation
     // failure in its bookkeeping (the cleanup itself was released). A caller
     // whose result must include every report (a VM run) treats it as the
@@ -173,17 +167,6 @@ public:
     // For a caller that had to swallow an allocation failure from this table
     // (a dying box): the run's result must not claim success.
     void note_report_lost() noexcept { reports_lost_.store(true, std::memory_order_relaxed); }
-    // Withdraws, from `owner`'s pending CloseReport failures, exactly those of
-    // kind `kind` whose handle was created after `since` (sequence > since),
-    // whose last counted reference was dropped (reason Abandoned: no owner
-    // survived) and whose cleanup hook ended the resource and reported a
-    // failed step (CleanupOutcome::failure, state CleanupIncomplete: a file
-    // left open). Explicit closes, context-end and shutdown releases, Lost
-    // (hook threw or unresolved) and Failed (alive after kill) cleanups,
-    // detached handles and older handles are never withdrawn. The
-    // lifecycle itself is untouched (each cleanup already ran exactly once).
-    // Returns the number withdrawn.
-    std::size_t withdraw_abandoned_failures(ContextId owner, HandleKind kind, std::uint64_t since);
 
     TableStats stats() const;
     const KindSpec* kind_spec(HandleKind kind) const;
@@ -243,7 +226,7 @@ private:
     OwnerList detached_;
     std::size_t detached_in_flight_ = 0, detached_obligations_ = 0, obligations_ = 0;
     std::vector<CleanupFailure> detached_failures_;
-    // created_: also read without mu_ by creation_count() (written only under mu_).
+    // created_: the number of handles created (LifeRecord::sequence); written only under mu_.
     std::atomic<std::uint64_t> created_{0};
     std::atomic<bool> reports_lost_{false};
     std::uint64_t cleaned_ = 0, settled_ = 0, next_closer_ = 1;

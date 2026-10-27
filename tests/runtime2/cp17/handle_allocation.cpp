@@ -194,13 +194,14 @@ int main() {
     // Left open: the context close runs the file hook, which reports a failure
     // (left open) through the cleanup bookkeeping.
     campaign("left-open", "f := file(\"p\")\nf.open(\"r\")\nprint(f.read_line())\n", NIFT_PROGRAM_ERROR);
-    // Decision B: an unwound frame's file is discarded silently.
+    // Unwind release: an unwound frame's file is discarded silently.
     campaign("unwound", "fn(w()) { f := file(\"p\"); f.open(\"r\"); throw error(\"s\") }\n"
                         "try { w() } catch(e) { print(e.message) }\n", NIFT_PROGRAM_COMPLETE);
-    // Statement rollback: a leaked callee file's report is withdrawn.
-    campaign("rollback", "fn(leak()) { g := file(\"q\"); g.open(\"r\"); return 1 }\n"
+    // Unwind release: a callee that returned normally leaving its file open
+    // is reported, even though a later Error in the same statement is caught.
+    campaign("caught-after-leak", "fn(leak()) { g := file(\"q\"); g.open(\"r\"); return 1 }\n"
                          "fn(work()) { throw error(\"s\") }\n"
-                         "try { x := leak() + work() } catch(e) { print(e.message) }\n", NIFT_PROGRAM_COMPLETE);
+                         "try { x := leak() + work() } catch(e) { print(e.message) }\n", NIFT_PROGRAM_ERROR);
     // Normal return leaving a file open: dropped and reported at the return.
     campaign("dropped-open", "fn(leak()) { g := file(\"q\"); g.open(\"r\"); return 1 }\nprint(leak())\n",
              NIFT_PROGRAM_ERROR);

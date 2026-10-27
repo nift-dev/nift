@@ -353,13 +353,19 @@ private:
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;
     std::vector<int> try_scopes_;  // CP13B: loop depth at each active try entry
-    // CP17 x CP13B statement rollback: inside a try body of this function, each
-    // evaluation legacy rolls back as a unit (a statement, an if/else-if or
-    // while condition) starts with StmtMark, which records the handle table's
-    // creation count in the innermost handler. Nothing is emitted elsewhere.
-    void stmt_mark() {
-        if (!try_scopes_.empty()) fb_->emit(OpCode::StmtMark);
-    }
+    // CP17 unwind release (owner decision, 2026-10-28): a block left normally
+    // clears the registers it allocated, so a managed file it abandoned is
+    // dropped (and reported) when the block ends, never kept alive by a stale
+    // register until a later Error unwinds it silently. Only blocks that can
+    // hold a handle (kKindHandle anywhere in them) emit the clears.
+    struct BlockRegs {
+        std::uint16_t mark = 0, high = 0, outer_high = 0;
+        bool clear = false;
+    };
+    BlockRegs block_begin(NodeId block);
+    void block_end(BlockRegs& regs);              // after the block's code: records its range
+    void block_clear(const BlockRegs& regs);      // emits the clears (at each normal exit)
+    bool block_holds_handles(NodeId block) const;
     std::uint32_t error_call_offset_ = kNoNode;  // `throw error(...)`: report the throw
     std::uint32_t error_call_offset_saved_ = kNoNode;
 
