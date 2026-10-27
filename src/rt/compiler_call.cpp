@@ -55,6 +55,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         ~Restore() { c.textual_statement_ = saved; c.update_flags(); }
     } restore{*this, saved_textual};
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
+    if (!operand_window(base, node.count)) return false;
     if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     const Node* const saved_print = print_arg_;
@@ -64,15 +65,13 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         path_arg_ = is_native || index_depth_ > 0 || !bare_argument(node, k) ? kNoNode : args[k];
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
-        std::uint16_t reg = base;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
         if (!is_native && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
             k < plan_.escaping[f].size() && plan_.escaping[f][k])
             return fail(ast_.at(args[k]), "alias-argument");
         if (is_native && !print_argument_ok(args[k], ast_.at(args[k]))) return false;
-        if (!(in_place && k == 0) && !temp(reg)) return false;
-        if (!expr_to(args[k], reg)) return false;
+        if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
     path_arg_ = saved_path;
     path_chain_ = saved_chain;
@@ -97,8 +96,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
             fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
         fb_->note(at, std::string(name));
     }
-    std::uint16_t slot = base;
-    if (node.count == 0 && !in_place && !temp(slot)) return false;  // the result slot exists even without arguments
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
@@ -135,19 +132,16 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
     const std::uint32_t window = node.count + (receiver != kNoNode ? 1u : 0u);
     if (window > 0x7fff) return fail(node, "limit:arguments");
     const std::uint16_t mark = fb_->top();
-    std::uint16_t base = 0;
-    bool first = true;
+    const auto base = mark;
+    if (!operand_window(base, window)) return false;
+    std::uint16_t slot = base;
     const auto next = [&](NodeId value) {
         if (ast_.at(value).kind == NodeKind::Spread) return fail(ast_.at(value), "spread");
-        std::uint16_t reg = 0;
-        if (!temp(reg)) return false;
-        if (first) { base = reg; first = false; }
-        return expr_to(value, reg);
+        return window_value(value, slot++);
     };
     if (receiver != kNoNode && !next(receiver)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k)
         if (!next(args[k])) return false;
-    if (first && !temp(base)) return false;  // no receiver and no arguments: the result slot
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::CallNative, base,
                                      static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),

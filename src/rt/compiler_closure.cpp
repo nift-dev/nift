@@ -356,14 +356,10 @@ bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, s
     std::uint16_t callee_reg = 0;
     if (!temp(callee_reg) || !expr_to(callee_id, callee_reg)) return false;
     const std::uint16_t base = fb_->top();
+    if (!operand_window(base, node.count)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k) {
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        std::uint16_t reg = 0;
-        if (!temp(reg) || !expr_to(args[k], reg)) return false;
-    }
-    if (node.count == 0) {
-        std::uint16_t result = 0;
-        if (!temp(result)) return false;
+        if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
     if (session_ && !session_call_types(node, callee_id, base)) return false;
     fb_->set_offset(site(node));

@@ -226,8 +226,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     if (node.count != fn.count) return fail(node, "static-error:arity");
     const NodeId* args = ast_.list(node);
     const std::uint16_t base = fb_->top();
-    std::uint16_t reg = 0;
-    if (!temp(reg)) return false;
+    if (!operand_window(base, node.count + 1)) return false;
     if (receiver_reg >= 0) fb_->emit(OpCode::SlotOf, base, static_cast<std::uint16_t>(receiver_reg));
     else if (!receiver_slot(receiver, base)) return false;
     ++call_args_;
@@ -239,7 +238,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
                  plan_.escaping[f][k])
             ok = fail(ast_.at(args[k]), "alias-argument");
-        else ok = temp(reg) && expr_to(args[k], reg);
+        else ok = window_value(args[k], static_cast<std::uint16_t>(base + k + 1));
     }
     path_arg_ = saved_path;
     path_chain_ = saved_chain;

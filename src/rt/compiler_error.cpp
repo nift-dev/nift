@@ -54,14 +54,11 @@ bool UnitCompiler::error_new(const Node& node, std::uint16_t dst) {
     const bool in_place = dst + 1u == fb_->top();
     const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
+    if (!operand_window(base, node.count)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k) {
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
-        std::uint16_t reg = base + k;
-        if (!(in_place && k == 0) && !temp(reg)) return false;
-        if (!expr_to(args[k], reg)) return false;
+        if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
-    std::uint16_t slot = base;
-    if (node.count == 0 && !in_place && !temp(slot)) return false;
     fb_->set_offset(error_call_offset_ == kNoNode ? site(node) : error_call_offset_);
     fb_->emit(OpCode::ErrorNew, base, base, static_cast<std::uint16_t>(node.count));
     if (dst != base) fb_->emit(OpCode::Move, dst, base);

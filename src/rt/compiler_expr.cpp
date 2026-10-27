@@ -268,12 +268,25 @@ bool UnitCompiler::array_literal(const Node& node, std::uint16_t dst) {
     if (!no_trailing_comma(node)) return false;
     const std::uint16_t base = fb_->top();
     const NodeId* items = ast_.list(node);
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 22
     for (std::uint32_t k = 0; k < node.count; ++k) {
         std::uint16_t reg = 0;
-        if (ast_.at(items[k]).kind == NodeKind::Spread) return fail(ast_.at(items[k]), "spread");
-        if (!no_alias(items[k], ast_.at(items[k]))) return false;
         if (!temp(reg) || !expr_to(items[k], reg)) return false;
     }
+#else
+    // Reserve contiguous payload; Cell reads need scratch registers between items.
+    for (std::uint32_t k = 0; k < node.count; ++k) {
+        std::uint16_t reg = 0;
+        if (!temp(reg)) return false;
+    }
+    const auto scratch = fb_->top();
+    for (std::uint32_t k = 0; k < node.count; ++k) {
+        if (ast_.at(items[k]).kind == NodeKind::Spread) return fail(ast_.at(items[k]), "spread");
+        if (!no_alias(items[k], ast_.at(items[k]))) return false;
+        if (!expr_to(items[k], static_cast<std::uint16_t>(base + k))) return false;
+        fb_->release_to(scratch);
+    }
+#endif
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::NewArray, dst, base, static_cast<std::uint16_t>(node.count));
     fb_->release_to(base);

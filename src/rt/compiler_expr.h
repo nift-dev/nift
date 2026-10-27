@@ -271,6 +271,8 @@ private:
     }
     bool no_trailing_comma(const Node& node);
     bool temp(std::uint16_t& reg);
+    bool operand_window(std::uint16_t base, std::uint32_t count);
+    bool window_value(NodeId value, std::uint16_t dst);
     // CP12b globals (compiler_globals.cpp): the binding of `name` in the code
     // being compiled: a local, or (in a function) the top-level binding a
     // resolved free name denotes (Binding::global); nullptr otherwise.

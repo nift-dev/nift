@@ -9,10 +9,9 @@ int UnitCompiler::session_native_call(const Node& node, NodeId receiver, std::st
         if (!builtin_arguments_ok(node, *candidate.spec, receiver)) return 0;
     const auto mark = fb_->top();
     const auto base = mark;
-    std::uint16_t reg = 0;
-    if (!temp(reg) || !expr_to(receiver, reg)) return 0;
+    if (!operand_window(base, node.count + 1) || !window_value(receiver, base)) return 0;
     for (std::uint32_t k = 0; k < node.count; ++k)
-        if (!temp(reg) || !expr_to(ast_.list(node)[k], reg)) return 0;
+        if (!window_value(ast_.list(node)[k], static_cast<std::uint16_t>(base + k + 1))) return 0;
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 11
     std::uint16_t ignored = 0;
     if (!temp(ignored) || !expr_to(receiver, ignored)) return 0;
