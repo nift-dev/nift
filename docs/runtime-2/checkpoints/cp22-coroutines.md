@@ -208,7 +208,9 @@ reports it:
 | `coro-collection-callback` | collection callbacks in a coroutine unit (suspension inside the CP14B controller is not yet proven) |
 | `coro-sleep-arity` | `sleep` with other than one argument in a coroutine unit |
 | `coro-module` | imports in a coroutine unit (module initialisation order vs spawns unproven) |
-| existing `callable:thread`, `callable:mutex`, `atomic…` | OS threads, mutexes and atomics stay on legacy: running VM code on another thread needs isolates (CP23, D-036 assigns `mutex` to CP22/CP23) |
+| `coro-thread-callee` | `thread(…)` whose first argument is not a directly named top-level synchronous function (lambdas and values: unproven arity/position rules; non-callables; an async function is `coro-async-value`, its join would yield a future) (§11.6) |
+| `coro-thread-arity` | `thread(f, …)` with the wrong argument count (legacy reports it against its internal `__thread_callable` at 1:1) |
+| existing `callable:mutex`, `atomic…` | mutexes and atomics stay on legacy (CP23; D-036 assigns `mutex` to CP22/CP23, the CP12B inventory to CP23) |
 | `fn-flags` | unchanged for deferred bodies and methods |
 
 Admission is measured by the D-016 suites: async programs move from the
@@ -324,8 +326,9 @@ resource growth (`heap_peak`, RSS, fds before/after drain).
   captures are copyable in parallel isolates); (b) refuse CPU-heavy async
   units on the VM (no static criterion exists; not recommended); (c) bring
   isolate-parallel tasks forward into CP22 (CP23 scope). Recommendation: (a).
-* **`Kind::Future`** takes the last free 4-bit value tag (owner-visible: after
-  this no value tag remains; a further kind must reuse a tag with a subkind).
+* **`Kind::Future`** takes the last value of the 4-bit heap-tag mask
+  (superseded by §11.2: the mask is one constant over a byte with three
+  unused bits; Future is not irreversible).
   Alternative after CP17 lands: futures as CP17 boxed handles
   (`HandleKind::Future`, the box's `release` hook pointing at the scheduler);
   all future operations are in the new files, so the switch stays local.
@@ -354,6 +357,329 @@ resource growth (`heap_peak`, RSS, fds before/after drain).
    negative controls; Makefile targets wired into `test-rt-vm`,
    `test-rt-vm-sanitize`, certification guard and plan.
 7. Benchmarks + exploratory evidence; this record's Evidence section.
+
+## 11. Owner decisions, round 2 (2026-10-27) — new proposal, not accepted
+
+The owner's answers on candidate e06ea42d: the cooperative single-threaded
+scheduler is accepted **provisionally** as the implementation architecture
+(no performance obligation waived, no async functionality permanently
+reduced); `Kind::Future` is not approved as irreversible; work-stealing may be
+proposed for CP23, no roadmap amendment approved; CP17 reconciliation stays
+blocked until CP17 is accepted and integrated.
+
+### 11.1 CPU-bound scaling: single-threaded scheduling vs multithreaded execution
+
+**Exploratory** (this container: 2 vCPUs, `nproc` 2, sched_getaffinity 2,
+shared, not the reference platform). `benchmarks/runtime2/cp22_coro.py
+--scale-only`: k = 1, 2, 4, 8 concurrent `fn[async]` tasks with the same work
+each (weak scaling), the same binary and program on both engines, median of
+3 runs, wall and process CPU time (user + sys, `wait4`). Outputs identical on
+both engines in every row; every VM run executed on the VM (`outcome: vm`).
+Legacy executes tasks on its pool (`max(2, hardware_concurrency)` threads,
+i.e. multithreaded execution); the VM schedules them on one thread
+(single-threaded scheduling, no parallel execution).
+
+| Body (iterations per task) | k | Legacy wall / CPU (s) | Legacy CPU/wall | VM wall / CPU (s) | Legacy wall / VM wall |
+| --- | --- | --- | --- | --- | --- |
+| arith (600k) | 1 | 0.413 / 0.407 | 0.98 | 0.063 / 0.062 | 6.6 |
+| arith | 2 | 0.495 / 0.889 | 1.80 | 0.110 / 0.107 | 4.5 |
+| arith | 4 | 0.952 / 1.719 | 1.81 | 0.250 / 0.237 | 3.8 |
+| arith | 8 | 2.268 / 3.875 | 1.71 | 0.423 / 0.418 | 5.4 |
+| string (300k) | 1 | 0.283 / 0.282 | 1.00 | 0.029 / 0.029 | 9.8 |
+| string | 2 | 0.295 / 0.570 | 1.94 | 0.055 / 0.054 | 5.4 |
+| string | 4 | 0.731 / 1.163 | 1.59 | 0.106 / 0.105 | 6.9 |
+| string | 8 | 1.275 / 2.313 | 1.81 | 0.216 / 0.214 | 5.9 |
+| native: `sha256` of 64 KiB (10k) | 1 | 0.642 / 0.642 | 1.00 | 0.537 / 0.528 | 1.20 |
+| native | 2 | 0.692 / 1.340 | 1.94 | 1.103 / 1.101 | **0.63** |
+| native | 4 | 1.375 / 2.628 | 1.91 | 2.147 / 2.128 | **0.64** |
+| native | 8 | 2.692 / 5.192 | 1.93 | 4.252 / 4.209 | **0.63** |
+
+Reading (single-threaded scheduling ≠ multithreaded execution):
+
+* VM wall time grows linearly with k (one thread: wall ≈ CPU ≈ k × the
+  single-task cost); legacy uses up to `min(k, cores)` cores (CPU/wall ≈ 1.8-1.9
+  here, the 2-core ceiling).
+* Where the work is interpreted (arith, string), the VM's single-thread cost
+  is 6.6-9.8× lower, so it wins at every k on 2 cores. On a machine with P
+  cores, legacy's wall time is about k × c_legacy / min(k, P) × (parallel
+  efficiency, ≈ 0.9 here), the VM's k × c_vm: **the VM loses once min(k, P)
+  exceeds c_legacy / c_vm divided by the efficiency** — for these bodies with
+  about 8 or more concurrent CPU-bound tasks on 8+ cores (arith) and 11+
+  (string). This is a projection; it cannot be measured on 2 cores.
+* Where the time is spent in natives (the same C++ code on both engines), the
+  VM's advantage disappears (1.2× at k = 1) and **the VM already loses on
+  this 2-core machine: 1.6× slower wall at k ≥ 2**; on P cores the loss
+  approaches min(k, P) / 1.2.
+* The same holds for `thread()` (same task path) and, once VM Host ops can
+  block (CP17/CP20 processes and handles), for tasks that block in Host ops:
+  legacy overlaps them on threads, the VM's one thread would serialise them
+  unless the Host op suspends the task (CP22 §6 plan).
+* Options (unchanged, owner): (a) keep cooperative scheduling until CP23
+  isolates run capture-only tasks in parallel (the provisional decision); (b)
+  run Host ops off-thread with completion through the WakeSource (needed
+  anyway for blocking Host ops; does not help CPU-bound natives); (c) bring
+  isolate-parallel execution into CP22. The obligation stands: the loss rows
+  above are a regression against legacy for CPU-parallel async programs until
+  one of these lands.
+
+### 11.2 Value-kind extensibility (is Kind::Future irreversible?)
+
+Where a runtime kind is encoded, and what one more kind costs:
+
+| Layer | Encoding | Room after Future (14) and threads | Cost of one more kind |
+| --- | --- | --- | --- |
+| `rt::Value` tag (byte 15) | a full byte (`Kind : uint8_t`) | 241 values | none |
+| `HeapObject::tag` | low 4 bits = kind, bit 7 = D-040 identity summary, **bits 4-6 unused** | 1 value (15) with `kKindMask = 0x0F`; 113 with `0x7F` | change `kKindMask` to `0x7F` (one constant, two static_asserts): `kind()` stays one `and` with a different immediate |
+| infer `KindSet` (compile time only) | `uint16_t` bit set; bits 11-13 CP17 handles, 14 future, 15 thread | none | `KindSet` becomes `uint32_t`: 2 more bytes per AST node in `UnitKinds`, compile time only, nothing at run time |
+| `binding_tag` (legacy text types) | per-kind switch | n/a | one `case` |
+| identity fast path (`aggregate.cpp`: kinds >= Array may carry identity) | ordering of `Kind` | a new kind appended is treated as identity-capable (conservative, correct) | a new *scalar* kind must be inserted before Array (renumbering; `Kind` values are never persisted) |
+| C ABI / bindings | not exposed: `include/nift` has its own `nift::Value::Type` and `nift_program_result` carries copied text only; no FFI marshals `rt::Kind` in the base (CP18 FFI is legacy-side) | n/a | none |
+| Bytecode / caches | `Kind` values are not serialised (no persistent bytecode; D-041's module cache is in-memory and keyed by compiler version) | n/a | none |
+
+Evidence (one small compile, `kindprobe/`): `src/rt/value.cpp` compiled with
+the base header and with `kKindMask = 0x7F` plus two more kinds
+(`Probe15`, `Probe16`): every `HeapObject::kind()` site is the same single
+instruction (`and $0xf` → `and $0x7f`), 1,056 vs 1,060 instructions in the
+object (the 4 extra are the two new `kind_name` cases). So the "last free
+tag" in §9 was overstated: the 4-bit field is an artificial mask over a byte
+with three unused bits, and the representation is adequate; no type-system
+redesign is needed.
+
+Alternatives compared:
+
+* **(A) current: `Kind::Future` (14), threads as a heap subkind of it**
+  (`FutureObject::thread`, §11.6). One heap kind serves every task handle
+  (futures, threads; channels/isolate handles of CP23 could join it). Hot
+  paths: none (futures are never on arithmetic or collection paths; the
+  dispatch switch only reaches them through the cold coroutine opcodes).
+* **(B) a generic heap kind with a subkind byte** (e.g. `Kind::Task` whose
+  object carries `{future, thread, …}`): what (A) already is, apart from the
+  name. Renaming `Future` to a neutral name is cosmetic.
+* **(C) futures as CP17 boxed handles** (`HandleKind::Future` already exists in
+  the base enum; CP17's `HandleBoxObject` makes `Kind::Handle` a heap kind with
+  a box flag): frees tag 14 but makes every handle operation distinguish
+  futures by the aux byte, `type`/`binding_tag`/equality read the box, and
+  futures enter the handle table's lifecycle (contexts, transfer, release
+  scheduling) which they do not need; depends on CP17 being integrated.
+  More cost, no gain while tag room is not scarce.
+* **(D) widen the mask now** (0x0F → 0x7F): free and reversible; not done in
+  this candidate because no further kind is needed yet; the analysis above is
+  the evidence that it is a one-constant change when one is.
+
+Recommendation: keep (A); treat `Kind::Future` as "the task-handle kind" (heap
+subkinds for thread and later CP23 handles). Nothing irreversible: no ABI,
+serialisation or persisted format depends on the value 14.
+
+### 11.3 Work-stealing and mandatory CP22 semantics
+
+Checked against `checkpoints.md` (row CP22: "VM coroutines + work-stealing
+scheduler + event loop", gates 10k sleeps < 0.2 s and linear spawn scaling),
+`decisions.md`, `architecture.md` and the scope assignments of
+`checkpoints/cp12b-coverage-inventory.md` / `cp12b-resolver.md` /
+`cp13-diagnostics-design.md` / `cp16-host-ops-design.md`:
+
+* No decision (D-001…D-052) defines a CP22 *semantic* that needs parallel
+  execution or work stealing: the CP22 gates are a sleep latency and a spawn
+  scaling gate, both met by an M:1 scheduler; D-001 #7 (isolate-owned heaps,
+  non-atomic refcounts) forbids running one isolate's tasks on several OS
+  threads; D-034's deadline/cancellation mechanism (cited by CP16 as "the
+  mechanism CP22 reuses") is untouched; D-041 leaves module-instance states
+  "room for CP22–CP23" (concurrent imports), which CP22 refuses (`coro-module`)
+  — an admission gap, not a semantic of work stealing.
+* So leaving work-stealing out leaves **no CP22 semantics unfinished by
+  itself**; its only effect is performance (§11.1), and the proposal is to
+  move it to CP23 with isolates (proposal only; `checkpoints.md` unchanged).
+* The check found **one mandatory CP22 item the candidate had left out**:
+  the CP12B inventory assigns `thread()` to CP22 ("CP22 (threads, scheduler);
+  CP23 (mutexes, atomics)"; `callable:thread` 100 programs; also CP13 S11
+  "thread failure `thread: return: …`" → CP22). e06ea42d refused it. It is now
+  implemented on the scheduler (§11.6). Mutexes and atomics stay CP23.
+* `fn-flags` (`fn[async]` → CP22, `@fn` → CP24): see §11.4.
+
+### 11.4 `@fn[async]`: out of CP22 scope (evidence)
+
+* `@fn` is the template function form (`docs/ADVANCED-TEMPLATING.md`
+  `@fn(add(a,b)){ @return(a+b) }`); the parser marks it `kFlagDeferredBody`
+  ("FnDecl written as template `@fn`: body translated at call time",
+  `rt/ast.h`). The base VM refuses every `@fn`, async or not (`fn-flags`,
+  `resolver.cpp`), before CP22.
+* The scope documents assign it to CP24: inventory row "`fn-flags`
+  (`fn[async]`, `@fn`) → CP22 (async) / CP24 (`@fn`)"; "CP22/CP24 | fn[async]
+  (CP22), @fn deferred bodies (CP24)"; `cp12b-resolver.md` "`@fn` is a
+  translated body" (CP24). CP24 (template compiler) is a later checkpoint.
+* Legacy probe: `@fn[async](add(a, b)) { return a + b }` behaves as
+  `fn[async]` (prints 3); a plain `@fn(add…)` likewise as `fn`. Compiling the
+  deferred body is CP24's job; once CP24 compiles `@fn` bodies, the CP22
+  machinery (Spawn, snapshot, futures) applies unchanged because the flag only
+  changes how the body is obtained. Fixture `refuse/r_at_fn_async.f` keeps the
+  refusal (`fn-flags`) under test.
+
+### 11.5 Windows timer path
+
+The scheduler's own timers never depended on the host loop: a task's
+`sleep` deadline is the scheduler's timer heap and the VM thread waits in
+`WakeSource::wait_until` (portable `std::condition_variable`), so `sleep`
+suspension works on Windows as on POSIX. What was missing on Windows is the
+cross-thread wake path `WakeSource::post_at` → CP16 `loop_at`, which was a
+stub returning 0 (never fires). It is now implemented in
+`src/rt/host/process_loop.cpp` (own commit; CP21 owns the file): the
+`_WIN32` branch is a portable timer loop (one lazily started thread,
+`std::condition_variable`, same contract: never early, callbacks without the
+lock, cancel is a no-op for fired ids); `loop_when_readable` stays a no-op
+there (Windows has no CP16 fd watches). The same branch is compiled on Linux
+with `-DNIFT_HOST_LOOP_PORTABLE` and run by `test-runtime2-cp22-tsan`
+(`coro-wake-portable`) under TSan, and every CP22 source and the loop compile
+with the MinGW-w64 cross compiler (`-fsyntax-only`). Not done: running on a
+Windows host (no Windows machine or emulator here; the Windows CI target is
+not run from this container).
+
+### 11.6 Threads on the scheduler
+
+Legacy (`v45_threads.sh` and probes `probe2/t*.f`, `u*.f`, `v*.f`):
+`thread(f, args…)` runs `f(args…)` on an OS thread with the async snapshot
+rule; `join()` returns the result (repeatable), `done()`, `status()`
+(`running`/`done`/`error`), `type` "thread", binding type string; a fatal
+failure joins as `thread: <msg>` at the thread's position (`thread: return:
+…` at the `return`, the D-009#5 shape), a thrown Error re-raises unchanged
+(catchable); unjoined failures are ignored; unjoined threads drain at the end;
+a thread created in a parent may be joined in a child (args or snapshot) but
+one created in a child is invalid in the parent (`thread: invalid handle`);
+`await t` is `await: expected future`; `p.join()` on a future is a parse-level
+error.
+
+**Default: refused before execution (`callable:thread`, as in the base).**
+The cooperative implementation below compiles only with the test opt-in
+`NIFT_VM_COOPERATIVE_THREADS=1` (`CompileLimits::cooperative_threads`), pending
+the owner decision of §11.7; fixture `refuse/r_thread_default.f` keeps the
+default under test.
+
+VM (opt-in): `thread(f, args…)` compiles to `CallValueAny` with the thread bit
+(`c & 0x8000`; argument windows are < 0x8000) and spawns the task exactly as
+an async call (snapshot, FIFO, structured completion, drain), marking its
+`FutureObject` as a thread (heap subkind, §11.2); `join()` is `Await` with
+`c = 1` (legacy's `thread: ` prefix); infer gives the handle `kKindThread`.
+Admitted: `f` a top-level synchronous function named directly with the
+right arity. Refused before execution (legacy defects or unproven):
+`coro-thread-callee` (a lambda/value or a non-callable; an async function is
+refused before that as `coro-async-value`),
+`coro-thread-arity` (legacy reports it against its internal
+`__thread_callable` at 1:1), `coro-future-flow:Return` (a handle returned
+from a thread body), `coro-future-flow:Member` (`join` on a future). Ordering
+is FIFO, one of legacy's interleavings (VM-only fixture `v_thread_order`).
+The D-009#5 location rule applies to `thread: ` exactly as to `future: `
+(policy `D-009#5-thread`, EXPECT.tsv). The CPU parallelism of legacy threads
+is the §11.1 question.
+
+### 11.7 `thread()` execution model — owner decision required
+
+**Contract.** Legacy and its documentation promise actual concurrency:
+`ReleaseNotes.md` (v4.5) "Real native concurrency: `thread(...)`, replayable
+`join`, `hardware_concurrency()`, mutex-backed explicitly shared state,
+sequentially-consistent `atomic<int>` / `atomic<bool>` … and async
+functions/futures on a bounded native worker pool"; the v4.5 handover
+(`docs/handover/V4.5-NATIVE-RUNTIME-SHELL.md`): "add real native concurrency:
+threads, mutexes and `async` / `await` backed by actual parallel execution";
+"`async` / `await` must be genuinely parallel-capable. Do not implement a
+JavaScript-style single-threaded event-loop substitute and call it
+multithreading." (The nift.dev pages are not in the repository; these are
+the in-repo statements.) The cooperative model therefore **changes the
+observable execution model** of `thread()`; the same text bears on `async`,
+whose cooperative scheduling the owner accepted provisionally (§11).
+
+**Safe default implemented:** a unit calling `thread()` is refused before
+execution and runs on legacy unchanged (`callable:thread`). The cooperative
+code path stays in the tree behind the opt-in only to produce the evidence
+below.
+
+Evidence (opt-in build path; legacy is the same binary with `NIFT_VM=0`):
+
+1. **Parallel execution:** none on the VM. Every task of an isolate runs on
+   the one VM thread (D-001 #7); `thread()` tasks interleave at loop
+   safepoints (every 1,024 back-edges), suspension points (`join`, `await`,
+   `sleep`) and task ends. VM CPU/wall ≤ 1.0 in every scaling row; legacy
+   reaches ~1.9 on 2 cores.
+2. **Scaling with `thread()`** (1/2/4/8 threads, wall/CPU, 2 cores):
+   exploratory, `cp22_coro.py --scale-only --scale-kind thread`
+   (legacy: one OS thread per `thread()`; VM: opt-in, one thread), median of 3:
+
+   | Body | k | Legacy wall / CPU (s) | Legacy CPU/wall | VM wall / CPU (s) | Legacy / VM wall |
+   | --- | --- | --- | --- | --- | --- |
+   | arith (600k) | 1 | 0.362 / 0.361 | 1.00 | 0.050 / 0.048 | 7.3 |
+   | arith | 2 | 0.380 / 0.736 | 1.93 | 0.095 / 0.094 | 4.0 |
+   | arith | 4 | 0.779 / 1.483 | 1.90 | 0.193 / 0.192 | 4.0 |
+   | arith | 8 | 1.574 / 2.864 | 1.82 | 0.374 / 0.366 | 4.2 |
+   | native sha256 (10k) | 1 | 0.577 / 0.559 | 0.97 | 0.475 / 0.468 | 1.21 |
+   | native | 2 | 0.578 / 1.097 | 1.90 | 0.928 / 0.919 | **0.62** |
+   | native | 4 | 1.115 / 2.181 | 1.96 | 1.816 / 1.807 | **0.61** |
+   | native | 8 | 2.233 / 4.310 | 1.93 | 3.634 / 3.602 | **0.61** |
+
+   Same outputs on both engines, every VM run `outcome: vm`. A faster VM
+   (arith) is not parity: it is the interpreter's single-thread speed; with
+   native-bound work the VM is 1.6× slower from 2 threads on, and on P cores
+   the gap grows towards min(k, P) / 1.2 (projection, §11.1).
+3. **Blocking without suspending:**
+   * tight CPU loop: preempted at loop safepoints, so a thread spinning on
+     another's `done()` terminates as in legacy (`th_spin_wait.f`, also
+     `busy_poll.f`, VM-only `v_preempt.f`). A single long native call (one
+     `sha256` of a large string, one `sort`) is not preempted: other threads
+     wait for it to return (bounded by the call; legacy runs them meanwhile).
+   * blocking Host call: the task holds the VM thread for the whole call.
+     `tests/runtime2/cp22/blocking_probe.py`: thread A `open()`s a FIFO whose
+     external writer writes after 2 s, thread B returns `epoch()`: B finished
+     after **0-2 ms on legacy, 1,998 ms on the VM** in two runs (same output
+     otherwise).
+     Starvation for the duration of the block; it becomes a **deadlock where
+     legacy would not** whenever the unblocking event depends on another VM
+     thread (e.g. a pipe/process handle written by a sibling thread). In the
+     admitted VM subset no built-in can write to such a channel (no VM file
+     or process handles before CP17/CP20), so no deadlock witness can be
+     written today; the hazard arrives with CP17/CP20 unless those Host ops
+     suspend the task (record §6).
+   * mutex wait / atomics: `mutex()` and `atomic<…>` are refused
+     (`callable:mutex`, `callable:atomic<int>`; fixtures
+     `refuse/r_thread_mutex.f` 750, `r_thread_atomic.f` 2000 run on legacy).
+     Under a cooperative model a `lock()` that blocks instead of suspending
+     would deadlock as soon as the holder is suspended: CP23 must make lock
+     waits suspension points.
+   * join on another thread: a suspension point (never blocks the VM
+     thread). Join cycles cannot form: a thread can only reach handles created
+     before it (snapshot at creation); self-join reads an unbound name and
+     fails as in legacy (`th_self_join.f`, D-009#5-thread).
+4. **Cancellation and Errors:** no script-level cancellation in legacy or
+   VM; a run stopped internally abandons every task once (coro_unit,
+   teardown benchmark; threads use the same task record). Errors:
+   `th_error_fatal` (`thread: …`, D-009#5-thread), `th_error_thrown` (the
+   original Error, catchable, repeatable join), `th_error_uncaught`,
+   `th_status_error`, `th_unjoined` (unjoined failure ignored).
+5. **Futures and lifetime:** futures passed into threads and threads into
+   async tasks (`th_transfer`, `th_with_async`, `tr_thread` with per-thread
+   Host-op traces); structured completion and end-of-run drain as for async
+   (`th_unjoined`: a sleeping unjoined thread still prints after main);
+   handles cannot flow upwards (`refuse/r_thread_result.f`).
+6. **Legacy differential witnesses:** 16 `th_*`/`tr_thread` fixtures
+   (join ordering, repeated joins, joins in loops/arrays, snapshot isolation,
+   errors, drain), VM-only `v_thread_order` (FIFO interleaving), refusals for
+   mutex/atomics/lambda/arity/value/result, and the adversarial generator
+   (threads inside tasks and from main, joined in reverse and twice). Legacy
+   output with mutexes and atomics is deterministic only for the final
+   values, which the refusal fixtures check.
+
+**Options for the owner:**
+
+* **(a) Keep `thread()` on real OS threads, as legacy does** — on the VM this
+  needs an isolate per thread (CP23 capture-only isolates: values copied in,
+  results copied out, mutex/atomic as shared host objects). Exact legacy
+  model; it is CP23 work, not CP22.
+* **(b) Refuse `thread()` on the VM until CP23** — current default in this
+  candidate; programs using `thread()` keep running on legacy (no fallback
+  change for CP25 accounting beyond the existing `callable:thread`).
+* **(c) The cooperative model** — only if the owner amends the contract
+  above (it is not allowed by the v4.5 text as written); costs: no CPU
+  parallelism (§11.1 and item 2), blocking Host ops starve siblings (item 3),
+  locks must become suspension points in CP23.
+
+Recommendation: (b) now, (a) in CP23. The same contract text should be
+weighed against the provisional acceptance of cooperative `async`.
 
 ## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 
@@ -389,3 +715,34 @@ reference platform, so none of these is a gate result):
 | idle (10 tasks sleeping 1 s) | 3 ms CPU over 1.0 s |
 | teardown at a 64 MiB memory budget | 78,187 suspended tasks abandoned, run stopped in 0.13 s |
 | CPU-bound async (4 tasks, 700k iterations) | legacy 1.25 s wall / 2.34 s CPU (thread pool); VM 0.27 s wall / 0.27 s CPU (one thread) |
+
+### Evidence, round 2 (owner decisions of 2026-10-27; same container)
+
+Run on the final code of this round (threads gated by default; raw logs in
+the handover's evidence directory, `*-r2`/`*-r3` names):
+
+* `make test-runtime2-cp22` (goto and switch builds): legacy oracle 91/91,
+  VM differential 64/64 (5 under D-009#5 policies: 3 `future`, 2 `thread`),
+  refusals 27/27 before execution (incl. `r_thread_default`, the default
+  `callable:thread`), VM-only 7/7, per-task traces 4/4, adversarial 80 × 2
+  builds with threads (0 differences, 2,200 tasks), negative controls.
+* Mutants: 11/11 detected by their named witnesses (M11: `await` accepts a
+  thread handle, witness `th_await_thread.f`).
+* ASan+UBSan+LSan: coro_unit 76/76; `test-runtime2-cp22-sanitize` vm 64,
+  refuse 27, vm-only 7, adversarial seed 2 (30 programs, 616 tasks).
+* TSan: `coro_wake_unit` 127/127 on the POSIX host loop and 127/127 on the
+  portable (Windows) timer loop (`-DNIFT_HOST_LOOP_PORTABLE`).
+* MinGW-w64 (`x86_64-w64-mingw32-g++-posix -fsyntax-only -Wall -Wextra
+  -pedantic`): all 26 `.cpp` files changed by CP22 compile without warnings
+  (compile check only; nothing run on Windows).
+* `make -k test-rt-vm`: exit 0; rt-lint, test-test-integrity (incl. header
+  name collisions), certification guard and self-test (27 controls): pass.
+* Exploratory scaling (§11.1, §11.7) and the blocking probe (§11.7).
+* Refreshed exploratory measurements on the final code
+  (`cp22_coro.py --callgrind --runs 5`, `bench3.jsonl`; not gate results):
+  10k × `sleep(10)` 0.025 s wall; callgrind instructions per spawn 1k 5,242,
+  10k 5,110, 100k 4,961 (0-spawn baseline 3.07 M subtracted), ratio
+  100k/1k 0.95 (pre-registered criterion ≤ 1.25); spawn wall / peak RSS 1k
+  3.7 ms / 14.8 MiB, 10k 7.0 ms / 14.8 MiB, 100k 50 ms / 29.7 MiB; yield
+  overhead +4.1 %; wake-up latency 0.20 ms; idle 2.4 ms CPU per 1 s;
+  teardown of 78,187 suspended tasks at the 64 MiB budget 0.12 s.
