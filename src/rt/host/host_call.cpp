@@ -12,12 +12,20 @@ HostCall::HostCall(const HostCallEnv& env, HostOp op, std::string_view builtin)
 
 HostCall::~HostCall() {
     if (finished_) return;
-    HostError e;
-    make_error(e, "internal.host_call", builtin_ + ": host call ended without an outcome");
     status_ = HostStatus::Internal;
-    error_ = e;
     finished_ = true;
-    emit_v2("error", e.code);
+    // CP17 rework (F2): the call usually ends here because an exception (an
+    // allocation failure in the native) is unwinding it. Building the error and
+    // the v2 trace line allocates; a failure must not escape a destructor
+    // (std::terminate). Then the line is lost: the run fails as the
+    // allocation failure it was.
+    try {
+        HostError e;
+        make_error(e, "internal.host_call", builtin_ + ": host call ended without an outcome");
+        error_ = e;
+        emit_v2("error", e.code);
+    } catch (...) {
+    }
 }
 
 HostStatus HostCall::resolve(std::string_view raw, PathSemantics semantics) {

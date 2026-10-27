@@ -3641,9 +3641,15 @@ CP17_HANDLE_ALLOC := $(TEST_DIR)/cp17/handle-allocation$(EXEEXT)
 $(CP17_HANDLE_ALLOC): tests/runtime2/cp17/handle_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+# CP17 rework (F2): allocation failure that persists (consecutive failures).
+CP17_HANDLE_ALLOC_PERSIST := $(TEST_DIR)/cp17/handle-allocation-persistent$(EXEEXT)
+$(CP17_HANDLE_ALLOC_PERSIST): tests/runtime2/cp17/handle_allocation_persistent.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
 .PHONY: test-runtime2-cp17-handle-allocation
-test-runtime2-cp17-handle-allocation: $(CP17_HANDLE_ALLOC)
+test-runtime2-cp17-handle-allocation: $(CP17_HANDLE_ALLOC) $(CP17_HANDLE_ALLOC_PERSIST)
 	timeout 1800 $(CP17_HANDLE_ALLOC)
+	timeout 3600 $(CP17_HANDLE_ALLOC_PERSIST)
 $(CP18_COW_SWITCH): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(LDLIBS) -o $@

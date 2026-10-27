@@ -49,7 +49,10 @@ struct TerminationStart {
 class HandleTable {
 public:
     explicit HandleTable(TableOptions options = {});
-    ~HandleTable();  // shutdown(); failures are discarded (call shutdown() to see them)
+    // shutdown(); failures are discarded (call shutdown() to see them). If
+    // shutdown() fails (allocation), every handle is still released, without
+    // reports and without allocating (CP17 rework F2): never throws.
+    ~HandleTable();
     HandleTable(const HandleTable&) = delete;
     HandleTable& operator=(const HandleTable&) = delete;
 
@@ -215,6 +218,9 @@ private:
     // CP17 x CP18: releases a cleanup whose bookkeeping threw (no allocation)
     // and records that its report was lost (reports_lost()).
     void abandon_cleanup_locked(std::uint64_t record, ContextId owner) noexcept;
+    // ~HandleTable after shutdown() failed: releases every live slot without
+    // reports or allocation (CP17 rework F2).
+    void teardown_after_failure() noexcept;
     // CP17 x CP18 (no allocation): settles an unsettled record Lost and
     // releases its obligation (lose_), or only releases it (release_).
     void lose_record_locked(std::uint64_t id, ContextId owner) noexcept;

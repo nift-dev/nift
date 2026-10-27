@@ -61,6 +61,12 @@ public:
     void erase(ContextId id);
     std::vector<ContextId> roots() const { return roots_; }
     std::size_t size() const { return contexts_.size(); }
+    // A cleanup hook of a handle taken from some context is running (no allocation).
+    bool any_in_flight() const noexcept {
+        for (const auto& entry : contexts_)
+            if (entry.second.in_flight != 0) return true;
+        return false;
+    }
 
     static bool is_build_kind(ContextKind kind) { return kind != ContextKind::Script; }
 

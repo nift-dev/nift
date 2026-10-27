@@ -33,8 +33,6 @@ std::uint32_t next_table_tag() {
 HandleTable::HandleTable(TableOptions options)
     : store_(next_table_tag(), options.capacity), invalid_setting_(std::move(options.invalid_setting)) {}
 
-HandleTable::~HandleTable() { shutdown(); }
-
 bool HandleTable::in_own_hook() const {
     for (const void* t : t_hook_tables) {
         if (t == this) return true;
