@@ -3345,16 +3345,22 @@ CP21_FAULT_LIBS := $(TEST_DIR)/cp21-delay-tcsetpgrp.so $(TEST_DIR)/cp21-fail-con
 CP21_RECOVERY_LIBS := $(TEST_DIR)/cp21-restore-fault.so
 endif
 $(CP21_PROBE): tests/cp21_foreground_probe.c
+	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-delay-tcsetpgrp.so: tests/cp21_delay_tcsetpgrp.c
+	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-cont.so: tests/cp21_fail_cont.c
+	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-restore-fault.so: tests/cp21_restore_fault.c
+	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-child-death.so: tests/cp21_unrelated_child_death.c
+	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fallback-fault.so: tests/cp21_fallback_fault.c
+	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
@@ -3363,49 +3369,51 @@ $(TEST_DIR)/cp21-mutants/%/nift$(EXEEXT): $(filter-out src/shell/Spawn.o,$(CLI_O
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
 CP21_TERMINAL_LEASE := $(TEST_DIR)/cp21-terminal-lease$(EXEEXT)
 $(CP21_TERMINAL_LEASE): tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES)
+	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES) -o "$@"
 CP21_TERMINAL_RECOVERY := $(TEST_DIR)/cp21-terminal-recovery$(EXEEXT)
 $(CP21_TERMINAL_RECOVERY): tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES)
+	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES) -o "$@"
 .PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease \
 	test-cp21-terminal-recovery test-cp21-terminal-recovery-mutants test-cp21-fd-inheritance \
 	test-cp21-fd-inheritance-mutants test-cp21-prompt-latency test-cp21-make-failure-control
 test-cp21-interactive-host: $(TARGET) $(CP21_PROBE)
-	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)"
+	python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" "$(CURDIR)/$(TARGET)"
 	@if [ "$(shell uname -s)" = "Linux" ]; then \
 	  set -e; \
 	  $(MAKE) --no-print-directory $(CP21_FAULT_LIBS) >/dev/null; \
-	  CP21_DELAY_LIB="$(CURDIR)/$(TEST_DIR)/cp21-delay-tcsetpgrp.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-delay "$(CURDIR)/$(TARGET)"; \
-	  CP21_FAIL_CONT_LIB="$(CURDIR)/$(TEST_DIR)/cp21-fail-cont.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-cont "$(CURDIR)/$(TARGET)"; \
-	  CP21_RESTORE_LIB="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-handoff "$(CURDIR)/$(TARGET)"; \
-	  CP21_RESTORE_LIB="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" --fault-restore "$(CURDIR)/$(TARGET)"; \
+	  CP21_DELAY_LIB="$(abspath $(TEST_DIR)/cp21-delay-tcsetpgrp.so)" python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" --fault-delay "$(CURDIR)/$(TARGET)"; \
+	  CP21_FAIL_CONT_LIB="$(abspath $(TEST_DIR)/cp21-fail-cont.so)" python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" --fault-cont "$(CURDIR)/$(TARGET)"; \
+	  CP21_RESTORE_LIB="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" --fault-handoff "$(CURDIR)/$(TARGET)"; \
+	  CP21_RESTORE_LIB="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" --fault-restore "$(CURDIR)/$(TARGET)"; \
 	fi
 	$(MAKE) --no-print-directory test-cp21-terminal-lease
 test-cp21-interactive-host-mutants: $(TARGET) $(CP21_MUTANT_NIFTS) $(CP21_PROBE)
 	@set -e; \
 	for m in 1 2 3 4 5; do \
-	  bin="$(CURDIR)/$(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT)"; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1 || { echo "FAIL CP21 mutant $$m: not detected"; cat ".build/cp21-mutants/$$m.log"; exit 1; }; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" /bin/false --mutant $$m > ".build/cp21-mutants/$$m-dead.log" 2>&1 && { echo "FAIL CP21 mutant $$m: dead binary accepted"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; }; \
+	  bin="$(abspath $(TEST_DIR)/cp21-mutants/$$m/nift$(EXEEXT))"; \
+	  python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" "$$bin" --mutant $$m > ".build/cp21-mutants/$$m.log" 2>&1 || { echo "FAIL CP21 mutant $$m: not detected"; cat ".build/cp21-mutants/$$m.log"; exit 1; }; \
+	  python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" /bin/false --mutant $$m > ".build/cp21-mutants/$$m-dead.log" 2>&1 && { echo "FAIL CP21 mutant $$m: dead binary accepted"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; }; \
 	  grep -q "no behavioural evidence" ".build/cp21-mutants/$$m-dead.log" || { echo "FAIL CP21 mutant $$m: dead control failed for the wrong reason"; cat ".build/cp21-mutants/$$m-dead.log"; exit 1; }; \
-	  python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant $$m > ".build/cp21-mutants/$$m-normal.log" 2>&1 && { echo "FAIL CP21 mutant $$m: normal build accepted"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; }; \
+	  python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" "$(CURDIR)/$(TARGET)" --mutant $$m > ".build/cp21-mutants/$$m-normal.log" 2>&1 && { echo "FAIL CP21 mutant $$m: normal build accepted"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; }; \
 	  grep -q "expected only" ".build/cp21-mutants/$$m-normal.log" || { echo "FAIL CP21 mutant $$m: normal control failed for the wrong reason"; cat ".build/cp21-mutants/$$m-normal.log"; exit 1; }; \
 	  echo "PASS CP21 mutant $$m: rejected with dead/normal controls"; \
 	done; \
-	python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TEST_DIR)/cp21-mutants/6/nift$(EXEEXT)" --mutant 2 > ".build/cp21-mutants/unrelated.log" 2>&1 && { echo "FAIL CP21 unrelated-failure control accepted"; cat ".build/cp21-mutants/unrelated.log"; exit 1; }; \
+	python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" "$(abspath $(TEST_DIR)/cp21-mutants/6/nift$(EXEEXT))" --mutant 2 > ".build/cp21-mutants/unrelated.log" 2>&1 && { echo "FAIL CP21 unrelated-failure control accepted"; cat ".build/cp21-mutants/unrelated.log"; exit 1; }; \
 	grep -q "expected only" ".build/cp21-mutants/unrelated.log" || { echo "FAIL CP21 unrelated-failure control failed for the wrong reason"; cat ".build/cp21-mutants/unrelated.log"; exit 1; }; \
 	echo "PASS CP21 unrelated-failure control: rejected"
 	@if [ "$(shell uname -s)" = "Linux" ]; then \
 	  set -e; \
 	  $(MAKE) --no-print-directory $(TEST_DIR)/cp21-child-death.so >/dev/null; \
-	  LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-child-death.so" python3 tests/cp21_interactive_host.py --probe "$(CURDIR)/$(CP21_PROBE)" "$(CURDIR)/$(TARGET)" --mutant 2 > ".build/cp21-mutants/unrelated-child-death.log" 2>&1 && { echo "FAIL CP21 unrelated-child-death control accepted"; cat ".build/cp21-mutants/unrelated-child-death.log"; exit 1; }; \
+	  LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-child-death.so)" python3 tests/cp21_interactive_host.py --probe "$(abspath $(CP21_PROBE))" "$(CURDIR)/$(TARGET)" --mutant 2 > ".build/cp21-mutants/unrelated-child-death.log" 2>&1 && { echo "FAIL CP21 unrelated-child-death control accepted"; cat ".build/cp21-mutants/unrelated-child-death.log"; exit 1; }; \
 	  grep -q "expected only bg-state-running" ".build/cp21-mutants/unrelated-child-death.log" || { echo "FAIL CP21 unrelated-child-death control failed for the wrong reason"; cat ".build/cp21-mutants/unrelated-child-death.log"; exit 1; }; \
 	  echo "PASS CP21 unrelated-child-death control: rejected"; \
 	fi
 test-cp21-terminal-lease: $(CP21_TERMINAL_LEASE)
 	"$(CP21_TERMINAL_LEASE)"
 test-cp21-terminal-recovery: $(CP21_TERMINAL_RECOVERY) $(CP21_RECOVERY_LIBS)
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_TERMINAL_RECOVERY)"
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" "$(CP21_TERMINAL_RECOVERY)"
 CP21_RECOVERY_D1 := $(TEST_DIR)/cp21-terminal-recovery-d1$(EXEEXT)
 CP21_RECOVERY_D2 := $(TEST_DIR)/cp21-terminal-recovery-d2$(EXEEXT)
 $(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o: src/rt/host/process_posix_launch.cpp \
@@ -3429,12 +3437,18 @@ $(CP21_RECOVERY_D2): tests/cp21_terminal_recovery.cpp \
 		$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
 		$(TEST_DIR)/cp21-mutants/d2/process_terminal.o -ldl -o "$@"
 CP21_FD_CHILD := $(TEST_DIR)/cp21-fd-child$(EXEEXT)
+CP21_FD_CHILD_UNRELATED := $(TEST_DIR)/cp21-fd-child-unrelated$(EXEEXT)
 CP21_FD_INHERITANCE := $(TEST_DIR)/cp21-fd-inheritance$(EXEEXT)
 CP21_FD_INHERITANCE_D3 := $(TEST_DIR)/cp21-fd-inheritance-d3$(EXEEXT)
 $(CP21_FD_CHILD): tests/cp21_fd_child.c
+	mkdir -p "$(dir $@)"
+	$(CC) $(CFLAGS) $< -o "$@"
+$(CP21_FD_CHILD_UNRELATED): tests/cp21_fd_child_unrelated.c
+	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_INHERITANCE): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp \
 	src/rt/host/process_terminal.h
+	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/d3/process_terminal.o: src/rt/host/process_terminal.cpp \
 	src/rt/host/process_terminal.h
@@ -3442,33 +3456,50 @@ $(TEST_DIR)/cp21-mutants/d3/process_terminal.o: src/rt/host/process_terminal.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_D3_MUTANT=1 -MMD -MP -c $< -o "$@"
 $(CP21_FD_INHERITANCE_D3): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.h \
 	$(TEST_DIR)/cp21-mutants/d3/process_terminal.o
+	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp \
 		$(TEST_DIR)/cp21-mutants/d3/process_terminal.o -ldl -o "$@"
 test-cp21-fd-inheritance: $(CP21_FD_INHERITANCE) $(CP21_FD_CHILD) $(TEST_DIR)/cp21-fallback-fault.so
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE)" "$(CURDIR)/$(CP21_FD_CHILD)"
-test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
-	$(TEST_DIR)/cp21-fallback-fault.so
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD))"
+test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
+	$(CP21_FD_CHILD_UNRELATED) $(TEST_DIR)/cp21-fallback-fault.so
 	@set -e; \
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE_D3)" "$(CURDIR)/$(CP21_FD_CHILD)" > "$(TEST_DIR)/cp21-d3-mutant.log" 2>&1 && \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_FD_CHILD))" > "$(TEST_DIR)/cp21-d3-mutant.log" 2>&1 && \
 	  { echo "FAIL CP21 D3 mutant not detected"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
 	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-mutant.log" || \
 	  { echo "FAIL CP21 D3 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
+	grep -q "PASS exec-child-valid-status" "$(TEST_DIR)/cp21-d3-mutant.log" || \
+	  { echo "FAIL CP21 D3 mutant did not have the scanner defect status"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
 	echo "PASS CP21 D3 mutant: non-atomic duplicate detected"; \
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-fallback-fault.so" "$(CP21_FD_INHERITANCE)" /bin/true > "$(TEST_DIR)/cp21-d3-dead-child.log" 2>&1 && \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/true > "$(TEST_DIR)/cp21-d3-dead-child.log" 2>&1 && \
 	  { echo "FAIL CP21 D3 dead-child control accepted"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
-	grep -q "SETUP_FAIL exec child did not scan descriptors" "$(TEST_DIR)/cp21-d3-dead-child.log" || \
+	grep -q "^SETUP_FAIL" "$(TEST_DIR)/cp21-d3-dead-child.log" || \
 	  { echo "FAIL CP21 D3 dead-child control failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
 	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-dead-child.log" && \
 	  { echo "FAIL CP21 D3 dead-child control reported the intended defect"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
-	echo "PASS CP21 D3 dead-child control: rejected as missing evidence"
+	echo "PASS CP21 D3 dead-child control: rejected as missing evidence"; \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_UNRELATED))" > "$(TEST_DIR)/cp21-d3-unrelated.log" 2>&1 && \
+	  { echo "FAIL CP21 D3 unrelated-exit control accepted"; cat "$(TEST_DIR)/cp21-d3-unrelated.log"; exit 1; }; \
+	grep -q "FAIL exec-child-valid-status" "$(TEST_DIR)/cp21-d3-unrelated.log" || \
+	  { echo "FAIL CP21 D3 unrelated-exit control failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-unrelated.log"; exit 1; }; \
+	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-unrelated.log" && \
+	  { echo "FAIL CP21 D3 unrelated-exit control reported the intended defect"; cat "$(TEST_DIR)/cp21-d3-unrelated.log"; exit 1; }; \
+	echo "PASS CP21 D3 unrelated-exit control: rejected"; \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/sh > "$(TEST_DIR)/cp21-d3-timeout.log" 2>&1 && \
+	  { echo "FAIL CP21 D3 timeout control accepted"; cat "$(TEST_DIR)/cp21-d3-timeout.log"; exit 1; }; \
+	grep -q "TIMEOUT exec child did not finish and was killed/reaped" "$(TEST_DIR)/cp21-d3-timeout.log" || \
+	  { echo "FAIL CP21 D3 timeout control failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-timeout.log"; exit 1; }; \
+	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-timeout.log" && \
+	  { echo "FAIL CP21 D3 timeout control reported the intended defect"; cat "$(TEST_DIR)/cp21-d3-timeout.log"; exit 1; }; \
+	echo "PASS CP21 D3 timeout control: bounded and rejected"
 test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(TEST_DIR)/cp21-restore-fault.so
 	@set -e; \
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_RECOVERY_D1)" > "$(TEST_DIR)/cp21-d1-mutant.log" 2>&1 && \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" "$(CP21_RECOVERY_D1)" > "$(TEST_DIR)/cp21-d1-mutant.log" 2>&1 && \
 	  { echo "FAIL CP21 D1 mutant not detected"; cat "$(TEST_DIR)/cp21-d1-mutant.log"; exit 1; }; \
 	grep -q "FAIL parent-only-child-not-executed" "$(TEST_DIR)/cp21-d1-mutant.log" || \
 	  { echo "FAIL CP21 D1 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d1-mutant.log"; exit 1; }; \
 	echo "PASS CP21 D1 mutant: parent race detected"; \
-	LD_PRELOAD="$(CURDIR)/$(TEST_DIR)/cp21-restore-fault.so" "$(CP21_RECOVERY_D2)" > "$(TEST_DIR)/cp21-d2-mutant.log" 2>&1 && \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" "$(CP21_RECOVERY_D2)" > "$(TEST_DIR)/cp21-d2-mutant.log" 2>&1 && \
 	  { echo "FAIL CP21 D2 mutant not detected"; cat "$(TEST_DIR)/cp21-d2-mutant.log"; exit 1; }; \
 	grep -q "FAIL closed-stdin-actual-shell-owns" "$(TEST_DIR)/cp21-d2-mutant.log" || \
 	  { echo "FAIL CP21 D2 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d2-mutant.log"; exit 1; }; \

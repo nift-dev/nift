@@ -68,6 +68,28 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 - The D3 normal and mutant tests are permanent `test-v45-job-control`
   dependencies with certification-guard removal controls.
 
+## R3-review acceptance-harness corrections
+
+- **H1 bounded scanner:** the D3 exec child is run with a 5 s poll/read
+  deadline and a bounded `waitpid`; fork/wait/read errors are classified as
+  setup failures. On timeout the child process group is SIGKILLed and reaped.
+  A sleeping-child timeout control is permanent and never counts as detection.
+- **H2 scanner status:** a clean scan must exit 0; a descriptor-inheritance
+  witness must exit 1 with exactly one `exec_extra_fds=N` marker consistent
+  with the emitted `extra_fd=` lines. Exit 23 after a clean scan, arbitrary
+  nonzero exits, signals, missing/duplicate output and setup failures are
+  rejected. The real D3 mutant still fails `exec-child-no-extra-fds` with
+  `exec-child-valid-status` passing.
+- **H3 cold targets:** every new CP21 helper/mutant recipe creates its
+  `TEST_DIR` output directory; normal and mutant D3 targets build and run from
+  an empty output directory.
+- **Synchronized PTY oracle:** `foreground_tty` waits for the complete result
+  line and the next prompt, then requires shell ownership through both
+  `/proc` and `tcgetpgrp` and no remaining foreground child. `jobs_ids` waits
+  for the prompt after each command. The corrected oracle passes release and
+  sanitizer runs, including all eight comparator controls. Historical failed
+  sanitizer transcripts that were not supplied remain explicitly unresolved.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
@@ -135,6 +157,8 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 | compiled D2 mutant (isatty-gated restore) | closed-stdin ownership check fails for the intended reason |
 | compiled D3 mutant (dup then fcntl) | exec child inherits the tty and `exec-child-no-extra-fds` fails |
 | dead D3 exec child | setup failure, never counted as detection |
+| D3 timeout child | bounded kill/reap, never counted as detection |
+| D3 unrelated scanner (clean scan, exit 23) | invalid status, never counted as detection |
 
 ## Mutants and controls
 
