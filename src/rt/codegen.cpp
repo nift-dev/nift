@@ -63,8 +63,10 @@ std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, s
     return proto_->code.size() - 1;
 }
 
-std::size_t FunctionBuilder::note(std::size_t at, std::string text, bool eval_nullable_error, bool session_inspection) {
-    proto_->note_table.push_back(Note{eval_nullable_error, std::move(text), session_inspection});
+std::size_t FunctionBuilder::note(std::size_t at, std::string text, bool eval_nullable_error,
+                                  bool session_inspection, bool session_numeric_return) {
+    proto_->note_table.push_back(
+        Note{eval_nullable_error, std::move(text), session_inspection, session_numeric_return});
     proto_->notes[at] = static_cast<std::uint32_t>(proto_->note_table.size());
     return proto_->note_table.size() - 1;
 }

@@ -88,6 +88,27 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             result.message = "return: " + result.message;
         }
     }
+    if (pc->op == OpCode::SessionNumeric && fault.reason == StopReason::Error && !fault.catchable) {
+        bool collection = false;
+        for (const auto& frame : frames_) collection = collection || (frame.ret - 1)->op == OpCode::CollectionCall;
+#if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 21
+        if (!collection) {
+            result.message = fault.message;
+            const auto expression = [](const FunctionObject* closure) {
+                return closure && closure->is_lambda && closure->expression_body;
+            };
+            if (expression(closure_)) result.message = "lambda body error: " + result.message;
+            if (pc->flags & kInstrReturnCall) result.message = "return: " + result.message;
+            for (auto frame = frames_.rbegin(); frame != frames_.rend(); ++frame) {
+                const auto* note = note_at(frame->proto, frame->ret - 1);
+                if (frame->return_call || (note && note->session_numeric_return))
+                    result.message = "return: " + result.message;
+                if (expression(frame->closure) && result.message.rfind("return: ", 0) != 0)
+                    result.message = "lambda body error: " + result.message;
+            }
+        }
+#endif
+    }
     if (uncaught_error) {
         const auto* error = fault.error.heap_as<ErrorObject>();
         result.error_origin = !error->source.empty() && error->line != 0 && error->column != 0;

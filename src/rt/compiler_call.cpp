@@ -39,6 +39,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     // legacy_with_span): such a call is not loop-evaluator code, which the
     // context refusals (D-018) and the VM statistics' loop evidence follow.
     const bool saved_textual = textual_statement_;
+    const auto saved_flags = fb_->flags();
     if (loop_region())
         for (std::uint32_t k = 0; k < node.count; ++k) {
             const Node& arg = ast_.at(args[k]);
@@ -94,7 +95,11 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     } else {
         const std::size_t at =
             fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
+#if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 24
         fb_->note(at, std::string(name));
+#else
+        fb_->note(at, std::string(name), false, false, session_ && (saved_flags & kInstrReturnCall));
+#endif
     }
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);

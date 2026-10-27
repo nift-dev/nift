@@ -35,7 +35,6 @@ OpCode fused_not_jump(Op op) {
     }
 }
 
-
 // Kinds an arithmetic operator accepts without a legacy type error (or a
 // prepared-path rendering of aggregates in `+`).
 bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
@@ -55,7 +54,6 @@ bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     }
     return only(l, kKindNumber) && only(r, kKindNumber);
 }
-
 bool ordering_kinds_ok(KindSet l, KindSet r) {
     if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1)
     return ((l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0) || ((l & ~kKindString) == 0 && (r & ~kKindString) == 0);
@@ -197,11 +195,17 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
         default: break;
     }
     const std::uint16_t mark = fb_->top();
+    const auto numeric_flags = fb_->flags();
     std::uint16_t left = 0, right = 0;
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
     fb_->set_offset(site(node));
 #if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 9
-    if (numeric_guard) fb_->emit(OpCode::SessionNumeric, 0, left, right);
+    if (numeric_guard) {
+        const auto saved_flags = fb_->flags();
+        fb_->set_flags(numeric_flags);
+        fb_->emit(OpCode::SessionNumeric, 0, left, right);
+        fb_->set_flags(saved_flags);
+    }
 #endif
     fb_->emit(op, dst, left, right);
     fb_->release_to(mark);

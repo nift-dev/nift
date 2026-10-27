@@ -351,6 +351,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
 
 bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, std::uint16_t dst) {
     const Node& callee = ast_.at(callee_id);
+    const bool numeric_return = session_ && (fb_->flags() & kInstrReturnCall);
     const NodeId* args = ast_.list(node);
     const std::uint16_t mark = fb_->top();
     std::uint16_t callee_reg = 0;
@@ -367,7 +368,7 @@ bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, s
     if (member) fb_->set_flags(static_cast<std::uint8_t>(fb_->flags() | kInstrCallMember));
     const std::size_t at = fb_->emit(OpCode::CallValue, base, callee_reg, static_cast<std::uint16_t>(node.count));
     fb_->set_flags(saved);
-    fb_->note(at, member ? std::string(text(node)) : std::string(text(callee)));
+    fb_->note(at, member ? std::string(text(node)) : std::string(text(callee)), false, false, numeric_return);
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(mark);
     return builder_ok();

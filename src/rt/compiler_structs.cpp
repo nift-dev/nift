@@ -221,6 +221,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     if (receiver != kNoNode) struct_of_receiver(receiver, is_this);
     if (m.priv && !is_this) return fail(node, "struct-private");
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
+    const bool numeric_return = session_ && (fb_->flags() & kInstrReturnCall);
     const std::size_t f = m.function;
     const Node& fn = ast_.at(plan_.functions[f]);
     if (node.count != fn.count) return fail(node, "static-error:arity");
@@ -252,7 +253,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1),
                                      static_cast<std::uint16_t>(node.count + 1));
-    fb_->note(at, std::string(m.name));
+    fb_->note(at, std::string(m.name), false, false, numeric_return);
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(dst >= base ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();

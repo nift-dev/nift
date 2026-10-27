@@ -49,6 +49,7 @@ struct Note {
     bool eval_nullable_error = false;  // cold nullable Error member diagnostic, CP19
     std::string text;
     bool session_inspection = false;
+    bool session_numeric_return = false;  // cold SessionNumeric reporting only
 };
 
 class SourceMap;

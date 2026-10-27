@@ -114,3 +114,11 @@ set is bottom; arguments and the VM's existing failed-call diagnostic still run.
 Stale callable source/signature metadata is cleared after a String replaces it.
 Retained original aliases continue to own their actual callable and source.
 
+The new retained numeric guard has a cold uncaught diagnostic correction: it
+reconstructs legacy Return/lambda prefixes from existing instruction flags and
+frames. It changes no caught Error, handler selection, fault slot or Frame layout.
+Numeric guard emission preserves its enclosing return flag across operand calls.
+Nested argument calls can reset ordinary instruction return flags. Session-only
+call-note metadata records the enclosing return for cold SessionNumeric reporting.
+The ordinary return flags and CP13B reporter are preserved. The extra note boolean
+is not a Frame/fault slot and is never read at ordinary dispatch or call entry.
