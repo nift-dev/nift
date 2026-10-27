@@ -34,6 +34,11 @@ UnitKinds infer_session_aliases(const Ast& ast, NodeId root, const UnitPlan& pla
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 13
     return infer_unit_kinds(ast, root, plan, walks, globals, session);
 #endif
+    // Growing inference seeds must not replace the original admission bounds.
+    // Code generation sees the original private transaction; successful export
+    // publishes the final kinds only after every guard and compiler pass succeeds.
+    SessionCompileContext seeds = *session;
+    session = &seeds;
     Bounds bounds;
     std::vector<SessionLocationEdge> edges;
     const auto add = [&](const SessionCaptureLocation& location, const infer_detail::TyRef& type) {
