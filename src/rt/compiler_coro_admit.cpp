@@ -6,6 +6,7 @@
 
 #include <array>
 #include <charconv>
+#include <cstdlib>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -13,8 +14,8 @@
 
 // rt-lint: cold-file compile-time cooperative admission, once per coroutine unit
 
-// Test-only deliberate defect (`-DNIFT_CORO_MUTANT=12`, tests/runtime2/cp22):
-// the admission rule admits everything. Normal builds contain none.
+// Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
+// 12 the admission rule admits everything; 13 A5 is off. Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -44,13 +45,17 @@ bool listed(const std::array<std::string_view, N>& list, std::string_view name) 
 
 class Admission {
 public:
-    Admission(const Ast& ast, const UnitPlan& plan) : ast_(ast), plan_(plan) {}
+    Admission(const Ast& ast, const UnitPlan& plan, bool observe) : ast_(ast), plan_(plan), observe_(observe) {}
 
     bool run(NodeId root, std::string& reason, std::uint32_t& offset) {
 #if NIFT_CORO_MUTANT == 12
         return true;  // M12: cooperative admission disabled
 #endif
+#if NIFT_CORO_MUTANT == 13
+        observe_ = true;  // M13: scheduling observations admitted (A5 off)
+#endif
         if (!host_calls(root, reason, offset)) return false;
+        if (!observe_ && !observations(root, reason, offset)) return false;
         collect_tasks();
         if (tasks_.empty()) return true;
         if (cyclic(reason, offset)) return false;
@@ -92,6 +97,27 @@ private:
             const natives::BuiltinSpec* spec = bind_function(name);
             if (spec == nullptr || !natives::host_builtin(spec->id)) return true;
             reason = "coro-blocking-host:" + std::string(name);
+            offset = n.begin;
+            return ok = false;
+        }, true);
+        return ok;
+    }
+
+    // A5: nothing in the unit observes scheduling: no clock read (`epoch`)
+    // and no `done()` / `status()` poll (task printing is checked in task code).
+    // Admitted programs are then schedule-independent (record §12.1).
+    bool observations(NodeId root, std::string& reason, std::uint32_t& offset) const {
+        bool ok = true;
+        walk(root, [&](NodeId, const Node& n) {
+            if (n.kind != NodeKind::Call || n.a == kNoNode) return true;
+            const Node& callee = ast_.at(n.a);
+            std::string_view name;
+            if (callee.kind == NodeKind::Ident && !user_function(ast_.text(callee))) name = ast_.text(callee);
+            if (callee.kind == NodeKind::Member && callee.b != kNoNode) name = ast_.text(ast_.at(callee.b));
+            const bool clock = callee.kind == NodeKind::Ident && name == "epoch";
+            const bool poll = callee.kind == NodeKind::Member && (name == "done" || name == "status");
+            if (!clock && !poll) return true;
+            reason = "coro-observe:" + std::string(name);
             offset = n.begin;
             return ok = false;
         }, true);
@@ -238,6 +264,11 @@ private:
                 if (listed(kTaskMethods, name)) return true;
             } else if (callee.kind == NodeKind::Ident) {
                 name = ast_.text(callee);
+                if (!observe_ && name == "print" && !user_function(name)) {  // A5: output only from main
+                    reason = "coro-observe:print";
+                    offset = n.begin;
+                    return ok = false;
+                }
                 if (user_function(name) || listed(kTaskFunctions, name) || !known_callee(name)) return true;
             } else {
                 return true;  // a call through a value: its target is task code too
@@ -251,6 +282,7 @@ private:
 
     const Ast& ast_;
     const UnitPlan& plan_;
+    bool observe_;  // non-contractual test switch: A5 off (VM-only scheduler tests)
     std::vector<NodeId> tasks_;
     std::unordered_set<NodeId> seen_;
     std::unordered_map<NodeId, std::vector<NodeId>> callees_;
@@ -261,9 +293,18 @@ private:
 
 }  // namespace
 
-bool check_cooperative_admission(const Ast& ast, NodeId root, const UnitPlan& plan, std::string& reason,
-                                 std::uint32_t& offset) {
-    return Admission(ast, plan).run(root, reason, offset);
+bool check_cooperative_admission(const Ast& ast, NodeId root, const UnitPlan& plan, bool observe,
+                                 std::string& reason, std::uint32_t& offset) {
+    return Admission(ast, plan, observe).run(root, reason, offset);
+}
+
+void cooperative_switches(CompileLimits& limits) {
+    const auto on = [](const char* name) {
+        const char* v = std::getenv(name);
+        return v != nullptr && v[0] == '1' && v[1] == '\0';
+    };
+    limits.cooperative_threads = on("NIFT_VM_COOPERATIVE_THREADS");
+    limits.cooperative_observe = on("NIFT_VM_COOPERATIVE_OBSERVE");
 }
 
 }  // namespace nift::rt

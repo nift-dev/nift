@@ -3610,18 +3610,19 @@ test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
 	"$(RT_CORO_UNIT)"
 	$(CP22_RUN) --nift "$(CURDIR)/$(TARGET)" --mode legacy
 	set -e; for b in "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(CP13B_SWITCH_NIFT)"; do \
-	  for m in vm refuse vm-only trace; do $(CP22_RUN) --nift "$$b" --mode $$m; done; \
+	  for m in vm refuse default vm-only trace; do $(CP22_RUN) --nift "$$b" --mode $$m; done; \
 	done
 	$(PYTHON) tests/runtime2/cp22/adversarial.py --nift "$(CURDIR)/$(TARGET)" --switch "$(CURDIR)/$(CP13B_SWITCH_NIFT)" \
 		--seed $${RT_VM_SEED:-1} --count $${CP22_ADV:-80}
 	$(PYTHON) tests/runtime2/cp22/controls.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp22/print_order.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-cp22-sanitize: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp \
 		-o "$(TEST_DIR)/rt-san/coro-unit"
 	ulimit -f 100000; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
-	set -e; for m in vm refuse vm-only; do env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+	set -e; for m in vm refuse default vm-only; do env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 	  UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 $(CP22_RUN) --nift "$(CURDIR)/$(SAN_TARGET)" --mode $$m; done
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/cp22/adversarial.py --nift "$(CURDIR)/$(SAN_TARGET)" --seed $${RT_VM_SEED:-2} --count $${CP22_ADV_SAN:-30}
@@ -3647,7 +3648,7 @@ $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJEC
 		$(addprefix $(CP22_MUTANT_DIR)/$*/,$(notdir $(CP22_CORO_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
 test-runtime2-cp22-mutants: $(TARGET)
 	set -e; normal=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
-	for n in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13; do \
 	  $(MAKE) "$(CP22_MUTANT_DIR)/nift-$$n" >/dev/null; \
 	  sha=$$(sha256sum "$(CP22_MUTANT_DIR)/nift-$$n" | cut -d' ' -f1); \
 	  printf '{"mutant": %s, "sha256": "%s", "normal_sha256": "%s"}\n' "$$n" "$$sha" "$$normal" \

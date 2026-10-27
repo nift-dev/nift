@@ -13,6 +13,10 @@
   run.py --nift ./nift --mode trace       tr_*.f: the Host-op trace (NIFT_TRACE_HOST) of
                                           each context ("script", "script/async#N", ...)
                                           is the legacy one, in order (rt-diff's rule)
+  run.py --nift ./nift --mode default     the contractual default (no test switches):
+                                          each case runs on the VM == its golden, or is
+                                          refused before execution for an admission
+                                          reason and legacy == its golden
   run.py --nift ./nift --mode vm-only     VM-determinism fixtures (vm-only/*.f) ==
                                           their .vm goldens (legacy is racy there)
   run.py --nift ./nift --record           (re)write legacy goldens from the oracle
@@ -65,6 +69,8 @@ MUTANTS = {
     12: ("cooperative admission disabled", {"refuse/r_ca_cpu_loop.f": {"exit": 0, "outcome": "vm"},
                                            "refuse/r_ca_blocking_host.f": {"stdout": b"false\n", "exit": 0,
                                                                            "outcome": "vm"}}),
+    13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
+                                                                              "outcome": "vm"}}),
 }
 
 
@@ -78,7 +84,16 @@ def table(path):
     return rows
 
 
-def run(nift, folder, name, vm=None, extra=None, trace=None):
+# Non-contractual test switches (record §12): cooperative thread() and A5 off
+# (scheduling observations admitted). Every VM run of the corpus sets them,
+# except fixtures named `*_default.f` and the `default` mode, which check the
+# contractual default.
+SWITCHES = {"NIFT_VM_COOPERATIVE_THREADS": "1", "NIFT_VM_COOPERATIVE_OBSERVE": "1"}
+# Reasons the contractual default may refuse a fixture for (record §12.1).
+DEFAULT_REASONS = ("coro-observe:", "coro-task-", "coro-blocking-host:", "callable:thread")
+
+
+def run(nift, folder, name, vm=None, extra=None, trace=None, switches=True):
     with tempfile.TemporaryDirectory(prefix="cp22-") as d:
         shutil.copy(folder / name, Path(d) / name)
         module = folder / (name[:-2] + ".m.nft")
@@ -91,8 +106,8 @@ def run(nift, folder, name, vm=None, extra=None, trace=None):
             env.update({"NIFT_VM": vm, "NIFT_VM_STATS": str(stats)})
             # thread() compiles only with the cooperative opt-in (owner decision
             # pending); `*_default.f` fixtures check the default refusal.
-            if not name.endswith("_default.f"):
-                env["NIFT_VM_COOPERATIVE_THREADS"] = "1"
+            if switches and not name.endswith("_default.f"):
+                env.update(SWITCHES)
         env.update(extra or {})
         fds = ()
         if trace is not None:
@@ -168,6 +183,30 @@ def check_vm(nift, name, policy):
         elif not policy_ok(policy, legacy, want):
             problems.append(f"policy {policy} does not describe the difference {legacy!r} -> {want!r}")
     return problems
+
+
+def check_default(nift, name, policy):
+    """The contractual default (no switches, NIFT_VM=1): either the fixture
+    runs on the VM with the expected output, or it is refused before
+    execution for an admission reason and legacy produces its golden."""
+    result, st = run(nift, CASES, name, "1", switches=False)
+    bad = harness_problem(result, st, executed=False)
+    if bad:
+        return [bad], None
+    if st.get("outcome") in ("vm", "vm-error"):
+        want = golden(CASES, name, ".r2") if policy else golden(CASES, name)
+        if st.get("vm_executions") != 1 or st.get("legacy_executions") != 0:
+            return [f"not one VM execution ({st})"], None
+        return ([] if result == want else [f"VM {result!r} != expected {want!r}"]), "vm"
+    reason = st.get("reason", "")
+    problems = []
+    if st.get("outcome") != "fallback" or st.get("vm_executions") != 0:
+        problems.append(f"outcome {st.get('outcome')} vm_executions={st.get('vm_executions')}")
+    if not reason.startswith(DEFAULT_REASONS):
+        problems.append(f"refused for {reason!r}, not an admission reason")
+    if result != golden(CASES, name):
+        problems.append(f"fallback output {result!r} != legacy golden")
+    return problems, reason
 
 
 POLICY_PREFIX = {"D-009#5-future": "future: ", "D-009#5-thread": "thread: "}
@@ -322,7 +361,7 @@ def mutant(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
-    ap.add_argument("--mode", choices=["legacy", "vm", "refuse", "vm-only", "trace"])
+    ap.add_argument("--mode", choices=["legacy", "vm", "refuse", "vm-only", "trace", "default"])
     ap.add_argument("--record", action="store_true")
     ap.add_argument("--mutant", type=int, choices=sorted(MUTANTS))
     ap.add_argument("--oracle")
@@ -388,6 +427,24 @@ def main():
                 print(f"FAIL trace {path.name}: " + "; ".join(problems))
             else:
                 print(f"ok   trace {path.name}")
+    elif args.mode == "default":
+        admitted, refused = [], {}
+        for path in sorted(CASES.glob("*.f")):
+            count += 1
+            problems, outcome = check_default(args.nift, path.name, expect.get(path.name, ""))
+            if problems:
+                failures += 1
+                print(f"FAIL default {path.name}: " + "; ".join(problems))
+                continue
+            if outcome == "vm":
+                admitted.append(path.name)
+            else:
+                refused.setdefault(outcome.split(":")[0] + (":" + outcome.split(":")[1] if ":" in outcome else ""),
+                                   []).append(path.name)
+            print(f"ok   default {path.name} ({outcome})")
+        print(f"default: {len(admitted)} admitted on the VM: {' '.join(admitted)}")
+        for reason, names in sorted(refused.items()):
+            print(f"default: {len(names)} refused ({reason}): {' '.join(names)}")
     elif args.mode == "vm-only":
         for path in sorted(VM_ONLY.glob("*.f")):
             count += 1

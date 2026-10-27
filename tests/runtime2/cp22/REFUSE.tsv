@@ -40,3 +40,8 @@ spawn_tree.f	coro-task-loop
 tr_exists.f	coro-blocking-host:exists
 tr_fs.f	coro-blocking-host:is_dir
 tr_thread.f	coro-blocking-host:exists
+r_obs_print_default.f	coro-observe:print
+r_obs_epoch_default.f	coro-observe:epoch
+r_obs_done_default.f	coro-observe:done
+r_obs_status_default.f	coro-observe:status
+r_obs_task_epoch_default.f	coro-observe:epoch

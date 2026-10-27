@@ -6,6 +6,7 @@
 // between suspension points and nothing in the unit blocks in a Host call.
 // Everything else is refused before execution and runs on legacy.
 #include "rt/ast.h"
+#include "rt/compiler.h"
 #include "rt/resolver.h"
 
 #include <cstdint>
@@ -21,7 +22,16 @@ namespace nift::rt {
 //                              unconditionally suspend (`sleep(<literal >= 1>)`)
 //   coro-task-native:<name>    a function or method in task code outside the
 //                              constant-time allowlist
-bool check_cooperative_admission(const Ast& ast, NodeId root, const UnitPlan& plan, std::string& reason,
-                                 std::uint32_t& offset);
+//   coro-observe:<name>        an observation of scheduling: `print` in task
+//                              code, `epoch` or `done()`/`status()` anywhere
+//                              (skipped when `observe`, the non-contractual
+//                              NIFT_VM_COOPERATIVE_OBSERVE=1 test switch)
+bool check_cooperative_admission(const Ast& ast, NodeId root, const UnitPlan& plan, bool observe,
+                                 std::string& reason, std::uint32_t& offset);
+
+// The two non-contractual test switches (record §12), off by default:
+// NIFT_VM_COOPERATIVE_THREADS=1 (thread() as a cooperative task) and
+// NIFT_VM_COOPERATIVE_OBSERVE=1 (A5 off, for VM-only scheduler tests).
+void cooperative_switches(CompileLimits& limits);
 
 }  // namespace nift::rt

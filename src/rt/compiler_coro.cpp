@@ -336,7 +336,7 @@ bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, con
         return false;
     }
     if (!FutureFlow(ast, plan, kinds).run(root, reason, offset)) return false;
-    return check_cooperative_admission(ast, root, plan, reason, offset);  // owner decision 2026-10-27
+    return check_cooperative_admission(ast, root, plan, limits.cooperative_observe, reason, offset);
 }
 
 bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset) {

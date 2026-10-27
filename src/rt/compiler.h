@@ -36,6 +36,9 @@ struct CompileLimits {
     // legacy threads execute in parallel, and until the owner decides the
     // execution model a unit calling thread() is refused (`callable:thread`).
     bool cooperative_threads = false;
+    // CP22, non-contractual test switch: admit programs that observe scheduling
+    // (record §12.1 A5) so VM-only scheduler tests can run. Off by default.
+    bool cooperative_observe = false;
 };
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());
