@@ -73,3 +73,12 @@ sanitizer and matched instruction outcomes. The million-catch limit remains
 <=1.0 times matched CP18, separately for both workloads and dispatch modes.
 A failed mandatory gate remains failed. This record does not itself grant
 independent acceptance, authoritative integration or checkpoint completion.
+
+MUTATION MAINTENANCE
+The original M23 reserve-only mutation became equivalent on its retained
+argument-window witness after reconciliation (both named and lambda calls
+returned the correct 12). Ten expression variants were examined in each form;
+none was a detection. The delivery preserves that investigation. M23 now
+misplaces operands one register forward, an explicit overlapping-window defect;
+the existing exact arithmetic-internal-stop witness and reciprocal/dead/unrelated
+controls apply. The old equivalent version is never counted as killed.

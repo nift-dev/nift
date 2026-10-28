@@ -159,6 +159,8 @@ void windows(bool broken) {
         CHECK(r.admitted && r.execution.reason==StopReason::None);
         r=session.evaluate("addv(x,y)","call",output);
         CHECK(r.admitted && r.vm_executions==1);
+        if(r.execution.reason!=(broken ? StopReason::Internal : StopReason::None))
+            std::cerr<<"WINDOW reason="<<static_cast<int>(r.execution.reason)<<" message="<<r.execution.message<<" int="<<(r.value.is(Kind::Int)?r.value.as_int():-99)<<"\n";
         CHECK(r.execution.reason==(broken ? StopReason::Internal : StopReason::None));
         if(broken)CHECK(r.execution.message=="unexpected operands (compiler defect): arithmetic");
         else CHECK(r.value.is(Kind::Int) && r.value.as_int()==12);

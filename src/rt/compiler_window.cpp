@@ -11,8 +11,10 @@ bool UnitCompiler::operand_window(std::uint16_t base, std::uint32_t count) {
 }
 bool UnitCompiler::window_value(NodeId value, std::uint16_t dst) {
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 23
-    if (fb_->top() <= dst || dst + 1u < fb_->top()) if (!temp(dst)) return false;
-    return expr_to(value, dst);
+    // M23: overlap adjacent argument destinations. The former reserve-only
+    // mutation became equivalent after reconciliation and is not a detection.
+    if (fb_->top() <= dst) { std::uint16_t scratch = 0; if (!temp(scratch)) return false; }
+    return expr_to(value, static_cast<std::uint16_t>(dst + 1u));
 #else
     const auto mark = fb_->top();
     if (!expr_to(value, dst)) return false;
