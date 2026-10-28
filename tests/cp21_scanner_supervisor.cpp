@@ -54,14 +54,16 @@ bool proc_available() {
     return read_file("/proc/" + std::to_string(::getpid()) + "/task/" + std::to_string(::getpid()) + "/children", text, missing, error) && !missing;
 }
 
-bool children_of(pid_t pid, std::set<pid_t>& found, std::string& error) {
+bool children_of(pid_t pid, std::set<pid_t>& found, bool& complete, std::string& error) {
     found.clear();
+    complete = false;
     std::string text;
     bool missing = false;
     if (!read_file("/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid) + "/children",
                    text, missing, error))
         return false;
-    if (missing) return true;  // process exited before inspection
+    if (missing) return true;  // process exited, but absence is not proven
+    complete = true;
     std::istringstream in(text);
     long child = 0;
     while (in >> child) {
@@ -70,14 +72,17 @@ bool children_of(pid_t pid, std::set<pid_t>& found, std::string& error) {
     return true;
 }
 
-bool children_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+bool children_descendants(pid_t root, std::set<pid_t>& found, bool& complete, std::string& error) {
     found.clear();
+    complete = true;
     std::set<pid_t> frontier{root};
     while (!frontier.empty()) {
         const pid_t current = *frontier.begin();
         frontier.erase(frontier.begin());
         std::set<pid_t> direct;
-        if (!children_of(current, direct, error)) return false;
+        bool direct_complete = false;
+        if (!children_of(current, direct, direct_complete, error)) return false;
+        if (!direct_complete) complete = false;
         for (pid_t child : direct) {
             if (found.insert(child).second) frontier.insert(child);
         }
@@ -85,14 +90,16 @@ bool children_descendants(pid_t root, std::set<pid_t>& found, std::string& error
     return true;
 }
 
-bool stat_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+bool stat_descendants(pid_t root, std::set<pid_t>& found, bool& complete, std::string& error) {
     found.clear();
+    complete = false;
     std::map<pid_t, pid_t> parents;
     DIR* dir = ::opendir("/proc");
     if (!dir) {
         error = "cannot open /proc";
         return false;
     }
+    bool root_seen = false;
     while (dirent* entry = ::readdir(dir)) {
         char* end = nullptr;
         errno = 0;
@@ -124,6 +131,7 @@ bool stat_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
             ::closedir(dir);
             return false;
         }
+        if (pid == root) root_seen = true;
         parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
     }
     ::closedir(dir);
@@ -138,20 +146,27 @@ bool stat_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
             }
         }
     }
+    complete = root_seen;
     return true;
 }
 
-bool descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+bool descendants(pid_t root, std::set<pid_t>& found, bool& children_complete, bool& stat_complete,
+                 std::string& error) {
     std::set<pid_t> from_children;
     std::set<pid_t> from_stat;
     std::string children_error;
     std::string stat_error;
-    const bool children_ok = children_descendants(root, from_children, children_error);
-    const bool stat_ok = stat_descendants(root, from_stat, stat_error);
+    const bool children_ok = children_descendants(root, from_children, children_complete, children_error);
+    const bool stat_ok = stat_descendants(root, from_stat, stat_complete, stat_error);
     if (!children_ok && !stat_ok) {
         error = children_error + (children_error.empty() || stat_error.empty() ? "" : "; ") + stat_error;
+        found.clear();
+        children_complete = false;
+        stat_complete = false;
         return false;
     }
+    if (!children_ok) children_complete = false;
+    if (!stat_ok) stat_complete = false;
     found = from_children;
     found.insert(from_stat.begin(), from_stat.end());
     return true;
@@ -182,14 +197,18 @@ bool reap_bounded(pid_t child, const Clock::time_point& end) {
 
 bool cleanup(pid_t child, std::string& error) {
     std::set<pid_t> targets;
-    if (!descendants(::getpid(), targets, error)) {
-        // Still kill the direct group; report the inspection failure.
+    bool children_complete = false;
+    bool stat_complete = false;
+    if (!descendants(::getpid(), targets, children_complete, stat_complete, error)) {
         const pid_t pgid = ::getpgid(child);
         if (pgid == child) ::kill(-child, SIGKILL);
         ::kill(child, SIGKILL);
         reap_bounded(child, Clock::now() + std::chrono::seconds(2));
         return false;
     }
+    bool discovered_descendant = false;
+    for (pid_t pid : targets)
+        if (pid != child) discovered_descendant = true;
     targets.insert(child);
     const pid_t pgid = ::getpgid(child);
     if (pgid == child) {
@@ -210,14 +229,22 @@ bool cleanup(pid_t child, std::string& error) {
     }
     while (Clock::now() < end) {
         std::set<pid_t> remaining;
-        if (!descendants(::getpid(), remaining, error)) return false;
+        if (!descendants(::getpid(), remaining, children_complete, stat_complete, error)) return false;
+        for (pid_t pid : remaining)
+            if (pid != child) discovered_descendant = true;
         bool any_alive = false;
         for (pid_t pid : targets) {
             bool is_alive = false;
             if (!alive(pid, is_alive, error)) return false;
             if (is_alive) { any_alive = true; ::kill(pid, SIGKILL); }
         }
-        if (remaining.empty() && !any_alive) return true;
+        if (remaining.empty() && !any_alive) {
+            if (!stat_complete && !(children_complete && discovered_descendant)) {
+                error = "descendant evidence incomplete";
+                return false;
+            }
+            return true;
+        }
         for (pid_t pid : remaining)
             if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) {
                 error = "descendant kill failed";
@@ -230,7 +257,9 @@ bool cleanup(pid_t child, std::string& error) {
         ::usleep(2000);
     }
     std::set<pid_t> remaining;
-    if (!descendants(::getpid(), remaining, error)) return false;
+    if (!descendants(::getpid(), remaining, children_complete, stat_complete, error)) return false;
+    for (pid_t pid : remaining)
+        if (pid != child) discovered_descendant = true;
     for (pid_t pid : targets) {
         bool is_alive = false;
         if (!alive(pid, is_alive, error)) return false;
@@ -241,6 +270,10 @@ bool cleanup(pid_t child, std::string& error) {
     }
     if (!remaining.empty()) {
         error = "descendants survived SIGKILL";
+        return false;
+    }
+    if (!stat_complete && !(children_complete && discovered_descendant)) {
+        error = "descendant evidence incomplete";
         return false;
     }
     return true;
@@ -311,8 +344,10 @@ int main(int argc, char** argv) {
         ::usleep(2000);
     }
     std::set<pid_t> leftovers;
+    bool children_complete = false;
+    bool stat_complete = false;
     std::string error;
-    if (!descendants(::getpid(), leftovers, error)) {
+    if (!descendants(::getpid(), leftovers, children_complete, stat_complete, error)) {
         write_status(status_path, "TIMEOUT_CLEANUP_FAIL " + error);
         return 4;
     }
@@ -321,6 +356,10 @@ int main(int argc, char** argv) {
         write_status(status_path, ok ? "COMPLETED_CLEANED_DESCENDANTS " + std::to_string(WIFEXITED(status) ? WEXITSTATUS(status) : -1)
                                      : "TIMEOUT_CLEANUP_FAIL " + error);
         return ok ? 0 : 4;
+    }
+    if (!stat_complete) {
+        write_status(status_path, "TIMEOUT_CLEANUP_FAIL descendant evidence incomplete");
+        return 4;
     }
     if (WIFSIGNALED(status))
         write_status(status_path, "SIGNALED " + std::to_string(WTERMSIG(status)));

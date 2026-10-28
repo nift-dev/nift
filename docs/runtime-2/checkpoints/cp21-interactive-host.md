@@ -197,6 +197,35 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   claim it; adversarial controls report cleanup failure/uncertainty when
   evidence is contradictory or unavailable.
 
+## R10 certification-integrity corrections
+
+- **Mandatory mutant evidence:** `test-cp21-d3-mutant` and
+  `test-cp21-parser-target-mutant` are separate mandatory targets. Each runs
+  the intended compiled binary, requires the named behavioural witness, and
+  writes a run record containing the binary path, binary SHA-256, current make
+  invocation token and witness names. `test-cp21-d3-mandatory` verifies both
+  records are from the current invocation and match the current binaries before
+  it can pass. The guard requires the two mandatory edges and the negative
+  `test-cp21-evidence-control` replaces each execution body with a no-op and
+  requires the mandatory target to reject stale evidence. This detects the R9
+  hollow-recipe failure; it does not claim to detect arbitrary malicious edits
+  to all certification recipes.
+- **Truthful cleanup evidence:** children-file and stat inspection now return
+  separate completeness flags. An empty/missing children file or an unavailable
+  stat record is not proof of absence. Cleanup succeeds only when stat evidence
+  is complete (the live supervisor's own stat record was observed) or when a
+  non-direct descendant was actually discovered and the children traversal is
+  complete. Previously discovered descendants remain cleanup obligations until
+  observed dead. A successful `kill` request alone is not treated as proof.
+- **Both-source faults:** permanent ENOENT and empty probes make both evidence
+  sources unavailable after startup while an escaped descendant survives. The
+  supervisor reports `TIMEOUT_CLEANUP_FAIL descendant evidence incomplete`, not
+  `cleaned=1`; the control requires the survivor to be independently observed
+  before it is killed.
+- **Limitation:** non-atomic `/proc` snapshots cannot prove that an undiscovered
+  escaped descendant has terminated. The adversarial suite reports known
+  cleanup and uncertainty; it is not a general containment guarantee.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves

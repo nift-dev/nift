@@ -3385,6 +3385,12 @@ $(TEST_DIR)/cp21-fail-kill.so: tests/cp21_fail_kill.c
 $(TEST_DIR)/cp21-fail-proc-all.so: tests/cp21_fail_proc_all.c
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-proc-all-enoent.so: tests/cp21_fail_proc_all_missing.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-proc-all-empty.so: tests/cp21_fail_proc_all_missing.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC -DCP21_ALL_EMPTY $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
@@ -3514,6 +3520,9 @@ $(CP21_FD_INHERITANCE_D3): tests/cp21_fd_inheritance.cpp src/rt/host/process_ter
 		$(TEST_DIR)/cp21-mutants/d3/process_terminal.o -ldl -o "$@"
 CP21_FD_PROTOCOL_UNIT := $(TEST_DIR)/cp21-fd-protocol-unit$(EXEEXT)
 CP21_FD_PROTOCOL_UNIT_MUTANT := $(TEST_DIR)/cp21-fd-protocol-unit-target-mutant$(EXEEXT)
+CP21_D3_EVIDENCE_TOKEN := $(shell date +%s%N)-$(shell od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+CP21_D3_MUTANT_EVIDENCE := $(TEST_DIR)/cp21-d3-mutant.evidence
+CP21_PARSER_MUTANT_EVIDENCE := $(TEST_DIR)/cp21-parser-target-mutant.evidence
 $(CP21_FD_PROTOCOL_UNIT): tests/cp21_fd_protocol_unit.cpp tests/cp21_fd_protocol.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_protocol_unit.cpp -o "$@"
@@ -3525,22 +3534,16 @@ $(CP21_FD_PROTOCOL_UNIT_MUTANT): tests/cp21_fd_protocol_unit.cpp tests/cp21_fd_p
 test-cp21-fd-inheritance: test-cp21-fd-protocol-unit
 test-cp21-fd-inheritance: $(CP21_FD_INHERITANCE) $(CP21_FD_CHILD) $(CP21_SCANNER_SUPERVISOR) $(TEST_DIR)/cp21-fallback-fault.so
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))"
-test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
+test-cp21-fd-inheritance-mutants: test-cp21-d3-mutant test-cp21-parser-target-mutant $(CP21_FD_INHERITANCE) $(CP21_FD_CHILD) \
 	$(CP21_FD_CHILD_UNRELATED) $(CP21_FD_CHILD_ESCAPE) $(CP21_FD_CHILD_ESCAPE_UNTAGGED) \
 	$(CP21_FD_CHILD_HOLD) $(CP21_FD_CHILD_MALFORMED) $(CP21_SCANNER_SUPERVISOR) \
-	$(CP21_FD_PROTOCOL_UNIT_MUTANT) $(TEST_DIR)/cp21-fallback-fault.so \
+	$(TEST_DIR)/cp21-fallback-fault.so \
 	$(TEST_DIR)/cp21-fail-subreaper.so $(TEST_DIR)/cp21-fail-proc.so $(TEST_DIR)/cp21-fail-proc-reads.so \
 	$(TEST_DIR)/cp21-fail-proc-enoent.so $(TEST_DIR)/cp21-fail-proc-empty.so \
 	$(TEST_DIR)/cp21-fail-proc-children.so $(TEST_DIR)/cp21-fail-kill.so \
-	$(TEST_DIR)/cp21-fail-proc-all.so
+	$(TEST_DIR)/cp21-fail-proc-all.so $(TEST_DIR)/cp21-fail-proc-all-enoent.so \
+	$(TEST_DIR)/cp21-fail-proc-all-empty.so
 	@set -e; \
-	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_FD_CHILD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(TEST_DIR)/cp21-d3-mutant.log" 2>&1 && \
-	  { echo "FAIL CP21 D3 mutant not detected"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
-	grep -q "FAIL exec-child-no-extra-fds" "$(TEST_DIR)/cp21-d3-mutant.log" || \
-	  { echo "FAIL CP21 D3 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
-	grep -q "PASS exec-child-valid-status" "$(TEST_DIR)/cp21-d3-mutant.log" || \
-	  { echo "FAIL CP21 D3 mutant did not have the scanner defect status"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
-	echo "PASS CP21 D3 mutant: non-atomic duplicate detected"; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/true "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(TEST_DIR)/cp21-d3-dead-child.log" 2>&1 && \
 	  { echo "FAIL CP21 D3 dead-child control accepted"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
 	grep -q "^SETUP_FAIL" "$(TEST_DIR)/cp21-d3-dead-child.log" || \
@@ -3586,11 +3589,6 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	  echo "PASS CP21 D3 malformed control: $$malformed rejected"; \
 	done
 	@set -e; \
-	"$(CP21_FD_PROTOCOL_UNIT_MUTANT)" > "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)" 2>&1 && \
-	  { echo "FAIL CP21 parser target mutant not detected"; cat "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)"; exit 1; }; \
-	grep -q "FAIL protocol-" "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)" || \
-	  { echo "FAIL CP21 parser target mutant failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)"; exit 1; }; \
-	echo "PASS CP21 parser target mutant: target grammar is enforced"; \
 	for fault in subreaper proc; do \
 	  if [ "$$fault" = subreaper ]; then preload="$(abspath $(TEST_DIR)/cp21-fail-subreaper.so):$(abspath $(TEST_DIR)/cp21-fallback-fault.so)"; else preload="$(abspath $(TEST_DIR)/cp21-fail-proc.so):$(abspath $(TEST_DIR)/cp21-fallback-fault.so)"; fi; \
 	  LD_PRELOAD="$$preload" "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" --unrelated-child > "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" 2>&1 && \
@@ -3602,28 +3600,38 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	  echo "PASS CP21 D3 $$fault-unavailable control: fail closed"; \
 	done
 	@set -e; \
-	for fault in enoent empty children kill all; do \
+	for fault in enoent empty children kill all both-enoent both-empty; do \
 	  case "$$fault" in \
 	    enoent) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-enoent.so)" ;; \
 	    empty) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-empty.so)" ;; \
 	    children) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-children.so)" ;; \
 	    kill) lib="$(abspath $(TEST_DIR)/cp21-fail-kill.so)" ;; \
 	    all) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all.so)" ;; \
+	    both-enoent) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all-enoent.so)" ;; \
+	    both-empty) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all-empty.so)" ;; \
 	  esac; \
 	  LD_PRELOAD="$$lib:$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" \
-	    "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" \
+	    "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" --unrelated-child \
 	    > "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" 2>&1 || true; \
 	  if [ "$$fault" = kill ] || [ "$$fault" = all ]; then \
 	    grep -q "SETUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
 	      { echo "FAIL CP21 D3 $$fault control failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	    grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" && \
 	      { echo "FAIL CP21 D3 $$fault control claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	  elif [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ]; then \
+	    grep -Eq "SETUP_FAIL|TIMEOUT_CLEANUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
+	      { echo "FAIL CP21 D3 $$fault dual-source fault did not fail closed"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	    grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" && \
+	      { echo "FAIL CP21 D3 $$fault dual-source fault claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	  else \
 	    grep -q "TIMEOUT exec child did not finish and was killed/reaped cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
 	      { echo "FAIL CP21 D3 $$fault single-source fault did not clean via alternate evidence"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	  fi; \
 	  pids=$$(pgrep -f '^$(abspath $(CP21_FD_CHILD_ESCAPE))$$' || true); \
-	  if [ -n "$$pids" ]; then \
+	  if [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ]; then \
+	    [ -n "$$pids" ] || { echo "FAIL CP21 D3 $$fault dual-source fault lost survivor evidence"; exit 1; }; \
+	    kill -9 $$pids || true; \
+	  elif [ -n "$$pids" ]; then \
 	    if [ "$$fault" != kill ] && [ "$$fault" != all ]; then \
 	      echo "FAIL CP21 D3 $$fault control left a survivor"; exit 1; \
 	    fi; \
@@ -3631,18 +3639,41 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	  fi; \
 	  echo "PASS CP21 D3 $$fault control"; \
 	done
-.PHONY: test-cp21-d3-mandatory
-test-cp21-d3-mandatory: test-cp21-fd-inheritance $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) \
-	$(CP21_FD_CHILD_UNRELATED) $(CP21_FD_CHILD_MALFORMED) $(CP21_SCANNER_SUPERVISOR) \
-	$(CP21_FD_PROTOCOL_UNIT_MUTANT) $(TEST_DIR)/cp21-fallback-fault.so
+.PHONY: test-cp21-d3-mutant test-cp21-parser-target-mutant
+test-cp21-d3-mutant: $(CP21_FD_INHERITANCE_D3) $(CP21_FD_CHILD) $(CP21_SCANNER_SUPERVISOR) $(TEST_DIR)/cp21-fallback-fault.so
 	@set -e; \
-	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_FD_CHILD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)" 2>&1 && \
-	  { echo "FAIL CP21 D3 mutant not detected"; cat "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)"; exit 1; }; \
-	grep -q "FAIL exec-child-no-extra-fds" "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)" || \
-	  { echo "FAIL CP21 D3 mutant failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)"; exit 1; }; \
-	grep -q "PASS exec-child-valid-status" "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)" || \
-	  { echo "FAIL CP21 D3 mutant did not have the scanner defect status"; cat "$(abspath $(TEST_DIR)/cp21-d3-mutant.log)"; exit 1; }; \
-	echo "PASS CP21 D3 mutant: non-atomic duplicate detected"; \
+	record="$(abspath $(CP21_D3_MUTANT_EVIDENCE))"; log="$(abspath $(TEST_DIR)/cp21-d3-mutant.log)"; \
+	rm -f "$$record"; \
+	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_FD_CHILD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$$log" 2>&1 && \
+	  { echo "FAIL CP21 D3 mutant not detected"; cat "$$log"; exit 1; }; \
+	grep -q "FAIL exec-child-no-extra-fds" "$$log" || \
+	  { echo "FAIL CP21 D3 mutant failed for the wrong reason"; cat "$$log"; exit 1; }; \
+	grep -q "PASS exec-child-valid-status" "$$log" || \
+	  { echo "FAIL CP21 D3 mutant did not have the scanner defect status"; cat "$$log"; exit 1; }; \
+	sha=$$(sha256sum "$(CP21_FD_INHERITANCE_D3)" | cut -d' ' -f1); \
+	{ printf 'kind=d3\n'; printf 'binary=%s\n' "$(abspath $(CP21_FD_INHERITANCE_D3))"; \
+	  printf 'binary_sha256=%s\n' "$$sha"; printf 'run_token=%s\n' "$(CP21_D3_EVIDENCE_TOKEN)"; \
+	  printf 'witness=fail-exec-child-no-extra-fds\n'; printf 'witness=pass-exec-child-valid-status\n'; \
+	  printf 'log=%s\n' "$$log"; } > "$$record"; \
+	echo "PASS CP21 D3 mutant: non-atomic duplicate detected (evidence recorded)"
+
+test-cp21-parser-target-mutant: $(CP21_FD_PROTOCOL_UNIT_MUTANT)
+	@set -e; \
+	record="$(abspath $(CP21_PARSER_MUTANT_EVIDENCE))"; log="$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)"; \
+	rm -f "$$record"; \
+	"$(CP21_FD_PROTOCOL_UNIT_MUTANT)" > "$$log" 2>&1 && \
+	  { echo "FAIL CP21 parser target mutant not detected"; cat "$$log"; exit 1; }; \
+	grep -q "FAIL protocol-" "$$log" || \
+	  { echo "FAIL CP21 parser target mutant failed for the wrong reason"; cat "$$log"; exit 1; }; \
+	sha=$$(sha256sum "$(CP21_FD_PROTOCOL_UNIT_MUTANT)" | cut -d' ' -f1); \
+	{ printf 'kind=parser\n'; printf 'binary=%s\n' "$(abspath $(CP21_FD_PROTOCOL_UNIT_MUTANT))"; \
+	  printf 'binary_sha256=%s\n' "$$sha"; printf 'run_token=%s\n' "$(CP21_D3_EVIDENCE_TOKEN)"; \
+	  printf 'witness=FAIL protocol-\n'; printf 'log=%s\n' "$$log"; } > "$$record"; \
+	echo "PASS CP21 parser target mutant: target grammar is enforced (evidence recorded)"
+
+.PHONY: test-cp21-d3-mandatory
+test-cp21-d3-mandatory: test-cp21-fd-inheritance test-cp21-d3-mutant test-cp21-parser-target-mutant
+	@set -e; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/true "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(abspath $(TEST_DIR)/cp21-d3-dead-child.log)" 2>&1 || true; \
 	grep -q "^SETUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-dead-child.log)" || \
 	  { echo "FAIL CP21 D3 dead-child control failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-dead-child.log)"; exit 1; }; \
@@ -3668,12 +3699,29 @@ test-cp21-d3-mandatory: test-cp21-fd-inheritance $(CP21_FD_INHERITANCE_D3) $(CP2
 	  grep -q "FAIL exec-child-no-extra-fds" "$(abspath $(TEST_DIR)/cp21-d3-$$malformed.log)" && \
 	    { echo "FAIL CP21 D3 malformed scanner reported the intended defect: $$malformed"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$malformed.log)"; exit 1; }; \
 	  echo "PASS CP21 D3 malformed control: $$malformed rejected"; \
-	done; \
-	"$(CP21_FD_PROTOCOL_UNIT_MUTANT)" > "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)" 2>&1 && \
-	  { echo "FAIL CP21 parser target mutant not detected"; cat "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)"; exit 1; }; \
-	grep -q "FAIL protocol-" "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)" || \
-	  { echo "FAIL CP21 parser target mutant failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-parser-target-mutant.log)"; exit 1; }; \
-	echo "PASS CP21 parser target mutant: target grammar is enforced"
+	done
+	@set -e; \
+	verify_evidence() { \
+	  kind="$$1"; bin="$$2"; record="$$3"; \
+	  [ -f "$$record" ] || { echo "FAIL CP21 mandatory evidence missing: $$kind"; exit 1; }; \
+	  grep -qx "kind=$$kind" "$$record" || { echo "FAIL CP21 mandatory evidence kind mismatch: $$kind"; exit 1; }; \
+	  grep -qx "run_token=$(CP21_D3_EVIDENCE_TOKEN)" "$$record" || { echo "FAIL CP21 mandatory evidence is stale: $$kind"; exit 1; }; \
+	  sha=$$(sha256sum "$$bin" | cut -d' ' -f1); \
+	  grep -qx "binary_sha256=$$sha" "$$record" || { echo "FAIL CP21 mandatory evidence binary mismatch: $$kind"; exit 1; }; \
+	  if [ "$$kind" = d3 ]; then \
+	    grep -qx "witness=fail-exec-child-no-extra-fds" "$$record" || { echo "FAIL CP21 mandatory D3 witness missing"; exit 1; }; \
+	    grep -qx "witness=pass-exec-child-valid-status" "$$record" || { echo "FAIL CP21 mandatory D3 status witness missing"; exit 1; }; \
+	    normal_sha=$$(sha256sum "$(CP21_FD_INHERITANCE)" | cut -d' ' -f1); \
+	    [ "$$sha" != "$$normal_sha" ] || { echo "FAIL CP21 mandatory D3 binary is not the mutant"; exit 1; }; \
+	  else \
+	    grep -q "^witness=FAIL protocol-" "$$record" || { echo "FAIL CP21 mandatory parser witness missing"; exit 1; }; \
+	    normal_sha=$$(sha256sum "$(CP21_FD_PROTOCOL_UNIT)" | cut -d' ' -f1); \
+	    [ "$$sha" != "$$normal_sha" ] || { echo "FAIL CP21 mandatory parser binary is not the mutant"; exit 1; }; \
+	  fi; \
+	}; \
+	verify_evidence d3 "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_D3_MUTANT_EVIDENCE))"; \
+	verify_evidence parser "$(CP21_FD_PROTOCOL_UNIT_MUTANT)" "$(abspath $(CP21_PARSER_MUTANT_EVIDENCE))"; \
+	echo "PASS CP21 mandatory mutant evidence: current run, intended binaries, named witnesses"
 
 test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(TEST_DIR)/cp21-restore-fault.so
 	@set -e; \
@@ -3687,6 +3735,10 @@ test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(T
 	grep -q "FAIL closed-stdin-actual-shell-owns" "$(TEST_DIR)/cp21-d2-mutant.log" || \
 	  { echo "FAIL CP21 D2 mutant failed for the wrong reason"; cat "$(TEST_DIR)/cp21-d2-mutant.log"; exit 1; }; \
 	echo "PASS CP21 D2 mutant: lost-stdin ownership detected"
+.PHONY: test-cp21-evidence-control
+test-cp21-evidence-control: test-cp21-d3-mutant test-cp21-parser-target-mutant
+	bash tests/runtime2/cp21_evidence_selftest.sh
+
 test-cp21-prompt-latency: $(TARGET)
 	python3 tests/cp21_prompt_latency.py "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp21-prompt-latency.json"
 test-cp21-make-failure-control: $(TARGET) $(CP21_PROBE)

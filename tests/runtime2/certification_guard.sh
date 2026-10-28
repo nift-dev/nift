@@ -123,7 +123,9 @@ if sys.platform.startswith('linux'):
     EDGES += [('test-v45-job-control', 'test-cp21-terminal-recovery'),
               ('test-v45-job-control', 'test-cp21-terminal-recovery-mutants'),
               ('test-v45-job-control', 'test-cp21-d3-mandatory'),
-              ('test-cp21-fd-inheritance', 'test-cp21-fd-protocol-unit')]
+              ('test-cp21-fd-inheritance', 'test-cp21-fd-protocol-unit'),
+              ('test-cp21-d3-mandatory', 'test-cp21-d3-mutant'),
+              ('test-cp21-d3-mandatory', 'test-cp21-parser-target-mutant')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
