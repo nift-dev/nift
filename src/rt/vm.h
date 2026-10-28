@@ -122,6 +122,8 @@ class Vm {
 public:
     Vm(const Program& program, VmOptions options = VmOptions());
     ~Vm();
+    Vm(const Vm&) = delete;
+    Vm& operator=(const Vm&) = delete;
     VmResult finish_session_resources(bool cancelled = false);
     VmResult run(std::string& output);
     VmResult run_session_unit(const Program& unit, const std::vector<const Proto*>& linked, std::string& output);

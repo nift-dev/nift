@@ -8,6 +8,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <type_traits>
+static_assert(!std::is_copy_constructible_v<nift::rt::Vm>);
+static_assert(!std::is_move_constructible_v<nift::rt::Vm>);
 using namespace nift::rt;
 namespace {
 SessionResult run(VmSession& session, const std::string& source, StopReason expected=StopReason::None) {

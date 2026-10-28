@@ -15,7 +15,7 @@ for round in range(a.rounds):
  for dispatch,workload,name in lanes:
   source=Path(f'tests/runtime2/cp13b/stress/stress_{workload}.f.in').read_text().replace('@COUNT@','1000000');(work/'p.f').write_text(source)
   folder=a.out/f'r{round}'/dispatch/workload/name;folder.mkdir(parents=True)
-  (folder/'source.f').write_text(source);shutil.copy2(binaries[dispatch][name],runner);assert sha(runner)==identity[dispatch][name]['sha256']
+  (folder/'source.f').write_text(source);runner.unlink(missing_ok=True);shutil.copy2(binaries[dispatch][name],runner);assert sha(runner)==identity[dispatch][name]['sha256']
   stats.unlink(missing_ok=True);profile=folder/'callgrind.out'
   env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=str(work),NIFT_VM='require',NIFT_PREVALIDATE='off',NIFT_VM_STATS=str(stats),NIFT_VM_HEAP_BUDGET='8000000')
   argv=['valgrind','--tool=callgrind','--callgrind-out-file='+str(profile),str(runner),'p.f']
