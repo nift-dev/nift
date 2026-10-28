@@ -1,6 +1,7 @@
 // CP21 D3 scanner supervisor: isolates scanner execution and cleanup. Only
-// descendants of this process are enumerated/signalled. Linux children files
-// provide the process-set evidence; no global /proc scan is used.
+// descendants of this process are enumerated/signalled. Descendant evidence
+// combines checked Linux children files with checked /proc stat parentage;
+// missing or empty evidence is uncertainty, not proof that a process exited.
 #include <chrono>
 #include <csignal>
 #include <cstdio>
