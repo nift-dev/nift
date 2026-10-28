@@ -30,6 +30,8 @@ int main(int argc,char** argv) {
         VmSession session;
         run(session,"f:=file("+quoted(p)+");f.open(\"rw\")");
         Value first=session.value("f"); CHECK(first.boxed_handle());
+        run(session,"if(true){f:=file("+quoted(p)+");f.open(\"r\");f.close()}");
+        CHECK(session.value("f").heap()==first.heap());
         run(session,"a:=[1]");run(session,"a.push(\"wide\")");
         run(session,"g:=f"); CHECK(session.value("g").heap()==first.heap());
         first=Value();
@@ -93,6 +95,16 @@ int main(int argc,char** argv) {
         auto obligation=run(session,"tick:=1",StopReason::Error);
         CHECK(obligation.execution.message.find("managed file left open")!=std::string::npos);
         run(session,"tick+=1");CHECK(session.finish().reason==StopReason::None);
+    }
+    {
+        VmSession session;run(session,"anchor:=file("+quoted(p)+")");
+        auto anchor=session.value("anchor");auto* box=anchor.heap_as<HandleBoxObject>();
+        auto& table=*static_cast<handles::HandleTable*>(box->table);
+        CHECK(table.stats().live==1);
+        run(session,"fn(streamtemp()){s:=ofstream("+quoted(root/"out")+");s.write(\"committed\")};streamtemp()");
+        CHECK(table.stats().live==1);CHECK(table.stats().cleaned==1);
+        std::ifstream input(root/"out");std::string contents((std::istreambuf_iterator<char>(input)),{});
+        CHECK(contents=="committed");CHECK(session.finish().reason==StopReason::None);
     }
 #ifndef _WIN32
     {

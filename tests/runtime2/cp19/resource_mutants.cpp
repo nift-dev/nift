@@ -50,5 +50,6 @@ int main(int argc,char** argv) {
         CHECK(session.finish().reason==StopReason::None);
     }
     auto status=rt_test::finish("CP19 resource mutation witness");
-    if(!status)std::cout<<"WITNESS "<<test<<' '<<expect<<'\n';return status;
+    if(!status)std::cout<<"WITNESS "<<test<<' '<<expect<<'\n';
+    return status;
 }
