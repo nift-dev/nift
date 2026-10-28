@@ -97,6 +97,23 @@ MUTANTS = [
      "FAIL c-completed-inner-try-body (legacy)"),
     ("no-catch-clear", "src/rt/compiler_try.cpp", "    block_clear(catch_regs);\n", "", "vm",
      "FAIL c-completed-catch-body (legacy)"),
+    # Independent review R1: block-clearing mutants the witnesses above missed.
+    ("no-merge-high", "src/rt/compiler_blocks.cpp", "    fb_->merge_high(regs.outer_high);\n", "", "vm",
+     "FAIL c-break-out-of-inner-try (legacy)"),
+    ("if-clear-only-without-else", "src/rt/compiler.cpp",
+     "    if (!ok) return false;\n    block_clear(body_regs);\n    if (node.c == kNoNode) {\n",
+     "    if (!ok) return false;\n    if (node.c == kNoNode) {\n        block_clear(body_regs);\n", "vm",
+     "FAIL c-then-completed-with-else (legacy)"),
+    # Independent review R2: the two while-clear mutants again, now required to
+    # be killed by the pad-free structural witnesses (register-placement
+    # independent), not only by the padded behavioural ones.
+    ("no-while-iteration-clear-structure", "src/rt/compiler.cpp",
+     "        const std::size_t iteration_end = fb_->here();\n        block_clear(body_regs);\n",
+     "        const std::size_t iteration_end = fb_->here();\n", "vm", "FAIL s-while-iteration-clear (structure)"),
+    ("continue-skips-clear-structure", "src/rt/compiler.cpp",
+     "        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);",
+     "        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);", "vm",
+     "FAIL s-while-continue-reaches-clear (structure)"),
     # F3: the left-open summary (count, and the most recently created file named).
     ("no-left-open-count", "src/rt/vm_handles.cpp", "    if (count < 2) return;\n", "    return;\n", "vm",
      "FAIL c-two-completed-names (legacy)"),

@@ -40,7 +40,9 @@ cases the contract's scope boundaries (the *-throw-first cases throw in a later
 iteration before the body redeclares its file, so only the iteration-end clear
 reports the earlier iteration's file; in the while cases two declarations
 precede the file so that the throw's temporaries cannot reuse its register
-and drop it, which would hide a missing clear).
+and drop it, which would hide a missing clear). Because those padded cases
+depend on register placement, the `s-` programs (no padding) check the while
+clears on the compiled code itself; see STRUCTURE.
 """
 import argparse
 import json
@@ -217,7 +219,75 @@ CASES = [
     ('c-else-completed-then-throw', 'try { if (false) { print("n") } else { f := file("p"); f.open("r") }; throw error("x") } catch(e) { print(e.message) }\n', 'legacy', [('p', 1)]),
     ('c-uncaught-in-loop', 'i := 0\nwhile (i < 1) { i = i + 1; f := file("p"); f.open("r"); throw error("x") }\n', 'legacy', []),
     ('c-two-open-unwound', 'fn(w()) { f := file("p"); f.open("r"); g := file("q"); g.open("r"); throw error("x") }\ntry { w() } catch(e) { print(e.message) }\n', 'legacy', []),
+    # Independent review R1 (2026-10-28): block-clearing paths with no
+    # normal-completion witness. A loop left by `break` from an inner try body
+    # (the nested try/catch blocks must merge their register high-water mark
+    # into the loop body's clear), and a completed then-branch that has an else.
+    ('c-break-out-of-inner-try', 'i := 0\ntry { while (i < 3) { i = i + 1; try { f := file("p"); f.open("r"); break } catch(e) { } }; throw error("x") } catch(e) { print(e.message) }\n', 'legacy', [('p', 1)]),
+    ('c-then-completed-with-else', 'try { if (true) { pad := 0; pad2 := 0; f := file("p"); f.open("r") } else { print("n") }; throw error("x") } catch(e) { print(e.message) }\n', 'legacy', [('p', 1)]),
+    ('c-then-completed-with-else-if', 'try { if (true) { pad := 0; pad2 := 0; f := file("p"); f.open("r") } else if (false) { print("n") }; throw error("x") } catch(e) { print(e.message) }\n', 'legacy', [('p', 1)]),
 ]
+
+# Independent review R2 (2026-10-28): a behavioural witness for a missing loop
+# clear only works while nothing in the next iteration happens to overwrite the
+# file's register (the padded while cases above). These pad-free programs are
+# checked on the compiled code instead (NIFT_VM_DUMP), which does not depend on
+# register placement: at the end of every while body, every register the body
+# binds (type and value, nested blocks included) is cleared before the back
+# edge, and no jump in the body (a `continue`) goes straight back to the loop
+# start, skipping that clear.
+STRUCTURE = [
+    ('s-while-iteration-clear', 'i := 0\ntry { while (i < 2) { i = i + 1; if (i == 2) { throw error("x") }; f := file("p"); f.open("r") } } catch(e) { print(e.message) }\n'),
+    ('s-while-continue-reaches-clear', 'i := 0\ntry { while (i < 3) { i = i + 1; if (i == 3) { throw error("x") }; f := file("p"); f.open("r"); if (i < 3) { continue } } } catch(e) { print(e.message) }\n'),
+    ('s-nested-while-clears', 'i := 0\nwhile (i < 2) { i = i + 1; f := file("p"); f.open("r"); j := 0; while (j < 2) { j = j + 1; g := file("q"); g.open("r"); if (j < 2) { continue } } }\n'),
+]
+DUMP_LINE = re.compile(r"\s+(\d+): (\w+) (\d+) (\d+) (\d+)")
+
+
+def dump_protos(text):
+    """{proto: [(pc, op, a, b, c)]} from the NIFT_VM_DUMP listing."""
+    protos, current = {}, None
+    for line in text.splitlines():
+        if line.startswith("proto "):
+            current = protos.setdefault(line.split()[1], [])
+        elif current is not None:
+            m = DUMP_LINE.match(line)
+            if m:
+                current.append((int(m[1]), m[2]) + tuple(int(x) for x in m.groups()[2:]))
+    return protos
+
+
+def jump_target(pc, op, c):
+    if not op.startswith("Jmp"):
+        return None
+    return pc + 1 + (c - 65536 if c >= 32768 else c)
+
+
+def structure_problems(code):
+    problems, loops = [], 0
+    for proto, ins in dump_protos(code).items():
+        by_pc = {i[0]: i for i in ins}
+        for pc, op, a, b, c in ins:
+            start = jump_target(pc, op, c)
+            if op != "Jmp" or start is None or start >= pc:
+                continue  # only unconditional back edges close a while body
+            loops += 1
+            body = [i for i in ins if start < i[0] < pc]
+            bound = {r for i in body if i[1] == "BindType" for r in (i[2], i[3])}
+            cleared, k = set(), pc - 1
+            while k in by_pc and by_pc[k][1] == "LoadNull":
+                cleared.add(by_pc[k][2])
+                k -= 1
+            if bound - cleared:
+                problems.append(f"proto {proto} loop at {start}: body bindings {sorted(bound - cleared)} "
+                                f"not cleared before the back edge at {pc}")
+            skips = [i[0] for i in body if jump_target(i[0], i[1], i[4]) == start]
+            if skips:
+                problems.append(f"proto {proto} loop at {start}: jump(s) at {skips} return to the loop start "
+                                f"without the iteration-end clear")
+    if not loops:
+        problems.append("no while loop found in the dump")
+    return problems
 
 
 def run(nift, root, source, vm):
@@ -305,7 +375,25 @@ def main():
                 print(f"ok   {name} ({mode})")
     print(f"{'PASS' if not failures else 'FAIL'} cp17 unwind release: {len(CASES)} cases, {failures} failure(s); "
           f"{corrections} approved correction(s) against legacy")
-    return 1 if failures else 0
+    structural = 0
+    for name, source in STRUCTURE:
+        with tempfile.TemporaryDirectory(prefix="cp17-unwind-") as tmp:
+            root = Path(tmp)
+            (root / "p").write_text("one\ntwo\n")
+            (root / "q").write_text("q\n")
+            (root / "case.f").write_text(source)
+            env = dict(os.environ, NIFT_VM="require", NIFT_VM_DUMP="1")
+            proc = subprocess.run([nift, "case.f"], cwd=root, env=env, stdin=subprocess.DEVNULL,
+                                  capture_output=True, text=True, timeout=60)
+            problems = structure_problems(proc.stdout + proc.stderr)
+        if problems:
+            structural += 1
+            print(f"FAIL {name} (structure): " + "; ".join(problems))
+        else:
+            print(f"ok   {name} (structure)")
+    print(f"{'PASS' if not structural else 'FAIL'} cp17 loop clear structure: {len(STRUCTURE)} programs, "
+          f"{structural} failure(s)")
+    return 1 if failures or structural else 0
 
 
 if __name__ == "__main__":
