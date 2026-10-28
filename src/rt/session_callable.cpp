@@ -41,6 +41,9 @@ struct Scan {
     std::unordered_set<const HeapObject*> active;
     Shape visit(const Value& value, unsigned depth) {
         if (!may_contain_identity(value)) return {};
+#if !defined(NIFT_SESSION_RESOURCE_MUTANT) || NIFT_SESSION_RESOURCE_MUTANT != 6
+        if (value.is(Kind::Handle)) return {};
+#endif
         if (depth > 64) return incomplete();
         if (!(value.is(Kind::Function) || value.is(Kind::Array) || value.is(Kind::Object))) return incomplete();
         if (active.count(value.heap())) return incomplete();  // no shared_ptr cycles in compiler facts

@@ -46,7 +46,7 @@ struct TerminationStart {
     TerminationCause cause = TerminationCause::None;  // what had started termination, if anything
 };
 
-class HandleTable {
+class HandleTable : public std::enable_shared_from_this<HandleTable> {
 public:
     explicit HandleTable(TableOptions options = {});
     // shutdown(); failures are discarded (call shutdown() to see them). If
@@ -83,6 +83,10 @@ public:
     // or hook); its descendants end with it on the same error. Hooks see it in
     // CleanupEvent::context_error; the report carries it.
     CloseReport close_context(ContextId id, bool on_error = false);
+    // Consume already-settled reports once, without closing or settling resources.
+    CloseReport take_failures(ContextId id);
+    // Same emergency release as destruction; never allocates on the fallback path.
+    void shutdown_noexcept() noexcept;
     // Whether `id` is a build-family context, where detach() is
     // DetachForbidden: lets a native refuse a detached launch up front.
     HandleStatus context_in_build(ContextId id, bool& in_build) const;

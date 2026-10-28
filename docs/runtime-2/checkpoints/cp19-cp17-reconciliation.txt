@@ -1,0 +1,41 @@
+CP19 reconciliation with accepted CP17 — development record, 28 October 2026
+Foundation: 812bf21ab66bbf652141c069c92995293987ca55
+Tree: 028f64e92230624d0cbf735d4a0845667bbee4d2
+CP19 frozen parent: 87c4cbea988e65ba7c8ca5d5b1bb0bdbcc5c1172
+
+Authority: D-056 in decisions.md; handles/table.h; natives/host_file_handles.h;
+compiler_handles.cpp; CP17 resource_contracts and unwind regression witnesses.
+
+A handle Value identifies a generation-checked slot, not an independent resource
+owner. A HandleBox adopts one counted table reference; copies alias that box.
+Last-box release starts cleanup once. Explicit close is idempotent. Context end
+waits for outstanding lifecycle-ticket obligations and returns final reports.
+Normal abandonment reports an open managed file, discarding unwritten buffers.
+Exceptional abandonment silently discards only exclusively owned abandoned files;
+surviving aliases and persistent outer bindings remain live. Caught Errors and
+normal-completion obligations retain their accepted semantics.
+
+Session adaptation: keep the existing Script context open across commands. Clear
+command registers at each boundary, using accepted exceptional abandonment only
+on an aborted command. Drain already-settled cleanup failures without closing
+surviving resources or moving ownership. Finalization closes the Script context
+and waits through the accepted close_context path. Cancellation first marks the
+same context Cancelling, then finalizes it. No new process owner or ticket exists.
+
+A narrow HandleTable report-drain API is needed because close_context currently
+combines final reporting with closing all resources. Draining does not settle or
+cancel obligations and cannot consume a failure twice. Outstanding asynchronous
+settlements still remain the context's final-close obligations.
+
+VM-produced boxes may be inspected by embedding/session callers after execution.
+They must keep their table storage alive, while VM/session finalization still
+closes the context promptly. Shared table storage does not extend resource
+ownership. Stack-allocated Host HandleTables retain their existing caller-managed
+lifetime contract. Emergency teardown keeps CP17's allocation-free release path.
+
+Admission retains CP17's W13 handle-position/forgery barriers, including cross-unit
+free-name captures. No aggregate/return/render escape is newly authorized.
+ProcessGroup attachment belongs to the accepted Host seam; script process values
+and interactive job-control persistence must be assessed against the actual CP21
+interface rather than invented here. Broader performance and acceptance evidence
+must be collected after these adaptations stabilize. This record is not acceptance.

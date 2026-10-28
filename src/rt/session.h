@@ -17,7 +17,7 @@ struct SessionResult {
 };
 // VM-owned from construction, including when the first unit refuses (D-054).
 // Owns one VM, stable cells, and every immutable code/source unit it publishes.
-// Host handles remain unadmitted until CP17 session-lifetime reconciliation.
+// File/stream resources share the accepted CP17 Script context across commands.
 class VmSession {
 public:
     explicit VmSession(VmOptions options = VmOptions());
@@ -37,6 +37,7 @@ public:
     std::uint64_t refusals() const { return refusals_; }
     std::size_t retained_code_units() const;
     std::size_t code_slots() const { return linked_.size(); }
+    VmResult finish(bool cancelled = false);
     void close();
 private:
     std::vector<std::pair<std::uint64_t, const Proto*>> activation_targets(const Program&) const;
@@ -57,7 +58,7 @@ private:
     SessionCompileContext namespace_;
     std::vector<Value> globals_;
     std::unique_ptr<Vm> vm_;
-    bool closed_ = false, active_ = false, close_pending_ = false;
+    bool closed_ = false, active_ = false, close_pending_ = false, cancel_pending_ = false;
     std::uint64_t executions_ = 0, refusals_ = 0;
 };
 } // namespace nift::rt

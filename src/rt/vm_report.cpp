@@ -14,6 +14,9 @@
 namespace nift::rt {
 
 namespace {
+inline const Note* note_at(const Proto* proto, const Instr* pc) {
+    return proto->note(static_cast<std::size_t>(pc - proto->code.data()));
+}
 inline bool truth(const Value& v) { return v.is(Kind::Bool) ? v.as_bool() : truthy(v); }
 } // namespace
 #define RK(x) (((x) & kConstantBit) ? K[(x) & 0x7fffu] : R[(x)])

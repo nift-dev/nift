@@ -5,7 +5,9 @@
 
 namespace nift::rt::handles {
 
-HandleTable::~HandleTable() {
+HandleTable::~HandleTable() { shutdown_noexcept(); }
+
+void HandleTable::shutdown_noexcept() noexcept {
     try {
         shutdown();
         return;

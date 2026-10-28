@@ -121,6 +121,8 @@ inline void fault_into(VmResult& result, const Fault& fault) {
 class Vm {
 public:
     Vm(const Program& program, VmOptions options = VmOptions());
+    ~Vm();
+    VmResult finish_session_resources(bool cancelled = false);
     VmResult run(std::string& output);
     VmResult run_session_unit(const Program& unit, const std::vector<const Proto*>& linked, std::string& output);
     void clear_session_execution();
@@ -147,7 +149,8 @@ private:
     };
     bool reserve_registers(std::size_t needed);
     void open_handle_runtime();
-    void close_handle_runtime(VmResult& result);
+    void complete_run(VmResult& result);
+    void close_handle_runtime(VmResult& result, bool on_error = false);
     static void left_open_summary(const handles::CloseReport& close, VmResult& result);
     // CP17 unwind release: a caught Error is unwinding `register_value`'s
     // register (natives::abandon_file_on_unwind has the exact rule).
@@ -236,7 +239,8 @@ private:
     bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;
-    handles::HandleTable handle_table_;  // CP17: one table per VM run
+    std::shared_ptr<handles::HandleTable> handle_table_owner_;
+    handles::HandleTable& handle_table_;  // one Script context per run or persistent session
     handles::ContextId handle_context_ = 0;
     bool handle_context_open_ = false;
     std::vector<Value> stack_;

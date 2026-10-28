@@ -26,6 +26,9 @@ Value box_counted_handle(HandleTable& table, const Value& handle) {
     box->id = handle.handle_id();
     box->generation = handle.handle_generation();
     box->handle_kind = handle.handle_kind();
+#if !defined(NIFT_SESSION_RESOURCE_MUTANT) || NIFT_SESSION_RESOURCE_MUTANT != 3
+    box->table_owner = table.weak_from_this().lock();
+#endif
     box->table = &table;
     box->release = release_box;
     heap_retally(box);

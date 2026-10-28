@@ -323,7 +323,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     std::string handle_reason;
     std::uint32_t handle_offset = 0;
-    if (detail::check_handle_flow(ast, root, kinds, handle_reason, handle_offset)) {
+    if (detail::check_handle_flow(ast, root, kinds, handle_reason, handle_offset, limits.session)) {
         result.reason = std::move(handle_reason);
         result.offset = handle_offset;
         return result;

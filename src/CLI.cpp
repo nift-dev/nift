@@ -1620,6 +1620,19 @@ static nift::rt::VmOptions session_options() {
     nift::rt::detail::limits_from_environment(options);
     return options;
 }
+static int finish_vm_session(nift::rt::VmSession& session, int status) {
+    try {
+        const auto result = session.finish(status != 0);
+        if (result.reason != nift::rt::StopReason::None) {
+            console::error(result.message);
+            if (!status) return result.reason == nift::rt::StopReason::Internal ? 70 : 1;
+        }
+    } catch (const std::bad_alloc&) {
+        console::error("NIFT_VM internal failure: resource finalization allocation failed");
+        return 70;
+    }
+    return status;
+}
 static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
                                     const std::string& path, bool inspect = true,
                                     SessionDisplay display = SessionDisplay::Repl) {
@@ -1698,7 +1711,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
         session.initialize_invocation(cmd, script_args);
         const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
                                                     SessionDisplay::Script);
-        if (status != 0) return status;
+        if (status != 0) return finish_vm_session(session, status);
         ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host, info);
         parser.set_script_invocation(cmd, script_args);
         return run_script_shell_loop(parser, false, &session);
@@ -2742,6 +2755,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         owned_session = std::make_unique<nift::rt::VmSession>(session_options()); session = owned_session.get();
         session->initialize_invocation("<repl>", {});
     }
+    const auto loop = [&]() -> int {
     std::string pending; nift::shell::JobTable jobs; ShellJobTable legacy_jobs;
     auto history=load_nift_history();
 #ifndef _WIN32
@@ -2814,6 +2828,9 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     std::string resource_error;
     if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
     return 0;
+    };
+    const auto status = loop();
+    return session ? finish_vm_session(*session, status) : status;
 }
 
 static int run_script_shell() {

@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string_view>
 
 namespace nift::rt {
@@ -68,6 +69,7 @@ struct HandleBoxObject : HeapObject {
     std::uint64_t id = 0;
     std::uint32_t generation = 0;
     HandleKind handle_kind = HandleKind::None;
+    std::shared_ptr<void> table_owner;  // VM boxes pin storage, never the owning context
     void* table = nullptr;
     void (*release)(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) = nullptr;
     HandleBoxObject() : HeapObject(Kind::Handle) {}

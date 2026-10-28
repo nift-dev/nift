@@ -1,6 +1,7 @@
 #include "rt/vm_handles.h"
 
 #include "rt/handles/file_resource.h"
+#include "rt/cell.h"
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_stream_handles.h"
 
@@ -9,6 +10,30 @@
 #include <string_view>
 
 namespace nift::rt {
+
+Vm::~Vm() { handle_table_.shutdown_noexcept(); }
+
+VmResult Vm::finish_session_resources(bool cancelled) {
+    VmResult result;
+    if (cancelled && handle_context_open_) handle_table_.cancel_context(handle_context_);
+    if (options_.return_value) *options_.return_value = Value();
+    if (options_.session_globals) for (auto& value : *options_.session_globals) {
+        if (cancelled && is_cell(value) && value.refcount() == 1)
+            abandon_unwound_handle(cell_of(value)->value);
+        value = Value();
+    }
+    close_handle_runtime(result, cancelled);
+    return result;
+}
+
+void Vm::complete_run(VmResult& result) {
+#if defined(NIFT_SESSION_RESOURCE_MUTANT) && NIFT_SESSION_RESOURCE_MUTANT == 1
+    close_handle_runtime(result);
+#else
+    if (!options_.session_globals) close_handle_runtime(result);
+#endif
+    result_stats(result);
+}
 
 void Vm::open_handle_runtime() {
     handles::KindSpec file_spec;
@@ -28,9 +53,9 @@ void Vm::abandon_unwound_handle(const Value& value) {
     if (handle_context_open_) natives::abandon_file_on_unwind(handle_table_, handle_context_, value);
 }
 
-void Vm::close_handle_runtime(VmResult& result) {
+void Vm::close_handle_runtime(VmResult& result, bool on_error) {
     if (!handle_context_open_) return;
-    const handles::CloseReport close = handle_table_.close_context(handle_context_);
+    const handles::CloseReport close = handle_table_.close_context(handle_context_, on_error);
     handle_context_open_ = false;
     // CP17 x CP18: a cleanup report lost to an allocation failure (a dying
     // box cannot throw) fails the run as the allocation failure it was, never

@@ -99,6 +99,18 @@ CloseReport HandleTable::close_context(ContextId id, bool on_error) {
     return report;
 }
 
+CloseReport HandleTable::take_failures(ContextId id) {
+    CloseReport report;
+    std::lock_guard<std::mutex> lock(mu_);
+    auto* context = contexts_.find(id, report.status);
+#if defined(NIFT_SESSION_RESOURCE_MUTANT) && NIFT_SESSION_RESOURCE_MUTANT == 4
+    if (context) report.failures = context->failures;
+#else
+    if (context) report.failures.swap(context->failures);
+#endif
+    return report;
+}
+
 CloseReport HandleTable::shutdown() {
     CloseReport report;
     if (in_own_hook()) { report.status = HandleStatus::ReentrantClose; return report; }

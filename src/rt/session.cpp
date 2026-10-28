@@ -29,13 +29,23 @@ VmSession::VmSession(VmOptions options) {
     vm_ = std::make_unique<Vm>(bootstrap_, options);
 }
 VmSession::~VmSession() { close(); }
-void VmSession::close() {
-    if (closed_) return;
-    if (active_) { close_pending_ = true; return; }
+VmResult VmSession::finish(bool cancelled) {
+    if (closed_) return {};
+    cancel_pending_ = cancel_pending_ || cancelled;
+    if (active_) { close_pending_ = true; return {}; }
     close_pending_ = false;
-    // Destroy executable values before the immutable code they refer to.
+    auto result = vm_->finish_session_resources(cancel_pending_);
     vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
+    return result;
+}
+void VmSession::close() {
+    try { (void)finish(); }
+    catch (...) {
+        // Vm destruction uses CP17's allocation-free emergency release path.
+        vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
+        linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
+    }
 }
 std::size_t VmSession::retained_code_units() const {
     return std::count_if(units_.begin(), units_.end(), [](const auto& unit) { return !unit.owner.expired(); });

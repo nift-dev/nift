@@ -20,7 +20,6 @@
 #include "rt/resolver.h"
 #include "rt/text_type.h"
 
-
 #include <cstdint>
 #include <memory>
 #include <string>

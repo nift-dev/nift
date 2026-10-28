@@ -127,10 +127,15 @@ NodeId write_literal_argument(const Ast& ast, const Node& call, const natives::B
 }
 
 bool check_handle_flow(const Ast& ast, NodeId root, const UnitKinds& kinds, std::string& reason,
-                       std::uint32_t& offset) {
+                       std::uint32_t& offset, const SessionCompileContext* session) {
     std::vector<FunctionOwner> owners(ast.size() + 1u);
     std::vector<std::size_t> node_owner(ast.size(), 0);
     collect_function_owners(ast, root, 0, owners, node_owner);
+#if !defined(NIFT_SESSION_RESOURCE_MUTANT) || NIFT_SESSION_RESOURCE_MUTANT != 5
+    if (session) for (const auto& symbol : session->symbols) owners[0].decls.insert(symbol.name);
+#else
+    (void)session;
+#endif
     std::vector<NodeId> parent(ast.size(), kNoNode);
     std::vector<NodeId> stack{root};
     while (!stack.empty()) {

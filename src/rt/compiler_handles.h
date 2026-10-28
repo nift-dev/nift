@@ -10,7 +10,7 @@ namespace nift::rt::detail {
 // True when a handle value appears outside the W13 positions; sets the refusal
 // reason and source offset.
 bool check_handle_flow(const Ast& ast, NodeId root, const UnitKinds& kinds, std::string& reason,
-                       std::uint32_t& offset);
+                       std::uint32_t& offset, const SessionCompileContext* session = nullptr);
 
 // The argument node of a file/stream write that is (or contains) an
 // interpolated string literal, or kNoNode. Legacy writes such a literal's raw

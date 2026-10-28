@@ -56,7 +56,24 @@ VmResult Vm::run_session_unit(const Program& unit, const std::vector<const Proto
     } else result = run(output);
     options_.heap_budget = budget;
     update_heap_limit();
+    // D-056: an uncaught command abandons its temporaries, not persistent cells.
+#if !defined(NIFT_SESSION_RESOURCE_MUTANT) || NIFT_SESSION_RESOURCE_MUTANT != 2
+    if (result.reason != StopReason::None)
+        for (auto& value : stack_) {
+            if (value.is(Kind::Handle)) abandon_unwound_handle(value);
+            value = Value();
+        }
+#endif
     clear_session_execution();
+    if (handle_table_.reports_lost()) throw std::bad_alloc();
+    const auto reports = result.reason == StopReason::None ?
+        handle_table_.take_failures(handle_context_) : handles::CloseReport{};
+    if (reports.cleanup_failed()) {
+        result.reason = StopReason::Error;
+        result.message = reports.failures.front().message;
+        result.code = reports.failures.front().code;
+        left_open_summary(reports, result);
+    }
     return result;
 }
 } // namespace nift::rt
