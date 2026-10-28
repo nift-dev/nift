@@ -25,6 +25,7 @@ from pathlib import Path
 ANSI = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 LINUX = sys.platform.startswith("linux") and os.environ.get("CP21_FORCE_PORTABLE") != "1"
 PROBE = None
+TTY_AUDIT = None
 
 MUTANT = {
     1: {"scenario": "background_owner", "witness": "background-started",
@@ -121,6 +122,8 @@ class Pty:
             env.update(HOME=self.root, TERM="dumb", LANG="C", LC_ALL="C")
             if extra_env:
                 env.update(extra_env)
+            if TTY_AUDIT:
+                env["CP21_TTY_AUDIT"] = str(Path(self.root) / "tty-audit")
             os.chdir(self.root)
             os.execve(binary, [binary], env)
 
@@ -265,12 +268,39 @@ def foreground_pipeline(s, r):
     r.check("foreground-pipeline-runs", "hi" in s.output())
 
 
+def background_tty_stolen(records):
+    return any(requested > 0 and requested != group and requested == observed and rc == 0
+               for kind, group, requested, observed, rc in records if kind == "handoff")
+
+
+def read_tty_audit(path, shell_pid):
+    records = []
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) != 6 or parts[0] not in ("ready", "handoff"):
+            raise OSError("malformed terminal audit")
+        pid, group, requested, observed, rc = map(int, parts[1:])
+        if pid == shell_pid:
+            records.append((parts[0], group, requested, observed, rc))
+    if not any(kind == "ready" and group == observed and rc == 0
+               for kind, group, requested, observed, rc in records):
+        raise OSError("terminal audit missing shell ownership prerequisite")
+    return records
+
+
 def background_owner(s, r):
     s.line("/bin/sleep 1 &")
     s.prompt()
     out = s.output()
     if "[1]" in out:
         r.witness("background-started")
+    if TTY_AUDIT:
+        # Read durable evidence after the handoff, before relying on a surviving
+        # child. CP19 may already have reaped the mutant's child after tty EIO.
+        records = read_tty_audit(Path(s.root) / "tty-audit", s.pid)
+        if background_tty_stolen(records):
+            r.check(MUTANT[1]["check"], False, records)
+            return
     if LINUX:
         s.until(lambda: bool(children(s.pid)), 2.0, "background child")
         snap = s.snapshot()
@@ -525,7 +555,12 @@ SCENARIOS = {
 
 
 def run_scenario(binary, name, extra_env=None):
+    extra_env = dict(extra_env or {})
+    if name == "background_owner" and TTY_AUDIT:
+        existing = extra_env.get("LD_PRELOAD", os.environ.get("LD_PRELOAD", ""))
+        extra_env["LD_PRELOAD"] = TTY_AUDIT + (":" + existing if existing else "")
     s = Pty(binary, extra_env)
+    # The path is known before exec through HOME; no inherited audit fd.
     r = Result()
     try:
         initial_prompt(s)
@@ -533,7 +568,7 @@ def run_scenario(binary, name, extra_env=None):
         r.completed = True
     except Timeout as exc:
         r.setup_error = f"timeout: {exc}"
-    except (OSError, ChildProcessError) as exc:
+    except (OSError, ChildProcessError, ValueError) as exc:
         r.setup_error = f"{type(exc).__name__}: {exc}"
     finally:
         s.close()
@@ -545,7 +580,7 @@ def report_setup_error(name, result):
 
 
 def main():
-    global PROBE
+    global PROBE, TTY_AUDIT
     parser = argparse.ArgumentParser()
     parser.add_argument("nift")
     parser.add_argument("--probe", required=True, help="portable foreground-probe binary")
@@ -557,6 +592,11 @@ def main():
     args = parser.parse_args()
     binary = os.path.abspath(args.nift)
     PROBE = os.path.abspath(args.probe)
+    if sys.platform.startswith("linux"):
+        TTY_AUDIT = str(Path(PROBE).parent / "cp21-tty-audit.so")
+        if not Path(TTY_AUDIT).is_file():
+            print("FAIL missing terminal audit library " + TTY_AUDIT)
+            return 1
     if not os.access(binary, os.X_OK):
         print(f"FAIL missing binary {binary}")
         return 1

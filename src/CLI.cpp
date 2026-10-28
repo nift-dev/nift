@@ -2734,9 +2734,9 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         owned_session = std::make_unique<nift::rt::VmSession>(session_options()); session = owned_session.get();
         session->initialize_invocation("<repl>", {});
     }
+    std::unique_ptr<nift::shell::JobTable> legacy_jobs;
     const auto loop = [&]() -> int {
     std::string pending;
-    std::unique_ptr<nift::shell::JobTable> legacy_jobs;
     nift::shell::JobTable* session_jobs = nullptr;
     if (session) {
         auto owner = std::make_unique<nift::shell::SessionJobs>();
@@ -2804,17 +2804,22 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if(!rr.ok){ console::error(rr.error.message);continue; }
         if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
-    // Session end cancels jobs through the sole CP21 owner; never wait forever
-    // on a stopped/background job and never give it a second process owner.
-    if (!session) {
-        const auto result = jobs.finish();
-        if (result.host_fault || !result.error.empty()) { console::error(result.error); return 1; }
-    }
-    std::string resource_error;
-    if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
     return 0;
     };
-    const auto status = loop();
+    auto status = loop();
+    // Every loop exit (including shell exit/status paths) settles both domains.
+    // Keep the CP21 owner alive until its bounded finish, then independently
+    // finalize legacy script resources even when job cleanup reports a fault.
+    ProcessResult job_result;
+    if (legacy_jobs) job_result = legacy_jobs->finish();
+    std::string resource_error;
+    const bool resources_ok = parser.finalize_script_resources(resource_error);
+    if (!resources_ok) console::error(resource_error);  // primary script diagnostic
+    if (job_result.host_fault || !job_result.error.empty()) {
+        console::error(job_result.error);
+        if (!status) status = 1;
+    }
+    if (!resources_ok && !status) status = 1;
     return session ? finish_vm_session(*session, status) : status;
 }
 

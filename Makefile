@@ -4362,3 +4362,24 @@ test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
 include tests/runtime2/cp19/resources.mk
 
 include tests/runtime2/cp19/jobs.mk
+
+# Durable mutant-1 kernel witness survives CP19 bounded session-end cleanup.
+ifeq ($(shell uname -s),Linux)
+$(TEST_DIR)/cp21-tty-audit.so: tests/cp21_tty_audit.c
+	@mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+test-cp21-interactive-host test-cp21-interactive-host-mutants: $(TEST_DIR)/cp21-tty-audit.so
+endif
+.PHONY: test-cp21-tty-audit-guards
+test-cp21-tty-audit-guards:
+	$(PYTHON) tests/cp21_tty_audit_unit.py
+test-cp21-interactive-host-mutants: test-cp21-tty-audit-guards
+.PHONY: test-cp21-mutant1-controls
+test-cp21-mutant1-controls: $(TARGET) $(TEST_DIR)/cp21-mutants/2/nift$(EXEEXT) $(CP21_PROBE)
+	$(PYTHON) tests/cp21_mutant1_controls.py --normal "$(abspath $(TARGET))" --unrelated "$(abspath $(TEST_DIR)/cp21-mutants/2/nift$(EXEEXT))" --probe "$(abspath $(CP21_PROBE))" --out "$(TEST_DIR)/cp21-mutants/mutant1-controls.json"
+ifeq ($(shell uname -s),Linux)
+test-cp21-mutant1-controls: $(TEST_DIR)/cp21-tty-audit.so
+endif
+test-cp21-interactive-host-mutants: test-cp21-mutant1-controls
+# Retain the actual mutation objects for source/object/binary provenance.
+.SECONDARY: $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp21-mutants/$(m)/Spawn.o)

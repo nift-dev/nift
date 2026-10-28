@@ -1,0 +1,30 @@
+{
+  "reviewed_parent": "91b78c359c82114824374771780da19a08c54648",
+  "reviewed_parent_tree": "0d2af8600fb301f8226c27c2d42380d79e420aaf",
+  "acceptance_status": "R2 correction candidate only; independent re-review required; CP19 incomplete",
+  "F1": {
+    "requirement": "Both independent legacy shell cleanup domains finalize despite a job result fault, on EOF and all loop returns",
+    "implementation": ["src/CLI.cpp:run_script_shell_loop"],
+    "invariants": ["one JobTable owner", "bounded finish before release", "script-resource diagnostic primary", "independent job diagnostic", "preserve nonzero shell status", "no duplicate ticket or group owner"],
+    "regressions": ["tests/runtime2/cp19/cleanup_cli.py", "tests/runtime2/cp19/fail_restore.c", "tests/parser_statement_state_unit.cpp", "tests/runtime2/cp19/jobs.cpp"],
+    "fault_distinction": "Reviewer shim reproduces real failed terminal restoration/EIO. Permanent explicit-exit matrix restores terminal ownership but returns EIO, allowing the exit command to be read; it does not replace the original-fault reproduction.",
+    "cancellation_contract": "VM explicit nonzero exit preserves accepted cancellation/discard semantics without an unclosed-file Error; legacy reports its independent managed-file error. Both preserve requested exit status."
+  },
+  "F2": {
+    "requirement": "Detect CP21 mutant 1 by actual background terminal theft before CP19 cleanup can remove the child",
+    "classification": "Intended mutation interacts with bounded shutdown; original surviving-child observation is obsolete for that mutant. Normal production background ownership is not changed.",
+    "production_spawn_change": false,
+    "regressions": ["tests/cp21_interactive_host.py", "tests/cp21_tty_audit.c", "tests/cp21_tty_audit_unit.py", "tests/cp21_mutant1_controls.py"],
+    "witness": "After a real successful tcsetpgrp, tcgetpgrp confirms the background group owns the terminal; parent PID and initial shell ownership are validated and the launched-job witness is still required.",
+    "observer_effect": "Test-only Linux preload records completed kernel operations; no injected delay, process stop, lifetime extension or syscall result change.",
+    "controls": ["normal", "dead", "unrelated mutant", "premature exit", "timeout", "missing/invalid audit prerequisite", "failed handoff", "wrong kernel group", "unrelated PID"],
+    "certification": "test-v45-job-control retains genuine mutants, existing reciprocal checks and D3/terminal/fault guards; Make retains actual mutant objects for provenance."
+  },
+  "unchanged_failures": {
+    "million_catch_vs_CP18": {"default_caught": 1.005634820, "default_caught_cell": 1.010119190, "switch_caught": 1.008258728, "switch_caught_cell": 1.011953511},
+    "performance_status": "All four R1 mandatory results remain failed, threshold <=1.0, no waiver. Closed investigation not repeated; no new R2 performance measurement claimed.",
+    "CP22_print_order": "Inherited r_f3_member_print_default expects 1,3,2,6 but foundation/candidate produce 3,1,2,6; no golden edit."
+  },
+  "remaining_qualifications": ["VM callable:run refusal", "atomic persistent session:coroutine refusal", "CP22 section 6.1 resource-lifecycle obligation", "remaining platform certification", "independent functional re-review pending"],
+  "authority": "No integration, push, CI dispatch, tag, release, infrastructure spend or direct reviewer communication"
+}

@@ -235,6 +235,19 @@ int main() {
     assert(!failed_script.ok);
     resource_error.clear();assert(import_parser.finalize_script_resources(resource_error));
 
+    // CP19 R2: a reported unclosed managed file is finalized once; a second
+    // finish is inert and never saves the discarded working buffer.
+    const auto twice_path = root / "finalize-twice.txt";
+    { std::ofstream original(twice_path); original << "original"; }
+    assert(import_parser.run_statement("twice:=file(\"" + twice_path.generic_string() + "\");twice.open(\"rw\");twice.write(\"dirty\")", root / "main.f").ok);
+    resource_error.clear();
+    assert(!import_parser.finalize_script_resources(resource_error));
+    assert(resource_error.find("managed file left open") != std::string::npos);
+    resource_error.clear();
+    assert(import_parser.finalize_script_resources(resource_error));
+    assert(resource_error.empty());
+    { std::ifstream original(twice_path); std::string saved; original >> saved; assert(saved == "original"); }
+
     // A failed package import must roll back its ModuleEnv and release the read
     // lease even while the persistent parser remains alive.
     const auto package=root/".nift/packages/demo";std::filesystem::create_directories(package/"src",ec);assert(!ec);

@@ -41,3 +41,13 @@ $(TEST_DIR)/cp19/function-owner-oom: tests/rt/value_destroy_oom.cpp $(CP19_EXPR_
 $(TEST_DIR)/cp19/function-owner-oom-sanitize: tests/rt/value_destroy_oom.cpp $(CP19_EXPR_SAN_OBJECTS)
 	@mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+
+ifeq ($(shell uname -s),Linux)
+$(TEST_DIR)/cp19/fail-restore.so: tests/runtime2/cp19/fail_restore.c
+	@mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+.PHONY: test-cp19-cleanup-cli
+test-cp19-cleanup-cli: $(TARGET) $(CP13B_SWITCH_NIFT) $(TEST_DIR)/cp19/fail-restore.so
+	$(PYTHON) tests/runtime2/cp19/cleanup_cli.py --nift "$(CURDIR)/$(TARGET)" --fault "$(abspath $(TEST_DIR)/cp19/fail-restore.so)" --out "$(TEST_DIR)/cp19/cleanup-cli.json"
+	$(PYTHON) tests/runtime2/cp19/cleanup_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --fault "$(abspath $(TEST_DIR)/cp19/fail-restore.so)" --out "$(TEST_DIR)/cp19/cleanup-cli-switch.json"
+endif
