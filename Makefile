@@ -3672,7 +3672,9 @@ test-cp21-parser-target-mutant: $(CP21_FD_PROTOCOL_UNIT_MUTANT)
 	echo "PASS CP21 parser target mutant: target grammar is enforced (evidence recorded)"
 
 .PHONY: test-cp21-d3-mandatory
-test-cp21-d3-mandatory: test-cp21-fd-inheritance test-cp21-d3-mutant test-cp21-parser-target-mutant
+test-cp21-d3-mandatory: test-cp21-fd-inheritance
+test-cp21-d3-mandatory: test-cp21-d3-mutant
+test-cp21-d3-mandatory: test-cp21-parser-target-mutant
 	@set -e; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/true "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(abspath $(TEST_DIR)/cp21-d3-dead-child.log)" 2>&1 || true; \
 	grep -q "^SETUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-dead-child.log)" || \
