@@ -195,9 +195,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     update_flags();
     Loop loop;
     loop.start = fb_->here();
-    // CP22: a safepoint every iteration (continue included); a = 1 marks a
-    // body that starts with a qualifying sleep (cooperative admission A3).
-    if (plan_.coroutines) fb_->emit(OpCode::Yield, suspending_loop_body(ast_, ast_.at(node.b), plan_) ? 1 : 0);
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;

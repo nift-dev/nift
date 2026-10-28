@@ -1,9 +1,9 @@
 #include "rt/compiler_coro_admit.h"
 
+#include "rt/compiler_coro_loops.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
 
-#include <charconv>
 #include <cstdlib>
 #include <string_view>
 #include <vector>
@@ -12,9 +12,9 @@
 
 // Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
 // 12 the admission rule admits everything; 13 A5 off; 14 A1 off; 15 A2 off;
-// 16 A3 off; 17 A4 off; 19 A3 accepts a `sleep` anywhere at the top level of
-// the body (the rejected round-5 rule); 20 calls through values are not
-// followed (the rejected round-5 member-call gap). Normal builds contain none.
+// 16 A3 off; 17 A4 off; 20 calls through values are not followed (the
+// rejected round-5 member-call gap); 19, 21 and 22 weaken A3
+// (compiler_coro_loops.cpp). Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -219,14 +219,15 @@ private:
     // A3, A4 and the task part of A5.
     bool task_code(std::size_t p, std::string& reason, std::uint32_t& offset) const {
         const std::vector<Instr>& code = proto(p).code;
+#if NIFT_CORO_MUTANT != 16
+        std::size_t head = 0;
+        if (!loops_suspend(proto(p), head)) return fail(p, head, "coro-task-loop", reason, offset);
+#endif
         for (std::size_t pc = 0; pc < code.size(); ++pc) {
             const Instr& in = code[pc];
 #if NIFT_CORO_MUTANT != 17
             if (!task_op_allowed(in.op))
                 return fail(p, pc, std::string("coro-task-op:") + opcode_name(in.op), reason, offset);
-#endif
-#if NIFT_CORO_MUTANT != 16
-            if (in.op == OpCode::Yield && in.a != 1) return fail(p, pc, "coro-task-loop", reason, offset);
 #endif
             if (in.op != OpCode::CallNative) continue;
             if (in.b < kFirstBuiltin) {
@@ -254,32 +255,6 @@ private:
 bool check_cooperative_admission(const Program& program, bool observe, std::string& reason,
                                  std::uint32_t& offset) {
     return Admission(program, observe).run(reason, offset);
-}
-
-bool suspending_loop_body(const Ast& ast, const Node& body, const UnitPlan& plan) {
-    if (body.kind != NodeKind::Block || body.count == 0) return false;
-    const Node& first = ast.at(ast.list(body)[0]);
-#if NIFT_CORO_MUTANT == 19
-    // M19: the rejected round-5 rule (a top-level sleep anywhere in the body).
-    for (std::uint32_t k = 0; k < body.count; ++k) {
-        const Node& s = ast.at(ast.list(body)[k]);
-        if (s.kind == NodeKind::ExprStmt && s.a != kNoNode && ast.at(s.a).kind == NodeKind::Call) {
-            const Node& call = ast.at(s.a);
-            if (call.a != kNoNode && ast.text(ast.at(call.a)) == "sleep") return true;
-        }
-    }
-#endif
-    if (first.kind != NodeKind::ExprStmt || first.a == kNoNode) return false;
-    const Node& call = ast.at(first.a);
-    if (call.kind != NodeKind::Call || call.count != 1 || call.a == kNoNode) return false;
-    const Node& callee = ast.at(call.a);
-    if (callee.kind != NodeKind::Ident || ast.text(callee) != "sleep" || plan.index.count("sleep")) return false;
-    const Node& arg = ast.at(ast.list(call)[0]);
-    if (arg.kind != NodeKind::Number) return false;
-    const std::string_view text = ast.text(arg);
-    long long ms = 0;
-    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), ms);
-    return parsed.ec == std::errc() && parsed.ptr == text.data() + text.size() && ms >= 1;
 }
 
 void cooperative_switches(CompileLimits& limits) {

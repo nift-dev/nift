@@ -6,10 +6,8 @@
 // identified exactly (a built-in method, a callable stored in a field and a
 // thread `join` are different instructions); anything it cannot classify is
 // refused. Everything refused runs on legacy, before any effect.
-#include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/proto.h"
-#include "rt/resolver.h"
 
 #include <cstdint>
 #include <string>
@@ -21,8 +19,8 @@ namespace nift::rt {
 //                              constant-time environment reads, anywhere
 //   coro-task-recursion        A2: a call cycle among task code (calls through
 //                              values reach every function value)
-//   coro-task-loop             A3: a loop in task code whose body does not start
-//                              with `sleep(<integer literal >= 1>)`
+//   coro-task-loop             A3: a cycle in task code that does not pass
+//                              through a genuine suspension (loops_suspend)
 //   coro-task-native:<name>    A4: a built-in in task code outside the constant-
 //                              time allowlist (identified by id, not by name)
 //   coro-task-op:<opcode>      A4: an instruction task code may not execute
@@ -34,11 +32,6 @@ namespace nift::rt {
 // function value (LoadFunction or Closure anywhere in the program).
 bool check_cooperative_admission(const Program& program, bool observe, std::string& reason,
                                  std::uint32_t& offset);
-
-// A3 marker: a loop body whose first statement is `sleep(<integer literal
-// >= 1>)` with the built-in `sleep`; the compiler records it in the loop's
-// Yield (a = 1), so every iteration, `continue` included, suspends first.
-bool suspending_loop_body(const Ast& ast, const Node& body, const UnitPlan& plan);
 
 // The two non-contractual test switches (record §12), off by default:
 // NIFT_VM_COOPERATIVE_THREADS=1 (thread() as a cooperative task) and

@@ -3636,10 +3636,12 @@ test-runtime2-cp22-tsan:
 	$(CXX) $(CPPFLAGS) -DNIFT_HOST_LOOP_PORTABLE -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/coro_wake_unit.cpp \
 		src/rt/coro_wake.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-tsan/coro-wake-portable"
 	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-tsan/coro-wake-portable"
-# Mutants: the three scheduler objects compiled -DNIFT_CORO_MUTANT=n, linked
-# with the normal objects; tests/runtime2/cp22/run.py --mutant checks each
-# against its named witness (provenance manifest: binary and oracle sha256).
-CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_run.cpp src/rt/compiler_coro_admit.cpp src/rt/compiler_coro.cpp
+# Mutants: the CP22 objects compiled -DNIFT_CORO_MUTANT=n, linked with the
+# normal objects; tests/runtime2/cp22/run.py --mutant checks each against its
+# named witness (provenance manifest: binary and oracle sha256, and each CP22
+# object's sha256 next to the normal one: at least one must differ).
+CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_run.cpp src/rt/compiler_coro_admit.cpp \
+	src/rt/compiler_coro_loops.cpp src/rt/compiler_coro.cpp
 CP22_MUTANT_DIR := $(TEST_DIR)/coro-mutants
 $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CP22_CORO_SOURCES) $(RT_VALUE_HEADERS) $(LIBFFI_A)
 	mkdir -p "$(CP22_MUTANT_DIR)/$*"
