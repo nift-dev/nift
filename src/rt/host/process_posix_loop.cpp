@@ -4,6 +4,7 @@
 
 #include "rt/host/process_posix_lifecycle.h"
 #include "rt/host/process_posix_sys.h"
+#include "rt/host/process_terminal.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -236,11 +237,14 @@ bool read_file_bounded(int fd, std::uint64_t limit, std::string& out) {
     }
 }
 
-void restore_terminal(State& s) {
-    if (!s.handoff) return;
-    s.handoff = false;
-    ::tcsetpgrp(STDIN_FILENO, ::getpgrp());  // SIGTTOU is still ignored here
-    ::sigaction(SIGTTOU, &s.old_ttou, nullptr);
+bool restore_terminal(State& s) {
+    if (!s.handoff) return false;
+    // Keep handoff set on failure so destruction and explicit retries know
+    // there is still a coordinator-owned restoration obligation.
+    const bool ok = terminal_release(&s);
+    if (ok) s.handoff = false;
+    runtime::test_event(&s, "terminal-restore", ok ? 1 : 0);
+    return ok;
 }
 
 void finish(State& s, const void* key) {
@@ -264,7 +268,8 @@ void finish(State& s, const void* key) {
     close_fd(s.out_file);
     close_fd(s.err_file);
     for (auto& stage : s.st) if (stage.pidfd >= 0) { ::close(stage.pidfd); stage.pidfd = -1; }
-    restore_terminal(s);
+    const bool had_handoff = s.handoff;
+    const bool terminal_restored = restore_terminal(s);
 
     ProcessResult& r = s.result;
     r.stages.clear();
@@ -305,6 +310,10 @@ void finish(State& s, const void* key) {
                 default: r.state = s.limit_hit ? GroupState::LimitExceeded : GroupState::Exited; break;
             }
         }
+    }
+    if (had_handoff && !terminal_restored) {
+        r.host_fault = true;
+        if (r.error.empty()) r.error = "failed to restore terminal";
     }
     r.stdin_total = s.stdin_total;
     r.stdin_written = s.stdin_written;

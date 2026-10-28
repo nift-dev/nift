@@ -131,11 +131,10 @@ def pty_bg():
 
 
 def pty_host_bg_never():
-    # Force the scripted Host path while keeping a real controlling terminal;
-    # H1 must prevent the Host background job from taking it.
+    # Interactive jobs now use the same Host table as scripts; H1 must still
+    # prevent a background job from taking the controlling terminal.
     pid, fd, out, home = pty_session([(b"/bin/sleep 2 &\r", 0.3),
-                                      (b"/bin/echo HOST-FG\r", 1.2)],
-                                     extra_env={"NIFT_CP20_FORCE_SCRIPTED": "1"})
+                                      (b"/bin/echo HOST-FG\r", 1.2)])
     text = out.decode(errors="replace").replace("\r", "")
     st = Path(f"/proc/{pid}/stat").read_text().split(")")[1].split()
     check("pty-host-bg-never", "HOST-FG" in text and st[2] == st[5],

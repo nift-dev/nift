@@ -115,7 +115,17 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-host', 'test-runtime2-cp17-handle-allocation'),
          ('test-rt-vm', 'test-runtime2-cp22'),
          ('test-rt-vm-sanitize', 'test-runtime2-cp22-sanitize'),
-         ('test-rt-vm-sanitize', 'test-runtime2-cp22-tsan')]
+         ('test-rt-vm-sanitize', 'test-runtime2-cp22-tsan'),
+         ('test-v45-job-control', 'test-cp21-interactive-host'),
+         ('test-v45-job-control', 'test-cp21-interactive-host-mutants'),
+         ('test-v45-job-control', 'test-cp21-make-failure-control')]
+if sys.platform.startswith('linux'):
+    EDGES += [('test-v45-job-control', 'test-cp21-terminal-recovery'),
+              ('test-v45-job-control', 'test-cp21-terminal-recovery-mutants'),
+              ('test-v45-job-control', 'test-cp21-d3-mandatory'),
+              ('test-cp21-fd-inheritance', 'test-cp21-fd-protocol-unit'),
+              ('test-cp21-d3-mandatory', 'test-cp21-d3-mutant'),
+              ('test-cp21-d3-mandatory', 'test-cp21-parser-target-mutant')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']

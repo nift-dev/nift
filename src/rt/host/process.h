@@ -125,6 +125,7 @@ struct ProcessResult {
     int exit_code = -1;
     std::string out, err;
     std::string error;
+    bool host_fault = false;  // a Host operation failed after the child outcome
     std::vector<StageResult> stages;
     // New-option fields (only shown when the call used the new options, §11.10).
     GroupState state = GroupState::Running;
@@ -265,6 +266,16 @@ public:
     // for managed groups (guards against pgid reuse); elsewhere kill(-pgid, 0).
     bool has_live_members() const;
     bool has_stopped_members() const;  // CP20 B0: WNOWAIT query, does not reap
+
+    // CP21 job control. wait_job_control() returns when the group finishes or
+    // when every live stage is stopped (it does not consume the stop status).
+    // The terminal methods hand the controlling terminal to the group and
+    // return it to the shell; continue_group() resumes a stopped group.
+    enum class JobWait : std::uint8_t { Exited, Stopped };
+    JobWait wait_job_control();
+    bool continue_group();
+    bool give_terminal();
+    bool reclaim_terminal();
 
 private:
     explicit ProcessGroup(std::unique_ptr<State> state);
