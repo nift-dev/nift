@@ -176,6 +176,27 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   test-driver child that must survive. Partial-procfs/subreaper controls fail
   closed.
 
+## R8-review D3 acceptance split
+
+- **Mandatory descriptor gate:** `test-cp21-d3-mandatory` runs the normal
+  scanner, the genuine compiled D3 mutant, strict protocol/parser validation,
+  parser-target mutation, malformed/dead/unrelated/timeout controls and the
+  supervisor's direct-child cleanup. It is the certification edge. It does not
+  claim arbitrary escaped-descendant containment.
+- **Adversarial containment controls:** `test-cp21-fd-inheritance-mutants`
+  retains escaped/untagged/environment-clearing descendants, unrelated-child
+  survival, subreaper/`proc` failures, ENOENT/empty/children-file faults and
+  failed-kill controls as a separate developer/safety target.
+- **Evidence model:** descendant discovery uses the union of checked
+  `/proc/<pid>/task/<pid>/children` recursion and checked `/proc/<pid>/stat`
+  parentage. A single unavailable source is compensated by the other; if both
+  are unavailable the cleanup is uncertain and never `cleaned=1`. Known
+  descendants are verified with `/proc` stat and `kill(pid,0)`/reaping.
+- **Explicit limitation:** non-atomic `/proc` observations cannot prove
+  arbitrary escaped-descendant containment. The mandatory D3 gate does not
+  claim it; adversarial controls report cleanup failure/uncertainty when
+  evidence is contradictory or unavailable.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves

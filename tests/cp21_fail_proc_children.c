@@ -4,10 +4,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static int denied(const char* path) {
     if (!path || strncmp(path, "/proc/", 6) != 0) return 0;
+    char self_prefix[64];
+    snprintf(self_prefix, sizeof self_prefix, "/proc/%d/", getpid());
+    if (strncmp(path, self_prefix, strlen(self_prefix)) == 0) return 0;
     const char* p = path + 6;
     if (strncmp(p, "self/", 5) == 0 || strncmp(p, "thread-self/", 12) == 0) return 0;
     return strstr(p, "/task/") && strstr(p, "/children") &&

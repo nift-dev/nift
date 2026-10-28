@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <string>
@@ -69,7 +70,7 @@ bool children_of(pid_t pid, std::set<pid_t>& found, std::string& error) {
     return true;
 }
 
-bool descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+bool children_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
     found.clear();
     std::set<pid_t> frontier{root};
     while (!frontier.empty()) {
@@ -81,6 +82,78 @@ bool descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
             if (found.insert(child).second) frontier.insert(child);
         }
     }
+    return true;
+}
+
+bool stat_descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+    found.clear();
+    std::map<pid_t, pid_t> parents;
+    DIR* dir = ::opendir("/proc");
+    if (!dir) {
+        error = "cannot open /proc";
+        return false;
+    }
+    while (dirent* entry = ::readdir(dir)) {
+        char* end = nullptr;
+        errno = 0;
+        const long pid = std::strtol(entry->d_name, &end, 10);
+        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
+        std::string text;
+        bool missing = false;
+        if (!read_file("/proc/" + std::to_string(pid) + "/stat", text, missing, error)) {
+            ::closedir(dir);
+            return false;
+        }
+        if (missing) continue;
+        if (text.empty()) {
+            error = "empty /proc/" + std::to_string(pid) + "/stat";
+            ::closedir(dir);
+            return false;
+        }
+        const std::size_t close = text.rfind(')');
+        if (close == std::string::npos) {
+            error = "malformed /proc/" + std::to_string(pid) + "/stat";
+            ::closedir(dir);
+            return false;
+        }
+        std::istringstream fields(text.substr(close + 1));
+        std::string state;
+        long ppid = 0;
+        if (!(fields >> state >> ppid)) {
+            error = "malformed /proc/" + std::to_string(pid) + "/stat fields";
+            ::closedir(dir);
+            return false;
+        }
+        parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
+    }
+    ::closedir(dir);
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& [pid, ppid] : parents) {
+            if (pid == root || found.count(pid)) continue;
+            if (ppid == root || found.count(ppid)) {
+                found.insert(pid);
+                changed = true;
+            }
+        }
+    }
+    return true;
+}
+
+bool descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
+    std::set<pid_t> from_children;
+    std::set<pid_t> from_stat;
+    std::string children_error;
+    std::string stat_error;
+    const bool children_ok = children_descendants(root, from_children, children_error);
+    const bool stat_ok = stat_descendants(root, from_stat, stat_error);
+    if (!children_ok && !stat_ok) {
+        error = children_error + (children_error.empty() || stat_error.empty() ? "" : "; ") + stat_error;
+        return false;
+    }
+    found = from_children;
+    found.insert(from_stat.begin(), from_stat.end());
     return true;
 }
 
@@ -107,31 +180,10 @@ bool reap_bounded(pid_t child, const Clock::time_point& end) {
     return direct_reaped;
 }
 
-bool verify_descendants(const std::set<pid_t>& targets, pid_t direct, std::string& error) {
-    for (pid_t pid : targets) {
-        if (pid == direct) continue;
-        std::string text;
-        bool missing = false;
-        if (!read_file("/proc/" + std::to_string(pid) + "/stat", text, missing, error) ||
-            missing || text.empty()) {
-            if (error.empty()) error = "cannot verify descendant " + std::to_string(pid);
-            return false;
-        }
-    }
-    return true;
-}
-
 bool cleanup(pid_t child, std::string& error) {
     std::set<pid_t> targets;
     if (!descendants(::getpid(), targets, error)) {
         // Still kill the direct group; report the inspection failure.
-        const pid_t pgid = ::getpgid(child);
-        if (pgid == child) ::kill(-child, SIGKILL);
-        ::kill(child, SIGKILL);
-        reap_bounded(child, Clock::now() + std::chrono::seconds(2));
-        return false;
-    }
-    if (!verify_descendants(targets, child, error)) {
         const pid_t pgid = ::getpgid(child);
         if (pgid == child) ::kill(-child, SIGKILL);
         ::kill(child, SIGKILL);
