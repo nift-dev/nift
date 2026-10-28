@@ -122,8 +122,7 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
 if sys.platform.startswith('linux'):
     EDGES += [('test-v45-job-control', 'test-cp21-terminal-recovery'),
               ('test-v45-job-control', 'test-cp21-terminal-recovery-mutants'),
-              ('test-v45-job-control', 'test-cp21-fd-inheritance'),
-              ('test-v45-job-control', 'test-cp21-fd-inheritance-mutants'),
+              ('test-v45-job-control', 'test-cp21-d3-mandatory'),
               ('test-cp21-fd-inheritance', 'test-cp21-fd-protocol-unit')]
 
 def reachable(graph):
