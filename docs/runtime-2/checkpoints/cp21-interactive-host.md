@@ -210,18 +210,24 @@ ownership of `.niftrc` compilation and the shared compiler front end.
   requires the mandatory target to reject stale evidence. This detects the R9
   hollow-recipe failure; it does not claim to detect arbitrary malicious edits
   to all certification recipes.
-- **Truthful cleanup evidence:** children-file and stat inspection now return
+- **Truthful cleanup evidence:** children-file and stat inspection return
   separate completeness flags. An empty/missing children file or an unavailable
-  stat record is not proof of absence. Cleanup succeeds only when stat evidence
-  is complete (the live supervisor's own stat record was observed) or when a
-  non-direct descendant was actually discovered and the children traversal is
-  complete. Previously discovered descendants remain cleanup obligations until
-  observed dead. A successful `kill` request alone is not treated as proof.
-- **Both-source faults:** permanent ENOENT and empty probes make both evidence
-  sources unavailable after startup while an escaped descendant survives. The
-  supervisor reports `TIMEOUT_CLEANUP_FAIL descendant evidence incomplete`, not
-  `cleaned=1`; the control requires the survivor to be independently observed
-  before it is killed.
+  stat record is not proof of absence. Cleanup succeeds only when both sources
+  are complete, or when a non-direct descendant was actually discovered and at
+  least one source is complete. Stat completeness also requires known live
+  direct/tracked processes to be observable; a missing non-root stat record is
+  not treated as a vanished process. Previously discovered descendants remain
+  cleanup obligations until observed dead. A successful `kill` request alone is
+  not treated as proof.
+- **Both-source and non-root faults:** permanent ENOENT, empty and non-root-stat
+  probes make evidence unavailable after startup while an escaped descendant
+  survives. The supervisor reports `TIMEOUT_CLEANUP_FAIL descendant evidence
+  incomplete`, not `cleaned=1`; each control requires the survivor to be
+  independently observed before it is killed.
+- **R11 correction:** the R10 root-only stat-completeness shortcut is removed.
+  Known-live tracked pids with missing stat records force uncertainty, and an
+  incomplete children observation plus an undiscovered descendant cannot be
+  rescued by the supervisor's own stat record.
 - **Limitation:** non-atomic `/proc` snapshots cannot prove that an undiscovered
   escaped descendant has terminated. The adversarial suite reports known
   cleanup and uncertainty; it is not a general containment guarantee.

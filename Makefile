@@ -3391,6 +3391,9 @@ $(TEST_DIR)/cp21-fail-proc-all-enoent.so: tests/cp21_fail_proc_all_missing.c
 $(TEST_DIR)/cp21-fail-proc-all-empty.so: tests/cp21_fail_proc_all_missing.c
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC -DCP21_ALL_EMPTY $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-nonroot-stat-children.so: tests/cp21_fail_nonroot_stat_children.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
@@ -3542,7 +3545,7 @@ test-cp21-fd-inheritance-mutants: test-cp21-d3-mutant test-cp21-parser-target-mu
 	$(TEST_DIR)/cp21-fail-proc-enoent.so $(TEST_DIR)/cp21-fail-proc-empty.so \
 	$(TEST_DIR)/cp21-fail-proc-children.so $(TEST_DIR)/cp21-fail-kill.so \
 	$(TEST_DIR)/cp21-fail-proc-all.so $(TEST_DIR)/cp21-fail-proc-all-enoent.so \
-	$(TEST_DIR)/cp21-fail-proc-all-empty.so
+	$(TEST_DIR)/cp21-fail-proc-all-empty.so $(TEST_DIR)/cp21-fail-nonroot-stat-children.so
 	@set -e; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE)" /bin/true "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(TEST_DIR)/cp21-d3-dead-child.log" 2>&1 && \
 	  { echo "FAIL CP21 D3 dead-child control accepted"; cat "$(TEST_DIR)/cp21-d3-dead-child.log"; exit 1; }; \
@@ -3600,7 +3603,7 @@ test-cp21-fd-inheritance-mutants: test-cp21-d3-mutant test-cp21-parser-target-mu
 	  echo "PASS CP21 D3 $$fault-unavailable control: fail closed"; \
 	done
 	@set -e; \
-	for fault in enoent empty children kill all both-enoent both-empty; do \
+	for fault in enoent empty children kill all both-enoent both-empty nonroot; do \
 	  case "$$fault" in \
 	    enoent) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-enoent.so)" ;; \
 	    empty) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-empty.so)" ;; \
@@ -3609,6 +3612,7 @@ test-cp21-fd-inheritance-mutants: test-cp21-d3-mutant test-cp21-parser-target-mu
 	    all) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all.so)" ;; \
 	    both-enoent) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all-enoent.so)" ;; \
 	    both-empty) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-all-empty.so)" ;; \
+	    nonroot) lib="$(abspath $(TEST_DIR)/cp21-fail-nonroot-stat-children.so)" ;; \
 	  esac; \
 	  LD_PRELOAD="$$lib:$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" \
 	    "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" --unrelated-child \
@@ -3618,18 +3622,18 @@ test-cp21-fd-inheritance-mutants: test-cp21-d3-mutant test-cp21-parser-target-mu
 	      { echo "FAIL CP21 D3 $$fault control failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	    grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" && \
 	      { echo "FAIL CP21 D3 $$fault control claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
-	  elif [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ]; then \
+	  elif [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ] || [ "$$fault" = nonroot ]; then \
 	    grep -Eq "SETUP_FAIL|TIMEOUT_CLEANUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
-	      { echo "FAIL CP21 D3 $$fault dual-source fault did not fail closed"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	      { echo "FAIL CP21 D3 $$fault incomplete-evidence control did not fail closed"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	    grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" && \
-	      { echo "FAIL CP21 D3 $$fault dual-source fault claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	      { echo "FAIL CP21 D3 $$fault incomplete-evidence control claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	  else \
 	    grep -q "TIMEOUT exec child did not finish and was killed/reaped cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
 	      { echo "FAIL CP21 D3 $$fault single-source fault did not clean via alternate evidence"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
 	  fi; \
 	  pids=$$(pgrep -f '^$(abspath $(CP21_FD_CHILD_ESCAPE))$$' || true); \
-	  if [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ]; then \
-	    [ -n "$$pids" ] || { echo "FAIL CP21 D3 $$fault dual-source fault lost survivor evidence"; exit 1; }; \
+	  if [ "$$fault" = both-enoent ] || [ "$$fault" = both-empty ] || [ "$$fault" = nonroot ]; then \
+	    [ -n "$$pids" ] || { echo "FAIL CP21 D3 $$fault incomplete-evidence control lost survivor evidence"; exit 1; }; \
 	    kill -9 $$pids || true; \
 	  elif [ -n "$$pids" ]; then \
 	    if [ "$$fault" != kill ] && [ "$$fault" != all ]; then \
@@ -3710,6 +3714,8 @@ test-cp21-d3-mandatory: $(CP21_FD_CHILD_MALFORMED)
 	  [ -f "$$record" ] || { echo "FAIL CP21 mandatory evidence missing: $$kind"; exit 1; }; \
 	  grep -qx "kind=$$kind" "$$record" || { echo "FAIL CP21 mandatory evidence kind mismatch: $$kind"; exit 1; }; \
 	  grep -qx "run_token=$(CP21_D3_EVIDENCE_TOKEN)" "$$record" || { echo "FAIL CP21 mandatory evidence is stale: $$kind"; exit 1; }; \
+	  if [ "$$kind" = d3 ]; then expected_bin="$(abspath $(CP21_FD_INHERITANCE_D3))"; else expected_bin="$(abspath $(CP21_FD_PROTOCOL_UNIT_MUTANT))"; fi; \
+	  grep -qx "binary=$$expected_bin" "$$record" || { echo "FAIL CP21 mandatory evidence binary path mismatch: $$kind"; exit 1; }; \
 	  sha=$$(sha256sum "$$bin" | cut -d' ' -f1); \
 	  grep -qx "binary_sha256=$$sha" "$$record" || { echo "FAIL CP21 mandatory evidence binary mismatch: $$kind"; exit 1; }; \
 	  if [ "$$kind" = d3 ]; then \
