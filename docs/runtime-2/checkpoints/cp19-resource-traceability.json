@@ -1,47 +1,236 @@
 {
-  "status": "INCOMPLETE",
-  "accepted_cp17": "812bf21ab66bbf652141c069c92995293987ca55",
-  "verified": {
-    "file_stream_survival": [
-      "src/rt/vm_session.cpp",
-      "tests/runtime2/cp19/resources.cpp"
+  "status": "FROZEN FOR REVIEW, NOT GATE-COMPLETE",
+  "foundation": {
+    "commit": "475f5192f6ca510d19602e42041d6e10a88efc78",
+    "tree": "339bb7fc60ac3245e7e4d6a4ddc54476a321811b"
+  },
+  "preserved_parent": "5f653128a84c32d4291c0d620ef71229b9bf5a9a",
+  "implemented": {
+    "single_job_owner": [
+      "src/shell/SessionJobs.h",
+      "src/rt/session.h",
+      "src/rt/session.cpp",
+      "src/CLI.cpp"
     ],
-    "alias_and_box_storage_lifetime": [
-      "src/rt/handles/handle_box.cpp",
-      "tests/runtime2/cp19/resources.cpp"
+    "bounded_cleanup_and_settlement": [
+      "src/shell/Spawn.cpp",
+      "tests/runtime2/cp19/jobs.cpp"
     ],
-    "finalization_cancellation_tickets": [
+    "command_survival_and_no_fallback": [
+      "tests/runtime2/cp19/jobs.cpp",
+      "tests/runtime2/cp19/jobs_cli.py"
+    ],
+    "independent_host_fault": [
+      "src/rt/vm.h",
+      "src/rt/session.cpp",
+      "src/CLI.cpp",
+      "tests/runtime2/cp19/jobs_mutants.cpp"
+    ],
+    "CP17_script_context_tickets": [
       "src/rt/vm_handles.cpp",
-      "tests/runtime2/cp19/resources.cpp"
-    ],
-    "reports_and_primary_error": [
       "tests/runtime2/cp19/resources.cpp",
-      "tests/runtime2/cp19/resource_cli.py"
+      "tests/runtime2/cp19/jobs.cpp"
     ],
-    "admission_atomicity_W13": [
-      "src/rt/compiler_handles.cpp",
-      "tests/runtime2/cp19/resource_mutants.cpp"
-    ],
-    "host_processgroup_seam": [
-      "tests/runtime2/cp19/resources.cpp"
-    ],
-    "allocation_and_sanitizers": [
-      "tests/runtime2/cp19/resource_alloc.cpp"
+    "F6_terminal_and_process_contracts": "accepted-host-preservation.json: unchanged source blobs",
+    "callable_code_lifetime": [
+      "src/rt/heap.h",
+      "src/rt/value.cpp",
+      "src/rt/heap_account.cpp",
+      "tests/rt/value_destroy_oom.cpp",
+      "tests/runtime2/cp19/session.cpp"
     ]
   },
-  "pending": {
-    "CP21": [
-      "session ownership",
-      "command survival",
-      "cancellation",
-      "exactly-once cleanup",
-      "lifecycle-ticket settlement",
-      "host_fault propagation"
-    ],
-    "performance": "four final total instruction comparisons exceed unchanged CP18 gate"
+  "performance": [
+    {
+      "dispatch": "default",
+      "workload": "caught",
+      "samples": {
+        "cp18": [
+          3023671295,
+          3023671221,
+          3023671263,
+          3023671264,
+          3023671283
+        ],
+        "foundation": [
+          3052709358,
+          3052709354,
+          3052709279,
+          3052709257,
+          3052709347
+        ],
+        "new_": [
+          3040709079,
+          3040709173,
+          3040709102,
+          3040709106,
+          3040709130
+        ]
+      },
+      "medians": {
+        "cp18": 3023671264,
+        "foundation": 3052709347,
+        "new_": 3040709106
+      },
+      "cp19_increment_vs_accepted_foundation": 0.9960689867144433,
+      "accepted_foundation_vs_cp18": 1.0096035846706384,
+      "new_vs_cp18": 1.0056348195661524,
+      "threshold": 1.0,
+      "waiver": false,
+      "vs_cp18_paired_bootstrap_95": [
+        1.0056348003264026,
+        1.0056348560259025
+      ],
+      "increment_vs_foundation_paired_bootstrap_95": [
+        0.9960689742806494,
+        0.9960690160805575
+      ],
+      "pass": false
+    },
+    {
+      "dispatch": "default",
+      "workload": "caught_cell",
+      "samples": {
+        "cp18": [
+          5340778053,
+          5340777943,
+          5340777996,
+          5340778047,
+          5340777526
+        ],
+        "foundation": [
+          5389823961,
+          5389823893,
+          5389823858,
+          5389823901,
+          5389823877
+        ],
+        "new_": [
+          5394822345,
+          5394822383,
+          5394821859,
+          5394822376,
+          5394822331
+        ]
+      },
+      "medians": {
+        "cp18": 5340777996,
+        "foundation": 5389823893,
+        "new_": 5394822345
+      },
+      "cp19_increment_vs_accepted_foundation": 1.0009273868867017,
+      "accepted_foundation_vs_cp18": 1.009183286973683,
+      "new_vs_cp18": 1.010119190320301,
+      "threshold": 1.0,
+      "waiver": false,
+      "vs_cp18_paired_bootstrap_95": [
+        1.0101190993223228,
+        1.0101192765916382
+      ],
+      "increment_vs_foundation_paired_bootstrap_95": [
+        1.00092730321652,
+        1.000927393937025
+      ],
+      "pass": false
+    },
+    {
+      "dispatch": "switch",
+      "workload": "caught",
+      "samples": {
+        "cp18": [
+          3031669939,
+          3031669842,
+          3031669868,
+          3031669864,
+          3031669914
+        ],
+        "foundation": [
+          3068707877,
+          3068707857,
+          3068707816,
+          3068707818,
+          3068707831
+        ],
+        "new_": [
+          3056707635,
+          3056707606,
+          3056707609,
+          3056707587,
+          3056707593
+        ]
+      },
+      "medians": {
+        "cp18": 3031669868,
+        "foundation": 3068707831,
+        "new_": 3056707606
+      },
+      "cp19_increment_vs_accepted_foundation": 0.9960894859788298,
+      "accepted_foundation_vs_cp18": 1.0122170172257028,
+      "new_vs_cp18": 1.0082587283873747,
+      "threshold": 1.0,
+      "waiver": false,
+      "vs_cp18_paired_bootstrap_95": [
+        1.0082587088008421,
+        1.0082587370343343
+      ],
+      "increment_vs_foundation_paired_bootstrap_95": [
+        0.9960894775393407,
+        0.9960894918253762
+      ],
+      "pass": false
+    },
+    {
+      "dispatch": "switch",
+      "workload": "caught_cell",
+      "samples": {
+        "cp18": [
+          5357776602,
+          5357776592,
+          5357776556,
+          5357776572,
+          5357776575
+        ],
+        "foundation": [
+          5411822486,
+          5411822415,
+          5411821900,
+          5411822468,
+          5411822451
+        ],
+        "new_": [
+          5421820815,
+          5421820836,
+          5421820851,
+          5421820813,
+          5421820435
+        ]
+      },
+      "medians": {
+        "cp18": 5357776575,
+        "foundation": 5411822451,
+        "new_": 5421820815
+      },
+      "cp19_increment_vs_accepted_foundation": 1.001847504069198,
+      "accepted_foundation_vs_cp18": 1.0100873702446242,
+      "new_vs_cp18": 1.0119535107713968,
+      "threshold": 1.0,
+      "waiver": false,
+      "vs_cp18_paired_bootstrap_95": [
+        1.0119534398464534,
+        1.0119535210792392
+      ],
+      "increment_vs_foundation_paired_bootstrap_95": [
+        1.001847433852556,
+        1.0018476127235452
+      ],
+      "pass": false
+    }
+  ],
+  "qualifications": {
+    "compiled_run": "unsupported callable:run; no VM credit or session fallback",
+    "persistent_coroutines": "session:coroutine refusal; no lifecycle reconciliation claimed",
+    "CP22_legacy_refusal_golden": "r_f3_member_print_default mismatch reproduced on accepted foundation, gate FAILED",
+    "jobs_tickets": "No CP17 ticket/sink attached to CP21-owned groups; group settlement and separate script tickets verified"
   },
-  "provisional_cp21_tracking_only": {
-    "commit": "5f94a6fb",
-    "tree": "27f85c5f"
-  }
+  "independent_acceptance": "pending; no reviewer contacted"
 }

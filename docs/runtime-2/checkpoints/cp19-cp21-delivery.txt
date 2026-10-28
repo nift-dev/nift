@@ -1,0 +1,140 @@
+CP19 — accepted CP21 reconciliation: frozen review candidate
+29 October 2026
+
+OUTCOME
+Persistent interactive-job ownership is implemented against the accepted CP21
+interfaces and is ready for independent review. CP19 IS NOT GATE-COMPLETE OR
+ACCEPTED. The unchanged million-catch performance gate remains failed wherever
+shown below; no waiver or threshold change is claimed. Remaining admission and
+inherited-fixture qualifications are explicit below.
+
+FOUNDATION AND PRESERVATION
+Accepted foundation: 475f5192f6ca510d19602e42041d6e10a88efc78
+Tree: 339bb7fc60ac3245e7e4d6a4ddc54476a321811b
+Preserved CP19 parent: 5f653128a84c32d4291c0d620ef71229b9bf5a9a
+Tree: 394032a9afe63b06bf2f76da54629c6557657d79
+All 351 entries of that frozen package reverified with zero mismatches.
+Work is isolated on codex/cp19-cp21-complete. Only local reconciliation commits
+were made; no authoritative integration, push, CI dispatch, tag, release,
+external messages or infrastructure spending occurred.
+
+WHAT CHANGED
+VmSession retains exactly one SessionJobs attachment containing CP21's JobTable.
+The same table serves launch/jobs/fg/bg/wait across commands. No shell group is
+registered in HandleTable and no script process becomes a job. Session end and
+cancellation run the accepted bounded Cleanup termination, observe settlement,
+release the groups once and close the owner. EOF/exit do not wait indefinitely
+for a stopped/background job. Launch after finalization is refused.
+CP17 resources retain their existing Script context and its final ticket wait.
+Jobs have no CP17 tickets by the accepted CP21 contract: their ProcessGroup
+settlement and the separate script table's lifecycle-ticket settlement are both
+checked. No second process owner, LifecycleSink or resource table was invented.
+Job cleanup faults carry independent host_fault/reporting metadata. A concurrent
+script cleanup Error remains primary; distinct job diagnostics are also reported.
+Caught Error values remain unchanged. Accepted Host/F6/terminal/process-handle
+sources were compared byte-for-byte against the foundation and are unchanged.
+
+The optional callable subtype experiment was measured and reverted. The final
+candidate retains the frozen parent's FunctionObject Program-owner and identity/
+display fields and its existing lifetime, cycle handling and accounting. The
+experiment's source identity, binaries, full matrix and profiles are preserved.
+No instruction speedup is assumed from a layout change. Value and Frame layout
+are unchanged by this CP19 work. No general dispatch, call-entry or spawn
+architecture rewrite was performed.
+
+FUNCTIONAL AND LIFETIME EVIDENCE
+Both dispatches: 106 session-job checks, including command survival, pre-effect
+run refusal, caught and uncaught command Errors, stopped-job cancellation,
+child reaping, idempotent finalization, closed-owner launch refusal, child exit
+7 separate from host_fault, script-table settlement and simultaneous diagnostics.
+Both dispatches: 405 existing session checks; 168 file/stream/Host-seam resource
+checks; complete retained proof and CLI/session admission/presentation matrices.
+The job CLI checks cover rc state, actual background processes, later compiled
+commands, EOF and exit in legacy/VM/require lanes. Existing 16-case resource CLI
+and 40-case session CLI matrices retain affirmative VM/no-fallback counters and
+explicit D-056/W13 classifications.
+CP21 terminal/job-control checks passed in normal mode and NIFT_VM=require,
+including injected handoff/continue/restore faults and terminal-lease recovery.
+Affected CP17 file/stream, lifecycle, catchability, unwind, loop-clear, flow and
+resource-contract gates passed. CP13B's 80-case exception lanes and nullable
+presentation checks passed; its harness/control checks also passed.
+
+MUTATIONS AND SANITIZERS
+Existing 7 session and 13 admission mutation suites passed both dispatches.
+The 14 summary/reporting mutation suite passed both dispatches, with its exact
+behavior and reciprocal/dead/unrelated controls. CP22's accepted Ident scratch
+release made the former M22/M23 reserve-only mutations equivalent; they are not
+counted as killed. Their explicit replacement destination mutations and the
+preserved investigation are documented in cp19-cp21-reconciliation.txt.
+Six resource mutations passed both dispatches; two job reporting mutations
+passed their named and reciprocal/dead/unrelated controls.
+ASan/LSan/UBSan, leak detection enabled outside the tracer: 106 job checks and
+168 resource checks per dispatch; resource allocation sweep 231 points,
+1618 checks per dispatch (227 before admission, 4 admitted containment, 1 success).
+The existing destruction stress test passed 92,938 checks both normally and
+under sanitizers, including nested Program-owner release during OOM destruction.
+The final summary allocation sweep covers 721 points and 5012 checks per
+dispatch normally; ASan/LSan/UBSan covers 722 points and 5017 checks per
+dispatch, with zero failures. CP17 normal and persistent
+allocation campaigns pass with zero bad campaigns; full site observations
+are retained in the restored-normal log. No replay or disabled leak detection is used as success evidence.
+
+PERFORMANCE — UNCHANGED LIMIT <=1.0 TIMES MATCHED CP18
+Three binaries: exact accepted CP18 reference, exact accepted CP17+CP22+CP21
+foundation built locally, and this corrected candidate. Five fresh observations
+per binary/workload/dispatch: 60 observations in the final comparison, unchanged
+one-million-catch workloads. Forty unchanged, hash-verified reference observations
+are reused from the initial matrix; twenty final candidate observations are fresh.
+The reference_evidence fields identify every reused observation explicitly.
+Executable spelling, source path, HOME, cwd, flags and VM limits are matched.
+Individual profiles, output, counters, hashes, medians and paired bootstrap
+intervals are preserved. Dispatch/workload samples are never pooled.
+This agent's cooperating heavy campaigns are serialized under a shared lock;
+external workstation load is not controlled. These are instruction counts;
+no wall-clock neutrality or portable timing speedup is claimed.
+
+default caught       candidate/CP18=1.005634820  increment/foundation=0.996068987  gate=FAIL
+    95% paired bootstrap candidate/CP18: [1.0056348003264026, 1.0056348560259025]; increment/foundation: [0.9960689742806494, 0.9960690160805575]
+default caught_cell  candidate/CP18=1.010119190  increment/foundation=1.000927387  gate=FAIL
+    95% paired bootstrap candidate/CP18: [1.0101190993223228, 1.0101192765916382]; increment/foundation: [1.00092730321652, 1.000927393937025]
+switch  caught       candidate/CP18=1.008258728  increment/foundation=0.996089486  gate=FAIL
+    95% paired bootstrap candidate/CP18: [1.0082587088008421, 1.0082587370343343]; increment/foundation: [0.9960894775393407, 0.9960894918253762]
+switch  caught_cell  candidate/CP18=1.011953511  increment/foundation=1.001847504  gate=FAIL
+    95% paired bootstrap candidate/CP18: [1.0119534398464534, 1.0119535210792392]; increment/foundation: [1.001847433852556, 1.0018476127235452]
+
+Any positive captured-Cell increment shown above remains an unwaived result.
+Final self-profile attribution locates remaining added instructions in closure
+creation and heap-object destruction/deletion. The subtype accounting branch
+disappeared on restoration. Vm::run adds roughly five million more instructions
+in switch dispatch than computed-goto on captured-Cell: the total residual is
+approximately five million versus ten million instructions. Unwind self counts
+are unchanged. Origin lookup
+is inlined differently into throw handling: individual symbol deltas are not
+independent causal estimates. Raw annotations and self-count tables are retained
+for default and switch captured-Cell lanes. No broad speculative optimization
+campaign or weakening of exception/lifecycle semantics was used to chase a pass.
+
+QUALIFICATIONS AND FAILED GATES
+The accepted VM does not compile run() (callable:run). VM-owned sessions refuse
+it before effects without fallback. Shell Host-job execution and the existing
+Host ProcessGroup seam do not certify compiled script run() support.
+Persistent coroutine units are refused atomically (session:coroutine). CP22's
+separate task-global/resource lifecycle reconciliation is not implemented here.
+Stateless CP22 VM/default (87 cases each), VM-only (7), trace (3), binding (26)
+and 80 adversarial programs across both builds passed, as did its harness controls
+and print-order evidence. The inherited r_f3_member_print_default golden expects
+1,3,2,6 but the accepted foundation and candidate both produced 3,1,2,6 in five
+control repetitions each. Legacy/refusal aggregate gates remain explicitly
+failed for that fixture; no golden was edited and no waiver is claimed.
+Validation is local Linux; Windows job-control certification is not claimed.
+The earlier interrupted attempt is excluded. The completed optional-subtype
+experiment is preserved separately and is not the final candidate. Initial build, test
+fixture, missing test-include, Make recipe and equivalent-mutation failures are
+retained in logs and superseded only by their named successful final checks.
+The sanitizer libffi configure attempt under the tracer failed and was rerun
+outside it. Failed attempts are not added to passing sample counts.
+
+REVIEW
+Review the exact source/tree and evidence below before acceptance. The CP21
+implementation dependency is resolved. Performance and the explicit qualifications
+remain acceptance work; this delivery does not claim full checkpoint completion.
