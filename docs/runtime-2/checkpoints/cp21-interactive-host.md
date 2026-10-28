@@ -345,3 +345,45 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 6. **Integration:** CP17/CP18 combined-tree certification. Preserve CP20's F6
    ESRCH fast path during CP17 reconciliation; CP21 did not change that
    destructor.
+
+## Integration onto runtime-2 with CP17 and CP22 (2026-10-29)
+
+The owner accepted R11 (`5f94a6fb`, tree `27f85c5f`) with qualifications.
+Its 27 commits were replayed onto `runtime-2` `6cf73bed` (CP17 + N2 and
+CP22 integrated):
+* Every CP21 production file is byte-identical to the accepted candidate.
+* Conflicts:
+  * the certification guard and its self-test: a union of the CP17, CP22
+    and CP21 edges, keeping CP21's Linux-only terminal-recovery edges;
+  * `src/rt/host-sources.txt` (automatic merge): CP17's
+    `table_settle.cpp` sits beside CP21's two new sources.
+* No production file was changed by both sides.
+
+Ownership after integration:
+* Each process group has exactly one owner:
+  * script processes: the CP17 `HandleTable` (`process_handles.*`, with
+    the lifecycle sink);
+  * interactive shell jobs: the session's `nift::shell::JobTable`, with
+    CP21 terminal ownership.
+* Neither registers with the other, and no second owner was introduced.
+* `host_fault` is set only when the terminal cannot be restored after a
+  foreground handoff. Script `run()` never hands off the terminal, so the
+  CP17 script path has nothing to propagate.
+* CP22 coroutine units cannot hold processes: the VM refuses `run()`
+  (`callable:run`), and A1 refuses managed files.
+
+Focused integration gates (local 2-vCPU container) all passed:
+* build, lint, test integrity, and the certification guard and its
+  self-test;
+* `test-v45-job-control`, which includes the mandatory D3 evidence;
+* `test-cp21-evidence-control` and `test-cp21-fd-inheritance-mutants`;
+* CP20 shell-spawn and its mutants, and fd-leak;
+* `test-rt-host`, which includes the CP17 suites, F6 cleanup and
+  `managed_pgid_cleanup` `before=0 after=0`;
+* the F6 mutants;
+* `test-runtime2-cp22`.
+
+Obligations 1–5 above are unchanged and are not satisfied by this
+integration. Obligation 6 is integrated and its focused checks pass;
+combined-tree final certification stays open. CP19 owns the persistent
+session and `.niftrc` interfaces.
