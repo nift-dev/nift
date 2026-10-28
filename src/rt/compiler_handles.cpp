@@ -128,6 +128,11 @@ NodeId write_literal_argument(const Ast& ast, const Node& call, const natives::B
 
 bool check_handle_flow(const Ast& ast, NodeId root, const UnitKinds& kinds, std::string& reason,
                        std::uint32_t& offset, const SessionCompileContext* session) {
+    // The validation loop below only examines nodes with a handle kind. Avoid
+    // building ownership/parent graphs when none of its cases can apply.
+    bool has_handles = false;
+    for (NodeId id = 0; id < ast.size(); ++id) has_handles = has_handles || (kinds.of(id) & kKindHandle);
+    if (!has_handles) return false;
     std::vector<FunctionOwner> owners(ast.size() + 1u);
     std::vector<std::size_t> node_owner(ast.size(), 0);
     collect_function_owners(ast, root, 0, owners, node_owner);
