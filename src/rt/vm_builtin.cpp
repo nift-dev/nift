@@ -6,9 +6,12 @@
 #include "rt/native.h"
 #include "rt/error.h"
 #include "rt/natives/builtin.h"
+#include "rt/shared_state.h"
 
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
+#include <thread>
 #include <utility>
 
 // The VM's call into the CP14 built-in natives (CallNative with an id from
@@ -62,6 +65,12 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.host.error_code = &context.host_error_code;  // N1: per-call Host code
     context.handles =
         handles::HandleAccess{&handle_table_, handle_context_open_ ? handle_context_ : handles::kDetached};
+    context.protos = transfer_map_;
+    context.task = options_.current_task;
+    context.owner_token =
+        options_.current_task
+            ? static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(options_.current_task.get()))
+            : static_cast<std::uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())) | 1u;
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {

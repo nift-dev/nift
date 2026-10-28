@@ -34,7 +34,7 @@ struct Binding {
     // CP12 review round 2: the inferred kinds of the declaring value (or the
     // parameter's arguments) and whether the declaring text may give the
     // binding type double; 0xff = unknown.
-    std::uint16_t decl_kinds = 0x7ff;  // CP12 KindSet (widened in R6)
+    std::uint32_t decl_kinds = 0x7ff;  // CP12 KindSet (widened for CP23 shared kinds)
     bool decl_text_double = false;  // the declaring text is always typed double
     bool decl_may_double = false;   // ... or may be (a binding it names may be double)
     // CP12b globals: a top-level binding a function reaches as a free name

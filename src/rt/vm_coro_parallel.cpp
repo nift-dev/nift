@@ -4,6 +4,7 @@
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
 #include "rt/parallel_task.h"
+#include "rt/shared_state.h"
 
 #include <algorithm>
 #include <chrono>
@@ -127,6 +128,10 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
                              std::size_t& base, const Instr*& pc, Fault& fault, FutureObject* future, bool join) {
     Coro& coro = *vm.coro_;
     const std::shared_ptr<ParallelTaskRecord> record = future->parallel;
+    if (vm.cancellation_requested()) {
+        vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
+        return 0;
+    }
     bool complete = false;
     {
         std::lock_guard<std::mutex> lock(record->mutex);
@@ -137,6 +142,10 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
         coro.tasks[coro.current].state = State::Waiting;
         save(vm, proto, base, pc);
         return next(vm, R, K, proto, base, pc, fault);
+    }
+    if (vm.cancellation_requested()) {
+        vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
+        return 0;
     }
     resolve_parallel(vm, future, record);
     flush_parallel_outputs(vm);

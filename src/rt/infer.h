@@ -36,7 +36,7 @@
 
 namespace nift::rt {
 
-using KindSet = std::uint16_t;
+using KindSet = std::uint32_t;
 inline constexpr KindSet kKindNull = 1u << 0;
 inline constexpr KindSet kKindBool = 1u << 1;
 inline constexpr KindSet kKindInt = 1u << 2;   // an integral number
@@ -76,6 +76,15 @@ inline constexpr KindSet kKindFuture = 1u << 14;
 // The last bit of the 16-bit set (widening KindSet is compile-time only).
 inline constexpr KindSet kKindThread = 1u << 15;
 inline constexpr KindSet kKindTask = kKindFuture | kKindThread;  // either task handle
+// CP23: shared concurrency objects (mutex, atomic<int>, atomic<bool>, channel).
+// They live in the process-wide shared registry, outside isolate heaps; the
+// bits are outside kKindAll, so generic value operations never admit them.
+inline constexpr KindSet kKindMutex = 1u << 16;
+inline constexpr KindSet kKindAtomicInt = 1u << 17;
+inline constexpr KindSet kKindAtomicBool = 1u << 18;
+inline constexpr KindSet kKindAtomic = kKindAtomicInt | kKindAtomicBool;
+inline constexpr KindSet kKindChannel = 1u << 19;
+inline constexpr KindSet kKindShared = kKindMutex | kKindAtomic | kKindChannel;
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -89,6 +98,9 @@ static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKin
 static_assert((kKindAll & kKindHandle) == 0);
 static_assert(kKindFuture == (1u << 14) && (kKindAll & kKindFuture) == 0 && kKindFuture != kKindUnknown);
 static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
+static_assert(kKindMutex == (1u << 16) && kKindAtomicInt == (1u << 17) &&
+              kKindAtomicBool == (1u << 18) && kKindChannel == (1u << 19));
+static_assert((kKindAll & kKindShared) == 0 && (kKindUnknown & kKindShared) == 0);
 
 struct UnitKinds {
     std::vector<KindSet> kinds;  // per NodeId (expressions)

@@ -1,11 +1,11 @@
 #include "rt/infer.h"
 
+#include "rt/infer_atomic.h"
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
 #include "rt/infer_unit.h"
 #include "rt/literal.h"
 #include "rt/number.h"
-
 #include <cmath>
 #include <memory>
 #include <string>
@@ -262,7 +262,7 @@ TyRef Inference::expr(NodeId id) {
             if (!t) t = o;
             break;
         }
-        case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
+        case NodeKind::IncDec: t = incdec_result(expr(n.a)); break;
         case NodeKind::Call: t = call(n); break;
         case NodeKind::Await: t = awaited(expr(n.a)); break;  // CP22
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)

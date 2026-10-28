@@ -3,6 +3,8 @@
 #include "rt/aggregate.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/isolate_transfer_support.h"
+#include "rt/shared_state.h"
 #include "rt/string.h"
 
 #include <unordered_map>
@@ -12,24 +14,7 @@ namespace nift::rt {
 
 namespace {
 
-std::size_t object_slot(Atom key, std::size_t mask) {
-    return (key.id * 2654435761u) & mask;
-}
-void rebuild_object_index(ObjectObject& object) {
-    if (object.entries.size() < ObjectObject::kIndexThreshold) { object.index.clear(); return; }
-    std::size_t capacity = 16;
-    while (capacity < object.entries.size() * 2) capacity <<= 1;
-    object.index.assign(capacity, 0);
-    const std::size_t mask = capacity - 1;
-    for (std::size_t i = 0; i < object.entries.size(); ++i) {
-        std::size_t slot = object_slot(object.entries[i].first, mask);
-        while (object.index[slot] != 0) slot = (slot + 1) & mask;
-        object.index[slot] = static_cast<std::uint32_t>(i + 1);
-    }
-}
-void note_child(HeapObject* parent, const Value& child) {
-    if (child.kind() >= Kind::Array) mark_may_hold_identity(parent);
-}
+using namespace transfer_detail;
 } // namespace
 
 const char* transfer_status_name(TransferStatus status) {
@@ -57,8 +42,18 @@ private:
     TransferStatus add(const Value& value, std::uint32_t& id, std::string& error) {
         if (value.is(Kind::Future))
             return fail(TransferStatus::RefusedFuture, "cannot transfer a Future between isolates", error);
-        if (value.is(Kind::Handle))
-            return fail(TransferStatus::RefusedHandle, "cannot transfer a Handle between isolates", error);
+        if (value.is(Kind::Handle)) {
+            if (!is_shared_handle(value))
+                return fail(TransferStatus::RefusedHandle, "cannot transfer a Handle between isolates", error);
+            Node node;
+            node.kind = WireKind::SharedHandle;
+            node.handle_kind = static_cast<std::uint8_t>(value.handle_kind());
+            node.handle_id = value.handle_id();
+            node.handle_generation = value.handle_generation();
+            id = static_cast<std::uint32_t>(nodes_.size());
+            nodes_.push_back(std::move(node));
+            return TransferStatus::Ok;
+        }
         if (!value.is_heap()) return add_inline(value, id, error);
         const HeapObject* object = value.heap();
         const auto found = seen_.find(object);
@@ -234,6 +229,11 @@ private:
             case WireKind::Error: return decode_error(id, node, out, error);
             case WireKind::Cell: return decode_cell(id, node, out, error);
             case WireKind::Function: return decode_function(id, node, out, error);
+            case WireKind::SharedHandle:
+                return done(id,
+                            Value::handle(static_cast<HandleKind>(node.handle_kind), node.handle_id,
+                                          node.handle_generation),
+                            out);
         }
         return fail(TransferStatus::InvalidGraph, "unknown graph node kind", error);
     }

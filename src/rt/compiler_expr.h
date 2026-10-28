@@ -136,6 +136,7 @@ private:
     bool return_statement(const Node& node);
     bool assign_value(const Node& node, const Binding& b);
     bool compound_op(const Node& node, const Binding& b);
+    bool atomic_update(const Node& node, const Binding& b, std::uint16_t dst, bool expression);
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);

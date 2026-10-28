@@ -226,6 +226,7 @@ private:
         const std::string_view name = ast_.text(callee);
         if (plan_.index.count(name)) return true;
         if (thread_builtin(call.a)) return true;  // handles reach a thread's snapshot (legacy shares them)
+        if (name == "cancel") return k == kKindFuture || k == kKindThread;  // CP23 cooperative cancellation
         if (name == "type") return k == kKindFuture || k == kKindThread || !(k & kKindTask);
         // A call through a binding (a lambda value): legacy binds the value.
         return (kinds_.of(call.a) & kKindFunction) && !(kinds_.of(call.a) & kKindUnknown);

@@ -45,9 +45,11 @@ void Vm::coro_init() {
     coro.trampoline.offsets = {0, 0};
     coro.trampoline.notes = {0, 0};
     coro.parallel = options_.parallel;
-    coro.parallel_wait = std::make_shared<ParallelWait>();
+    coro.parallel_wait = options_.parallel_wait ? options_.parallel_wait : std::make_shared<ParallelWait>();
     if (coro.parallel) {
         coro.parallel_map = std::make_shared<ProgramTransferMap>(program_);
+        transfer_map_owner_ = coro.parallel_map;
+        transfer_map_ = transfer_map_owner_.get();
         coro.program_owner = options_.program_keepalive;
         if (!coro.program_owner)
             coro.program_owner = std::shared_ptr<const Program>(&program_, [](const Program*) {});

@@ -39,9 +39,9 @@ int Vm::op_coro(const Instr& in, Value*& R, const Value*& K, const Proto*& proto
             FutureState state = future->state;
             if (future->parallel) {
                 const ParallelTaskState parallel = future->parallel->snapshot_state();
-                state = parallel == ParallelTaskState::Pending  ? FutureState::Pending
-                        : parallel == ParallelTaskState::Failed ? FutureState::Failed
-                                                                : FutureState::Done;
+                state = parallel == ParallelTaskState::Pending ? FutureState::Pending
+                        : parallel == ParallelTaskState::Done  ? FutureState::Done
+                                                               : FutureState::Failed;
             }
             Value out = in.c == 0 ? Value::boolean(state != FutureState::Pending)
                                   : make_string(state == FutureState::Pending  ? "running"

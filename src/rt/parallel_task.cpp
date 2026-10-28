@@ -1,6 +1,8 @@
 #include "rt/parallel_task.h"
 
 #include "HostTrace.h"
+#include "rt/error.h"
+#include "rt/shared_state.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -77,13 +79,48 @@ void notify_wait_state(const std::shared_ptr<ParallelWait>& state) {
 
 void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     nift::trace::ContextGuard guard(record->label);
-    IsolateTaskOutcome outcome = execute_isolate_task(*record->program, record->input, record->options);
+    record->options.current_task = record;
+    if (!record->options.parallel_wait) record->options.parallel_wait = record->wait_state;
+    IsolateTaskOutcome outcome;
+    if (!task_cancelled(record)) {
+        outcome = execute_isolate_task(*record->program, record->input, record->options);
+    } else {
+        outcome.status = IsolateTaskStatus::ExecutionError;
+        outcome.result.reason = StopReason::Error;
+        outcome.result.message = "task cancelled";
+        outcome.result.code = "runtime.cancelled";
+    }
+    record->options.current_task.reset();  // the worker Vm is gone; no self-reference may survive
+    if (task_cancelled(record) && !outcome.has_error_value) {
+        Value error;
+        std::string why;
+        if (make_system_error("runtime.cancelled", "task cancelled", SourceOrigin{}, error, why)) {
+            std::string transfer_error;
+            if (record->proto_map &&
+                outcome.error_value.encode(error, *record->proto_map, transfer_error) == TransferStatus::Ok) {
+                outcome.has_error_value = true;
+            } else {
+                outcome.error_value.clear();
+            }
+        }
+    }
     {
         std::lock_guard<std::mutex> lock(record->mutex);
-        if (outcome.status == IsolateTaskStatus::Ok && outcome.result.reason == StopReason::None) {
+        const bool succeeded = outcome.status == IsolateTaskStatus::Ok && outcome.result.reason == StopReason::None;
+        if (succeeded) {
             record->state = ParallelTaskState::Done;
             record->result = std::move(outcome.return_value);
             record->has_result = outcome.has_return_value;
+        } else if (outcome.result.code == "runtime.cancelled" ||  // rt-lint: allow-string-compare cancellation code
+                   (record->cancelled && !outcome.has_error_value)) {
+            record->state = ParallelTaskState::Cancelled;
+            record->failure_message = "task cancelled";
+            record->failure_code = "runtime.cancelled";
+            record->failure_catchable = true;
+            if (outcome.has_error_value) {
+                record->error_value = std::move(outcome.error_value);
+                record->has_error_value = true;
+            }
         } else {
             record->state = ParallelTaskState::Failed;
             record->failure_message =
@@ -97,6 +134,10 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
             record->has_error_value = outcome.has_error_value;
         }
         record->output = std::move(outcome.output);
+    }
+    {
+        std::lock_guard<std::mutex> lock(record->mutex);
+        record->failure_catchable = record->failure_catchable && record->has_error_value;
     }
     record->cv.notify_all();
     notify_wait_state(record->wait_state);

@@ -76,6 +76,42 @@ prerequisite for CPU-bound CP23 work.
 6. Differential, race, mutation, sanitizer and scaling suites.
 7. Performance evidence and final traceability.
 
+## 4a. Milestone 4 shared objects (implemented)
+
+Shared `mutex`, `atomic<int>`/`atomic<bool>` and `channel` handles live in a
+process-wide registry protected by one mutex/condition variable; a handle is
+`(HandleKind, id, generation)`, never an isolate heap pointer. Values stored in
+a mutex or carried by a channel are kept as `TransferGraph` wire data and are
+encoded on the producer thread and decoded on the consumer thread. The
+transfer graph encodes shared handles by id and still refuses live file/stream,
+process, future and other non-shared handles.
+
+- `mutex()` / `mutex(initial)` supports `lock`, `try_lock`, `unlock`,
+  `locked`, `get` and `set(v)`. `lock` waits without pinning the isolate;
+  re-locking by the same owner, unlocking by another owner, and `get`/`set`
+  without the lock are catchable `runtime.invalid_argument` Errors. A
+  cancellation request wakes a waiting `lock`.
+- `atomic<int>(v)` / `atomic<bool>(v)` support `load`, `store`, `exchange`,
+  `fetch_add`, `fetch_sub` and `compare_exchange`, plus legacy's compound
+  (`+=`, `-=`, `%=`, `&=`, `|=`, `^=`) and prefix/postfix increment/decrement
+  operators. Signed 64-bit add/sub overflow raises catchable
+  `runtime.atomic_overflow` and leaves the value unchanged.
+- `channel(capacity)`, `send`, `recv` and `close` are ordinary calls. Capacity
+  0 is a rendezvous; a positive capacity is a bounded FIFO. Sending on a closed
+  channel raises catchable `runtime.channel_closed`; a closed and drained
+  `recv` returns an Error sentinel with code `runtime.channel_closed` (never
+  `null`). `close` is idempotent and wakes all waiters.
+- `cancel(task)` is idempotent and cooperative: it sets the task record's flag,
+  wakes blocked `send`/`recv`/`lock`/`await`/`join`, and never terminates a
+  thread. The observed operation raises the catchable `runtime.cancelled`
+  Error; catching it consumes that request so cleanup can run. A task settles
+  exactly once as done, failed or cancelled.
+
+`type()` reports `mutex`, `atomic<int>`, `atomic<bool>` and `channel`.
+Cooperative (`NIFT_VM_COOPERATIVE_THREADS=1`) runs share the same registry;
+blocking waits there still occupy the single scheduler thread, so cancellation
+of a CPU-bound cooperative loop remains limited to its safepoints.
+
 ## 5. Temporary restrictions
 
 Until their milestone lands, development may conservatively refuse

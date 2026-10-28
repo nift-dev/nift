@@ -11,6 +11,7 @@
 #include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
 #include "rt/natives/object_methods.h"
+#include "rt/natives/shared_methods.h"
 #include "rt/natives/string_methods.h"
 
 // rt-lint: cold-file names are resolved here at compile time only, never on the VM hot path
@@ -47,6 +48,9 @@ constexpr NativeFn kFunctions[] = {
     file_move, file_remove,
     stream_close, stream_read, stream_read_all, stream_read_line, stream_write, stream_write_line, stream_flush,
     stream_eof,
+    shared_mutex, shared_atomic_int, shared_atomic_bool, shared_channel, shared_send, shared_recv, shared_cancel,
+    mutex_lock, mutex_try_lock, mutex_unlock, mutex_locked, mutex_get, mutex_set,
+    atomic_load, atomic_store, atomic_exchange, atomic_fetch_add, atomic_fetch_sub, atomic_compare_exchange,
 };
 
 constexpr BuiltinSpec kSpecs[] = {
@@ -111,6 +115,14 @@ std::string_view recoverable_code(BuiltinId id) {
         case BuiltinId::StreamWrite: case BuiltinId::StreamWriteLine: return "stream.write_failed";
         case BuiltinId::StreamFlush: return "stream.flush_failed";
         case BuiltinId::StreamClose: return "stream.close_failed";
+        case BuiltinId::SharedRecv: case BuiltinId::SharedSend: return "runtime.channel_closed";
+        case BuiltinId::SharedCancel: return "runtime.cancelled";
+        case BuiltinId::SharedMutex: case BuiltinId::SharedAtomicInt: case BuiltinId::SharedAtomicBool:
+        case BuiltinId::SharedChannel: case BuiltinId::MutexLock: case BuiltinId::MutexTryLock:
+        case BuiltinId::MutexUnlock: case BuiltinId::MutexGet: case BuiltinId::MutexSet:
+        case BuiltinId::AtomicLoad: case BuiltinId::AtomicStore: case BuiltinId::AtomicExchange:
+        case BuiltinId::AtomicFetchAdd: case BuiltinId::AtomicFetchSub:
+        case BuiltinId::AtomicCompareExchange: return "runtime.invalid_argument";
         default: return std::string_view();
     }
 }
@@ -122,6 +134,9 @@ Status call_builtin(const BuiltinSpec& spec, const Context& context, const Value
 
 bool is_recoverable_code(std::string_view code) {
     if (code.empty()) return false;
+    if (code == "runtime.cancelled" || code == "runtime.channel_closed" ||
+        code == "runtime.atomic_overflow" || code == "runtime.invalid_argument")
+        return true;
     // CP17 handle statuses classed Recoverable (D-035 runtime.handle_closed).
     if (handle_code_recoverable(code)) return true;
     for (std::uint16_t i = 0; i < static_cast<std::uint16_t>(BuiltinId::Count); ++i)

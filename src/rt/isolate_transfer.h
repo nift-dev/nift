@@ -49,6 +49,7 @@ public:
 private:
     enum class WireKind : std::uint8_t {
         Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Struct, Error, Cell, Function,
+        SharedHandle,  // CP23: registry id, never a live VM heap object
     };
 
     struct Node {
@@ -69,6 +70,9 @@ private:
         std::int64_t binding_type = 0;
         std::uint32_t proto_index = 0;
         std::uint32_t native_id = 0;
+        std::uint64_t handle_id = 0;
+        std::uint32_t handle_generation = 0;
+        std::uint8_t handle_kind = 0;
         bool has_proto = false;
         bool is_lambda = false;
         bool expression_body = false;

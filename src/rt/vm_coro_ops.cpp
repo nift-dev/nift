@@ -162,6 +162,10 @@ int Vm::Coro::sleep(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
 // of the run queue.
 int Vm::Coro::yield(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                     const Instr*& pc, Fault& fault) {
+    if (vm.cancellation_requested()) {
+        vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
+        return 0;
+    }
     Coro& coro = *vm.coro_;
     ++pc;
     if (--coro.budget != 0) return 1;

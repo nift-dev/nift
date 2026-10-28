@@ -47,6 +47,10 @@
 namespace nift::rt {
 
 struct ParallelRuntime;
+struct ParallelTaskRecord;
+struct ParallelWait;
+class ProgramTransferMap;
+class TransferProtoMap;
 
 inline constexpr std::size_t kMaxEvidenceLines = 4096;
 
@@ -79,6 +83,12 @@ struct VmOptions {
     // CP23: the bounded worker admission shared by an isolate and every nested
     // isolate it spawns. Null with cooperative_tasks (or before the Vm starts).
     std::shared_ptr<ParallelRuntime> parallel;
+    // CP23: the shared record of the worker task running this Vm (null for the
+    // parent run), used for cooperative cancellation checks.
+    std::shared_ptr<ParallelTaskRecord> current_task;
+    // CP23: the wait state shared by an isolate family so cancellation wakes
+    // every blocked await/join in the family.
+    std::shared_ptr<ParallelWait> parallel_wait;
     // Keeps an isolate's cloned Program alive while its worker tasks run.
     std::shared_ptr<const Program> program_keepalive;
 };
@@ -220,6 +230,8 @@ private:
     bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
     bool origin_at(std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
     bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
+    bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,
+                          Fault& fault);
     bool collection(const Instr&,Value*,Fault&,const Proto*);
     bool op_collection_sort(const Instr&, Value*, Fault&, const Proto*);
     bool op_collection_step(const Instr&, Value*, Fault&);
@@ -249,6 +261,9 @@ private:
     void collection_error_context(VmResult&, const Fault&, const Proto*, const Instr*) const;
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
     std::uint32_t report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const;
+    bool cancellation_requested() const;
+    bool raise_catchable(Fault& fault, std::string code, std::string message, std::uint32_t offset);
+    bool raise_cancelled(Fault& fault, const Proto* proto, std::uint32_t offset);
     bool memory_ok(Fault& fault) {
         const std::size_t live = live_heap_bytes();
         if (live > heap_peak_) heap_peak_ = live;
@@ -276,6 +291,8 @@ private:
     int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                         const Instr*& pc, Fault& fault);
     std::unique_ptr<Coro, CoroDelete> coro_;
+    std::shared_ptr<ProgramTransferMap> transfer_map_owner_;
+    const TransferProtoMap* transfer_map_ = nullptr;
 
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
                                       const Proto*, std::size_t base, const Instr* pc);

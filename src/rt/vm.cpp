@@ -66,7 +66,12 @@ Vm::Vm(const Program& program, VmOptions options)
     if (next_frame_check_ > options_.max_frames) next_frame_check_ = options_.max_frames;
     update_heap_limit();
     if (program.has_coroutines) coro_init();  // CP22 (vm_coro.cpp)
+    if (transfer_map_ == nullptr) {
+        transfer_map_owner_ = std::make_shared<ProgramTransferMap>(program_);
+        transfer_map_ = transfer_map_owner_.get();
+    }
 }
+
 
 void Vm::update_heap_limit() {
     const std::size_t stacks = stack_.capacity() * sizeof(Value) + frames_.capacity() * sizeof(Frame) +
@@ -268,6 +273,7 @@ VmResult Vm::run(std::string& output) {
     CHECKED(AddAssign)
     if (!add_assign_slow(*pc, R[pc->a], RK(pc->b), fault) || !memory_ok(fault)) FAIL();
     NOTE_LARGE NEXT();
+    OP(AtomicUpdate) { if (!atomic_update_op(*pc, R, K, proto, pc, fault)) FAIL(); NEXT(); }
     COMPARE(Eq, Eq, x == y, pc->b, pc->c, SET_RESULT)
     COMPARE(Ne, Ne, x != y, pc->b, pc->c, SET_RESULT)
     COMPARE(Lt, Lt, x < y, pc->b, pc->c, SET_RESULT)

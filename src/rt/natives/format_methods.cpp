@@ -1,5 +1,7 @@
 #include "rt/natives/format_methods.h"
 
+#include "rt/shared_state.h"
+
 #include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/natives/support.h"
@@ -160,7 +162,8 @@ const char* public_type_name(const Value& value) {
         case Kind::Function: return "function";
         case Kind::Struct: return "struct";
         case Kind::Error: return "error";
-        default: return nullptr;  // handles: typed names arrive with CP17
+        case Kind::Handle: return shared_handle_type_name(value);
+        default: return nullptr;  // host handles keep their CP17 refusal
     }
 }
 

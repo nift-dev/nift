@@ -357,6 +357,30 @@ $(RT_CP23_PARALLEL_UNIT): tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_DEPS)
 test-cp23-parallel-unit: $(RT_CP23_PARALLEL_UNIT)
 	"$(RT_CP23_PARALLEL_UNIT)"
 
+# CP23 milestone 4: shared mutex/atomic/channel registry, cancellation, close
+# sentinel and operator support across OS workers.
+RT_CP23_SHARED_UNIT := $(TEST_DIR)/rt/cp23-shared-unit$(EXEEXT)
+$(RT_CP23_SHARED_UNIT): tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-cp23-shared-unit: $(RT_CP23_SHARED_UNIT)
+	"$(RT_CP23_SHARED_UNIT)"
+
+# Focused ASan/UBSan run of the shared-object unit (registry lifetime, wire
+# values, cancellation and worker teardown).
+RT_CP23_SHARED_UNIT_SAN := $(TEST_DIR)/rt-san/cp23-shared-unit$(EXEEXT)
+$(RT_CP23_SHARED_UNIT_SAN): tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_DEPS)
+	@if [ "$$(ulimit -v)" != unlimited ]; then \
+		echo "test-cp23-shared-unit-sanitize: run without ulimit -v (ASan shadow memory; found $$(ulimit -v) KiB)"; exit 1; fi
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread \
+		tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-cp23-shared-unit-sanitize: $(RT_CP23_SHARED_UNIT_SAN)
+	"$(RT_CP23_SHARED_UNIT_SAN)"
+
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"

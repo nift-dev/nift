@@ -33,8 +33,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
+
+namespace nift::rt {
+class TransferProtoMap;
+struct ParallelTaskRecord;
+}
 
 namespace nift::rt::natives {
 
@@ -50,6 +56,11 @@ struct Context {
     std::size_t heap_limit = kNoHeapLimit;
     host::HostCallEnv host;  // trace/path policy; no observer for standalone scripts
     handles::HandleAccess handles;  // CP17: table + execution context for handle natives
+    // CP23: the current isolate's wire map, its shared task record, and the
+    // owner token (recursive-lock identity) used by shared built-ins.
+    const TransferProtoMap* protos = nullptr;
+    std::shared_ptr<ParallelTaskRecord> task;
+    std::uint64_t owner_token = 0;
     // N1: the code of the failing HostCall in this call (empty when the native
     // has no HostCall, e.g. validate's schema.rejected).
     std::string host_error_code;
@@ -68,7 +79,7 @@ using NativeFn = Status (*)(const Context& context, const Value* args, std::uint
 // Unknown): wiring CP15 widens CP12's set (design record cp15, W8).
 // Duplicated here, not included, so CP14 does not depend on CP12's in-flight
 // headers; the wiring patch static_asserts that both layouts agree.
-using KindSet = std::uint16_t;
+using KindSet = std::uint32_t;
 inline constexpr KindSet kNull = 1u << 0;
 inline constexpr KindSet kBool = 1u << 1;
 inline constexpr KindSet kInt = 1u << 2;
@@ -85,11 +96,20 @@ inline constexpr KindSet kHandle = 1u << 11;
 inline constexpr KindSet kFile = kHandle | (1u << 12);
 inline constexpr KindSet kStream = kHandle | (1u << 13);
 inline constexpr KindSet kAny = 0xff;
+// CP23: shared concurrency handle families (registry-backed, outside isolate
+// heaps). Like kHandle they are not part of kAny.
+inline constexpr KindSet kMutex = 1u << 16;
+inline constexpr KindSet kAtomicInt = 1u << 17;
+inline constexpr KindSet kAtomicBool = 1u << 18;
+inline constexpr KindSet kAtomic = kAtomicInt | kAtomicBool;
+inline constexpr KindSet kChannel = 1u << 19;
 
 // The receiver a built-in is called on: a method of a string, array,
 // object, number, bool or null, a method of any value (Any: the presentation
 // methods), or a free function (None).
-enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream };
+enum class Receiver : std::uint8_t {
+    None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream, Mutex, Atomic, Channel
+};
 
 // How the result kinds follow from the argument kinds (for kind inference).
 enum class ResultRule : std::uint8_t {
@@ -127,9 +147,9 @@ inline constexpr std::uint8_t kVariadic = 255;
 // last in builtin_list.inc. Used by the R1 refusal of linked units
 // (script_runner.cpp). A built-in appended after the block must be added here
 // deliberately (the assert fails until it is).
-static_assert(static_cast<std::uint16_t>(BuiltinId::StreamEof) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::AtomicCompareExchange) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
-              "host_builtin(): review the host block when appending built-ins");
+              "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {
     return id >= BuiltinId::HostOpen && id <= BuiltinId::StreamEof;
 }

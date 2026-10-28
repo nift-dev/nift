@@ -123,6 +123,7 @@ void Inference::statement(NodeId id) {
             else if (target.kind == NodeKind::Ident)
                 var = find(ast_.text(target));
             if (!var) break;
+            if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }
             Op op = Op::Add;
             switch (n.op) {
                 case Op::SubAssign: op = Op::Sub; break;
@@ -145,7 +146,8 @@ void Inference::statement(NodeId id) {
             else if (target.kind == NodeKind::Ident)
                 var = find(ast_.text(target));
             if (var) {
-                merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
+                if (!((*var)->kinds & kKindAtomic))
+                    merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
                 record(n.a, *var);
             }
             break;

@@ -30,6 +30,9 @@ static_assert(natives::kBytes == kKindBytes, "the bytes bit must match CP12's By
 static_assert(natives::kHandle == kKindHandle && natives::kFile == kKindFile &&
                   natives::kStream == kKindStream,
               "CP17 handle bits must match CP12's kind bits");
+static_assert(natives::kMutex == kKindMutex && natives::kAtomicInt == kKindAtomicInt &&
+                  natives::kAtomicBool == kKindAtomicBool && natives::kChannel == kKindChannel,
+              "CP23 shared kinds must match CP12's kind bits");
 static_assert((kKindFunction & natives::kAny) == 0 && (kKindError & natives::kAny) == 0,
               "Function/Error are not CP14 native families");
 static_assert(static_cast<std::size_t>(natives::BuiltinId::Count) + kFirstBuiltin <= 0x10000,

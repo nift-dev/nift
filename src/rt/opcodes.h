@@ -25,6 +25,7 @@ namespace nift::rt {
     X(Mod)        /* R[a] = RK[b] % RK[c]                                       */                    \
     X(AddI)       /* R[a] = R[b] + int16 c                                      */                    \
     X(AddAssign)  /* R[a] = R[a] += RK[b]  (numbers or two strings only)        */                    \
+    X(AtomicUpdate) /* R[a] = atomic<int> update of R[b] by RK[c]; flags: op/mode (CP23) */          \
     X(Eq)         /* R[a] = RK[b] == RK[c]                                      */                    \
     X(Ne)         /* R[a] = RK[b] != RK[c]                                      */                    \
     X(Lt)         /* R[a] = RK[b] <  RK[c]                                      */                    \
