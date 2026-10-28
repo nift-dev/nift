@@ -198,16 +198,31 @@ bool seed_values(const Program& source, const IsolateTaskInput& input, const Clo
                  std::vector<Value>& globals, std::vector<Value>& args,
                  std::string& error, IsolateTaskStatus& status) {
     const std::size_t global_count = source.main().nregs;
-    std::vector<Value> seeds;
-    seeds.reserve(global_count + input.args.size());
-    for (std::size_t g = 0; g < global_count; ++g)
-        seeds.push_back(g < input.globals.size() ? input.globals[g] : Value());
-    seeds.insert(seeds.end(), input.args.begin(), input.args.end());
     std::vector<Value> transferred;
-    const TransferStatus result = transfer_values(seeds, *input.proto_map, map, transferred, error);
-    if (result != TransferStatus::Ok) {
-        status = transfer_status(result, false);
-        return false;
+    if (input.has_seed_graph) {
+        Value seeds;
+        const TransferStatus result = input.seed_graph.decode(map, seeds, error);
+        if (result != TransferStatus::Ok) {
+            status = transfer_status(result, false);
+            return false;
+        }
+        if (!seeds.is(Kind::Array) || array_size(seeds) != global_count + input.argc) {
+            error = "seed graph does not match the global and argument count";
+            status = IsolateTaskStatus::InvalidInput;
+            return false;
+        }
+        transferred = array_items(seeds);
+    } else {
+        std::vector<Value> seeds;
+        seeds.reserve(global_count + input.args.size());
+        for (std::size_t g = 0; g < global_count; ++g)
+            seeds.push_back(g < input.globals.size() ? input.globals[g] : Value());
+        seeds.insert(seeds.end(), input.args.begin(), input.args.end());
+        const TransferStatus result = transfer_values(seeds, *input.proto_map, map, transferred, error);
+        if (result != TransferStatus::Ok) {
+            status = transfer_status(result, false);
+            return false;
+        }
     }
     globals.assign(transferred.begin(), transferred.begin() + static_cast<std::ptrdiff_t>(global_count));
     args.assign(transferred.begin() + static_cast<std::ptrdiff_t>(global_count), transferred.end());
@@ -233,12 +248,16 @@ IsolateTaskStatus valid_input(const Program& source, const IsolateTaskInput& inp
         error = "entry proto is out of range";
         return IsolateTaskStatus::EntryOutOfRange;
     }
-    if (input.argc != input.args.size()) {
+    if (!input.has_seed_graph && input.argc != input.args.size()) {
         error = "argc does not match the argument count";
         return IsolateTaskStatus::InvalidInput;
     }
+    if (input.has_seed_graph && input.seed_graph.empty()) {
+        error = "the seed graph is empty";
+        return IsolateTaskStatus::InvalidInput;
+    }
     const std::uint32_t globals = source.main().nregs;
-    if (input.globals.size() > globals) {
+    if (!input.has_seed_graph && input.globals.size() > globals) {
         error = "more global values than the program's global slots";
         return IsolateTaskStatus::InvalidInput;
     }
@@ -274,9 +293,10 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
     std::string error;
     const IsolateTaskStatus valid = valid_input(source, input, error);
     if (valid != IsolateTaskStatus::Ok) return failure(valid, std::move(error));
-    Program clone;
-    if (!prepare_clones(source, clone, error)) return failure(IsolateTaskStatus::InvalidInput, std::move(error));
-    const CloneTransferMap map(*input.proto_map, source, clone.protos);
+    auto clone = std::make_shared<Program>();
+    if (!prepare_clones(source, *clone, error))
+        return failure(IsolateTaskStatus::InvalidInput, std::move(error));
+    const CloneTransferMap map(*input.proto_map, source, clone->protos);
     IsolateTaskStatus status = IsolateTaskStatus::Ok;
     std::vector<Value> globals;
     std::vector<Value> args;
@@ -287,14 +307,20 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
     std::size_t next = 0;
     for (std::size_t i = 0; i < source.protos.size(); ++i)
         for (std::size_t k = 0; k < source.protos[i]->constants.size(); ++k)
-            clone.protos[i + 1]->constants.push_back(constants[next++]);
-    if (!build_wrapper(*clone.protos[0], globals, input.global_ready, args, input.entry_proto, error))
+            clone->protos[i + 1]->constants.push_back(constants[next++]);
+    if (!build_wrapper(*clone->protos[0], globals, input.global_ready, args, input.entry_proto, error))
         return failure(IsolateTaskStatus::InvalidInput, std::move(error));
 
     options.return_value_only = true;
-    Vm vm(clone, options);
+    options.program_keepalive = clone;
+    Vm vm(*clone, options);
     IsolateTaskOutcome outcome;
     outcome.result = vm.run(outcome.output);
+    if (vm.has_uncaught_error()) {
+        const TransferStatus encoded_error = outcome.error_value.encode(vm.take_uncaught_error(), map, outcome.error);
+        if (encoded_error == TransferStatus::Ok) outcome.has_error_value = true;
+        else outcome.error_value.clear();
+    }
     if (outcome.result.reason != StopReason::None) {
         outcome.status = IsolateTaskStatus::ExecutionError;
         outcome.error = outcome.result.message;

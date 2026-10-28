@@ -346,6 +346,17 @@ $(RT_ISOLATE_TASK_UNIT): tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_DE
 test-cp23-isolate-task-unit: $(RT_ISOLATE_TASK_UNIT)
 	"$(RT_ISOLATE_TASK_UNIT)"
 
+# CP23 milestone 3: parallel async/thread() on bounded OS workers (await/join,
+# error transfer, nested spawn, drain, done/status and a two-worker CPU check).
+RT_CP23_PARALLEL_UNIT := $(TEST_DIR)/rt/cp23-parallel-unit$(EXEEXT)
+$(RT_CP23_PARALLEL_UNIT): tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-cp23-parallel-unit: $(RT_CP23_PARALLEL_UNIT)
+	"$(RT_CP23_PARALLEL_UNIT)"
+
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
@@ -3630,7 +3641,7 @@ $(RT_CORO_UNIT): tests/rt/coro_unit.cpp $(RT_VM_DEPS)
 CP22_RUN = $(PYTHON) tests/runtime2/cp22/run.py
 .PHONY: test-runtime2-cp22 test-runtime2-cp22-sanitize test-runtime2-cp22-tsan test-runtime2-cp22-mutants
 test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
-	"$(RT_CORO_UNIT)"
+	NIFT_VM_COOPERATIVE_THREADS=1 "$(RT_CORO_UNIT)"
 	$(CP22_RUN) --nift "$(CURDIR)/$(TARGET)" --mode legacy
 	set -e; for b in "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(CP13B_SWITCH_NIFT)"; do \
 	  for m in vm refuse default vm-only trace; do $(CP22_RUN) --nift "$$b" --mode $$m; done; \
@@ -3644,8 +3655,8 @@ test-runtime2-cp22-sanitize: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp \
 		-o "$(TEST_DIR)/rt-san/coro-unit"
-	ulimit -f 100000; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
-		timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
+	ulimit -f 100000; NIFT_VM_COOPERATIVE_THREADS=1 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+		UBSAN_OPTIONS=halt_on_error=1 timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
 	set -e; for m in vm refuse default vm-only; do env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 	  UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 $(CP22_RUN) --nift "$(CURDIR)/$(SAN_TARGET)" --mode $$m; done
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 \

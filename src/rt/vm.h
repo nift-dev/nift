@@ -46,6 +46,8 @@
 
 namespace nift::rt {
 
+struct ParallelRuntime;
+
 inline constexpr std::size_t kMaxEvidenceLines = 4096;
 
 // Legacy limit of nested user-callable frames (ParserHelpers.cpp kMaxCallableDepth).
@@ -71,6 +73,14 @@ struct VmOptions {
     // CP23: capture the TopReturn value without rendering it. The isolate task
     // wrapper transfers any Value, including ones the renderer does not print.
     bool return_value_only = false;
+    // CP23: the cooperative CP22 path (no OS workers). Default false; the CLI
+    // sets it from NIFT_VM_COOPERATIVE_THREADS=1.
+    bool cooperative_tasks = false;
+    // CP23: the bounded worker admission shared by an isolate and every nested
+    // isolate it spawns. Null with cooperative_tasks (or before the Vm starts).
+    std::shared_ptr<ParallelRuntime> parallel;
+    // Keeps an isolate's cloned Program alive while its worker tasks run.
+    std::shared_ptr<const Program> program_keepalive;
 };
 
 struct VmResult {
@@ -137,6 +147,13 @@ public:
     Value take_return_value() noexcept {
         has_return_value_ = false;
         return std::move(return_value_);
+    }
+    // CP23: the original Value of an uncaught catchable Error of this run, for
+    // encoding it through TransferGraph before this Vm is destroyed.
+    bool has_uncaught_error() const noexcept { return has_uncaught_error_; }
+    Value take_uncaught_error() noexcept {
+        has_uncaught_error_ = false;
+        return std::move(uncaught_error_);
     }
 
     // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
@@ -285,6 +302,9 @@ private:
     bool beyond_legacy_depth_ = false;
     Value return_value_;  // CP23: the last TopReturn value (see take_return_value)
     bool has_return_value_ = false;
+    Value uncaught_error_;  // CP23: original uncaught Error (see take_uncaught_error)
+    bool has_uncaught_error_ = false;
+    std::string* coro_output_ = nullptr;  // CP23: output of the running coroutine unit
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
     std::size_t global_taken_ = 0;  // C6: globals nulled by global_take and not yet put back

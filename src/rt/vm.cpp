@@ -8,12 +8,14 @@
 #include "rt/heap.h"
 #include "rt/heap_account.h"
 #include "rt/native.h"
+#include "rt/parallel_task.h"
 #include "rt/render.h"
 #include "rt/string.h"
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iterator>
 #include <utility>
 
@@ -47,6 +49,13 @@ VmResult register_budget_exceeded() {
 
 Vm::Vm(const Program& program, VmOptions options)
     : program_(program), options_(options), handle_table_(handles::table_options_from_environment()) {
+    if (!options_.cooperative_tasks && !options_.parallel) {
+        const char* cooperative = std::getenv("NIFT_VM_COOPERATIVE_THREADS");
+        if (cooperative != nullptr && cooperative[0] == '1' && cooperative[1] == '\0')
+            options_.cooperative_tasks = true;
+    }
+    if (program.has_coroutines && !options_.cooperative_tasks && !options_.parallel)
+        options_.parallel = ParallelRuntime::from_environment();
     program_has_collection_boundaries_ = program.has_collection_boundaries;
     open_handle_runtime();
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
@@ -204,26 +213,20 @@ bool Vm::op_meta_global(const Instr& in, Value* R, Fault& fault, const Proto* pr
 }
 
 VmResult Vm::run(std::string& output) {
-    VmResult result;
-    Fault fault;
-    const Proto* proto = protos_.front();
-    std::size_t base = 0;
+    VmResult result; Fault fault; coro_output_ = &output;
+    const Proto* proto = protos_.front(); std::size_t base = 0;
     if (!reserve_registers(proto->nregs + 1u)) return register_budget_exceeded();
-    Value* R = stack_.data();
-    const Value* K = proto->constants.data();
-    const Instr* pc = proto->code.data();
+    Value* R = stack_.data(); const Value* K = proto->constants.data(); const Instr* pc = proto->code.data();
 #if NIFT_RT_COMPUTED_GOTO
 #define NIFT_RT_LABEL(name) &&L_##name,
     static const void* const kLabels[] = {NIFT_RT_OPCODES(NIFT_RT_LABEL)};
 #undef NIFT_RT_LABEL
-    const void* checked_labels[std::size(kLabels)];
-    std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
+    const void* checked_labels[std::size(kLabels)]; std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);
     for (const auto& [op, label] : {std::pair{OpCode::Add, &&LC_Add}, {OpCode::Sub, &&LC_Sub},
                                     {OpCode::Mul, &&LC_Mul}, {OpCode::Mod, &&LC_Mod},
                                     {OpCode::AddI, &&LC_AddI}, {OpCode::AddAssign, &&LC_AddAssign}})
         checked_labels[static_cast<std::size_t>(op)] = label;
-    MUTATE_CHECKED_TABLE(checked_labels)
-    const void* const* labels = kLabels;
+    MUTATE_CHECKED_TABLE(checked_labels) const void* const* labels = kLabels;
     DISPATCH();
 #else
     bool checked = false;
@@ -346,11 +349,16 @@ VmResult Vm::run(std::string& output) {
 #endif
 bail:
     if (handle_bail(fault, result, R, K, proto, base, pc)) DISPATCH();
+    if (fault.reason == StopReason::Error && fault.catchable && fault.error.is(Kind::Error)) {
+        uncaught_error_ = fault.error;
+        has_uncaught_error_ = true;
+    }
     goto done;
 #if !NIFT_RT_COMPUTED_GOTO
     }
 #endif
 done:
+    coro_output_ = nullptr;
     if (coro_) { coro_teardown(result); } close_handle_runtime(result); result_stats(result); return result;
 }
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {

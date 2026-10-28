@@ -322,7 +322,7 @@ bool async_recursion(const Ast& ast, NodeId root, const UnitPlan& plan, std::uin
 bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                           const CompileLimits& limits, std::string& reason, std::uint32_t& offset) {
     if (!plan.coroutines) return true;
-    for (NodeId id = 0; !limits.cooperative_threads && id < ast.size(); ++id) {  // legacy threads run in parallel
+    for (NodeId id = 0; !(limits.cooperative_threads || limits.parallel_tasks) && id < ast.size(); ++id) {
         const Node& n = ast.at(id);
         if (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
             ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"))

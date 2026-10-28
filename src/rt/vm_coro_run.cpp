@@ -3,6 +3,7 @@
 #include "HostTrace.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/parallel_task.h"
 #include "rt/string.h"
 
 #include <utility>
@@ -35,10 +36,17 @@ int Vm::op_coro(const Instr& in, Value*& R, const Value*& K, const Proto*& proto
         case OpCode::FutureOp: {
             const FutureObject* future = future_of(R[in.b]);
             if (future == nullptr) return internal(fault, "future method receiver") ? 1 : 0;
-            Value out = in.c == 0 ? Value::boolean(future->state != FutureState::Pending)
-                                  : make_string(future->state == FutureState::Pending  ? "running"
-                                                : future->state == FutureState::Failed ? "error"
-                                                                                       : "done");
+            FutureState state = future->state;
+            if (future->parallel) {
+                const ParallelTaskState parallel = future->parallel->snapshot_state();
+                state = parallel == ParallelTaskState::Pending  ? FutureState::Pending
+                        : parallel == ParallelTaskState::Failed ? FutureState::Failed
+                                                                : FutureState::Done;
+            }
+            Value out = in.c == 0 ? Value::boolean(state != FutureState::Pending)
+                                  : make_string(state == FutureState::Pending  ? "running"
+                                                : state == FutureState::Failed ? "error"
+                                                                               : "done");
             R[in.a] = std::move(out);
             ++pc;
             return memory_ok(fault) ? 1 : 0;
@@ -97,6 +105,10 @@ bool Vm::coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& 
     }
     const std::uint32_t id = coro.current;
     if (id == 0) {
+        if (fault.catchable && fault.error.is(Kind::Error)) {
+            uncaught_error_ = fault.error;
+            has_uncaught_error_ = true;
+        }
         error_result(result, fault, proto, pc);
         task_position(result);
     } else {
@@ -150,8 +162,9 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
 #if NIFT_CORO_MUTANT == 7
     return 2;  // M7: the tasks still running are not drained
 #endif
-    if (coro.tasks.front().children == 0) {
+    if (coro.tasks.front().children == 0 && coro.parallel_live.empty()) {
         coro.tasks.front().body_done = true;
+        coro.flush_parallel_outputs(*this);
         return 2;
     }
     Coro::save(*this, proto, base, pc);

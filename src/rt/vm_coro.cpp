@@ -2,6 +2,7 @@
 
 #include "HostTrace.h"
 #include "rt/heap_account.h"
+#include "rt/parallel_task.h"
 
 #include <algorithm>
 #include <utility>
@@ -43,6 +44,14 @@ void Vm::coro_init() {
     coro.trampoline.code = {Instr{OpCode::Nop, 0, 0, 0, 0}, Instr{OpCode::TaskEnd, 0, 0, 0, 0}};
     coro.trampoline.offsets = {0, 0};
     coro.trampoline.notes = {0, 0};
+    coro.parallel = options_.parallel;
+    coro.parallel_wait = std::make_shared<ParallelWait>();
+    if (coro.parallel) {
+        coro.parallel_map = std::make_shared<ProgramTransferMap>(program_);
+        coro.program_owner = options_.program_keepalive;
+        if (!coro.program_owner)
+            coro.program_owner = std::shared_ptr<const Program>(&program_, [](const Program*) {});
+    }
     coro.trace = nift::trace::enabled();
     Coro::Task main;
     main.state = Coro::State::Running;
@@ -177,6 +186,9 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
                    Fault& fault) {
     Coro& coro = *vm.coro_;
     for (;;) {
+        const std::uint64_t observed = coro.parallel_wait ? coro.parallel_wait->snapshot_generation() : 0;
+        coro.reap_parallel(vm);
+        coro.flush_parallel_outputs(vm);
         while (!coro.run_queue.empty()) {
             const std::uint32_t id = coro.run_queue.front();
             coro.run_queue.pop_front();
@@ -187,7 +199,14 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
             return 1;
         }
         const Task& main = coro.tasks.front();
-        if (main.body_done && main.children == 0) return 2;
+        if (main.body_done && main.children == 0 && coro.parallel_live.empty()) {
+            coro.flush_parallel_outputs(vm);
+            return 2;
+        }
+        if (!coro.parallel_live.empty()) {
+            coro.wait_parallel(vm, observed);
+            continue;
+        }
         if (coro.timers.empty()) {
             // Unreachable by construction (a future only refers to an earlier
             // task, so waits form no cycle): an internal stop, never a hang.

@@ -15,10 +15,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace nift::rt {
+
+struct ParallelTaskRecord;
 
 enum class FutureState : std::uint8_t { Pending, Done, Failed };
 
@@ -42,6 +45,10 @@ struct FutureObject : HeapObject {
     // `join()`, `type` "thread", failures prefixed `thread: ` (a heap subkind
     // of Kind::Future: no value tag of its own).
     bool thread = false;
+    // CP23: the parallel task record of a future/thread running on an OS
+    // worker. The record is shared and thread-safe; this object stays owned
+    // by the parent isolate and is never touched by the worker.
+    std::shared_ptr<ParallelTaskRecord> parallel;
     FutureObject() : HeapObject(Kind::Future) {}
 };
 

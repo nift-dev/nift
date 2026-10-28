@@ -31,6 +31,8 @@ Clock::time_point deadline_after(std::int64_t milliseconds) {
 
 bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault,
                      bool thread) {
+    if (!vm.options_.cooperative_tasks && vm.options_.parallel)
+        return spawn_parallel(vm, in, callee, R, fault, thread);
     Coro& coro = *vm.coro_;
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
     std::uint32_t id = 0;
@@ -93,6 +95,8 @@ int Vm::Coro::await(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
     if (future == nullptr || future->thread != join)
 #endif
         return raise(fault, StopReason::Error, "await: expected future") ? 1 : 0;
+    if (future->parallel)
+        return coro.await_parallel(vm, in, R, K, proto, base, pc, fault, future, join);
     if (future->state == FutureState::Pending) {
         future->waiters.push_back(coro.current);
         heap_retally(future);

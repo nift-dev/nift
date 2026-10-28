@@ -338,7 +338,8 @@ CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& lim
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
         program->has_coroutines = true;
         if (!check_coroutine_program(*program, result.reason, result.offset)) return result;
-        if (!check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
+        if (!limits.parallel_tasks &&
+            !check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
             return result;
     }
     result.program = std::move(program);

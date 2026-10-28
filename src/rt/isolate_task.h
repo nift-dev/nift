@@ -37,6 +37,11 @@ struct IsolateTaskInput {
     std::vector<std::uint8_t> global_ready;
     // Required: maps the source Program's immutable protos to wire indices.
     const TransferProtoMap* proto_map = nullptr;
+    // CP23 parallel tasks encode [globals..., args...] on the spawning thread.
+    // When set, `args` and `globals` are ignored and the graph is decoded in
+    // this thread's heap after the clone is prepared (so no Value crosses).
+    bool has_seed_graph = false;
+    TransferGraph seed_graph;
 };
 
 struct IsolateTaskOutcome {
@@ -48,6 +53,9 @@ struct IsolateTaskOutcome {
     // returned a value that transferred successfully.
     TransferGraph return_value;
     bool has_return_value = false;
+    // The original uncaught catchable Error, when it transferred successfully.
+    TransferGraph error_value;
+    bool has_error_value = false;
 };
 
 IsolateTaskOutcome execute_isolate_task(const Program& program, const IsolateTaskInput& input,
