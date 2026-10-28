@@ -85,8 +85,7 @@ std::size_t raw_footprint(const HeapObject* object) {
         }
         case Kind::Function: {
             const auto* f = static_cast<const FunctionObject*>(object);
-            return (session_function(f) ? sizeof(SessionFunctionObject) : sizeof(FunctionObject)) +
-                text_storage(f->name) + vector_storage(f->upvalues);
+            return sizeof(FunctionObject) + text_storage(f->name) + vector_storage(f->upvalues);
         }
         case Kind::Struct:
             return sizeof(StructObject) + vector_storage(static_cast<const StructObject*>(object)->fields);

@@ -42,10 +42,7 @@ void delete_object(HeapObject* object) noexcept {
         case Kind::Bytes: delete static_cast<BytesObject*>(object); return;
         case Kind::Array: delete static_cast<ArrayObject*>(object); return;
         case Kind::Object: delete static_cast<ObjectObject*>(object); return;
-        case Kind::Function:
-            if (object->tag & kSessionFunction) delete static_cast<SessionFunctionObject*>(object);
-            else delete static_cast<FunctionObject*>(object);
-            return;
+        case Kind::Function: delete static_cast<FunctionObject*>(object); return;
         case Kind::Struct: delete static_cast<StructObject*>(object); return;
         case Kind::Error: delete static_cast<ErrorObject*>(object); return;
         case Kind::Handle: {  // a counted handle box: drop its table reference (never blocks)

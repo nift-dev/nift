@@ -54,9 +54,8 @@ struct Scan {
         if (value.is(Kind::Function)) {
             const auto* function = value.heap_as<FunctionObject>();
             const auto* proto = static_cast<const Proto*>(function->code);
-            const auto* metadata = session_function(function);
-            if (metadata && metadata->session_identity && proto && proto->session_definition) {
-                SessionCallable target{session_function(function)->session_identity, proto->session_definition, {},
+            if (function->session_identity && proto && proto->session_definition) {
+                SessionCallable target{function->session_identity, proto->session_definition, {},
                     proto->session_parameter_shapes, proto->session_capture_shapes, {}, proto->session_call_facts};
                 for (std::size_t k = 0; k < function->upvalues.size(); ++k) {
                     const auto& capture = function->upvalues[k];

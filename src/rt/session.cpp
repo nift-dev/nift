@@ -120,7 +120,7 @@ void VmSession::refresh(SessionCompileContext& pending) {
             symbol.arity = proto->nparams;
             symbol.returns = proto->session_returns;
             symbol.definition = proto->session_definition;
-            symbol.identity = session_function(v.template heap_as<FunctionObject>())->session_identity;
+            symbol.identity = v.template heap_as<FunctionObject>()->session_identity;
             symbol.params = proto->session_params; symbol.param_types = proto->session_param_types;
         } else {
             symbol.definition.reset(); symbol.identity = 0; symbol.arity = symbol.returns = 0;

@@ -8,9 +8,8 @@
 
 namespace nift::rt {
 std::string callable_marker(const FunctionObject& function) {
-    const auto* metadata = session_function(&function);
     return std::string("\x1fnift:callable:") + (function.is_lambda
-        ? "lambda:" + std::to_string(metadata ? metadata->display_id : 0) : "named:" + function.name);
+        ? "lambda:" + std::to_string(function.display_id) : "named:" + function.name);
 }
 
 

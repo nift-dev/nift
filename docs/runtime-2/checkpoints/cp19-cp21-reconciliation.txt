@@ -55,17 +55,15 @@ The accepted VM still refuses run() (callable:run). Shell Host-job execution is
 not evidence of compiled script run() support. Tests witness the refusal and
 absence of its side effects, with later compiled session commands still working.
 
-BOUNDED PERFORMANCE CHANGE
-Ordinary FunctionObject payloads no longer initialize/destroy CP19's optional
-shared Program owner and two identity/display fields. A tagged derived
-SessionFunctionObject holds them only for session/eval callables. Factory and
-deletion paths test the subtype; these costs remain included in measurements.
-The existing conservative identity bit is separate from the new subtype bit;
-cycle traversal preserves it, deletion selects the real allocated type, and heap
-accounting includes the full subtype size. Owned code, retained aliases, stable
-redefinition identity and eval display metadata retain their original witnesses.
-No Value or Frame layout change, call-entry lookup, new fault slot or spawn
-architecture change. No speedup claim is inferred merely from this layout change.
+BOUNDED PERFORMANCE INVESTIGATION
+The optional session/eval callable subtype was measured, not assumed faster.
+Its added factory/deletion/heap-accounting instructions did not clear the gate.
+That experiment is preserved in evidence and reverted. The final candidate uses
+the frozen parent's FunctionObject Program-owner and identity/display fields,
+with its original lifetime, cycle handling and accounting. No new Value/Frame
+layout, call-entry lookup, fault slot or spawn architecture is introduced.
+The final candidate is measured against the same five matched reference samples;
+unchanged reference hashes and raw observations are retained explicitly.
 
 ACCEPTANCE
 The delivery report and raw evidence record final functional, mutation,

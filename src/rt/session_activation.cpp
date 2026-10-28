@@ -24,10 +24,9 @@ void VmSession::activate_code(const std::vector<std::pair<std::uint64_t, const P
         if (value.is(Kind::Function)) {
             auto* function = value.heap_as<FunctionObject>();
             const auto* original = static_cast<const Proto*>(function->code);
-            const auto* metadata = session_function(function);
-            for (const auto& target : targets) if (metadata && target.first == metadata->session_identity &&
+            for (const auto& target : targets) if (target.first == function->session_identity &&
                 target.second->session_definition == original->session_definition) {
-                function->code = target.second; session_function(function)->program_owner = owned; break;
+                function->code = target.second; function->program_owner = owned; break;
             }
             for (const auto& capture : function->upvalues) {
                 const auto* cell = cell_plain_capture(capture);
