@@ -174,10 +174,8 @@ void array_payload(bool broken) {
     CHECK(array_items(array)[0].is(Kind::Function));
     CHECK(array_items(array)[1].is(Kind::Function) != broken);
     r=session.execute("f:=a[0];f(3)","alias",output);
-    if(broken) {
-        CHECK(!r.admitted); CHECK(r.refusal=="session:current-callable-proof"); return;
-    }
     CHECK(r.admitted && r.execution.reason==StopReason::None);
+    if(broken) return;  // M22 corrupts element 1; element 0 remains a proved callable.
     r=session.execute("f = a[1]","replace",output);
     CHECK(r.admitted && r.execution.reason==(broken ? StopReason::Error : StopReason::None));
     r=session.evaluate("f(3)","invoke",output);
