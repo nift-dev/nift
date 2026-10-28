@@ -7,11 +7,14 @@
 #include "rt/value.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace nift::rt {
+
+struct ParallelTaskRecord;
 
 enum class TransferStatus : std::uint8_t {
     Ok,
@@ -50,6 +53,7 @@ private:
     enum class WireKind : std::uint8_t {
         Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Struct, Error, Cell, Function,
         SharedHandle,  // CP23: registry id, never a live VM heap object
+        TaskHandle,    // CP23: shared ParallelTaskRecord identity, never a FutureObject pointer
     };
 
     struct Node {
@@ -73,6 +77,8 @@ private:
         std::uint64_t handle_id = 0;
         std::uint32_t handle_generation = 0;
         std::uint8_t handle_kind = 0;
+        std::uint64_t task_id = 0;
+        bool task_thread = false;
         bool has_proto = false;
         bool is_lambda = false;
         bool expression_body = false;
@@ -88,6 +94,10 @@ private:
     class Decoder;
 
     std::vector<Node> nodes_;
+    // Shared completion records referenced by TaskHandle nodes. Holding a
+    // strong reference here keeps a transferred handle valid even when the
+    // source isolate's FutureObject has already gone away.
+    std::vector<std::shared_ptr<ParallelTaskRecord>> tasks_;
     std::uint32_t root_ = 0;
     bool has_root_ = false;
 };

@@ -107,6 +107,53 @@ void check_thread_prefix_and_join() {
            "5\n5\n10\nthread\n", "thread result, repeated join and nested thread");
 }
 
+
+void check_legacy_v45_compatibility() {
+    expect("@fn[async](add(a, b)) { return a + b }\n"
+           "base := 10\n"
+           "closure := async (x) => { return base + x }\n"
+           "a := add(2, 3)\n"
+           "b := closure(5)\n"
+           "base = 100\n"
+           "print(type(a))\nprint(await a)\nprint(await b)\n",
+           "future\n5\n15\n", "@fn[async] script declaration");
+
+    expect("base := 10\nclosure := (x) => { return base + x }\n"
+           "t := thread(closure, 5)\nbase = 100\nprint(t.join())\n",
+           "15\n", "thread(closure, args)");
+
+    const Outcome arity = run("fn(w(x)) { return x }\nt := thread(w)\nprint(t.join())\n");
+    CHECK(arity.reason.empty());
+    CHECK(arity.result.reason == StopReason::Error);
+    CHECK(arity.result.message == "thread: callable argument count mismatch: w");
+    const Outcome callee = run("t := thread(5)\nprint(t.join())\n");
+    CHECK(callee.reason.empty());
+    CHECK(callee.result.reason == StopReason::Error);
+    CHECK(callee.result.message == "thread: first argument must be callable");
+
+    const Outcome resource = run("f := file(\"x.txt\")\nfn(id(x)) { return x }\n"
+                                 "t := thread(id, [1, f])\nprint(t.join())\n");
+    CHECK(resource.reason.find("non-transferable resource") != std::string::npos);
+
+    expect("fn[async](slow()) { sleep(100); return 7 }\n"
+           "fn[async](reader(p)) { print(p.status()); return await p }\n"
+           "p := slow()\nw := reader(p)\nprint(await w)\nprint(p.status())\n",
+           "running\n7\ndone\n", "future handle status and await across isolates");
+
+    expect("fn(add(a, b)) { return a + b }\n"
+           "fn[async](joiner(t)) { return t.join() }\n"
+           "t := thread(add, 2, 3)\np := joiner(t)\n"
+           "print(await p)\nprint(t.join())\n",
+           "5\n5\n", "thread handle joined from an async isolate");
+
+    expect("c := channel(0)\n"
+           "fn[async](blocked()) { recv(c); return 1 }\n"
+           "fn[async](canceller(p)) { sleep(20); cancel(p); return 0 }\n"
+           "p := blocked()\nk := canceller(p)\nprint(await k)\n"
+           "try { await p } catch(e) { print(e.code) }\nprint(p.status())\n",
+           "0\nruntime.cancelled\nerror\n", "cancel a task handle from another isolate");
+}
+
 void check_two_worker_overlap() {
     const std::string spin =
         "fn[async](spin(ms)) { t0 := epoch(); n := 0\n"
@@ -145,6 +192,7 @@ int main() {
     check_nested_spawn_and_drain();
     check_done_status();
     check_thread_prefix_and_join();
+    check_legacy_v45_compatibility();
     check_two_worker_overlap();
     return rt_test::finish("cp23-parallel-unit");
 }

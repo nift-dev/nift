@@ -44,6 +44,10 @@ struct ParallelTaskRecord {
     bool failure_error_origin = false;
     bool failure_in_loop_path = false;
     bool cancelled = false;
+    // CP23 transfer identity: a process-unique id, never a heap/FutureObject
+    // pointer. TransferGraph carries it so another isolate can reference the
+    // same completion record.
+    std::uint64_t shared_id = 0;
     std::string output;
     bool output_merged = false;
     std::uint32_t owner_task = 0;
@@ -55,6 +59,10 @@ struct ParallelTaskRecord {
     VmOptions options;
     std::shared_ptr<ParallelRuntime> runtime;
     std::shared_ptr<ParallelWait> wait_state;
+    // Every scheduler wait state that has a task blocked in this record. A
+    // future/thread handle may be awaited from another isolate, whose wait
+    // state must be woken too.
+    std::vector<std::shared_ptr<ParallelWait>> wait_states;
 
     ParallelTaskState snapshot_state() const {
         std::lock_guard<std::mutex> lock(mutex);
@@ -96,6 +104,15 @@ private:
     std::size_t active_ = 0;
     std::size_t limit_ = 8;
 };
+
+// Stable transfer identity of a record. Assigns one on first use under the
+// record's mutex; zero only for a null record.
+std::uint64_t parallel_task_identity(const std::shared_ptr<ParallelTaskRecord>& record);
+// Registers `state` so completion/cancellation of `record` wakes it.
+void add_parallel_wait_state(const std::shared_ptr<ParallelTaskRecord>& record,
+                             const std::shared_ptr<ParallelWait>& state);
+// Wakes every registered scheduler wait state (completion or cancellation).
+void notify_parallel_wait_states(const std::shared_ptr<ParallelTaskRecord>& record);
 
 // Runs one record's isolate task on the calling worker thread, publishes its
 // wire result/error/output, wakes waiters and releases the admission lane.

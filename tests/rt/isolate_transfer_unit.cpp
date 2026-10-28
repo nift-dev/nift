@@ -7,6 +7,7 @@
 #include "rt/heap.h"
 #include "rt/heap_account.h"
 #include "rt/isolate_transfer.h"
+#include "rt/parallel_task.h"
 #include "rt/string.h"
 #include "rt_test.h"
 
@@ -261,7 +262,7 @@ void refusals() {
     Value handle = Value::handle(HandleKind::File, 7, 2);
     CHECK(graph.encode(handle, protos, error) == TransferStatus::RefusedHandle);
     CHECK(!error.empty() && graph.empty());
-    CHECK(error.find("Handle") != std::string::npos);
+    CHECK(error.find("non-transferable resource") != std::string::npos);
 
     auto* box = new HandleBoxObject();
     box->id = 11;
@@ -277,6 +278,47 @@ void refusals() {
     CHECK(graph.encode(nested, protos, error) == TransferStatus::RefusedFuture);
     CHECK(!error.empty() && graph.empty());
     CHECK(graph.decode(protos, decoded, error) == TransferStatus::InvalidGraph);
+}
+
+
+void task_handles() {
+    ProtoMap protos;
+    TransferGraph graph;
+    std::string error;
+    Value decoded;
+
+    auto record = std::make_shared<ParallelTaskRecord>();
+    record->state = ParallelTaskState::Done;
+    auto* source = new FutureObject();
+    source->thread = true;
+    source->parallel = record;
+    Value future = Value::adopt(source);
+    const std::uint64_t identity = parallel_task_identity(record);
+
+    CHECK(graph.encode(future, protos, error) == TransferStatus::Ok);
+    CHECK(graph.decode(protos, decoded, error) == TransferStatus::Ok);
+    const FutureObject* transferred = future_of(decoded);
+    CHECK(transferred != nullptr && transferred->thread);
+    CHECK(transferred->parallel.get() == record.get());
+    CHECK(parallel_task_identity(transferred->parallel) == identity);
+
+    // A second FutureObject naming the same record is a distinct value but the
+    // same task identity; an alias of the first source stays one node.
+    auto* twin_source = new FutureObject();
+    twin_source->thread = true;
+    twin_source->parallel = record;
+    Value twin = Value::adopt(twin_source);
+    Value root = make_array();
+    array_push(root, future);
+    array_push(root, future);
+    array_push(root, twin);
+    CHECK(graph.encode(root, protos, error) == TransferStatus::Ok);
+    CHECK(graph.decode(protos, decoded, error) == TransferStatus::Ok);
+    CHECK(array_size(decoded) == 3);
+    CHECK(array_items(decoded)[0].heap() == array_items(decoded)[1].heap());
+    CHECK(array_items(decoded)[2].heap() != array_items(decoded)[0].heap());
+    CHECK(future_of(array_items(decoded)[2])->parallel.get() == record.get());
+    CHECK(graph.node_count() == 3);  // array plus two FutureObjects, not three
 }
 
 void equality_and_length() {
@@ -312,6 +354,7 @@ int main() {
     structs_and_errors();
     cells_and_functions();
     refusals();
+    task_handles();
     equality_and_length();
     return rt_test::finish("isolate-transfer-unit");
 }

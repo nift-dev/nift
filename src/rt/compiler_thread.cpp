@@ -6,22 +6,23 @@
 
 namespace nift::rt::detail {
 
-// `thread(f, args…)` in a coroutine unit (legacy's thread built-in): f, a
-// synchronous top-level function named directly with matching arity, runs as
-// a task with the arguments (CallValueAny with the thread bit, c & 0x8000);
-// the value is its thread handle. Other forms are refused (legacy reports a
-// wrong count against its internal `__thread_callable` at 1:1, a defect).
+// `thread(callee, args…)` in a coroutine unit (legacy's thread built-in): the
+// callee is any expression (a named function, closure or other function value)
+// and is called by the task with the arguments (CallValueAny with the thread
+// bit, c & 0x8000); the value is its thread handle. Being callable and having
+// the right arity are checked by the VM at runtime, where legacy reports them.
 bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
+    // CP23 compatibility: the old public library call spellings stay removed,
+    // with legacy's diagnostic (not an opaque parse fallback).
+    if (name == "async")  // rt-lint: allow-string-compare compile time
+        return fail(node, "async(callable, ...) was removed; declare an async function/lambda and call it directly");
+    if (name == "await")  // rt-lint: allow-string-compare compile time
+        return fail(node, "await(...) was removed; use 'await future' or 'await async_fn(args)'");
     if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));
     if (node.count == 0) return fail(node, "coro-thread-callee");
     const NodeId* args = ast_.list(node);
     const Node& f = ast_.at(args[0]);
-    const bool named = f.kind == NodeKind::Ident && find_binding(text(f)) == nullptr;
-    const auto fn = named ? plan_.index.find(text(f)) : plan_.index.end();
-    if (fn == plan_.index.end() || (ast_.at(plan_.functions[fn->second - 1]).flags & kFlagAsync))
-        return fail(f, "coro-thread-callee");
-    if (ast_.at(plan_.functions[fn->second - 1]).count != node.count - 1) return fail(node, "coro-thread-arity");
     const std::uint16_t mark = fb_->top();
     std::uint16_t callee_reg = 0;
     if (!temp(callee_reg) || !expr_to(args[0], callee_reg)) return false;

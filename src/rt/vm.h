@@ -91,6 +91,10 @@ struct VmOptions {
     std::shared_ptr<ParallelWait> parallel_wait;
     // Keeps an isolate's cloned Program alive while its worker tasks run.
     std::shared_ptr<const Program> program_keepalive;
+    // CP23: canonical wire map of the isolate's cloned Program. Worker
+    // TransferGraphs use the root program's proto indices at every depth, so
+    // a transferred task result can be decoded in any isolate.
+    std::shared_ptr<const TransferProtoMap> transfer_map;
 };
 
 struct VmResult {
@@ -291,7 +295,7 @@ private:
     int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                         const Instr*& pc, Fault& fault);
     std::unique_ptr<Coro, CoroDelete> coro_;
-    std::shared_ptr<ProgramTransferMap> transfer_map_owner_;
+    std::shared_ptr<const TransferProtoMap> transfer_map_owner_;
     const TransferProtoMap* transfer_map_ = nullptr;
 
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,

@@ -112,6 +112,28 @@ Cooperative (`NIFT_VM_COOPERATIVE_THREADS=1`) runs share the same registry;
 blocking waits there still occupy the single scheduler thread, so cancellation
 of a CPU-bound cooperative loop remains limited to its safepoints.
 
+## 4b. Legacy v45 compatibility (implemented; not checkpoint acceptance)
+
+- `@fn[async]` script declarations are admitted on the VM path. Their deferred
+  body is still parsed in deferred mode, so template-only forms that become
+  Opaque remain refused rather than acquiring different semantics.
+- `thread(callee, args…)` accepts a named function, closure or other function
+  value. The VM validates callability and arity at run time with the legacy
+  `thread:` diagnostics.
+- A `FutureObject`/thread handle crosses isolates as a `TaskHandle` wire node
+  carrying the process-unique `ParallelTaskRecord` identity, never a heap or
+  `FutureObject` pointer. Decoding creates an isolate-local future that shares
+  the record, so `join`, `await`, `done`, `status` and `cancel` address the
+  same task from another worker.
+- A managed file/stream/process handle in a `thread(...)` argument is refused
+  with a specific non-transferable resource error. Shared mutex/atomic/channel
+  handles continue to cross by registry identity.
+
+Focused evidence: `test-rt-isolate-transfer-unit`, `test-cp23-isolate-task-unit`,
+`test-cp23-parallel-unit`, `test-cp23-shared-unit`, and the v4.5 async/thread/
+mutex/atomics scripts under `NIFT_VM=require`. This does not claim the full CP23
+acceptance matrix (sanitizers, race, scaling or platform evidence).
+
 ## 5. Temporary restrictions
 
 Until their milestone lands, development may conservatively refuse

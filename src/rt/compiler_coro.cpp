@@ -224,6 +224,7 @@ private:
             return member_name(callee) == "push" && kinds_.of(callee.a) == kKindArray;
         if (callee.kind != NodeKind::Ident) return false;
         const std::string_view name = ast_.text(callee);
+        if (name == "async" || name == "await") return true;  // removed call forms report their own diagnostic
         if (plan_.index.count(name)) return true;
         if (thread_builtin(call.a)) return true;  // handles reach a thread's snapshot (legacy shares them)
         if (name == "cancel") return k == kKindFuture || k == kKindThread;  // CP23 cooperative cancellation

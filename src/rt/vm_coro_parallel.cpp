@@ -42,6 +42,8 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Valu
     record->runtime = coro.parallel;
     record->wait_state = coro.parallel_wait;
     record->owner_task = coro.current;
+    record->wait_states.push_back(coro.parallel_wait);
+    parallel_task_identity(record);
     if (coro.trace) record->label = nift::trace::child_label(thread ? "thread" : "async");
     auto* future = new FutureObject();
     future->thread = thread;
@@ -95,7 +97,8 @@ void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
     if (record->state == ParallelTaskState::Done) {
         std::string error;
         Value value;
-        if (!record->has_result || record->result.decode(*record->proto_map, value, error) == TransferStatus::Ok) {
+        const TransferProtoMap* map = vm.transfer_map_ ? vm.transfer_map_ : record->proto_map.get();
+        if (!record->has_result || (map && record->result.decode(*map, value, error) == TransferStatus::Ok)) {
             future->result = std::move(value);
             future->state = FutureState::Done;
         } else {
@@ -114,7 +117,8 @@ void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
     if (future->failure.catchable) {
         std::string error;
         Value value;
-        if (record->error_value.decode(*record->proto_map, value, error) == TransferStatus::Ok &&
+        const TransferProtoMap* map = vm.transfer_map_ ? vm.transfer_map_ : record->proto_map.get();
+        if (map && record->error_value.decode(*map, value, error) == TransferStatus::Ok &&
             value.is(Kind::Error)) {
             future->error = std::move(value);
         } else {
@@ -133,12 +137,28 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
         return 0;
     }
     bool complete = false;
+    bool foreign = false;
     {
         std::lock_guard<std::mutex> lock(record->mutex);
         complete = record->state != ParallelTaskState::Pending;
-        if (!complete) record->waiters.push_back(coro.current);
+        if (!complete) {
+            foreign = std::find(coro.parallel_live.begin(), coro.parallel_live.end(), record) ==
+                      coro.parallel_live.end();
+            if (!foreign) {
+                record->waiters.push_back(coro.current);
+            } else {
+                bool known = false;
+                for (const auto& state : record->wait_states)
+                    if (state.get() == coro.parallel_wait.get()) {
+                        known = true;
+                        break;
+                    }
+                if (!known) record->wait_states.push_back(coro.parallel_wait);
+            }
+        }
     }
     if (!complete) {
+        if (foreign) coro.foreign_waits.push_back({record, coro.current});
         coro.tasks[coro.current].state = State::Waiting;
         save(vm, proto, base, pc);
         return next(vm, R, K, proto, base, pc, fault);
@@ -195,6 +215,22 @@ void Vm::Coro::reap_parallel(Vm& vm) {
         coro.parallel_live.erase(coro.parallel_live.begin() + static_cast<std::ptrdiff_t>(i));
         if (coro.live != 0) --coro.live;
         ++coro.finished;
+    }
+}
+
+void Vm::Coro::reap_foreign(Vm& vm) {
+    Coro& coro = *vm.coro_;
+    for (std::size_t i = 0; i < coro.foreign_waits.size();) {
+        const ForeignWait& wait = coro.foreign_waits[i];
+        if (!wait.record || !wait.record->complete()) {
+            ++i;
+            continue;
+        }
+        if (wait.task < coro.tasks.size() && coro.tasks[wait.task].state == State::Waiting) {
+            coro.tasks[wait.task].state = State::Ready;
+            coro.run_queue.push_back(wait.task);
+        }
+        coro.foreign_waits.erase(coro.foreign_waits.begin() + static_cast<std::ptrdiff_t>(i));
     }
 }
 

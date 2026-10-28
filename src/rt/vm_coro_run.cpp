@@ -65,9 +65,19 @@ int Vm::coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto
     const Value& callee = R[in.b];
     const FunctionObject* f = callee.is(Kind::Function) ? callee.heap_as<FunctionObject>() : nullptr;
     const Proto* code = f != nullptr ? static_cast<const Proto*>(f->code) : nullptr;
-    if (in.c & 0x8000u) {  // `thread(f, …)`: the compiler admits a synchronous function with matching arity
-        if (code == nullptr || code->is_async || (in.c & 0x7fffu) != code->nparams)
-            return internal(fault, "thread callee") ? 1 : 0;
+    if (in.c & 0x8000u) {  // `thread(callee, …)`: runtime callee and arity validation
+        if (code == nullptr)
+            return raise(fault, StopReason::Error, "thread: first argument must be callable") ? 1 : 0;
+        if (code->is_async) return raise(fault, StopReason::Error, "thread: invalid async callable") ? 1 : 0;
+        const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
+        if (argc != code->nparams) {
+            const Note* note = note_of(proto, &in);
+            if (f->is_lambda)
+                return raise(fault, StopReason::Error, "thread: lambda argument count mismatch") ? 1 : 0;
+            return raise(fault, StopReason::Error,
+                         "thread: callable argument count mismatch: " +
+                             std::string(note != nullptr && !note->text.empty() ? note->text : "callable")) ? 1 : 0;
+        }
         const Value function = callee;
         if (!Coro::spawn(*this, in, code, function, R, fault, true)) return 0;
         ++pc;

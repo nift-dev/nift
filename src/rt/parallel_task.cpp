@@ -5,6 +5,7 @@
 #include "rt/shared_state.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <system_error>
 #include <thread>
@@ -66,6 +67,8 @@ std::size_t ParallelRuntime::active() const {
 
 namespace {
 
+std::atomic<std::uint64_t> next_parallel_identity{1};
+
 void notify_wait_state(const std::shared_ptr<ParallelWait>& state) {
     if (!state) return;
     {
@@ -76,6 +79,32 @@ void notify_wait_state(const std::shared_ptr<ParallelWait>& state) {
 }
 
 } // namespace
+
+std::uint64_t parallel_task_identity(const std::shared_ptr<ParallelTaskRecord>& record) {
+    if (!record) return 0;
+    std::lock_guard<std::mutex> lock(record->mutex);
+    if (record->shared_id == 0) record->shared_id = next_parallel_identity.fetch_add(1);
+    return record->shared_id;
+}
+
+void add_parallel_wait_state(const std::shared_ptr<ParallelTaskRecord>& record,
+                             const std::shared_ptr<ParallelWait>& state) {
+    if (!record || !state) return;
+    std::lock_guard<std::mutex> lock(record->mutex);
+    for (const auto& existing : record->wait_states)
+        if (existing.get() == state.get()) return;
+    record->wait_states.push_back(state);
+}
+
+void notify_parallel_wait_states(const std::shared_ptr<ParallelTaskRecord>& record) {
+    if (!record) return;
+    std::vector<std::shared_ptr<ParallelWait>> states;
+    {
+        std::lock_guard<std::mutex> lock(record->mutex);
+        states = record->wait_states;
+    }
+    for (const auto& state : states) notify_wait_state(state);
+}
 
 void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     nift::trace::ContextGuard guard(record->label);
@@ -106,7 +135,8 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     }
     {
         std::lock_guard<std::mutex> lock(record->mutex);
-        const bool succeeded = outcome.status == IsolateTaskStatus::Ok && outcome.result.reason == StopReason::None;
+        const bool succeeded = outcome.status == IsolateTaskStatus::Ok &&
+                               outcome.result.reason == StopReason::None && !record->cancelled;
         if (succeeded) {
             record->state = ParallelTaskState::Done;
             record->result = std::move(outcome.return_value);
@@ -140,7 +170,7 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
         record->failure_catchable = record->failure_catchable && record->has_error_value;
     }
     record->cv.notify_all();
-    notify_wait_state(record->wait_state);
+    notify_parallel_wait_states(record);
     if (record->runtime) record->runtime->release();
 }
 

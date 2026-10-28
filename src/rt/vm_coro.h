@@ -70,6 +70,13 @@ struct Vm::Coro {
     struct Later {
         bool operator()(const Timer& a, const Timer& b) const { return a.at != b.at ? a.at > b.at : a.seq > b.seq; }
     };
+    // A local task blocked in `await`/`join` on a record owned by another
+    // isolate. The owning scheduler cannot wake this task id, so this isolate
+    // polls the record after its shared ParallelWait is notified.
+    struct ForeignWait {
+        std::shared_ptr<ParallelTaskRecord> record;
+        std::uint32_t task = 0;
+    };
 
     std::vector<Task> tasks;  // tasks[0] is the main program
     std::vector<std::uint32_t> free_ids;
@@ -86,9 +93,10 @@ struct Vm::Coro {
     // CP23 parallel tasks (null under the CP22 cooperative path).
     std::shared_ptr<ParallelRuntime> parallel;
     std::shared_ptr<const Program> program_owner;
-    std::shared_ptr<ProgramTransferMap> parallel_map;
+    std::shared_ptr<const TransferProtoMap> parallel_map;
     std::shared_ptr<ParallelWait> parallel_wait;
     std::vector<std::shared_ptr<ParallelTaskRecord>> parallel_live;
+    std::vector<ForeignWait> foreign_waits;
     std::deque<std::shared_ptr<ParallelTaskRecord>> parallel_output;
     bool trace = false;
     // A fatal failure re-raised by `await` reports the task's position.
@@ -132,6 +140,7 @@ struct Vm::Coro {
     static bool spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Value* R, Fault& fault, bool thread);
     // Settlement of completed records: structured child counts, waiters, stats.
     void reap_parallel(Vm& vm);
+    void reap_foreign(Vm& vm);
     void flush_parallel_outputs(Vm& vm);
     void resolve_parallel(Vm& vm, FutureObject* future, const std::shared_ptr<ParallelTaskRecord>& record);
     int await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,

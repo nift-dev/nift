@@ -25,13 +25,7 @@ bool shared_cancel(const Value& task_value, SharedOpError& error) {
     }
     if (wake) {
         record->cv.notify_all();
-        if (record->wait_state) {
-            {
-                std::lock_guard<std::mutex> lock(record->wait_state->mutex);
-                ++record->wait_state->generation;
-            }
-            record->wait_state->cv.notify_all();
-        }
+        notify_parallel_wait_states(record);
         Registry& r = registry();
         r.cv.notify_all();
     }

@@ -47,7 +47,8 @@ void Vm::coro_init() {
     coro.parallel = options_.parallel;
     coro.parallel_wait = options_.parallel_wait ? options_.parallel_wait : std::make_shared<ParallelWait>();
     if (coro.parallel) {
-        coro.parallel_map = std::make_shared<ProgramTransferMap>(program_);
+        coro.parallel_map = options_.transfer_map;
+        if (!coro.parallel_map) coro.parallel_map = std::make_shared<ProgramTransferMap>(program_);
         transfer_map_owner_ = coro.parallel_map;
         transfer_map_ = transfer_map_owner_.get();
         coro.program_owner = options_.program_keepalive;
@@ -190,6 +191,7 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
     for (;;) {
         const std::uint64_t observed = coro.parallel_wait ? coro.parallel_wait->snapshot_generation() : 0;
         coro.reap_parallel(vm);
+        coro.reap_foreign(vm);
         coro.flush_parallel_outputs(vm);
         while (!coro.run_queue.empty()) {
             const std::uint32_t id = coro.run_queue.front();
@@ -200,12 +202,20 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
             load(vm, id, R, K, proto, base, pc);
             return 1;
         }
+        // A cancellation request wakes this task's own await/join so the
+        // opcode can raise the catchable runtime.cancelled Error at its site.
+        if (coro.current != 0 && vm.cancellation_requested() &&
+            coro.tasks[coro.current].state == State::Waiting) {
+            coro.tasks[coro.current].state = State::Ready;
+            coro.run_queue.push_back(coro.current);
+            continue;
+        }
         const Task& main = coro.tasks.front();
-        if (main.body_done && main.children == 0 && coro.parallel_live.empty()) {
+        if (main.body_done && main.children == 0 && coro.parallel_live.empty() && coro.foreign_waits.empty()) {
             coro.flush_parallel_outputs(vm);
             return 2;
         }
-        if (!coro.parallel_live.empty()) {
+        if (!coro.parallel_live.empty() || !coro.foreign_waits.empty()) {
             coro.wait_parallel(vm, observed);
             continue;
         }

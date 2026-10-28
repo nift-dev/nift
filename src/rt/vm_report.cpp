@@ -8,6 +8,7 @@
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
 #include "rt/native.h"
+#include "rt/shared_state.h"
 #include "rt/render.h"
 #include "rt/vm_ops.h"
 
@@ -104,7 +105,16 @@ bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& outp
     switch (static_cast<NativeId>(in.b)) {
         case NativeId::Print: {
             const std::size_t before = output.size();
-            if (!native_print(R[in.a], output, fault.message))
+            Value printable = R[in.a];
+            if (printable.is(Kind::Handle) && printable.handle_kind() == HandleKind::Atomic) {
+                SharedOpError error;
+                Value loaded;
+                if (!shared_atomic_load(printable, loaded, error))
+                    return raise_catchable(fault, error.code.empty() ? "runtime.invalid_argument" : error.code,
+                                           error.message, report_offset(fault, proto, &in));
+                printable = std::move(loaded);
+            }
+            if (!native_print(printable, output, fault.message))
                 return raise(fault, StopReason::Error, fault.message);
             for (std::size_t k = before; k < output.size(); ++k) lines_ += output[k] == '\n';
             R[in.a] = Value();

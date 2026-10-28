@@ -326,7 +326,15 @@ NodeId ExprParser::await_expression(Token token) {
     const bool ends = after == Tok::End || after == Tok::Comma || after == Tok::RParen || after == Tok::RBracket ||
                       after == Tok::RBrace;
     if (ends) return postfix(primary(), token.begin);  // the name `await`
-    if (next != ' ') return fail(OpaqueReason::LegacyRuntimeError);
+    if (next != ' ') {
+        if (next == '(') {  // `await(...)`: the removed call form
+            advance();
+            name_base_ = true;
+            collection_base_ = false;
+            return postfix(leaf(NodeKind::Ident, token), token.begin);
+        }
+        return fail(OpaqueReason::LegacyRuntimeError);
+    }
     advance();
     const DepthGuard guard(expression_depth(), kMaxExpressionDepth);
     if (guard.exceeded) return fail(OpaqueReason::NestingLimit);

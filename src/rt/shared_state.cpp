@@ -249,7 +249,7 @@ bool shared_mutex_get(const Value& handle, std::uint64_t owner, const TransferPr
         Registry& r = registry();
         std::lock_guard<std::mutex> lock(r.mutex);
         if (!entry->locked || entry->owner != owner) {
-            fail(error, "runtime.invalid_argument", "mutex: get requires the current task to hold the lock");
+            fail(error, "runtime.invalid_argument", "mutex: get requires the current thread to hold the lock");
             return false;
         }
         graph = entry->value;
@@ -269,7 +269,7 @@ bool shared_mutex_set(const Value& handle, std::uint64_t owner, const Value& val
     Registry& r = registry();
     std::lock_guard<std::mutex> lock(r.mutex);
     if (!entry->locked || entry->owner != owner) {
-        fail(error, "runtime.invalid_argument", "mutex: set requires the current task to hold the lock");
+        fail(error, "runtime.invalid_argument", "mutex: set requires the current thread to hold the lock");
         return false;
     }
     entry->value = std::move(graph);

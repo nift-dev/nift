@@ -85,6 +85,32 @@ bool contains_interpolated_literal(const Ast& ast, NodeId id) {
     return false;
 }
 
+// A managed handle inside a `thread(...)` argument is admitted at compile time
+// so the isolate transfer can refuse it with the specific non-transferable
+// resource error at the spawn site (CP23). Ordinary calls keep the CP17
+// handle-flow barrier.
+bool inside_thread_argument(const Ast& ast, NodeId id, const std::vector<NodeId>& parent) {
+    NodeId current = id;
+    while (current < parent.size()) {
+        const NodeId p = parent[current];
+        if (p == kNoNode) return false;
+        const Node& pn = ast.at(p);
+        if (pn.kind == NodeKind::Array || pn.kind == NodeKind::Object || pn.kind == NodeKind::Property) {
+            current = p;
+            continue;
+        }
+        if (pn.kind != NodeKind::Call || pn.a == kNoNode) return false;
+        const Node& callee = ast.at(pn.a);
+        if (callee.kind != NodeKind::Ident || ast.text(callee) != "thread")  // rt-lint: allow-string-compare compile
+            return false;
+        const NodeId* args = ast.list(pn);
+        for (std::uint32_t k = 0; k < pn.count; ++k)
+            if (args[k] == current) return true;
+        return false;
+    }
+    return false;
+}
+
 bool handle_position_allowed(const Ast& ast, NodeId id, const std::vector<NodeId>& parent,
                              const UnitKinds& kinds) {
     const NodeId p = id < parent.size() ? parent[id] : kNoNode;
@@ -152,6 +178,11 @@ bool check_handle_flow(const Ast& ast, NodeId root, const UnitKinds& kinds, std:
         if ((kinds.of(id) & kKindHandle) == 0) continue;
         if (handle_read_crosses_function(ast, id, node_owner, owners)) {
             reason = "host-handle-flow";
+            offset = ast.at(id).begin;
+            return true;
+        }
+        if (inside_thread_argument(ast, id, parent)) {
+            reason = "non-transferable resource: cannot transfer a managed file/stream/process handle between isolates";
             offset = ast.at(id).begin;
             return true;
         }

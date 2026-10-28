@@ -101,7 +101,9 @@ void Inference::statement(NodeId id) {
             const TyRef v = expr(n.b);
             const Node& target = ast_.at(n.a);
             if (target.kind == NodeKind::Ident) {
-                if (TyRef* var = find(ast_.text(target))) { merge_local(*var, v); record(n.a, *var); }
+                if (TyRef* var = find(ast_.text(target))) {
+                    if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }  // CP23: atomic store
+                    merge_local(*var, v); record(n.a, *var); }
             } else if (target.kind == NodeKind::Index) {
                 expr(target.b);
                 add_element(ast_.at(target.a), v);

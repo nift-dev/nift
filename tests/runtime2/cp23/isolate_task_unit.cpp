@@ -225,7 +225,7 @@ void check_refusals() {
     input.globals[0] = Value::handle(HandleKind::File, 7, 2);
     IsolateTaskOutcome handle = execute_isolate_task(*built.program, input);
     CHECK(handle.status == IsolateTaskStatus::RefusedHandle);
-    CHECK(handle.error.find("Handle") != std::string::npos);
+    CHECK(handle.error.find("non-transferable resource") != std::string::npos);
     CHECK(!handle.has_return_value && handle.return_value.empty());
 
     input = task_input(map, built.entry);

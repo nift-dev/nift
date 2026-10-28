@@ -296,13 +296,14 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
     auto clone = std::make_shared<Program>();
     if (!prepare_clones(source, *clone, error))
         return failure(IsolateTaskStatus::InvalidInput, std::move(error));
-    const CloneTransferMap map(*input.proto_map, source, clone->protos);
+    auto map = std::make_shared<CloneTransferMap>(*input.proto_map, source, clone->protos);
     IsolateTaskStatus status = IsolateTaskStatus::Ok;
     std::vector<Value> globals;
     std::vector<Value> args;
-    if (!seed_values(source, input, map, globals, args, error, status)) return failure(status, std::move(error));
+    if (!seed_values(source, input, *map, globals, args, error, status))
+        return failure(status, std::move(error));
     std::vector<Value> constants;
-    if (!constants_from(source, *input.proto_map, map, constants, error, status))
+    if (!constants_from(source, *input.proto_map, *map, constants, error, status))
         return failure(status, std::move(error));
     std::size_t next = 0;
     for (std::size_t i = 0; i < source.protos.size(); ++i)
@@ -313,11 +314,12 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
 
     options.return_value_only = true;
     options.program_keepalive = clone;
+    options.transfer_map = map;
     Vm vm(*clone, options);
     IsolateTaskOutcome outcome;
     outcome.result = vm.run(outcome.output);
     if (vm.has_uncaught_error()) {
-        const TransferStatus encoded_error = outcome.error_value.encode(vm.take_uncaught_error(), map, outcome.error);
+        const TransferStatus encoded_error = outcome.error_value.encode(vm.take_uncaught_error(), *map, outcome.error);
         if (encoded_error == TransferStatus::Ok) outcome.has_error_value = true;
         else outcome.error_value.clear();
     }
@@ -328,7 +330,7 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
     }
     const Value* returned = vm.return_value();
     if (returned == nullptr) return outcome;
-    const TransferStatus encoded = outcome.return_value.encode(*returned, map, outcome.error);
+    const TransferStatus encoded = outcome.return_value.encode(*returned, *map, outcome.error);
     if (encoded != TransferStatus::Ok) {
         outcome.return_value.clear();
         outcome.status = transfer_status(encoded, false);

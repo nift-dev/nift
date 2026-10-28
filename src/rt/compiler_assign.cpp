@@ -186,6 +186,7 @@ bool UnitCompiler::assign(const Node& node) {
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
+    if (kinds(node.a) & kKindAtomic) return atomic_store(node, b);
     return assign_value(node, b);
 }
 

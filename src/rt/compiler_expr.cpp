@@ -92,49 +92,14 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
     return read_binding(*binding, reg);
 }
 
-bool UnitCompiler::has_call(NodeId id) const {
-    if (id == kNoNode) return false;
-    const Node& n = ast_.at(id);
-    if (n.kind == NodeKind::Call) return true;
-    if (has_call(n.a) || has_call(n.b) || has_call(n.c)) return true;
-    const NodeId* list = ast_.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k)
-        if (has_call(list[k])) return true;
-    return false;
-}
-
-// Literal (or negated numeric literal) value of `node`.
-bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant) {
-    is_constant = true;
-    switch (node.kind) {
-        case NodeKind::Number:
-            if (!decode_number_literal(text(node), value)) return fail(node, "number-literal");
-            return true;
-        case NodeKind::String:
-            if (node.count != 0) { is_constant = false; return true; }  // interpolation lowering
-            if (!decode_string_literal(text(node), value)) return fail(node, "string-literal");
-            return true;
-        case NodeKind::True: case NodeKind::False: value = Value::boolean(node.kind == NodeKind::True); return true;
-        case NodeKind::Null: value = Value::null(); return true;
-        case NodeKind::Unary: {
-            const Node& operand = ast_.at(node.a);
-            if (node.op != Op::Neg || operand.kind != NodeKind::Number) break;
-            switch (decode_negative_number_literal(text(operand), value)) {
-                case NegativeLiteral::Decoded: return true;
-                case NegativeLiteral::Zero: break;  // -0 stays a run-time negation
-                case NegativeLiteral::Invalid: return fail(operand, "number-literal");
-            }
-            break;
-        }
-        default: break;
-    }
-    is_constant = false;
-    return true;
-}
-
 bool UnitCompiler::expr_any(NodeId id, std::uint16_t& operand) {
     const Node& node = ast_.at(id);
-    if (node.kind == NodeKind::Ident) return local_register(node, operand);
+    if (node.kind == NodeKind::Ident) {
+        std::uint16_t source = 0;
+        if (!local_register(node, source)) return false;
+        if (!(kinds(id) & kKindAtomic)) { operand = source; return true; }
+        return atomic_read(id, source, operand);
+    }
     Value value;
     bool is_constant = false;
     if (!constant_of(node, value, is_constant)) return false;
@@ -144,7 +109,12 @@ bool UnitCompiler::expr_any(NodeId id, std::uint16_t& operand) {
 
 bool UnitCompiler::reg_any(NodeId id, std::uint16_t& reg) {
     const Node& node = ast_.at(id);
-    if (node.kind == NodeKind::Ident) return local_register(node, reg);
+    if (node.kind == NodeKind::Ident) {
+        std::uint16_t source = 0;
+        if (!local_register(node, source)) return false;
+        if (!(kinds(id) & kKindAtomic)) { reg = source; return true; }
+        return atomic_read(id, source, reg);
+    }
     return temp(reg) && expr_to(id, reg);
 }
 
@@ -200,7 +170,13 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
-    const KindSet l = kinds(node.a), r = kinds(node.b);
+    KindSet l = kinds(node.a), r = kinds(node.b);
+    // CP23: a bare atomic read in a value position is its contents (expr_any
+    // emits AtomicLoad). The handle tag itself is not an arithmetic kind.
+    if (l & kKindAtomicInt) l |= kKindInt;
+    if (r & kKindAtomicInt) r |= kKindInt;
+    l &= ~kKindAtomic;
+    r &= ~kKindAtomic;
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
             // Legacy's string + callable is a run-time error with a fixed
