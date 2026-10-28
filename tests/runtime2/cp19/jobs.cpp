@@ -33,6 +33,7 @@ int main(int argc,char**argv) {
   std::string output;auto refused=s.execute("run(\"true\")","run-refusal",output);CHECK(!refused.admitted);CHECK(refused.vm_executions==0);CHECK(refused.legacy_executions==0);
   CHECK(jobs->has_live_jobs());
   command(s,"try{throw error(\"caught\")}catch(e){}");CHECK(jobs->has_live_jobs());
+  if(cancelled) CHECK(::kill(-static_cast<pid_t>(list.front().process_group),SIGSTOP)==0);
   auto end=s.finish(cancelled);CHECK(end.reason==StopReason::None);CHECK(!end.host_fault);
   errno=0;CHECK(::kill(static_cast<pid_t>(pid),0)==-1);CHECK(errno==ESRCH);CHECK(s.finish().reason==StopReason::None);
  }
@@ -52,6 +53,16 @@ int main(int argc,char**argv) {
   int closes=0;VmSession s;s.attach_jobs(std::make_unique<FaultOwner>(closes));command(s,"a:=1");
   auto r=s.finish();CHECK(closes==1);CHECK(r.host_fault);CHECK(r.reason==StopReason::Error);CHECK(r.message=="independent host fault");CHECK(r.host_fault_message==r.message);
   CHECK(s.finish().reason==StopReason::None);CHECK(closes==1);
+ }
+ {
+  int closes=0;VmSession s;s.attach_jobs(std::make_unique<FaultOwner>(closes));
+  command(s,"f:=file(\""+std::string(argv[1])+"/job-file\");f.open(\"rw\");f.write(\"dirty\")");
+  const auto r=s.finish();CHECK(r.reason==StopReason::Error);CHECK(r.message!="independent host fault");
+  CHECK(r.host_fault);CHECK(r.host_fault_message=="independent host fault");CHECK(closes==1);
+ }
+ {
+  nift::shell::JobTable jobs;CHECK(jobs.finish().error.empty());
+  ProcessSpec spec;spec.program="/bin/true";CHECK(!jobs.launch({spec},"closed owner",false).error.empty());
  }
  {
   int closes=0;{VmSession s;s.attach_jobs(std::make_unique<FaultOwner>(closes));}CHECK(closes==1);

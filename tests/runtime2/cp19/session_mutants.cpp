@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     const auto f = session.value("f");
     if (expect == "owner") {
         CHECK(f.is(Kind::Function));
-        if (f.is(Kind::Function)) CHECK(!f.heap_as<FunctionObject>()->program_owner);
+        if (f.is(Kind::Function)) CHECK(!session_function(f.heap_as<FunctionObject>())->program_owner);
         const auto status = rt_test::finish("CP19 session negative-control witness");
         if (!status) std::cout << "WITNESS owner\n";
         return status;
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     CHECK(r.value.as_int() == assigned && session.value("tick").as_int() == assigned);
     std::weak_ptr<const Program> owner;
     CHECK(f.is(Kind::Function));
-    if (f.is(Kind::Function)) owner = f.heap_as<FunctionObject>()->program_owner;
+    if (f.is(Kind::Function)) owner = session_function(f.heap_as<FunctionObject>())->program_owner;
     CHECK(owner.expired() == (expect == "owner"));
     session.close();
     CHECK(owner.expired() == (expect == "owner"));

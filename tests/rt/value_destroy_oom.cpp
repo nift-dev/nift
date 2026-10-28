@@ -375,7 +375,7 @@ int main(int argc, char** argv) {
             auto proto = std::make_unique<Proto>();
             proto->constants.push_back(wide(1000));
             program->protos.push_back(std::move(proto));
-            auto* function = new FunctionObject();
+            auto* function = new SessionFunctionObject();
             function->code = &program->main();
             function->program_owner = std::move(program);
             function->upvalues.push_back(make_cell(wide(200), 5));

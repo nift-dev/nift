@@ -35,3 +35,9 @@ test-cp19-job-mutants: $(TEST_DIR)/cp19/job-control $(TEST_DIR)/cp19/job-m1 $(TE
 test-cp19-job-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp19/jobs_cli.py --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp19/jobs-cli-default.json"
 	$(PYTHON) tests/runtime2/cp19/jobs_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --out "$(TEST_DIR)/cp19/jobs-cli-switch.json"
+$(TEST_DIR)/cp19/function-owner-oom: tests/rt/value_destroy_oom.cpp $(CP19_EXPR_OBJECTS)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/function-owner-oom-sanitize: tests/rt/value_destroy_oom.cpp $(CP19_EXPR_SAN_OBJECTS)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@

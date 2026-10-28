@@ -1,0 +1,75 @@
+CP19 accepted CP21 reconciliation — implementation and review record
+29 October 2026
+
+Foundation: 475f5192f6ca510d19602e42041d6e10a88efc78
+Tree: 339bb7fc60ac3245e7e4d6a4ddc54476a321811b
+Preserved parent: 5f653128a84c32d4291c0d620ef71229b9bf5a9a
+Parent tree: 394032a9afe63b06bf2f76da54629c6557657d79
+Authority: owner directive and CP19-INTERFACE-HANDOVER.md, relayed 29 October.
+The older CP19 resource record describes the prior checkpoint, not the current
+CP21 dependency status. CP21 is available and reconciled here.
+
+OWNERSHIP DESIGN IMPLEMENTED
+VmSession owns a single optional SessionJobOwner. The CLI attaches SessionJobs,
+which contains exactly one CP21 JobTable. The same table pointer is threaded
+through the accepted shell dispatcher for launch, jobs, fg, bg and wait. Its
+lifetime is the persistent session, not an individual command or temporary VM
+unit. Script code still has no access to JobTable. No group is registered in
+both owners; no conversion between script handles and jobs was introduced.
+
+Session completion/cancellation explicitly finishes this owner before closing
+CP17 script resources. JobTable::finish runs accepted ProcessGroup::terminate
+with CancelReason::Cleanup, observes settlement/OS outcome/host_fault, releases
+the groups once, and becomes closed. It refuses subsequent launches. Repeated
+finish is inert. Destruction retains bounded cleanup as the exception fallback.
+EOF and explicit exit use this route; they do not wait indefinitely for a
+stopped or long-running background job. Jobs survive successful commands,
+script Errors and pre-admission refusal. CP17 script contexts and their aliases
+retain their accepted contracts independently.
+
+CP17 lifecycle tickets are issued for HandleTable resources only. Shell groups
+remain CP21-owned, with no CP17 LifecycleSink, ContextId or ticket attached.
+Their cleanup must reach ProcessGroup settlement; CP17 close_context separately
+waits for its own tickets. A second registration solely to manufacture a job
+ticket would violate the accepted single-owner boundary. The combined test
+checks the script table's created/cleaned/settled counts while a separate job
+owner has run and settled its jobs.
+
+FAULT REPORTING
+VmResult carries independent host_fault and host_fault_message reporting
+metadata. A job cleanup/terminal failure cannot be converted into child success.
+When a script cleanup Error already exists, its message remains primary and the
+job fault metadata survives separately; CLI finalization reports both messages
+when distinct. Caught Error payloads are untouched. The normal foreground shell
+path retains CP21's existing child exit status and independent host_fault logic.
+
+CP22 RECONCILIATION
+The accepted coroutine compiler, inference, opcode and scheduler paths are kept
+for stateless units, including async result inference in CP19's extracted callable
+worklist and accepted capture/admission checks. Session units containing coroutine
+code are refused atomically as session:coroutine: the bootstrap session VM cannot
+safely use CP22's separate task-global snapshot representation. This is an explicit
+remaining admission qualification, not a claim that persistent coroutine/resource
+reconciliation is implemented. No fallback occurs in VM-owned sessions.
+The accepted VM still refuses run() (callable:run). Shell Host-job execution is
+not evidence of compiled script run() support. Tests witness the refusal and
+absence of its side effects, with later compiled session commands still working.
+
+BOUNDED PERFORMANCE CHANGE
+Ordinary FunctionObject payloads no longer initialize/destroy CP19's optional
+shared Program owner and two identity/display fields. A tagged derived
+SessionFunctionObject holds them only for session/eval callables. Factory and
+deletion paths test the subtype; these costs remain included in measurements.
+The existing conservative identity bit is separate from the new subtype bit;
+cycle traversal preserves it, deletion selects the real allocated type, and heap
+accounting includes the full subtype size. Owned code, retained aliases, stable
+redefinition identity and eval display metadata retain their original witnesses.
+No Value or Frame layout change, call-entry lookup, new fault slot or spawn
+architecture change. No speedup claim is inferred merely from this layout change.
+
+ACCEPTANCE
+The delivery report and raw evidence record final functional, mutation,
+sanitizer and matched instruction outcomes. The million-catch limit remains
+<=1.0 times matched CP18, separately for both workloads and dispatch modes.
+A failed mandatory gate remains failed. This record does not itself grant
+independent acceptance, authoritative integration or checkpoint completion.
