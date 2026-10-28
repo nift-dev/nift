@@ -1,4 +1,4 @@
-CP19 independent implementation candidate — 27 October 2026
+CP19 independent implementation candidate — 28 October 2026
 
 Status
 The non-resource persistent compiler/session implementation is prepared for
@@ -101,7 +101,11 @@ waiver is claimed. The previous +0.112% Cell obligation has not been resolved;
 these final measurements show a larger outstanding regression. Earlier raw runs
 are retained with their own binary hashes. This audit does not establish the
 cause of the instruction differences; a compiler-only source change by itself
-is not performance evidence. No broad optimization round was performed.
+is not performance evidence. Self-attribution against the earlier development
+run locates about 16 million extra instructions per lane in glibc memcpy; the
+inspected hot VM self counts are unchanged. This is attribution, not an established
+root cause or a waiver. Raw annotated profiles are included. No broad optimization
+round was performed.
 
 Matched-dispatch compiler timing samples and bootstrap intervals are preserved.
 The final local medians were about 35.0 us (default) and 32.6 us (switch) for
