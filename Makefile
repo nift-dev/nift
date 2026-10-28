@@ -335,6 +335,17 @@ $(RT_ISOLATE_TRANSFER_UNIT): tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_DEPS)
 test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
 	"$(RT_ISOLATE_TRANSFER_UNIT)"
 
+# CP23 milestone 2: isolate task entry/result API (wrapper execution, cloned
+# constants, TransferGraph arguments/globals/result; no worker threads yet).
+RT_ISOLATE_TASK_UNIT := $(TEST_DIR)/rt/isolate-task-unit$(EXEEXT)
+$(RT_ISOLATE_TASK_UNIT): tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-cp23-isolate-task-unit: $(RT_ISOLATE_TASK_UNIT)
+	"$(RT_ISOLATE_TASK_UNIT)"
+
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"

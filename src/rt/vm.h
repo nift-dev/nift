@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace nift::rt {
@@ -67,6 +68,9 @@ struct VmOptions {
     // than returned in VmResult::return_text. The CLI sets it; embedders keep
     // the value separate.
     bool return_in_output = false;
+    // CP23: capture the TopReturn value without rendering it. The isolate task
+    // wrapper transfers any Value, including ones the renderer does not print.
+    bool return_value_only = false;
 };
 
 struct VmResult {
@@ -124,6 +128,16 @@ class Vm {
 public:
     Vm(const Program& program, VmOptions options = VmOptions());
     VmResult run(std::string& output);
+
+    // CP23: the value of the last TopReturn, kept in this VM's heap until the
+    // caller releases it (ideally after encoding it with TransferGraph on the
+    // same thread). Never a raw value passed to another isolate.
+    bool has_return_value() const noexcept { return has_return_value_; }
+    const Value* return_value() const noexcept { return has_return_value_ ? &return_value_ : nullptr; }
+    Value take_return_value() noexcept {
+        has_return_value_ = false;
+        return std::move(return_value_);
+    }
 
     // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
     struct Coro;
@@ -269,6 +283,8 @@ private:
     std::vector<std::uint64_t> large_lines_, derived_lines_;
     bool evidence_truncated_ = false;
     bool beyond_legacy_depth_ = false;
+    Value return_value_;  // CP23: the last TopReturn value (see take_return_value)
+    bool has_return_value_ = false;
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
     std::size_t global_taken_ = 0;  // C6: globals nulled by global_take and not yet put back
