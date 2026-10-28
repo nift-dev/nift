@@ -81,7 +81,8 @@ struct FunctionObject : HeapObject {
     FunctionObject() : HeapObject(Kind::Function) {}
 };
 // Optional CP19 metadata lives only on session/eval callables. Ordinary
-// closures retain their pre-CP19 representation and allocation/destruction cost.
+// closures retain their pre-CP19 payload size. The factory and destructor
+// still test the optional subtype; measured performance must include that cost.
 inline constexpr std::uint8_t kSessionFunction = 0x40;
 struct SessionFunctionObject : FunctionObject {
     std::shared_ptr<const Program> program_owner;
