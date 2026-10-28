@@ -2754,7 +2754,8 @@ test: test-source-translation
 RT_PARSER_SOURCES := $(filter-out \#%,$(shell grep -v '^\#' src/rt/parser-sources.txt))
 RT_PARSER_HEADERS := src/rt/lexer.h src/rt/ast.h src/rt/source_scan.h src/rt/parser.h src/rt/parser_internal.h \
 	src/rt/statement_parser.h src/rt/declarations.h src/rt/control_flow.h src/rt/expr_parser.h src/rt/expr_postfix.h \
-	src/rt/expr_literals.h src/rt/prevalidate.h tests/rt/rt_parser_tool.h
+	src/rt/expr_literals.h src/rt/prevalidate.h src/rt/legacy_names.h src/rt/reserved_names.h src/rt/binding_rules.h \
+	tests/rt/rt_parser_tool.h
 
 $(TEST_DIR)/rt-parse-dump$(EXEEXT): tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
 	mkdir -p $(TEST_DIR)

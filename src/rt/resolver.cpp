@@ -1,6 +1,7 @@
 #include "rt/resolver.h"
 
 #include "rt/alias.h"
+#include "rt/binding_rules.h"
 #include "rt/native.h"
 #include "rt/structs.h"
 
@@ -109,6 +110,15 @@ bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const 
 
 UnitPlan plan_unit(const Ast& ast, NodeId root) {
     UnitPlan plan;
+    // The for-loop/catch binding rule (rt/binding_rules.h), for units that
+    // skip prevalidation: such a call is never compiled as a call of the binding.
+    const BindingCallViolation binding = reserved_binding_call(ast);
+    if (binding.found) {
+        plan.ok = false;
+        plan.reason = "binding-call-reserved";
+        plan.offset = binding.offset;
+        return plan;
+    }
     const Node& program = ast.at(root);
     const NodeId* statements = ast.list(program);
     bool executable_seen = false, late = false;
