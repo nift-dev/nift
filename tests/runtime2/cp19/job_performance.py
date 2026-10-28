@@ -16,7 +16,7 @@ if a.reuse_reference:
   if row['binary']!='new_':
    assert row['sha256']==identity[row['dispatch']][row['binary']]['sha256'];rows.append({**row,'reference_evidence':str(a.reuse_reference.resolve())})
  assert len(rows)==8*a.rounds
-(a.out/'metadata.json').write_text(json.dumps(dict(platform=platform.platform(),valgrind=subprocess.check_output(['valgrind','--version'],text=True).strip(),binaries=identity,conditions='Identical cwd, executable spelling, source path, HOME, workload bytes, VM limits; no parallel heavy campaign. Same threshold <=1.0, no waiver.',source_origin=str(work/'p.f'),rounds=a.rounds),indent=2)+'\n')
+(a.out/'metadata.json').write_text(json.dumps(dict(platform=platform.platform(),valgrind=subprocess.check_output(['valgrind','--version'],text=True).strip(),binaries=identity,conditions='Identical cwd, executable spelling, source path, HOME, workload bytes, VM limits; this agent serializes its heavy campaigns under a shared lock; external host load is not controlled and wall-clock neutrality is not claimed. Same threshold <=1.0, no waiver.',source_origin=str(work/'p.f'),rounds=a.rounds),indent=2)+'\n')
 for round in range(a.rounds):
  lanes=[(dispatch,workload,name) for dispatch in binaries for workload in ['caught','caught_cell'] for name in binaries[dispatch] if not a.reuse_reference or name=='new_'];rng.shuffle(lanes)
  for dispatch,workload,name in lanes:
