@@ -59,6 +59,19 @@ Affected CP17 file/stream, lifecycle, catchability, unwind, loop-clear, flow and
 resource-contract gates passed. CP13B's 80-case exception lanes and nullable
 presentation checks passed; its harness/control checks also passed.
 
+TEST PHASES
+The final restored candidate repeats the 405/393/168/106 functional suites,
+all CP19 mutation matrices, both allocation sweeps, CP17 normal/persistent
+allocation, CP13B future (80 cases per dispatch), CP22 VM (87) and binding (26)
+per dispatch plus adversarial programs, and CP21 interactive terminal/fault
+checks in VM-owned sessions. Its resource/job/proof/destruction sanitizers pass.
+The fine-grained CP17 file/stream/unwind/flow/contract matrix, CP13B legacy,
+current and harness controls, CP22 default/VM-only/trace/control/print-order
+lanes, and standalone terminal-recovery/lease campaign also passed during the
+preceding subtype experiment. Those phase-specific logs are regression context;
+these broader lanes are not represented as separately rerun final-candidate
+gates. The final restoration returns callable storage to the frozen layout.
+
 MUTATIONS AND SANITIZERS
 Existing 7 session and 13 admission mutation suites passed both dispatches.
 The 14 summary/reporting mutation suite passed both dispatches, with its exact

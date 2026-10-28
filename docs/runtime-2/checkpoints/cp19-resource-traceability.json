@@ -232,5 +232,23 @@
     "CP22_legacy_refusal_golden": "r_f3_member_print_default mismatch reproduced on accepted foundation, gate FAILED",
     "jobs_tickets": "No CP17 ticket/sink attached to CP21-owned groups; group settlement and separate script tickets verified"
   },
+  "evidence_phases": {
+    "final_restored": [
+      "CP19 session/proof/resources/jobs",
+      "all CP19 mutations",
+      "CP19 normal and sanitizer allocation",
+      "CP17 allocation",
+      "CP13B future",
+      "CP22 VM/binding/adversarial",
+      "CP21 interactive terminal/fault checks in VM sessions",
+      "job/resource/proof/destruction sanitizers"
+    ],
+    "preceding_experiment_context_only": [
+      "CP17 detailed file/stream/unwind/flow/contracts",
+      "CP13B legacy/current/harness",
+      "CP22 default/VM-only/trace/controls/print-order",
+      "standalone terminal recovery/lease"
+    ]
+  },
   "independent_acceptance": "pending; no reviewer contacted"
 }
