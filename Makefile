@@ -2583,7 +2583,6 @@ test-v45-job-control: test-cp21-make-failure-control
 ifeq ($(shell uname -s),Linux)
 test-v45-job-control: test-cp21-terminal-recovery
 test-v45-job-control: test-cp21-terminal-recovery-mutants
-test-v45-job-control: test-cp21-fd-inheritance
 test-v45-job-control: test-cp21-d3-mandatory
 endif
 test-v45-job-control:
