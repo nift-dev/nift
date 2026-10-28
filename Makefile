@@ -3852,3 +3852,5 @@ test-rt-host-mutants: test-runtime2-cp17-routing-mutants
 test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant
 test-rt-host-mutants: test-runtime2-cp17-handle-mutants
 test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
+
+include tests/runtime2/cp19/resources.mk
