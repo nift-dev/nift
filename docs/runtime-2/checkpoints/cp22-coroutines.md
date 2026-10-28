@@ -749,7 +749,24 @@ isolate-backed parallel threads.
   and runs on legacy unchanged.
 * No coroutine syntax is added and `async` is not redefined.
 
-### 12.1 Cooperative admission rule (`compiler_coro_admit.{h,cpp}`) — round 6
+### 12.1 Cooperative admission rule (`compiler_coro_admit.{h,cpp}`, `compiler_coro_loops.{h,cpp}`) — round 7
+
+**Round 7 (owner rejection of 6e2d31d6, second independent review R2-1 to
+R2-4).** Two corrections to the round-6 text below:
+* The round-6 claim "the bytecode identifies every operation exactly" was
+  false as written. The bytecode identifies the operation **the VM
+  performs**. Before round 7, a `for`-loop or `catch` binding could reuse a
+  built-in's name; a call of it compiled to a call through the binding,
+  while legacy called the built-in (R2-1). Round 7 closes this twice:
+  * a language validation rule (§12.1.4): calling such a binding in its
+    scope is invalid, on both engines, before anything runs;
+  * A3 no longer trusts a source-level mark. It reads the control-flow graph
+    of each task proto and accepts only the compiled `Sleep` instruction with
+    a constant argument ≥ 1 as the suspension (A3 row below).
+* The identity statements below now hold for every call the VM compiles. A
+  call spelled with a reserved name can no longer resolve to a binding:
+  declarations, parameters and lambda parameters refuse reserved names, and
+  for-loop and catch bindings with such a name may not be called.
 
 **Round 6 (owner rejection of cf1ce940, independent review F1–F6).** The
 rule is now checked on the **compiled bytecode** of the whole program, after
@@ -808,7 +825,7 @@ higher-order arguments and futures.
 | --- | --- | --- |
 | A1 | No `CallNative` of a CP16 Host built-in outside `HOST_OK`, in any proto, main included | `coro-blocking-host:<name>` |
 | A2 | No cycle among T, where edges are `Call`, `Spawn`, and calls through values reaching every function value | `coro-task-recursion` |
-| A3 | Every loop in T suspends on every iteration. The compiler marks a loop's `Yield` (a = 1) only when the loop body's **first statement** is `sleep(<integer literal ≥ 1>)` with the built-in `sleep`. A `continue`, a branch, a nested loop or an early exit therefore cannot skip it: every iteration starts with the suspension, and each nested loop carries its own mark. Any unmarked `Yield` in T is refused. | `coro-task-loop` |
+| A3 | Every repeating path in T reaches the genuine suspension primitive (round 7). For each proto in T, `loops_suspend` builds the bytecode control-flow graph: fall-through, every jump, and a `TryBegin` → handler edge. It then removes the outgoing edges of each **genuine suspension**: a `Sleep` instruction with one argument, whose register the same basic block loads (no jump target in between) with `LoadI`/`LoadK` of an integer ≥ 1. `Sleep` exists only for the built-in `sleep`, bound by id (`compiler_coro.cpp`); a call through a value, a unit function or another built-in is never one. The proto is admitted only if the remaining graph is acyclic, i.e. no cycle avoids a genuine suspension. A `continue`, a branch without a sleep, `sleep(0)`, `sleep(n)` with a variable n, and an inner loop without its own sleep are all refused. A sleep that every path reaches is accepted wherever it stands in the body, e.g. a sleep in both branches or after other statements. | `coro-task-loop` |
 | A4 | Every instruction in T is in `TASK_OP`, and every `CallNative` in T is a `TASK_BUILTIN` (by id) or `print`, which falls under A5 | `coro-task-op:<opcode>`, `coro-task-native:<name>` |
 | A5 | No observation of scheduling: no `print` in T; no `epoch`, no `done()` or `status()` (`FutureOp`) anywhere | `coro-observe:<name>` |
 
@@ -830,8 +847,10 @@ under the non-contractual test switch `NIFT_VM_COOPERATIVE_OBSERVE=1`.
   with captures stay refused (`coro-capture`), because their safety is not
   shown. Witnesses: `sem_lambda_*` (policy `correction:lambda-registry`).
 * **F3, F4, F5.** Fixed by the bytecode rule above. Refusal witnesses
-  `r_f3_*`, `r_f4_*`, `r_f5_*`; mutants M19 (old A3) and M20 (no
-  value-call widening).
+  `r_f3_*`, `r_f4_*`, `r_f5_*`; mutants M19 (old A3: a sleep anywhere in
+  the loop counts) and M20 (no value-call widening). Round 7: A3 is the
+  control-flow rule; `r_f4_sleep_second` became the admitted
+  `ca_sleep_second`, because every path reaches its sleep.
 * **F6.** An inherited compatibility finding, outside CP22 (§13).
 
 #### 12.1.1 Proof of equivalence (round 4)
@@ -1027,7 +1046,8 @@ that each refusal is load-bearing.
 | Transitive task code: nested, indirect, higher-order calls, callable fields | `Admission::collect_tasks` on bytecode: `Call`/`Spawn` edges; any `CallValue`/`CallValueAny` in task code (direct value calls, callable object fields, aliases, higher-order arguments, futures holding functions) adds every `LoadFunction`/`Closure` target in the program | `r_ca_cpu_helper`, `r_ca_nested_call_chain`, `r_ca_higher_order`, `r_ca_global_lambda`, `r_ca_lambda_loop`, `r_f3_*` (M20) |
 | Unknown callable targets | a function value can only be created by `LoadFunction` (a unit function) or `Closure` (a lambda): `compiler_expr.cpp` `local_register` refuses a built-in name used as a value (`unresolved-name`/`free-name`), and an unresolved callee is refused (`callable:<name>`); the widening takes every such instruction in the program | `r_ca_higher_order`, `r_ca_global_lambda`, `r_f3_member_alias_default` |
 | Recursion, including mutual recursion and recursion through values or fields | `Admission::cyclic` (bytecode call graph, value calls to every function value) | `r_ca_recursion` (M15), `r_ca_mutual_recursion`, `r_f3_member_recursion` |
-| Loops must suspend on every path (continue, branches, nested loops, early exits) | `suspending_loop_body` (the body's first statement is the qualifying `sleep`) marks the loop's `Yield`; `Admission::task_code` refuses any unmarked `Yield` in T | `r_ca_cpu_loop` (M16), `r_f4_continue` (M19), `r_f4_branch_sleep`, `r_f4_sleep_second`, `r_f4_nested`, `r_ca_sleep_zero_loop`, `r_ca_for_await`; admitted `ca_sleep_loop`, `ca_nested_sleep_loops` |
+| Loops must suspend on every path (continue, branches, nested loops, early exits), by the identity of the compiled operation (round 7) | `loops_suspend` (`compiler_coro_loops.cpp`): the proto's control-flow graph without the outgoing edges of genuine suspensions (`Sleep`, one argument loaded in the same block with an integer constant ≥ 1) must be acyclic | `r_ca_cpu_loop` (M16), `r_f4_continue` (M19), `r_r2_identity_user_fn`, `r_r2_identity_value_call`, `r_r2_identity_builtin` (M21), `r_ca_sleep_zero_loop`, `r_r2_sleep_variable` (M22), `r_r2_sleep_joined`, `r_f4_branch_sleep`, `r_f4_nested`, `r_ca_for_await`; admitted `ca_sleep_loop`, `ca_nested_sleep_loops`, `ca_sleep_second`, `ca_sleep_both_branches`, `ca_sleep_continue_after` |
+| Built-in names rebound by `for`/`catch` bindings (round 7, R2-1) | language rule `reserved_binding_call` (`binding_rules.cpp`) in the prevalidator (both engines) and the VM planner (`binding-call-reserved`) | `binding/bad_*` (15 reviewer witnesses and 7 more: other built-ins, nested lambdas, a module), `binding/ok_*`, `refuse/r_r2_*` (prevalidation off) |
 | Built-ins and methods, identified exactly | `task_builtin_allowed` (built-in id), `task_op_allowed` (opcode); `print` is NativeId::Print | `r_ca_cpu_native` (M17), `r_ca_string_method`, `r_ca_nested_call_chain`, `r_f5_array_join` (`Array.join` refused; a thread `join` is `Await` c = 1) |
 | Blocking Host calls | `Admission::unit_wide`, `host_allowed` (built-in id) | `r_ca_main_blocking` (M14), `r_ca_blocking_host`, `tr_fs`, `tr_exists` |
 | Observations of scheduling | `Admission::unit_wide` (`FutureOp`, `epoch`), `task_code` (`print`) | `r_obs_*_default` (M13), `r_f3_member_print_default`, print_order.py |
@@ -1036,7 +1056,74 @@ that each refusal is load-bearing.
 | Cancellation, progress, future lifetime | `coro_teardown` (abandon once), `end_body`/`finish` (structured completion), deadlock raised as an internal stop | coro_unit teardown and heap-baseline checks, `v_heap_baseline` (M4), `drain_*` (M7, M9), `a02_nested_many` (M1) |
 | Positive sleeps, timers, starvation | timer heap (deadline, sequence), `wait_until` never early, A3 | `v_timer_not_early` (M3), `v_double_resume` (M2), `sleep_order`, `v_preempt` (M10) |
 | Refusal before any effect | admission runs in `compile_unit`, before a `Vm` exists; refuse mode checks `vm_executions == 0` and that the output equals legacy's | every `refuse/*.f`, `--mode default` |
-| Per-rule mutation controls | `-DNIFT_CORO_MUTANT=n`, sources in `CP22_CORO_SOURCES` | M12 (all off), M13 (A5), M14 (A1), M15 (A2), M16 (A3), M17 (A4), M18 (coro-capture), M19 (A3: the rejected sleep-anywhere rule), M20 (value calls not followed) |
+| Per-rule mutation controls | `-DNIFT_CORO_MUTANT=n`, sources in `CP22_CORO_SOURCES`; provenance by content: the manifest records each CP22 object's sha256 next to the normal one, and at least one must differ (an unmutated build is rejected, `controls.py`) | M12 (all off), M13 (A5), M14 (A1), M15 (A2), M16 (A3), M17 (A4), M18 (coro-capture), M19 (A3: a sleep anywhere in the loop counts), M20 (value calls not followed), M21 (A3 identity dropped: any call counts as the suspension), M22 (A3 argument dropped: any `Sleep` counts) |
+
+#### 12.1.4 Language rule: for-loop and catch bindings with a built-in's name (round 7)
+
+**The defect (R2-1, inherited from the base).** Declarations, function
+parameters and lambda parameters may not take a reserved built-in name
+(`binding-name-reserved`, `param-name-reserved`). For-loop bindings
+(`for (x : …)`, `for ((k, v) : …)`) and catch bindings (`catch (x)`) may.
+Legacy resolves a call `sleep(1)` inside such a binding's scope to the
+built-in; the VM resolved it to the binding. The non-async programs
+`s_catch_sync` (legacy `slept`, VM `undefined callable: sleep`),
+`s_forbind_sync`, `s_forbind_int_sync` and `b_touch_main` show the split
+predates CP22.
+
+**The rule (owner decision 2026-10-28), a language validation rule, not a
+CP22 refusal.** A call `name(…)` is invalid when `name` is a for-loop or
+catch binding with a reserved built-in name and the call lies in that
+binding's scope: the loop body or the catch block, nested lambdas and
+functions included.
+* **Same on both engines.** The CP13 prevalidator applies the rule
+  (`reserved_binding_call`, `src/rt/binding_rules.cpp`) to every unit:
+  script, `-e`, eval, and an imported module when it is loaded. This
+  happens before engine selection and before anything of the unit runs.
+  The diagnostic is `error: <file>:<line>:<col>: for-loop binding 'sleep'
+  has the name of a built-in and is called in its scope; rename the
+  binding` (or `catch binding …`) at the binding, with exit 1.
+* **Units that skip prevalidation** (the test-only `NIFT_PREVALIDATE=off`):
+  the VM planner applies the same function and refuses
+  (`binding-call-reserved`). The VM never compiles such a call as a call of
+  the binding.
+* **The actual binding, not every textual occurrence.** Only parsed
+  for-loop and catch bindings count, and only calls whose callee is that
+  identifier inside the scope. Members (`o.sleep(…)`), strings, object keys
+  and calls outside the scope are unaffected. A unit the CP10 parser leaves
+  Opaque (for example C-style loop headers, or the unparenthesised pair
+  form, which legacy itself rejects) runs only on legacy and is not covered.
+* **Valid built-in calls keep working.** Reading such a binding as a value
+  stays valid on both engines (`binding/ok_value_use`, `ok_builtin_calls`,
+  `ok_member_and_text`). The corpus has real code of that shape, which a
+  name-only ban would break: `for (range : …)` in the
+  `nift-packages_semver` contract test, `catch (err)` in the diagnostics
+  and error corpora, and `for (name : …)` in the docs. The rule therefore
+  rejects the call, the point where the engines disagree, not the name.
+  Whether to ban the name itself, as for declarations, is open for the
+  owner (§13 #14).
+* **Not reproduced:** legacy's callable resolution (owner decision 4). A
+  program that relied on legacy calling the built-in through such a binding
+  is now rejected with the diagnostic on both engines.
+* **Legacy's own for-binding rule (found in round 7, not repaired in this
+  candidate).** When the loop runs, legacy also rejects a for-loop binding
+  named like page metadata: `@for binding 'name' conflicts with built-in
+  metadata` (`name`, `title`, `loop`). The VM runs `name` and `title` loops;
+  `loop` is refused. This base mismatch was found while testing the rule
+  above (§13 #15).
+  * A planner refusal (`for-binding-metadata`) with witnesses is prepared as
+    a separate patch.
+  * It is not in this candidate. Its full gates could not run: the disk was
+    below 2 GB free.
+* **Witnesses (permanent regressions), `tests/runtime2/cp22/binding.py`**,
+  run on legacy and on the VM default, with prevalidation on. Each run
+  checks the golden, and that no file is left behind:
+  * the reviewer's long-running loop `bad_forbind_big` (3 000 000 sleeps on
+    legacy), rejected at once;
+  * the print, print-order, touch (task and main), setenv, epoch, mkdir,
+    getenv, `type` and `json` witnesses;
+  * the integer-binding and catch variants (sync and async), the pair form,
+    nested lambdas, a call after a valid loop, and an imported module
+    (nothing of the module runs).
 
 ### 12.2 Nonblocking Host integration
 
@@ -1099,7 +1186,7 @@ zero-fallback gate depends on CP23 for these refusals.
 None of these requirements is optional, and **CP22 is not complete while
 nonblocking Host integration remains open**.
 
-## 13. Classification of every legacy/VM mismatch (owner policy, round 6)
+## 13. Classification of every legacy/VM mismatch (owner policy, rounds 6 and 7)
 
 Legacy is evidence of legitimate behaviour and genuine errors. It does not
 define correctness for its implementation quirks. Every difference between
@@ -1111,9 +1198,10 @@ automatically a VM failure, and never automatically a quirk.
 | --- | --- | --- | --- | --- |
 | 1 | Fatal task error reported at the failing expression, without legacy's `return:` prefix, after `future:` / `thread:` | approved semantic correction (D-009#5) | location of the failing expression | `EXPECT.tsv` `D-009#5-future`, `D-009#5-thread` and their `.r2` goldens |
 | 2 | `alias := arr`, then a mutation through either name (legacy aliases some shapes, in tasks too) | approved semantic correction (D-040) | value semantics; shapes the VM cannot yet decide are refused (`aliasing`) | `r_share_alias`, `r_share_alias_task`; base D-040 suites |
-| 3 | A free name in a function read through a caller's local or parameter (legacy's dynamic scope); the async shapes are F1 | deliberate semantic correction (owner, round 6): lexical scoping | the unit's global, from the executing task's snapshot | `sem_lexical_dyn12`, `_dyn14`, `_dyn16`, `_dyn18` (`correction:lexical-scope`, `.r2`) |
+| 3 | A free name in a function read through a caller's local or parameter (legacy's dynamic scope); the async shapes are F1 | deliberate semantic correction (owner, round 6): lexical scoping, the approved contract | the unit's global, from the executing task's snapshot | `sem_lexical_dyn12`, `_dyn14`, `_dyn16`, `_dyn18`, `sem_lexical_lambda_caller` (`correction:lexical-scope`, `.r2`) |
+| 3b | **Engine selection decides the result (R2-2).** The base G2 refusal (`free-name`) sends units where a *named function* reads a free name through its caller to legacy, which uses dynamic scope. So `f1_lambda_caller` prints 1 (VM, lexical), while the same program plus an unrelated `fn(h(x)) { return await f() }` (`f1_lambda_caller_mixed`) prints `9 9` (refused `free-name`, legacy). The same holds for every correction while a unit can fall back for an unrelated reason | inherited release-consistency discrepancy, **not resolved by CP22**. Owner decision round 7: no refusal is added to preserve legacy's dynamic lookup. It is an explicit Runtime 2.0 release-consistency obligation: CP25 zero-fallback, or another separately approved correction | VM-executed units: lexical; units on legacy: legacy's lookup | `sem_lexical_lambda_caller` (VM, 1); `r_r2_lexical_mixed` and `r_r2_lexical_named` (refused `free-name`, legacy golden `9 9` / `9`) |
 | 3a | The same with no async code (`p/dyn8s.f`, `p/dyn17.f`: VM 1, legacy 9) | inherited finding in the base VM: its dynamic-scope refusal (`globals.cpp` G2) misses lambda and value-call callers. Recorded, **not repaired by CP22** | (base) | review `logs/findings-repro.log`; reproduced on cf1ce940 (`logs/repro-cf1ce940.log`) |
-| 4 | A lambda created in a task and used outside it (return, array, object, future, sibling task, parent) | legacy limitation (per-worker lambda table, `invalid lambda`); not reproduced | the lambda works anywhere; lambdas with captures stay refused | `sem_lambda_*` (`correction:lambda-registry`, `.r2`) |
+| 4 | A lambda created in a task and used outside it (return, array, object, future, sibling task, parent) | legacy bug and limitation: per-worker lambda ids. Legacy does not always fail with `invalid lambda`. Ids collide across workers, so lambdas from different tasks compare equal (`l_eq`: `fa == fb` is `true`), a task's lambda equals main's (`l_eq_main`), and a call can silently run *another* lambda with the same id (`l_wrong_id`: legacy 0, from main's `m`; VM 1001, the right one). Not reproduced (owner, round 7) | each lambda keeps its identity anywhere (`==` is identity, as in synchronous code: `l_eq_sync` gives `false true` on both engines); lambdas with captures stay refused, since their lifetime and ownership are not shown safe | `sem_lambda_*` (`correction:lambda-registry`, `.r2`); `sem_lambda_eq`, `sem_lambda_eq_main`, `sem_lambda_wrong_id` (`correction:lambda-identity`, `.r2`) |
 | 5 | A future created in a task and returned to its parent (legacy: `await: invalid future`) | unresolved specification question; refused before any effect (`coro-future-flow:Return`) | refused until the owner defines future escape semantics | `r_future_result`, `r_return_top` |
 | 6 | A named async function used as a value (legacy: `invalid async callable`) | legacy bug; the Runtime 2.0 meaning (a call through the value spawns) is not yet specified; refused (`coro-async-value`) | refused | `r_async_value` |
 | 7 | Async self-recursion (legacy runs it synchronously inside the task) | legacy quirk; specification question (a recursive call should return a future); refused (`coro-async-recursion`) | refused | `deep_chain` |
@@ -1123,8 +1211,14 @@ automatically a VM failure, and never automatically a quirk.
 | 11 | A catch binding used as an assignment's text type reads register 0 (`got = e`) | genuine VM correctness regression, inherited from CP13B; handled separately | (base defect) | handover notes |
 | 12 | Scheduling-dependent output (task `print`, `done`/`status`, `epoch`) under the non-contractual observe switch | not contractual: FIFO is one of legacy's interleavings on large pools, not on P = 2 | refused by default (A5) | print_order.py |
 | 13 | 300 000 tasks (`p/many.f`): legacy exceeds 40 s; the VM prints 45599850000 | legacy implementation limitation (performance); the value is the arithmetic result | the VM result | `logs/sweep-r6-classified.tsv` |
+| 14 | A for-loop or catch binding with a built-in's name, called in its scope (R2-1): legacy calls the built-in, the VM called the binding (base VM, also without async) | genuine correctness and safety regression (blocking). Fixed by a **language validation rule** (§12.1.4), the same on both engines and checked before anything runs; legacy's resolution is not reproduced | rejected with a diagnostic on both engines; reading the binding as a value stays valid. Open for the owner: whether the *name* itself should be banned (as for declarations), which would reject existing code such as `for (range : …)` and `catch (err)` | `binding/` (`binding.py`), `refuse/r_r2_*` (`binding-call-reserved`) |
+| 15 | A for-loop binding named `name` or `title` (legacy: `@for binding 'name' conflicts with built-in metadata`, exit 1; VM: runs the loop) | genuine base VM correctness defect (sync and async), found in round 7; **not repaired in this candidate** | (base; unchanged). Prepared fix: a planner refusal `for-binding-metadata`, so legacy reports its error; it needs its gates | probes in the handover (`logs/probe-metadata.txt`); prepared patch `proposed/0001-…` |
 
 **Unresolved dependencies** (all mandatory, none optional):
+* the Runtime 2.0 release-consistency obligation (§13 #3b): while a unit
+  can fall back to legacy for an unrelated reason, approved corrections
+  apply only to VM-executed units. This is resolved by CP25 zero-fallback or
+  a separately approved correction, not by CP22;
 * nonblocking Host-operation integration, which waits for the
   CP17/CP19/CP21 interfaces (§12.2);
 * CP17 reconciliation (§6.1);
@@ -1393,3 +1487,109 @@ commit after caff57af changes this record only.
   * Under the thread switch, `thread(f)` widened to every function value,
     which refused `tr_thread_env` as recursion. It is now an exact edge
     (§12.1).
+
+### Evidence, round 7 (R2-1 to R2-4; code commit c7e0b1d5, tree ffee932c)
+
+All results below were run on the candidate's code through heavy.sh. Raw
+logs are in the Opus scratchpad, `logs/*-r14` unless named otherwise. The
+commit after c7e0b1d5 changes this record only.
+
+* **Before: the second review's witnesses reproduced on the rejected
+  candidate** 6e2d31d6 (tree d82d782f). It was built in a separate scratch
+  worktree; the binary's sha256 is `1b556baf…41c83e`, identical to the
+  reviewer's build. All 93 reproducers of the review's `p/` were run with
+  its harness (`logs/repro-6e2d31d6.log`).
+  * R2-1:
+    * `s_forbind_big`: legacy still running at 20 s; VM `3000000`.
+    * `b_print_task`, `b_print_order`: VM omits the task prints.
+    * `b_touch_task`, `b_touch_main`: legacy creates the file; VM does not.
+    * `b_setenv_task`: legacy `set`, VM `null`. `b_epoch_task`: legacy
+      `true`, VM `false`.
+    * `s_forbind_int`, `s_catch`: VM `undefined callable: sleep`.
+    * `b_forpair_legacy`: VM `300` without suspending.
+    * Non-async base cases: `s_catch_sync` (legacy `slept`, VM `undefined
+      callable: sleep`), `s_forbind_sync`, `s_forbind_int_sync`.
+  * R2-2: `f1_lambda_caller` (legacy 9, VM 1);
+    `f1_lambda_caller_mixed` (`9 9`, refused `free-name`).
+  * R2-3: `l_eq` and `l_eq_main` (legacy `true`, VM `false`); `l_wrong_id`
+    (legacy `0 0`, VM `1001 0`); `l_eq_sync` (`false true` on both
+    engines).
+* **After: every reviewer witness of both reviews rerun and classified**
+  (`logs/sweep-r7.tsv`, `logs/sweep-r7-classified.tsv`). There are 100
+  round-1 and 93 round-2 witnesses. Each runs on legacy and on the
+  contractual default `NIFT_VM=1`, with prevalidation on, on 6e2d31d6 and
+  on this candidate.
+
+  | Classification | Witnesses |
+  | --- | --- |
+  | rejected on both engines before execution by the binding rule (§12.1.4); 12 of them were admitted by 6e2d31d6 with VM ≠ legacy | 17 |
+  | equal, executed on the VM | 54 |
+  | equal, both on legacy: refused by the VM before execution; 4 time out on both engines | 94 |
+  | §13 #1 D-009#5 location | 5 |
+  | §13 #3 lexical scope | 7 |
+  | §13 #3a inherited, not repaired | 2 |
+  | §13 #4 lambda registry | 6 |
+  | §13 #4 lambda identity | 4 |
+  | §13 #10 inherited F6 | 3 |
+  | §13 #13 legacy performance | 1 |
+  | **Unclassified** | **0** |
+
+  The F3–F5 adversarial witnesses are kept:
+  * `mc5`, `mc1`, `a3c` and `m_lambda_in_task_loop` are still refused;
+  * the callable-through-object, array, returned-function, future,
+    nested-task and mutual-recursion witnesses (`m_*`) are refused, equal,
+    or one of the approved corrections §13 #1 (`m_length`) and #4
+    (`m_lambda_ret_print`).
+* **`make test-runtime2-cp22`** (goto and switch builds), exit 0:
+
+  | Check | Result |
+  | --- | --- |
+  | coro-unit | 80/80 |
+  | Legacy oracle | 168/168 |
+  | VM | 87/87 |
+  | Refusals | 81/81 |
+  | `--mode default` | 87/87 per build: 60 admitted; refused 16 `callable:thread`, 5 `coro-observe:done`, 5 `coro-observe:print`, 1 `coro-observe:status` |
+  | VM-only | 7/7 |
+  | Traces | 3/3 |
+  | **Binding rule** (`binding.py`, both engines, prevalidation on) | **26/26** per build |
+  | Adversarial | seed 1, 80 × 2 builds, 0 differences |
+  | Controls | rejected, including the unmutated-mutant control, now on content provenance |
+
+  `print_order.py` passed: 8 distinct legacy orders in 30 runs; on P = 2,
+  legacy prints `a c b` where the VM prints `c a b`; 201 ms on legacy,
+  100–101 ms on the VM; 40 programs, 0 happens-before violations.
+* **Mutants:** **22/22** caught by their named witnesses.
+  * Provenance by content: for every mutant the manifest shows exactly the
+    intended object changed:
+    * `vm_coro.o`: M1–M4, M9;
+    * `vm_coro_ops.o`: M5, M6, M8, M10, M11;
+    * `vm_coro_run.o`: M7;
+    * `compiler_coro_admit.o`: M12–M17, M20;
+    * `compiler_coro.o`: M18;
+    * `compiler_coro_loops.o`: M19, M21, M22.
+  * M21 (A3 identity dropped: any call counts as the suspension) is caught
+    by `r_r2_identity_user_fn`, `r_r2_identity_value_call` and
+    `r_r2_identity_builtin`.
+  * M22 (argument dropped) is caught by `r_ca_sleep_zero_loop` and
+    `r_r2_sleep_variable`.
+  * M19 (a sleep anywhere in the loop) is caught by `r_f4_continue`.
+* **ASan+UBSan+LSan:** coro_unit 80/80; corpus VM 87, refusals 81,
+  default 87, vm-only 7, binding 26; adversarial seed 2 (30 programs).
+* **TSan:** 127/127 on the POSIX host loop and 127/127 on the portable loop.
+* **`make -k test-rt-vm`:** exit 0. The only "FAIL" line is the expected
+  detection by the deliberate `NIFT_KIND_MUTANT` binary.
+* **The prevalidator's own gates:** `make
+  test-runtime2-prevalidate-gate` (rules, project corpus, positive corpus)
+  and `make test-rt-parser` pass.
+* rt-lint, test-integrity, certification guard and self-test: pass.
+* MinGW-w64 syntax check: 32/32 files, 0 warnings.
+* **Found and fixed during this round:**
+  * The first CFG version treated every fall-through as a jump target, so
+    it refused every sleep loop. `--mode vm` caught it.
+  * It also searched for cycles only from the entry of the graph *with* the
+    suspension edges cut, so code after a sleep was never examined, and
+    `r_f4_nested` (an unsuspended inner loop after the sleep) was admitted.
+    `--mode refuse` caught it. Liveness is now computed on the full graph.
+* **Not in this candidate:** the base mismatch §13 #15 (`for (name : …)`).
+  Its prepared fix needs a full gate run, and the disk fell below 2 GB free
+  while the CP17 review ran.
