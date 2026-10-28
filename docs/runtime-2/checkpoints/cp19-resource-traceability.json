@@ -1,0 +1,47 @@
+{
+  "status": "INCOMPLETE",
+  "accepted_cp17": "812bf21ab66bbf652141c069c92995293987ca55",
+  "verified": {
+    "file_stream_survival": [
+      "src/rt/vm_session.cpp",
+      "tests/runtime2/cp19/resources.cpp"
+    ],
+    "alias_and_box_storage_lifetime": [
+      "src/rt/handles/handle_box.cpp",
+      "tests/runtime2/cp19/resources.cpp"
+    ],
+    "finalization_cancellation_tickets": [
+      "src/rt/vm_handles.cpp",
+      "tests/runtime2/cp19/resources.cpp"
+    ],
+    "reports_and_primary_error": [
+      "tests/runtime2/cp19/resources.cpp",
+      "tests/runtime2/cp19/resource_cli.py"
+    ],
+    "admission_atomicity_W13": [
+      "src/rt/compiler_handles.cpp",
+      "tests/runtime2/cp19/resource_mutants.cpp"
+    ],
+    "host_processgroup_seam": [
+      "tests/runtime2/cp19/resources.cpp"
+    ],
+    "allocation_and_sanitizers": [
+      "tests/runtime2/cp19/resource_alloc.cpp"
+    ]
+  },
+  "pending": {
+    "CP21": [
+      "session ownership",
+      "command survival",
+      "cancellation",
+      "exactly-once cleanup",
+      "lifecycle-ticket settlement",
+      "host_fault propagation"
+    ],
+    "performance": "four final total instruction comparisons exceed unchanged CP18 gate"
+  },
+  "provisional_cp21_tracking_only": {
+    "commit": "5f94a6fb",
+    "tree": "27f85c5f"
+  }
+}

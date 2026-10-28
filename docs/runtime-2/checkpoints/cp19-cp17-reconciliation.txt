@@ -1,41 +1,81 @@
-CP19 reconciliation with accepted CP17 — development record, 28 October 2026
-Foundation: 812bf21ab66bbf652141c069c92995293987ca55
-Tree: 028f64e92230624d0cbf735d4a0845667bbee4d2
-CP19 frozen parent: 87c4cbea988e65ba7c8ca5d5b1bb0bdbcc5c1172
+CP19 — accepted CP17 reconciliation: frozen for review
+28 October 2026
 
-Authority: D-056 in decisions.md; handles/table.h; natives/host_file_handles.h;
-compiler_handles.cpp; CP17 resource_contracts and unwind regression witnesses.
+STATUS: Independently verifiable resource work is implemented and verified.
+CP19 IS NOT COMPLETE. Interactive JobTable attachment awaits accepted CP21;
+the unchanged million-catch instruction gate also remains failed. No waiver.
 
-A handle Value identifies a generation-checked slot, not an independent resource
-owner. A HandleBox adopts one counted table reference; copies alias that box.
-Last-box release starts cleanup once. Explicit close is idempotent. Context end
-waits for outstanding lifecycle-ticket obligations and returns final reports.
-Normal abandonment reports an open managed file, discarding unwritten buffers.
-Exceptional abandonment silently discards only exclusively owned abandoned files;
-surviving aliases and persistent outer bindings remain live. Caught Errors and
-normal-completion obligations retain their accepted semantics.
+Foundation: accepted CP17 812bf21ab66bbf652141c069c92995293987ca55,
+tree 028f64e92230624d0cbf735d4a0845667bbee4d2.
+Frozen CP19 parent 87c4cbea988e65ba7c8ca5d5b1bb0bdbcc5c1172 is unchanged.
+Its 253-entry evidence manifest was reverified with zero mismatches.
+Development is isolated on codex/cp19-cp17-reconcile.
 
-Session adaptation: keep the existing Script context open across commands. Clear
-command registers at each boundary, using accepted exceptional abandonment only
-on an aborted command. Drain already-settled cleanup failures without closing
-surviving resources or moving ownership. Finalization closes the Script context
-and waits through the accepted close_context path. Cancellation first marks the
-same context Cancelling, then finalizes it. No new process owner or ticket exists.
+IMPLEMENTATION
+The session retains CP17's existing Script resource context across commands.
+Temporary registers are released at command boundaries; accepted exceptional
+abandonment applies only to aborted-command temporaries. Persistent aliases and
+outer bindings remain live. Settled failure reports drain once without closing
+surviving resources, settling tickets or changing ownership. A primary command
+Error remains primary; independent normal-abandonment reports remain queued.
+Finalization closes the existing context and waits through CP17 close_context;
+cancellation marks that same context Cancelling before finalization.
+VM-created boxes pin table storage, while finalization still promptly closes
+resources. Emergency teardown preserves the accepted allocation-free path.
+Cross-unit capture admission retains W13 restrictions. Inherited restrictions
+are not blanket certification of excluded categories. Vm remains noncopyable.
+The compiler skips handle-flow graph construction only when there are no Handle
+AST nodes for the existing validation loop to inspect. No general VM rewrite.
 
-A narrow HandleTable report-drain API is needed because close_context currently
-combines final reporting with closing all resources. Draining does not settle or
-cancel obligations and cannot consume a failure twice. Outstanding asynchronous
-settlements still remain the context's final-close obligations.
+EVIDENCE
+Both dispatch modes pass 168 resource checks each, six production mutations
+with named broken-behavior and reciprocal/dead/unrelated controls (72 raw
+observations), and 16 CLI cases across legacy/VM/require lanes (96 observations).
+ASan/LSan/UBSan: 168 resource checks each; allocation sweep 231 points and
+1618 checks each, zero failures, leak detection enabled. Injection outcomes:
+227 pre-admission, 4 admitted containment, 1 success. No execution replay.
+Existing 405-check CP19 suites and existing mutation matrices passed both modes.
+Affected CP17 file/stream, lifecycle, unwind, flow and resource-contract suites,
+CP13B future tests, CP18 embedding/COW and allocation campaigns passed. Final
+compiler change was followed by CP17/CP18 allocation, admission/CLI, compiler-cost
+and lint checks. Logs identify exact checks and bounded scope.
+CLI explicitly distinguishes accepted D-056 behavior and W13 refusal. Initial
+file/inline resources survive into -i in the VM session; legacy finalizes its
+initial Script and differs. This is recorded, not claimed as legacy parity.
 
-VM-produced boxes may be inspected by embedding/session callers after execution.
-They must keep their table storage alive, while VM/session finalization still
-closes the context promptly. Shared table storage does not extend resource
-ownership. Stack-allocated Host HandleTables retain their existing caller-managed
-lifetime contract. Emergency teardown keeps CP17's allocation-free release path.
+PERFORMANCE: unchanged limit <=1.0 times matched CP18, no waiver.
+Final instruction medians relative to matched CP18:
+ default caught       +0.199498%   (increment vs accepted CP17 -0.492700%)
+ default caught_cell  +0.730923%   (increment vs accepted CP17 -0.111453%)
+ switch  caught       +0.528824%   (increment vs accepted CP17 -0.424780%)
+ switch  caught_cell  +1.064564%   (increment vs accepted CP17 +0.110885%)
+All four total comparisons fail. The positive switch/cell CP19 increment remains.
+Matched measurements use identical executable spelling, source path, workloads,
+flags and execution environment, with two observations per lane. Final candidate
+runs reuse explicitly identified unchanged baseline raw evidence and hashes.
+A same-binary source-origin control demonstrated a 16,000,079-instruction path
+length artifact in older comparisons; it does not erase residual regressions.
+Frozen CP19 default/cell also retains a real +0.112468% matched CP18 difference.
+Compiler wall-time evidence is inconclusive for CP19-specific attribution:
+stateless medians are higher, session confidence intervals broad. No timing
+neutrality or portable speedup is claimed. No further architecture changes made.
 
-Admission retains CP17's W13 handle-position/forgery barriers, including cross-unit
-free-name captures. No aggregate/return/render escape is newly authorized.
-ProcessGroup attachment belongs to the accepted Host seam; script process values
-and interactive job-control persistence must be assessed against the actual CP21
-interface rather than invented here. Broader performance and acceptance evidence
-must be collected after these adaptations stabilize. This record is not acceptance.
+MANDATORY CP21 OBLIGATION
+CP21 R11 5f94a6fb / tree 27f85c5f is dependency tracking ONLY, not an accepted
+foundation. Accepted CP17 exposes no JobTable-to-session-owner attachment API.
+After independent CP21 acceptance and Claude's authoritative handover, reconcile
+interactive jobs with the session's resource owner: command-to-command survival,
+cancellation, exactly-once cleanup, lifecycle-ticket settlement and host_fault
+propagation. No provisional API or duplicate resource owner was introduced.
+Real Host ProcessGroup tests validate the accepted CP17 table/context seam and
+settled cleanup; they do not certify interactive JobTable ownership or host_fault.
+
+REVIEW AND LIMITS
+Review this candidate independently; Claude retains authoritative integration.
+No integration, push, CI dispatch, tag, release or infrastructure spending done.
+The old independent-candidate record describes the historical frozen parent;
+this reconciliation record supersedes its CP17 dependency status only.
+Historical incomplete tooling attempts are retained but excluded from pass claims:
+missing note_at was repaired; sanitizer configure was rerun outside the tracer;
+missing parse-dump harness was built and affected suites rerun; partial performance
+copy attempt was fixed and superseded by performance-final. Leak checks stayed on.
