@@ -1,4 +1,5 @@
 #include "rt/compiler_call.h"
+#include "rt/compiler_handles.h"
 #include <algorithm>
 #include "rt/alias.h"
 #include "rt/atom.h"
@@ -9,6 +10,7 @@
 #include "rt/vm_mutants.h"
 // Calls, methods, member and index reads (CP11/CP12); errors at the expression (D-018c).
 namespace nift::rt::detail {
+
 bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     if (callee.kind == NodeKind::Member) return method_call(node, dst);
@@ -105,8 +107,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
-// Can evaluating `id` stop the program: a member or index read, a division
-// or modulo, a call (D2 ruling).
 bool UnitCompiler::may_fault(NodeId id) const {
     if (id == kNoNode) return false;
     const Node& n = ast_.at(id);
@@ -118,8 +118,7 @@ bool UnitCompiler::may_fault(NodeId id) const {
         if (may_fault(list[k])) return true;
     return false;
 }
-// CP14 (W2, W4): an argument legacy may skip (lazy validation, Q11) must be
-// one whose evaluation cannot be observed: a literal or a local read.
+// CP14 W2/W4: an argument legacy may skip must be unobservable.
 bool UnitCompiler::unobservable_argument(NodeId id) {
     const Node& node = ast_.at(id);
     if (node.kind == NodeKind::Ident) return scopes_.find(text(node)) != nullptr;
@@ -127,9 +126,7 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
     bool is_constant = false;
     return constant_of(node, value, is_constant) && is_constant;
 }
-// CP14: a call of a pure built-in (rt/natives) over a fresh register window:
-// the receiver (methods), then the arguments, evaluated once, left to right
-// (D-018). The native's result replaces the window's first register.
+// CP14: a call of a built-in over a fresh window (receiver, arguments), D-018.
 bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
                                 std::uint16_t dst) {
     if (!builtin_arguments_ok(node, spec, receiver)) return false;

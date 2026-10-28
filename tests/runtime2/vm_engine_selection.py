@@ -60,9 +60,9 @@ CASES = [
      "vm-error", {}),
     ("vm-recursion-budget", 'fn(d(n)) { if (n == 0) { return 0 }\nreturn d(n - 1) + 1 }\nprint("s")\n'
                             'print(d(100005))\n', "vm-error", {}),
-    ("fallback-file-write", FILE_WRITE + 'print("wrote")\ni := 0\nwhile (i < 3) { print(i)\ni += 1 }\n',
-     "fallback", {}),
-    ("fallback-file-write-then-error", FILE_WRITE + 'print("wrote")\nprint(1 / 0)\n', "fallback", {}),
+    ("vm-file-write", FILE_WRITE + 'print("wrote")\ni := 0\nwhile (i < 3) { print(i)\ni += 1 }\n',
+     "vm", {}),
+    ("vm-file-write-then-error", FILE_WRITE + 'print("wrote")\nprint(1 / 0)\n', "vm-error", {}),
     ("fallback-type-error", 'print("a")\nprint("x" < 1)\n', "fallback", {}),
     ("vm-d040-copy", 'a := [1]\nb := a\nb.push(2)\nprint(a.length())\n', "vm", {}),
     ("internal-failure", 'print("start")\ns := "abcdefghijklmnopq"\nk := 0\nwhile (k < 22) { s += s\nk += 1 }\n'

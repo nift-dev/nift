@@ -3,6 +3,7 @@
 #include "rt/natives/host_fs_write.h"
 
 #include "rt/natives/host_fs_internal.h"
+#include "rt/natives/host_fs_observe.h"
 
 namespace nift::rt::natives {
 using namespace host_fs_detail;
@@ -85,6 +86,7 @@ Status host_cp(const Context& context, const Value* args, std::uint32_t argc, Va
         return fail(error, "copy: destination must be an existing directory for multiple sources");
     for (const fs::path& source : sources) {
         const fs::path target = destination_directory ? destination / source.filename() : destination;
+        observe_copy_source(context, source);  // N2: cp records its source as read
         HostCall call(context.host, host::HostOp::CopyTo, "copy");
         call.adopt(target);
         if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
@@ -137,6 +139,7 @@ Status host_mv(const Context& context, const Value* args, std::uint32_t argc, Va
         bool partial = false;
         ::filesystem::move_path(source, target, move_error, &partial);
         if (move_error) {
+            observe_copy_source(context, source);  // N2: a failed move still reads the source
             const std::string message = partial
                 ? "move: copied to " + target.generic_string() + " but could not remove the source " +
                       source.generic_string() + ": " + move_error.message()
@@ -150,6 +153,7 @@ Status host_mv(const Context& context, const Value* args, std::uint32_t argc, Va
         }
         if (finish_host(to, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
         if (finish_host(from, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
+        observe_move_absence(context, source);  // N2: successful mv records source absence
     }
     out = Value::null();
     return Status::Ok;

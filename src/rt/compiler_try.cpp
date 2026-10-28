@@ -17,11 +17,14 @@ bool UnitCompiler::try_statement(const Node& node) {
     try_scopes_.push_back(loop_depth_);
     scopes_.push();
     const std::uint16_t protect_mark = fb_->top();
+    BlockRegs body_regs = block_begin(node.a);
     const bool body_ok = statements(ast_.at(node.a));
+    block_end(body_regs);
     fb_->release_to(protect_mark);
     scopes_.pop();
     try_scopes_.pop_back();
     if (!body_ok) return false;
+    block_clear(body_regs);  // CP17 unwind release: the try body completed normally
     fb_->emit(OpCode::TryEnd);
     const std::size_t over = fb_->emit(OpCode::Jmp);
     if (!fb_->patch(at, fb_->here())) return builder_ok();
@@ -46,10 +49,13 @@ bool UnitCompiler::try_statement(const Node& node) {
     }
     if (!scopes_.declare(text(name), binding)) return fail(name, "static-error:redeclared");
     const std::uint16_t catch_mark = fb_->top();
+    BlockRegs catch_regs = block_begin(node.c);
     const bool catch_ok = statements(ast_.at(node.c));
+    block_end(catch_regs);
     fb_->release_to(catch_mark);
     scopes_.pop();
     if (!catch_ok) return false;
+    block_clear(catch_regs);
 #if defined(NIFT_EXC_MUTANT) && NIFT_EXC_MUTANT == 3
     if (scopes_.find(text(name)) == nullptr && !scopes_.declare(text(name), binding))
         return fail(name, "static-error:redeclared");

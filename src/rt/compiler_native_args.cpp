@@ -1,5 +1,6 @@
 #include "rt/compiler_native_args.h"
 #include "rt/builtin_bind.h"
+#include "rt/compiler_handles.h"
 // rt-lint: cold-file shared native argument evaluation and error restrictions
 namespace nift::rt::detail {
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
@@ -21,6 +22,8 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));
+    const auto literal_write = write_literal_argument(ast_, node, spec);
+    if (literal_write != kNoNode) return fail(ast_.at(literal_write), "host-literal-arg");
     // W2 / W4: legacy validates lazily and may never evaluate later arguments.
     if (spec.may_fail)
         for (std::uint32_t k = 1; k < node.count; ++k)

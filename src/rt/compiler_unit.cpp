@@ -211,6 +211,23 @@ bool UnitCompiler::compile_program(NodeId root, Program& program) {
     program_ = &program;
     lambda_tasks_.clear();
     prepare_captures();
+    // CP17 R1-2: a handle crossing a function/lambda boundary is a forbidden
+    // W13 flow even when every syntactic use inside the lambda is a permitted
+    // receiver or close argument. The capture analysis knows exactly which
+    // declarations cross; resolve the declaration's initializer/assignment
+    // kinds too, because inference records those on the value, not the target.
+    const auto captured_handle = [&](NodeId decl) {
+        if (kinds_.of(decl) & kKindHandle) return true;
+        for (NodeId id = 0; id < ast_.size(); ++id) {
+            const Node& n = ast_.at(id);
+            if ((n.kind == NodeKind::Declare || n.kind == NodeKind::Assign) && n.a == decl &&
+                n.b != kNoNode && (kinds_.of(n.b) & kKindHandle))
+                return true;
+        }
+        return false;
+    };
+    for (const NodeId decl : captured_bindings_)
+        if (captured_handle(decl)) return fail(ast_.at(decl), "host-handle-flow");
     program.protos.clear();
     program.protos.resize(plan_.functions.size() + 1);
     // Lambda tasks append Protos while a main/function Proto is being built;

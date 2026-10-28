@@ -60,11 +60,15 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
     context.host.paths = &vm_path_policy();
     context.host.error_code = &context.host_error_code;  // N1: per-call Host code
+    context.handles =
+        handles::HandleAccess{&handle_table_, handle_context_open_ ? handle_context_ : handles::kDetached};
     Value out;
     std::string message;
     switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {
         case natives::Status::Ok: break;
-        case natives::Status::Error: return raise(fault, StopReason::Error, std::move(message));
+        case natives::Status::Error:
+            if (!context.host_error_code.empty()) fault.code = context.host_error_code;
+            return raise(fault, StopReason::Error, std::move(message));
         case natives::Status::Recoverable: {
             // CP15: legacy raises a catchable Error. N1: the HostCall's own
             // code (io.open_failed / io.read_failed / ...) wins over the

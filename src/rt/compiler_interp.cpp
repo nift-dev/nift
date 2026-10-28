@@ -246,6 +246,7 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
 
         std::unordered_set<std::size_t> active;
         const KindSet kinds_here = interpolation_kind(part_id, active);
+        if (kinds_here & kKindHandle) return fail(part, "host-handle-flow");
         if (kinds_here & kKindUnknown) return fail(part, "interpolation:unknown-type");
         if (kinds_here & kKindAggregate) return fail(part, "interpolation:non-scalar");
         const KindSet scalar = scalar_only(kinds_here);

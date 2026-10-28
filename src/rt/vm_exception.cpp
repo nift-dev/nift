@@ -208,7 +208,12 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
         return false;
     }
     while (frames_.size() > handler.frame_depth) {
-        for (std::uint16_t k = 0; k < proto->nregs; ++k) R[k] = Value();
+        for (std::uint16_t k = 0; k < proto->nregs; ++k) {
+            // CP17 unwind release (owner decision, 2026-10-28): before this
+            // frame's reference dies (natives::abandon_file_on_unwind).
+            if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);
+            R[k] = Value();
+        }
         const Frame frame = frames_.back();
         frames_.pop_back();
         base = frame.base;
@@ -229,7 +234,12 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
 #else
     handlers_.pop_back();
 #endif
-    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) R[k] = Value();
+    // The try body's own registers (its locals and temporaries, at and above
+    // reg_top): that part of the handler's frame was unwound too.
+    for (std::uint16_t k = handler.reg_top; k < proto->nregs; ++k) {
+        if (R[k].is(Kind::Handle)) abandon_unwound_handle(R[k]);  // CP17 unwind release
+        R[k] = Value();
+    }
     R[handler.catch_reg] = std::move(fault.error);
     fault = Fault{};
     pc = proto->code.data() + handler.catch_pc;

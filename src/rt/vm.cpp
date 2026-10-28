@@ -1,4 +1,5 @@
 #include "rt/vm.h"
+#include "rt/handles/limit_setting.h"
 
 #include "rt/aggregate.h"
 #include "rt/cell.h"
@@ -44,8 +45,10 @@ VmResult register_budget_exceeded() {
 
 } // namespace
 
-Vm::Vm(const Program& program, VmOptions options) : program_(program), options_(options) {
+Vm::Vm(const Program& program, VmOptions options)
+    : program_(program), options_(options), handle_table_(handles::table_options_from_environment()) {
     program_has_collection_boundaries_ = program.has_collection_boundaries;
+    open_handle_runtime();
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
     named_functions_.resize(protos_.size());
     stack_.resize(256);
@@ -344,7 +347,7 @@ bail:
     }
 #endif
 done:
-    result_stats(result); return result;
+    close_handle_runtime(result); result_stats(result); return result;
 }
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     if (in.b >= global_ready_.size() || !global_ready_[in.b]) {

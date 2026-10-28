@@ -17,6 +17,12 @@ TerminationCause cause_of(ReleaseReason reason) {
     return TerminationCause::None;
 }
 
+void LifecycleStore::reserve_one() {
+    if (free_.empty() && records_.size() == records_.capacity())
+        records_.reserve(records_.empty() ? 16 : records_.size() * 2);
+    if (free_.capacity() < records_.capacity()) free_.reserve(records_.capacity());  // erase() never allocates
+}
+
 std::uint64_t LifecycleStore::add(HandleKind kind, const Value& handle, ContextId owner) {
     std::uint64_t id;
     if (!free_.empty()) {
@@ -81,18 +87,23 @@ const char* default_failure_message(LifeState state) {
 }
 
 CleanupFailure make_failure(const LifeRecord& base, LifeState state, CleanupOutcome&& outcome) {
-    return CleanupFailure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {},
-                          outcome.code.empty() ? default_failure_code(state) : std::move(outcome.code),
-                          outcome.message.empty() ? default_failure_message(state) : std::move(outcome.message)};
+    CleanupFailure failure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {},
+                           outcome.code.empty() ? default_failure_code(state) : std::move(outcome.code),
+                           outcome.message.empty() ? default_failure_message(state) : std::move(outcome.message)};
+    failure.sequence = base.sequence;
+    return failure;
 }
 
 bool LifecycleStore::settle(LifeRecord& record, CleanupOutcome&& outcome, CleanupFailure& failure, bool& failed) {
     failed = false;
     if (is_settled(record.state)) return false;
-    record.state = settled_state(outcome.result);
+    const LifeState state = settled_state(outcome.result);
+    // The failure is built before the record changes (it allocates): an
+    // allocation failure leaves the record unsettled (CP17 x CP18).
+    if (state != LifeState::Completed) failure = make_failure(record, state, std::move(outcome));
+    record.state = state;
     if (record.state == LifeState::Completed) return true;
     failed = true;
-    failure = make_failure(record, record.state, std::move(outcome));
     return true;
 }
 

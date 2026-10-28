@@ -1,5 +1,7 @@
 #include "rt/handles/native_access.h"
 
+#include "rt/handles/handle_box.h"
+
 namespace nift::rt::handles {
 
 void describe_handle_failure(HandleStatus status, std::string_view builtin, HandleKind kind, const Value& handle,
@@ -66,6 +68,7 @@ HandleStatus native_handle_result(const HandleAccess& access, std::string_view b
                                   CreateOptions options) {
     HandleStatus status = HandleStatus::UnknownContext;
     if (access.table) status = access.table->create(access.context, kind, std::move(resource), out, options);
+    if (status == HandleStatus::Ok && options.counted && access.table) out = box_counted_handle(*access.table, out);
     if (status != HandleStatus::Ok) describe_handle_failure(status, builtin, kind, Value(), access.table, error);
     return status;
 }

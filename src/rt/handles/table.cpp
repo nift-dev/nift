@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <exception>
+#include <new>
 
 namespace nift::rt::handles {
 
@@ -31,8 +32,6 @@ std::uint32_t next_table_tag() {
 
 HandleTable::HandleTable(TableOptions options)
     : store_(next_table_tag(), options.capacity), invalid_setting_(std::move(options.invalid_setting)) {}
-
-HandleTable::~HandleTable() { shutdown(); }
 
 bool HandleTable::in_own_hook() const {
     for (const void* t : t_hook_tables) {
@@ -84,12 +83,17 @@ HandleStatus HandleTable::create(ContextId owner, HandleKind kind, std::shared_p
     else if (!resource) status = HandleStatus::NullResource;
     ExecContext* c = status == HandleStatus::Ok ? contexts_.find(owner, status) : nullptr;
     if (c && c->state != ContextState::Open) status = HandleStatus::ContextClosed;
+    // CP17 x CP18: the record's room is reserved before the slot exists, so an
+    // allocation failure never leaves a live slot without its lifecycle record.
+    if (status == HandleStatus::Ok) records_.reserve_one();
     if (status == HandleStatus::Ok) status = store_.allocate(kind, resource, owner, options.counted, c->handles, out);
     if (status == HandleStatus::Ok) {
         std::uint32_t index = 0;
         store_.classify(out, kind, index);
-        store_.slot(index).record = records_.add(kind, out, owner);
-        ++created_;
+        store_.slot(index).record = records_.add(kind, out, owner);  // cannot allocate: reserved above
+        const std::uint64_t sequence = created_.load(std::memory_order_relaxed) + 1;
+        records_.find(store_.slot(index).record)->sequence = sequence;
+        created_.store(sequence, std::memory_order_relaxed);  // written only under mu_
     }
     lock.unlock();  // a refused resource is destroyed without the lock
     return status;
@@ -215,56 +219,72 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
     const KindSpec& spec = kinds_[static_cast<std::uint8_t>(t.kind)].spec;  // immutable once registered
     CompletionTicket ticket = started.ticket ? CompletionTicket(this, t.record) : CompletionTicket();
     lock.unlock();
-    CleanupOutcome outcome = CleanupOutcome::completed();
-    CleanupEvent event{t.kind, t.handle, t.owner, started.reason, t.resource, started.state, started.cause,
-                       *started.label, started.context_error, started.ticket ? &ticket : nullptr};
-    bool threw = false;
-    if (spec.cleanup) {
-        HookScope scope(this);
-        try {
-            outcome = spec.cleanup(event);
-        } catch (const std::exception& e) {
-            outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", e.what());
-            threw = true;
-        } catch (...) {
-            outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", "unknown exception");
-            threw = true;
+    try {
+        CleanupOutcome outcome = CleanupOutcome::completed();
+        CleanupEvent event{t.kind, t.handle, t.owner, started.reason, t.resource, started.state, started.cause,
+                           *started.label, started.context_error, started.ticket ? &ticket : nullptr};
+        bool threw = false;
+        if (spec.cleanup) {
+            HookScope scope(this);
+            try {
+                outcome = spec.cleanup(event);
+            } catch (const std::bad_alloc&) {
+                throw;  // CP17 x CP18: allocation failure, not a hook failure (released below, rethrown)
+            } catch (const std::exception& e) {
+                outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", e.what());
+                threw = true;
+            } catch (...) {
+                outcome = CleanupOutcome::lost("internal.handle_cleanup_threw", "unknown exception");
+                threw = true;
+            }
         }
-    }
-    bool failed = false;
-    LifeRecord base;  // identity fields for failures reported from here
-    base.handle = t.handle;
-    base.kind = t.kind;
-    base.owner = t.owner;
-    base.reason = started.reason;
-    base.cause = started.ticket ? cause_of(started.reason) : started.cause;
-    if (ticket && (threw || outcome.result != CleanupOutcome::Result::Pending)) {
-        const LifeState state = settled_state(outcome.result);
-        failed = state != LifeState::Completed;
-        if (failed && failure) {  // the caller's copy, with the same defaults as the report
-            *failure = make_failure(base, state, CleanupOutcome(outcome));
-            failure->context_label = *started.label;
+        bool failed = false;
+        LifeRecord base;  // identity fields for failures reported from here
+        base.handle = t.handle;
+        base.kind = t.kind;
+        base.owner = t.owner;
+        base.reason = started.reason;
+        base.cause = started.ticket ? cause_of(started.reason) : started.cause;
+        if (ticket && (threw || outcome.result != CleanupOutcome::Result::Pending)) {
+            const LifeState state = settled_state(outcome.result);
+            failed = state != LifeState::Completed;
+            if (failed && failure) {  // the caller's copy, with the same defaults as the report
+                *failure = make_failure(base, state, CleanupOutcome(outcome));
+                failure->context_label = *started.label;
+            }
+            ticket.complete(std::move(outcome));
+        } else if (threw || (t.owner == kDetached && outcome.result != CleanupOutcome::Result::Completed &&
+                             outcome.result != CleanupOutcome::Result::Pending)) {
+            // Known and otherwise unreported: a hook that threw after taking the
+            // ticket or while releasing bookkeeping, or a failure a detached
+            // resource's hook knows about (D-039: detached_failures, no exit effect).
+            CleanupFailure f = make_failure(base, threw ? LifeState::Lost : settled_state(outcome.result),
+                                            std::move(outcome));
+            f.context_label = *started.label;
+            lock.lock();
+            failures_of(t.owner).push_back(std::move(f));
+            lock.unlock();
         }
-        ticket.complete(std::move(outcome));
-    } else if (threw || (t.owner == kDetached && outcome.result != CleanupOutcome::Result::Completed &&
-                         outcome.result != CleanupOutcome::Result::Pending)) {
-        // Known and otherwise unreported: a hook that threw after taking the
-        // ticket or while releasing bookkeeping, or a failure a detached
-        // resource's hook knows about (D-039: detached_failures, no exit effect).
-        CleanupFailure f = make_failure(base, threw ? LifeState::Lost : settled_state(outcome.result),
-                                        std::move(outcome));
-        f.context_label = *started.label;
+        // A ticket the hook left behind with pending() settles here as unresolved.
+        { CompletionTicket leftover(std::move(ticket)); }
+        t.resource.reset();  // the table's reference dies outside the lock (the reaper may keep its own)
         lock.lock();
-        failures_of(t.owner).push_back(std::move(f));
-        lock.unlock();
+        finish_locked(t.owner);
+        return failed;
+    } catch (...) {
+        // CP17 x CP18: an allocation failure in this cleanup's own bookkeeping
+        // (the hook's exceptions are caught above). Without this, the owner's
+        // in-flight count and the record's obligation were never released and
+        // close_context/shutdown() waited forever. Release them without
+        // allocating; the outcome report is lost (Lost if not yet settled).
+        ticket.table_ = nullptr;  // never completed from here: completing allocates
+        if (!lock.owns_lock()) lock.lock();
+        abandon_cleanup_locked(t.record, t.owner);
+        t.resource.reset();
+        throw;
     }
-    // A ticket the hook left behind with pending() settles here as unresolved.
-    { CompletionTicket leftover(std::move(ticket)); }
-    t.resource.reset();  // the table's reference dies outside the lock (the reaper may keep its own)
-    lock.lock();
-    finish_locked(t.owner);
-    return failed;
 }
+
 
 HandleStatus HandleTable::close_locked(std::uint32_t index, std::unique_lock<std::mutex>& lock,
                                        CleanupFailure* failure) {
@@ -317,28 +337,6 @@ HandleStatus HandleTable::drop(const Value& handle) {
     return HandleStatus::Ok;
 }
 
-bool HandleTable::settle(std::uint64_t id, CleanupOutcome&& outcome) {
-    std::lock_guard<std::mutex> lock(mu_);
-    LifeRecord* r = records_.find(id);
-    if (!r) return false;
-    CleanupFailure failure;
-    bool failed = false;
-    if (!LifecycleStore::settle(*r, std::move(outcome), failure, failed)) return false;
-    ++settled_;
-    if (failed) {
-        const ExecContext* c = r->owner == kDetached ? nullptr : contexts_.find(r->owner);
-        if (c) failure.context_label = c->label;
-        failures_of(r->owner).push_back(std::move(failure));
-    }
-    if (r->obligation) {
-        r->obligation = false;
-        if (std::size_t* n = obligations_of(r->owner)) --*n;
-        --obligations_;
-    }
-    if (!r->slot_live) records_.erase(id);
-    idle_.notify_all();
-    return true;
-}
 
 HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
                                             CompletionTicket& ticket, TerminationStart* info) {
@@ -379,7 +377,7 @@ TableStats HandleTable::stats() const {
     s.contexts = contexts_.size();
     s.records = records_.size();
     s.pending_obligations = obligations_;
-    s.created = created_;
+    s.created = created_.load(std::memory_order_relaxed);
     s.cleaned = cleaned_;
     s.settled = settled_;
     return s;

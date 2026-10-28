@@ -462,11 +462,18 @@ RT_HANDLE_UNIT := $(TEST_DIR)/rt/handle-unit$(EXEEXT)
 RT_HANDLE_STRESS := $(TEST_DIR)/rt/handle-stress$(EXEEXT)
 RT_HANDLE_LIFECYCLE := $(TEST_DIR)/rt/handle-lifecycle$(EXEEXT)
 RT_HANDLE_BENCH := $(TEST_DIR)/rt/handle-bench$(EXEEXT)
+RT_HANDLE_BOX_UNIT := $(TEST_DIR)/rt/handle-box-unit$(EXEEXT)
 RT_HANDLE_TSAN_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread
 
 $(RT_HANDLE_UNIT): $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) -o "$@"
+
+# CP17 x CP18 (2026-10-27): HandleTable::close_context under allocation failure.
+RT_HANDLE_CLOSE_OOM := $(TEST_DIR)/rt/handle-close-oom$(EXEEXT)
+$(RT_HANDLE_CLOSE_OOM): tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 $(RT_HANDLE_STRESS): tests/rt/handle_table_stress.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
@@ -480,10 +487,17 @@ $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/handle_table_bench.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
+$(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
+
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
-test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE)
+test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE) $(RT_HANDLE_BOX_UNIT) $(RT_HANDLE_CLOSE_OOM)
+	timeout 120 "$(RT_HANDLE_CLOSE_OOM)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_UNIT)"
+	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_BOX_UNIT)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_LIFECYCLE)"
 	ulimit -f 100000; ulimit -v 4000000; timeout 300 "$(RT_HANDLE_STRESS)" $${RT_HANDLE_STRESS_MS:-2000} $${RT_HANDLE_RACE_ROUNDS:-500}
 	python3 tests/runtime2/cp17/no_handle_strings.py --self-test
@@ -500,7 +514,11 @@ test-rt-handles-sanitize:
 		-o "$(TEST_DIR)/rt-san/handle-stress"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
+		-o "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
+	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-lifecycle"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-stress" $${RT_HANDLE_STRESS_MS:-2000} \
 		$${RT_HANDLE_RACE_ROUNDS:-300}
@@ -709,10 +727,102 @@ $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
 
+# CP17 N2: Host-level observer parity (real PageObserver over a test RenderHost).
+RT_N2_PARITY_UNIT := $(TEST_DIR)/rt/n2-observer-parity$(EXEEXT)
+$(RT_N2_PARITY_UNIT): tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp -o "$@"
+
+RT_STREAM_GUARD_UNIT := $(TEST_DIR)/rt/stream-resource-guards$(EXEEXT)
+$(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+# CP17 x CP13B decision B: the unwound-frame file release rule, linked against
+# the production natives and handle table (functional and ASan/UBSan builds).
+RT_UNWIND_RELEASE_UNIT := $(TEST_DIR)/rt/unwind-file-release$(EXEEXT)
+$(RT_UNWIND_RELEASE_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+RT_UNWIND_RELEASE_SAN_UNIT := $(TEST_DIR)/rt-san/unwind-file-release
+$(RT_UNWIND_RELEASE_SAN_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
+$(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+.PHONY: test-runtime2-cp17-sanitize
+test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT) $(RT_UNWIND_RELEASE_SAN_UNIT)
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_UNWIND_RELEASE_SAN_UNIT)"
+	# CP17 x CP18: the handle table under injected allocation failure (ASan/LSan/UBSan).
+	mkdir -p "$(TEST_DIR)/rt-san"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_SOURCES) \
+		-o "$(TEST_DIR)/rt-san/handle-close-oom"
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 600 "$(TEST_DIR)/rt-san/handle-close-oom"
+
+.PHONY: test-runtime2-cp17-handles
+test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT) $(RT_UNWIND_RELEASE_UNIT)
+	"$(RT_STREAM_GUARD_UNIT)"
+	"$(RT_UNWIND_RELEASE_UNIT)"
+	python3 tests/runtime2/cp17/file_stream_handles.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/script_handle_lifecycle.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/closed_handle_catchable.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/unwind_handle_release.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
+	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
+
+# CP17 N2 R1: production incremental decision fed by observer observations.
+N2_REBUILD_UNIT := $(TEST_DIR)/rt/n2-rebuild-decision$(EXEEXT)
+N2_REBUILD_OBJECTS := $(filter-out src/nift.o src/CLI.o src/embed/%,$(OBJECTS))
+$(N2_REBUILD_UNIT): tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS) $(LDLIBS) -o "$@"
+N2_REBUILD_MUTANT ?= 0
+N2_REBUILD_MUTANT_DIR := $(TEST_DIR)/rt/n2-rebuild-mutants/$(N2_REBUILD_MUTANT)
+N2_REBUILD_MUTANT_BIN := $(TEST_DIR)/rt/n2-rebuild-decision-m$(N2_REBUILD_MUTANT)
+$(N2_REBUILD_MUTANT_DIR)/host_fs_write.o: src/rt/natives/host_fs_write.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(N2_REBUILD_MUTANT_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_HOST_MUTANT=$(N2_REBUILD_MUTANT) -c $< -o $@
+$(N2_REBUILD_MUTANT_BIN): tests/rt/n2_rebuild_decision.cpp $(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) \
+		$(N2_REBUILD_MUTANT_DIR)/host_fs_write.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp \
+		$(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) $(N2_REBUILD_MUTANT_DIR)/host_fs_write.o $(LDLIBS) -o "$@"
+# CP17 rework (F4): the certification edge runs the real N2 mutants 15 and 16
+# against the production rebuild-decision witness, with compile provenance and
+# a NIFT_HOST_MUTANT=0 control (tests/runtime2/cp17/n2_rebuild_mutants.sh).
+.PHONY: test-runtime2-cp17-n2-rebuild-mutant
+test-runtime2-cp17-n2-rebuild-mutant:
+	bash tests/runtime2/cp17/n2_rebuild_mutants.sh "$(MAKE)"
+
+.PHONY: test-runtime2-cp17-n2-rebuild
+test-runtime2-cp17-n2-rebuild: $(N2_REBUILD_UNIT)
+	"$(N2_REBUILD_UNIT)"
+	"$(N2_REBUILD_UNIT)" --omit cp
+	"$(N2_REBUILD_UNIT)" --omit mv
+
+.PHONY: test-runtime2-cp17-routing-mutants
+test-runtime2-cp17-routing-mutants: $(TARGET)
+	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
+
+.PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
+test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT) $(N2_REBUILD_UNIT)
+	"$(RT_N2_PARITY_UNIT)"
+	"$(N2_REBUILD_UNIT)"
+	"$(N2_REBUILD_UNIT)" --omit cp
+	"$(N2_REBUILD_UNIT)" --omit mv
+test-runtime2-cp17-tripwire: $(TARGET)
+	python3 tests/runtime2/cp17/build_vm_tripwire.py --nift "$(CURDIR)/$(TARGET)"
+
 # CP16 N1: the positive per-call Host-code tests and their harness controls.
 .PHONY: test-runtime2-cp16-n1
 test-runtime2-cp16-n1: $(TARGET) $(RT_HOST_NATIVE_UNIT)
 	"$(RT_HOST_NATIVE_UNIT)"
+	python3 tests/runtime2/cp17/native_assertion_witness.py --unit "$(RT_HOST_NATIVE_UNIT)"
 	$(PYTHON) tests/runtime2/cp16_n1.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp16_n1_controls.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp16_n1_consumer_controls.py
@@ -3059,6 +3169,15 @@ RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
+# CP17 file/stream handle natives render scalar values (legacy file.write) and
+# are Host natives, not part of the pure-builtin isolation contract.
+RT_HOST_HANDLE_SOURCES := src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_ops.cpp \
+	src/rt/natives/host_stream_handles.cpp
+RT_ISOLATION_SOURCES := $(filter-out $(RT_HOST_HANDLE_SOURCES),$(RT_BUILTINS_SOURCES))
+# The isolated bench still links the built-in table, which names the Host
+# handle natives. Test-only stubs satisfy those names without linking the
+# render/legacy value bridge (the real natives are tested by test-rt-host).
+RT_ISOLATION_STUBS := tests/rt/host_handle_native_stubs.cpp
 # CP16: the native table includes the Host built-ins, which call the Host layer
 # and the RuntimeValue-free helpers in ParserHostHelpers.cpp (never
 # ParserHelpers.cpp, which needs the legacy value model). Every builtins binary,
@@ -3066,6 +3185,7 @@ RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
 RT_BUILTINS_HOST := $(RT_HOST_LINK_SOURCES) src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp
 RT_BUILTINS_CORE += $(RT_BUILTINS_HOST)
 RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/natives/*.inc) \
+	$(RT_ISOLATION_STUBS) \
 	$(RT_BUILTINS_HOST) src/ParserHostHelpers.h \
 	$(RT_BUILTINS_CORE) $(wildcard src/rt/*.h) src/RuntimeValue.h tests/rt/rt_test.h tests/rt/builtins_support.h
 RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
@@ -3118,7 +3238,7 @@ RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 # CP16 certification fix: secure_random_bytes checks the budget before its
 # buffer exists and keeps one result-sized buffer. Linked with the isolated core
@@ -3127,7 +3247,7 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
 $(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
 .PHONY: test-rt-host-random-budget
 test-rt-host-random-budget: $(RT_HOST_RANDOM_BUDGET)
@@ -3137,7 +3257,7 @@ test: test-rt-host-random-budget
 .PHONY: test-rt-builtins-isolation test-rt-builtins-guards
 test-rt-builtins-isolation: $(RT_BUILTINS_BENCH)
 	@if grep -nE '#include .*(RuntimeValue|legacy_bridge|rt/render)|nift::RuntimeValue|(to|from)_legacy\(|append_rendered' \
-		src/rt/natives/*; then \
+		$(RT_ISOLATION_SOURCES); then \
 		echo "FAIL: a native refers to the legacy value bridge" >&2; exit 1; fi
 	@echo "PASS natives link without RuntimeValue/legacy_bridge/render and do not include them"
 
@@ -3560,9 +3680,17 @@ test-embed: test-runtime2-cp18
 
 CP18_SWITCH_LIB := $(TEST_DIR)/cp18/switch/$(SHARED_LIB)
 CP18_SWITCH_OBJ := $(TEST_DIR)/cp18/vm-switch.o
-$(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS)
+# Compiler-generated dependencies (-MMD): vm.cpp includes far more than
+# RT_VALUE_HEADERS (e.g. rt/handles/table.h through rt/vm.h); a stale object
+# built against an older HandleTable layout crashed the switch build.
+# An object without its dependency file (built before this rule) is rebuilt:
+# the missing .d is "remade" by its empty rule, which makes the object stale.
+CP18_SWITCH_DEP := $(CP18_SWITCH_OBJ:.o=.d)
+$(CP18_SWITCH_DEP): ;
+$(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS) $(CP18_SWITCH_DEP)
 	mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -MMD -MP -c $< -o $@
+-include $(CP18_SWITCH_DEP)
 $(CP18_SWITCH_LIB): $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(SHARED_SYS_LIBS)
@@ -3585,6 +3713,20 @@ CP18_COW_SWITCH := $(TEST_DIR)/cp18/cow-allocation-switch$(EXEEXT)
 $(CP18_COW): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+# CP17 x CP18: allocation failure in handle-using programs through the program API.
+CP17_HANDLE_ALLOC := $(TEST_DIR)/cp17/handle-allocation$(EXEEXT)
+$(CP17_HANDLE_ALLOC): tests/runtime2/cp17/handle_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+# CP17 rework (F2): allocation failure that persists (consecutive failures).
+CP17_HANDLE_ALLOC_PERSIST := $(TEST_DIR)/cp17/handle-allocation-persistent$(EXEEXT)
+$(CP17_HANDLE_ALLOC_PERSIST): tests/runtime2/cp17/handle_allocation_persistent.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
+.PHONY: test-runtime2-cp17-handle-allocation
+test-runtime2-cp17-handle-allocation: $(CP17_HANDLE_ALLOC) $(CP17_HANDLE_ALLOC_PERSIST)
+	timeout 1800 $(CP17_HANDLE_ALLOC)
+	timeout 3600 $(CP17_HANDLE_ALLOC_PERSIST)
 $(CP18_COW_SWITCH): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(LDLIBS) -o $@
@@ -3685,3 +3827,28 @@ $(TEST_DIR)/cp19/operand-windows: tests/runtime2/cp19/operand_windows.cpp $(CP19
 .PHONY: test-cp19-operand-windows
 test-cp19-operand-windows: $(TEST_DIR)/cp19/operand-windows
 	$<
+
+test-rt-host: test-runtime2-cp17-n2
+test-rt-vm: test-runtime2-cp17-n2
+test-rt-vm: test-runtime2-cp17-tripwire
+
+# CP17 + N2 integration (2026-10-27): every CP17 suite is reached by
+# certification through exactly one tier edge (functional, sanitizer or
+# mutation), each protected by a guard removal control.
+.PHONY: test-runtime2-cp17-handle-mutants test-runtime2-cp17-unwind-mutants
+test-runtime2-cp17-handle-mutants:
+	python3 tests/runtime2/cp17/handle_mutants.py "$(CURDIR)/$(TEST_DIR)/cp17-handle-mutants"
+test-runtime2-cp17-unwind-mutants:
+	python3 tests/runtime2/cp17/unwind_mutants.py
+test-rt-host: test-rt-handles
+test-rt-host: test-rt-handles-guards
+test-rt-host: test-runtime2-cp17-handles
+test-rt-host: test-runtime2-cp17-n2-rebuild
+test-rt-host: test-runtime2-cp17-handle-allocation
+test-rt-host-sanitize: test-rt-handles-sanitize
+test-rt-host-sanitize: test-rt-handles-tsan
+test-rt-host-sanitize: test-runtime2-cp17-sanitize
+test-rt-host-mutants: test-runtime2-cp17-routing-mutants
+test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant
+test-rt-host-mutants: test-runtime2-cp17-handle-mutants
+test-rt-host-mutants: test-runtime2-cp17-unwind-mutants

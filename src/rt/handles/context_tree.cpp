@@ -62,25 +62,32 @@ HandleStatus ContextTree::cancel(ContextId id) {
     return HandleStatus::Ok;
 }
 
-void ContextTree::collect(ContextId id, std::uint64_t closer, std::vector<ContextId>& order,
-                          std::vector<ContextId>& elsewhere) {
-    ExecContext& c = contexts_[id];
-    c.state = ContextState::Closing;
-    c.closer = closer;
-    // Iterate a copy: children are only erased by erase(), never during this walk.
-    const std::vector<ContextId> children = c.children;
-    for (auto it = children.rbegin(); it != children.rend(); ++it) {
+void ContextTree::collect(ContextId id, std::vector<ContextId>& order, std::vector<ContextId>& elsewhere) const {
+    const auto self = contexts_.find(id);
+    if (self == contexts_.end()) return;
+    // Read-only: nothing is marked until the whole walk has allocated.
+    for (auto it = self->second.children.rbegin(); it != self->second.children.rend(); ++it) {
         const auto child = contexts_.find(*it);
         if (child == contexts_.end()) continue;
         if (child->second.state == ContextState::Closing) elsewhere.push_back(*it);  // another close owns it
-        else collect(*it, closer, order, elsewhere);
+        else collect(*it, order, elsewhere);
     }
     order.push_back(id);
 }
 
 std::vector<ContextId> ContextTree::begin_close(ContextId id, std::uint64_t closer, std::vector<ContextId>& elsewhere) {
+    // CP17 x CP18 (2026-10-27): two phases, so an allocation failure in the
+    // walk leaves every context as it was (open, retryable). Marking a context
+    // Closing before a throw stranded it: no closer would ever end it and
+    // shutdown() (the table's destructor) waited for it forever.
     std::vector<ContextId> order;
-    collect(id, closer, order, elsewhere);
+    collect(id, order, elsewhere);
+    for (const ContextId each : order) {  // no allocation from here
+        const auto it = contexts_.find(each);
+        it->second.before_close = it->second.state;
+        it->second.state = ContextState::Closing;
+        it->second.closer = closer;
+    }
     return order;
 }
 

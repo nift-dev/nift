@@ -1,8 +1,12 @@
 #include "rt/natives/builtin.h"
 
+#include "rt/handle.h"
+
 #include "rt/natives/array_methods.h"
 #include "rt/natives/bytes_methods.h"
+#include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_ops.h"
+#include "rt/natives/host_stream_handles.h"
 #include "rt/natives/json_methods.h"
 #include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
@@ -37,6 +41,12 @@ constexpr NativeFn kFunctions[] = {
     host_cp, host_mv, host_mv, host_which,
     host_getenv, host_env, host_setenv, host_unsetenv, host_os, host_arch, host_platform,
     host_hardware_concurrency, host_epoch, host_sleep, host_secure_random_bytes,
+    handle_file, handle_ifstream, handle_ofstream, handle_close,
+    file_open, file_close, file_read, file_read_all, file_read_line, file_write, file_write_line, file_flush,
+    file_save, file_revert, file_path, file_exists, file_modified, file_tell, file_seek, file_eof, file_copy,
+    file_move, file_remove,
+    stream_close, stream_read, stream_read_all, stream_read_line, stream_write, stream_write_line, stream_flush,
+    stream_eof,
 };
 
 constexpr BuiltinSpec kSpecs[] = {
@@ -91,6 +101,16 @@ std::string_view recoverable_code(BuiltinId id) {
         case BuiltinId::HostRemove: case BuiltinId::HostRm: return "io.remove_failed";
         case BuiltinId::HostCp: return "io.copy_failed";
         case BuiltinId::HostMv: case BuiltinId::HostMove: return "io.move_failed";
+        case BuiltinId::FileOpen: case BuiltinId::FileSave: return "io.open_failed";
+        case BuiltinId::FileCopy: return "io.copy_failed";
+        case BuiltinId::FileMove: return "io.move_failed";
+        case BuiltinId::FileRemove: return "io.remove_failed";
+        case BuiltinId::HandleIfstream: case BuiltinId::HandleOfstream: return "stream.open_failed";
+        case BuiltinId::StreamRead: case BuiltinId::StreamReadAll: case BuiltinId::StreamReadLine:
+            return "stream.read_failed";
+        case BuiltinId::StreamWrite: case BuiltinId::StreamWriteLine: return "stream.write_failed";
+        case BuiltinId::StreamFlush: return "stream.flush_failed";
+        case BuiltinId::StreamClose: return "stream.close_failed";
         default: return std::string_view();
     }
 }
@@ -102,6 +122,8 @@ Status call_builtin(const BuiltinSpec& spec, const Context& context, const Value
 
 bool is_recoverable_code(std::string_view code) {
     if (code.empty()) return false;
+    // CP17 handle statuses classed Recoverable (D-035 runtime.handle_closed).
+    if (handle_code_recoverable(code)) return true;
     for (std::uint16_t i = 0; i < static_cast<std::uint16_t>(BuiltinId::Count); ++i)
         if (recoverable_code(static_cast<BuiltinId>(i)) == code) return true;
     return false;

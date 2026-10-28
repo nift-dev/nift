@@ -27,6 +27,7 @@
 //   * Every heap object a native creates goes through the CP09 constructors
 //     (make_string, make_array, array_push, object_set), so the live-heap total
 //     stays exact (heap_account.h).
+#include "rt/handles/native_access.h"
 #include "rt/host/host_call.h"
 #include "rt/value.h"
 
@@ -48,6 +49,7 @@ struct Context {
     static constexpr std::size_t kNoHeapLimit = static_cast<std::size_t>(-1);
     std::size_t heap_limit = kNoHeapLimit;
     host::HostCallEnv host;  // trace/path policy; no observer for standalone scripts
+    handles::HandleAccess handles;  // CP17: table + execution context for handle natives
     // N1: the code of the failing HostCall in this call (empty when the native
     // has no HostCall, e.g. validate's schema.rejected).
     std::string host_error_code;
@@ -77,12 +79,17 @@ inline constexpr KindSet kObject = 1u << 6;
 inline constexpr KindSet kNumber = kInt | kFrac;
 inline constexpr KindSet kScalar = kNull | kBool | kNumber | kString;
 inline constexpr KindSet kBytes = 1u << 7;
+// CP17 W13: handle family (bit 11) and its file/stream refinements. Handles
+// are not part of kAny: a native family must opt in explicitly.
+inline constexpr KindSet kHandle = 1u << 11;
+inline constexpr KindSet kFile = kHandle | (1u << 12);
+inline constexpr KindSet kStream = kHandle | (1u << 13);
 inline constexpr KindSet kAny = 0xff;
 
 // The receiver a built-in is called on: a method of a string, array,
 // object, number, bool or null, a method of any value (Any: the presentation
 // methods), or a free function (None).
-enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes };
+enum class Receiver : std::uint8_t { None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream };
 
 // How the result kinds follow from the argument kinds (for kind inference).
 enum class ResultRule : std::uint8_t {
@@ -120,11 +127,11 @@ inline constexpr std::uint8_t kVariadic = 255;
 // last in builtin_list.inc. Used by the R1 refusal of linked units
 // (script_runner.cpp). A built-in appended after the block must be added here
 // deliberately (the assert fails until it is).
-static_assert(static_cast<std::uint16_t>(BuiltinId::HostSecureRandomBytes) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::StreamEof) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "host_builtin(): review the host block when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {
-    return id >= BuiltinId::HostOpen && id <= BuiltinId::HostSecureRandomBytes;
+    return id >= BuiltinId::HostOpen && id <= BuiltinId::StreamEof;
 }
 
 // The whole table, indexed by BuiltinId.
@@ -136,8 +143,9 @@ const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name);
 // The error code of a Status::Recoverable result of `id` ("schema.rejected"
 // for validate); empty for built-ins that never return Recoverable.
 std::string_view recoverable_code(BuiltinId id);
-// True when `code` is the recoverable code of any built-in (one predicate,
-// derived from recoverable_code; no second classification table).
+// True when `code` is the recoverable code of any built-in, or of a handle
+// status classed Recoverable (handle_code_recoverable, D-035). Derived from
+// recoverable_code and handle_error_class; no second classification table.
 bool is_recoverable_code(std::string_view code);
 
 // Calls the native. Each native checks its own arity and reports legacy's

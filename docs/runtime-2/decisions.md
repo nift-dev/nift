@@ -1271,3 +1271,45 @@ cleanup obligations, and does not authorise temporary CP17 Host-context APIs.
 Identifier check: D-054 was absent from both this register and the authoritative
 integration tip `8e65196b` when the owner decision was recorded. D-053 remains
 unassigned here; the owner's requested available identifier D-054 is used.
+
+## D-055 — CP22/CP23 concurrency boundary (owner, 2026-10-28)
+
+Runtime 2.0 preserves the established real-parallelism contract of `thread()` and `async`. Cooperative scheduling is not an equivalent replacement for parallel execution.
+
+1. **CP22 owns coroutine infrastructure:** cooperative scheduling, futures, suspension and resumption, timers, cancellation, Error propagation, future lifetimes, the event loop, and nonblocking Host-operation integration.
+
+2. **Cooperative admission requires proof:** the VM may execute an existing `async` program cooperatively only when compiler analysis establishes that its observable behaviour is compatible with the approved parallel semantics. This includes the effects of shared mutable state, aliases, captured Cells, globals, Host operations, timing, output ordering and cancellation. Otherwise, compilation refuses before execution. No speculative replay or partial effects are permitted.
+
+3. **CP23 owns genuine parallel execution:** real parallel `thread()`, parallel `async` for CPU-bound and blocking workloads, `mutex`, `atomic`, capture-only isolates, channels, cross-isolate ownership and parallel execution certification. Work-stealing is optional if another implementation satisfies the required semantics and performance objectives.
+
+4. **No permanent parallelism refusals:** CP23 must eliminate refusals caused by missing parallel execution for legacy-supported concurrency features. Reclassifying those refusals under unrelated diagnostics does not satisfy this requirement. VM execution, rather than legacy fallback, is mandatory for supported programs.
+
+5. **Performance:** CP23 must compare legacy and VM execution for CPU-bound interpreted and native workloads at 1, 2, 4 and 8 concurrent tasks. A quantitative scaling acceptance threshold must be approved before CP23 certification. No unspecified performance factor constitutes a passing gate.
+
+6. **Dependencies:** CP22 development may proceed from CP12, but its nonblocking Host integration requires the accepted CP17, CP19 and CP21 interfaces. Those integrations remain mandatory CP22 completion requirements and may not be deferred to CP23 merely to close CP22.
+
+7. **Certification:** CP22's cooperative-admission proof requires independent adversarial review. CP23 must independently establish genuine parallel execution, cancellation, resource lifetime, correctness and race freedom. Existing compatibility, mutation, sanitizer and platform requirements remain in force. Neither checkpoint may claim full acceptance while its mandatory requirements remain incomplete.
+
+8. **Release gate:** CP25's zero-fallback requirement depends on CP23 completing the supported parallelism migration. This decision changes checkpoint ownership and sequencing, not the required final Runtime 2.0 capabilities.
+
+## D-056 — Managed resource exception-unwind semantics (owner, 2026-10-28)
+
+**Decision:** Runtime 2.0 adopts uniform exception-unwind release semantics for managed files. Legacy evaluator-specific rollback behaviour is not normative.
+
+1. **Exceptional abandonment.** When an Error unwinds execution, managed files exclusively owned by the execution frames or scopes actually abandoned by that unwind are closed and discarded silently. Buffered but unwritten changes are not flushed.
+
+2. **Normal completion.** A managed file abandoned by normally completed execution remains a reportable resource obligation. Normal block, loop-iteration and function completion must not defer abandonment merely because stale VM registers retain references.
+
+3. **Surviving ownership.** Resources reachable through surviving aliases, outer bindings or valid ownership transfers remain live. An Error caught within a surviving execution context does not release unrelated resources owned by that context.
+
+4. **Try/catch boundaries.** An aborted try or catch body constitutes exceptional abandonment within its relevant scope. A normally completed body follows normal resource reporting rules.
+
+5. **Error integrity.** Cleanup must preserve the primary Error, its identity and its propagation semantics. Cleanup must not convert failing execution into false success or suppress independently reportable obligations from completed execution.
+
+6. **Resource safety.** Release must be exactly once, must not write discarded buffers, and must not depend on successful allocation during destruction or emergency teardown. Handle-table and Host cleanup must preserve these guarantees under injected allocation failures.
+
+7. **Compatibility.** Legacy remains evidence for legitimate language behaviour and genuine errors, not authority for inconsistent textual-versus-prepared evaluation boundaries. Intentional corrections must be explicitly classified, documented and tested against the approved Runtime 2.0 contract.
+
+8. **Certification.** Acceptance requires named normal-completion, exceptional-unwind, nested try/catch, loop, function, alias-survival, report-multiplicity, unsaved-write and allocation-failure witnesses; independent mutation controls; and applicable sanitizer and platform gates. A passing legacy differential count alone does not establish compliance.
+
+**Scope:** CP17 + N2 managed-resource semantics. This decision does not authorise unrelated language changes, integration, pushing or release.

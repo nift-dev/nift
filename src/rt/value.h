@@ -51,7 +51,27 @@ void destroy_heap_object(HeapObject* object) noexcept;
 
 // Handle kinds are typed tags, never strings (decision 5). Values carry
 // (kind, id, generation); registries own the resource (rt/handle.h).
-enum class HandleKind : std::uint8_t { None, Timer, File, Process, Module, Future, Mutex, Atomic, Ffi, Custom };
+// Values are persisted nowhere, but keep existing numbers stable: append new kinds.
+enum class HandleKind : std::uint8_t {
+    None, Timer, File, Process, Module, Future, Mutex, Atomic, Ffi, Custom,
+    Stream,   // CP16: an open Host stream (legacy "\x1fnift:stream:N")
+    Command,  // CP16: a cmd() pipeline builder (legacy "\x1fnift:cmd:N"); started groups are Process
+};
+
+// CP17/D-035: a counted handle boxed on the VM heap. The box holds one
+// handle-table reference; its refcount (per isolate, like every heap object)
+// counts the VM's references. When the last VM reference dies the box is
+// destroyed and `release` drops the table reference, which schedules cleanup
+// without blocking. The Value keeps (kind, generation) inline for the fast
+// checks; the id lives in the box. Built only by rt/handles/handle_box.h.
+struct HandleBoxObject : HeapObject {
+    std::uint64_t id = 0;
+    std::uint32_t generation = 0;
+    HandleKind handle_kind = HandleKind::None;
+    void* table = nullptr;
+    void (*release)(void* table, HandleKind kind, std::uint64_t id, std::uint32_t generation) = nullptr;
+    HandleBoxObject() : HeapObject(Kind::Handle) {}
+};
 
 class Value {
 public:
@@ -93,12 +113,18 @@ public:
         Value v; v.set_kind(Kind::Handle); v.bytes_[14] = static_cast<unsigned char>(kind);
         v.set_payload(id); std::memcpy(v.bytes_ + 8, &generation, 4); return v;
     }
+    // Takes ownership of one reference to `box` (a counted handle).
+    static Value adopt_handle_box(HandleBoxObject* box) noexcept {
+        Value v; v.set_kind(Kind::Handle); v.bytes_[14] = static_cast<unsigned char>(box->handle_kind);
+        v.set_pointer(box); std::memcpy(v.bytes_ + 8, &box->generation, 4); v.bytes_[12] = kBoxedHandle; return v;
+    }
 
     Kind kind() const noexcept { return static_cast<Kind>(bytes_[15]); }
     bool is(Kind k) const noexcept { return kind() == k; }
     bool is_null() const noexcept { return kind() == Kind::Null; }
     bool is_number() const noexcept { return kind() == Kind::Int || kind() == Kind::Double || kind() == Kind::Decimal; }
-    bool is_heap() const noexcept { return heap_kind(kind()) && !inline_string(); }
+    bool is_heap() const noexcept { return (heap_kind(kind()) && !inline_string()) || boxed_handle(); }
+    bool boxed_handle() const noexcept { return kind() == Kind::Handle && bytes_[12] == kBoxedHandle; }
     bool inline_string() const noexcept { return kind() == Kind::String && (bytes_[14] & kInlineFlag) != 0; }
 
     bool as_bool() const noexcept { return payload() != 0; }
@@ -107,7 +133,11 @@ public:
     HeapObject* heap() const noexcept { HeapObject* p; std::memcpy(&p, bytes_, sizeof p); return p; }
     template <class T> T* heap_as() const noexcept { return static_cast<T*>(heap()); }
     HandleKind handle_kind() const noexcept { return static_cast<HandleKind>(bytes_[14]); }
-    std::uint64_t handle_id() const noexcept { return payload(); }
+    std::uint64_t handle_id() const noexcept {
+        return boxed_handle() ? static_cast<const HandleBoxObject*>(heap())->id : payload();
+    }
+    // The plain (unboxed) identity of a handle value, for the handle table.
+    Value handle_identity() const noexcept { return handle(handle_kind(), handle_id(), handle_generation()); }
     std::uint32_t handle_generation() const noexcept { std::uint32_t g; std::memcpy(&g, bytes_ + 8, 4); return g; }
     std::uint32_t refcount() const noexcept { return is_heap() ? heap()->refcount : 0; }
 
@@ -168,6 +198,7 @@ private:
     }
 
     static constexpr unsigned char kInlineFlag = 0x80;
+    static constexpr unsigned char kBoxedHandle = 0x01;  // bytes_[12] of a boxed handle
     static bool heap_kind(Kind k) noexcept {
         switch (k) {
             case Kind::Decimal: case Kind::String: case Kind::Bytes: case Kind::Array: case Kind::Object:

@@ -8,9 +8,11 @@
 int main() {
     using namespace nift::rt;
     const bool distinct = kKindFunction != kKindBytes && kKindError != kKindFunction && kKindError != kKindBytes &&
-                          kKindUnknown != kKindFunction && kKindUnknown != kKindBytes && kKindUnknown != kKindError;
+                          kKindUnknown != kKindFunction && kKindUnknown != kKindBytes && kKindUnknown != kKindError &&
+                          kKindHandle != kKindUnknown && kKindFile != kKindStream;
     const bool disjoint = (kKindFunction & kKindBytes) == 0 && (kKindError & (kKindFunction | kKindBytes)) == 0 &&
-                          (kKindUnknown & kKindAll) == 0;
+                          (kKindUnknown & kKindAll) == 0 && (kKindHandle & kKindAll) == 0 &&
+                          (kKindFile & kKindStream) == kKindHandle;
     if (!distinct || !disjoint) {
         std::printf("FAIL kind bits alias: function=%u bytes=%u error=%u unknown=%u\n",
                     unsigned(kKindFunction), unsigned(kKindBytes), unsigned(kKindError), unsigned(kKindUnknown));

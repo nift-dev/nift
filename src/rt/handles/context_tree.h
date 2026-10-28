@@ -25,6 +25,7 @@ struct ExecContext {
     bool build_family = false;         // a build context or nested in one: no detach
     bool ending_on_error = false;      // set by close_context(id, true) for the closing subtree
     std::uint64_t closer = 0;          // the close_context call that owns ending this context
+    ContextState before_close = ContextState::Open;  // restored if that close fails (allocation)
     std::string label;                 // diagnostics: "page 'index'", "build", ...
     std::vector<ContextId> children;   // in open order
     OwnerList handles;                 // owned handles in creation order
@@ -60,12 +61,17 @@ public:
     void erase(ContextId id);
     std::vector<ContextId> roots() const { return roots_; }
     std::size_t size() const { return contexts_.size(); }
+    // A cleanup hook of a handle taken from some context is running (no allocation).
+    bool any_in_flight() const noexcept {
+        for (const auto& entry : contexts_)
+            if (entry.second.in_flight != 0) return true;
+        return false;
+    }
 
     static bool is_build_kind(ContextKind kind) { return kind != ContextKind::Script; }
 
 private:
-    void collect(ContextId id, std::uint64_t closer, std::vector<ContextId>& order,
-                 std::vector<ContextId>& elsewhere);
+    void collect(ContextId id, std::vector<ContextId>& order, std::vector<ContextId>& elsewhere) const;
 
     std::unordered_map<ContextId, ExecContext> contexts_;
     std::vector<ContextId> roots_;   // in open order

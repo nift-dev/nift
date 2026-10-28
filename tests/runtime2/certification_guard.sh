@@ -97,7 +97,21 @@ EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-vm', 'test-runtime2-cp14b-witnesses'),
          ('test-rt-vm-sanitize', 'test-runtime2-cp14b-sanitize'),
          ('test-rt-vm', 'test-runtime2-d040-witnesses'),
-         ('test-rt-vm', 'test-runtime2-cp14b-profile')]
+         ('test-rt-vm', 'test-runtime2-cp14b-profile'),
+         # CP17 + N2 (2026-10-27): each CP17 suite through one tier edge.
+         ('test-rt-vm', 'test-runtime2-cp17-tripwire'),
+         ('test-rt-host', 'test-rt-handles'),
+         ('test-rt-host', 'test-rt-handles-guards'),
+         ('test-rt-host', 'test-runtime2-cp17-handles'),
+         ('test-rt-host', 'test-runtime2-cp17-n2-rebuild'),
+         ('test-rt-host-sanitize', 'test-rt-handles-sanitize'),
+         ('test-rt-host-sanitize', 'test-rt-handles-tsan'),
+         ('test-rt-host-sanitize', 'test-runtime2-cp17-sanitize'),
+         ('test-rt-host-mutants', 'test-runtime2-cp17-routing-mutants'),
+         ('test-rt-host-mutants', 'test-runtime2-cp17-n2-rebuild-mutant'),
+         ('test-rt-host-mutants', 'test-runtime2-cp17-handle-mutants'),
+         ('test-rt-host-mutants', 'test-runtime2-cp17-unwind-mutants'),
+         ('test-rt-host', 'test-runtime2-cp17-handle-allocation')]
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']

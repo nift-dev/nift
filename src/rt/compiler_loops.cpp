@@ -32,7 +32,10 @@ bool UnitCompiler::for_loop(const Node& node) {
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     if (!for_step(state)) return false;
-    if (!for_emit_body(state)) return false;
+    state.body_regs = block_begin(node.b);
+    const bool body_ok = for_emit_body(state);
+    block_end(state.body_regs);
+    if (!body_ok) return false;
     if (!for_finish(state)) return false;
     return builder_ok();
 }
@@ -117,6 +120,7 @@ bool UnitCompiler::for_finish(ForState& state) {
     const Node& node = *state.node;
     // Advance; `continue` lands here (or, in M3, on the condition).
     const std::size_t increment = fb_->here();
+    block_clear(state.body_regs);  // CP17 unwind release: the end of an iteration (also `continue`)
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 4
     for (std::size_t at : loops_.back().continues) fb_->patch(at, state.loop_start);  // M3: no advance
 #else
@@ -137,6 +141,7 @@ bool UnitCompiler::for_finish(ForState& state) {
 
     // Clean up iterator state on every normal/break exit (M4: breaks skip it).
     const std::size_t cleanup = fb_->here();
+    block_clear(state.body_regs);  // `break` leaves the body without its iteration end
     for (std::size_t at : state.exits) fb_->patch(at, cleanup);
 #if !(defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 5)
     for (std::size_t at : loops_.back().breaks) fb_->patch(at, cleanup);

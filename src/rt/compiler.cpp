@@ -3,6 +3,9 @@
 #include "rt/session_history.h"
 #include "rt/session_shape.h"
 
+#include "rt/compiler_handles.h"
+
+#include "rt/builtin_bind.h"
 #include "rt/compiler_expr.h"
 #include "rt/globals.h"
 #include "rt/literal.h"
@@ -155,9 +158,12 @@ bool UnitCompiler::if_chain(const Node& node) {
     if (!false_jump(node.a, to_else)) return false;
     const Node& body = ast_.at(node.b);
     scopes_.push();
+    BlockRegs body_regs = block_begin(node.b);
     const bool ok = statements(body);
+    block_end(body_regs);
     scopes_.pop();
     if (!ok) return false;
+    block_clear(body_regs);
     if (node.c == kNoNode) {
         for (std::size_t at : to_else) fb_->patch(at, fb_->here());
         return builder_ok();
@@ -173,7 +179,10 @@ bool UnitCompiler::if_chain(const Node& node) {
     } else {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
+        BlockRegs else_regs = block_begin(node.c);
         other_ok = statements(other);
+        block_end(else_regs);
+        if (other_ok) block_clear(else_regs);
         fb_->release_to(mark);
         scopes_.pop();
     }
@@ -194,20 +203,27 @@ bool UnitCompiler::while_loop(const Node& node) {
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
     bool ok = false_jump(node.a, exits);
+    BlockRegs body_regs;
     if (ok) {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
+        body_regs = block_begin(node.b);
         ok = statements(ast_.at(node.b));
+        block_end(body_regs);
         fb_->release_to(mark);
         scopes_.pop();
     }
     if (ok) {
-        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);
+        // CP17 unwind release: clear the body at each iteration end (`continue` too) and at the exit.
         fb_->set_offset(node.begin);
+        const std::size_t iteration_end = fb_->here();
+        block_clear(body_regs);
+        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);
         const std::size_t back = fb_->emit(OpCode::Jmp);
         fb_->patch(back, loops_.back().start);
         for (std::size_t at : exits) fb_->patch(at, fb_->here());
         for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
+        block_clear(body_regs);
     }
     loops_.pop_back();
     if (ok && !statement_preparable(node)) ok = fail(node, "prepared-unpreparable");
@@ -303,6 +319,13 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     if (!kinds.converged) {  // never compile with unsound kinds (review D1)
         result.reason = "analysis-limit:kinds";
         result.offset = ast.at(root).begin;
+        return result;
+    }
+    std::string handle_reason;
+    std::uint32_t handle_offset = 0;
+    if (detail::check_handle_flow(ast, root, kinds, handle_reason, handle_offset)) {
+        result.reason = std::move(handle_reason);
+        result.offset = handle_offset;
         return result;
     }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);

@@ -20,7 +20,7 @@ constexpr HostOpInfo kOps[] = {
     {HostOp::Mkdir, "mkdir", TP::Pre, "mkdir", R::Written},
     {HostOp::CopyTo, "copy-to", TP::Pre, "copy-to", R::Written},
     {HostOp::MoveTo, "move-to", TP::Pre, "move-to", R::Written},
-    {HostOp::MoveFrom, "move-from", TP::Pre, "move-from", R::Written},
+    {HostOp::MoveFrom, "move-from", TP::Pre, "move-from", R::None},
     {HostOp::ReadSource, "read-source", TP::PostAlways, "read-source", R::Read},
     {HostOp::ReadJson, "read-json", TP::PostAlways, "read-json", R::Read},
     {HostOp::Getenv, "getenv", TP::PostOk, "getenv", R::Environment},

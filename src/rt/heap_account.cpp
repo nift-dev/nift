@@ -93,6 +93,7 @@ std::size_t raw_footprint(const HeapObject* object) {
             return sizeof(ErrorObject) + text_storage(e->message) + text_storage(e->code) +
                    text_storage(e->category) + text_storage(e->source);
         }
+        case Kind::Handle: return sizeof(HandleBoxObject);
         case Kind::Cell: return sizeof(CellObject);  // the child Value is counted separately
         default: return 0;
     }
