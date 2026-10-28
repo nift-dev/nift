@@ -20,10 +20,10 @@ $(TEST_DIR)/cp19/job-control: tests/runtime2/cp19/jobs_mutants.cpp $(CP19_EXPR_O
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 define CP19_JOB_MUTANT
 $(TEST_DIR)/cp19/job-m$(1).o: src/rt/session.cpp
-	@mkdir -p "$(dir $@)"
+	@mkdir -p "$$(dir $$@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_JOB_MUTANT=$(1) -MMD -MP -c $$< -o $$@
 $(TEST_DIR)/cp19/job-m$(1): tests/runtime2/cp19/jobs_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/job-m$(1).o
-	@mkdir -p "$(dir $@)"
+	@mkdir -p "$$(dir $$@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/job-m$(1).o $(LDLIBS) -o $$@
 endef
 $(foreach M,1 2,$(eval $(call CP19_JOB_MUTANT,$(M))))
