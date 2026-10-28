@@ -324,6 +324,17 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_NATIVE_BUDGET)"
 	"$(RT_HEAP_LIMIT_ZERO)"
 
+# CP23 milestone 1: thread-neutral isolate value transfer (aliases, cycles,
+# atoms by text, errors, cells, functions, refused futures/handles).
+RT_ISOLATE_TRANSFER_UNIT := $(TEST_DIR)/rt/isolate-transfer-unit$(EXEEXT)
+$(RT_ISOLATE_TRANSFER_UNIT): tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_DEPS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp -o "$@"
+
+test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
+	"$(RT_ISOLATE_TRANSFER_UNIT)"
+
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
