@@ -63,9 +63,10 @@ def main():
         # 4. The unmutated binary posing as mutant 6 (snapshot write-back).
         info = Path(d) / "fake.json"
         sha = hashlib.sha256(Path(nift).read_bytes()).hexdigest()
-        info.write_text(json.dumps({"mutant": 6, "sha256": sha, "normal_sha256": sha}))
+        info.write_text(json.dumps({"mutant": 6, "sha256": sha, "normal_sha256": sha,
+                                    "objects": {"vm_coro.o": [sha, sha]}}))
         rc, out = gate("--nift", nift, "--mutant", "6", "--oracle", nift, "--mutant-info", str(info))
-        if rc == 0 or "miss mutant 6" not in out:
+        if rc == 0 or "provenance: the mutant is identical" not in out:
             failures.append(f"unmutated binary reported as a detection: rc={rc} {out[-300:]}")
     for f in failures:
         print("FAIL cp22 control: " + f)

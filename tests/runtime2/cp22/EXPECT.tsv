@@ -15,3 +15,7 @@ sem_lambda_sibling.f	correction:lambda-registry
 sem_lambda_parent.f	correction:lambda-registry
 sem_lambda_containers.f	correction:lambda-registry
 sem_lambda_future_chain.f	correction:lambda-registry
+sem_lexical_lambda_caller.f	correction:lexical-scope
+sem_lambda_eq.f	correction:lambda-identity
+sem_lambda_eq_main.f	correction:lambda-identity
+sem_lambda_wrong_id.f	correction:lambda-identity

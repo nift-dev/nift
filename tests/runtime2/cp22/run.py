@@ -20,6 +20,7 @@
   run.py --nift ./nift --mode vm-only     VM-determinism fixtures (vm-only/*.f) ==
                                           their .vm goldens (legacy is racy there)
   run.py --nift ./nift --record           (re)write legacy goldens from the oracle
+  (binding.py: the for-loop/catch binding rule, prevalidation on, both engines)
   run.py --nift M --mutant N --oracle ./nift --mutant-info M.json
                                           a -DNIFT_CORO_MUTANT=N build must be caught
                                           by its named witness fixtures (MUTANTS)
@@ -83,6 +84,15 @@ MUTANTS = {
                                                                                               "outcome": "vm"}}),
     20: ("calls through values (callable fields) not followed", {"refuse/r_f3_member_loop.f": {"exit": 0,
                                                                                              "outcome": "vm"}}),
+    # Round 7 (R2-1, R2-4): A3 identifies the suspension by the compiled
+    # operation (a Sleep, with a constant >= 1), never by a callee's spelling.
+    21: ("A3 identity dropped (any call counts as the suspension)", {
+        "refuse/r_r2_identity_user_fn.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"},
+        "refuse/r_r2_identity_value_call.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"},
+        "refuse/r_r2_identity_builtin.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
+    22: ("A3 argument dropped (any Sleep counts, sleep(0) or a variable)", {
+        "refuse/r_ca_sleep_zero_loop.f": {"stdout": b"10\n", "exit": 0, "outcome": "vm"},
+        "refuse/r_r2_sleep_variable.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
     13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
                                                                               "outcome": "vm"}}),
 }
@@ -232,11 +242,16 @@ def correction_ok(policy, legacy, vm):
       correction:lexical-scope   legacy resolves a free name in the caller's
                                  dynamic scope; same exit status, other stdout
       correction:lambda-registry legacy fails with `invalid lambda` (its per-worker
-                                 lambda table); the VM succeeds"""
+                                 lambda table); the VM succeeds
+      correction:lambda-identity legacy's per-worker lambda ids collide: lambdas
+                                 from different tasks compare equal, or a call
+                                 runs another lambda; both exit 0, other stdout"""
     if policy == "correction:lexical-scope":
         return legacy[2] == vm[2] == 0 and legacy[0] != vm[0]
     if policy == "correction:lambda-registry":
         return legacy[2] == 1 and b"invalid lambda" in legacy[1] and vm[2] == 0
+    if policy == "correction:lambda-identity":
+        return legacy[2] == vm[2] == 0 and legacy[1] == vm[1] == b"" and legacy[0] != vm[0]
     return False
 
 
@@ -346,6 +361,13 @@ def mutant(args):
             info.get("normal_sha256") != sha256(args.oracle):
         print(f"FAIL coroutine mutant {n}: harness: provenance manifest does not match the binaries")
         return 1
+    # Provenance by content: the mutant binary and at least one of its
+    # CP22 objects differ from the normal build (an unmutated build is no kill).
+    changed = sorted(o for o, (m, normal) in info.get("objects", {}).items() if m != normal)
+    if info["sha256"] == info["normal_sha256"] or not changed:
+        print(f"FAIL coroutine mutant {n}: harness: provenance: the mutant is identical to the normal build")
+        return 1
+    print(f"ok   mutant {n} provenance: changed objects {changed}")
     failures, detected = 0, []
     for key, sig in witnesses.items():
         if key.startswith("refuse/"):  # a refusal witness: the mutant runs what the oracle refuses

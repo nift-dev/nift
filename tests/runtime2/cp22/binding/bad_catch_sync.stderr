@@ -1,0 +1,1 @@
+error: $ROOT/bad_catch_sync.f:1:33: catch binding 'sleep' has the name of a built-in and is called in its scope; rename the binding

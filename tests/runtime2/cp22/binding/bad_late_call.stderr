@@ -1,0 +1,1 @@
+error: $ROOT/bad_late_call.f:3:22: for-loop binding 'json' has the name of a built-in and is called in its scope; rename the binding

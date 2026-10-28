@@ -1,0 +1,1 @@
+error: $ROOT/bad_touch_main.f:2:6: for-loop binding 'touch' has the name of a built-in and is called in its scope; rename the binding

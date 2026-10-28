@@ -1,0 +1,1 @@
+error: $ROOT/bad_print_order.f:2:37: for-loop binding 'print' has the name of a built-in and is called in its scope; rename the binding
