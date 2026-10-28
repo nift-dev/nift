@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """CP20 R2 Windows CI probe (POSIX hosts skip).
 
-F1: with the interactive branch forced, an external command must still run
-(F1 regression on R1).
+F1: an external command in the piped (scripted) shell must still run on the
+legacy Windows launcher after CP21 removed the forced-interactive switch.
 F2: a console pipeline must expose the pre-CP20 captured/normalised LF bytes;
 the original CP20 `(false,false)` path emits raw CRLF.
 """
@@ -42,12 +42,12 @@ def main():
     else:
         print("PASS redirected-console-bytes")
 
-    interactive = run('cmd /c echo hello\nexit\n', {"NIFT_CP20_FORCE_INTERACTIVE": "1"})
-    if interactive.stdout.replace(b"\r\n", b"\n") != b"hello\n":
+    external = run('cmd /c echo hello\nexit\n')
+    if external.stdout.replace(b"\r\n", b"\n") != b"hello\n":
         ok = False
-        print("FAIL forced-interactive-external", interactive.stdout, interactive.stderr)
+        print("FAIL piped-external", external.stdout, external.stderr)
     else:
-        print("PASS forced-interactive-external")
+        print("PASS piped-external")
     return 0 if ok else 1
 
 

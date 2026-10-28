@@ -19,7 +19,6 @@
 #include "rt/infer.h"
 #include "rt/resolver.h"
 #include "rt/text_type.h"
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -27,14 +26,11 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
 namespace nift::rt::detail {
-
 class UnitCompiler {
 public:
     UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                  const std::vector<bool>& loop_called, const GlobalPlan* globals = nullptr);
-
     // Compiles main (proto 0) and every function (proto k + 1) into `program`.
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
@@ -49,7 +45,6 @@ public:
     void set_session(SessionCompileContext* session);
     void expression_result() { expression_result_ = true; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
-
 private:
     SessionCompileContext* session_ = nullptr;
     std::unordered_map<std::string, Binding> session_bindings_;
@@ -66,7 +61,6 @@ private:
         std::vector<std::size_t> continues;  // patched after the body (For) or to start (While)
         std::size_t try_depth = 0;           // CP13B: try scopes active at loop entry
     };
-
 public:
     struct Capture {
         enum class Source : std::uint8_t { LocalCell, OuterUpvalue };
@@ -84,9 +78,7 @@ public:
         std::vector<bool> upvalue_const_array;
         std::vector<Capture> captures;
     };
-
 private:
-
     // compiler.cpp: statements
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
@@ -115,6 +107,14 @@ private:
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);
+    // CP22 coroutine units (compiler_coro.cpp): Call or Spawn for function f;
+    // `type(future)` and `sleep(ms)` (-1: not handled, 0 refused, 1 compiled);
+    // `.done()`/`.status()` on a future (same convention); `await e`.
+    OpCode call_opcode(std::size_t f) const;
+    int coro_call(const Node& node, std::string_view name, const natives::BuiltinSpec* builtin, std::uint16_t dst);
+    int future_method(const Node& node, std::uint16_t dst);
+    bool thread_call(const Node& node, std::string_view name, std::uint16_t dst);  // CP22, else `callable:<name>`
+    bool await_expr(const Node& node, std::uint16_t dst);
     // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
     bool for_loop(const Node& node);
@@ -149,7 +149,6 @@ private:
     bool indexed_binding(const Binding& b, std::uint16_t& reg);
     bool store_indexed_binding(const Binding& b, std::uint16_t value);
     bool store_binding(const Binding& b, std::uint16_t value, std::uint16_t text_type);
-
     // compiler_expr.cpp: expressions
     bool expr_to(NodeId id, std::uint16_t dst);
     bool expr_any(NodeId id, std::uint16_t& operand);
@@ -319,7 +318,6 @@ private:
     const StructFieldInfo* struct_target(const Node& target);
     NodeId target_receiver(const Node& target) const { return target.kind == NodeKind::Member ? target.a : kNoNode; }
     std::uint16_t this_reg_ = 0;  // a method's register holding its instance's stack slot
-
     bool fail(const Node& node, std::string reason);
     bool builder_ok();
     std::string_view text(const Node& node) const { return ast_.text(node); }

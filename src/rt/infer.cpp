@@ -9,9 +9,7 @@
 #include "rt/number.h"
 #include <memory>
 #include <string>
-
 // rt-lint: cold-file compile-time analysis, once per unit
-
 namespace nift::rt {
 namespace infer_detail {
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
@@ -38,7 +36,6 @@ Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const Gl
         }
     }
 }
-
 UnitKinds Inference::run(std::size_t max_walks) {
     const std::size_t n = plan_.functions.size();
     callers_.assign(n, {});
@@ -301,6 +298,7 @@ TyRef Inference::expr(NodeId id) {
             statement(id); t = expr(n.a); break;
         case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
         case NodeKind::Call: t = call(n); break;
+        case NodeKind::Await: t = awaited(expr(n.a)); break;  // CP22
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)
     }
     return record(id, t ? t : empty_ty());
@@ -374,6 +372,7 @@ TyRef Inference::call(const Node& n) {
         }
         return result;
     }
+    if (plan_.coroutines && callee.kind == NodeKind::Ident && n.count > 0) if (TyRef t = thread_call(n)) return t;
     const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
     for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);

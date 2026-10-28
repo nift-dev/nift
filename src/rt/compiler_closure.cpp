@@ -72,7 +72,6 @@ void UnitCompiler::collect_lambda_names(NodeId id, std::vector<std::string_view>
 }
 
 bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
-    if (node.flags & kFlagAsync) return fail(node, "fn-flags");
     if (node.b == kNoNode) return fail(node, "lambda-shape");
     const NodeId* params = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
@@ -118,6 +117,8 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     }
     if (session_ && !session_lambda_captures(node_id(node), node, upvalue_names, upvalue_loop,
                                             upvalue_readonly, upvalue_const_array)) return false;
+    // Async captures include prior-command cells; preserve CP22 refusal.
+    if ((node.flags & kFlagAsync) && !upvalue_names.empty()) return fail(node, "coro-capture");
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);
@@ -366,7 +367,8 @@ bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, s
     fb_->set_offset(site(node));
     const std::uint8_t saved = fb_->flags();
     if (member) fb_->set_flags(static_cast<std::uint8_t>(fb_->flags() | kInstrCallMember));
-    const std::size_t at = fb_->emit(OpCode::CallValue, base, callee_reg, static_cast<std::uint16_t>(node.count));
+    const OpCode op = plan_.coroutines ? OpCode::CallValueAny : OpCode::CallValue;  // CP22: may spawn
+    const std::size_t at = fb_->emit(op, base, callee_reg, static_cast<std::uint16_t>(node.count));
     fb_->set_flags(saved);
     fb_->note(at, member ? std::string(text(node)) : std::string(text(callee)), false, false, numeric_return);
     if (dst != base) fb_->emit(OpCode::Move, dst, base);

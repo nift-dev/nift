@@ -107,6 +107,7 @@ private:
     TyRef expr(NodeId id);
 
     TyRef call(const Node& n);
+    TyRef thread_call(const Node& n);  // CP22: `thread(f, args…)`, or null when the call is not one
 
     void block(NodeId id);
 

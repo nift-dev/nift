@@ -70,6 +70,14 @@ inline constexpr KindSet kKindAll = kKindNull | kKindBool | kKindInt | kKindFrac
 // anything" and refuses (review CP12 round 1, D1); the unit is refused either
 // way, at most for another reason.
 inline constexpr KindSet kKindUnknown = 1u << 10;
+// CP22: a future. Outside kKindAll (like CP17's handle bits 11-13): no generic
+// value operation admits one; the coroutine flow check (compiler_coro.h)
+// admits the positions whose legacy behaviour the VM reproduces.
+inline constexpr KindSet kKindFuture = 1u << 14;
+// CP22: a thread handle (legacy `thread(f, …)`): like a future, with join().
+// The last bit of the 16-bit set (widening KindSet is compile-time only).
+inline constexpr KindSet kKindThread = 1u << 15;
+inline constexpr KindSet kKindTask = kKindFuture | kKindThread;  // either task handle
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -81,6 +89,8 @@ static_assert((kKindFile & kKindHandle) == kKindHandle && (kKindStream & kKindHa
 static_assert((kKindFile & kKindStream) == kKindHandle);
 static_assert((kKindAll & kKindUnknown) == 0 && (kKindAll & ~(kKindError | (kKindError - 1))) == 0);
 static_assert((kKindAll & kKindHandle) == 0);
+static_assert(kKindFuture == (1u << 14) && (kKindAll & kKindFuture) == 0 && kKindFuture != kKindUnknown);
+static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
 
 struct SessionInferenceProof {
     std::unordered_set<std::uint64_t> historical_calls;
@@ -112,6 +122,8 @@ struct UnitKinds {
     std::unordered_map<NodeId,NodeId> bindings;
     std::unordered_map<NodeId,KindSet> collection_elements;
     std::unordered_set<NodeId> collection_text_numbers;
+    // CP22: expressions whose value is, or may contain at any depth, a future.
+    std::unordered_set<NodeId> future_holders;
     bool converged = false;
     std::size_t walks = 0;  // unit walks the worklist needed (statistics, tests)
     KindSet of(NodeId id) const {

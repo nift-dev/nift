@@ -78,17 +78,23 @@ struct FunctionObject : HeapObject {
     bool expression_body = false;
     bool selector_call_site = false;  // returned expression body lacks a legacy source view
     std::vector<Value> upvalues;
-    std::shared_ptr<const Program> program_owner;  // session code lifetime, never a state bridge
-    std::uint64_t session_identity = 0;  // stable across session named-function redefinition
-    std::uint64_t display_id = 0;  // CLI presentation only; callable identity remains the Value
     FunctionObject() : HeapObject(Kind::Function) {}
-    // Keep optional Program-owner cleanup in the existing destruction path;
-    // an out-of-line default destructor adds cost even for ordinary closures.
-#if defined(__GNUC__)
-    __attribute__((always_inline))
-#endif
-    ~FunctionObject() = default;
 };
+// Optional CP19 metadata lives only on session/eval callables. Ordinary
+// closures retain their pre-CP19 representation and allocation/destruction cost.
+inline constexpr std::uint8_t kSessionFunction = 0x40;
+struct SessionFunctionObject : FunctionObject {
+    std::shared_ptr<const Program> program_owner;
+    std::uint64_t session_identity = 0;
+    std::uint64_t display_id = 0;
+    SessionFunctionObject() { tag |= kSessionFunction; }
+};
+inline SessionFunctionObject* session_function(FunctionObject* f) noexcept {
+    return f && (f->tag & kSessionFunction) ? static_cast<SessionFunctionObject*>(f) : nullptr;
+}
+inline const SessionFunctionObject* session_function(const FunctionObject* f) noexcept {
+    return f && (f->tag & kSessionFunction) ? static_cast<const SessionFunctionObject*>(f) : nullptr;
+}
 
 // CP12C: a captured binding. Internal only: never reachable from script values,
 // natives or Host; the VM's cell opcodes and the D-040 cycle graph are its only

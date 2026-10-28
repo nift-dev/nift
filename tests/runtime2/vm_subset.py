@@ -131,7 +131,11 @@ UNSUPPORTED = [
     ("fn-called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"),
     ("fn-called-before-declaration-transitive", "fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n",
      "fn-called-before-declaration"),
-    ("async-fn", "fn[async](f()) { return 1 }\nprint(1)\n", "fn-flags"),
+    # CP22: async functions compile (tests/runtime2/cp22); an async lambda
+    # capturing a local stays refused (legacy clones captures per task).
+    ("async-capture", "fn(m()) {\n  n := 1\n  f := async () => n\n  return await f()\n}\nprint(m())\n",
+     "coro-capture"),
+    ("deferred-fn", "@fn(f()) { return 1 }\nprint(1)\n", "fn-flags"),
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),
     ("jump-outside-loop", "break\n", "jump-outside-loop"),

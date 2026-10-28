@@ -5,6 +5,7 @@
 
 #include "rt/host/process_posix_lifecycle.h"
 #include "rt/host/process_posix_loop.h"
+#include "rt/host/process_terminal.h"
 #include "rt/host/process_runtime.h"
 
 #include "ProcessEnvironment.h"  // nift_environment_mutex: consistent environ snapshots
@@ -33,9 +34,12 @@ std::string pipe_error() { return std::string("cannot create pipe: ") + std::str
 // Child side of stage i: group, terminal, parent death, cwd and redirections,
 // then exec. Async-signal-safe only.
 [[noreturn]] void run_child(Launch& l, std::size_t i, const int link[2], const int report[2], const int pid_pipe[2],
-                            pid_t target_pgid) {
+                            pid_t target_pgid, int handoff_sync) {
     State& s = l.s;
     const bool last = i + 1 == s.req.stages.size();
+#if defined(NIFT_CP21_D1_MUTANT) && NIFT_CP21_D1_MUTANT
+    (void)handoff_sync;
+#endif
     if (report[0] >= 0) ::close(report[0]);
     if (l.detached) {
         ::close(pid_pipe[0]);
@@ -52,16 +56,10 @@ std::string pipe_error() { return std::string("cannot create pipe: ") + std::str
     } else {
         if (s.req.own_group && ::setpgid(0, target_pgid) != 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
         if (l.want_handoff && i == 0) {
-            struct sigaction ign {};
-            ign.sa_handler = SIG_IGN;
-            sigemptyset(&ign.sa_mask);
-            struct sigaction prev {};
-            ::sigaction(SIGTTOU, &ign, &prev);
-            ::tcsetpgrp(STDIN_FILENO, ::getpid());
-            struct sigaction dfl {};
-            dfl.sa_handler = SIG_DFL;
-            sigemptyset(&dfl.sa_mask);
-            ::sigaction(SIGTTOU, &dfl, nullptr);
+            child_take_terminal(report[1]);
+#if !defined(NIFT_CP21_D1_MUTANT) || NIFT_CP21_D1_MUTANT == 0
+            child_wait_handoff(handoff_sync, report[1]);
+#endif
         }
 #ifdef __linux__
         if (s.req.die_with_parent) {
@@ -122,7 +120,8 @@ std::size_t read_payload(int fd, void* into, std::size_t size) {
 }
 
 // Parent side after fork() of stage i.
-void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2], int pid_pipe[2]) {
+void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2], int pid_pipe[2],
+                  int handoff_sync) {
     State& s = l.s;
     if (report[1] >= 0) ::close(report[1]);
     pid_t stage_pid = pid;
@@ -141,7 +140,16 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
             if (i == 0) s.pgid = pid;
             ::setpgid(pid, s.pgid);  // both sides set it: no window where the child is outside its group
         }
-        if (l.want_handoff && i == 0) ::tcsetpgrp(STDIN_FILENO, pid);
+        if (l.want_handoff && i == 0) {
+            if (terminal_set_foreground(pid)) parent_commit_handoff(handoff_sync);
+            else {
+                l.fail("cannot take terminal for " + s.req.stages[i].program + ": " +
+                       std::strerror(errno));
+                parent_abort_handoff(handoff_sync);
+            }
+        } else if (handoff_sync >= 0) {
+            parent_abort_handoff(handoff_sync);
+        }
     }
     auto& stage = s.st[i];
     runtime::test_event(&s, "spawn", stage_pid, s.pgid, static_cast<long>(i), "");  // a = pid, b = pgid, c = stage
@@ -181,55 +189,6 @@ void record_stage(Launch& l, std::size_t i, pid_t pid, int link[2], int report[2
     l.prev_read = link[0];
 }
 } // namespace
-void open_endpoints(Launch& l) {
-    State& s = l.s;
-    const OutputMode mode = l.mode;
-    const bool pipes = mode == OutputMode::PipeCapture || mode == OutputMode::Interactive;
-    if (mode == OutputMode::FileCapture) {
-        s.out_file = open_capture_file();
-        s.err_file = open_capture_file();
-        if (s.out_file < 0 || s.err_file < 0) l.fail("cannot create capture files");
-        l.out_child = s.out_file;
-        l.err_child = s.err_file;
-    } else if (pipes) {
-        int o[2], e[2];
-        if (!make_pipe(o)) {
-            l.fail(pipe_error());
-        } else if (!make_pipe(e)) {
-            l.fail(pipe_error());
-            ::close(o[0]);
-            ::close(o[1]);
-        } else {
-            s.out_fd = o[0]; l.out_child = o[1];
-            s.err_fd = e[0]; l.err_child = e[1];
-            set_nonblocking(s.out_fd);
-            set_nonblocking(s.err_fd);
-        }
-    }
-    l.stdin_pipe =
-        !s.launch_failed && !l.detached && (mode == OutputMode::Interactive || s.req.stdin_mode == StdinMode::Text);
-    if (l.stdin_pipe) {
-        int i[2];
-        if (!make_pipe(i)) {
-            l.fail(pipe_error());
-        } else {
-            l.in_child = i[0];
-            s.in_fd = i[1];
-            set_nonblocking(s.in_fd);
-            if (mode != OutputMode::Interactive) {
-                s.in_pending = s.req.stdin_text;
-                s.stdin_total = s.req.stdin_text.size();
-                s.close_stdin_when_drained = true;
-            }
-        }
-    }
-    l.null_stdin = l.detached || s.req.stdin_mode == StdinMode::Null;
-    const bool blocking = mode == OutputMode::FileCapture || mode == OutputMode::PipeCapture ||
-                          mode == OutputMode::Stream || mode == OutputMode::Inherit;
-    l.want_handoff = !l.detached && s.req.own_group && blocking && !l.stdin_pipe && !l.null_stdin &&
-                     s.req.terminal != TerminalPolicy::Never &&
-                     s.req.stages.front().stdin_path.empty() && terminal_foreground();
-}
 void prepare_stages(Launch& l) {
     State& s = l.s;
     // Environment snapshot once per launch.
@@ -247,10 +206,10 @@ void prepare_stages(Launch& l) {
     l.parent_pid = ::getpid();
     runtime::index_add(l.key, runtime::IndexedGroup{-1, {}, l.detached});
     if (l.want_handoff) {
-        struct sigaction ign {};
-        ign.sa_handler = SIG_IGN;
-        sigemptyset(&ign.sa_mask);
-        ::sigaction(SIGTTOU, &ign, &s.old_ttou);
+        if (!terminal_acquire(&s)) {
+            l.fail("cannot take terminal ownership");
+            return;
+        }
         s.handoff = true;
     }
 }
@@ -285,15 +244,35 @@ bool launch_stage(Launch& l, std::size_t i) {
         ::close(report[1]);
         return false;
     }
+    // Terminal-sensitive first stage: the child may set up its group and take
+    // the tty, but cannot exec until the parent commits the authoritative
+    // handoff decision. Non-handoff launches pay no extra descriptor.
+    int handoff_sync[2] = {-1, -1};
+#if defined(NIFT_CP21_D1_MUTANT) && NIFT_CP21_D1_MUTANT
+    const bool barrier = false;
+#else
+    const bool barrier = l.want_handoff && i == 0;
+#endif
+    if (barrier && !make_pipe(handoff_sync)) {
+        l.fail(pipe_error());
+        for (int fd : {link[0], link[1], report[0], report[1], pid_pipe[0], pid_pipe[1]}) if (fd >= 0) ::close(fd);
+        return false;
+    }
     const pid_t target_pgid = i == 0 ? 0 : s.pgid;
     const pid_t pid = ::fork();
     if (pid < 0) {
         l.fail("cannot start " + s.req.stages[i].program + ": " + std::strerror(errno));
-        for (int fd : {link[0], link[1], report[0], report[1], pid_pipe[0], pid_pipe[1]}) if (fd >= 0) ::close(fd);
+        for (int fd : {link[0], link[1], report[0], report[1], pid_pipe[0], pid_pipe[1],
+                       handoff_sync[0], handoff_sync[1]})
+            if (fd >= 0) ::close(fd);
         return false;
     }
-    if (pid == 0) run_child(l, i, link, report, pid_pipe, target_pgid);
-    record_stage(l, i, pid, link, report, pid_pipe);
+    if (pid == 0) {
+        if (barrier) ::close(handoff_sync[1]);
+        run_child(l, i, link, report, pid_pipe, target_pgid, barrier ? handoff_sync[0] : -1);
+    }
+    if (barrier) ::close(handoff_sync[0]);
+    record_stage(l, i, pid, link, report, pid_pipe, barrier ? handoff_sync[1] : -1);
     return true;
 }
 void read_stage_reports(Launch& l) {

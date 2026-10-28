@@ -16,3 +16,6 @@ src/rt/expr_parser.cpp
 src/rt/expr_postfix.cpp
 src/rt/expr_literals.cpp
 src/rt/prevalidate.cpp
+src/rt/legacy_names.cpp
+src/rt/reserved_names.cpp
+src/rt/binding_rules.cpp

@@ -203,4 +203,30 @@ KindSet arithmetic_kinds(Op op, KindSet l, KindSet r) {
     return static_cast<KindSet>(out | ((l | r) & kKindUnknown));
 }
 
+TyRef async_result(std::uint32_t flags, const TyRef& returns) {
+    if (!(flags & kFlagAsync)) return returns;
+    auto future = std::make_shared<Ty>();
+    future->kinds = kKindFuture;
+    future->elem = returns ? returns : empty_ty();
+    return future;
+}
+
+TyRef awaited(const TyRef& t) {
+    if (!t || t->any || (t->kinds & kKindUnknown)) return any_ty();
+    if (!(t->kinds & kKindFuture) || !t->elem) return empty_ty();  // only an error, never a value
+    return t->elem;
+}
+
+bool holds_future(const TyRef& t, int depth) {
+    if (!t) return false;
+    if (t->kinds & kKindTask) return true;
+    if (depth > kMaxDepth + 2) return false;
+    if (holds_future(t->elem, depth + 1)) return true;
+    for (const TyRef& item : t->items)
+        if (holds_future(item, depth + 1)) return true;
+    for (const auto& field : t->fields)
+        if (holds_future(field.second, depth + 1)) return true;
+    return false;
+}
+
 } // namespace nift::rt::infer_detail

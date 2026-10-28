@@ -26,7 +26,7 @@ inline std::string first_opaque(const nift::rt::Ast& ast, nift::rt::NodeId id) {
     return std::string("opaque:") + nift::rt::opaque_reason_name(ast.at(opaque).reason);
 }
 
-inline Compiled compile(const std::string& source) {
+inline Compiled compile(const std::string& source, const nift::rt::CompileLimits& limits = nift::rt::CompileLimits()) {
     Compiled c;
     c.source = source;
     c.ast = std::make_unique<nift::rt::Ast>(c.source);
@@ -34,7 +34,7 @@ inline Compiled compile(const std::string& source) {
     if (!parsed.ok) { c.reason = "parse-error"; return c; }
     c.reason = first_opaque(*c.ast, parsed.root);
     if (!c.reason.empty()) return c;
-    nift::rt::CompileResult result = nift::rt::compile_unit(*c.ast, parsed.root);
+    nift::rt::CompileResult result = nift::rt::compile_unit(*c.ast, parsed.root, limits);
     if (!result.program) { c.reason = result.reason; return c; }
     c.program = std::move(result.program);
     return c;

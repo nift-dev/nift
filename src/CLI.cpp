@@ -37,6 +37,7 @@
 #include "rt/eval_result.h"
 #include "shell/CommandDispatch.h"
 #include "shell/Spawn.h"
+#include "shell/SessionJobs.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1623,6 +1624,8 @@ static nift::rt::VmOptions session_options() {
 static int finish_vm_session(nift::rt::VmSession& session, int status) {
     try {
         const auto result = session.finish(status != 0);
+        if (result.host_fault && !result.host_fault_message.empty() && result.host_fault_message != result.message)
+            console::error(result.host_fault_message);
         if (result.reason != nift::rt::StopReason::None) {
             console::error(result.message);
             if (!status) return result.reason == nift::rt::StopReason::Internal ? 70 : 1;
@@ -2175,11 +2178,7 @@ static int run_shell_job_builtin_impl(const std::string& builtin,
 static int run_shell_job_builtin(const std::string& builtin,
                                  const std::vector<std::string>& args,
                                  nift::shell::JobTable* jobs,
-                                 ShellJobTable* legacy_jobs,
-                                 bool interactive,
                                  bool print_errors) {
-    if (interactive && legacy_jobs && legacy_jobs->supported())
-        return run_shell_job_builtin_impl(builtin, args, legacy_jobs, print_errors);
     return run_shell_job_builtin_impl(builtin, args, jobs, print_errors);
 }
 
@@ -2187,8 +2186,6 @@ static int dispatch_shell_state(Parser& parser,
                                 const std::string& builtin,
                                 const std::vector<std::string>& args,
                                 nift::shell::JobTable* jobs,
-                                ShellJobTable* legacy_jobs,
-                                bool interactive,
                                 bool print_errors,
                                 bool& exit_requested,
                                 int& exit_code, nift::rt::VmSession* session = nullptr) {
@@ -2233,7 +2230,7 @@ static int dispatch_shell_state(Parser& parser,
         if (!result.output.empty()) std::cout << result.output << '\n';
         return 0;
     }
-    return run_shell_job_builtin(builtin, args, jobs, legacy_jobs, interactive, print_errors);
+    return run_shell_job_builtin(builtin, args, jobs, print_errors);
 }
 
 static int run_nift_command(Parser& parser,
@@ -2259,9 +2256,7 @@ static int run_external_words(Parser& parser,
                               const std::vector<ShellWord>& words,
                               const std::string& line,
                               bool print_errors,
-                              nift::shell::JobTable* jobs,
-                              ShellJobTable* legacy_jobs,
-                              bool interactive) {
+                              nift::shell::JobTable* jobs) {
     (void)parser;
     if (std::getenv("NIFT_NO_PROCESS")) {
         if (print_errors) console::error("external process execution disabled");
@@ -2326,8 +2321,8 @@ static int run_external_words(Parser& parser,
 
     const bool background = !words.empty() && words.back().operator_token && words.back().text == "&";
     if (background) {
-        if (interactive ? !legacy_jobs : !jobs) {
-            if (print_errors) console::error("background jobs require the interactive shell");
+        if (!jobs || !jobs->supported()) {
+            if (print_errors) console::error("interactive job control is not supported on Windows");
             return 2;
         }
     }
@@ -2338,21 +2333,14 @@ static int run_external_words(Parser& parser,
         }
     }
     if (background) {
-        ProcessResult result;
-        if (interactive && legacy_jobs && legacy_jobs->supported()) {
-            result = legacy_jobs->launch(stages, line, false);
-        } else if (!interactive && jobs && jobs->supported()) {
-            result = jobs->launch(stages, line, false);
-        } else {
-            if (print_errors) console::error("interactive job control is not supported on Windows");
-            return 2;
-        }
+        ProcessResult result = jobs->launch(stages, line, false);
         int status = result.exit_code;
         if (!result.error.empty()) {
             if (print_errors) console::error(result.error);
             return status < 0 ? 2 : status;
         }
-        auto list = (interactive && legacy_jobs) ? legacy_jobs->jobs(false) : jobs->jobs(false);
+        if (result.host_fault) return status == 0 ? 1 : status;
+        auto list = jobs->jobs(false);
         if (!list.empty()) {
             const auto& job = list.back();
             std::cout << "[" << job.id << "] " << job.process_group << '\n';
@@ -2362,29 +2350,20 @@ static int run_external_words(Parser& parser,
 
     const bool direct = !has_ops && stages.size() == 1;
     ProcessResult result;
-#if defined(NIFT_CP20_MUTANT) && NIFT_CP20_MUTANT == 10
-    if (interactive && legacy_jobs) {
-#else
-    if (interactive && legacy_jobs && legacy_jobs->supported()) {
-#endif
-        // J1(a): the complete legacy foreground job-control path stays until
-        // CP21 adds Host stop/continue. This preserves Ctrl-C/Ctrl-Z/fg/bg.
-        result = legacy_jobs->launch(stages, line, true);
-    } else if (jobs && jobs->supported()) {
+    if (jobs && jobs->supported()) {
         result = jobs->launch(stages, line, true);
     } else {
         if (direct) stages[0].foreground_terminal = true;
         result = nift::shell::run_pipeline(stages, line, direct);
     }
     if (!result.error.empty() && print_errors) console::error(result.error);
+    if (result.host_fault) return result.exit_code == 0 ? 1 : result.exit_code;
     return result.exit_code;
 }
 static int execute_shell_command(Parser& parser,
                                  const std::string& line,
                                  bool print_errors,
                                  nift::shell::JobTable* jobs,
-                                 ShellJobTable* legacy_jobs,
-                                 bool interactive,
                                  const nift::shell::ShellSnapshot* supplied_snapshot = nullptr,
                                  bool* exit_requested_out = nullptr,
                                  int* exit_code_out = nullptr,
@@ -2483,7 +2462,7 @@ static int execute_shell_command(Parser& parser,
                     continue;
                 }
             }
-            last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 #endif
@@ -2503,7 +2482,7 @@ static int execute_shell_command(Parser& parser,
                 last = 2;
                 continue;
             }
-            last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+            last = run_external_words(parser, segment_words, line, print_errors, jobs);
             continue;
         }
 
@@ -2515,7 +2494,7 @@ static int execute_shell_command(Parser& parser,
                     args.assign(segment_texts.begin() + static_cast<std::ptrdiff_t>(name_index + 1),
                                 segment_texts.end());
                 }
-                last = dispatch_shell_state(parser, segment.first.name, args, jobs, legacy_jobs, interactive, print_errors,
+                last = dispatch_shell_state(parser, segment.first.name, args, jobs, print_errors,
                                             exit_requested, exit_code, session);
                 break;
             }
@@ -2524,7 +2503,7 @@ static int execute_shell_command(Parser& parser,
                 last = run_nift_command(parser, segment_texts, print_errors, session);
                 break;
             case nift::shell::CommandKind::External:
-                last = run_external_words(parser, segment_words, line, print_errors, jobs, legacy_jobs, interactive);
+                last = run_external_words(parser, segment_words, line, print_errors, jobs);
                 break;
             case nift::shell::CommandKind::NotFound:
                 if (print_errors) console::error("nift: " + segment.first.name + ": command not found");
@@ -2756,13 +2735,23 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         session->initialize_invocation("<repl>", {});
     }
     const auto loop = [&]() -> int {
-    std::string pending; nift::shell::JobTable jobs; ShellJobTable legacy_jobs;
+    std::string pending;
+    std::unique_ptr<nift::shell::JobTable> legacy_jobs;
+    nift::shell::JobTable* session_jobs = nullptr;
+    if (session) {
+        auto owner = std::make_unique<nift::shell::SessionJobs>();
+        session_jobs = &owner->jobs; session->attach_jobs(std::move(owner));
+    } else { legacy_jobs = std::make_unique<nift::shell::JobTable>(); session_jobs = legacy_jobs.get(); }
+    auto& jobs = *session_jobs;
     auto history=load_nift_history();
 #ifndef _WIN32
     size_t hist_pos=history.size();
 #endif
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
+    jobs.set_interactive(interactive);
+#else
+    jobs.set_interactive(_isatty(_fileno(stdin)) != 0);
 #endif
     if (load_rc) if (const char* home = std::getenv("HOME")) {
         fs::path rc = fs::path(home) / ".niftrc";
@@ -2799,15 +2788,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         const auto snapshot=make_shell_snapshot(parser, session);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
-#ifndef _WIN32
-            const bool forced_scripted = std::getenv("NIFT_CP20_FORCE_SCRIPTED") != nullptr;
-            const bool interactive_shell = interactive && !forced_scripted;
-#else
-            const bool forced_interactive = std::getenv("NIFT_CP20_FORCE_INTERACTIVE") != nullptr;
-            const bool interactive_shell = _isatty(_fileno(stdin)) != 0 || forced_interactive;
-#endif
-            const auto status = execute_shell_command(parser,trimmed,true,&jobs,&legacy_jobs,interactive_shell,
-                                                      &snapshot,&exit_requested,&exit_code,session);
+            const auto status = execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code,session);
             if (status == 70) return status;
             pending.clear();
             if(exit_requested) return exit_code;
@@ -2823,8 +2804,12 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if(!rr.ok){ console::error(rr.error.message);continue; }
         if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
-    if(jobs.has_live_jobs()) jobs.wait_all();
-    if(legacy_jobs.has_live_jobs()) legacy_jobs.wait_all();
+    // Session end cancels jobs through the sole CP21 owner; never wait forever
+    // on a stopped/background job and never give it a second process owner.
+    if (!session) {
+        const auto result = jobs.finish();
+        if (result.host_fault || !result.error.empty()) { console::error(result.error); return 1; }
+    }
     std::string resource_error;
     if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
     return 0;

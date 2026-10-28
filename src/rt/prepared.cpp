@@ -140,7 +140,8 @@ private:
     void mark_calls(NodeId id) {
         walk(ast_, id, [this](NodeId, const Node& n) {
             const int f = callee_index(n);
-            if (f >= 0 && !marked_[static_cast<std::size_t>(f)]) {
+            if (f >= 0 && !marked_[static_cast<std::size_t>(f)] &&  // CP22: a task runs canonically
+                !(ast_.at(plan_.functions[static_cast<std::size_t>(f)]).flags & kFlagAsync)) {
                 marked_[static_cast<std::size_t>(f)] = true;
                 changed_ = true;
             }

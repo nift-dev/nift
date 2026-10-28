@@ -1,6 +1,7 @@
 #include "rt/prevalidate.h"
 
 #include "rt/ast.h"
+#include "rt/binding_rules.h"
 #include "rt/lexer.h"
 #include "rt/parser.h"
 
@@ -346,6 +347,10 @@ Prevalidation prevalidate(std::string_view source) {
         if (node.kind == NodeKind::Opaque && node.reason == OpaqueReason::LegacyRuntimeError)
             check_region(source, node.begin, node.end, skips, functions, finding);
     }
+    // Not syntax: the for-loop/catch binding rule (rt/binding_rules.h), on
+    // both engines before anything runs.
+    const BindingCallViolation binding = reserved_binding_call(ast);
+    if (binding.found) finding.take(binding.offset, binding.message, "binding-call-reserved", kTranslation);
     if (finding.found) {
         result.ok = false;
         result.offset = finding.offset;

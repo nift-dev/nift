@@ -26,18 +26,19 @@ bool Vm::op_load_function(const Instr& in, Value* R, Fault& fault) {
             auto* function = candidate.heap_as<FunctionObject>();
             if (function->is_lambda || function->name != protos_[in.b]->name) continue;
             function->code = protos_[in.b];
-            function->program_owner = protos_[in.b]->session_owner.lock();
+            session_function(function)->program_owner = protos_[in.b]->session_owner.lock();
             value = candidate;
             break;
         }
     }
     if (value.is_null()) {
-        auto* function = new FunctionObject();
+        auto* function = (protos_[in.b]->session_source || options_.return_value)
+            ? static_cast<FunctionObject*>(new SessionFunctionObject()) : new FunctionObject();
         function->name = protos_[in.b]->name;
         function->code = protos_[in.b];
-        if (protos_[in.b]->session_source) function->session_identity = next_session_callable_id_++;
+        if (protos_[in.b]->session_source) session_function(function)->session_identity = next_session_callable_id_++;
 #if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
-    if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
+    if (protos_[in.b]->session_source) session_function(function)->program_owner = protos_[in.b]->session_owner.lock();
 #endif
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 8)
         heap_retally(function);
@@ -128,15 +129,16 @@ bool Vm::op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* pro
 
 bool Vm::op_closure(const Instr& in, Value* R, Fault& fault) {
     if (in.b >= protos_.size()) return internal(fault, "closure proto");
-    auto* function = new FunctionObject();
+    auto* function = (protos_[in.b]->session_source || options_.return_value)
+            ? static_cast<FunctionObject*>(new SessionFunctionObject()) : new FunctionObject();
     function->name = protos_[in.b]->name;
     function->code = protos_[in.b];
-    if (protos_[in.b]->session_source) function->session_identity = next_session_callable_id_++;
+    if (protos_[in.b]->session_source) session_function(function)->session_identity = next_session_callable_id_++;
 #if !(defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 5)
-    if (protos_[in.b]->session_source) function->program_owner = protos_[in.b]->session_owner.lock();
+    if (protos_[in.b]->session_source) session_function(function)->program_owner = protos_[in.b]->session_owner.lock();
 #endif
     function->is_lambda = true;
-    if (options_.return_value) function->display_id = next_callable_display_id_++;
+    if (options_.return_value) session_function(function)->display_id = next_callable_display_id_++;
     function->expression_body = (in.flags & kInstrLambdaExprBody) != 0;
     function->selector_call_site = function->expression_body &&
         ((in.flags & kInstrLambdaReturnOrigin) || (closure_ && closure_->selector_call_site));

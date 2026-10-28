@@ -130,6 +130,9 @@ struct UnitPlan {
     std::unordered_map<std::string_view, std::size_t> struct_index;
     std::vector<int> method_of;
     bool is_method(std::size_t f) const { return f < method_of.size() && method_of[f] >= 0; }
+    // CP22: the unit declares an async function or contains an async lambda
+    // (a coroutine unit: Spawn/CallValueAny/Await/Sleep/Yield are emitted).
+    bool coroutines = false;
 };
 
 // Collects the top-level functions of `root` (a Program) and checks the

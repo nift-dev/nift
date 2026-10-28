@@ -17,6 +17,8 @@ TyRef Inference::record(NodeId id, TyRef t) {
     else result_.collection_arrays.erase(id);
     if(t->collection_object)result_.collection_objects.insert(id);
     else result_.collection_objects.erase(id);
+    if(plan_.coroutines&&holds_future(t))result_.future_holders.insert(id);  // CP22
+    else result_.future_holders.erase(id);
     auto& targets = result_.callable_targets[id];
     targets.clear();
     result_.callable_unknown[id] = t->any || (t->kinds & kKindUnknown) || t->untracked_callable;
@@ -28,6 +30,24 @@ TyRef Inference::record(NodeId id, TyRef t) {
         else result_.callable_unknown[id] = true;
     }
     return t;
+}
+
+// CP22: `thread(f, args…)` (legacy's thread built-in) in a coroutine unit: f
+// is called by the task with the arguments; the value is a thread handle
+// whose join() gives f's result (kept as its `elem`, like a future's).
+TyRef Inference::thread_call(const Node& n) {
+    const std::string_view name = ast_.text(ast_.at(n.a));
+    if(name!="thread"||find(name)!=nullptr||plan_.index.find(name)!=plan_.index.end())return nullptr;
+    const NodeId* args=ast_.list(n);
+    const TyRef f=expr(args[0]);
+    std::vector<TyRef> values;
+    for(std::uint32_t k=1;k<n.count;++k)values.push_back(expr(args[k]));
+    bool grew=false;
+    const TyRef returns=f->callables.empty()?any_ty():call_callables(f,values,grew);
+    auto handle=std::make_shared<Ty>();
+    handle->kinds=kKindThread;
+    handle->elem=returns;
+    return handle;
 }
 
 }

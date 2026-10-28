@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 namespace nift::rt {
+// Session-owned interactive jobs keep their CP21 owner; no HandleTable registration.
+struct SessionJobOwner {
+    virtual ~SessionJobOwner() = default;
+    virtual VmResult finish() = 0;
+};
 struct SessionResult {
     bool admitted = false;
     std::string refusal;
@@ -37,6 +42,7 @@ public:
     std::uint64_t refusals() const { return refusals_; }
     std::size_t retained_code_units() const;
     std::size_t code_slots() const { return linked_.size(); }
+    void attach_jobs(std::unique_ptr<SessionJobOwner> jobs);
     VmResult finish(bool cancelled = false);
     void close();
 private:
@@ -48,6 +54,7 @@ private:
                                bool inspect_tail = false, bool coherent = false,
                                double prior_parse_us = 0, double prior_compile_us = 0);
     void refresh(SessionCompileContext& pending);
+    std::unique_ptr<SessionJobOwner> jobs_;
     Value last_value_;
     void retire_code();
     struct CodeUnit { std::weak_ptr<Program> owner; std::vector<std::uint16_t> slots; };

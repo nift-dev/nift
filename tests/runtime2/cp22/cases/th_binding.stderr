@@ -1,0 +1,1 @@
+error: $ROOT/th_binding.f:6:1: cannot assign string to int binding 'x'

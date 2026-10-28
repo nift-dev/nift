@@ -1,5 +1,6 @@
 #include "rt/heap_account.h"
 
+#include "rt/future.h"
 #include "rt/heap.h"
 
 #include <limits>
@@ -84,7 +85,8 @@ std::size_t raw_footprint(const HeapObject* object) {
         }
         case Kind::Function: {
             const auto* f = static_cast<const FunctionObject*>(object);
-            return sizeof(FunctionObject) + text_storage(f->name) + vector_storage(f->upvalues);
+            return (session_function(f) ? sizeof(SessionFunctionObject) : sizeof(FunctionObject)) +
+                text_storage(f->name) + vector_storage(f->upvalues);
         }
         case Kind::Struct:
             return sizeof(StructObject) + vector_storage(static_cast<const StructObject*>(object)->fields);
@@ -95,6 +97,11 @@ std::size_t raw_footprint(const HeapObject* object) {
         }
         case Kind::Handle: return sizeof(HandleBoxObject);
         case Kind::Cell: return sizeof(CellObject);  // the child Value is counted separately
+        case Kind::Future: {  // CP22: children counted separately; a suspended task's storage here
+            const auto* f = static_cast<const FutureObject*>(object);
+            return sizeof(FutureObject) + text_storage(f->failure.message) + text_storage(f->failure.code) +
+                   vector_storage(f->waiters) + f->task_bytes;
+        }
         default: return 0;
     }
 }

@@ -1,0 +1,1 @@
+error: $ROOT/bad_setenv_task.f:2:25: for-loop binding 'setenv' has the name of a built-in and is called in its scope; rename the binding

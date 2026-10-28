@@ -104,7 +104,7 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
                        ? Shallow::Descend
                        : Shallow::Unequal;
         case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
-        case Kind::Function: same = left.heap() == right.heap(); break;
+        case Kind::Function: case Kind::Future: same = left.heap() == right.heap(); break;  // identity
         case Kind::Handle:
             same = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                    left.handle_generation() == right.handle_generation();
@@ -293,13 +293,14 @@ std::uint64_t hash(const Value& value) {
 }
 
 bool identity_bearing(const Value& value) noexcept {
-    return value.is(Kind::Function) || value.is(Kind::Handle);
+    return value.is(Kind::Function) || value.is(Kind::Handle) || value.is(Kind::Future);
 }
 
 Sameness same(const Value& left, const Value& right) noexcept {
     if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
     if (left.kind() != right.kind()) return Sameness::Different;
-    if (left.is(Kind::Function)) return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
+    if (left.is(Kind::Function) || left.is(Kind::Future))
+        return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
     const bool same_resource = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                                left.handle_generation() == right.handle_generation();
     return same_resource ? Sameness::Same : Sameness::Different;

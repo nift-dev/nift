@@ -64,7 +64,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
         std::uint16_t scratch = 0;
         return temp(scratch) && expr_to(node.a, scratch);  // prepared loop statements discard values
     }
-    if (expr.kind != NodeKind::Call) return fail(expr, "expression-statement");
+    if (expr.kind != NodeKind::Call && !(expr.kind == NodeKind::Await && plan_.coroutines))
+        return fail(expr, "expression-statement");
     if (kinds(node.a) == kKindError) return fail(expr, "error-result-expression");
     std::uint16_t scratch = 0;
     return temp(scratch) && expr_to(node.a, scratch);

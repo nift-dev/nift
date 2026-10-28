@@ -137,7 +137,7 @@ void lifetime(bool cached) {
             CHECK(session.retained_code_units()<=3);
         }
         auto proof=facts(session); weak=proof;proof.reset();
-        retained=session.value("g"); owner=retained.heap_as<FunctionObject>()->program_owner;
+        retained=session.value("g"); owner=session_function(retained.heap_as<FunctionObject>())->program_owner;
         session.close(); CHECK(!weak.expired() && !owner.expired());
     }
     retained=Value(); CHECK(owner.expired()); CHECK(weak.expired() != cached);

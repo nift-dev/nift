@@ -39,6 +39,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -66,9 +67,16 @@ struct VmOptions {
     // Callable values still require their Program lifetime, as elsewhere.
     Value* return_value = nullptr;
     std::vector<Value>* session_globals = nullptr;  // stable cells/types, owned by the session
+    // CP22: a top-level `return` value is appended to the output where it
+    // happens (legacy prints it before tasks still running then finish) rather
+    // than returned in VmResult::return_text. The CLI sets it; embedders keep
+    // the value separate.
+    bool return_in_output = false;
 };
 
 struct VmResult {
+    bool host_fault = false;  // independent session job cleanup/terminal failure
+    std::string host_fault_message;
     // Cold uncaught-report context; never applied to a caught Error.
     std::vector<nift::detail::DiagnosticFrame> diagnostic_frames;
     StopReason reason = StopReason::None;  // None: the program completed
@@ -108,6 +116,10 @@ struct VmResult {
     bool return_inspection = false;
     SourceOrigin report_origin;  // cold session diagnostics; separate from the Error payload
     std::string statement_text;  // buffered REPL presentation, discarded on failure
+    // CP22 coroutine statistics (`coro` false for programs without async code).
+    bool coro = false;
+    std::uint64_t coro_spawned = 0, coro_switches = 0, coro_preemptions = 0, coro_wakeups = 0;
+    std::size_t coro_live_peak = 0;
 };
 
 // The stop's reason, message, code and catchability.
@@ -129,6 +141,10 @@ public:
     VmResult run_session_unit(const Program& unit, const std::vector<const Proto*>& linked, std::string& output);
     void clear_session_execution();
     void retire_session_slots(const std::vector<std::uint16_t>& slots);
+
+    // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
+    struct Coro;
+    struct CoroDelete { void operator()(Coro* coro) const noexcept; };
 
 private:
     Value& global_slot(std::size_t slot) {
@@ -235,6 +251,23 @@ private:
 #endif
     bool memory_exceeded(Fault& fault);
     void update_heap_limit();
+
+    // CP22 (vm_coro*.cpp). op_coro runs the coroutine opcodes and may switch
+    // tasks (it reloads R/K/proto/base/pc): 0 = fault, 1 = dispatch, 2 = the run
+    // ended. coro_uncaught completes a task's future with an uncaught stop (or
+    // starts the drain after main's) and switches; coro_main_end does the same
+    // for main's normal end; coro_teardown abandons what is left (exactly once).
+    void coro_init();
+    int op_coro(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                const Instr*& pc, std::string& output, VmResult& result, Fault& fault);
+    bool coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
+                       std::size_t& base, const Instr*& pc);
+    int coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc,
+                      std::string& output, VmResult& result, Fault& fault);
+    void coro_teardown(VmResult& result);
+    int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
+                        const Instr*& pc, Fault& fault);
+    std::unique_ptr<Coro, CoroDelete> coro_;
 
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
                                       const Proto*, std::size_t base, const Instr* pc);

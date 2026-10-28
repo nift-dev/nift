@@ -1,6 +1,7 @@
 #include "rt/resolver.h"
 
 #include "rt/alias.h"
+#include "rt/binding_rules.h"
 #include "rt/native.h"
 #include "rt/structs.h"
 
@@ -39,7 +40,9 @@ bool reject(UnitPlan& plan, const Node& node, std::string reason) {
 
 bool admit_function(const Ast& ast, NodeId id, UnitPlan& plan) {
     const Node& fn = ast.at(id);
-    if (fn.flags & (kFlagAsync | kFlagDeferredBody | kFlagMethod)) return reject(plan, fn, "fn-flags");
+    // CP22: `fn[async]` is admitted (a coroutine unit); `@fn` bodies and methods are not.
+    if (fn.flags & (kFlagDeferredBody | kFlagMethod)) return reject(plan, fn, "fn-flags");
+    if (fn.flags & kFlagAsync) plan.coroutines = true;
     if (fn.a == kNoNode || fn.b == kNoNode) return reject(plan, fn, "fn-shape");
     const std::string_view name = ast.text(ast.at(fn.a));
     if (reserved_name(name)) return reject(plan, fn, "fn-name-reserved");
@@ -110,6 +113,15 @@ bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const 
 
 UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::string>* existing_functions) {
     UnitPlan plan;
+    // The for-loop/catch binding rule (rt/binding_rules.h), for units that
+    // skip prevalidation: such a call is never compiled as a call of the binding.
+    const BindingCallViolation binding = reserved_binding_call(ast);
+    if (binding.found) {
+        plan.ok = false;
+        plan.reason = "binding-call-reserved";
+        plan.offset = binding.offset;
+        return plan;
+    }
     const Node& program = ast.at(root);
     const NodeId* statements = ast.list(program);
     bool executable_seen = false, late = false;
@@ -123,6 +135,13 @@ UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::st
     }
     // Declarations after statements: admitted when no call can run first.
     if (late && !check_declaration_order(ast, root, plan, position, existing_functions)) return plan;
+    for (NodeId id = 0; !plan.coroutines && id < ast.size(); ++id) {  // CP22: async lambdas, `thread(…)` calls
+        const Node& n = ast.at(id);
+        plan.coroutines = (n.kind == NodeKind::Lambda && (n.flags & kFlagAsync)) ||
+                          (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
+                           ast.text(ast.at(n.a)) == "thread" &&  // rt-lint: allow-string-compare compile time
+                           !plan.index.count("thread"));
+    }
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");

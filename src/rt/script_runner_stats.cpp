@@ -43,7 +43,7 @@ void report(const Stats& s) {
     list("large_lines", s.large_lines);
     list("derived_lines", s.derived_lines);
     line << ",\"evidence_truncated\":" << (s.evidence_truncated ? "true" : "false")
-         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json
+         << ",\"heap_peak\":" << s.heap_peak << ",\"heap_live\":" << s.heap_live << s.inventory_json << s.coro_json
          << ",\"path\":\""
          << json_escape(s.path) << "\"}\n";
     if (std::string(target) == "1") {

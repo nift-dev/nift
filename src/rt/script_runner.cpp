@@ -6,6 +6,7 @@
 #include "rt/compiler_eval.h"
 #include "rt/eval_result.h"
 #include "rt/eval_refusal_inventory.h"
+#include "rt/compiler_coro_admit.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
 #include "rt/module_host_op.h"
@@ -18,6 +19,7 @@
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
+#include "rt/vm_coro_run.h"
 
 #include <algorithm>
 #include <chrono>
@@ -299,8 +301,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         unit_root = relinked.root;
     }
     CompileLimits limits;
-    limits.module_names = link.module_names;
-    CompileResult compiled = eval ? compile_expression_unit(ast, parsed.root)
+    limits.module_names = link.module_names; limits.linked = link.linked; cooperative_switches(limits);
+    CompileResult compiled = eval ? compile_eval_program(ast, make_eval_program(ast, parsed.root), limits)
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
@@ -336,6 +338,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     VmOptions options;
     detail::limits_from_environment(options);
     options.flush = &write_stdout;  // output streams: nothing is ever replayed (CP12, D-013)
+    options.return_in_output = true;  // CP22: a top-level return prints where legacy prints it
     const SourceMap source_map = source_map_for(link, source_path, source);  // owns source positions
     options.source_map = &source_map;
     Value returned;
@@ -355,6 +358,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     std::string output;
     const VmResult result = vm.run(output);
     stats.execute_us = micros(t2, Clock::now());
+    if (result.coro) stats.coro_json = coro_stats_json(result);
     write_stdout(output, nullptr);
     return finish_run(source, source_path, link, result, returned, stats, eval, exit_code);
 }

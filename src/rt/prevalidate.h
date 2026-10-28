@@ -19,7 +19,9 @@
 //    not changed by this file.
 //  * valid, compiled -> accepted.
 //
-// Passing guarantees only valid syntax, not static validity.
+// Passing guarantees only valid syntax, not static validity, with one
+// static rule: a for-loop or catch binding with a reserved built-in name may
+// not be called in its scope (rt/binding_rules.h, rule `binding-call-reserved`).
 #include <cstdint>
 #include <string>
 #include <string_view>

@@ -29,12 +29,29 @@ VmSession::VmSession(VmOptions options) {
     vm_ = std::make_unique<Vm>(bootstrap_, options);
 }
 VmSession::~VmSession() { close(); }
+void VmSession::attach_jobs(std::unique_ptr<SessionJobOwner> jobs) {
+    if (closed_ || active_ || jobs_) throw std::logic_error("invalid session job attachment");
+    jobs_ = std::move(jobs);
+}
 VmResult VmSession::finish(bool cancelled) {
     if (closed_) return {};
     cancel_pending_ = cancel_pending_ || cancelled;
     if (active_) { close_pending_ = true; return {}; }
     close_pending_ = false;
+    VmResult job_result;
+    if (jobs_) {
+#if !defined(NIFT_SESSION_JOB_MUTANT) || NIFT_SESSION_JOB_MUTANT != 1
+        job_result = jobs_->finish();
+#endif
+        jobs_.reset();
+    }
+#if defined(NIFT_SESSION_JOB_MUTANT) && NIFT_SESSION_JOB_MUTANT == 2
+    job_result.host_fault = false;
+#endif
     auto result = vm_->finish_session_resources(cancel_pending_);
+    result.host_fault = job_result.host_fault;
+    result.host_fault_message = job_result.host_fault_message;
+    if (result.reason == StopReason::None && job_result.reason != StopReason::None) result = std::move(job_result);
     vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
     return result;
@@ -42,6 +59,7 @@ VmResult VmSession::finish(bool cancelled) {
 void VmSession::close() {
     try { (void)finish(); }
     catch (...) {
+        jobs_.reset();  // CP21 owner destructor still performs bounded cleanup
         // Vm destruction uses CP17's allocation-free emergency release path.
         vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
         linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
@@ -102,7 +120,7 @@ void VmSession::refresh(SessionCompileContext& pending) {
             symbol.arity = proto->nparams;
             symbol.returns = proto->session_returns;
             symbol.definition = proto->session_definition;
-            symbol.identity = v.template heap_as<FunctionObject>()->session_identity;
+            symbol.identity = session_function(v.template heap_as<FunctionObject>())->session_identity;
             symbol.params = proto->session_params; symbol.param_types = proto->session_param_types;
         } else {
             symbol.definition.reset(); symbol.identity = 0; symbol.arity = symbol.returns = 0;

@@ -85,7 +85,7 @@ bool unshare(Value& value);
 // storing it can never close a cycle (D-040 V16).
 inline bool may_contain_identity(const Value& value) noexcept {
     switch (value.kind()) {
-        case Kind::Function: case Kind::Handle: case Kind::Cell: return true;
+        case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: return true;
         case Kind::Array: case Kind::Object: case Kind::Struct: return may_hold_identity(value.heap());
         default: return false;
     }

@@ -25,7 +25,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;
-    if (fn == plan_.index.end() && !is_native && !builtin) return fail(callee, "callable:" + std::string(name));
+    if (fn == plan_.index.end() && !is_native && !builtin) return thread_call(node, name, dst);  // or refused
     const std::uint16_t arity =
         builtin ? 0 : is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
     // When `dst` is the newest register nothing above it is live, so the call
@@ -57,6 +57,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         bool saved;
         ~Restore() { c.textual_statement_ = saved; c.update_flags(); }
     } restore{*this, saved_textual};
+    if (const int r = builtin ? coro_call(node, name, builtin, dst) : -1; r >= 0) return r == 1;  // CP22
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
     if (!operand_window(base, node.count)) return false;
     if (!is_native) ++call_args_;
@@ -76,10 +77,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (is_native && !print_argument_ok(args[k], ast_.at(args[k]))) return false;
         if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
-    path_arg_ = saved_path;
-    path_chain_ = saved_chain;
-    print_arg_ = saved_print;
-    if (!is_native) --call_args_;
+    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; if (!is_native) --call_args_;
     if (!is_native && loop_reachable()) {
         // Legacy's prepared call types a parameter from the value only, the
         // canonical one from the argument's text and value (P5): refused where
@@ -95,8 +93,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         fb_->emit(OpCode::CallNative, base, static_cast<std::uint16_t>(native.id),
                   static_cast<std::uint16_t>(node.count));
     } else {
-        const std::size_t at =
-            fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
+        const std::size_t at =  // CP22: Spawn for an async function
+            fb_->emit(call_opcode(f), base, static_cast<std::uint16_t>(f + 1), static_cast<std::uint16_t>(node.count));
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 24
         fb_->note(at, std::string(name));
 #else
@@ -160,6 +158,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;
+    if (int r = future_method(node, dst); r >= 0) return r == 1;  // CP22
     if (error_method_call(node, dst, name, callee.a)) return true;
     // `length()`/`size()` keep the CP11/CP12 Length opcode (the fast path,
     // with its own kind checks and the context:object-length refusal, Q3).

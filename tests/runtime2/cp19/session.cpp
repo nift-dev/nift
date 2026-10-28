@@ -35,7 +35,7 @@ int main() {
         const auto calls = session.executions();
         const auto closure = session.value("counter");
         const auto* original_code = closure.heap_as<FunctionObject>()->code;
-        const auto* original_owner = closure.heap_as<FunctionObject>()->program_owner.get();
+        const auto* original_owner = session_function(closure.heap_as<FunctionObject>())->program_owner.get();
         std::string output;
         auto refused = session.execute("leaked:=99;print(\"FORBIDDEN\");bytes([65])", "unit-6", output);
         CHECK(!refused.admitted && !refused.refusal.empty());
@@ -44,12 +44,12 @@ int main() {
         CHECK(session.executions() == calls && session.refusals() == 1);
         CHECK(session.value("counter").heap() == closure.heap());
         CHECK(closure.heap_as<FunctionObject>()->code == original_code);
-        CHECK(closure.heap_as<FunctionObject>()->program_owner.get() == original_owner);
+        CHECK(session_function(closure.heap_as<FunctionObject>())->program_owner.get() == original_owner);
         execute("print(getx());print(counter());print(x)", "5\n12\n5\n", 7);
         // Unit 8 closes once; an externally held closure owns its immutable
         // code until its final reference is dropped.
         if (!closure.is(Kind::Function)) return rt_test::finish("CP19 real eight-unit session");
-        std::weak_ptr<const Program> code = closure.heap_as<FunctionObject>()->program_owner;
+        std::weak_ptr<const Program> code = session_function(closure.heap_as<FunctionObject>())->program_owner;
         CHECK(!code.expired());
         session.close(); session.close();
         CHECK(!code.expired());
@@ -150,12 +150,12 @@ int main() {
         auto r = session.execute("fn(g0()){return 1};f:=g0", "old-definition", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         auto alias = session.value("f");
-        std::weak_ptr<const Program> old = alias.heap_as<FunctionObject>()->program_owner;
-        const auto identity = alias.heap_as<FunctionObject>()->session_identity;
+        std::weak_ptr<const Program> old = session_function(alias.heap_as<FunctionObject>())->program_owner;
+        const auto identity = session_function(alias.heap_as<FunctionObject>())->session_identity;
         r = session.execute("fn(g0()){return 2}", "new-definition", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         CHECK(session.value("g0").heap() == alias.heap());
-        CHECK(alias.heap_as<FunctionObject>()->session_identity == identity && identity != 0);
+        CHECK(session_function(alias.heap_as<FunctionObject>())->session_identity == identity && identity != 0);
         CHECK(old.expired());
         r = session.evaluate("f()", "alias-after-redefinition", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
@@ -218,7 +218,7 @@ int main() {
         const auto array_targets = session_callable_targets(array);
         CHECK(object_targets.size() == 1 && array_targets.size() == 1);
         CHECK(object_targets.front().identity == array_targets.front().identity);
-        std::weak_ptr<const Program> owner = session.value("f").heap_as<FunctionObject>()->program_owner;
+        std::weak_ptr<const Program> owner = session_function(session.value("f").heap_as<FunctionObject>())->program_owner;
         session.close();
         CHECK(owner.expired());  // compiler facts never pin executable values or their Program
         CHECK(object_targets.front().definition->path == "callable-facts");
@@ -232,10 +232,10 @@ int main() {
         const auto object = session.value("o");
         const auto function = object_entries(object).front().second;
         const auto code = function.heap_as<FunctionObject>()->code;
-        const auto owner = function.heap_as<FunctionObject>()->program_owner;
+        const auto owner = session_function(function.heap_as<FunctionObject>())->program_owner;
         r = session.execute("leaked:=9;print(\"FORBIDDEN\");o.f(bytes([65]))", "refused-object-call", output);
         CHECK(!r.admitted && !session.contains("leaked") && output.empty());
-        CHECK(function.heap_as<FunctionObject>()->code == code && function.heap_as<FunctionObject>()->program_owner == owner);
+        CHECK(function.heap_as<FunctionObject>()->code == code && session_function(function.heap_as<FunctionObject>())->program_owner == owner);
         r = session.evaluate("o.f(4)", "specialized-object-call", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 5);
         CHECK(object_entries(session.value("o")).front().second.heap() == function.heap());
@@ -305,15 +305,15 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         const auto old = session.value("f"), reader = session.value("reader");
         const auto code = old.heap_as<FunctionObject>()->code;
-        const auto owner = old.heap_as<FunctionObject>()->program_owner;
-        const auto last_id = reader.heap_as<FunctionObject>()->session_identity;
+        const auto owner = session_function(old.heap_as<FunctionObject>())->program_owner;
+        const auto last_id = session_function(reader.heap_as<FunctionObject>())->session_identity;
         r = session.execute("f = ()=>9;print(\"FORBIDDEN\");bytes([65])", "refused-rebind", output);
         CHECK(!r.admitted && output.empty() && session.value("f").heap() == old.heap());
-        CHECK(old.heap_as<FunctionObject>()->code == code && old.heap_as<FunctionObject>()->program_owner == owner);
+        CHECK(old.heap_as<FunctionObject>()->code == code && session_function(old.heap_as<FunctionObject>())->program_owner == owner);
         r = session.execute("f = ()=>2", "new-lambda", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         CHECK(session.value("f").heap() != old.heap() && session.value("oldf").heap() == old.heap());
-        CHECK(session.value("f").heap_as<FunctionObject>()->session_identity == last_id + 1);
+        CHECK(session_function(session.value("f").heap_as<FunctionObject>())->session_identity == last_id + 1);
         r = session.evaluate("f()", "new-lambda-call", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
         r = session.evaluate("oldf()", "old-lambda-call", output);
@@ -419,14 +419,14 @@ int main() {
         for (const char* rejected : {
             "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(\"bad\")};print(\"FORBIDDEN\");bytes([65])",
             "fn(g()){return 2};leaked:=7;f = ()=>\"changed\";for(row:a){row.push(2)};print(\"FORBIDDEN\");bytes([65])"}) {
-            const auto owner = function.heap_as<FunctionObject>()->program_owner;
+            const auto owner = session_function(function.heap_as<FunctionObject>())->program_owner;
             const auto* code = function.heap_as<FunctionObject>()->code;
             r = session.execute(rejected, "combined-refusal", output);
             CHECK(!r.admitted && r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
             CHECK(r.refusal == "builtin-bytes:bytes");
             CHECK(!session.contains("leaked") && session.binding_count() == count);
             CHECK(session.value("a").heap() == array.heap() && session.value("f").heap() == function.heap());
-            CHECK(session.value("g").heap() == named.heap() && function.heap_as<FunctionObject>()->program_owner == owner &&
+            CHECK(session.value("g").heap() == named.heap() && session_function(function.heap_as<FunctionObject>())->program_owner == owner &&
                 function.heap_as<FunctionObject>()->code == code);
             r = session.execute("print(\"FORBIDDEN\");for(row:a){row.push(\"bad\")};bytes([65])", "bounds-still-original", output);
             CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
@@ -445,7 +445,7 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
         r = session.evaluate("f()", "rebind-survives", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "live");
-        CHECK(session.value("f").heap() != function.heap() && bool(function.heap_as<FunctionObject>()->program_owner));
+        CHECK(session.value("f").heap() != function.heap() && bool(session_function(function.heap_as<FunctionObject>())->program_owner));
         r = session.evaluate("old()", "old-reader-new-cell", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,2.5]]");
         r = session.execute("fn(makec()){caparr:=[[1]];return v=>{for(row:caparr){row.push(v)};return caparr.stringify()}};"

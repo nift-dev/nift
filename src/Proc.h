@@ -38,7 +38,7 @@ struct ProcessStageResult { bool launched=false; int exit_code=-1; std::string e
 // back into memory (0 = unbounded, the historical behaviour for callers that
 // do not pass one). Past it the capture is released, never truncated, and
 // capture_limit_exceeded names the stream ("stdout"/"stderr").
-struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; bool exec_failed=false; std::vector<ProcessStageResult> stages; std::string capture_limit_exceeded; };
+struct ProcessResult { int exit_code=-1; std::string out, err; bool launched=false; std::string error; bool host_fault=false; bool exec_failed=false; std::vector<ProcessStageResult> stages; std::string capture_limit_exceeded; };
 ProcessResult nift_run_process(const ProcessSpec& spec, bool capture=true, bool stream=false, std::uint64_t capture_limit=0);
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capture=true, bool stream=false, std::uint64_t capture_limit=0);
 bool nift_find_executable(const std::string& name, std::string& path);

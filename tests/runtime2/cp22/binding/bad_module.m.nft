@@ -1,0 +1,2 @@
+print("module runs")
+try { throw error("m") } catch (print) { print("caught") }

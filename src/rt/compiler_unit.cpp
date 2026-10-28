@@ -80,7 +80,8 @@ UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, co
                 if (observable_[use.callee][use.index]) names[f].insert(use.names.begin(), use.names.end());
             const Node& fn = ast.at(plan.functions[f]);
             const NodeId* params = ast.list(fn);
-            for (std::uint32_t k = 0; k < fn.count; ++k)
+            // CP22: an async call binds parameters from values (legacy's __future_argN).
+            for (std::uint32_t k = 0; k < fn.count && !(fn.flags & kFlagAsync); ++k)
                 if (!observable_[f][k] && names[f].count(ast.text(ast.at(params[k])))) {
                     observable_[f][k] = true;
                     changed = true;
@@ -239,6 +240,7 @@ bool UnitCompiler::compile_program(NodeId root, Program& program) {
     for (std::size_t f = 0; f < plan_.functions.size(); ++f) {
         std::unique_ptr<Proto> proto;
         if (!compile_function(f, proto)) return false;
+        proto->is_async = (ast_.at(plan_.functions[f]).flags & kFlagAsync) != 0;  // CP22
         program.protos[f + 1] = std::move(proto);
     }
     for (std::size_t i = 0; i < lambda_tasks_.size(); ++i) {
@@ -252,6 +254,7 @@ bool UnitCompiler::compile_program(NodeId root, Program& program) {
             proto->collection_entry=entry.get();
             program.protos.push_back(std::move(entry));
         }
+        proto->is_async = (ast_.at(task.lambda).flags & kFlagAsync) != 0;  // CP22
         program.protos[task.proto_slot] = std::move(proto);
     }
     program_ = nullptr;
@@ -333,7 +336,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     // would not be passed by the callers: refuse instead.
     for (const Instr& in : out->code)
         for (std::uint32_t k = 0; k < node.count; ++k)
-            if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k] &&
+            if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k] && !(node.flags & kFlagAsync) &&
                 !captured_binding(node_id(ast_.at(params[k]))) &&
                 !selector_roots_.count(node_id(ast_.at(params[k]))))
                 return fail(ast_.at(params[k]), "param-type-unpredicted");

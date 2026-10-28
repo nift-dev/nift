@@ -3,6 +3,8 @@
 #include "rt/session_history.h"
 #include "rt/session_shape.h"
 
+#include "rt/compiler_coro.h"
+#include "rt/compiler_coro_admit.h"
 #include "rt/compiler_handles.h"
 
 #include "rt/builtin_bind.h"
@@ -199,6 +201,7 @@ bool UnitCompiler::while_loop(const Node& node) {
     update_flags();
     Loop loop;
     loop.start = fb_->here();
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
@@ -328,6 +331,16 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         result.offset = handle_offset;
         return result;
     }
+    // Persistent task/global snapshots require CP22's separate lifecycle
+    // reconciliation. Refuse atomically rather than run coroutine opcodes
+    // without the bootstrap VM's scheduler or share another task's cells.
+    if (limits.session && plan.coroutines) {
+        result.reason = "session:coroutine";
+        result.offset = ast.at(root).begin;
+        return result;
+    }
+    // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
+    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset)) return result;
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
     compiler.set_session(limits.session);
@@ -350,6 +363,12 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             }
         }
         return result;
+    }
+    if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
+        program->has_coroutines = true;
+        if (!check_coroutine_program(*program, result.reason, result.offset)) return result;
+        if (!check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
+            return result;
     }
     if (limits.session && limits.session->coherent_recompile)
         for (auto& symbol : limits.session->symbols) {

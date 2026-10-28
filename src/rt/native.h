@@ -5,6 +5,7 @@
 // built-ins, which a compiled unit may not rebind (D-009#3: legacy precedence
 // between user names and built-ins differs per name, so such units stay on
 // the legacy engine until the new precedence rule is implemented).
+#include "rt/reserved_names.h"
 #include "rt/value.h"
 
 #include <cstdint>
@@ -26,10 +27,6 @@ struct NativeInfo {
 // Natives callable by name from compiled code. Returns false when `name` is
 // not a supported native (the unit then falls back).
 bool lookup_native(std::string_view name, NativeInfo& info);
-
-// Names the legacy engine resolves as built-ins, script bindings or
-// callables with special dispatch.
-bool reserved_name(std::string_view name);
 
 // print(value): appends the legacy rendering and a newline to `out`.
 // Returns false (with `error` set) for values legacy refuses to render.

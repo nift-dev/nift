@@ -1,0 +1,1 @@
+error: $ROOT/m.nft:2:33: import: catch binding 'print' has the name of a built-in and is called in its scope; rename the binding

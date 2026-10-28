@@ -27,6 +27,7 @@ struct Stats {
     bool catchable = false;  // vm-error: legacy raises it as a catchable Error
     bool error_origin = false;  // vm-error: the stop carries an Error origin
     std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
+    std::string coro_json;  // accepted CP22 coroutine statistics
     std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
 };
 

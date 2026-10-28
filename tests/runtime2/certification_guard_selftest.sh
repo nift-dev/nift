@@ -71,27 +71,53 @@ if ! grep -Eq "removal control|alternate-edge control" "$TMP/alternate.log"; the
 fi
 echo "PASS guard control: an alternate certify-targets edge is rejected"
 
-# CP20 F6, CP13B, CP14B, CP18 and CP17: removing any required edge must fail certification, naming it.
-for edge in "test-rt-host: test-runtime2-f6-cleanup" "test-rt-host-mutants: test-runtime2-f6-mutants" "test-rt-host-sanitize: test-runtime2-f6-sanitize" \
-            "test-rt-vm: test-runtime2-cp13b" "test-rt-vm: test-rt-source-map" "test-rt-vm: test-rt-error-oom" \
-            "test-rt-vm-sanitize: test-rt-source-map-sanitize" "test-rt-vm-sanitize: test-rt-source-map-tsan" "test-rt-vm-sanitize: test-rt-error-oom-sanitize" \
-            "test-rt-vm: test-runtime2-cp14b" "test-rt-vm: test-runtime2-cp14b-sort" "test-rt-vm: test-runtime2-cp14b-witnesses" \
-            "test-rt-vm-sanitize: test-runtime2-cp14b-sanitize" "test-rt-vm: test-runtime2-d040-witnesses" "test-rt-vm: test-runtime2-cp14b-profile" \
-            "test-embed: test-runtime2-cp18" "test-runtime2-cp18: test-runtime2-cp18-switch" "test-runtime2-cp18: test-runtime2-cp18-cow" \
-            "test-embed: test-runtime2-cp18-sanitize" \
-            "test-rt-vm: test-runtime2-cp17-tripwire" \
-            "test-rt-host: test-rt-handles" \
-            "test-rt-host: test-rt-handles-guards" \
-            "test-rt-host: test-runtime2-cp17-handles" \
-            "test-rt-host: test-runtime2-cp17-n2-rebuild" \
-            "test-rt-host-sanitize: test-rt-handles-sanitize" \
-            "test-rt-host-sanitize: test-rt-handles-tsan" \
-            "test-rt-host-sanitize: test-runtime2-cp17-sanitize" \
-            "test-rt-host-mutants: test-runtime2-cp17-routing-mutants" \
-            "test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant" \
-            "test-rt-host-mutants: test-runtime2-cp17-handle-mutants" \
-            "test-rt-host-mutants: test-runtime2-cp17-unwind-mutants" \
-            "test-rt-host: test-runtime2-cp17-handle-allocation"; do
+# CP20 F6, CP13B, CP14B, CP18, CP17, CP22 and CP21: removing any required edge must fail certification, naming it.
+edges=("test-rt-host: test-runtime2-f6-cleanup" \
+       "test-rt-host-mutants: test-runtime2-f6-mutants" \
+       "test-rt-host-sanitize: test-runtime2-f6-sanitize" \
+       "test-rt-vm: test-runtime2-cp13b" \
+       "test-rt-vm: test-rt-source-map" \
+       "test-rt-vm: test-rt-error-oom" \
+       "test-rt-vm-sanitize: test-rt-source-map-sanitize" \
+       "test-rt-vm-sanitize: test-rt-source-map-tsan" \
+       "test-rt-vm-sanitize: test-rt-error-oom-sanitize" \
+       "test-rt-vm: test-runtime2-cp14b" \
+       "test-rt-vm: test-runtime2-cp14b-sort" \
+       "test-rt-vm: test-runtime2-cp14b-witnesses" \
+       "test-rt-vm-sanitize: test-runtime2-cp14b-sanitize" \
+       "test-rt-vm: test-runtime2-d040-witnesses" \
+       "test-rt-vm: test-runtime2-cp14b-profile" \
+       "test-embed: test-runtime2-cp18" \
+       "test-runtime2-cp18: test-runtime2-cp18-switch" \
+       "test-runtime2-cp18: test-runtime2-cp18-cow" \
+       "test-embed: test-runtime2-cp18-sanitize" \
+       "test-rt-vm: test-runtime2-cp17-tripwire" \
+       "test-rt-host: test-rt-handles" \
+       "test-rt-host: test-rt-handles-guards" \
+       "test-rt-host: test-runtime2-cp17-handles" \
+       "test-rt-host: test-runtime2-cp17-n2-rebuild" \
+       "test-rt-host-sanitize: test-rt-handles-sanitize" \
+       "test-rt-host-sanitize: test-rt-handles-tsan" \
+       "test-rt-host-sanitize: test-runtime2-cp17-sanitize" \
+       "test-rt-host-mutants: test-runtime2-cp17-routing-mutants" \
+       "test-rt-host-mutants: test-runtime2-cp17-n2-rebuild-mutant" \
+       "test-rt-host-mutants: test-runtime2-cp17-handle-mutants" \
+       "test-rt-host-mutants: test-runtime2-cp17-unwind-mutants" \
+       "test-rt-host: test-runtime2-cp17-handle-allocation" \
+       "test-rt-vm: test-runtime2-cp22" \
+       "test-rt-vm-sanitize: test-runtime2-cp22-sanitize" \
+       "test-rt-vm-sanitize: test-runtime2-cp22-tsan" \
+       "test-v45-job-control: test-cp21-interactive-host" \
+       "test-v45-job-control: test-cp21-interactive-host-mutants" \
+       "test-v45-job-control: test-cp21-make-failure-control")
+if [ "$(uname -s)" = Linux ]; then
+    edges+=("test-v45-job-control: test-cp21-terminal-recovery" "test-v45-job-control: test-cp21-terminal-recovery-mutants" \
+            "test-v45-job-control: test-cp21-d3-mandatory" \
+            "test-cp21-fd-inheritance: test-cp21-fd-protocol-unit" \
+            "test-cp21-d3-mandatory: test-cp21-d3-mutant" \
+            "test-cp21-d3-mandatory: test-cp21-parser-target-mutant")
+fi
+for edge in "${edges[@]}"; do
     name="${edge##* }"
     populate "$TMP/f6-$name"
     python3 - "$TMP/f6-$name/Makefile" "$edge" <<'PY'
@@ -149,3 +175,21 @@ if bash "$TMP/cp14b-leaf/tests/runtime2/certification_guard.sh" >"$TMP/cp14b-lea
 fi
 grep -q "test-runtime2-cp14b-mutants" "$TMP/cp14b-leaf.log" || { echo "FAIL guard control: the missing CP14B leaf was not named" >&2; cat "$TMP/cp14b-leaf.log" >&2; exit 1; }
 echo "PASS guard control: dropping the CP14B mutation gate fails certification"
+
+# CP22 certification tier: the same control for the coroutine mutation gate.
+populate "$TMP/cp22-leaf"
+python3 - "$TMP/cp22-leaf/Makefile" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'certify-targets: test-runtime2-cp22-mutants\n'
+if needle not in text:
+    raise SystemExit('certify edge not found')
+open(path, 'w').write(text.replace(needle, '', 1))
+PY
+if bash "$TMP/cp22-leaf/tests/runtime2/certification_guard.sh" >"$TMP/cp22-leaf.log" 2>&1; then
+    echo "FAIL guard control: dropping test-runtime2-cp22-mutants from certify-targets still passed" >&2
+    cat "$TMP/cp22-leaf.log" >&2; exit 1
+fi
+grep -q "test-runtime2-cp22-mutants" "$TMP/cp22-leaf.log" || { echo "FAIL guard control: the missing CP22 leaf was not named" >&2; cat "$TMP/cp22-leaf.log" >&2; exit 1; }
+echo "PASS guard control: dropping the CP22 mutation gate fails certification"

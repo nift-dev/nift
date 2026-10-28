@@ -1,0 +1,1 @@
+error: $ROOT/fut_bind_type.f:6:1: cannot assign string to int binding 'y'
