@@ -3371,6 +3371,18 @@ $(TEST_DIR)/cp21-fail-proc.so: tests/cp21_fail_proc.c
 $(TEST_DIR)/cp21-fail-proc-reads.so: tests/cp21_fail_proc_reads.c
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-proc-enoent.so: tests/cp21_fail_proc_enoent.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-proc-empty.so: tests/cp21_fail_proc_empty.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-proc-children.so: tests/cp21_fail_proc_children.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
+$(TEST_DIR)/cp21-fail-kill.so: tests/cp21_fail_kill.c
+	mkdir -p "$(dir $@)"
+	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
@@ -3515,7 +3527,9 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	$(CP21_FD_CHILD_UNRELATED) $(CP21_FD_CHILD_ESCAPE) $(CP21_FD_CHILD_ESCAPE_UNTAGGED) \
 	$(CP21_FD_CHILD_HOLD) $(CP21_FD_CHILD_MALFORMED) $(CP21_SCANNER_SUPERVISOR) \
 	$(CP21_FD_PROTOCOL_UNIT_MUTANT) $(TEST_DIR)/cp21-fallback-fault.so \
-	$(TEST_DIR)/cp21-fail-subreaper.so $(TEST_DIR)/cp21-fail-proc.so $(TEST_DIR)/cp21-fail-proc-reads.so
+	$(TEST_DIR)/cp21-fail-subreaper.so $(TEST_DIR)/cp21-fail-proc.so $(TEST_DIR)/cp21-fail-proc-reads.so \
+	$(TEST_DIR)/cp21-fail-proc-enoent.so $(TEST_DIR)/cp21-fail-proc-empty.so \
+	$(TEST_DIR)/cp21-fail-proc-children.so $(TEST_DIR)/cp21-fail-kill.so
 	@set -e; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" "$(CP21_FD_INHERITANCE_D3)" "$(abspath $(CP21_FD_CHILD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(TEST_DIR)/cp21-d3-mutant.log" 2>&1 && \
 	  { echo "FAIL CP21 D3 mutant not detected"; cat "$(TEST_DIR)/cp21-d3-mutant.log"; exit 1; }; \
@@ -3585,14 +3599,25 @@ test-cp21-fd-inheritance-mutants: $(CP21_FD_INHERITANCE) $(CP21_FD_INHERITANCE_D
 	  echo "PASS CP21 D3 $$fault-unavailable control: fail closed"; \
 	done
 	@set -e; \
-	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-fail-proc-reads.so):$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" \
-	  "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_HOLD))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" > "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)" 2>&1 && \
-	  { echo "FAIL CP21 partial-procfs control accepted"; cat "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)"; exit 1; }; \
-	grep -q "SETUP_FAIL cleanup:" "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)" || \
-	  { echo "FAIL CP21 partial-procfs control failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)"; exit 1; }; \
-	grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)" && \
-	  { echo "FAIL CP21 partial-procfs control claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-proc-reads.log)"; exit 1; }; \
-	echo "PASS CP21 D3 partial-procfs control: fail closed"
+	for fault in enoent empty children kill; do \
+	  case "$$fault" in \
+	    enoent) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-enoent.so)" ;; \
+	    empty) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-empty.so)" ;; \
+	    children) lib="$(abspath $(TEST_DIR)/cp21-fail-proc-children.so)" ;; \
+	    kill) lib="$(abspath $(TEST_DIR)/cp21-fail-kill.so)" ;; \
+	  esac; \
+	  LD_PRELOAD="$$lib:$(abspath $(TEST_DIR)/cp21-fallback-fault.so)" \
+	    "$(CP21_FD_INHERITANCE)" "$(abspath $(CP21_FD_CHILD_ESCAPE))" "$(abspath $(CP21_SCANNER_SUPERVISOR))" \
+	    > "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" 2>&1 && \
+	    { echo "FAIL CP21 D3 $$fault control accepted"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	  grep -q "SETUP_FAIL" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" || \
+	    { echo "FAIL CP21 D3 $$fault control failed for the wrong reason"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	  grep -q "cleaned=1" "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)" && \
+	    { echo "FAIL CP21 D3 $$fault control claimed cleanup"; cat "$(abspath $(TEST_DIR)/cp21-d3-$$fault.log)"; exit 1; }; \
+	  pids=$$(pgrep -f '^$(abspath $(CP21_FD_CHILD_ESCAPE))$$' || true); \
+	  if [ -n "$$pids" ]; then kill -9 $$pids || true; fi; \
+	  echo "PASS CP21 D3 $$fault control: fail closed"; \
+	done
 test-cp21-terminal-recovery-mutants: $(CP21_RECOVERY_D1) $(CP21_RECOVERY_D2) $(TEST_DIR)/cp21-restore-fault.so
 	@set -e; \
 	LD_PRELOAD="$(abspath $(TEST_DIR)/cp21-restore-fault.so)" "$(CP21_RECOVERY_D1)" > "$(TEST_DIR)/cp21-d1-mutant.log" 2>&1 && \

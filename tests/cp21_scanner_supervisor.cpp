@@ -1,6 +1,6 @@
-// CP21 D3 scanner supervisor: isolates scanner execution and cleanup from the
-// test driver's other children. Only descendants of this process are ever
-// signalled.
+// CP21 D3 scanner supervisor: isolates scanner execution and cleanup. Only
+// descendants of this process are enumerated/signalled. Linux children files
+// provide the process-set evidence; no global /proc scan is used.
 #include <chrono>
 #include <csignal>
 #include <cstdio>
@@ -9,7 +9,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <fstream>
-#include <map>
 #include <set>
 #include <sstream>
 #include <string>
@@ -21,12 +20,12 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-bool read_proc_file(const std::string& path, std::string& text, bool& disappeared, std::string& error) {
-    disappeared = false;
+bool read_file(const std::string& path, std::string& text, bool& missing, std::string& error) {
+    missing = false;
     text.clear();
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        if (errno == ENOENT || errno == ESRCH) { disappeared = true; return true; }
+        if (errno == ENOENT || errno == ESRCH) { missing = true; return true; }
         error = "cannot open " + path + ": " + std::strerror(errno);
         return false;
     }
@@ -41,7 +40,6 @@ bool read_proc_file(const std::string& path, std::string& text, bool& disappeare
         return false;
     }
     ::close(fd);
-    if (text.empty()) disappeared = true;
     return true;
 }
 
@@ -50,60 +48,48 @@ bool proc_available() {
     if (!dir) return false;
     ::closedir(dir);
     std::string text;
-    bool disappeared = false;
+    bool missing = false;
     std::string error;
-    return read_proc_file("/proc/self/stat", text, disappeared, error) && !disappeared;
+    return read_file("/proc/" + std::to_string(::getpid()) + "/task/" + std::to_string(::getpid()) + "/children", text, missing, error) && !missing;
+}
+
+bool children_of(pid_t pid, std::set<pid_t>& found, std::string& error) {
+    found.clear();
+    std::string text;
+    bool missing = false;
+    if (!read_file("/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid) + "/children",
+                   text, missing, error))
+        return false;
+    if (missing) return true;  // process exited before inspection
+    std::istringstream in(text);
+    long child = 0;
+    while (in >> child) {
+        if (child > 0) found.insert(static_cast<pid_t>(child));
+    }
+    return true;
 }
 
 bool descendants(pid_t root, std::set<pid_t>& found, std::string& error) {
     found.clear();
-    std::map<pid_t, pid_t> parents;
-    DIR* dir = ::opendir("/proc");
-    if (!dir) {
-        error = "cannot open /proc";
-        return false;
-    }
-    while (dirent* entry = ::readdir(dir)) {
-        char* end = nullptr;
-        errno = 0;
-        const long pid = std::strtol(entry->d_name, &end, 10);
-        if (errno != 0 || end == entry->d_name || *end != 0 || pid <= 0) continue;
-        std::string text;
-        bool disappeared = false;
-        if (!read_proc_file("/proc/" + std::to_string(pid) + "/stat", text, disappeared, error)) {
-            ::closedir(dir);
-            return false;
-        }
-        if (disappeared) continue;
-        const std::size_t close = text.rfind(')');
-        if (close == std::string::npos) {
-            error = "malformed /proc/" + std::to_string(pid) + "/stat";
-            ::closedir(dir);
-            return false;
-        }
-        std::istringstream fields(text.substr(close + 1));
-        std::string state;
-        long ppid = 0;
-        if (!(fields >> state >> ppid)) {
-            error = "malformed /proc/" + std::to_string(pid) + "/stat fields";
-            ::closedir(dir);
-            return false;
-        }
-        parents[static_cast<pid_t>(pid)] = static_cast<pid_t>(ppid);
-    }
-    ::closedir(dir);
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& [pid, ppid] : parents) {
-            if (pid == root || found.count(pid)) continue;
-            if (ppid == root || found.count(ppid)) {
-                found.insert(pid);
-                changed = true;
-            }
+    std::set<pid_t> frontier{root};
+    while (!frontier.empty()) {
+        const pid_t current = *frontier.begin();
+        frontier.erase(frontier.begin());
+        std::set<pid_t> direct;
+        if (!children_of(current, direct, error)) return false;
+        for (pid_t child : direct) {
+            if (found.insert(child).second) frontier.insert(child);
         }
     }
     return true;
+}
+
+bool alive(pid_t pid, bool& alive_flag, std::string& error) {
+    if (::kill(pid, 0) == 0) { alive_flag = true; return true; }
+    if (errno == ESRCH) { alive_flag = false; return true; }
+    if (errno == EPERM) { alive_flag = true; return true; }
+    error = "cannot verify pid " + std::to_string(pid) + ": " + std::strerror(errno);
+    return false;
 }
 
 bool reap_bounded(pid_t child, const Clock::time_point& end) {
@@ -121,11 +107,38 @@ bool reap_bounded(pid_t child, const Clock::time_point& end) {
     return direct_reaped;
 }
 
+bool verify_descendants(const std::set<pid_t>& targets, pid_t direct, std::string& error) {
+    for (pid_t pid : targets) {
+        if (pid == direct) continue;
+        std::string text;
+        bool missing = false;
+        if (!read_file("/proc/" + std::to_string(pid) + "/stat", text, missing, error) ||
+            missing || text.empty()) {
+            if (error.empty()) error = "cannot verify descendant " + std::to_string(pid);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool cleanup(pid_t child, std::string& error) {
-    // Collect descendants BEFORE the scanner parent dies; an escaped child is
-    // still visible under its parent regardless of subreaper semantics.
     std::set<pid_t> targets;
-    const bool inspected = descendants(::getpid(), targets, error);
+    if (!descendants(::getpid(), targets, error)) {
+        // Still kill the direct group; report the inspection failure.
+        const pid_t pgid = ::getpgid(child);
+        if (pgid == child) ::kill(-child, SIGKILL);
+        ::kill(child, SIGKILL);
+        reap_bounded(child, Clock::now() + std::chrono::seconds(2));
+        return false;
+    }
+    if (!verify_descendants(targets, child, error)) {
+        const pid_t pgid = ::getpgid(child);
+        if (pgid == child) ::kill(-child, SIGKILL);
+        ::kill(child, SIGKILL);
+        reap_bounded(child, Clock::now() + std::chrono::seconds(2));
+        return false;
+    }
+    targets.insert(child);
     const pid_t pgid = ::getpgid(child);
     if (pgid == child) {
         if (::kill(-child, SIGKILL) != 0 && errno != ESRCH) {
@@ -133,26 +146,27 @@ bool cleanup(pid_t child, std::string& error) {
             return false;
         }
     }
-    if (::kill(child, SIGKILL) != 0 && errno != ESRCH) {
-        error = "kill failed";
-        return false;
-    }
     for (pid_t pid : targets)
         if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) {
-            error = "descendant kill failed";
+            error = "kill failed";
             return false;
         }
     const auto end = Clock::now() + std::chrono::seconds(2);
-    const bool reaped = reap_bounded(child, end);
-    if (!reaped) {
+    if (!reap_bounded(child, end)) {
         error = "direct child not reaped";
         return false;
     }
-    if (!inspected) return false;
     while (Clock::now() < end) {
-        if (!descendants(::getpid(), targets, error)) return false;
-        if (targets.empty()) return true;
-        for (pid_t pid : targets)
+        std::set<pid_t> remaining;
+        if (!descendants(::getpid(), remaining, error)) return false;
+        bool any_alive = false;
+        for (pid_t pid : targets) {
+            bool is_alive = false;
+            if (!alive(pid, is_alive, error)) return false;
+            if (is_alive) { any_alive = true; ::kill(pid, SIGKILL); }
+        }
+        if (remaining.empty() && !any_alive) return true;
+        for (pid_t pid : remaining)
             if (::kill(pid, SIGKILL) != 0 && errno != ESRCH) {
                 error = "descendant kill failed";
                 return false;
@@ -163,8 +177,17 @@ bool cleanup(pid_t child, std::string& error) {
         }
         ::usleep(2000);
     }
-    if (!descendants(::getpid(), targets, error)) return false;
-    if (!targets.empty()) {
+    std::set<pid_t> remaining;
+    if (!descendants(::getpid(), remaining, error)) return false;
+    for (pid_t pid : targets) {
+        bool is_alive = false;
+        if (!alive(pid, is_alive, error)) return false;
+        if (is_alive) {
+            error = "descendants survived SIGKILL";
+            return false;
+        }
+    }
+    if (!remaining.empty()) {
         error = "descendants survived SIGKILL";
         return false;
     }
@@ -235,8 +258,6 @@ int main(int argc, char** argv) {
         }
         ::usleep(2000);
     }
-    // A normal scanner should not leave descendants behind. If it does, remove
-    // them before reporting completion; failure is not a clean result.
     std::set<pid_t> leftovers;
     std::string error;
     if (!descendants(::getpid(), leftovers, error)) {

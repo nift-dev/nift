@@ -157,6 +157,25 @@ ownership of `.niftrc` compilation and the shared compiler front end.
 - **Parser/Make corrections retained:** strict target grammar, parser unit
   mutation, `.PHONY` mandatory execution and guard edge remain unchanged.
 
+## R7-review cleanup-evidence correction
+
+- The supervisor enumerates the scanner subtree through Linux
+  `/proc/<pid>/task/<pid>/children` files, not a global `/proc` scan. It never
+  treats a failed or empty `stat` read as proof of disappearance.
+- Known descendants are verified with `/proc/<pid>/stat`; ENOENT/ESRCH,
+  zero-length records, permission failures and malformed records are explicit
+  cleanup failures. A previously observed live descendant remains an
+  obligation until `kill(pid, 0)`/reaping confirms it is gone.
+- Cleanup collects descendants before killing the scanner parent, kills the
+  verified group and descendants, reaps direct/adopted children, and requires
+  every known PID to be gone. A survivor or unreadable record cannot produce
+  `cleaned=1`.
+- Permanent controls cover ENOENT, zero-length stat, failed children
+  enumeration, failed SIGKILL, subreaper denial, unavailable `/proc`,
+  malformed/missing children, escaped/untagged descendants and an unrelated
+  test-driver child that must survive. Partial-procfs/subreaper controls fail
+  closed.
+
 ## N1–N5 corrections
 
 - **N1 recovery:** failed `tcsetpgrp`/SIGTTOU restoration leaves
