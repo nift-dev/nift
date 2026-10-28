@@ -33,6 +33,9 @@ int main(int argc,char**argv) {
   std::string output;auto refused=s.execute("run(\"true\")","run-refusal",output);CHECK(!refused.admitted);CHECK(refused.vm_executions==0);CHECK(refused.legacy_executions==0);
   CHECK(jobs->has_live_jobs());
   command(s,"try{throw error(\"caught\")}catch(e){}");CHECK(jobs->has_live_jobs());
+  auto failed=s.execute("throw error(\"uncaught command\")","failed-command",output);
+  CHECK(failed.admitted);CHECK(failed.vm_executions==1);CHECK(failed.legacy_executions==0);
+  CHECK(failed.execution.reason==StopReason::Error);CHECK(jobs->has_live_jobs());
   if(cancelled) CHECK(::kill(-static_cast<pid_t>(list.front().process_group),SIGSTOP)==0);
   auto end=s.finish(cancelled);CHECK(end.reason==StopReason::None);CHECK(!end.host_fault);
   errno=0;CHECK(::kill(static_cast<pid_t>(pid),0)==-1);CHECK(errno==ESRCH);CHECK(s.finish().reason==StopReason::None);
