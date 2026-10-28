@@ -13,7 +13,10 @@
 // condition is dropped: any call counts as a suspension (a call of a value,
 // a unit function or another built-in, as a binding named `sleep` would
 // compile); 22 the argument condition is dropped: any `Sleep` counts, whatever
-// its duration (0, a variable). Normal builds contain none.
+// its duration (0, a variable); 23 the join check is dropped: the argument's
+// load counts even when another path joins before the Sleep; 24 the exception
+// handler edge is dropped: a throw in a try body may skip the Sleep
+// (independent review R3, Q1). Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -26,7 +29,10 @@ bool conditional_jump(OpCode op) {
     switch (op) {
         case OpCode::JmpFalse: case OpCode::JmpTrue: case OpCode::JmpNotNull: case OpCode::JmpNotLt:
         case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq:
-        case OpCode::JmpNotNe: case OpCode::JmpIncLt: case OpCode::TryBegin:
+        case OpCode::JmpNotNe: case OpCode::JmpIncLt:
+#if NIFT_CORO_MUTANT != 24
+        case OpCode::TryBegin:
+#endif
             return true;
         default: return false;
     }
@@ -120,7 +126,9 @@ private:
         return true;  // M22: the argument condition is dropped
 #endif
         for (std::size_t k = pc; k-- > 0;) {
+#if NIFT_CORO_MUTANT != 23
             if (target_[k + 1]) return false;  // another path joins between the load and the Sleep
+#endif
             if (code_[k].a != in.a) continue;
             if (code_[k].op == OpCode::LoadI) return jump_offset(code_[k].b) >= 1;
             if (code_[k].op != OpCode::LoadK || code_[k].b >= proto_.constants.size()) return false;

@@ -278,6 +278,32 @@ Read from `integ-cp17-bd` `eeb3bead` (not a base):
 6. `HandleBoxObject` values are heap values: the snapshot copy and argument
    moves need no change (refcounts are per isolate, one isolate here).
 
+**Integration onto the accepted CP17 (2026-10-28, runtime-2 after
+`812bf21a`).** The 34 commits were replayed unchanged except for the
+conflicts:
+* step 1: CP17's rework removed `StmtMark`, so the CP22 opcodes follow
+  `ArrayMutate` (automatic merge);
+* step 2: `Vm::Vm` opens the handle runtime before `coro_init()`, and
+  `Vm::run`'s `done:` runs `coro_teardown(result)` before
+  `close_handle_runtime(result)`;
+* step 4: CP17's handle-flow check (W13) runs first, then
+  `check_coroutine_unit`, in `compile_unit`;
+* the certification guard and its self-test require both checkpoints'
+  edges;
+* `UnitCompiler::expression_statement` moved verbatim to
+  `compiler_statement_expr.cpp`, because the combined `compiler.cpp`
+  exceeded rt-lint's 400-line limit.
+
+Steps 3 and 5 (release by task frames, per-task handle contexts) are not
+implemented and are **not reachable**. Admission rule A1 refuses every
+coroutine unit that uses a managed file (`coro-blocking-host:file`), in a
+task or in main, and W13 refuses handles passed to or returned from tasks
+(`host-handle-flow`). So no VM-executed unit combines CP17 handles with
+coroutines. Permanent witnesses: `refuse/r_int_cp17_task_file.f` and
+`refuse/r_int_cp17_main_file.f`. They stay obligations for the nonblocking
+Host integration (§12.2), which must implement them before it admits a
+handle in a coroutine unit.
+
 ## 7. Requirements → tests
 
 | Requirement | Test (all new under `tests/runtime2/cp22/` unless noted) |
@@ -1099,8 +1125,16 @@ functions included.
   `nift-packages_semver` contract test, `catch (err)` in the diagnostics
   and error corpora, and `for (name : …)` in the docs. The rule therefore
   rejects the call, the point where the engines disagree, not the name.
-  Whether to ban the name itself, as for declarations, is open for the
-  owner (§13 #14).
+  **Owner decision (2026-10-28, after the round-7 independent review):
+  this narrow rule is approved.** The name itself is not banned; extending
+  it to a name ban needs new evidence and a new owner decision (§13 #14).
+* **Scope (independent review R3, Q3).** "Every unit" above means every
+  unit the prevalidator sees: scripts, `-e`, `-c`, stdin, imported modules
+  and `eval` calls inside a script. Two entry points are not prevalidated:
+  REPL lines (`nift -i`) and the `nift eval` command. Both run only on
+  legacy, which calls the built-in, so the engines cannot disagree there;
+  `nift eval` also rejects `for` inside lambdas, so the rule is not
+  reachable through it.
 * **Not reproduced:** legacy's callable resolution (owner decision 4). A
   program that relied on legacy calling the built-in through such a binding
   is now rejected with the diagnostic on both engines.
@@ -1211,8 +1245,9 @@ automatically a VM failure, and never automatically a quirk.
 | 11 | A catch binding used as an assignment's text type reads register 0 (`got = e`) | genuine VM correctness regression, inherited from CP13B; handled separately | (base defect) | handover notes |
 | 12 | Scheduling-dependent output (task `print`, `done`/`status`, `epoch`) under the non-contractual observe switch | not contractual: FIFO is one of legacy's interleavings on large pools, not on P = 2 | refused by default (A5) | print_order.py |
 | 13 | 300 000 tasks (`p/many.f`): legacy exceeds 40 s; the VM prints 45599850000 | legacy implementation limitation (performance); the value is the arithmetic result | the VM result | `logs/sweep-r6-classified.tsv` |
-| 14 | A for-loop or catch binding with a built-in's name, called in its scope (R2-1): legacy calls the built-in, the VM called the binding (base VM, also without async) | genuine correctness and safety regression (blocking). Fixed by a **language validation rule** (§12.1.4), the same on both engines and checked before anything runs; legacy's resolution is not reproduced | rejected with a diagnostic on both engines; reading the binding as a value stays valid. Open for the owner: whether the *name* itself should be banned (as for declarations), which would reject existing code such as `for (range : …)` and `catch (err)` | `binding/` (`binding.py`), `refuse/r_r2_*` (`binding-call-reserved`) |
+| 14 | A for-loop or catch binding with a built-in's name, called in its scope (R2-1): legacy calls the built-in, the VM called the binding (base VM, also without async) | genuine correctness and safety regression (blocking). Fixed by a **language validation rule** (§12.1.4), the same on both engines and checked before anything runs; legacy's resolution is not reproduced | rejected with a diagnostic on both engines; reading the binding as a value stays valid. Owner decision (2026-10-28): the narrow rule is approved and the *name* itself is not banned, so existing code such as `for (range : …)` and `catch (err)` stays valid | `binding/` (`binding.py`), `refuse/r_r2_*` (`binding-call-reserved`) |
 | 15 | A for-loop binding named `name` or `title` (legacy: `@for binding 'name' conflicts with built-in metadata`, exit 1; VM: runs the loop) | genuine base VM correctness defect (sync and async), found in round 7; **not repaired in this candidate** | (base; unchanged). Prepared fix: a planner refusal `for-binding-metadata`, so legacy reports its error; it needs its gates | probes in the handover (`logs/probe-metadata.txt`); prepared patch `proposed/0001-…` |
+| 16 | CPU work between yield points (independent review R3, Q2): A3/A4 bound a task loop's *structure* (every iteration suspends), not the work done between suspensions. `benchmarks/runtime2/cp22_cpu_between_yields.f` (two tasks, each appending to an 8 MiB string between `sleep(1)` calls, 400 iterations) is admitted with identical output (`6710887200`): VM wall 5.62 s / 5.68 s (user 5.50 s, one core), legacy wall 4.52 s / 3.90 s (user 7.39 s / 6.55 s, about 1.7 cores); 2-vCPU container, review logs `probe-cpu-per-iteration.log` | known CP22 limitation, **not waived** (owner decision 2026-10-28). Cooperative scheduling does not provide CPU parallelism and does not bound the CPU work between yield points; wall time is not observable under §12.1.1, so output is unaffected. No CPU-work admission bound is added to CP22. The missing parallelism is a **CP23 obligation** (D-055) and joins CP23's scaling and acceptance criteria | admitted; runs on one VM thread | the benchmark program and the measurements in this row |
 
 **Unresolved dependencies** (all mandatory, none optional):
 * the Runtime 2.0 release-consistency obligation (§13 #3b): while a unit
@@ -1225,7 +1260,8 @@ automatically a VM failure, and never automatically a quirk.
 * future lifetimes across handles, which come with CP17;
 * the platform obligations: Windows and macOS runs, and reference-platform
   gates;
-* the CP23 parallelism requirements (D-055).
+* the CP23 parallelism requirements (D-055), including §13 #16: CPU-bound
+  task work between yield points must regain legacy's parallelism.
 
 ## Evidence (Opus, 2026-10-27; local 2-vCPU container, Linux 6.18, GCC 13.3)
 

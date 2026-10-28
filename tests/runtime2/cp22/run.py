@@ -93,6 +93,12 @@ MUTANTS = {
     22: ("A3 argument dropped (any Sleep counts, sleep(0) or a variable)", {
         "refuse/r_ca_sleep_zero_loop.f": {"stdout": b"10\n", "exit": 0, "outcome": "vm"},
         "refuse/r_r2_sleep_variable.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
+    # Independent review R3 Q1 (2026-10-28): the two remaining A3 soundness
+    # conditions, each with a witness that flips only under its own mutant.
+    23: ("A3 join check dropped (the Sleep argument reached by another path)", {
+        "refuse/r_r3_sleep_ternary_join.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
+    24: ("A3 handler edge dropped (a throw in try skips the Sleep)", {
+        "refuse/r_r3_handler_skips_sleep.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
     13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
                                                                               "outcome": "vm"}}),
 }
