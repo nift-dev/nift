@@ -114,6 +114,15 @@ def supported():
     out.append(("deep-equality", "fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
                                  "while (i < 500) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n"))
     out.append(("lambda", "f := (x) => x + 1\nprint(f(1))\n"))
+    # CP23 (test corrected in CP25-R): async lambdas capturing locals run on
+    # the VM with legacy's copy-on-capture: the captured value, a write in
+    # the lambda that leaves the frame's binding unchanged, and a write in the
+    # frame before the await.
+    out.append(("async-capture", "fn(m()) {\n  n := 1\n  f := async () => n\n  return await f()\n}\nprint(m())\n"))
+    out.append(("async-capture-write", "fn(m()) {\n  n := 1\n  f := async () => { n = 5; return n }\n"
+                                       "  r := await f()\n  print(n)\n  return r\n}\nprint(m())\n"))
+    out.append(("async-capture-before-await", "fn(m()) {\n  n := 1\n  f := async () => n\n  n = 7\n"
+                                              "  return await f()\n}\nprint(m())\n"))
     # CP25-R: a reserved parameter name that is only read is an ordinary parameter.
     out.append(("reserved-param-read", "fn(f(name)) { return name }\nprint(f(1))\n"))
     out.append(("for-top", "for (x : [1, 2]) { print(x) }\n"))
@@ -134,10 +143,13 @@ UNSUPPORTED = [
     ("fn-called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"),
     ("fn-called-before-declaration-transitive", "fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n",
      "fn-called-before-declaration"),
-    # CP22: async functions compile (tests/runtime2/cp22); an async lambda
-    # capturing a local stays refused (legacy clones captures per task).
-    ("async-capture", "fn(m()) {\n  n := 1\n  f := async () => n\n  return await f()\n}\nprint(m())\n",
-     "coro-capture"),
+    # CP22 refused an async lambda capturing a local (coro-capture; legacy
+    # clones captures per task). CP23 admits it (cp23-concurrency.md,
+    # CP22-CLASSIFICATION.tsv r_capture.f: vm, legacy-golden); the programs are
+    # now SUPPORTED (supported(): async-capture*). Still refused next to them:
+    # a capture of an aggregate whose element is aliased in the frame.
+    ("async-capture-aliased", "fn(m()) {\n  n := [[1], [2]]\n  f := async () => n[0].size()\n  inner := n[0]\n"
+     "  inner.push(9)\n  return await f()\n}\nprint(m())\n", "aliasing"),
     ("deferred-fn", "@fn(f()) { return 1 }\nprint(1)\n", "fn-flags"),
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),
