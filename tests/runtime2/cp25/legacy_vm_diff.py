@@ -56,6 +56,9 @@ def main():
     ap.add_argument("--values")
     ap.add_argument("--contexts")
     ap.add_argument("--output")
+    ap.add_argument("--or-refused", action="append", default=[],
+                    help="a case may instead be refused for a reason with this prefix (an unrelated refusal "
+                         "the same construct gets without the corrected rule); counted separately")
     ap.add_argument("--expect-refusal", action="store_true",
                     help="negative control: every case must still be refused by the VM")
     a = ap.parse_args()
@@ -68,12 +71,16 @@ def main():
         prelude, _, body = text.rpartition("\n---\n") if "\n---\n" in text else ("", "", text)
         source = (prelude.strip() + "\n" if prelude.strip() else "") + xtext.replace("{BODY}", body.strip())
         cases.append((f"{cname}/{vname}/{xname}", source))
-    rows, failures = [], 0
+    rows, failures, refused_other = [], 0, 0
     for name, source in cases:
         problems = []
         lrc, lout, lerr, _ = run_norm(binary, "0", source)
         vrc, vout, verr, st = run_norm(binary, "require", source)
-        if a.expect_refusal:
+        refused_ok = st.get("outcome") not in ("vm", "vm-error") and any(
+            st.get("reason", "").startswith(r) for r in a.or_refused)
+        if refused_ok:
+            refused_other += 1
+        elif a.expect_refusal:
             if st.get("outcome") == "vm": problems.append("VM executed a case expected to be refused")
         else:
             if (st.get("vm_executions"), st.get("legacy_executions")) != (1, 0):
@@ -87,7 +94,8 @@ def main():
             failures += 1
             print(f"FAIL {name}: " + "; ".join(problems)[:600])
     if a.output: Path(a.output).write_text(json.dumps(rows, indent=1) + "\n")
-    print(f"{'PASS' if not failures else 'FAIL'} legacy/VM differential: {len(rows)} cases, {failures} failure(s)")
+    extra = f" ({refused_other} refused as allowed: {', '.join(a.or_refused)})" if a.or_refused else ""
+    print(f"{'PASS' if not failures else 'FAIL'} legacy/VM differential: {len(rows)} cases, {failures} failure(s){extra}")
     return 1 if failures else 0
 
 

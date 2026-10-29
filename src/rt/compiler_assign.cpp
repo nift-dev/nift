@@ -282,7 +282,6 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->const_scalar) return const_write(node, &ast_.at(node.b), nullptr);  // CP25: after the value
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
@@ -306,6 +305,8 @@ bool UnitCompiler::compound_assign(const Node& node) {
         if (node.op == Op::AddAssign && ((l | r) & kKindString) && may_double_[binding_scope(b)].count(text(target)))
             return fail(node, "context:string-append-type");
     }
+    // CP25: legacy computes the operation (its errors first), then rejects the write.
+    if (b.const_scalar) return const_write(node, &ast_.at(node.b), nullptr, &b);
     return compound_op(node, b);
 }
 
@@ -318,13 +319,13 @@ bool UnitCompiler::inc_dec(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->const_scalar) return const_write(node, nullptr, nullptr);  // CP25
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
+    if (b.const_scalar) return const_write(node, nullptr, nullptr, &b);  // CP25: after the numeric check
     return compound_op(node, b);
 }
 
@@ -334,11 +335,11 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     const Binding* found = find_binding(text(target));
     if (!found) return fail(target, "assign-free-name");
     if (found->const_array) return fail(target, "declare-const");
-    if (found->const_scalar) { const std::uint16_t r = dst; return const_write(node, nullptr, &r); }  // CP25
     if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;
     if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, dst, true);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
+    if (b.const_scalar) return const_write(node, nullptr, &dst, &b);  // CP25: after the numeric check
     const std::uint16_t mark = fb_->top();
     std::uint16_t work = 0;
     if (!temp(work)) return false;

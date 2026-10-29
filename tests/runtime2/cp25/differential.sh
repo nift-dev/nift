@@ -18,3 +18,8 @@ run --cases "$D/const/cases.txt" --values "$D/const/values.txt" --contexts "$D/c
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/contexts.txt"
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/refused-contexts.txt"
 run --cases "$D/const/refused-cases.txt" --expect-refusal
+# Legacy computes a compound assignment's or increment's operation (and its
+# errors) before rejecting the const write. Operand kinds the compiler refuses
+# for any binding (type:*) stay refused here too.
+run --cases "$D/const/operation-cases.txt" --values "$D/const/values.txt" --contexts "$D/const/contexts.txt" \
+    --or-refused type:

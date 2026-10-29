@@ -1,0 +1,35 @@
+=== compound-add-same
+const c := {V}
+print("before")
+c += {V}
+print("after")
+=== compound-sub-int
+const c := {V}
+print("before")
+c -= 1
+print("after")
+=== compound-div-zero
+const c := {V}
+print("before")
+c /= 0
+print("after")
+=== compound-mod-zero
+const c := {V}
+print("before")
+c %= 0
+print("after")
+=== compound-mul-large
+const c := {V}
+print("before")
+c *= 9007199254740991
+print("after")
+=== increment
+const c := {V}
+print("before")
+c++
+print("after")
+=== decrement-expression
+const c := {V}
+print("before")
+print(c--)
+print("after")
