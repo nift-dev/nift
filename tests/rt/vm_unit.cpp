@@ -115,7 +115,9 @@ void check_fallbacks() {
         {"fn(is_enum(x)) { return 42 }\nprint(is_enum(1))\n", "fn-name-reserved"},
         {"title := 1\nprint(title)\n", "binding-name-reserved"},
         {"loop := 1\nprint(loop)\n", "binding-name-reserved"},
-        {"fn(f(name)) { return name }\nprint(f(1))\n", "param-name-reserved"},
+        // CP25-R: a reserved parameter name is refused only when it is called
+        // in the body (legacy calls the built-in there).
+        {"fn(f(print)) { print(1)\nreturn 0 }\nprint(f(1))\n", "param-name-reserved"},
         // D6: a place argument to a parameter the callee mutates (legacy alias).
         {"fn(f(p)) { p.push(9) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
         {"fn(f(p)) { p[0] = 5 }\na := [[1]]\nf(a[0])\n", "alias-argument"},

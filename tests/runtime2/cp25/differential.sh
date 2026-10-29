@@ -49,3 +49,8 @@ run --cases "$D/const/operation-cases.txt" --values "$D/const/values.txt" --cont
 run --cases "$D/interp/cases.txt" --values "$D/interp/values.txt" --contexts "$D/interp/contexts.txt"
 run --cases "$D/interp/int-cases.txt" --contexts "$D/interp/contexts.txt"
 run --cases "$D/interp/refused-cases.txt" --expect-refusal
+# A user function's parameter with a reserved built-in name, never called in
+# the function's body: an ordinary parameter in legacy (reads, writes, every
+# context). Called there (legacy calls the built-in, D-009 #3) it stays refused.
+run --cases "$D/param/cases.txt" --values "$D/param/names.txt" --contexts "$D/param/contexts.txt"
+run --cases "$D/param/refused-cases.txt" --values "$D/param/names.txt" --expect-refusal

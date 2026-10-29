@@ -1,0 +1,7 @@
+=== called-in-body
+fn(f({V})) { return {V}("x") }
+print(f(1))
+=== called-in-nested-lambda
+fn(f({V})) { h := () => {V}("x")
+return 1 }
+print(f(1))

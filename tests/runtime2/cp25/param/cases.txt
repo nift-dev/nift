@@ -1,0 +1,35 @@
+=== read
+fn(f({V})) { return {V} }
+---
+print(f(7))
+print(f("s"))
+=== interpolate
+fn(f({V})) { return "v=$[{V}]." }
+---
+print(f("s"))
+=== write
+fn(f({V})) { {V} = 9
+return {V} }
+---
+print(f(1))
+=== method
+fn(f({V})) { return {V}.length() }
+---
+print(f("abc"))
+=== passed-on
+fn(g(x)) { return x + 1 }
+fn(f({V})) { return g({V}) }
+---
+print(f(41))
+=== loop-in-body
+fn(f({V})) { j := 0
+t := 0
+while(j < 3) { t = t + {V}
+j += 1 }
+return t }
+---
+print(f(5))
+=== second-parameter
+fn(f(a, {V})) { return "$[a]-$[{V}]" }
+---
+print(f("x", "y"))

@@ -34,4 +34,10 @@ struct BindingCallViolation {
 // The first violation in source order of the binding, if any.
 BindingCallViolation reserved_binding_call(const Ast& ast);
 
+// CP25-R: whether `name(…)` is called with its callee inside `scope` (nested
+// lambdas and functions included). A user function's parameter with a
+// reserved built-in name is compiled only when it is never called there:
+// legacy then reads and writes it as an ordinary parameter in every context.
+bool reserved_name_called_in(const Ast& ast, std::string_view name, const Node& scope);
+
 } // namespace nift::rt

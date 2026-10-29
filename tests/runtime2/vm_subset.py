@@ -114,6 +114,8 @@ def supported():
     out.append(("deep-equality", "fn(w(p)) { return [p ?? 0] }\nx := [1]\ny := [1]\ni := 0\n"
                                  "while (i < 500) { x = w(x); y = w(y); i += 1 }\nprint(x == y)\n"))
     out.append(("lambda", "f := (x) => x + 1\nprint(f(1))\n"))
+    # CP25-R: a reserved parameter name that is only read is an ordinary parameter.
+    out.append(("reserved-param-read", "fn(f(name)) { return name }\nprint(f(1))\n"))
     out.append(("for-top", "for (x : [1, 2]) { print(x) }\n"))
     out.append(("for-in-loop", "i0 := 0\nwhile (i0 < 2) {\n  i0 += 1\n  for (x : [1, 2]) { print(x) }\n}\n"))
     out.append(("for-in-function", "fn(w0()) {\n  for (x : [1, 2]) { print(x) }\n  return 0\n}\nprint(w0())\n"))
@@ -184,7 +186,8 @@ UNSUPPORTED = [
     # Names legacy dispatches specially.
     ("builtin-fn-name", "fn(is_null(x)) { return 1 }\nprint(is_null(2))\n", "fn-name-reserved"),
     ("reserved-binding", "title := 1\nprint(title)\n", "binding-name-reserved"),
-    ("reserved-param", "fn(f(name)) { return name }\nprint(f(1))\n", "param-name-reserved"),
+    # CP25-R: refused only when the reserved parameter is called in the body.
+    ("reserved-param", "fn(f(print)) { print(1)\nreturn 0 }\nprint(f(1))\n", "param-name-reserved"),
     # Methods and natives.
     # CP14 wiring: split is a bound built-in; replace_once is batch C (CP16).
     ("method", 'x := "a,b"\nprint(x.replace_once("a", "b"))\n', "method:replace_once"),

@@ -892,7 +892,8 @@ INJECT = [
     ("jump-outside-loop", "", "break", "top", "jump-outside-loop"),
     ("fn-flags", "@fn(zg()) { return 1 }", "", "top", "fn-flags"),  # CP22: fn[async] compiles
     ("fn-name-reserved", "fn(is_null(x)) { return 1 }", "", "top", "fn-name-reserved"),
-    ("param-name-reserved", "fn(zg(name)) { return 1 }", "print(zg(1))", "top", "param-name-reserved"),
+    # CP25-R: refused only when the reserved parameter is called in the body.
+    ("param-name-reserved", "fn(zg(print)) { print(1)\nreturn 1 }", "print(zg(1))", "top", "param-name-reserved"),
     # CP12b: a global compiles; only a caller's local resolving the name stays refused.
     ("free-name", "fn(zg()) { return zglobal }\nfn(zh()) { zglobal := 1\nreturn zg() }", "print(zh())", "top",
      "free-name"),

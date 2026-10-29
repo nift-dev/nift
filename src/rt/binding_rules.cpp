@@ -34,6 +34,11 @@ bool first_call(const Ast& ast, std::string_view name, const Node& scope, std::u
 
 }  // namespace
 
+bool reserved_name_called_in(const Ast& ast, std::string_view name, const Node& scope) {
+    std::uint32_t at = 0;
+    return first_call(ast, name, scope, at);
+}
+
 BindingCallViolation reserved_binding_call(const Ast& ast) {
     std::vector<Scoped> bindings;
     for (NodeId id = 0; id < ast.size(); ++id) {
