@@ -10,3 +10,11 @@ run --cases "$D/print/cases.txt" --values "$D/print/values.txt" --contexts "$D/p
 run --cases "$D/arity/cases.txt" --contexts "$D/arity/contexts.txt"
 run --cases "$D/arity/cases.txt" --contexts "$D/arity/refused-contexts.txt" --expect-refusal
 run --cases "$D/arity/refused-cases.txt" --expect-refusal
+run --cases "$D/const/cases.txt" --values "$D/const/values.txt" --contexts "$D/const/contexts.txt"
+run --cases "$D/const/captured-read.txt" --values "$D/const/values.txt" --contexts "$D/const/top-context.txt"
+run --cases "$D/const/captured-read.txt" --values "$D/const/values.txt" --contexts "$D/const/function-context.txt" --expect-refusal
+run --cases "$D/const/cases.txt" --values "$D/const/values.txt" --contexts "$D/const/refused-contexts.txt" --expect-refusal
+# A const that is only read (here: passed by value) runs on the VM in every context, loops included.
+run --cases "$D/const/read-cases.txt" --contexts "$D/const/contexts.txt"
+run --cases "$D/const/read-cases.txt" --contexts "$D/const/refused-contexts.txt"
+run --cases "$D/const/refused-cases.txt" --expect-refusal

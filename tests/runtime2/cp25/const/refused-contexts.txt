@@ -1,0 +1,12 @@
+=== loop
+i := 0
+while(i < 2) {
+{BODY}
+i += 1
+}
+=== loop-callee
+fn(go()) {
+{BODY}
+}
+i := 0
+while(i < 2) { go(); i += 1 }

@@ -278,6 +278,23 @@ bool UnitCompiler::legacy_fatal(const Node& at, std::string message, std::uint16
     return builder_ok();
 }
 
+// CP25: a write to a `const`/`immut` scalar binding raises legacy's fatal
+// Error at the statement. `value` (compound assignment) is evaluated first,
+// as legacy does; a plain assignment raises before its value.
+bool UnitCompiler::const_write(const Node& node, const Node* value, const std::uint16_t* result) {
+    // Legacy's loop evaluator does not enforce const: such writes stay refused.
+    if (loop_reachable()) return fail(node, "declare-const");
+    const std::uint16_t mark = fb_->top();
+    std::uint16_t reg = 0;
+    if (!temp(reg)) return false;
+    if (value != nullptr && !expr_to(node_id(*value), reg)) return false;
+    const Node& target = ast_.at(node.a);
+    if (!legacy_fatal(node, "cannot assign to const binding: " + std::string(text(target)), reg)) return false;
+    if (result && *result != reg) fb_->emit(OpCode::Move, *result, reg);
+    fb_->release_to(mark);
+    return builder_ok();
+}
+
 bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason) {
     if ((kinds(id) & ~allowed) == 0 || unknown_defers(kinds(id))) return true;  // Unknown: never within (D1)
     return fail(at, reason);

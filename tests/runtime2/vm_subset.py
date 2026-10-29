@@ -123,7 +123,8 @@ def supported():
 # (name, program, expected fallback reason prefix)
 UNSUPPORTED = [
     # Statements and declarations outside the subset.
-    ("const", "const c := 1\nprint(c)\n", "declare-const"),
+    # CP25-R: const scalars compile outside loop code; objects stay refused.
+    ("const", 'const c := {"a": 1}\nprint(c.a)\n', "declare-const"),
     ("destructuring", "[a, b] := [1, 2]\nprint(a)\n", "declare-pattern"),
     # CP12b structs compile (vm_structs.py); a field initialised by a
     # non-constant is still refused (legacy evaluates it at each construction).

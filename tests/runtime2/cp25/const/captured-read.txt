@@ -1,0 +1,4 @@
+=== captured-read
+const c := {V}
+f := () => c
+print(f())

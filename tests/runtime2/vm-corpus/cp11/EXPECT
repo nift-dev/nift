@@ -13,7 +13,8 @@ fallback_await.f vm
 fallback_bare_expression.f fallback expression-statement
 # CP14 wiring: split() is a bound built-in; the unit is still refused, now for print() of its array result.
 fallback_builtin.f vm-error print: value is not directly renderable
-fallback_const.f fallback declare-const
+# CP25-R: a scalar const that is never written runs on the VM.
+fallback_const.f vm
 fallback_escape.f vm
 fallback_fn_after.f vm 
 fallback_fn_called_early.f fallback fn-called-before-declaration

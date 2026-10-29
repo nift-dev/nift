@@ -1,0 +1,6 @@
+=== param-copy
+const c := 1
+fn(f(x)) { x = 9; return x }
+---
+print(f(c))
+print(c)

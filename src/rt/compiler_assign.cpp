@@ -31,15 +31,27 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
 }
 
 bool UnitCompiler::declare(const Node& node) {
-    if ((node.flags & kFlagImmut) || ((node.flags & kFlagConst) && kinds(node.b) != kKindArray))
-        return fail(node, "declare-const");
     const Node& target = ast_.at(node.a);
+    // CP25: a `const`/`immut` binding of a proved scalar is an ordinary binding
+    // whose every write raises legacy's fatal "cannot assign to const binding"
+    // Error. Captured or session constants keep the refusal (the capture and
+    // session paths carry no const flag).
+    const KindSet init_kinds = kinds(node.b);
+    const bool const_decl = (node.flags & (kFlagImmut | kFlagConst)) != 0;
+    // Loop-evaluator code keeps the refusal: legacy's prepared path does not
+    // enforce const there (e.g. `c++` in a loop succeeds).
+    const bool const_scalar = const_decl && init_kinds != 0 && (init_kinds & ~kKindScalar) == 0 &&
+                              !session_ && !loop_reachable() && target.kind == NodeKind::Ident &&
+                              !captured_binding(node_id(target));
+    if (const_decl && !const_scalar && ((node.flags & kFlagImmut) || init_kinds != kKindArray))
+        return fail(node, "declare-const");
     if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
     const std::string_view name = text(target);
     std::uint16_t reg = 0;
     Binding binding;
     if (!new_binding(name, target, reg, binding)) return false;
-    binding.const_array = (node.flags & kFlagConst) != 0;
+    binding.const_array = (node.flags & kFlagConst) != 0 && !const_scalar;
+    binding.const_scalar = const_scalar;
     // CP12b structs: `p := Name(args)` makes the instance the binding holds.
     const Node& init = ast_.at(node.b);
     const auto made = init.kind == NodeKind::Call && ast_.at(init.a).kind == NodeKind::Ident
@@ -144,7 +156,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
         // Const admission is limited to CP14B's guarded methods. The older
         // generic index setter has no const lifecycle contract: retain refusal.
-        if(holder&&holder->const_array)return fail(target,"declare-const");
+        if(holder&&(holder->const_array||holder->const_scalar))return fail(target,"declare-const");
         const bool global = holder != nullptr && holder->global;
         const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
         const Binding held = (global || indirect) ? *holder : Binding();
@@ -183,6 +195,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
+    if (binding->const_scalar) return const_write(node, nullptr, result);  // CP25: before the value
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
@@ -269,6 +282,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
+    if (binding->const_scalar) return const_write(node, &ast_.at(node.b), nullptr);  // CP25: after the value
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
@@ -304,6 +318,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     const Binding* binding = find_binding(text(target));
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
+    if (binding->const_scalar) return const_write(node, nullptr, nullptr);  // CP25
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
@@ -319,6 +334,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     const Binding* found = find_binding(text(target));
     if (!found) return fail(target, "assign-free-name");
     if (found->const_array) return fail(target, "declare-const");
+    if (found->const_scalar) { const std::uint16_t r = dst; return const_write(node, nullptr, &r); }  // CP25
     if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;
     if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, dst, true);

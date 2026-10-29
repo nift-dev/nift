@@ -1,0 +1,21 @@
+=== global-written-in-function
+const c := 1
+fn(w()) { c = 2 }
+---
+w()
+=== loop-write
+const c := 1
+i := 0
+while(i < 1) { c = 2; i += 1 }
+=== object-const
+const c := {"a": 1}
+print(c.a)
+
+=== redeclare
+const c := 1
+c := 2
+=== captured-write
+const c := 1
+f := () => { c = 2; return c }
+print("before")
+print(f())

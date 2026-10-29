@@ -867,7 +867,7 @@ def former_program(seed, index):
 # (a new function called from a loop).
 
 INJECT = [
-    ("const", "", "const zc := 1\nprint(zc)", "any", "declare-const"),
+    ("const", "", 'const zc := {"a": 1}\nprint(zc.a)', "any", "declare-const"),  # CP25-R: objects only
     ("pattern", "", "[za, zb] := [1, 2]\nprint(za)", "any", "declare-pattern"),
     ("bare-expression", "", "zx := 1\nzx", "any", "expression-statement"),
     ("native", "", "print(stringify(1))", "any", "callable:stringify"),

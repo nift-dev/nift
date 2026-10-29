@@ -1,0 +1,10 @@
+=== int
+1
+=== string
+"s"
+=== bool
+true
+=== double
+2.5
+=== null
+null

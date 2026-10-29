@@ -93,7 +93,9 @@ void check_fallbacks() {
         {"print(f())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
         {"fn(g()) { return f() }\nprint(g())\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
         {"x := 1\nif (x > 5) { print(f()) }\nfn(f()) { return 1 }\n", "fn-called-before-declaration"},
-        {"const c := 1\n", "declare-const"},
+        // CP25-R: a const scalar compiles (writes raise legacy's Error); a
+        // const object keeps the refusal.
+        {"const c := {\"a\": 1}\n", "declare-const"},
         {"fn(min(a, b)) { return 0 }\nprint(min(1, 2))\n", "fn-name-reserved"},
         {"x := \"a\"\nprint(x.replace_once(\"a\", \"b\"))\n", "method:replace_once"},  // CP14: split is bound
         {"print(args)\n", "unresolved-name"},

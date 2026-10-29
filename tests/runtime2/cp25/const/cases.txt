@@ -1,0 +1,44 @@
+=== read-only-use
+const c := {V}
+print(c)
+d := c
+print(d)
+=== assign-before-value
+fn(p(x)) { print("eval"); return x }
+---
+const c := {V}
+print("before")
+c = p(1)
+print("after")
+=== compound-after-value
+fn(p(x)) { print("eval"); return x }
+---
+const c := 1
+print("before")
+c += p(2)
+print("after")
+=== increment
+immut c := 1
+print("before")
+c++
+print("after")
+=== decrement-expression
+const c := 5
+print("before")
+x := c--
+print(x)
+=== immut-assign
+immut c := {V}
+c = {V}
+=== shadow-inner-block
+const c := 1
+if(true) { c := 2; print(c); c = 3; print(c) }
+print(c)
+=== in-try
+const c := 1
+try { c = 2 } catch(e) { print("caught") }
+print("after")
+=== write-unreached
+const c := 1
+if(false) { c = 2 }
+print(c)
