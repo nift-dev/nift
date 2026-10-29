@@ -103,7 +103,17 @@ int Vm::coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto
 bool Vm::coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
                        std::size_t& base, const Instr*& pc) {
     Coro& coro = *coro_;
-    const auto task_position = [&coro](VmResult& r) {
+    const auto task_position = [&](VmResult& r) {
+        // Uncaught join diagnostics carry the thread boundary; the caught
+        // Error itself keeps its original message, identity and provenance.
+        // Only project the failure of this exact join, never an unrelated
+        // cancellation or an Error later rethrown by a script handler.
+        if (fault.catchable && fault.error.is(Kind::Error) && pc->op == OpCode::Await && pc->c == 1) {
+            const FutureObject* future = future_of(R[pc->b]);
+            if (future && future->parallel && future->error.is(Kind::Error) &&
+                future->error.heap() == fault.error.heap())
+                r.message = "thread: " + future->failure.message;
+        }
         if (!coro.pending_report) return;
         coro.pending_report = false;
         r.offset = r.main_offset = coro.report_offset;

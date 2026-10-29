@@ -369,3 +369,16 @@ predicate and the condition-variable sleep. The same synchronisation applies
 to explicit cancellation, emergency task cleanup and pool destruction. This
 changes no Error or cancellation-completion precedence. Diagnostic-only rescue
 notifications used to identify the race are absent from the regression suite.
+
+### Separate uncaught thread-reporting correction
+
+An uncaught catchable Error escaping a parallel thread join now projects
+`thread: ` into the diagnostic result. Each nested uncaught join contributes
+one boundary, matching legacy. This runs only in coroutine uncaught handling,
+after handler selection has declined the Error; the original Error is never
+rewritten. A handler which catches and later rethrows the Error retains R2's
+message and provenance. Explicit identity guards prevent an unrelated
+cancellation at a join from acquiring the completed thread's diagnostic.
+Ordinary errors and noncatchable division diagnostics are unchanged. Legacy's
+inability to catch some mutex Errors is not adopted; accepted VM catchability
+and CP13B exception behaviour remain in force. No policy or golden changes.

@@ -153,3 +153,11 @@ times. Allocation mode `timers` checks four concurrent sleepers with one-shot
 and persistent allocation failure. The mutation lane adds real topology-limit
 and retained-timer-permit defects, each requiring a completed admission suite and
 its own signature; normal, dead, timeout and unrelated inputs must be rejected.
+
+Uncaught thread reporting is checked by `cp23-reporting-unit` in the normal,
+ASan/UBSan/LSan and TSan aggregates. `thread_diagnostics.py --nift PATH
+--switch PATH --r2 PATH --output FILE` records 24 VM executions against a
+frozen R2 binary: direct and nested uncaught prefixes are corrected, while
+caught Error identity/messages, internal catches, rethrows, ordinary mutex
+errors and division diagnostics retain R2 behaviour. The thread-reporting
+mutant must fail the completed reporting suite; a timeout is not detection.
