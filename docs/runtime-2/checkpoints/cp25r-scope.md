@@ -1,8 +1,8 @@
 # CP25-R — release readiness scope (D-057)
 
-Status: scope recorded 2026-10-29 from the owner's decision. The gates in
-section 3 are the integrator's proposal for owner confirmation. They are
-frozen once confirmed and do not change during measurement.
+Status: scope recorded 2026-10-29 from the owner's decision. Gates G1–G6
+approved in principle by the owner (2026-10-29), with the G2 refinement below.
+They do not change during measurement.
 
 CP25-R is **not** CP25. The original CP25 is now CP25-L (D-057), unchanged
 and deferred behind CP24 (D-053). Nothing here claims or implies CP25-L
@@ -31,7 +31,7 @@ progress beyond what is measured.
 - Default engine routing (D-057 item 7).
 - Performance optimisation work.
 
-## 3. Gates (proposed)
+## 3. Gates (approved in principle)
 
 **G1 Inventory.**
 - Every refusal reason produced on the release script corpora is listed,
@@ -41,17 +41,18 @@ progress beyond what is measured.
 - The inventory is regenerated from the candidate binary by a committed tool.
   It is not hand-maintained.
 
-**G2 Fallback.**
-- On the release script corpora, every non-VM execution belongs to a reason
-  classified as one of:
-  - an intentional semantic refusal;
-  - outside the release contract;
-  - CP24-dependent;
-  - a toolchain or platform portability problem.
-- Each such reason is explicitly approved.
-- No "missing VM capability" or "compiler/admission limitation" reason
-  remains unless the owner defers it by name.
-- Measured over one full test cycle on the release candidate.
+**G2 Fallback (owner refinement, 2026-10-29).** On the release script
+corpora, a non-VM execution is acceptable only when its reason is:
+- explicitly classified (section 5);
+- justified by the documented language or implementation contract;
+- individually or categorically approved by the owner;
+- covered by a test that verifies the fallback (or refusal) is intentional.
+
+The existing fallback cases are **not** grandfathered: each must meet all four
+conditions or be removed by genuine VM support. No "missing VM capability" or
+"compiler/admission limitation" reason remains unless the owner defers it by
+name. No admission guarantee is weakened. Measured over one full test cycle on
+the release candidate.
 
 **G3 Equivalence.** Each eliminated refusal has a committed legacy/VM
 differential (`tests/runtime2/cp25/legacy_vm_diff.py`). It requires:
