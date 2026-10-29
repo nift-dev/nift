@@ -1,0 +1,12 @@
+=== int
+7
+=== negative
+-3
+=== double
+2.5
+=== zero
+0
+=== large
+9007199254740991
+=== huge-double
+1e300

@@ -105,6 +105,7 @@ private:
     int function_index(const Node& callee) const;
 
     TyRef expr(NodeId id);
+    void interpolation(const Node& n);  // CP25-R: a string's `$[...]` expressions (infer_walk.cpp)
 
     TyRef call(const Node& n);
     TyRef thread_call(const Node& n);  // CP22: `thread(f, args…)`, or null when the call is not one

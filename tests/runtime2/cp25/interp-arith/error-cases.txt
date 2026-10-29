@@ -1,0 +1,48 @@
+=== print-div-zero
+x := 0
+---
+print("before")
+print("v=$[7 / x].")
+print("after")
+=== print-mod-zero
+x := 0
+---
+print("v=$[7 % x].")
+=== print-mod-fraction
+x := 2.5
+---
+print("v=$[x % 2].")
+=== print-overflow
+x := 9223372036854775807
+---
+print("v=$[x + 1].")
+=== print-overflow-mul
+x := 4611686018427387904
+---
+print("v=$[x * 2].")
+=== print-not-finite
+x := 1e308
+---
+print("v=$[x * 10].")
+=== print-side-effect-before-error
+fn(s()) { print("side")
+return 1 }
+x := 0
+---
+print("a$[s()]b$[5 / x]")
+=== declaration-div-zero
+x := 0
+---
+print("before")
+s := "v=$[1 / x]"
+print(s)
+=== assignment-mod-zero
+x := 0
+s := ""
+---
+s = "v=$[3 % x]"
+print(s)
+=== no-error-boundary
+x := 9223372036854775806
+---
+print("v=$[x + 1] $[x - 9223372036854775806] $[1e308 * 1] $[-x]")

@@ -54,3 +54,11 @@ run --cases "$D/interp/refused-cases.txt" --expect-refusal
 # context). Called there (legacy calls the built-in, D-009 #3) it stays refused.
 run --cases "$D/param/cases.txt" --values "$D/param/names.txt" --contexts "$D/param/contexts.txt"
 run --cases "$D/param/refused-cases.txt" --values "$D/param/names.txt" --expect-refusal
+# Arithmetic inside `$[...]`: compiled like any other arithmetic (inference
+# now visits interpolations). Errors raised there are reported at the failing
+# operation (D-059, policy "D-018c interpolation"); everything else is
+# byte-identical. Negation in loop code keeps its existing refusal.
+run --cases "$D/interp-arith/cases.txt" --values "$D/interp-arith/values.txt" --contexts "$D/interp-arith/contexts.txt" \
+    --allow-policy "D-018c interpolation" --or-refused context:negative-zero
+run --cases "$D/interp-arith/error-cases.txt" --contexts "$D/interp-arith/contexts.txt" \
+    --allow-policy "D-018c interpolation" --allow-policy "D-018c diagnostics" --or-refused context:negative-zero

@@ -278,4 +278,12 @@ void Inference::walk_function(std::size_t f) {
     if (block_falls_through(ast_, fn.b)) merge_return(kinds_ty(kKindNull));
 }
 
+// CP25-R: an interpolation's expressions are inferred where they are
+// evaluated (left to right), so the compiler knows their kinds.
+void Inference::interpolation(const Node& n) {
+    const NodeId* parts = ast_.list(n);
+    for (std::uint32_t k = 0; k < n.count; ++k)
+        if (ast_.at(parts[k]).kind != NodeKind::StringPart) expr(parts[k]);
+}
+
 } // namespace nift::rt::infer_detail

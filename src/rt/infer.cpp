@@ -161,7 +161,7 @@ TyRef Inference::expr(NodeId id) {
     TyRef t;
     switch (n.kind) {
         case NodeKind::Number: t=number_literal(id);break;
-        case NodeKind::String: t = kinds_ty(kKindString); break;
+        case NodeKind::String: interpolation(n); t = kinds_ty(kKindString); break;
         case NodeKind::True: case NodeKind::False: t = kinds_ty(kKindBool); break;
         case NodeKind::Null: t = kinds_ty(kKindNull); break;
         case NodeKind::Ident: {

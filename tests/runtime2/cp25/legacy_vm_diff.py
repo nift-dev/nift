@@ -29,6 +29,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import vm_policies  # noqa: E402  (the shared approved-difference policies)
+
 
 def blocks(path):
     out, name, lines = [], None, []
@@ -69,6 +72,9 @@ def main():
     ap.add_argument("--oracle-may-match", action="store_true",
                     help="with --oracle-contexts: legacy may already behave like the oracle for some cases "
                          "(counted as parity); at least one case must still differ")
+    ap.add_argument("--allow-policy", action="append", default=[],
+                    help="a difference approved by this vm_policies policy (e.g. 'D-018c interpolation') is "
+                         "accepted, with one VM and no legacy execution; counted separately")
     ap.add_argument("--or-refused", action="append", default=[],
                     help="a case may instead be refused for a reason with this prefix (an unrelated refusal "
                          "the same construct gets without the corrected rule); counted separately")
@@ -92,6 +98,7 @@ def main():
         oracle = place(ctext, vtext, oracles[xname]) if oracles else None
         cases.append((f"{cname}/{vname}/{xname}", place(ctext, vtext, xtext), oracle))
     rows, failures, refused_other, oracle_same = [], 0, 0, 0
+    policy_approved = {}
     for name, source, oracle in cases:
         problems = []
         lrc, lout, lerr, _ = run_norm(binary, "0", source)
@@ -117,6 +124,11 @@ def main():
         else:
             if (st.get("vm_executions"), st.get("legacy_executions")) != (1, 0):
                 problems.append(f"VM run outcome {st.get('outcome')} {st.get('reason', '')}")
+            if (lrc, lout, lerr) != (vrc, vout, verr) and a.allow_policy:
+                verdict = vm_policies.classify((lout, lerr, lrc), (vout, verr, vrc), st, source.encode())
+                if verdict[0] == "approved" and verdict[1] in a.allow_policy:
+                    policy_approved[verdict[1]] = policy_approved.get(verdict[1], 0) + 1
+                    lrc, lout, lerr = vrc, vout, verr
             if (lrc, lout, lerr) != (vrc, vout, verr):
                 problems.append(f"differs: legacy rc={lrc} out={lout!r} err={lerr!r} | vm rc={vrc} out={vout!r} err={verr!r}")
         rows.append({"case": name, "source": source, "oracle": oracle, "problems": problems,
@@ -127,6 +139,8 @@ def main():
             print(f"FAIL {name}: " + "; ".join(problems)[:600])
     if a.output: Path(a.output).write_text(json.dumps(rows, indent=1) + "\n")
     extra = f" ({refused_other} refused as allowed: {', '.join(a.or_refused)})" if a.or_refused else ""
+    if a.allow_policy:
+        extra += f" (approved differences: {policy_approved or 'none'})"
     if a.oracle_contexts:
         differ = len(rows) - refused_other - oracle_same
         extra += f" ({differ} approved differences from legacy, {oracle_same} where legacy already agrees)"

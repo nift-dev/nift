@@ -1,0 +1,37 @@
+=== add-literal
+x := {V}
+print("v=$[x + 1].")
+=== sub-mul
+x := {V}
+print("v=$[x - 2] $[x * 3]")
+=== div
+x := {V}
+print("v=$[x / 4]")
+=== mod
+x := {V}
+print("v=$[x % 3]")
+=== compare
+x := {V}
+print("v=$[x > 1] $[x <= 0] $[x == 7]")
+=== negate
+x := {V}
+print("v=$[-x]")
+=== two-bindings
+x := {V}
+y := 2
+print("v=$[x + y] $[(x + y) * y]")
+=== parameter
+fn(f(p)) { return "v=$[p + 1]" }
+---
+print(f({V}))
+=== global-in-function
+g := {V}
+fn(f()) { return "v=$[g * 2]" }
+---
+print(f())
+=== side-effects
+fn(s()) { print("side")
+return 1 }
+x := {V}
+---
+print("v=$[s() + x] $[x + s()]")

@@ -113,6 +113,13 @@ KindSet UnitCompiler::interpolation_function_kind(std::size_t f,
     return result == 0 ? kKindUnknown : result;
 }
 
+namespace {
+// CP25-R: an operand proved to be a number (int, fraction or either). The
+// kind proof used to require exactly Int|Frac, so `$[x + 1]` with an int `x`
+// was refused although the arithmetic itself is compiled as anywhere else.
+bool numeric(KindSet k) { return k != 0 && (k & ~kKindNumber) == 0; }
+}  // namespace
+
 KindSet UnitCompiler::interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const {
     return interpolation_kind_impl(id, active, false);
 }
@@ -147,7 +154,7 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
         case NodeKind::Unary: {
             if (node.op == Op::Not) return kKindBool;
             const KindSet operand = interpolation_kind_impl(node.a, active, literal_only);
-            if (operand == kKindNumber) return kKindNumber;
+            if (numeric(operand)) return kKindNumber;
             return (operand & kKindAggregate) ? kKindAggregate : kKindUnknown;
         }
         case NodeKind::Binary: {
@@ -157,15 +164,15 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
             if ((left | right) & kKindAggregate) return kKindAggregate;
             switch (node.op) {
                 case Op::Add:
-                    if (left == kKindNumber && right == kKindNumber) return kKindNumber;
+                    if (numeric(left) && numeric(right)) return kKindNumber;
                     if ((left & kKindString) || (right & kKindString)) return kKindString;
                     return kKindUnknown;
                 case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
-                    return (left == kKindNumber && right == kKindNumber) ? kKindNumber : kKindUnknown;
+                    return (numeric(left) && numeric(right)) ? kKindNumber : kKindUnknown;
                 case Op::Eq: case Op::Ne:
                     return kKindBool;
                 case Op::Lt: case Op::Le: case Op::Gt: case Op::Ge:
-                    return ((left == kKindNumber && right == kKindNumber) ||
+                    return ((numeric(left) && numeric(right)) ||
                             (left == kKindString && right == kKindString))
                                ? kKindBool
                                : kKindUnknown;
