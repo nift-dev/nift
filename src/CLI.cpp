@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <iomanip>
@@ -2736,6 +2737,17 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 }
 #endif
+// Reports an exception that escaped the shell loop. It must not throw itself:
+// building the message can fail under memory exhaustion, and an exception
+// here would skip the cleanup that follows, so it falls back to a fixed
+// string written without allocating.
+static void report_shell_internal_error(const char* what) noexcept {
+    try {
+        console::error(std::string("internal error: ") + (what ? what : "unknown exception"));
+    } catch (...) {
+        std::fputs("error: internal error\n", stderr);
+    }
+}
 static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSession* session) {
     std::unique_ptr<nift::rt::VmSession> owned_session;
     if (!session && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
@@ -2829,9 +2841,9 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     try {
         status = loop();
     } catch (const std::exception& e) {
-        console::error(std::string("internal error: ") + e.what());
+        report_shell_internal_error(e.what());
     } catch (...) {
-        console::error("internal error: unknown exception");
+        report_shell_internal_error(nullptr);
     }
     // Every loop exit (including shell exit/status paths) settles both domains.
     // Keep the CP21 owner alive until its bounded finish, then independently

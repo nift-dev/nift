@@ -54,6 +54,7 @@ endif
 
 # CP19 shell-loop exception boundary (2026-10-29): the CLI with test-only
 # failure injection (NIFT_TEST_SHELL_THROW; production objects never define it).
+-include $(TEST_DIR)/cp19/shell-throw/CLI.d
 $(TEST_DIR)/cp19/shell-throw/CLI.o: src/CLI.cpp
 	@mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_SHELL_THROW -MMD -MP -c src/CLI.cpp -o "$@"

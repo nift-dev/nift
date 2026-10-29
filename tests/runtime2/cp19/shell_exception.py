@@ -12,9 +12,14 @@ job at the same time, in legacy (NIFT_VM=0) and VM-session (NIFT_VM=1,
 NIFT_VM=require) modes:
 
   natural   production binary: mkdir/cd/rmdir the working directory. The
-            shell must continue (prompt "?"), run the next statement, and at
-            EOF settle both domains normally: exit 1, one managed-file
-            diagnostic, file unchanged, job terminated by the job table.
+            prompt must not end the shell (it shows "?"): the next statement
+            runs, and at EOF both domains settle normally: exit 1, one
+            managed-file diagnostic, file unchanged, job terminated by the job
+            table. Scope: a statement that itself needs the deleted directory
+            (cd .., pwd, exists(...)) still raises from a throwing
+            std::filesystem call; the boundary then ends the session cleanly
+            with status 70 instead of aborting (independent review F1; making
+            those helpers non-throwing is a separate follow-up).
   inject-*  test-only binary (NIFT_TEST_SHELL_THROW) throwing
             std::runtime_error, std::bad_alloc or a non-std value from inside
             the loop. Exit 70, one "internal error" diagnostic naming it, the
@@ -84,6 +89,8 @@ def run_case(binary, mode, case):
                  f'sh -c "while [ ! -s {pidfile} ]; do sleep 0.05; done"']
         if case == "natural":
             lines += ["mkdir gone", "cd gone", "rmdir ../gone"]
+        elif case == "natural-cwd-builtin":  # independent review F1
+            lines += ["mkdir gone", "cd gone", "rmdir ../gone", "cd .."]
         elif case in MAGIC:
             lines += [MAGIC[case]]
         lines += ['print("after")']
@@ -125,6 +132,18 @@ def check(case, r, mode):
     if not r["job_term_marker"]:
         problems.append("job not terminated by the job table (no SIGTERM marker)")
     internal = re.findall(r"internal error:[^\n]*", err)
+    if case == "natural-cwd-builtin":
+        # A statement that needs the deleted directory still raises; the
+        # session ends cleanly with 70 (legacy through the shell boundary,
+        # the VM through its own internal-failure handling), never an abort.
+        if r["rc"] != 70:
+            problems.append(f"rc {r['rc']}, want 70")
+        if not re.search(r"internal (error|failure)", err):
+            problems.append("no internal error/failure diagnostic")
+        if "after" in r["stdout"]:
+            problems.append("statement after the failure ran")
+        return [x for x in problems if "managed-file diagnostics" not in x] + (
+            [] if mode != "0" or len(left_open) == 1 else [f"{len(left_open)} managed-file diagnostics, want 1"])
     if case in EXPECT_INTERNAL:
         if r["rc"] != 70:
             problems.append(f"rc {r['rc']}, want 70")
@@ -149,7 +168,8 @@ def main():
     a = ap.parse_args()
     failures = 0
     for mode in ("0", "1", "require"):
-        plan = [("natural", a.nift), ("control", a.inject)] + [(c, a.inject) for c in MAGIC]
+        plan = [("natural", a.nift), ("natural-cwd-builtin", a.nift), ("control", a.inject)] + \
+               [(c, a.inject) for c in MAGIC]
         for case, binary in plan:
             r = run_case(binary, mode, case)
             problems = check(case, r, mode)
