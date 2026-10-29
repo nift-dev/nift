@@ -1269,8 +1269,9 @@ does not change Error identity, provenance, handler selection or resource
 cleanup obligations, and does not authorise temporary CP17 Host-context APIs.
 
 Identifier check: D-054 was absent from both this register and the authoritative
-integration tip `8e65196b` when the owner decision was recorded. D-053 remains
-unassigned here; the owner's requested available identifier D-054 is used.
+integration tip `8e65196b` when the owner decision was recorded. D-053 remained
+unassigned at that time; it now records the CP24 deferral (below, recorded
+2026-10-29 for the owner decision of 2026-10-26).
 
 ## D-055 — CP22/CP23 concurrency boundary (owner, 2026-10-28)
 
@@ -1313,3 +1314,58 @@ Runtime 2.0 preserves the established real-parallelism contract of `thread()` an
 8. **Certification.** Acceptance requires named normal-completion, exceptional-unwind, nested try/catch, loop, function, alias-survival, report-multiplicity, unsaved-write and allocation-failure witnesses; independent mutation controls; and applicable sanitizer and platform gates. A passing legacy differential count alone does not establish compliance.
 
 **Scope:** CP17 + N2 managed-resource semantics. This decision does not authorise unrelated language changes, integration, pushing or release.
+
+## D-053 — CP24 deferred post-release (owner, 2026-10-26; recorded 2026-10-29)
+
+CP24 (template compiler and Host-op dependency recording) is deferred until
+after the initial Runtime 2.0 release: "parked, not abandoned". It is neither
+failed nor accepted for default replacement.
+
+1. The release keeps the existing website template renderer as the default; the
+   experimental CP24 adapter stays out of `runtime-2`. Website builds that do not
+   use scripting must not pay for the VM.
+2. CP24's exit gate is unchanged and applies whenever CP24 (or any other template
+   replacement) resumes: byte-identical output, no slower than official v4.12.0
+   and same-commit legacy on the same work, RSS no more than v4.12 + 10%, and
+   explicit owner approval.
+3. Website build time and memory on the retained renderer remain release
+   non-regression obligations against v4.12.0 (reported in CP27).
+4. CP17's routing tripwire (build, page and hook code never reach the VM) stays
+   in force for the release and is part of release certification.
+5. The CP24 feasibility evidence (frozen candidates, benchmarks, inventories)
+   is preserved; nothing else in the correctness, performance or certification
+   requirements is relaxed.
+
+Recording note: the 2026-10-26 proposal suggested D-053 for this decision; no
+other decision has used the identifier.
+
+## D-057 — CP25 split: CP25-R release readiness and CP25-L legacy retirement (owner, 2026-10-29)
+
+With CP24 deferred (D-053), templates and hooks keep running on the legacy
+evaluator, so the original CP25 ("fallback count zero; delete legacy evaluator",
+zero fallbacks on all corpora) cannot complete before the release.
+
+1. **CP25-L** is the original CP25, unchanged: zero fallbacks on all corpora for
+   one full test cycle and the legacy evaluator deleted. It depends on CP24 and
+   on CP25-R, and stays a visible, deferred obligation in the release ledger.
+2. **CP25-R** is a separate release-readiness checkpoint: bring the supported
+   scripting and shell surface to the agreed release contract, remove
+   unnecessary legacy fallbacks, preserve intentional refusals, and produce a
+   fully classified refusal inventory. Its gates are recorded in
+   `checkpoints/cp25r-scope.md`.
+3. CP25-R is never reported as completion of CP25 or CP25-L, and deferred
+   requirements are never labelled as passed.
+4. CP25-R does not remove the legacy evaluator, does not change the template
+   engine, and may not regress website performance.
+5. A refusal disappears only when the VM genuinely supports the behaviour, with
+   equivalent results and error behaviour and VM-only execution counts.
+   Admission rules are not weakened to meet a count, and refusal-before-effects
+   guarantees are kept.
+6. CP26 removes only scaffolding for paths retired by CP25-L; scaffolding the
+   retained legacy engine still needs stays.
+7. Default engine routing (whether `NIFT_VM` unset selects the VM for scripts)
+   is not decided by this record.
+
+D-036 remains the record that no permanent legacy fallback is accepted: the
+template engine is a scheduled post-release retirement (CP25-L), not a
+permanent fallback.

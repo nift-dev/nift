@@ -38,9 +38,10 @@ as measured in CP00.
 | CP21 | M6 Shell | Interactive layer: completion, history, rc compile, job control | CP20 | Prompt ≤ 3 ms; job-control tests green on Linux/macOS |
 | CP22 | M7 Concurrency | VM coroutines: cooperative scheduler, futures, suspension/resumption, timers and cancellation, Error propagation and future lifetimes, event loop, nonblocking Host-operation integration; cooperative execution only for programs proven schedule-independent (cp22-coroutines.md §12.1), all other unsupported execution refused before effects | CP12; completion of Host integration requires accepted CP17, CP19 and CP21 interfaces | 10k sleeps of 10 ms in < 0.2 s; linear spawn scaling to 100k; admitted programs match approved semantics under differential, adversarial and mutation tests; no legacy-supported parallel operation silently executed cooperatively; all CP22-owned Host integration implemented and certified |
 | CP23 | M7 Concurrency | Capture-only isolates, channels and cancellation; real parallel `thread()`, parallel `async` for CPU-bound and blocking work, `mutex` and `atomic`; isolate pool (work-stealing optional) | CP22 | Labs concurrency suite; no data races under TSan; all legacy-supported `thread()`, `async`, `mutex` and `atomic` operations execute on the VM without legacy fallback or refusals attributable to missing parallel execution; CPU-bound interpreted and native workloads tested against legacy at 1, 2, 4 and 8 concurrent tasks, with a quantitative scaling acceptance threshold approved before CP23 certification |
-| CP24 | M8 Templates | Template compiler; Host-op dependency recording | CP16, CP02 | Byte-identical output on Labs sites; build time ≤ today; RSS ≤ today + 10% |
-| CP25 | M9 Retirement | Fallback count zero; delete legacy evaluator | CP13–CP24 | Zero fallbacks on all corpora for one full test cycle; legacy files removed |
-| CP26 | M9 Retirement | Remove parity scaffolding and dead flags | CP25 | Build and suites green; code-size report |
+| CP24 | M8 Templates | Template compiler; Host-op dependency recording — **DEFERRED POST-RELEASE (D-053)** | CP16, CP02 | Byte-identical output on Labs sites; build time ≤ today; RSS ≤ today + 10% (unchanged; applies whenever CP24 resumes) |
+| CP25-R | M9 Release readiness (D-057) | Script and shell VM coverage to the release contract; classified refusal inventory; legacy evaluator retained | CP13–CP23 | See `checkpoints/cp25r-scope.md`; never reported as completion of CP25-L |
+| CP25-L | M9 Retirement (original CP25, D-057) | Fallback count zero; delete legacy evaluator | CP13–CP24, CP25-R | Zero fallbacks on all corpora for one full test cycle; legacy files removed (unchanged; blocked while CP24 is deferred) |
+| CP26 | M9 Retirement | Remove parity scaffolding and dead flags | CP25-L | Build and suites green; code-size report (scaffolding the retained legacy engine still needs stays until CP25-L) |
 | CP27 | M10 Demonstration | End-to-end campaign: performance, cross-platform, final report | CP26 | All perf targets reported (met or explained); Linux/macOS/Windows CI green |
 
 Parallelism: CP04–CP07 are independent of each other and of CP01–CP03.
@@ -183,7 +184,7 @@ become current. Non-negotiable gates already fixed now:
 - CP11 is a genuine go/no-go. If calls are not ≥ 5× cheaper than today, stop and
   report to the owner with profiles before continuing.
 - CP24 may not regress website build time or memory beyond the matrix limits.
-- CP25 requires the fallback counter to read zero across all corpora.
+- CP25-L (the original CP25) requires the fallback counter to read zero across all corpora. CP25-R (D-057) has its own recorded gates and never satisfies this one.
 - CP27 reports every performance target from the owner's table, met or not.
 
 ## Feature checkpoints (outside the CP numbering)
