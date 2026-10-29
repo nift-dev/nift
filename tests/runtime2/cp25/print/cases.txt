@@ -1,0 +1,25 @@
+=== direct
+print("before")
+print({V})
+print("after")
+=== bound
+print("before")
+x := {V}
+print(x)
+print("after")
+=== in-try
+print("before")
+try { print({V}) } catch(e) { print("caught") }
+print("after")
+=== returned
+fn(get()) { return {V} }
+---
+print("before")
+print(get())
+print("after")
+=== mixed-kind
+fn(get(k)) { if(k) { return {V} } return 1 }
+---
+print(get(0))
+print(get(1))
+print("after")

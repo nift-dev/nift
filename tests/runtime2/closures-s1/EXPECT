@@ -30,7 +30,7 @@ g13_spread_callable.f fallback:spread
 g14_binding_function_type.f vm-error
 g15_shadow_toplevel_block.f vm
 g15_late_global.f vm-error
-g15_lambda_array_print.f fallback:type:print
+g15_lambda_array_print.f vm-error
 g16_late_local.f fallback:free-name
 g16_lambda_late.f fallback:free-name
 g17_push_unknown.f vm-error

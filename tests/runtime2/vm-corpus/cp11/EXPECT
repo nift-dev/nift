@@ -12,7 +12,7 @@ fallback_args.f fallback unresolved-name
 fallback_await.f vm
 fallback_bare_expression.f fallback expression-statement
 # CP14 wiring: split() is a bound built-in; the unit is still refused, now for print() of its array result.
-fallback_builtin.f fallback type:print
+fallback_builtin.f vm-error print: value is not directly renderable
 fallback_const.f fallback declare-const
 fallback_escape.f vm
 fallback_fn_after.f vm 
@@ -36,7 +36,8 @@ fallback_try.f vm
 functions.f vm 
 kernels.f vm 
 logic.f vm 
-objects.f fallback type:print
+# CP25-R: print of an unknown-kind value now renders at run time (legacy succeeds); the next refusal is aliasing.
+objects.f fallback aliasing
 # CP14B D-040: exact independent-copy result is pinned by corpus(), without a general alias policy.
 replay_alias.f vm
 replay_arity.f fallback static-error:arity
@@ -58,7 +59,7 @@ replay_ordering.f fallback type:<
 replay_overflow.f vm-error signed 64-bit integer overflow
 replay_param_redeclare.f fallback static-error:redeclared
 replay_redeclare.f fallback static-error:redeclared
-replay_render_array.f fallback type:print
+replay_render_array.f vm-error print: value is not directly renderable
 replay_return_array.f fallback type:script-return
 replay_return_local_array.f fallback aliasing
 replay_return_place.f fallback aliasing

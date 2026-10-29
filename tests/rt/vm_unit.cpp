@@ -226,7 +226,7 @@ void check_errors() {
          "context:assignment-error"},
         {"a := [1]\nb := a\n", "aliasing"},
         {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
-        {"print([1])\n", "type:print"},
+        // CP25-R: print([1]) compiles; the VM raises legacy's print Error.
         {"s := \"abc\"\nprint(s.size())\n", "type:length"},
         {"x := 5\nprint(x.length())\n", "type:length"},
         {"x := null\nprint(x.size())\n", "type:length"},

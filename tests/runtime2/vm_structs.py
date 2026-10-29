@@ -46,7 +46,9 @@ USES = {
     "field-type-error": ('c.n = "s"', {"*": "vm", "loop": "context:struct-field", "fnloop": "context:struct-field"}),
     # An instance is never copied: legacy would share it.
     "copy": ("d := c\n  print(1)", {"*": "aliasing", "fnloop": "prepared-decl-type"}),
-    "print": ("print(c)", {"*": "type:print"}),
+    # CP25-R: print no longer refuses by kind; a struct instance is still not a
+    # first-class value, so the unit stays refused for that reason.
+    "print": ("print(c)", {"*": "struct-value"}),
 }
 
 SHAPES = {

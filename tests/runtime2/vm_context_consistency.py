@@ -26,6 +26,7 @@ import os
 import shutil
 import subprocess
 import sys
+import re
 import tempfile
 
 HELPERS = "fn(f2(a)) { return a * 3 }\n"
@@ -86,6 +87,23 @@ def run(nift, d, source, mode):
     return (p.stdout, p.stderr, p.returncode), st
 
 
+CALLER_POS = re.compile(rb"p\.f:(\d+):(\d+):")
+
+
+def caller_error(body, result):
+    """CP25-R: printing f's result can itself raise legacy's fatal Error
+    (`print: value is not directly renderable`). That error belongs to the
+    context's own print call, not to f, so its position legitimately differs
+    by context; it is normalised here and checked against legacy instead."""
+    m = CALLER_POS.search(result[1])
+    first_context_line = (HELPERS + "fn(f(p)) {\n" + body + "\n}\nfn(g(p)) { return f(p) }\n").count("\n") + 1
+    return m is not None and int(m.group(1)) >= first_context_line
+
+
+def normalise(result):
+    return (result[0], CALLER_POS.sub(b"p.f:<caller>:", result[1]), result[2])
+
+
 def check(nift, work, body_name, arg):
     d = tempfile.mkdtemp(dir=work)
     try:
@@ -137,6 +155,17 @@ def main():
                 # The direct, loop, nested and nested-loop contexts print the
                 # same thing; the condition context only f's own output and
                 # the error.
+                callers = {c for c, r in vm.items() if caller_error(BODIES[body_name], r)}
+                for c in sorted(callers):
+                    if vm[c] != legacy[c]:
+                        failures.append(f"{label}: {c}: caller-site error differs from legacy: {vm[c]!r} != {legacy[c]!r}")
+                if callers:
+                    # The condition context never prints f's result: there it
+                    # is checked against legacy instead of the other contexts.
+                    cond = vm.pop("condition", None)
+                    if cond is not None and cond != legacy["condition"]:
+                        failures.append(f"{label}: condition: differs from legacy: {cond!r} != {legacy['condition']!r}")
+                    vm = {c: (normalise(r) if c in callers else r) for c, r in vm.items()}
                 full = {c: r for c, r in vm.items() if c != "condition"}
                 if len(set(full.values())) > 1:
                     failures.append(f"{label}: VM results differ by context: " +

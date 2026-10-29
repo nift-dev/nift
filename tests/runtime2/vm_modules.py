@@ -273,7 +273,7 @@ def main():
 
 # Expected outcomes of the agreeing D-041 fixtures that are not on the VM.
 FIXTURES = {"export_clash": "import-collision", "circular": "import-cycle", "self_cycle": "import-cycle",
-            "doc_try_import": "import-nested", "doc_math": "vm", "import_path_print": "type:print",
+            "doc_try_import": "import-nested", "doc_math": "vm", "import_path_print": "vm",
             "import_path_read": "path-in-call-argument", "import_path_write": "alias-argument",
             "nested_chain": "import-scope"}
 

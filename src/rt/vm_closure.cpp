@@ -264,6 +264,10 @@ bool Vm::op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*
 
 bool Vm::op_undefined(const Instr& in, Fault& fault, const Proto* proto) {
     const Note* note = note_at(proto, &in);
+    // CP25: b == 1 is a legacy fatal Error whose message is the note itself
+    // (an error legacy raises when it reaches the statement, after the
+    // output of every earlier statement; never catchable, as in legacy).
+    if (in.b == 1) return raise(fault, StopReason::Error, note ? note->text : std::string());
     return raise(fault, StopReason::Error,
                  "unknown value or malformed expression: " + std::string(note ? note->text : ""));
 }

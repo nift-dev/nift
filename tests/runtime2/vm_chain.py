@@ -38,7 +38,7 @@ SHAPES = [
     # method chains over natives (CP14 string methods on a call result)
     ("\" a \".trim().to_upper()", "vm"), ("fa(1)[2].to_upper().length()", "vm"),
     # run-time errors, reported by the VM as legacy does
-    ("fa(1)[7]", "vm"), ("fa(1)[-1]", "type:print"), ("fo(2)[\"zz\"]", "vm"), ("[1, 2][5]", "vm"),
+    ("fa(1)[7]", "vm"), ("fa(1)[-1]", "vm"), ("fo(2)[\"zz\"]", "vm"), ("[1, 2][5]", "vm"),
     ("{\"k\": 1}[\"q\"]", "vm"), ("fa(1)[1][9]", "vm"),
     # member reads on call results and literals (CP12b): compiled with legacy's
     # textual wording; refused in loop code, where legacy words it otherwise (L43)

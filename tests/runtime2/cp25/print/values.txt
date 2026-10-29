@@ -1,0 +1,22 @@
+=== array
+[1, 2]
+=== empty-array
+[]
+=== object
+{"a": 1}
+=== empty-object
+{}
+=== nested
+[{"a": [1]}]
+=== lambda
+(x) => x + 1
+=== int
+42
+=== string
+"s"
+=== bool
+true
+=== null
+null
+=== double
+1.5

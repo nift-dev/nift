@@ -1,0 +1,19 @@
+=== top
+{BODY}
+=== function
+fn(go()) {
+{BODY}
+}
+go()
+=== loop
+i := 0
+while(i < 1) {
+{BODY}
+i += 1
+}
+=== loop-callee
+fn(go()) {
+{BODY}
+}
+i := 0
+while(i < 1) { go(); i += 1 }

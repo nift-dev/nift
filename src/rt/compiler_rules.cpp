@@ -259,9 +259,23 @@ bool UnitCompiler::print_argument_ok(NodeId id, const Node& arg) {
     // Unknown/empty kinds are not assumed scalar and are not a licence to
     // admit blindly: they defer to the VM's checked native print, which now
     // raises legacy's ordinary print Error (never an internal failure).
-    const KindSet k = kinds(id);
-    if (k & kKindUnknown) return true;
-    return kinds_within(id, static_cast<KindSet>(kKindScalar | kKindError | kKindAtomic), arg, "type:print");
+    // CP25: a value proved (or possibly) non-renderable is no longer refused:
+    // the VM's checked native print raises legacy's fatal "print: value is not
+    // directly renderable" Error at the print statement, after the output of
+    // every earlier statement, exactly where legacy raises it.
+    static_cast<void>(id);
+    static_cast<void>(arg);
+    return true;
+}
+
+// CP25: an error legacy raises when it reaches this point (never catchable,
+// after the output of every earlier statement) is compiled as that Error
+// instead of refusing the whole unit. Undefined with b == 1 raises the note.
+bool UnitCompiler::legacy_fatal(const Node& at, std::string message, std::uint16_t dst) {
+    fb_->set_offset(site(at));
+    fb_->note(fb_->emit(OpCode::Undefined, dst, 1), std::move(message));
+    fb_->emit(OpCode::LoadNull, dst);
+    return builder_ok();
 }
 
 bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason) {
