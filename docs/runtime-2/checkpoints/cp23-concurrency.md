@@ -382,3 +382,14 @@ cancellation at a join from acquiring the completed thread's diagnostic.
 Ordinary errors and noncatchable division diagnostics are unchanged. Legacy's
 inability to catch some mutex Errors is not adopted; accepted VM catchability
 and CP13B exception behaviour remain in force. No policy or golden changes.
+
+### R4 F1: exact CP22 default diagnostic contract
+
+The owner-approved uncaught parallel thread-boundary projection also applies
+when a user Error escapes `join()`. CP22's `th_error_uncaught` legacy and
+cooperative VM golden remains `boom` at 1:13. The default parallel VM expects
+`thread: boom` at exactly 1:13, with identical stdout and exit. Only this named
+fixture has a `DEFAULT_EXPECT.tsv` entry and `.parallel` golden; it does not
+extend D-009's fatal-error position matcher or any general parity policy.
+The complete default lane must execute on both dispatch builds. Missing,
+duplicate, misplaced and unrelated prefixes are rejected by negative controls.
