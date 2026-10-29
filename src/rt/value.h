@@ -93,6 +93,12 @@ public:
         if (this != &other) { Value copy(other); swap(copy); }
         return *this;
     }
+    // Always inlined: with CP19 and CP23 combined, Vm::run outgrew GCC's
+    // inlining budget and the register-store hot path (e.g. AddAssign) called
+    // an outlined copy (+10 instructions per arithmetic loop iteration).
+#if defined(__GNUC__)
+    __attribute__((always_inline))
+#endif
     Value& operator=(Value&& other) noexcept {
         if (this != &other) { Value moved(static_cast<Value&&>(other)); swap(moved); }
         return *this;
