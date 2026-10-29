@@ -1,0 +1,16 @@
+# r_f3_member_print_default under legacy, by async pool size (2026-10-29)
+# binary: 4e8c15760596723d (cp19-int c00d6bc7, GCC 13.3); pool = max(2, hardware_concurrency) set via nprocs_shim.so (CP22_FAKE_NPROCS)
+# 10 runs per row; NIFT_VM unset (legacy), NIFT_PREVALIDATE=off as in run.py
+## original-r_f3_member_print_default.f
+workers=max(2,1): 10 1,3,2,6, 
+workers=max(2,2): 10 1,3,2,6, 
+workers=max(2,3): 10 3,1,2,6, 
+workers=max(2,4): 10 3,1,2,6, 
+workers=max(2,8): 10 3,1,2,6, 
+## redesigned
+workers=max(2,1): 10 1,2,3,6, 
+workers=max(2,2): 10 1,2,3,6, 
+workers=max(2,3): 10 1,2,3,6, 
+workers=max(2,4): 10 1,2,3,6, 
+workers=max(2,8): 10 1,2,3,6, 
+## VM (NIFT_VM=1): both fixtures fall back with coro-observe:print, vm_executions 0
