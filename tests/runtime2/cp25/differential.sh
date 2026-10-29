@@ -43,3 +43,9 @@ run --cases "$D/const/refused-cases.txt" --expect-refusal
 # for any binding (type:*) stay refused here too.
 run --cases "$D/const/operation-cases.txt" --values "$D/const/values.txt" --contexts "$D/const/contexts.txt" \
     --or-refused type:
+# Interpolation of a top-level global inside a function: resolved as every
+# other read of it in that function (the global plan); unresolved, dynamic
+# or not-yet-declared names stay refused.
+run --cases "$D/interp/cases.txt" --values "$D/interp/values.txt" --contexts "$D/interp/contexts.txt"
+run --cases "$D/interp/int-cases.txt" --contexts "$D/interp/contexts.txt"
+run --cases "$D/interp/refused-cases.txt" --expect-refusal

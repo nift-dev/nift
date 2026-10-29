@@ -1,0 +1,24 @@
+=== mutated-to-new-value
+g := 1
+fn(f()) { return "v=$[g]." }
+---
+print(f())
+g = 2
+print(f())
+g += 40
+print(f())
+=== written-inside-function
+g := 1
+fn(f()) { g = g + 1
+return "v=$[g]." }
+---
+print(f())
+print(f())
+print(g)
+=== double-global
+g := 2.5
+fn(f()) { return "v=$[g]" }
+---
+print(f())
+g = 3
+print(f())

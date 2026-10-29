@@ -134,6 +134,13 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
         case NodeKind::Ident: {
             if (literal_only) return kKindUnknown;  // never use the caller's scope for a callee return
             const Binding* binding = scopes_.find(text(node));
+            // CP25-R: a function's read of a top-level global is resolved as
+            // every other read of it (find_binding: only the globals the
+            // plan resolves for this function); its binding type is main's.
+            if (!binding && !session_) {
+                const Binding* global = find_binding(text(node));
+                if (global != nullptr && global->global) binding = global;
+            }
             if (!binding) return kKindUnknown;
             return scalar_only(binding->decl_kinds);
         }

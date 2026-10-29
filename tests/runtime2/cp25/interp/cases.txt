@@ -1,0 +1,49 @@
+=== global-before
+g := {V}
+fn(f()) { return "v=$[g]." }
+---
+print(f())
+=== global-declared-after-function
+fn(f()) { return "v=$[g]." }
+g := {V}
+---
+print(f())
+=== mutated-between-calls
+g := {V}
+fn(f()) { return "v=$[g]." }
+---
+print(f())
+g = {V}
+print(f())
+=== shadowed-by-local
+g := {V}
+fn(f()) { g := "local"
+return "v=$[g]." }
+---
+print(f())
+print("g=$[g]")
+=== shadowed-by-parameter
+g := {V}
+fn(f(g)) { return "v=$[g]." }
+---
+print(f("param"))
+=== side-effect-order
+g := {V}
+fn(s()) { print("side")
+return 1 }
+fn(f()) { return "a$[s()]b$[g]c" }
+---
+print("before")
+print(f())
+=== nested-callee
+g := {V}
+fn(h()) { return "[$[g]]" }
+fn(f()) { return h() + "!" }
+---
+print(f())
+=== two-globals
+g := {V}
+k := "k"
+fn(f()) { return "$[k]:$[g]:$[k]" }
+---
+print(f())

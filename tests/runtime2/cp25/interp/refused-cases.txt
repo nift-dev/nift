@@ -1,0 +1,12 @@
+=== undefined-global
+fn(f()) { return "v=$[nope]." }
+print(f())
+=== called-before-declaration
+fn(f()) { return "v=$[g]." }
+print(f())
+g := 1
+=== dynamic-caller-local
+fn(f()) { return "v=$[g]." }
+fn(h()) { g := 5
+return f() }
+print(h())

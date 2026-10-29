@@ -1,0 +1,17 @@
+=== top
+{BODY}
+=== loop
+i := 0
+while(i < 1) {
+{BODY}
+i += 1
+}
+=== function
+fn(go()) {
+{BODY}
+}
+go()
+=== try
+try {
+{BODY}
+} catch(e) { print("caught") }
