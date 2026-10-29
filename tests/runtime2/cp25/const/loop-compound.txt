@@ -1,0 +1,14 @@
+=== declared-inside-compound
+fn(p(x)) { print("eval"); return x }
+---
+const c := 1
+print("before")
+c += p(2)
+print("after")
+=== declared-outside-compound
+fn(p(x)) { print("eval"); return x }
+const c := 1
+---
+print("before")
+c += p(2)
+print("after")

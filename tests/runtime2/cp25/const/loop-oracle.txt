@@ -1,0 +1,21 @@
+=== while
+i := 0
+if(i < 2) {
+{BODY}
+i += 1
+}
+=== for
+if(true) {
+{BODY}
+}
+=== while-callee
+fn(go()) {
+{BODY}
+}
+i := 0
+if(i < 2) { go(); i += 1 }
+=== for-callee
+fn(go()) {
+{BODY}
+}
+if(true) { go() }

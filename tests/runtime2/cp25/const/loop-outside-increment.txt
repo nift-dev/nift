@@ -1,0 +1,6 @@
+=== declared-outside-increment
+immut c := {V}
+---
+print("before")
+c++
+print("after")

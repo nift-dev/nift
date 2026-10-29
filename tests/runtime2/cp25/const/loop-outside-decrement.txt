@@ -1,0 +1,5 @@
+=== declared-outside-decrement-expression
+const c := 5
+---
+print("before")
+print(c--)

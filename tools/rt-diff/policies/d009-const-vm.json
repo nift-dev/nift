@@ -1,0 +1,38 @@
+[
+ {
+  "id": "loop_const-stdout",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "source_sha256": "e0834934e9f3bebdfc0109d7e045c06eeb6cdb3c78104f5f17744a44ef1190be",
+  "channel": "stdout",
+  "old": "2\n",
+  "new": "",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stdout, intended loop_const.r2.stdout)"
+ },
+ {
+  "id": "loop_const-stderr",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "source_sha256": "e0834934e9f3bebdfc0109d7e045c06eeb6cdb3c78104f5f17744a44ef1190be",
+  "channel": "stderr",
+  "old": "error: $ROOT/loop_const.f:4:1: cannot assign to const binding: k\n",
+  "new": "error: $ROOT/loop_const.f:3:30: cannot assign to const binding: c\n",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stderr, intended loop_const.r2.stderr)"
+ },
+ {
+  "id": "loop_const-combined",
+  "decision": "D-009#2",
+  "entry": "semantics/loop_const.f",
+  "source_sha256": "e0834934e9f3bebdfc0109d7e045c06eeb6cdb3c78104f5f17744a44ef1190be",
+  "channel": "combined",
+  "old": "2\nerror: $ROOT/loop_const.f:4:1: cannot assign to const binding: k\n",
+  "new": "error: $ROOT/loop_const.f:3:30: cannot assign to const binding: c\n",
+  "count": 1,
+  "justification": "const is immutable everywhere; the loop-body reassignment is an error at the assignment.",
+  "test": "tests/runtime2/semantics/loop_const.f (legacy golden loop_const.stdout, intended loop_const.r2.stdout)"
+ }
+]

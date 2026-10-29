@@ -1,0 +1,19 @@
+=== declared-inside-assign
+fn(p(x)) { print("eval"); return x }
+---
+const c := {V}
+print("before")
+c = p(1)
+print("after")
+=== declared-inside-increment
+immut c := 1
+print("before")
+c++
+print("after")
+=== declared-inside-decrement-expression
+const c := 5
+print("before")
+print(c--)
+=== declared-inside-immut
+immut c := {V}
+c = {V}

@@ -257,6 +257,7 @@ def rt_diff(args, work):
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--policy", "tools/rt-diff/policies/d040-vm.json",
+           "--policy", "tools/rt-diff/policies/d009-const-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
            "--timeout", str(max(60, args.timeout)),
            "--b-vm-stats",
@@ -308,6 +309,18 @@ def rt_diff(args, work):
             wid = d040_witnesses.match(text, legacy, vm, st)
         if wid != r["id"]:
             print(f"FAIL rt-diff D-040 approval for {r['id']} not confirmed by its exact witness and VM statistics")
+            bad_class += 1
+    # CP25-R D-009 #2 (const immutable in loop code, tools/rt-diff/policies/
+    # d009-const-vm.json): the approved text must come from one VM execution
+    # that raised the error, with no legacy execution.
+    d009_ids = {rule["id"] for rule in json.load(open(os.path.join(REPO, "tools/rt-diff/policies/d009-const-vm.json")))}
+    for r in report["results"]:
+        if not any(d["policy"] in d009_ids for d in r["approved"]):
+            continue
+        approvals["d009-const"] += 1
+        own = r.get("vm_stats") or []
+        if len(own) != 1 or own[0].get("outcome") != "vm-error" or own[0].get("legacy_executions", 0) != 0:
+            print(f"FAIL rt-diff D-009 #2 approval for {r['id']} not confirmed by VM statistics")
             bad_class += 1
     print(f"rt-diff class approvals (confirmed by VM statistics): {dict(sorted(approvals.items()))}")
     if bad_class:

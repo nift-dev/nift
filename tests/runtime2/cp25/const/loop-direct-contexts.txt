@@ -1,0 +1,10 @@
+=== while
+i := 0
+while(i < 2) {
+{BODY}
+i += 1
+}
+=== for
+for(i : [1, 2]) {
+{BODY}
+}

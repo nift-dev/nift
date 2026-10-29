@@ -1,0 +1,11 @@
+=== while-callee
+fn(go()) {
+{BODY}
+}
+i := 0
+while(i < 2) { go(); i += 1 }
+=== for-callee
+fn(go()) {
+{BODY}
+}
+for(i : [1, 2]) { go() }

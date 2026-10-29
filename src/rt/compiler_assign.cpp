@@ -38,10 +38,10 @@ bool UnitCompiler::declare(const Node& node) {
     // session paths carry no const flag).
     const KindSet init_kinds = kinds(node.b);
     const bool const_decl = (node.flags & (kFlagImmut | kFlagConst)) != 0;
-    // Loop-evaluator code keeps the refusal: legacy's prepared path does not
-    // enforce const there (e.g. `c++` in a loop succeeds).
+    // In loop-evaluator code legacy's prepared path does not enforce a const
+    // declared there; D-009 #2 (const is immutable everywhere) applies.
     const bool const_scalar = const_decl && init_kinds != 0 && (init_kinds & ~kKindScalar) == 0 &&
-                              !session_ && !loop_reachable() && target.kind == NodeKind::Ident &&
+                              !session_ && target.kind == NodeKind::Ident &&
                               !captured_binding(node_id(target));
     if (const_decl && !const_scalar && ((node.flags & kFlagImmut) || init_kinds != kKindArray))
         return fail(node, "declare-const");
@@ -195,7 +195,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding) return fail(target, "assign-free-name");
     if (binding->const_array) return fail(target, "declare-const");
-    if (binding->const_scalar) return const_write(node, nullptr, result);  // CP25: before the value
+    if (binding->const_scalar) return const_write(node, nullptr, result, *binding, false);  // CP25: before the value
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
@@ -306,7 +306,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
             return fail(node, "context:string-append-type");
     }
     // CP25: legacy computes the operation (its errors first), then rejects the write.
-    if (b.const_scalar) return const_write(node, &ast_.at(node.b), nullptr, &b);
+    if (b.const_scalar) return const_write(node, &ast_.at(node.b), nullptr, b, true);
     return compound_op(node, b);
 }
 
@@ -325,7 +325,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     const Binding b = *binding;
     if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
-    if (b.const_scalar) return const_write(node, nullptr, nullptr, &b);  // CP25: after the numeric check
+    if (b.const_scalar) return const_write(node, nullptr, nullptr, b, true);  // CP25: after the numeric check
     return compound_op(node, b);
 }
 
@@ -339,7 +339,9 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     const Binding b = *found;
     if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, dst, true);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
-    if (b.const_scalar) return const_write(node, nullptr, &dst, &b);  // CP25: after the numeric check
+    // CP25: after the numeric check; a loop-code prefix is legacy's unapplied read (below).
+    const bool loop_prefix = loop_reachable() && node.op != Op::PostInc && node.op != Op::PostDec;
+    if (b.const_scalar && !loop_prefix) return const_write(node, nullptr, &dst, b, true);
     const std::uint16_t mark = fb_->top();
     std::uint16_t work = 0;
     if (!temp(work)) return false;

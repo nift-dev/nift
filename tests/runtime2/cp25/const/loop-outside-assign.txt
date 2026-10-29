@@ -1,0 +1,7 @@
+=== declared-outside-assign
+fn(p(x)) { print("eval"); return x }
+const c := {V}
+---
+print("before")
+c = p(1)
+print("after")

@@ -320,7 +320,7 @@ private:
     std::uint16_t this_reg_ = 0;  // a method's register holding its instance's stack slot
     bool fail(const Node& node, std::string reason);
     bool legacy_fatal(const Node& at, std::string message, std::uint16_t dst);  // CP25 (compiler_rules.cpp)
-    bool const_write(const Node& node, const Node* value, const std::uint16_t* result, const Binding* update = nullptr);
+    bool const_write(const Node& node, const Node* value, const std::uint16_t* result, const Binding& b, bool update);
     bool builder_ok();
     std::string_view text(const Node& node) const { return ast_.text(node); }
     bool probe_ = false;

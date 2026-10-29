@@ -11,6 +11,14 @@ value kinds and execution contexts (top level, function, loop, try, ...).
 A case may start with a prelude (top-level declarations) ended by a line
 `---`; the prelude is placed before the context, the rest inside it.
 
+Approved differences (--oracle-contexts): where an accepted language decision
+overrides a known legacy defect (D-009 #2: const is immutable everywhere,
+including legacy's loop evaluator), the expected behaviour is not legacy's
+result in the same context. Each context then has an oracle context of the
+same name with the same line layout in which legacy follows the decision
+(e.g. the loop body placed in an `if` block, run once); the VM run of the
+case must equal legacy's run of the oracle, and legacy's run of the case
+itself must differ from it, so the difference is real and stays recorded.
 """
 import argparse
 import itertools
@@ -56,6 +64,8 @@ def main():
     ap.add_argument("--values")
     ap.add_argument("--contexts")
     ap.add_argument("--output")
+    ap.add_argument("--oracle-contexts",
+                    help="approved difference: per-context oracle (same names as --contexts)")
     ap.add_argument("--or-refused", action="append", default=[],
                     help="a case may instead be refused for a reason with this prefix (an unrelated refusal "
                          "the same construct gets without the corrected rule); counted separately")
@@ -66,13 +76,20 @@ def main():
     cases = []
     values = blocks(a.values) if a.values else [("-", "")]
     contexts = blocks(a.contexts) if a.contexts else [("-", "{BODY}\n")]
-    for (cname, ctext), (vname, vtext), (xname, xtext) in itertools.product(blocks(a.cases), values, contexts):
+    oracles = dict(blocks(a.oracle_contexts)) if a.oracle_contexts else {}
+    if a.oracle_contexts and set(oracles) != {x for x, _ in contexts}:
+        ap.error("--oracle-contexts must name exactly the contexts of --contexts")
+
+    def place(ctext, vtext, xtext):
         text = ctext.replace("{V}", vtext.strip())
         prelude, _, body = text.rpartition("\n---\n") if "\n---\n" in text else ("", "", text)
-        source = (prelude.strip() + "\n" if prelude.strip() else "") + xtext.replace("{BODY}", body.strip())
-        cases.append((f"{cname}/{vname}/{xname}", source))
+        return (prelude.strip() + "\n" if prelude.strip() else "") + xtext.replace("{BODY}", body.strip())
+
+    for (cname, ctext), (vname, vtext), (xname, xtext) in itertools.product(blocks(a.cases), values, contexts):
+        oracle = place(ctext, vtext, oracles[xname]) if oracles else None
+        cases.append((f"{cname}/{vname}/{xname}", place(ctext, vtext, xtext), oracle))
     rows, failures, refused_other = [], 0, 0
-    for name, source in cases:
+    for name, source, oracle in cases:
         problems = []
         lrc, lout, lerr, _ = run_norm(binary, "0", source)
         vrc, vout, verr, st = run_norm(binary, "require", source)
@@ -80,6 +97,15 @@ def main():
             st.get("reason", "").startswith(r) for r in a.or_refused)
         if refused_ok:
             refused_other += 1
+        elif oracle is not None:
+            orc, oout, oerr, _ = run_norm(binary, "0", oracle)
+            if (st.get("vm_executions"), st.get("legacy_executions")) != (1, 0):
+                problems.append(f"VM run outcome {st.get('outcome')} {st.get('reason', '')}")
+            if (orc, oout, oerr) != (vrc, vout, verr):
+                problems.append(f"VM differs from the decision's oracle: oracle rc={orc} out={oout!r} err={oerr!r} | "
+                                f"vm rc={vrc} out={vout!r} err={verr!r}")
+            if (lrc, lout, lerr) == (orc, oout, oerr):
+                problems.append("legacy already follows the decision here: not an approved difference")
         elif a.expect_refusal:
             if st.get("outcome") == "vm": problems.append("VM executed a case expected to be refused")
         else:
@@ -87,7 +113,7 @@ def main():
                 problems.append(f"VM run outcome {st.get('outcome')} {st.get('reason', '')}")
             if (lrc, lout, lerr) != (vrc, vout, verr):
                 problems.append(f"differs: legacy rc={lrc} out={lout!r} err={lerr!r} | vm rc={vrc} out={vout!r} err={verr!r}")
-        rows.append({"case": name, "source": source, "problems": problems,
+        rows.append({"case": name, "source": source, "oracle": oracle, "problems": problems,
                      "legacy": [lrc, lout.decode(errors="replace"), lerr.decode(errors="replace")],
                      "vm": [vrc, vout.decode(errors="replace"), verr.decode(errors="replace")]})
         if problems:

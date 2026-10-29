@@ -1369,3 +1369,33 @@ zero fallbacks on all corpora) cannot complete before the release.
 D-036 remains the record that no permanent legacy fallback is accepted: the
 template engine is a scheduled post-release retirement (CP25-L), not a
 permanent fallback.
+
+## D-058 — Writes to immutable bindings (owner, 2026-10-29; CP25-R)
+
+Recorded from the owner's CP25-R const decision. It refines D-009 #2 (const
+is immutable everywhere) and applies D-009 #5 (errors at the actual location).
+
+1. **Approved: loop code.** A `const`/`immut` binding is immutable in
+   loop-evaluator code too, including one declared inside the loop (legacy
+   never enforces it there). The Error is reported where the write is,
+   including inside a loop-called function (legacy: at the call site).
+2. **Approved: plain assignment.** An assignment to an immutable binding fails
+   before its right-hand side is evaluated, in every context. At top level and
+   in functions this is legacy's behaviour; in loop code legacy evaluates the
+   value first for a const declared outside the loop (approved difference).
+   Completed side effects of earlier statements and expressions are kept.
+3. **Increment/decrement** keep legacy's order everywhere: the numeric-operand
+   check, then the const Error (they have no right-hand side).
+4. **Open: compound assignment.** The owner's rule ("fails before evaluating
+   the right-hand side") would also change top-level behaviour: legacy
+   evaluates the value and computes the operation first, so `c /= 0` reports
+   division by zero and `c += f()` runs `f`, before the const Error
+   (`semantics.md` lists top-level const as unchanged). Reported to the owner
+   as a conflict on 2026-10-29. Until decided: top level and functions keep
+   legacy's order (CP25-R parity); loop code refuses
+   (`const-loop-compound-order`).
+
+Tests: `tests/runtime2/cp25/const/` (loop cases against a same-layout oracle
+outside the loop, with legacy shown to differ; compound loop cases asserted as
+refusals); `semantics/loop_const.f` with its `.r2` goldens, approved in the VM
+lane by `tools/rt-diff/policies/d009-const-vm.json`.
