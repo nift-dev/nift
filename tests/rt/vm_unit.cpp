@@ -120,7 +120,9 @@ void check_fallbacks() {
         {"fn(h(z)) { z.push(8) }\nfn(f(p)) { h(p) }\no := {\"k\": [1]}\nf(o.k)\n", "alias-argument"},
         // Review round 2: statically known errors are refused, not replayed.
         {"x := 1\nx := 2\n", "static-error:redeclared"},
-        {"fn(f(a)) { return a }\nprint(f())\n", "static-error:arity"},
+        // CP25-R: outside loop code and return expressions the call raises
+        // legacy's arity Error at run time; loop code keeps the refusal.
+        {"fn(f(a)) { return a }\ni := 0\nwhile(i < 1) { i += 1\nprint(f()) }\n", "static-error:arity"},
         {"o := {\"k\": 1}\no.k = 2\n", "static-error:member-assign"},
         // M1/N1: declarations typed from another binding, in prepared-reachable code.
         {"i := 0\nwhile(i < 1) { i += 1; a := 2.0; b := a; b = 2.5 }\n", "prepared-decl-type"},

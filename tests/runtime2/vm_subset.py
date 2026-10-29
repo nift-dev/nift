@@ -191,7 +191,8 @@ UNSUPPORTED = [
     ("alias-argument", 'fn(f(p)) { p.push(9) }\no := {"k": [1]}\nf(o.k)\n', "alias-argument"),
     # Statically known errors (review round 2: refused, no longer replayed).
     ("redeclared", "x := 1\nx := 2\n", "static-error:redeclared"),
-    ("arity", "fn(f(a)) { return a }\nprint(f())\n", "static-error:arity"),
+    # CP25-R: arity errors compile outside loop code and return expressions.
+    ("arity", "fn(f(a)) { return a }\ni := 0\nwhile (i < 1) { i += 1\nprint(f()) }\n", "static-error:arity"),
     ("member-assign", 'o := {"k": 1}\no.k = 2\n', "static-error:member-assign"),
     ("push-arity", "fn(zbadpush()) { a := [1]; a.push(1, 2) }\nwhile(false) { zbadpush() }\n", "static-error:push-arity"),
     # Parser (CP10): Opaque shapes.

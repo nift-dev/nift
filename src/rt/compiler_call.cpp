@@ -35,7 +35,14 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const bool in_place = dst + 1u == fb_->top();
     const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
-    if (!builtin && node.count != arity) return fail(node, "static-error:arity");
+    // CP25: legacy evaluates every argument, then raises its arity Error.
+    // Kept refused where legacy's report differs: in loop-evaluator code
+    // legacy evaluates the arguments a second time on its canonical retry,
+    // and inside a return expression it prefixes "return: " per frame and
+    // reports the return statement's position.
+    const bool arity_error = !builtin && !is_native && node.count != arity && !loop_reachable() &&
+                             !(fb_->flags() & kInstrReturnCall);
+    if (!builtin && node.count != arity && !arity_error) return fail(node, "static-error:arity");
     const std::size_t f = is_native || builtin ? 0 : fn->second - 1u;
     // Legacy evaluates a call with an argument its prepared parser rejects on
     // the textual path, arguments and callee included (Ast.cpp Kind::Call,
@@ -72,13 +79,19 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
-        if (!is_native && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
+        if (!is_native && !arity_error && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
             k < plan_.escaping[f].size() && plan_.escaping[f][k])
             return fail(ast_.at(args[k]), "alias-argument");
         if (is_native && !print_argument_ok(args[k], ast_.at(args[k]))) return false;
         if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
     path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; if (!is_native) --call_args_;
+    if (arity_error) {
+        const bool ok = legacy_fatal(node, "callable argument count mismatch: " + std::string(name), base);
+        if (dst != base) fb_->emit(OpCode::Move, dst, base);
+        fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
+        return ok && builder_ok();
+    }
     if (!is_native && loop_reachable()) {
         // Legacy's prepared call types a parameter from the value only, the
         // canonical one from the argument's text and value (P5): refused where

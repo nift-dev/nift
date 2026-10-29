@@ -896,7 +896,7 @@ INJECT = [
     # CP12b: a global compiles; only a caller's local resolving the name stays refused.
     ("free-name", "fn(zg()) { return zglobal }\nfn(zh()) { zglobal := 1\nreturn zg() }", "print(zh())", "top",
      "free-name"),
-    ("arity", "fn(zg(x)) { return x }", "print(zg())", "any", "static-error:arity"),
+    ("arity", "fn(zg(x)) { return x }", "print(zg())", "loop", "static-error:arity"),  # CP25-R: loop code only
     ("alias-argument", "fn(zg(p)) { p.push(9)\nreturn 0 }", 'zo := {"k": [1]}\nzg(zo.k)', "any", "alias-argument"),
     ("string-arg-number", "fn(zg(n)) { return n }", 'print(zg("2.5"))', "any", "string-arg-type"),
     # Stage 4 (stage4e review): the parameter copy `zq := p` is admitted when
@@ -955,7 +955,8 @@ def unsupported_program(seed, index, added=None):
         name, extra = FN_AFTER
         return base + extra + "\n", "fn-called-before-declaration", name, "top"
     name, add_fns, add_stmts, where, reason = rng.choice(INJECT) if added is None else added
-    ctx = "top" if where == "top" else rng.choice(CONTEXTS)
+    # CP25-R: "loop" constructs stay refused only in loop-evaluator code.
+    ctx = "top" if where == "top" else rng.choice(["loop", "fnloop"]) if where == "loop" else rng.choice(CONTEXTS)
     if add_stmts:
         body = add_stmts
         if ctx == "if":

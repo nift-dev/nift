@@ -1,0 +1,10 @@
+=== return-expression
+fn(f(n)) { if(n == 0) { return f() } return f(n - 1) }
+---
+print("start")
+print(f(3))
+=== conditional
+fn(two(a, b)) { return a + b }
+---
+k := 0
+while(k < 3) { print(k); if(k == 2) { print(two(k)) } k += 1 }

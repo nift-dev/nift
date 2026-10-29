@@ -15,7 +15,8 @@ r_await_plain.f	await-outside-coroutine-unit	require-error	await-outside-corouti
 r_return_top.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
 r_module.f	coro-module	require-error	coro-module	preserved-refusal
 r_future_result.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
-err_arity.f	static-error:arity	require-error	static-error:arity	preserved-refusal
+# CP25-R (D-057): a statically certain arity mismatch now raises legacy's fatal Error on the VM when reached.
+err_arity.f	static-error:arity	vm-error	callable argument count mismatch: f	legacy-golden
 deep_chain.f	coro-async-recursion	vm	-	qualified:legacy-await-chain-defect
 iso_undeclared_at_spawn.f	free-name	require-error	free-name	preserved-refusal
 r_thread_lambda.f	coro-thread-callee	vm	-	legacy-golden

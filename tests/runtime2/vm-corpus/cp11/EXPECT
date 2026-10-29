@@ -40,7 +40,8 @@ logic.f vm
 objects.f fallback aliasing
 # CP14B D-040: exact independent-copy result is pinned by corpus(), without a general alias policy.
 replay_alias.f vm
-replay_arity.f fallback static-error:arity
+# CP25-R: the arity mismatch raises legacy's fatal Error when reached, after "x" is printed.
+replay_arity.f vm-error callable argument count mismatch: f
 replay_bad_index.f vm-error JSON array index 2 is out of range
 replay_concat_array.f fallback type:+
 replay_div_zero.f vm-error division by zero

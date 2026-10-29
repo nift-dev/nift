@@ -1,0 +1,53 @@
+=== too-few
+fn(two(a, b)) { return a + b }
+fn(p(x)) { print("eval " + x); return x }
+---
+print("before")
+x := two(p(1))
+print("after")
+=== too-many
+fn(two(a, b)) { return a + b }
+fn(p(x)) { print("eval " + x); return x }
+---
+print("before")
+x := two(p(1), p(2), p(3))
+print("after")
+=== zero-for-one
+fn(one(a)) { return a }
+---
+print("before")
+print(one())
+=== statement-call
+fn(two(a, b)) { print("in two"); return a + b }
+fn(p(x)) { print("eval " + x); return x }
+---
+print("before")
+two(p(7))
+print("after")
+=== nested
+fn(two(a, b)) { return a + b }
+fn(p(x)) { print("eval " + x); return x }
+---
+print(p(1) + two(p(2), two(p(3))))
+=== arg-error-first
+fn(two(a, b)) { return a + b }
+fn(bad()) { throw error("argument failed") }
+---
+print("before")
+x := two(bad())
+=== arg-error-caught
+fn(two(a, b)) { return a + b }
+fn(bad()) { throw error("argument failed") }
+---
+try { x := two(bad()) } catch(e) { print("caught " + e.message) }
+print("after")
+=== in-try
+fn(two(a, b)) { return a + b }
+---
+try { print(two(1)) } catch(e) { print("caught") }
+print("after")
+=== unreached
+fn(two(a, b)) { return a + b }
+---
+if(false) { print(two(1)) }
+print("ok")

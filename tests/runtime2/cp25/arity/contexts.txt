@@ -1,0 +1,7 @@
+=== top
+{BODY}
+=== function
+fn(go()) {
+{BODY}
+}
+go()
