@@ -23,6 +23,7 @@ namespace nift::rt {
 
 struct ParallelTaskRecord;
 struct ParallelWait;
+struct ParallelWaitRegistration;
 struct ParallelRuntime;
 class ProgramTransferMap;
 
@@ -60,6 +61,7 @@ struct Vm::Coro {
         std::uint32_t parent = kNoTask;
         std::uint32_t children = 0;  // live tasks it spawned (structured completion)
         std::uint64_t sleep_seq = 0;  // the timer entry that may wake it (stale entries are ignored)
+        std::shared_ptr<ParallelWaitRegistration> parallel_await; // one exact pending await
         std::string label;           // Host-trace context ("<owner>/async#N")
     };
     struct Timer {
@@ -76,6 +78,7 @@ struct Vm::Coro {
     struct ForeignWait {
         std::shared_ptr<ParallelTaskRecord> record;
         std::uint32_t task = 0;
+        const ParallelWaitRegistration* registration = nullptr;
     };
 
     std::vector<Task> tasks;  // tasks[0] is the main program
@@ -150,6 +153,7 @@ struct Vm::Coro {
                        const Instr*& pc, Fault& fault, FutureObject* future, bool join);
     // Waits for any parallel completion after `observed` or the next due timer.
     bool wait_parallel(Vm& vm, std::uint64_t observed, Fault& fault);
+    void clear_parallel_await(std::uint32_t task) noexcept;
     // Per-proto global slots a task of that proto can reach (build once).
     static void build_snapshot(Coro& coro, const std::vector<const Proto*>& protos);
 

@@ -26,6 +26,7 @@ void Vm::Coro::charge(Task& task, bool suspended) noexcept {
 }
 
 void Vm::Coro::release(Task& task) noexcept {
+    task.parallel_await.reset();
     std::vector<Value>().swap(task.stack);
     std::vector<std::uint8_t>().swap(task.ready);
     std::vector<Frame>().swap(task.frames);
@@ -219,11 +220,10 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
             if (!coro.wait_parallel(vm, observed, fault)) {
                 // Restore the suspended frame/handler/handle roots before
                 // taking the ordinary VM fault path; never unwind C++ here.
-                // This wait was never admitted. Remove its borrowed-future
-                // observer so error completion cannot wait on that future.
-                coro.foreign_waits.erase(std::remove_if(coro.foreign_waits.begin(), coro.foreign_waits.end(),
-                    [&](const Coro::ForeignWait& wait) { return wait.task == coro.current; }),
-                    coro.foreign_waits.end());
+                // Detach only this task's refused await before restoring
+                // its roots. Other tasks and schedulers keep their leases;
+                // final teardown separately releases any abandoned tasks.
+                coro.clear_parallel_await(coro.current);
                 if (!coro.tasks[coro.current].body_done)
                     load(vm, coro.current, R, K, proto, base, pc);
                 return 0;
@@ -286,6 +286,7 @@ void Vm::Coro::finish(Vm& vm, std::uint32_t id) {
 void Vm::Coro::end_body(Vm& vm, std::uint32_t id) {
     Coro& coro = *vm.coro_;
     Task& task = coro.tasks[id];
+    coro.clear_parallel_await(id);
     task.body_done = true;
     task.state = State::Finishing;
 #if NIFT_CORO_MUTANT == 4

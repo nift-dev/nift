@@ -372,6 +372,9 @@ test-cp23-shared-unit: $(RT_CP23_SHARED_UNIT)
 CP23_CORE := $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
 CP23_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(CP23_CORE))
 CP23_TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(CP23_CORE))
+$(TEST_DIR)/rt/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-reporting-unit: tests/runtime2/cp23/reporting_unit.cpp $(CP23_CORE:.cpp=.o)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
@@ -393,6 +396,12 @@ $(TEST_DIR)/rt/cp23-ownership-unit: tests/runtime2/cp23/ownership_unit.cpp $(CP2
 $(TEST_DIR)/rt-san/isolate-transfer-unit: tests/rt/isolate_transfer_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+$(TEST_DIR)/rt-san/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+$(TEST_DIR)/rt-tsan/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(TSAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(TSAN_FLAGS) $< $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 $(TEST_DIR)/rt-san/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
@@ -4279,15 +4288,17 @@ test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
 # CP23 local lanes. Reference-host performance and platform certification are
 # separate owner/integrator obligations; these targets never provision hosts.
 CP23_NORMAL_UNITS := isolate-transfer-unit isolate-task-unit cp23-parallel-unit cp23-shared-unit \
-	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit cp23-rejected-wait-unit
 CP23_SAN_UNITS := isolate-transfer-unit cp23-isolate_task-unit cp23-parallel-unit cp23-shared-unit \
-	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit
-CP23_TSAN_UNITS := cp23-parallel-unit cp23-shared-unit cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit cp23-rejected-wait-unit
+CP23_TSAN_UNITS := cp23-parallel-unit cp23-shared-unit cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit cp23-reporting-unit cp23-rejected-wait-unit
 .PHONY: test-runtime2-cp23 test-runtime2-cp23-sanitize test-runtime2-cp23-tsan
 test-runtime2-cp23: $(TARGET) $(CP13B_SWITCH_NIFT) $(addprefix $(TEST_DIR)/rt/,$(CP23_NORMAL_UNITS))
 	@set -e; for unit in $(CP23_NORMAL_UNITS); do timeout 180 "$(TEST_DIR)/rt/$$unit"; done
 	$(PYTHON) tests/runtime2/cp23/compatibility.py --nift "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp23-compatibility.json"
 	$(PYTHON) tests/runtime2/cp23/compatibility.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --output "$(TEST_DIR)/cp23-compatibility-switch.json"
+	$(CP22_RUN) --nift "$(CURDIR)/$(TARGET)" --mode default
+	$(CP22_RUN) --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --mode default
 test-runtime2-cp23-sanitize: $(addprefix $(TEST_DIR)/rt-san/,$(CP23_SAN_UNITS))
 	@set -e; for unit in $(CP23_SAN_UNITS); do \
 	  env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \

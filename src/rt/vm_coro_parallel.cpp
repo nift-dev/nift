@@ -143,33 +143,31 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
                              std::size_t& base, const Instr*& pc, Fault& fault, FutureObject* future, bool join) {
     Coro& coro = *vm.coro_;
     const std::shared_ptr<ParallelTaskRecord> record = future->parallel;
+    coro.clear_parallel_await(coro.current);
     if (vm.cancellation_requested()) {
         vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
         return 0;
     }
     bool complete = false;
     bool foreign = false;
+    std::shared_ptr<ParallelWaitRegistration> registration;
     {
         std::lock_guard<std::mutex> lock(record->mutex);
         complete = record->state != ParallelTaskState::Pending;
         if (!complete) {
+            registration = std::make_shared<ParallelWaitRegistration>(record);
             foreign = std::find(coro.parallel_live.begin(), coro.parallel_live.end(), record) ==
                       coro.parallel_live.end();
-            if (!foreign) {
-                record->waiters.push_back(coro.current);
-            } else {
-                bool known = false;
-                for (const auto& state : record->wait_states)
-                    if (state.get() == coro.parallel_wait.get()) {
-                        known = true;
-                        break;
-                    }
-                if (!known) record->wait_states.push_back(coro.parallel_wait);
-            }
+            if (!foreign)
+                record->waiters.push_back({coro.current, registration.get()});
+            else
+                record->wait_observers.push_back({registration.get(), coro.parallel_wait});
         }
     }
     if (!complete) {
-        if (foreign) coro.foreign_waits.push_back({record, coro.current});
+        coro.tasks[coro.current].parallel_await = std::move(registration);
+        if (foreign) coro.foreign_waits.push_back({record, coro.current,
+                                                 coro.tasks[coro.current].parallel_await.get()});
         coro.tasks[coro.current].state = State::Waiting;
         save(vm, proto, base, pc);
         return next(vm, R, K, proto, base, pc, fault);
@@ -215,12 +213,13 @@ bool Vm::Coro::reap_parallel(Vm& vm, Fault& fault) {
         }
         if (record->failure_reason == StopReason::Internal)
             return raise(fault, StopReason::Internal, record->failure_message);
-        std::vector<std::uint32_t> waiters;
+        std::vector<ParallelTaskWaiter> waiters;
         {
             std::lock_guard<std::mutex> lock(record->mutex);
             waiters.swap(record->waiters);
         }
-        for (std::uint32_t waiter : waiters) {
+        for (const auto& entry : waiters) {
+            const std::uint32_t waiter = entry.task;
             if (waiter >= coro.tasks.size() || coro.tasks[waiter].state != State::Waiting) continue;
             coro.tasks[waiter].state = State::Ready;
             coro.run_queue.push_back(waiter);
@@ -270,6 +269,15 @@ void Vm::Coro::flush_parallel_outputs(Vm& vm) {
         *vm.coro_output_ += text;
         coro.parallel_output.pop_front();
     }
+}
+
+void Vm::Coro::clear_parallel_await(std::uint32_t id) noexcept {
+    auto& registration = tasks[id].parallel_await;
+    if (!registration) return;
+    const auto* identity = registration.get();
+    foreign_waits.erase(std::remove_if(foreign_waits.begin(), foreign_waits.end(),
+        [&](const ForeignWait& wait) { return wait.registration == identity; }), foreign_waits.end());
+    registration.reset(); // detaches only this lease under the record mutex
 }
 
 bool Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed, Fault& fault) {

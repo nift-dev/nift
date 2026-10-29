@@ -280,6 +280,7 @@ void notify_parallel_wait_states(const std::shared_ptr<ParallelTaskRecord>& reco
     if (!record) return;
     std::lock_guard<std::mutex> lock(record->mutex);
     for (const auto& state : record->wait_states) notify_wait_state(state);
+    for (const auto& observer : record->wait_observers) notify_wait_state(observer.state);
 }
 
 void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {

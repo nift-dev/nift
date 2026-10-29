@@ -393,3 +393,29 @@ fixture has a `DEFAULT_EXPECT.tsv` entry and `.parallel` golden; it does not
 extend D-009's fatal-error position matcher or any general parity policy.
 The complete default lane must execute on both dispatch builds. Missing,
 duplicate, misplaced and unrelated prefixes are rejected by negative controls.
+
+### R4 F2: transactional ownership of a suspended parallel await
+
+Each pending parallel await owns one neutral `ParallelWaitRegistration` lease
+in its coroutine Task (not its Frame). A local waiter carries that lease's
+identity; a foreign observer carries the identity and notification target in
+`wait_observers`. Existing persistent `wait_states` targets are untouched.
+Record entries never own the lease. The lease owns its record and removes only
+entries with its exact identity under that record's mutex, without allocation.
+Two schedulers sharing the same notification target therefore remain distinct.
+
+The lease is allocated only for a pending await. Publication failures roll back
+through RAII; an exception after publication is covered by the owning Task's
+destruction. Resume, cancellation, body completion and teardown release the
+lease and its scheduler mirror. Refusal to park detaches only the current task's
+await before restoring its suspended roots; other tasks and schedulers keep
+their leases. Final teardown separately releases abandoned tasks. A refusal
+cannot erase a permanent owner notification target. Existing CPU,
+timer, admission and Error-precedence rules are unchanged.
+
+The R3 before witness completes with seven failures: foreign targets remain
+strongly retained after three refused awaits, and a retained child record has
+a stale local waiter id. This demonstrates stale ownership, not a reproduced
+use-after-free. R4 adds direct local/foreign refusal, shared-target legitimate
+waiter preservation, cancellation and later successful-await witnesses, including
+nested suspended frames and a handler which must not catch limit.exceeded.

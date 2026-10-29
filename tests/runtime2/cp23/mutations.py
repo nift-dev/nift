@@ -21,12 +21,13 @@ mutants=[
 ]
 mutants.append(('cancellation-completion','src/rt/parallel_task.cpp','} else if (cancelled_completion) {','} else if (outcome.result.code == \"runtime.cancelled\") {','cancelled normal completion remains catchable'))
 mutants += [
+ ('rejected-wait-cleanup','src/rt/parallel_wait_registration.cpp','ParallelWaitRegistration::~ParallelWaitRegistration() noexcept {','ParallelWaitRegistration::~ParallelWaitRegistration() noexcept { return;','CHECK failed: weak.expired()'),
  ('thread-reporting','src/rt/vm_coro_run.cpp','r.message = "thread: " + future->failure.message;','r.message = future->failure.message;','CHECK failed: result.message==message'),
  ('topology-admission','src/rt/parallel_task.cpp','capacity_(std::max<std::size_t>(1, std::min(kTaskCapacity, task_capacity)))','capacity_(std::max<std::size_t>(64, std::min<std::size_t>(1024, limit_ * 64)))','error=future: parallel task admission limit exceeded'),
  ('timer-permit','src/rt/vm_coro.cpp','ParallelBlock timer_wait(ParallelWaitKind::Timer);','/* mutant: suspended timer retains its CPU permit */','CHECK failed: parked'),
 ]
 def unit_for(name):
- return 'reporting' if name=='thread-reporting' else 'admission' if name in ('topology-admission','timer-permit') else ('parallel' if name=='cancellation-completion' else 'ownership')
+ return 'rejected-wait' if name=='rejected-wait-cleanup' else 'reporting' if name=='thread-reporting' else 'admission' if name in ('topology-admission','timer-permit') else ('parallel' if name=='cancellation-completion' else 'ownership')
 def detected(name,signature,code,output):
  if name=='atom-member':signature='output=[40\n]'
  return code==1 and ('cp23-'+unit_for(name)+'-unit:') in output and signature in output
@@ -36,7 +37,7 @@ for name,source,old,new,signature in mutants:
  text=(ROOT/source).read_text()
  if text.count(old)!=1:raise SystemExit('ambiguous mutation '+name)
  altered=folder/'mutated.cpp';altered.write_text(text.replace(old,new));obj=folder/'mutated.o';binary=folder/'unit'
- commands=[['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread','-c',str(altered),'-o',str(obj)],['g++','-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-pthread',('tests/runtime2/cp23/'+unit_for(name)+'_unit.cpp'),*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)]]
+ commands=[['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread','-c',str(altered),'-o',str(obj)],['g++','-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-pthread',('tests/runtime2/cp23/'+unit_for(name).replace('-','_')+'_unit.cpp'),*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)]]
  for cmd in commands:
   p=run(cmd);(args.evidence/(name+'-build.log')).open('a').write(p.stdout+p.stderr)
   if p.returncode:raise SystemExit('build failure '+name)
@@ -48,6 +49,10 @@ for name,source,old,new,signature in mutants:
  if not was_detected:raise SystemExit('not detected '+name)
  print('DETECTED',name,flush=True)
 controls=[]
+rejected_normal=run([str(ROOT/'.build/rt/cp23-rejected-wait-unit')])
+rejected_normal_output=rejected_normal.stdout+rejected_normal.stderr
+(args.evidence/'rejected-normal.log').write_text(rejected_normal_output)
+if rejected_normal.returncode or '0 failures' not in rejected_normal_output:raise SystemExit('rejected-wait positive control failed')
 reporting_normal=run([str(ROOT/'.build/rt/cp23-reporting-unit')])
 reporting_normal_output=reporting_normal.stdout+reporting_normal.stderr
 (args.evidence/'reporting-normal.log').write_text(reporting_normal_output)
@@ -63,7 +68,7 @@ parallel_normal_output=parallel_normal.stdout+parallel_normal.stderr
 if parallel_normal.returncode or '0 failures' not in parallel_normal_output:raise SystemExit('parallel positive control failed')
 dead=run(['/bin/false'])
 for name,source,old,new,signature in mutants:
- controls.append(dict(witness=name,input='normal',rejected=not detected(name,signature,0,reporting_normal_output if name=='thread-reporting' else admission_normal_output if unit_for(name)=='admission' else (parallel_normal_output if name=='cancellation-completion' else normal_output))))
+ controls.append(dict(witness=name,input='normal',rejected=not detected(name,signature,0,rejected_normal_output if name=='rejected-wait-cleanup' else reporting_normal_output if name=='thread-reporting' else admission_normal_output if unit_for(name)=='admission' else (parallel_normal_output if name=='cancellation-completion' else normal_output))))
  controls.append(dict(witness=name,input='dead',rejected=not detected(name,signature,dead.returncode,dead.stdout+dead.stderr)))
  # A real timeout is rejected even if its stdout counterfeits a witness.
  marker='cp23-ownership-unit: 1 failure\n'+('output=[40\n]' if name=='atom-member' else signature)

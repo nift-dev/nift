@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='cp23-admission-') as temp:
  for kind in ('nift','switch'):
   for permits in (1,2,4,8):
    for n in (200,10000):
-    row=run(kind,n,permits);row['passed']=row['exit']==0 and row['stdout']==str(n*(n-1)//2)+'\n' and row['stats'].get('vm_executions')==1 and row['stats'].get('legacy_executions')==0
+    row=run(kind,n,permits);row['passed']=row['exit']==0 and row['stdout']==str(n*(n-1)//2)+'\n' and row['stats'].get('vm_executions')==1 and row['stats'].get('legacy_executions')==0 and (n!=10000 or row['stats'].get('coro_live_peak')==10001)
     report['rows'].append(row);save()
     if not row['passed']:raise SystemExit('admission regression: '+str(row))
 report['passed']=True;save();print('PASS 16 VM-only sleep cases; 200/10000 tasks; 1/2/4/8 CPU permits; actual R2 negative control detected')

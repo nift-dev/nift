@@ -199,6 +199,7 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
 void Vm::coro_teardown(VmResult& result) {
     coro_abort_parallel();
     Coro& coro = *coro_;
+    for (std::uint32_t id = 0; id < coro.tasks.size(); ++id) coro.clear_parallel_await(id);
     const std::string label = coro.tasks.empty() ? std::string() : coro.tasks.front().label;
     if (!coro.tasks.empty()) Coro::release(coro.tasks.front());  // a suspended main's record (else empty)
     for (std::size_t id = 1; id < coro.tasks.size(); ++id) {

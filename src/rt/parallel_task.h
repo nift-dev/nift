@@ -5,6 +5,7 @@
 // compiled code and TransferGraph wire data.
 #include "rt/isolate_task.h"
 #include "rt/parallel_task_start.h"
+#include "rt/parallel_wait_registration.h"
 #include "rt/proto.h"
 #include "rt/shared_gc.h"
 
@@ -74,7 +75,7 @@ struct ParallelTaskRecord {
     bool output_merged = false;
     bool output_root = false;
     std::uint32_t owner_task = 0;
-    std::vector<std::uint32_t> waiters;  // parent-scheduler task ids blocked on it
+    std::vector<ParallelTaskWaiter> waiters; // exact local await registrations
     std::string label;
     std::shared_ptr<const Program> program;
     std::shared_ptr<const TransferProtoMap> proto_map;
@@ -85,7 +86,8 @@ struct ParallelTaskRecord {
     // Every scheduler wait state that has a task blocked in this record. A
     // future/thread handle may be awaited from another isolate, whose wait
     // state must be woken too.
-    std::vector<std::shared_ptr<ParallelWait>> wait_states;
+    std::vector<std::shared_ptr<ParallelWait>> wait_states; // owner/explicit persistent notification targets
+    std::vector<ParallelTaskObserver> wait_observers; // individually owned foreign awaits
 
     ParallelTaskState snapshot_state() const {
         std::lock_guard<std::mutex> lock(mutex);

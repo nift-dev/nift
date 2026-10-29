@@ -161,3 +161,14 @@ frozen R2 binary: direct and nested uncaught prefixes are corrected, while
 caught Error identity/messages, internal catches, rethrows, ordinary mutex
 errors and division diagnostics retain R2 behaviour. The thread-reporting
 mutant must fail the completed reporting suite; a timeout is not detection.
+
+R4 adds the `cp23-rejected-wait-unit` normal/sanitized aggregates. Its neutral
+record witnesses inspect local waiter IDs and foreign observer leases, preserve
+an unrelated owner target and another scheduler sharing the same target, cancel
+an admitted wait, then complete a subsequent wait successfully. The
+`rejected-wait-cleanup` compiled mutant must fail its completed suite; timeout
+and unrelated failures remain invalid detections. Allocation mode `waiting`
+exercises pending local and foreign awaits and publication/teardown failures.
+`default_controls.py` checks the exact one-fixture CP22 default contract against
+actual R2 and corrupt-prefix/location/statistics controls. The complete CP22
+default lane is required on both dispatch builds, beyond the sleep-only probe.

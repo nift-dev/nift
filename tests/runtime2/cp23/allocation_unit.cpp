@@ -49,6 +49,8 @@ int main(int argc,char** argv) {
   source="fn[async](f()){sleep(10);return 1};p:=f();sleep(2);cancel(p);try{await p}catch(e){print(e.code)}";
  if(argc>4&&std::strcmp(argv[4],"timers")==0)
   source="fn[async](f()){sleep(2);return 1};a:=f();b:=f();c:=f();d:=f();print(await a);print(await b);print(await c);print(await d)";
+ if(argc>4&&std::strcmp(argv[4],"waiting")==0)
+  source="fn[async](slow()){sleep(20);return 7};fn[async](reader(p)){return await p};a:=slow();b:=reader(a);print(await b)";
  const bool cycle=argc>4&&std::strcmp(argv[4],"cycle")==0;
  if(argc>4&&std::strcmp(argv[4],"unawaited")==0)
   source="c:=channel(1);fn[async](f()){o:={\"x\":41};send(c,o);return o.x+1};p:=f();print(0)";
