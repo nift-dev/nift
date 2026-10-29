@@ -29,6 +29,8 @@ Shell cases (interactive session on stdin, NIFT_VM=1 and require):
   job-exit-status   the same, ending with `exit 7`: the session finishes as
                     cancelled (accepted CP19 semantics), the file is discarded
                     silently, and the job is still terminated.
+Eval cases (NIFT_VM=1 and require, 10 runs each; integration review F1): a
+worker's top-level return never becomes the `nift eval` result.
 """
 import argparse
 import json
@@ -161,6 +163,22 @@ def check_shell(case, r):
     return problems
 
 
+EVAL_CASES = {  # integration review F1: a worker's top-level return never becomes the eval result
+    "eval-worker-result": ('[thread(() => {sleep(30); return "worker"}), "parent"][1]', "parent"),
+    "eval-async-worker-result": ('[thread(() => {return "worker"}).join(), "parent"][1]', "parent"),
+}
+
+
+def run_eval(binary, mode, expr, repeats=10):
+    outs = []
+    for _ in range(repeats):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("NIFT_")}
+        env.update(NIFT_VM=mode, NO_COLOR="1")
+        p = subprocess.run([binary, "eval", expr], env=env, capture_output=True, text=True, timeout=60)
+        outs.append((p.returncode, p.stdout.strip(), p.stderr.strip()))
+    return outs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -195,6 +213,17 @@ def main():
                     print(f"FAIL {label}: " + "; ".join(problems) + f"\n  stderr: {r['stderr'][-300:]!r}")
                 else:
                     print(f"ok   {label}: rc {r['rc']}, job terminated, refusal atomic")
+        for mode in ("1", "require"):
+            for case, (expr, want) in EVAL_CASES.items():
+                outs = run_eval(binary, mode, expr)
+                bad = [o for o in outs if o != (0, want, "")]
+                rows.append({"binary": binary, "mode": mode, "case": case, "result": outs, "problems": bad})
+                label = f"{Path(binary).name} NIFT_VM={mode} {case}"
+                if bad:
+                    failures += 1
+                    print(f"FAIL {label}: {len(bad)}/{len(outs)} runs differ from {want!r}, e.g. {bad[0]!r}")
+                else:
+                    print(f"ok   {label}: {len(outs)}/{len(outs)} runs {want!r}")
     Path(a.output).write_text(json.dumps({"rows": rows, "failures": failures}, indent=1) + "\n")
     print(f"{'PASS' if not failures else 'FAIL'} CP23 x CP19 combined: {len(rows)} cases, {failures} failure(s)")
     return 1 if failures else 0

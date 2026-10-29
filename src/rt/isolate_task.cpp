@@ -349,6 +349,8 @@ IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTask
         return failure(IsolateTaskStatus::InvalidInput, std::move(error));
 
     options.return_value_only = true;
+    options.return_value = nullptr;      // never the parent's CP19 result slot (review F1)
+    options.session_globals = nullptr;   // never the parent's CP19 session globals
     options.program_keepalive = clone;
     options.transfer_map = map;
     Vm vm(*clone, options);

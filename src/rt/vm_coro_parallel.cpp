@@ -82,6 +82,10 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->options.flush_context = nullptr;
     record->options.return_in_output = false;
     record->options.return_value_only = true;
+    // CP19 x CP23 (integration review F1): a worker never writes the parent's
+    // eval/session result or touches its persistent session globals.
+    record->options.return_value = nullptr;
+    record->options.session_globals = nullptr;
     record->options.cooperative_tasks = false;
     record->options.parallel = coro.parallel;
     record->options.program_keepalive = record->program;
