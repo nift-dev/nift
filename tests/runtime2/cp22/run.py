@@ -463,8 +463,25 @@ def main():
             else:
                 print(f"ok   vm {path.name}")
     elif args.mode == "refuse":
+        # CP23 reclassified part of this historical corpus: fixtures its
+        # accepted classification (tests/runtime2/cp23/CP22-CLASSIFICATION.tsv)
+        # runs on the VM are checked there (test-runtime2-cp23, VM execution and
+        # legacy-golden output), not here as refusals. Each is listed, never
+        # skipped silently; every other row keeps its CP22 refusal assertion.
+        cp23 = {r[0]: r for r in table(HERE.parent / "cp23" / "CP22-CLASSIFICATION.tsv")}
+        reclassified = 0
         for name, reason in ((r[0], r[1]) for r in table(HERE / "REFUSE.tsv")):
             count += 1
+            row = cp23.get(name)
+            if row is not None and row[2] in ("vm", "vm-error"):
+                if row[1] != reason:
+                    failures += 1
+                    print(f"FAIL refuse {name}: CP23 classification records CP22 reason {row[1]!r}, REFUSE.tsv {reason!r}")
+                else:
+                    reclassified += 1
+                    print(f"CP23 refuse {name} ({reason}): reclassified by CP23 as {row[2]} ({row[4]}); "
+                          "checked by test-runtime2-cp23")
+                continue
             problems = check_refuse(args.nift, name, reason)
             if problems:
                 failures += 1
