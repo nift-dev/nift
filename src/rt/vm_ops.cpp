@@ -90,8 +90,8 @@ bool Vm::atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto
     SharedOpError error;
     Value result;
     if (!shared_atomic_compound(R[in.b], op, operand, mode == 2, result, error))
-        return raise_catchable(fault, error.code.empty() ? "runtime.invalid_argument" : error.code, error.message, proto,
-                               report_offset(fault, proto, pc));
+        return raise_catchable(fault, error.code.empty() ? "runtime.invalid_argument" : error.code, error.message,
+                               proto, report_offset(fault, proto, pc));
     R[in.a] = std::move(result);
     return true;
 }

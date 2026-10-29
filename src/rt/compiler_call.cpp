@@ -1,4 +1,5 @@
 #include "rt/compiler_call.h"
+#include "rt/legacy_names.h"
 #include "rt/compiler_handles.h"
 #include <algorithm>
 #include "rt/alias.h"
@@ -180,6 +181,10 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
                 return fail(callee, "method:" + std::string(name));
             }
             case MethodBinding::Receiver:
+                // CP19 x CP23: CP23's mutex `set` made `set` a builtin name;
+                // a session keeps its specific refusal for a name legacy
+                // treats as a special method (as before the integration).
+                if (session_ && legacy_special_method(name)) return fail(node, "session:legacy-method-precedence");
                 // Probe mode only: Unknown defers to the underlying refusal.
                 if (!unknown_defers(k) || bind_method(0, name, spec) != MethodBinding::Dead)
                     return fail(node, "builtin-receiver:" + std::string(name));

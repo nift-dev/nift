@@ -1,16 +1,12 @@
 #pragma once
-// Expression compilation for the Runtime 2.0 compiler (CP11), and the
-// per-unit compiler state it shares with statement compilation
-// (compiler.cpp). Internal to the compiler.
+// Expression compilation for the Runtime 2.0 compiler (CP11), and the per-unit compiler state it shares with
+// statement compilation (compiler.cpp). Internal to the compiler.
 //
-// CP12 (D-018): one compiled representation per function and one meaning for
-// every expression wherever it appears: legacy's canonical (textual)
-// semantics. Legacy runs loop bodies and the functions called from them on a
-// second (prepared) evaluator; where a construct in such code could behave
-// differently there, the unit is refused before execution
-// ("context:*" reasons, compiler_rules.cpp), except for the approved
-// differences (D-018: exactly-once evaluation, keys of print(path) evaluated
-// once, errors reported where they occur; D-009#1/#5).
+// CP12 (D-018): one compiled representation per function and one meaning for every expression wherever it appears:
+// legacy's canonical (textual) semantics. Legacy runs loop bodies and the functions called from them on a second
+// (prepared) evaluator; where a construct in such code could behave differently there, the unit is refused before
+// execution ("context:*" reasons, compiler_rules.cpp), except for the approved differences (D-018: exactly-once
+// evaluation, keys of print(path) evaluated once, errors reported where they occur; D-009#1/#5).
 #include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/codegen.h"
