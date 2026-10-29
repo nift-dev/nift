@@ -133,13 +133,16 @@ struct Vm::Coro {
     static void release(Task& task) noexcept;
     // Creates the task of `callee` with the call window R[in.a ..] and puts
     // its future in R[in.a]. `function` is the callee value (null for Spawn).
-    static bool spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault,
+    static bool spawn(Vm& vm, const Instr& in, const Proto* callee,
+                               const Value& function, Value* R, Fault& fault,
                       bool thread = false);
     // CP23: starts `callee` on an OS worker instead of the run queue. The
     // FutureObject is created immediately and references the shared record.
-    static bool spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Value* R, Fault& fault, bool thread);
+    static bool spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
+                               const Value& function, Value* R, Fault& fault,
+                               bool thread);
     // Settlement of completed records: structured child counts, waiters, stats.
-    void reap_parallel(Vm& vm);
+    bool reap_parallel(Vm& vm, Fault& fault);
     void reap_foreign(Vm& vm);
     void flush_parallel_outputs(Vm& vm);
     void resolve_parallel(Vm& vm, FutureObject* future, const std::shared_ptr<ParallelTaskRecord>& record);

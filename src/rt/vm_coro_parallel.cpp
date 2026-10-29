@@ -24,7 +24,9 @@ void mark_failed(const std::shared_ptr<ParallelTaskRecord>& record, std::string 
 
 } // namespace
 
-bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Value* R, Fault& fault, bool thread) {
+bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
+                               const Value& function, Value* R, Fault& fault,
+                               bool thread) {
     Coro& coro = *vm.coro_;
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
     const auto index = coro.proto_index.find(callee);
@@ -37,15 +39,16 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Valu
         if (slot < vm.global_ready_.size()) ready[slot] = vm.global_ready_[slot];
     }
     auto record = std::make_shared<ParallelTaskRecord>();
-    record->program = coro.program_owner;
+
     record->proto_map = coro.parallel_map;
-    record->runtime = coro.parallel;
+    record->runtime = coro.parallel->weak_from_this();
     record->wait_state = coro.parallel_wait;
     record->owner_task = coro.current;
     record->wait_states.push_back(coro.parallel_wait);
     parallel_task_identity(record);
     if (coro.trace) record->label = nift::trace::child_label(thread ? "thread" : "async");
     auto* future = new FutureObject();
+    future->collect_parallel = shared_collect;
     future->thread = thread;
     future->parallel = record;
     heap_retally(future);
@@ -53,12 +56,18 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Valu
     Value seeds = make_array(g + argc);
     for (const Value& value : globals) array_push(seeds, value);
     for (std::uint16_t k = 0; k < argc; ++k) array_push(seeds, R[in.a + k]);
+    record->input.has_function = function.is(Kind::Function);
+    if (record->input.has_function) array_push(seeds, function);
     TransferGraph graph;
     std::string error;
     const TransferStatus encoded = graph.encode(seeds, *coro.parallel_map, error);
     if (encoded != TransferStatus::Ok) {
         mark_failed(record, error.empty() ? transfer_status_name(encoded) : error);
         R[in.a] = future_value;
+        return vm.memory_ok(fault);
+    }
+    if (!snapshot_isolate_program(vm.program_, *coro.parallel_map, record->input, record->program, error)) {
+        mark_failed(record, error); R[in.a] = future_value;
         return vm.memory_ok(fault);
     }
     record->input.entry_proto = index->second;
@@ -68,13 +77,14 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Valu
     record->input.has_seed_graph = true;
     record->input.seed_graph = std::move(graph);
     record->options = vm.options_;
+    record->options.current_task.reset();  // queued work must not retain its parent record
     record->options.flush = nullptr;
     record->options.flush_context = nullptr;
     record->options.return_in_output = false;
     record->options.return_value_only = true;
     record->options.cooperative_tasks = false;
     record->options.parallel = coro.parallel;
-    record->options.program_keepalive = coro.program_owner;
+    record->options.program_keepalive = record->program;
     const bool started = start_parallel_task(record, error);
     if (!started) {
         mark_failed(record, std::move(error));
@@ -92,8 +102,9 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, Valu
 void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
                                 const std::shared_ptr<ParallelTaskRecord>& record) {
     (void)vm;
-    std::lock_guard<std::mutex> lock(record->mutex);
+    std::unique_lock<std::mutex> lock(record->mutex);
     if (future->state != FutureState::Pending || record->state == ParallelTaskState::Pending) return;
+    lock.unlock();  // completion payload is immutable; never decode under a task lock
     if (record->state == ParallelTaskState::Done) {
         std::string error;
         Value value;
@@ -167,8 +178,11 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
         vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
         return 0;
     }
+    if (record->failure_reason == StopReason::Internal)
+        return raise(fault, StopReason::Internal, record->failure_message) ? 1 : 0;
     resolve_parallel(vm, future, record);
     flush_parallel_outputs(vm);
+    if (vm.coro_output_) vm.drain_parallel_output(*vm.coro_output_);
     if (future->state == FutureState::Done) {
         Value value = future->result;
         R[in.a] = std::move(value);
@@ -191,7 +205,7 @@ int Vm::Coro::await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K
     return 0;
 }
 
-void Vm::Coro::reap_parallel(Vm& vm) {
+bool Vm::Coro::reap_parallel(Vm& vm, Fault& fault) {
     Coro& coro = *vm.coro_;
     for (std::size_t i = 0; i < coro.parallel_live.size();) {
         const std::shared_ptr<ParallelTaskRecord> record = coro.parallel_live[i];
@@ -199,6 +213,8 @@ void Vm::Coro::reap_parallel(Vm& vm) {
             ++i;
             continue;
         }
+        if (record->failure_reason == StopReason::Internal)
+            return raise(fault, StopReason::Internal, record->failure_message);
         std::vector<std::uint32_t> waiters;
         {
             std::lock_guard<std::mutex> lock(record->mutex);
@@ -216,6 +232,7 @@ void Vm::Coro::reap_parallel(Vm& vm) {
         if (coro.live != 0) --coro.live;
         ++coro.finished;
     }
+    return true;
 }
 
 void Vm::Coro::reap_foreign(Vm& vm) {
@@ -261,12 +278,17 @@ void Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed) {
     if (!state) return;
     std::unique_lock<std::mutex> lock(state->mutex);
     const auto ready = [&state, observed] { return state->generation != observed; };
+    lock.unlock();
+    {
+    ParallelBlock blocked;
+    lock.lock();
     if (coro.timers.empty()) {
         state->cv.wait(lock, ready);
     } else {
         state->cv.wait_until(lock, coro.timers.top().at, ready);
     }
     lock.unlock();
+    }
     if (!coro.timers.empty() && coro.timers.top().at <= Clock::now()) fire_due(coro, Clock::now());
 }
 

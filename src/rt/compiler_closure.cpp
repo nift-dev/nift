@@ -111,7 +111,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     }
     // CP22: an async lambda capturing locals would share cells with its tasks
     // (legacy clones captures into each task): refused.
-    if ((node.flags & kFlagAsync) && !captures.empty()) return fail(node, "coro-capture");
+    if ((node.flags & kFlagAsync) && !captures.empty() && !parallel_tasks_) return fail(node, "coro-capture");
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);

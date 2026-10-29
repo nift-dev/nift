@@ -46,6 +46,7 @@ public:
     // program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
+    void set_parallel_tasks(bool enabled) { parallel_tasks_ = enabled; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 
 private:
@@ -329,6 +330,7 @@ private:
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;
+    bool parallel_tasks_ = false;
     const Ast& ast_;
     const UnitPlan& plan_;
     const UnitKinds& kinds_;

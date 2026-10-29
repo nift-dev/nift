@@ -31,6 +31,7 @@
 // process stops before the host runs out of memory.
 #include "rt/handles/table.h"
 #include "rt/heap_account.h"
+#include "rt/transfer_heap.h"
 #include "Diagnostic.h"
 #include "rt/proto.h"
 #include "rt/source_map.h"
@@ -47,6 +48,7 @@
 namespace nift::rt {
 
 struct ParallelRuntime;
+struct ParallelOutput;
 struct ParallelTaskRecord;
 struct ParallelWait;
 class ProgramTransferMap;
@@ -83,6 +85,7 @@ struct VmOptions {
     // CP23: the bounded worker admission shared by an isolate and every nested
     // isolate it spawns. Null with cooperative_tasks (or before the Vm starts).
     std::shared_ptr<ParallelRuntime> parallel;
+    std::shared_ptr<ParallelOutput> parallel_output;
     // CP23: the shared record of the worker task running this Vm (null for the
     // parent run), used for cooperative cancellation checks.
     std::shared_ptr<ParallelTaskRecord> current_task;
@@ -151,6 +154,7 @@ inline void fault_into(VmResult& result, const Fault& fault) {
 class Vm {
 public:
     Vm(const Program& program, VmOptions options = VmOptions());
+    ~Vm();
     VmResult run(std::string& output);
 
     // CP23: the value of the last TopReturn, kept in this VM's heap until the
@@ -175,6 +179,7 @@ public:
     struct CoroDelete { void operator()(Coro* coro) const noexcept; };
 
 private:
+    TransferHeapBoundary transfer_heap_boundary_;
     struct Frame {
         const Instr* ret = nullptr;
         std::size_t base = 0;
@@ -260,6 +265,8 @@ private:
     bool builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault);  // CP14 built-ins
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
     void flush_if_needed(std::string& output);
+    void drain_parallel_output(std::string& output);
+    void finish_run(VmResult& result, std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);
     void collection_error_context(VmResult&, const Fault&, const Proto*, const Instr*) const;
@@ -292,6 +299,7 @@ private:
     int coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc,
                       std::string& output, VmResult& result, Fault& fault);
     void coro_teardown(VmResult& result);
+    void coro_abort_parallel() noexcept;
     int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                         const Instr*& pc, Fault& fault);
     std::unique_ptr<Coro, CoroDelete> coro_;
@@ -303,6 +311,7 @@ private:
     bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;
+    std::uint64_t shared_owner_token_ = 0;
     handles::HandleTable handle_table_;  // CP17: one table per VM run
     handles::ContextId handle_context_ = 0;
     bool handle_context_open_ = false;

@@ -32,12 +32,20 @@ const char* transfer_status_name(TransferStatus status);
 class TransferProtoMap {
 public:
     virtual ~TransferProtoMap() = default;
+    virtual std::uint64_t domain() const noexcept { return 0; }
     virtual bool index_of(const Proto* proto, std::uint32_t& index) const = 0;
     virtual const Proto* proto_of(std::uint32_t index) const = 0;
 };
 
 class TransferGraph {
 public:
+    TransferGraph() = default;
+    ~TransferGraph();
+    TransferGraph(const TransferGraph&) = default;
+    TransferGraph(TransferGraph&&) noexcept = default;
+    TransferGraph& operator=(TransferGraph other) noexcept;
+    const std::vector<std::shared_ptr<void>>& shared_backings() const noexcept { return shared_; }
+    const std::vector<std::shared_ptr<ParallelTaskRecord>>& task_backings() const noexcept { return tasks_; }
     // Replaces the graph. On failure `error` is non-empty and the graph must
     // not be decoded.
     TransferStatus encode(const Value& root, const TransferProtoMap& protos, std::string& error);
@@ -73,6 +81,7 @@ private:
         std::uint64_t column = 0;
         std::int64_t binding_type = 0;
         std::uint32_t proto_index = 0;
+        std::uint64_t proto_domain = 0;
         std::uint32_t native_id = 0;
         std::uint64_t handle_id = 0;
         std::uint32_t handle_generation = 0;
@@ -94,6 +103,7 @@ private:
     class Decoder;
 
     std::vector<Node> nodes_;
+    std::vector<std::shared_ptr<void>> shared_;
     // Shared completion records referenced by TaskHandle nodes. Holding a
     // strong reference here keeps a transferred handle valid even when the
     // source isolate's FutureObject has already gone away.

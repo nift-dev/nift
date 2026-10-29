@@ -26,6 +26,8 @@ struct SharedOpError {
 
 const char* shared_handle_type_name(const Value& value);
 bool is_shared_handle(const Value& value);
+std::shared_ptr<void> shared_handle_backing(const Value& value);
+Value shared_handle_from_backing(HandleKind kind, std::uint64_t id, std::shared_ptr<void> backing);
 bool shared_handle_kind(HandleKind kind);
 
 Value shared_make_mutex(const Value* initial, const TransferProtoMap* protos, SharedOpError& error);

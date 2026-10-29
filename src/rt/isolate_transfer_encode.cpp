@@ -17,10 +17,15 @@ namespace nift::rt {
 class TransferGraph::Encoder {
 public:
     Encoder(const TransferProtoMap& protos, std::vector<Node>& nodes,
-            std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks)
-        : protos_(protos), nodes_(nodes), tasks_(tasks) {}
+            std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks, std::vector<std::shared_ptr<void>>& shared)
+        : protos_(protos), nodes_(nodes), tasks_(tasks), shared_(shared) {}
     TransferStatus encode(const Value& root, std::uint32_t& root_id, std::string& error) {
-        return add(root, root_id, error);
+        TransferStatus status = add(root, root_id, error);
+        while (status == TransferStatus::Ok && !pending_.empty()) {
+            const auto item = pending_.back(); pending_.pop_back();
+            status = add_children(*item.first, item.second, error);
+        }
+        return status;
     }
 private:
     TransferStatus fail(TransferStatus status, std::string message, std::string& error) {
@@ -35,7 +40,12 @@ private:
                             std::string("non-transferable resource: cannot transfer a ") +
                                 handle_kind_text(value.handle_kind()) + " handle between isolates",
                             error);
+            auto backing = shared_handle_backing(value);
+            if (!backing) return fail(TransferStatus::RefusedHandle, "expired shared handle", error);
             Node node;
+            node.proto_index = static_cast<std::uint32_t>(shared_.size());
+            shared_.push_back(std::move(backing));
+            shared_note_edges();
             node.kind = WireKind::SharedHandle;
             node.handle_kind = static_cast<std::uint8_t>(value.handle_kind());
             node.handle_id = value.handle_id();
@@ -89,6 +99,7 @@ private:
             case Kind::Function: {
                 const auto* function = value.heap_as<FunctionObject>();
                 node.kind = WireKind::Function;
+                node.proto_domain = protos_.domain();
                 node.name = function->name;
                 node.native_id = function->native_id;
                 node.is_lambda = function->is_lambda;
@@ -108,7 +119,8 @@ private:
         id = static_cast<std::uint32_t>(nodes_.size());
         nodes_.push_back(std::move(node));
         seen_.emplace(object, id);
-        return add_children(value, id, error);
+        pending_.emplace_back(&value, id);
+        return TransferStatus::Ok;
     }
     static const char* handle_kind_text(HandleKind kind) {
         switch (kind) {
@@ -144,6 +156,7 @@ private:
                 break;
             }
         if (!known) tasks_.push_back(future->parallel);
+        shared_note_edges();
         Node node;
         node.kind = WireKind::TaskHandle;
         node.task_id = task_id;
@@ -226,13 +239,15 @@ private:
     const TransferProtoMap& protos_;
     std::vector<Node>& nodes_;
     std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks_;
+    std::vector<std::shared_ptr<void>>& shared_;
     std::unordered_map<const HeapObject*, std::uint32_t> seen_;
+    std::vector<std::pair<const Value*, std::uint32_t>> pending_;
 };
 
 TransferStatus TransferGraph::encode(const Value& root, const TransferProtoMap& protos, std::string& error) {
     clear();
     error.clear();
-    Encoder encoder(protos, nodes_, tasks_);
+    Encoder encoder(protos, nodes_, tasks_, shared_);
     std::uint32_t root_id = 0;
     const TransferStatus status = encoder.encode(root, root_id, error);
     if (status != TransferStatus::Ok) { clear(); return status; }

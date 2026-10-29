@@ -182,7 +182,6 @@ void check_cancellation() {
 }
 
 void check_registry_releases() {
-    shared_registry_clear_for_test();
     CHECK(shared_registry_live_for_test() == 0);
 }
 

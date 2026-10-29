@@ -1,7 +1,7 @@
 # CP23 — genuine parallel execution, isolates, channels and cancellation
 
-Status: **refinement accepted; implementation in progress.** Foundation
-`6cf73bed` (tree `eac80979`). This record incorporates the owner decisions of
+Status: **Codex implementation candidate frozen for independent review; not accepted or integrated.**
+Original refinement foundation: `6cf73bed` (tree `eac80979`). This record incorporates the owner decisions of
 2026-10-29. It does not claim checkpoint acceptance.
 
 ## 1. Scope
@@ -48,7 +48,7 @@ prerequisite for CPU-bound CP23 work.
 - `TransferGraph`: thread-neutral wire representation. Encoded on the source
   thread, decoded on the destination thread; object keys by text; aliases and
   cycles preserved; mutable heap objects are never shared.
-- Per-isolate constants: `Proto` code/notes are shared read-only, but constants
+- Per-isolate constants: `Proto` code/notes are cloned and remapped from neutral metadata; constants
   are reconstructed in the isolate heap before execution. `LoadK` must never
   read a parent-thread `Value`.
 - `TaskRecord`: shared, mutex/CV-protected completion state. Isolate-local
@@ -84,7 +84,7 @@ process-wide registry protected by one mutex/condition variable; a handle is
 a mutex or carried by a channel are kept as `TransferGraph` wire data and are
 encoded on the producer thread and decoded on the consumer thread. The
 transfer graph encodes shared handles by id and still refuses live file/stream,
-process, future and other non-shared handles.
+process and other non-shared resource handles. Parallel futures transfer by completion-record identity.
 
 - `mutex()` / `mutex(initial)` supports `lock`, `try_lock`, `unlock`,
   `locked`, `get` and `set(v)`. `lock` waits without pinning the isolate;
@@ -134,13 +134,19 @@ Focused evidence: `test-rt-isolate-transfer-unit`, `test-cp23-isolate-task-unit`
 mutex/atomics scripts under `NIFT_VM=require`. This does not claim the full CP23
 acceptance matrix (sanitizers, race, scaling or platform evidence).
 
-## 5. Temporary restrictions
+## 5. Preserved admission boundaries
 
-Until their milestone lands, development may conservatively refuse
-cross-isolate futures/thread handles, live managed resources, mutable captures
-not yet representable, and programs requiring unimplemented shared objects.
-These are implementation gaps, not acceptance rules, and must be reconciled
-before freezing the checkpoint.
+Parallel mode now admits captured closures, structs, collection callbacks,
+CPU loops/recursion, blocking file/stream operations and scheduling observations
+with explicit execution witnesses. Cooperative mode keeps its schedule-safety
+checks. `tests/runtime2/cp23/CP22-CLASSIFICATION.tsv` records all 85 historical
+refusal fixtures and identifies preserved semantic/type/binding refusals.
+
+Future escape/observation forms and named async callable values still subject
+to CP22's unresolved semantic/admission rules remain refused before effects.
+Live file/stream/process resources do not cross isolate boundaries. `run()`
+is still not a compiled Host-process operation on this foundation. These are
+explicit limitations, not successful VM executions through fallback.
 
 ## 6. Acceptance
 
@@ -161,3 +167,105 @@ before freezing the checkpoint.
   implemented or explicitly refused at the isolate boundary.
 - CP19 attachment interfaces and CP21 JobTable ownership are not modified.
 - macOS/Windows worker/isolate execution remains unverified until CI/execution.
+
+## 8. Codex completion architecture (2026-10-29)
+
+The development foundation is the local reconciliation with accepted
+`475f5192f6ca510d19602e42041d6e10a88efc78` / tree
+`339bb7fc60ac3245e7e4d6a4ddc54476a321811b`. DeepSeek's frozen `a5179308` source,
+bundle and historical evidence are preserved separately. This record does not
+assert independent acceptance or integration.
+
+### Source ownership and symbols
+
+The submitting thread snapshots metadata and all constant Values before a
+worker starts. Queue records contain immutable metadata without Values and
+thread-neutral graphs; even ignored embedding args/globals are cleared on the
+source thread. Worker clones remap all six atom operands: ObjectSet, NewStruct,
+StructAdd, FieldSet, GetMember and FieldGet. Each task has a fresh AtomTable;
+reusable workers do not accumulate task symbols indefinitely. Constants,
+arguments, globals and callable captures are decoded in the destination heap.
+
+Encoding uses a work list. Decoding validates graph edges with an explicit
+stack, allocates all skeletons, then links them. Neither traversal consumes C++
+stack proportional to graph depth. Partial construction cuts edges while
+nodes are anchored, including allocation failures. Function wire indices also
+carry a program domain, preventing an unrelated program from interpreting an
+index as its own callable.
+
+### Pool, cancellation and shutdown
+
+A reusable FIFO pool has a CPU-permit limit (default min(8, hardware count),
+explicit environment range 1..256). Admission capacity is
+max(64, min(1024, permits*64)); saturation returns an explicit task-admission
+failure rather than growing an unbounded queue. This is refusal backpressure,
+not an indefinitely blocking spawn operation.
+
+An isolate stays on its OS thread. Blocking Host calls, resource-context closure, and channel/mutex/await/timer waits
+return their CPU permit. The FIFO reader/writer witness requires progress with
+one permit; native I/O does not pin it. Reusable compensating workers provide progress for
+nested waits and producer/consumer loops while keeping thread count bounded
+by admission capacity. Resuming workers take priority over new queued work.
+No worker is detached. Shutdown first closes admission and worker creation,
+cancels queued/running work, wakes native waits, and joins every thread.
+
+Cancellation remains cooperative and catchable; caught cancellation can run
+cleanup. User native code that never reaches a cancellation point can delay
+shutdown. Mutexes are not silently unlocked when an owner fails: scripts must
+unlock in their cleanup. Ownership tokens are process-unique VM tokens, not
+reused record addresses or thread hashes. Blocked lock acquisition is
+cancellable. Internal worker failures retain a fatal Internal stop and are
+observed at structured completion even without an explicit await.
+
+### Neutral and isolate heap lifetimes
+
+Shared handle boxes own neutral backing references. Registry entries are weak;
+queued/running tasks and wire graphs pin actual backing. A non-allocating
+collector under the registry mutex counts neutral internal edges and clears
+unreachable channel/mutex/task-record cycles. Pending tasks are conservative
+roots. Graph decoding and release never hold a completion-record lock while
+entering that collector.
+
+Decoded cyclic Values are tracked only within their owning thread. Worker
+scope collects unreachable cycles and releases remaining imported graph
+cycles after every task-owned Value has died. Root/embedding boundaries
+collect unreachable imported cycles after VM members die; embedding-retained
+Values survive those boundaries. Embedders that retain then drop cyclic
+Values outside a VM boundary can call `collect_transfer_heap()`; the root
+arena also collects at later decodes/boundaries and thread exit. Raw cyclic
+Values manually constructed by a C++ caller outside this transfer ownership
+mechanism remain that caller's responsibility. Script cycle-prevention rules
+are unchanged.
+
+### Output and shared operations
+
+Each worker publishes complete print chunks into a mutex-protected neutral
+sink. The root drains it before printing, observing an await result, and
+finishing teardown. A task's print therefore precedes a completed join/await,
+including foreign task handles and channel synchronization. Cross-worker
+order remains scheduling-dependent. The old spawn-order-only completion
+buffering failed happens-before tests and is replaced; output is emitted once.
+
+Rendezvous sends track consumption of their own queue item. Cancellation
+removes only that sender's item; close rejects unconsumed rendezvous sends.
+Positive-capacity channels drain accepted buffered messages after close.
+Mutex waits re-check the predicate after reacquiring a CPU permit. Atomics
+retain linearizable updates and overflow-without-change errors.
+
+### CP17/CP19/CP21 boundary
+
+Every worker VM owns its own accepted CP17 HandleTable/context and settles it
+before publishing completion. Live resource transfer is refused. No
+ProcessGroup, JobTable, terminal or session-resource owner is duplicated.
+Accepted Host/handles/Process/JobControl source is unchanged. CP19 has not been
+independently integrated here; combined persistent-session verification stays
+an explicit integrator obligation. CP20 F6 is preserved.
+
+Verification commands and qualifications are in
+`tests/runtime2/cp23/README.md`; final results and immutable source/binary
+identities accompany the candidate handover.
+
+The default atom-table pointer is cached after initialization, and shared-native
+metadata is populated only for the shared-operation family. Ordinary native
+calls do not repeatedly acquire task metadata. Initial and corrected performance
+observations remain in the delivery evidence; no threshold is changed.

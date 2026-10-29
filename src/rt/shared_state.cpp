@@ -3,6 +3,7 @@
 #include "rt/shared_state_internal.h"
 
 #include "rt/error.h"
+#include "rt/heap_account.h"
 #include "rt/future.h"
 #include "rt/number.h"
 #include "rt/parallel_task.h"
@@ -20,6 +21,13 @@ Registry& registry() {
     return instance;
 }
 
+Entry::~Entry() {
+    if (!id) return;
+    auto& r = registry();
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
+    r.entries.erase(id);
+}
+
 bool entry_kind_matches(EntryKind entry, HandleKind handle) {
     switch (handle) {
         case HandleKind::Mutex: return entry == EntryKind::Mutex;
@@ -32,30 +40,33 @@ bool entry_kind_matches(EntryKind entry, HandleKind handle) {
 std::shared_ptr<Entry> find_entry(const Value& handle, HandleKind kind) {
     if (!handle.is(Kind::Handle) || handle.handle_kind() != kind) return nullptr;
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     const auto found = r.entries.find(handle.handle_id());
-    if (found == r.entries.end() || !entry_kind_matches(found->second->kind, kind)) return nullptr;
-    return found->second;
+    if (found == r.entries.end()) return nullptr;
+    auto entry = found->second.lock();
+    return entry && entry_kind_matches(entry->kind, kind) ? entry : nullptr;
 }
 
 std::shared_ptr<Entry> find_channel(const Value& handle) {
     if (!handle.is(Kind::Handle) || handle.handle_kind() != HandleKind::Channel) return nullptr;
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     const auto found = r.entries.find(handle.handle_id());
-    if (found == r.entries.end() || found->second->kind != EntryKind::Channel) return nullptr;
-    return found->second;
+    if (found == r.entries.end()) return nullptr;
+    auto entry = found->second.lock();
+    return entry && entry->kind == EntryKind::Channel ? entry : nullptr;
 }
 
 Value add_entry(std::shared_ptr<Entry> entry, HandleKind kind) {
     Registry& r = registry();
     std::uint64_t id = 0;
     {
-        std::lock_guard<std::mutex> lock(r.mutex);
+        std::lock_guard<std::recursive_mutex> lock(r.mutex);
         id = r.next_id++;
-        r.entries.emplace(id, std::move(entry));
+        entry->id = id;
+        r.entries.emplace(id, entry);
     }
-    return Value::handle(kind, id, 0);
+    return shared_handle_from_backing(kind, id, std::move(entry));
 }
 
 bool cancelled(const std::shared_ptr<ParallelTaskRecord>& task) {
@@ -102,6 +113,28 @@ bool int_operand(const Value& value, const char* what, std::int64_t& out, Shared
 }
 
 }  // namespace shared_detail
+
+namespace {
+void release_shared_box(void* pointer, HandleKind, std::uint64_t, std::uint32_t) {
+    auto& r = shared_detail::registry();
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
+    delete static_cast<std::shared_ptr<void>*>(pointer);
+    shared_collect();
+}
+}
+Value shared_handle_from_backing(HandleKind kind, std::uint64_t id, std::shared_ptr<void> backing) {
+    if (!backing) return Value();
+    auto keep = std::make_unique<std::shared_ptr<void>>(std::move(backing));
+    auto box = std::make_unique<HandleBoxObject>();
+    box->id = id; box->handle_kind = kind; box->generation = 0;
+    box->release = release_shared_box; box->table = keep.release();
+    heap_retally(box.get());
+    return Value::adopt_handle_box(box.release());
+}
+std::shared_ptr<void> shared_handle_backing(const Value& handle) {
+    if (!is_shared_handle(handle)) return {};
+    return shared_detail::find_entry(handle, handle.handle_kind());
+}
 
 bool shared_handle_kind(HandleKind kind) {
     return kind == HandleKind::Mutex || kind == HandleKind::Atomic || kind == HandleKind::Channel;
@@ -167,12 +200,12 @@ bool shared_mutex_lock(const Value& handle, std::uint64_t owner,
         return false;
     }
     Registry& r = registry();
-    std::unique_lock<std::mutex> lock(r.mutex);
+    std::unique_lock<std::recursive_mutex> lock(r.mutex);
     if (entry->locked && entry->owner == owner && !cancelled(task)) {
         fail(error, "runtime.invalid_argument", "mutex: recursive lock is not supported");
         return false;
     }
-    r.cv.wait(lock, [&] { return !entry->locked || cancelled(task); });
+    wait_shared(lock, r.cv, [&] { return !entry->locked || cancelled(task); });
     if (cancelled(task)) {
         take_task_cancelled(task);
         fail(error, "runtime.cancelled", "task: cancelled while waiting for a mutex");
@@ -190,7 +223,7 @@ bool shared_mutex_try_lock(const Value& handle, std::uint64_t owner, bool& locke
         return false;
     }
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     if (entry->locked) {
         locked = false;
         return true;
@@ -209,7 +242,7 @@ bool shared_mutex_unlock(const Value& handle, std::uint64_t owner, SharedOpError
     }
     Registry& r = registry();
     {
-        std::lock_guard<std::mutex> lock(r.mutex);
+        std::lock_guard<std::recursive_mutex> lock(r.mutex);
         if (!entry->locked) {
             fail(error, "runtime.invalid_argument", "mutex: unlock of unlocked mutex");
             return false;
@@ -232,7 +265,7 @@ bool shared_mutex_locked(const Value& handle, bool& locked, SharedOpError& error
         return false;
     }
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     locked = entry->locked;
     return true;
 }
@@ -247,7 +280,7 @@ bool shared_mutex_get(const Value& handle, std::uint64_t owner, const TransferPr
     TransferGraph graph;
     {
         Registry& r = registry();
-        std::lock_guard<std::mutex> lock(r.mutex);
+        std::lock_guard<std::recursive_mutex> lock(r.mutex);
         if (!entry->locked || entry->owner != owner) {
             fail(error, "runtime.invalid_argument", "mutex: get requires the current thread to hold the lock");
             return false;
@@ -267,7 +300,7 @@ bool shared_mutex_set(const Value& handle, std::uint64_t owner, const Value& val
     TransferGraph graph;
     if (!encode_value(value, protos, graph, error)) return false;
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     if (!entry->locked || entry->owner != owner) {
         fail(error, "runtime.invalid_argument", "mutex: set requires the current thread to hold the lock");
         return false;
@@ -294,15 +327,15 @@ bool take_task_cancelled(const std::shared_ptr<ParallelTaskRecord>& task) {
 
 void shared_registry_clear_for_test() {
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     r.entries.clear();
-    r.next_id = 1;
+    // Never reuse ids while old handles may still exist.
     r.cv.notify_all();
 }
 
 std::size_t shared_registry_live_for_test() {
     Registry& r = registry();
-    std::lock_guard<std::mutex> lock(r.mutex);
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
     return r.entries.size();
 }
 

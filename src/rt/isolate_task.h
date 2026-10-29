@@ -41,7 +41,14 @@ struct IsolateTaskInput {
     // When set, `args` and `globals` are ignored and the graph is decoded in
     // this thread's heap after the clone is prepared (so no Value crosses).
     bool has_seed_graph = false;
+    bool has_function = false;
     TransferGraph seed_graph;
+    // Captured on the spawning thread. Metadata contains no heap-backed Value.
+    bool has_program_snapshot = false;
+    TransferGraph constants_graph;
+    std::vector<std::size_t> constant_counts;
+    std::vector<std::uint32_t> proto_wires;
+    std::vector<std::string> atom_names;
 };
 
 struct IsolateTaskOutcome {
@@ -57,6 +64,10 @@ struct IsolateTaskOutcome {
     TransferGraph error_value;
     bool has_error_value = false;
 };
+
+bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map,
+                              IsolateTaskInput& input, std::shared_ptr<const Program>& metadata,
+                              std::string& error);
 
 IsolateTaskOutcome execute_isolate_task(const Program& program, const IsolateTaskInput& input,
                                        VmOptions options = VmOptions());

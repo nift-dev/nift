@@ -1,4 +1,5 @@
 #include "rt/vm_report.h"
+#include "rt/parallel_task.h"
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
@@ -104,6 +105,7 @@ bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& outp
         if (is_cell(R[in.a + k])) return internal(fault, "cell reached a native");
     switch (static_cast<NativeId>(in.b)) {
         case NativeId::Print: {
+            drain_parallel_output(output);
             const std::size_t before = output.size();
             Value printable = R[in.a];
             if (printable.is(Kind::Handle) && printable.handle_kind() == HandleKind::Atomic) {

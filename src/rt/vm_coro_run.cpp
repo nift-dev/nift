@@ -113,6 +113,7 @@ bool Vm::coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& 
         coro.pending_report = false;
         return false;
     }
+    if (fault.code == "runtime.cancelled") coro_abort_parallel();  // rt-lint: allow-string-compare cancellation
     const std::uint32_t id = coro.current;
     if (id == 0) {
         if (fault.catchable && fault.error.is(Kind::Error)) {
@@ -159,6 +160,7 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
                       std::string& output, VmResult& result, Fault& fault) {
     Coro& coro = *coro_;
     if (coro.current != 0) return internal(fault, "main end outside main") ? 1 : 0;
+    drain_parallel_output(output);
     if (options_.return_in_output && result.returned) {
         if (!result.return_text.empty()) {
             output += result.return_text;
@@ -185,6 +187,7 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
 // End of the run (every path): tasks still alive (only after an internal
 // stop, or mutant M7) are abandoned; every Value they hold is released once.
 void Vm::coro_teardown(VmResult& result) {
+    coro_abort_parallel();
     Coro& coro = *coro_;
     const std::string label = coro.tasks.empty() ? std::string() : coro.tasks.front().label;
     if (!coro.tasks.empty()) Coro::release(coro.tasks.front());  // a suspended main's record (else empty)
@@ -200,6 +203,7 @@ void Vm::coro_teardown(VmResult& result) {
     coro.last_result = Value();
     if (!coro.tasks.empty()) coro.tasks.front().future = Value();  // main's internal accounting future
     if (coro.trace) nift::trace::detail::context() = label;
+    if (coro.parallel && !options_.current_task) coro.parallel->wait_idle();
     result.coro = true;
     result.coro_spawned = coro.spawned;
     result.coro_switches = coro.switches;

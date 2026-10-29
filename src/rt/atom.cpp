@@ -4,7 +4,11 @@
 
 namespace nift::rt {
 
+namespace { thread_local AtomTable* active_atoms = nullptr; }
 AtomTable::AtomTable() { intern(""); }
+AtomTable::~AtomTable() { heap_uncharge(charged_); }
+AtomTableScope::AtomTableScope() : previous_(active_atoms) { active_atoms = &table_; }
+AtomTableScope::~AtomTableScope() { active_atoms = previous_; }
 
 std::size_t AtomTable::entry_bytes(std::string_view text) noexcept {
     // libstdc++ keeps up to 15 characters inside the std::string object.
@@ -24,6 +28,7 @@ Atom AtomTable::intern(std::string_view text) {
         names_.pop_back();  // keep names_ and ids_ in step if the map cannot grow
         throw;
     }
+    charged_ += entry_bytes(text);
     heap_charge(entry_bytes(text));  // C2: charged once, on the intern path only
     return Atom{id};
 }
@@ -36,7 +41,9 @@ bool AtomTable::find(std::string_view text, Atom& atom) const {
 }
 
 AtomTable& AtomTable::current() {
+    if (active_atoms) return *active_atoms;
     thread_local AtomTable table;
+    active_atoms = &table;
     return table;
 }
 

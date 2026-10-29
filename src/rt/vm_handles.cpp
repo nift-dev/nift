@@ -1,4 +1,5 @@
 #include "rt/vm_handles.h"
+#include "rt/parallel_task.h"
 
 #include "rt/handles/file_resource.h"
 #include "rt/natives/host_file_handles.h"
@@ -30,6 +31,7 @@ void Vm::abandon_unwound_handle(const Value& value) {
 
 void Vm::close_handle_runtime(VmResult& result) {
     if (!handle_context_open_) return;
+    ParallelBlock blocked; // worker cleanup may close/flush blocking Host streams
     const handles::CloseReport close = handle_table_.close_context(handle_context_);
     handle_context_open_ = false;
     // CP17 x CP18: a cleanup report lost to an allocation failure (a dying

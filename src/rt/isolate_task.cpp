@@ -1,6 +1,10 @@
 #include "rt/isolate_task.h"
+#include "rt/isolate_snapshot.h"
 
 #include "rt/aggregate.h"
+#include "rt/atom.h"
+#include "rt/transfer_heap.h"
+#include <limits>
 
 #include <algorithm>
 #include <unordered_map>
@@ -25,11 +29,15 @@ struct ProgramIndex {
 class CloneTransferMap : public TransferProtoMap {
 public:
     CloneTransferMap(const TransferProtoMap& source, const Program& program,
-                     const std::vector<std::unique_ptr<Proto>>& clones) {
+                     const std::vector<std::unique_ptr<Proto>>& clones, const IsolateTaskInput& input)
+        : domain_(source.domain()) {
         for (std::size_t i = 0; i < program.protos.size(); ++i) {
             std::uint32_t wire = 0;
             const Proto* original = program.protos[i].get();
-            if (original == nullptr || !source.index_of(original, wire)) continue;
+            if (input.has_program_snapshot) {
+                wire = input.proto_wires.at(i);
+                if (wire == std::numeric_limits<std::uint32_t>::max()) continue;
+            } else if (original == nullptr || !source.index_of(original, wire)) continue;
             const Proto* clone = clones[i + 1].get();
             clone_to_wire_.emplace(clone, wire);
             wire_to_clone_[wire] = clone;
@@ -46,7 +54,9 @@ public:
         return found == wire_to_clone_.end() ? nullptr : found->second;
     }
 
+    std::uint64_t domain() const noexcept override { return domain_; }
 private:
+    std::uint64_t domain_;
     std::unordered_map<const Proto*, std::uint32_t> clone_to_wire_;
     std::unordered_map<std::uint32_t, const Proto*> wire_to_clone_;
 };
@@ -147,10 +157,10 @@ void emit(Proto& proto, OpCode op, std::uint16_t a, std::uint16_t b, std::uint16
 
 bool build_wrapper(Proto& wrapper, const std::vector<Value>& globals,
                    const std::vector<std::uint8_t>& ready, const std::vector<Value>& args,
-                   std::uint32_t entry, std::string& error) {
+                   std::uint32_t entry, const Value& function, std::string& error) {
     const std::uint32_t global_count = static_cast<std::uint32_t>(globals.size());
     wrapper.name = "<isolate-task>";
-    wrapper.nregs = static_cast<std::uint16_t>(global_count + std::max<std::uint32_t>(args.size(), 1));
+    wrapper.nregs = static_cast<std::uint16_t>(global_count + std::max<std::uint32_t>(args.size(), 1) + 1);
     for (std::uint32_t g = 0; g < global_count; ++g) {
         std::uint16_t index = 0;
         if (!add_constant(wrapper, globals[g], index, error)) return false;
@@ -165,8 +175,16 @@ bool build_wrapper(Proto& wrapper, const std::vector<Value>& globals,
         if (!add_constant(wrapper, args[i], index, error)) return false;
         emit(wrapper, OpCode::LoadK, static_cast<std::uint16_t>(global_count + i), index, 0);
     }
-    emit(wrapper, OpCode::Call, static_cast<std::uint16_t>(global_count),
-         static_cast<std::uint16_t>(entry + 1u), static_cast<std::uint16_t>(args.size()));
+    if (function.is(Kind::Function)) {
+        std::uint16_t k = 0;
+        if (!add_constant(wrapper, function, k, error)) return false;
+        auto f = static_cast<std::uint16_t>(wrapper.nregs - 1);
+        emit(wrapper, OpCode::LoadK, f, k, 0);
+        emit(wrapper, OpCode::CallValue, static_cast<std::uint16_t>(global_count), f,
+             static_cast<std::uint16_t>(args.size()));
+    } else emit(wrapper, OpCode::Call, static_cast<std::uint16_t>(global_count),
+                static_cast<std::uint16_t>(entry + 1u),
+             static_cast<std::uint16_t>(args.size()));
     emit(wrapper, OpCode::TopReturn, static_cast<std::uint16_t>(global_count), 0, 0);
     return true;
 }
@@ -183,8 +201,19 @@ bool prepare_clones(const Program& source, Program& clone, std::string& error) {
     return true;
 }
 
-bool constants_from(const Program& source, const TransferProtoMap& parent, const CloneTransferMap& map,
+bool constants_from(const Program& source, const IsolateTaskInput& input, const TransferProtoMap& parent,
+                    const CloneTransferMap& map,
                     std::vector<Value>& decoded, std::string& error, IsolateTaskStatus& status) {
+    if (input.has_program_snapshot) {
+        Value all;
+        const auto result = input.constants_graph.decode(map, all, error);
+        if (result != TransferStatus::Ok || !all.is(Kind::Array)) {
+            status = IsolateTaskStatus::UnsupportedConstant;
+            return false;
+        }
+        decoded = array_items(all);
+        return true;
+    }
     std::vector<Value> constants;
     for (const auto& proto : source.protos)
         for (const Value& value : proto->constants) constants.push_back(value);
@@ -195,7 +224,7 @@ bool constants_from(const Program& source, const TransferProtoMap& parent, const
 }
 
 bool seed_values(const Program& source, const IsolateTaskInput& input, const CloneTransferMap& map,
-                 std::vector<Value>& globals, std::vector<Value>& args,
+                 std::vector<Value>& globals, std::vector<Value>& args, Value& function,
                  std::string& error, IsolateTaskStatus& status) {
     const std::size_t global_count = source.main().nregs;
     std::vector<Value> transferred;
@@ -206,7 +235,7 @@ bool seed_values(const Program& source, const IsolateTaskInput& input, const Clo
             status = transfer_status(result, false);
             return false;
         }
-        if (!seeds.is(Kind::Array) || array_size(seeds) != global_count + input.argc) {
+        if (!seeds.is(Kind::Array) || array_size(seeds) != global_count + input.argc + (input.has_function ? 1 : 0)) {
             error = "seed graph does not match the global and argument count";
             status = IsolateTaskStatus::InvalidInput;
             return false;
@@ -225,6 +254,7 @@ bool seed_values(const Program& source, const IsolateTaskInput& input, const Clo
         }
     }
     globals.assign(transferred.begin(), transferred.begin() + static_cast<std::ptrdiff_t>(global_count));
+    if (input.has_function) { function = transferred.back(); transferred.pop_back(); }
     args.assign(transferred.begin() + static_cast<std::ptrdiff_t>(global_count), transferred.end());
     return true;
 }
@@ -261,11 +291,11 @@ IsolateTaskStatus valid_input(const Program& source, const IsolateTaskInput& inp
         error = "more global values than the program's global slots";
         return IsolateTaskStatus::InvalidInput;
     }
-    if (globals + std::max<std::uint32_t>(input.argc, 1) > kMaxRegisters) {
+    if (globals + std::max<std::uint32_t>(input.argc, 1) + 1 > kMaxRegisters) {
         error = "wrapper register budget exceeded";
         return IsolateTaskStatus::InvalidInput;
     }
-    if (globals + input.argc > kMaxConstants) {
+    if (globals + input.argc + 1 > kMaxConstants) {
         error = "wrapper constant budget exceeded";
         return IsolateTaskStatus::InvalidInput;
     }
@@ -290,26 +320,32 @@ const char* isolate_task_status_name(IsolateTaskStatus status) {
 
 IsolateTaskOutcome execute_isolate_task(const Program& source, const IsolateTaskInput& input,
                                        VmOptions options) {
+    TransferHeapScope transfer_heap;
     std::string error;
     const IsolateTaskStatus valid = valid_input(source, input, error);
     if (valid != IsolateTaskStatus::Ok) return failure(valid, std::move(error));
     auto clone = std::make_shared<Program>();
     if (!prepare_clones(source, *clone, error))
         return failure(IsolateTaskStatus::InvalidInput, std::move(error));
-    auto map = std::make_shared<CloneTransferMap>(*input.proto_map, source, clone->protos);
+    if (!remap_isolate_atoms(*clone, input, error))
+        return failure(IsolateTaskStatus::InvalidInput, std::move(error));
+    auto map = std::make_shared<CloneTransferMap>(*input.proto_map, source, clone->protos, input);
     IsolateTaskStatus status = IsolateTaskStatus::Ok;
     std::vector<Value> globals;
     std::vector<Value> args;
-    if (!seed_values(source, input, *map, globals, args, error, status))
+    Value function;
+    if (!seed_values(source, input, *map, globals, args, function, error, status))
         return failure(status, std::move(error));
     std::vector<Value> constants;
-    if (!constants_from(source, *input.proto_map, *map, constants, error, status))
+    if (!constants_from(source, input, *input.proto_map, *map, constants, error, status))
         return failure(status, std::move(error));
     std::size_t next = 0;
-    for (std::size_t i = 0; i < source.protos.size(); ++i)
-        for (std::size_t k = 0; k < source.protos[i]->constants.size(); ++k)
-            clone->protos[i + 1]->constants.push_back(constants[next++]);
-    if (!build_wrapper(*clone->protos[0], globals, input.global_ready, args, input.entry_proto, error))
+    for (std::size_t i = 0; i < source.protos.size(); ++i) {
+        const auto count = input.has_program_snapshot ? input.constant_counts.at(i)
+                                                     : source.protos[i]->constants.size();
+        for (std::size_t k = 0; k < count; ++k) clone->protos[i + 1]->constants.push_back(constants[next++]);
+    }
+    if (!build_wrapper(*clone->protos[0], globals, input.global_ready, args, input.entry_proto, function, error))
         return failure(IsolateTaskStatus::InvalidInput, std::move(error));
 
     options.return_value_only = true;

@@ -3,6 +3,7 @@
 #include "rt/shared_state_internal.h"
 
 #include <utility>
+#include <algorithm>
 
 namespace nift::rt {
 
@@ -18,12 +19,12 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
     TransferGraph graph;
     if (!encode_value(value, protos, graph, error)) return false;
     Registry& r = registry();
-    std::unique_lock<std::mutex> lock(r.mutex);
+    std::unique_lock<std::recursive_mutex> lock(r.mutex);
     const auto ready = [&] {
         return entry->closed || cancelled(task) ||
                entry->buffer.size() < (entry->capacity == 0 ? 1u : entry->capacity);
     };
-    r.cv.wait(lock, ready);
+    wait_shared(lock, r.cv, ready);
     if (entry->closed) {
         fail(error, "runtime.channel_closed", "send: channel is closed");
         return false;
@@ -33,19 +34,24 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
         fail(error, "runtime.cancelled", "task: cancelled while waiting to send");
         return false;
     }
-    entry->buffer.push_back(std::move(graph));
+    auto item = std::make_shared<ChannelItem>();
+    item->value = std::move(graph);
+    entry->buffer.push_back(item);
     r.cv.notify_all();
     if (entry->capacity != 0) return true;
     // A rendezvous send completes only when a receiver takes the value.
-    r.cv.wait(lock, [&] { return entry->buffer.empty() || entry->closed || cancelled(task); });
+    wait_shared(lock, r.cv, [&] { return item->consumed || entry->closed || cancelled(task); });
+    if (item->consumed) return true;
     if (cancelled(task)) {
         take_task_cancelled(task);
-        if (!entry->buffer.empty()) entry->buffer.pop_front();
+        const auto at = std::find(entry->buffer.begin(), entry->buffer.end(), item);
+        if (at != entry->buffer.end()) entry->buffer.erase(at);
         r.cv.notify_all();
         fail(error, "runtime.cancelled", "task: cancelled while waiting to send");
         return false;
     }
-    return true;
+    fail(error, "runtime.channel_closed", "send: channel is closed");
+    return false;
 }
 
 bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
@@ -60,8 +66,8 @@ bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
     Registry& r = registry();
     TransferGraph graph;
     {
-        std::unique_lock<std::mutex> lock(r.mutex);
-        r.cv.wait(lock, [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); });
+        std::unique_lock<std::recursive_mutex> lock(r.mutex);
+        wait_shared(lock, r.cv, [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); });
         if (cancelled(task)) {
             take_task_cancelled(task);
             fail(error, "runtime.cancelled", "task: cancelled while waiting to receive");
@@ -71,7 +77,8 @@ bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
             closed = true;
             return true;
         }
-        graph = std::move(entry->buffer.front());
+        entry->buffer.front()->consumed = true;
+        graph = std::move(entry->buffer.front()->value);
         entry->buffer.pop_front();
     }
     r.cv.notify_all();
@@ -86,8 +93,9 @@ bool shared_channel_close(const Value& handle, SharedOpError& error) {
     }
     Registry& r = registry();
     {
-        std::lock_guard<std::mutex> lock(r.mutex);
+        std::lock_guard<std::recursive_mutex> lock(r.mutex);
         entry->closed = true;
+        if (entry->capacity == 0) entry->buffer.clear();
     }
     r.cv.notify_all();
     return true;

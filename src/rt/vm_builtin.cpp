@@ -1,4 +1,6 @@
 #include "rt/vm_builtin.h"
+#include "rt/parallel_task.h"
+#include <atomic>
 
 #include "FileSystem.h"
 #include "HostTrace.h"
@@ -51,6 +53,19 @@ const host::PathPolicy& vm_path_policy() {
 }
 } // namespace
 
+namespace {
+bool blocking_host(natives::BuiltinId id) {
+    if (!natives::host_builtin(id)) return false;
+    switch (id) {
+        case natives::BuiltinId::HostEpoch:
+        case natives::BuiltinId::HostGetenv: case natives::BuiltinId::HostOs:
+        case natives::BuiltinId::HostArch: case natives::BuiltinId::HostPlatform:
+        case natives::BuiltinId::HostHardwareConcurrency: return false;
+        default: return true;
+    }
+}
+}
+
 // CP14: a pure built-in over R[a .. a+c) (receiver first for a method). The
 // natives store `out` last, so the result may replace R[a] directly; the
 // argument registers are temporaries of this call and are cleared.
@@ -65,15 +80,23 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.host.error_code = &context.host_error_code;  // N1: per-call Host code
     context.handles =
         handles::HandleAccess{&handle_table_, handle_context_open_ ? handle_context_ : handles::kDetached};
-    context.protos = transfer_map_;
-    context.task = options_.current_task;
-    context.owner_token =
-        options_.current_task
-            ? static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(options_.current_task.get()))
-            : static_cast<std::uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())) | 1u;
+    if (spec.id >= natives::BuiltinId::SharedMutex && spec.id <= natives::BuiltinId::AtomicCompareExchange) {
+        context.protos = transfer_map_;
+        context.task = options_.current_task;
+        if (!shared_owner_token_) {
+            static std::atomic<std::uint64_t> next_owner{1};
+            shared_owner_token_ = next_owner.fetch_add(1, std::memory_order_relaxed);
+        }
+        context.owner_token = shared_owner_token_;
+    }
     Value out;
     std::string message;
-    switch (natives::call_builtin(spec, context, &R[in.a], in.c, out, message)) {
+    natives::Status status;
+    if (options_.current_task && blocking_host(spec.id)) {
+        ParallelBlock blocked;
+        status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
+    } else status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
+    switch (status) {
         case natives::Status::Ok: break;
         case natives::Status::Error:
             if (!context.host_error_code.empty()) fault.code = context.host_error_code;

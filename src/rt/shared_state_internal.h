@@ -4,6 +4,8 @@
 // encode/decode and cancellation helpers shared by the split implementations.
 #include "rt/isolate_transfer.h"
 #include "rt/shared_state.h"
+#include "rt/shared_gc.h"
+#include "rt/parallel_task.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -19,8 +21,13 @@ namespace nift::rt::shared_detail {
 
 enum class EntryKind : std::uint8_t { Mutex, AtomicInt, AtomicBool, Channel };
 
+struct ChannelItem { TransferGraph value; bool consumed = false; };
+
 struct Entry {
     explicit Entry(EntryKind kind) : kind(kind) {}
+    ~Entry();
+    SharedGcNode gc;
+    std::uint64_t id = 0;
     EntryKind kind;
     bool locked = false;
     std::uint64_t owner = 0;
@@ -28,16 +35,31 @@ struct Entry {
     std::atomic<std::int64_t> integer{0};
     std::atomic<bool> boolean{false};
     std::size_t capacity = 0;
-    std::deque<TransferGraph> buffer;
+    std::deque<std::shared_ptr<ChannelItem>> buffer;
     bool closed = false;
 };
 
 struct Registry {
-    std::mutex mutex;
-    std::condition_variable cv;
-    std::unordered_map<std::uint64_t, std::shared_ptr<Entry>> entries;
+    std::recursive_mutex mutex;
+    std::condition_variable_any cv;
+    std::unordered_map<std::uint64_t, std::weak_ptr<Entry>> entries;
+    std::unordered_map<std::uint64_t, std::weak_ptr<ParallelTaskRecord>> tasks;
     std::uint64_t next_id = 1;
 };
+
+template<class Mutex, class Condition, class Predicate>
+void wait_shared(std::unique_lock<Mutex>& lock, Condition& cv, Predicate ready) {
+    while (!ready()) {
+        lock.unlock();
+        {
+            ParallelBlock blocked;
+            lock.lock();
+            cv.wait(lock, ready);
+            lock.unlock();
+        }
+        lock.lock();  // predicate can change while reacquiring the CPU permit
+    }
+}
 
 Registry& registry();
 

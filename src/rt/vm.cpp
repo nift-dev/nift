@@ -56,6 +56,8 @@ Vm::Vm(const Program& program, VmOptions options)
     }
     if (program.has_coroutines && !options_.cooperative_tasks && !options_.parallel)
         options_.parallel = ParallelRuntime::from_environment();
+    if (options_.parallel && !options_.current_task && !options_.parallel_output)
+        options_.parallel_output = std::make_shared<ParallelOutput>();
     program_has_collection_boundaries_ = program.has_collection_boundaries;
     open_handle_runtime();
     for (const auto& proto : program_.protos) protos_.push_back(proto.get());
@@ -132,9 +134,6 @@ bool Vm::frame_check(const Proto* callee, const char* error_name, Fault& fault) 
     return true;
 }
 
-void Vm::flush_if_needed(std::string& output) {
-    if (output.size() > options_.flush_threshold && options_.flush) options_.flush(output, options_.flush_context);
-}
 
 namespace {
 inline const Note* note_at(const Proto* proto, const Instr* pc) {
@@ -364,8 +363,7 @@ bail:
     }
 #endif
 done:
-    coro_output_ = nullptr;
-    if (coro_) { coro_teardown(result); } close_handle_runtime(result); result_stats(result); return result;
+    finish_run(result, output); return result;
 }
 bool Vm::op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     if (in.b >= global_ready_.size() || !global_ready_[in.b]) {

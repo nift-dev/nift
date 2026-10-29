@@ -164,6 +164,11 @@ void cycles() {
     heap_retally(break_inner);
     break_outer->items.clear();
     heap_retally(break_outer);
+    // The C++ fixture deliberately bypassed the language's cycle rule when
+    // constructing its source graphs. It owns their explicit dismantling.
+    self.heap_as<ArrayObject>()->items.clear();
+    inner.heap_as<ArrayObject>()->items.clear();
+    outer.heap_as<ArrayObject>()->items.clear();
 }
 
 void structs_and_errors() {

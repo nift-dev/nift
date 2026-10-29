@@ -1,4 +1,5 @@
 #include "rt/compare.h"
+#include "rt/future.h"
 
 #include "rt/aggregate.h"
 #include "rt/decimal.h"
@@ -13,6 +14,10 @@
 namespace nift::rt {
 
 namespace {
+const void* future_identity(const Value& value) noexcept {
+    const auto* f = value.heap_as<FutureObject>();
+    return f->parallel ? static_cast<const void*>(f->parallel.get()) : static_cast<const void*>(f);
+}
 
 bool numbers_equal(const Value& l, const Value& r) {
     if (l.is(Kind::Int) && r.is(Kind::Int)) return l.as_int() == r.as_int();
@@ -104,7 +109,8 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
                        ? Shallow::Descend
                        : Shallow::Unequal;
         case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
-        case Kind::Function: case Kind::Future: same = left.heap() == right.heap(); break;  // identity
+        case Kind::Function: same = left.heap() == right.heap(); break;
+        case Kind::Future: same = future_identity(left) == future_identity(right); break;  // identity
         case Kind::Handle:
             same = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                    left.handle_generation() == right.handle_generation();
@@ -224,6 +230,7 @@ std::uint64_t leaf_hash(const Value& value) {
             const auto& b = bytes_of(value);
             return mix(7, hash_text(std::string_view(reinterpret_cast<const char*>(b.data()), b.size())));
         }
+        case Kind::Future: return mix(14, reinterpret_cast<std::uintptr_t>(future_identity(value)));
         case Kind::Error: return mix(13, hash_text(value.heap_as<ErrorObject>()->message));
         case Kind::Handle: return mix(mix(12, value.handle_id()), value.handle_generation());
         default: return mix(static_cast<std::uint64_t>(value.kind()), reinterpret_cast<std::uintptr_t>(value.heap()));
@@ -299,7 +306,9 @@ bool identity_bearing(const Value& value) noexcept {
 Sameness same(const Value& left, const Value& right) noexcept {
     if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
     if (left.kind() != right.kind()) return Sameness::Different;
-    if (left.is(Kind::Function) || left.is(Kind::Future))
+    if (left.is(Kind::Future))
+        return future_identity(left) == future_identity(right) ? Sameness::Same : Sameness::Different;
+    if (left.is(Kind::Function))
         return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
     const bool same_resource = left.handle_kind() == right.handle_kind() && left.handle_id() == right.handle_id() &&
                                left.handle_generation() == right.handle_generation();

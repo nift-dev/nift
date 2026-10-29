@@ -190,7 +190,7 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
     Coro& coro = *vm.coro_;
     for (;;) {
         const std::uint64_t observed = coro.parallel_wait ? coro.parallel_wait->snapshot_generation() : 0;
-        coro.reap_parallel(vm);
+        if (!coro.reap_parallel(vm, fault)) return 0;
         coro.reap_foreign(vm);
         coro.flush_parallel_outputs(vm);
         while (!coro.run_queue.empty()) {
@@ -204,7 +204,7 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
         }
         // A cancellation request wakes this task's own await/join so the
         // opcode can raise the catchable runtime.cancelled Error at its site.
-        if (coro.current != 0 && vm.cancellation_requested() &&
+        if ((coro.current != 0 || vm.options_.current_task) && vm.cancellation_requested() &&
             coro.tasks[coro.current].state == State::Waiting) {
             coro.tasks[coro.current].state = State::Ready;
             coro.run_queue.push_back(coro.current);

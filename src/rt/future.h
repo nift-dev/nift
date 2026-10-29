@@ -50,6 +50,13 @@ struct FutureObject : HeapObject {
     // by the parent isolate and is never touched by the worker.
     std::shared_ptr<ParallelTaskRecord> parallel;
     FutureObject() : HeapObject(Kind::Future) {}
+    // Optional neutral reclamation hook keeps low-level Value/Host-only users
+    // independent of the parallel scheduler at link time.
+    void (*collect_parallel)() noexcept = nullptr;
+    ~FutureObject() {
+        parallel.reset();
+        if (collect_parallel) collect_parallel();
+    }
 };
 
 inline FutureObject* future_of(const Value& value) noexcept {

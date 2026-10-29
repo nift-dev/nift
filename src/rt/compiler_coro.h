@@ -22,6 +22,6 @@ bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, con
 
 // After compilation: no capturing closure, no cell or location in main, no
 // collection callback in a coroutine program. True: ok.
-bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset);
+bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset, bool parallel = false);
 
 }  // namespace nift::rt
