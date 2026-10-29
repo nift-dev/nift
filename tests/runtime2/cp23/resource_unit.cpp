@@ -62,6 +62,9 @@ int main(){
 #if defined(__linux__)
  auto fifo=root/"fifo";CHECK(mkfifo(fifo.c_str(),0600)==0);
  check("fn[async](r()){s:=ifstream(\""+fifo.string()+"\");x:=s.read(1);close(s);return x};fn[async](w()){s:=ofstream(\""+fifo.string()+"\");s.write(\"x\");close(s);return 1};a:=r();b:=w();print(await a);print(await b)",StopReason::None,"x\n1\n",1);
+ // The reader is inside native FIFO open/read when cancelled. A separate
+ // writer releases the OS call; its normal return must settle as cancelled.
+ check("ready:=channel(0);fn[async](r()){send(ready,1);s:=ifstream(\""+fifo.string()+"\");x:=s.read(1);close(s);return x};fn[async](w()){s:=ofstream(\""+fifo.string()+"\");s.write(\"x\");close(s);return 1};a:=r();recv(ready);sleep(10);cancel(a);b:=w();try{await a}catch(e){print(e.code)};print(await b)",StopReason::None,"runtime.cancelled\n1\n",1);
 #endif
  // Unsupported live resource kinds cannot acquire a second owner via a graph.
  auto compiled=rt_vm_tool::compile("print(1)");CHECK(compiled.program!=nullptr);

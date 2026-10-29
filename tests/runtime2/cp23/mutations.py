@@ -19,16 +19,17 @@ mutants=[
  ('callable-domain','src/rt/isolate_transfer_decode.cpp','if (n.proto_domain != protos_.domain())','if (false)','CHECK failed: graph.decode(second,out,why)==TransferStatus::ProtoUnavailable'),
  ('atom-member','src/rt/isolate_snapshot.cpp','*operand = found->second;','if (in.op == OpCode::GetMember && atom_text(Atom{found->second}) == "y") *operand = static_cast<std::uint16_t>(atom("x").id); else *operand = found->second;','output=[40]'),
 ]
+mutants.append(('cancellation-completion','src/rt/parallel_task.cpp','} else if (cancelled_completion) {','} else if (outcome.result.code == \"runtime.cancelled\") {','cancelled normal completion remains catchable'))
 def detected(name,signature,code,output):
  if name=='atom-member':signature='output=[40\n]'
- return code==1 and 'cp23-ownership-unit:' in output and signature in output
+ return code==1 and ('cp23-parallel-unit:' if name=='cancellation-completion' else 'cp23-ownership-unit:') in output and signature in output
 results=[]
 for name,source,old,new,signature in mutants:
  folder=ROOT/'.build/cp23-mutants'/name;folder.mkdir(parents=True,exist_ok=True)
  text=(ROOT/source).read_text()
  if text.count(old)!=1:raise SystemExit('ambiguous mutation '+name)
  altered=folder/'mutated.cpp';altered.write_text(text.replace(old,new));obj=folder/'mutated.o';binary=folder/'unit'
- commands=[['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread','-c',str(altered),'-o',str(obj)],['g++','-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-pthread','tests/runtime2/cp23/ownership_unit.cpp',*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)]]
+ commands=[['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread','-c',str(altered),'-o',str(obj)],['g++','-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-pthread',('tests/runtime2/cp23/parallel_unit.cpp' if name=='cancellation-completion' else 'tests/runtime2/cp23/ownership_unit.cpp'),*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)]]
  for cmd in commands:
   p=run(cmd);(args.evidence/(name+'-build.log')).open('a').write(p.stdout+p.stderr)
   if p.returncode:raise SystemExit('build failure '+name)
@@ -41,9 +42,13 @@ for name,source,old,new,signature in mutants:
  print('DETECTED',name,flush=True)
 controls=[]
 normal_output=(args.evidence/'normal.log').read_text()
+parallel_normal=run([str(ROOT/'.build/rt/cp23-parallel-unit')])
+parallel_normal_output=parallel_normal.stdout+parallel_normal.stderr
+(args.evidence/'parallel-normal.log').write_text(parallel_normal_output)
+if parallel_normal.returncode or '0 failures' not in parallel_normal_output:raise SystemExit('parallel positive control failed')
 dead=run(['/bin/false'])
 for name,source,old,new,signature in mutants:
- controls.append(dict(witness=name,input='normal',rejected=not detected(name,signature,0,normal_output)))
+ controls.append(dict(witness=name,input='normal',rejected=not detected(name,signature,0,parallel_normal_output if name=='cancellation-completion' else normal_output)))
  controls.append(dict(witness=name,input='dead',rejected=not detected(name,signature,dead.returncode,dead.stdout+dead.stderr)))
  # A real timeout is rejected even if its stdout counterfeits a witness.
  marker='cp23-ownership-unit: 1 failure\n'+('output=[40\n]' if name=='atom-member' else signature)

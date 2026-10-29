@@ -59,6 +59,8 @@ struct ParallelTaskRecord {
     bool failure_error_origin = false;
     bool failure_in_loop_path = false;
     bool cancelled = false;
+    // Completion claims the cancellation decision under mutex before encoding.
+    bool completion_started = false;
     // CP23 transfer identity: a process-unique id, never a heap/FutureObject
     // pointer. TransferGraph carries it so another isolate can reference the
     // same completion record.

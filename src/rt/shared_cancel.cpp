@@ -18,7 +18,8 @@ bool shared_cancel(const Value& task_value, SharedOpError& error) {
     bool wake = false;
     {
         std::lock_guard<std::mutex> lock(record->mutex);
-        if (!record->cancelled) {
+        if (record->state == ParallelTaskState::Pending &&
+            !record->completion_started && !record->cancelled) {
             record->cancelled = true;
             wake = true;
         }

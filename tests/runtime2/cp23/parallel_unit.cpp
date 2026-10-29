@@ -93,8 +93,8 @@ void check_nested_spawn_and_drain() {
 }
 
 void check_done_status() {
-    expect("fn[async](slow()) { sleep(80); return 7 }\np := slow()\n"
-           "print(p.status())\nwhile(!p.done()) { }\n"
+    expect("gate := channel(0)\nfn[async](slow()) { recv(gate); return 7 }\np := slow()\n"
+           "print(p.status())\nsend(gate, 1)\nwhile(!p.done()) { }\n"
            "print(p.status())\nprint(await p)\n",
            "running\ndone\n7\n", "done/status reflect the parallel record");
 }
@@ -135,8 +135,8 @@ void check_legacy_v45_compatibility() {
                                  "t := thread(id, [1, f])\nprint(t.join())\n");
     CHECK(resource.reason.find("non-transferable resource") != std::string::npos);
 
-    expect("fn[async](slow()) { sleep(100); return 7 }\n"
-           "fn[async](reader(p)) { print(p.status()); return await p }\n"
+    expect("gate := channel(0)\nfn[async](slow()) { recv(gate); return 7 }\n"
+           "fn[async](reader(p)) { print(p.status()); send(gate, 1); return await p }\n"
            "p := slow()\nw := reader(p)\nprint(await w)\nprint(p.status())\n",
            "running\n7\ndone\n", "future handle status and await across isolates");
 
@@ -154,7 +154,39 @@ void check_legacy_v45_compatibility() {
            "0\nruntime.cancelled\nerror\n", "cancel a task handle from another isolate");
 }
 
+void check_cancellation_completion() {
+    // A task returning directly from sleep has no subsequent opcode at which
+    // to observe cancellation: completion must still publish a catchable Error.
+    for (int i = 0; i < 12; ++i) {
+        expect("ready:=channel(0)\nfn[async](f()){send(ready,1);sleep(20);return 1}\n"
+               "p:=f();recv(ready);sleep(5);cancel(p);cancel(p)\n"
+               "try{await p}catch(e){print(e.code)}\n"
+               "try{await p}catch(e){print(e.code)}\nprint(p.done());print(p.status())\n",
+               "runtime.cancelled\nruntime.cancelled\ntrue\nerror\n",
+               "cancelled normal completion remains catchable on repeated await");
+    }
+    expect("ready:=channel(0)\nfn(f()){send(ready,1);sleep(20);return 1}\n"
+           "p:=thread(f);recv(ready);sleep(5);cancel(p)\n"
+           "try{p.join()}catch(e){print(e.code)}\n"
+           "try{p.join()}catch(e){print(e.code)}\n",
+           "runtime.cancelled\nruntime.cancelled\n", "cancelled normal completion repeated join");
+    expect("fn[async](f()){return 42}\np:=f();print(await p);cancel(p);print(await p)\n",
+           "42\n42\n", "cancellation after completion preserves the result");
+    expect("fn[async](f()){throw error(\"original\",\"user.original\")}\np:=f()\n"
+           "try{await p}catch(e){print(e.code);print(e.message)}\ncancel(p)\n"
+           "try{await p}catch(e){print(e.code);print(e.message)}\n",
+           "user.original\noriginal\nuser.original\noriginal\n",
+           "cancellation after script failure preserves the original Error");
+    expect("ready:=channel(0)\nfn[async](f()){send(ready,1);sleep(20);return 1}\n"
+           "p:=f();recv(ready);cancel(p)\nprint(\"after\")\n",
+           "after\n", "unawaited cancellation drains at shutdown");
+}
+
 void check_two_worker_overlap() {
+    if (ParallelRuntime::from_environment()->limit() < 2) {
+        std::puts("cp23-parallel-unit: overlap requires at least two CPU permits; correctness cases retained");
+        return;
+    }
     const std::string spin =
         "fn[async](spin(ms)) { t0 := epoch(); n := 0\n"
         "  while(epoch() - t0 < ms) { n = n + 1 }\n  return n }\n";
@@ -193,6 +225,7 @@ int main() {
     check_done_status();
     check_thread_prefix_and_join();
     check_legacy_v45_compatibility();
+    check_cancellation_completion();
     check_two_worker_overlap();
     return rt_test::finish("cp23-parallel-unit");
 }

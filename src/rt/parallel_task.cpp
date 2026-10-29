@@ -257,7 +257,18 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     if (record->output_root && record->options.parallel_output)
         record->options.parallel_output->drain(outcome.output);
     record->options.current_task.reset();  // the worker Vm is gone; no self-reference may survive
-    if (task_cancelled(record) && !outcome.has_error_value) {
+    bool cancelled_completion;
+    {
+        std::lock_guard<std::mutex> lock(record->mutex);
+        record->completion_started = true;
+        // An observed script failure (including its original Error) or fatal
+        // Internal failure wins over a concurrent cancellation request.
+        cancelled_completion = outcome.result.reason != StopReason::Internal &&
+            (outcome.result.code == "runtime.cancelled" ||  // rt-lint: allow-string-compare cancellation code
+             (record->cancelled && outcome.status == IsolateTaskStatus::Ok &&
+              outcome.result.reason == StopReason::None));
+    }
+    if (cancelled_completion && !outcome.has_error_value) {
         Value error;
         std::string why;
         if (make_system_error("runtime.cancelled", "task cancelled", SourceOrigin{}, error, why)) {
@@ -273,13 +284,12 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     {
         std::lock_guard<std::mutex> lock(record->mutex);
         const bool succeeded = outcome.status == IsolateTaskStatus::Ok &&
-                               outcome.result.reason == StopReason::None && !record->cancelled;
+                               outcome.result.reason == StopReason::None && !cancelled_completion;
         if (succeeded) {
             record->state = ParallelTaskState::Done;
             record->result = std::move(outcome.return_value);
             record->has_result = outcome.has_return_value;
-        } else if (outcome.result.code == "runtime.cancelled" ||  // rt-lint: allow-string-compare cancellation code
-                   (record->cancelled && !outcome.has_error_value)) {
+        } else if (cancelled_completion) {
             record->state = ParallelTaskState::Cancelled;
             record->failure_message = "task cancelled";
             record->failure_code = "runtime.cancelled";

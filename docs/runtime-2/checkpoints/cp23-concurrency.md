@@ -271,3 +271,17 @@ The default atom-table pointer is cached after initialization, and shared-native
 metadata is populated only for the shared-operation family. Ordinary native
 calls do not repeatedly acquire task metadata. Initial and corrected performance
 observations remain in the delivery evidence; no threshold is changed.
+
+### R2 completion/cancellation linearization
+
+Completion claims the cancellation decision under the task mutex before encoding
+its terminal payload. `cancel` before that claim converts a normal return to a
+catchable `runtime.cancelled`; an already observed script Error retains its
+identity and fatal Internal failures remain fatal. Cancellation after the claim
+is a no-op, including repeated cancellation of a terminal task. The state stays
+Pending until the immutable payload is ready, then publishes exactly once.
+Repeated await/join decodes the same terminal outcome; unawaited cancelled tasks
+are drained. Native blocking work still observes cancellation cooperatively and
+can delay shutdown. One CPU permit is supported, including compensating workers
+for blocked waits; simultaneous CPU overlap is asserted only with two or more
+permits. Status witnesses use channel synchronization rather than sleep timing.

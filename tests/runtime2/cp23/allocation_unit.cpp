@@ -45,6 +45,8 @@ int main(int argc,char** argv) {
  fail_worker=argc>2&&std::strcmp(argv[2],"worker")==0;
  persistent=argc>3&&std::strcmp(argv[3],"persistent")==0;
  std::string source="c:=channel(1); fn[async](f()){o:={\"x\":41};send(c,o);return o.x+1};p:=f();print(await p);recv(c)";
+ if(argc>4&&std::strcmp(argv[4],"cancelled")==0)
+  source="fn[async](f()){sleep(10);return 1};p:=f();sleep(2);cancel(p);try{await p}catch(e){print(e.code)}";
  const bool cycle=argc>4&&std::strcmp(argv[4],"cycle")==0;
  if(argc>4&&std::strcmp(argv[4],"unawaited")==0)
   source="c:=channel(1);fn[async](f()){o:={\"x\":41};send(c,o);return o.x+1};p:=f();print(0)";

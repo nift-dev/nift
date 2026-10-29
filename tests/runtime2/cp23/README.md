@@ -47,11 +47,11 @@ qualification; its event multiset is checked without prescribing inter-worker
 order. Keep the inherited legacy-oracle golden discrepancy visible.
 
 Mutations compile real altered source objects and run the complete ownership
-suite. A detection requires exit 1, a completed suite and the defect's specific
+suite, or the parallel suite for the cancellation-completion witness. A detection requires exit 1, a completed suite and the defect's specific
 assertion/output signature. Signals, timeouts, missing binaries and build
 failures are harness failures. The normal binary must pass first. Mutations
 cover output publication, reclamation, future identity, program domains and
-member-atom translation. The current mutation linker is a Linux/GNU local
+member-atom translation, and cancellation completion. The current mutation linker is a Linux/GNU local
 certification tool, not a cross-platform certification claim.
 
 ## Allocation containment
@@ -60,7 +60,7 @@ certification tool, not a cross-platform certification claim.
 python3 tests/runtime2/cp23/allocation.py --binary .build/rt/cp23-allocation-unit --output /tmp/cp23-oom.json
 ```
 
-Repeat with `--persistent` and with `--mode unawaited` / `--mode cycle`.
+Repeat with `--persistent` and with `--mode unawaited` / `--mode cycle` / `--mode cancelled`.
 Each tested site runs in a fresh process. The driver fails one real C++
 allocation, or every later C++ allocation on the selected thread role. It
 checks fatal Internal propagation, owned heap balance, registry release,
@@ -82,8 +82,7 @@ ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 <san-b
 TSAN_OPTIONS=halt_on_error=1 <tsan-binary>
 ```
 
-Run the allocation driver against the sanitizer allocation binary in all six
-modes too. A skipped, setup-failed or timed-out lane is not a pass. Serialize
+Run the allocation driver against the sanitizer allocation binary for each affected mode in both one-shot and persistent configurations too. A skipped, setup-failed or timed-out lane is not a pass. Serialize
 heavy campaigns with the workstation's shared heavy-test lock.
 
 ## Neighbours and performance
@@ -103,3 +102,29 @@ rewrite and verify all 1,000 pages on matched independent fixtures. The
 short sequential samples. Keep the first observations and every failed gate;
 do not retry until green. Local measurements do not replace authorised
 Linode or cross-platform certification.
+
+## R2 cancellation and one-permit regressions
+
+`parallel_unit` uses channel handshakes for pending-status assertions. The CPU
+overlap witness runs only when the configured runtime has at least two permits;
+all correctness cases also run with one permit. The R2 aggregate campaign uses
+1, 2, 4 and 8 permits without forcing a larger pool inside the tests.
+
+```
+python3 tests/runtime2/cp23/cancellation.py --nift ./nift --output /tmp/cp23-cancel.json
+python3 tests/runtime2/cp23/cancellation.py --nift .build/cp13b/nift-switch --output /tmp/cp23-cancel-switch.json
+```
+
+Each command checks 120 completion races plus 8 script-Error/consumed-request
+cases at 1/2/4/8 permits, both async futures
+and thread joins, repeated cancellation, and two identical observations of each
+terminal result. Either completion or catchable cancellation may win the race;
+empty failures, mixed outcomes, fatal failures, signals and timeouts fail. The
+focused suite additionally checks cancellation after native sleep returns,
+already completed script failures, late cancellation and unawaited shutdown.
+Allocation mode `cancelled` checks that failures during task/cancellation Error
+construction still propagate Internal rather than becoming cancellation.
+
+On Linux the resource suite also cancels a reader blocked in native FIFO I/O,
+then releases it with a writer and checks catchable cancellation plus descriptor
+and registry balance. The same case runs under ASan/LSan/UBSan and TSan.
