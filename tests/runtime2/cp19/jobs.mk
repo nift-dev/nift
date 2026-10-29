@@ -51,3 +51,17 @@ test-cp19-cleanup-cli: $(TARGET) $(CP13B_SWITCH_NIFT) $(TEST_DIR)/cp19/fail-rest
 	$(PYTHON) tests/runtime2/cp19/cleanup_cli.py --nift "$(CURDIR)/$(TARGET)" --fault "$(abspath $(TEST_DIR)/cp19/fail-restore.so)" --out "$(TEST_DIR)/cp19/cleanup-cli.json"
 	$(PYTHON) tests/runtime2/cp19/cleanup_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --fault "$(abspath $(TEST_DIR)/cp19/fail-restore.so)" --out "$(TEST_DIR)/cp19/cleanup-cli-switch.json"
 endif
+
+# CP19 shell-loop exception boundary (2026-10-29): the CLI with test-only
+# failure injection (NIFT_TEST_SHELL_THROW; production objects never define it).
+$(TEST_DIR)/cp19/shell-throw/CLI.o: src/CLI.cpp
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_SHELL_THROW -MMD -MP -c src/CLI.cpp -o "$@"
+$(TEST_DIR)/cp19/nift-shell-throw$(EXEEXT): $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/shell-throw/CLI.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/shell-throw/CLI.o $(LDLIBS) -o "$@"
+ifneq ($(OS),Windows_NT)
+.PHONY: test-cp19-shell-exception
+test-cp19-shell-exception: $(TARGET) $(TEST_DIR)/cp19/nift-shell-throw$(EXEEXT)
+	$(PYTHON) tests/runtime2/cp19/shell_exception.py --nift "$(CURDIR)/$(TARGET)" --inject "$(CURDIR)/$(TEST_DIR)/cp19/nift-shell-throw$(EXEEXT)"
+test: test-cp19-shell-exception
+endif

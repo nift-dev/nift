@@ -50,9 +50,12 @@
 #ifndef _WIN32
 #include <glob.h>
 #endif
+#include <exception>
+#include <new>
 #include <optional>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #ifndef _WIN32
 #include <termios.h>
 #include <unistd.h>
@@ -2564,7 +2567,12 @@ static std::vector<std::string> nift_shell_completions(const std::string& prefix
 namespace {
 std::string shell_prompt_text(bool continuation) {
     if (continuation) return "... ";
-    std::string shown = fs::current_path().generic_string();
+    // A deleted or unreadable working directory must not end the shell:
+    // the prompt shows "?" instead (std::filesystem's throwing overload
+    // escaped the shell loop and aborted the process).
+    std::error_code cwd_error;
+    const fs::path cwd = fs::current_path(cwd_error);
+    std::string shown = cwd_error ? std::string("?") : cwd.generic_string();
     if (const char* home = std::getenv("HOME")) {
         std::string h = fs::path(home).lexically_normal().generic_string();
         if (shown == h) shown = "~";
@@ -2772,6 +2780,13 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
 #else
         std::string line;if(_isatty(_fileno(stdin)))std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
 #endif
+#if defined(NIFT_TEST_SHELL_THROW)
+        // Test-only failure injection (tests/runtime2/cp19/shell_exception.py);
+        // production builds never define NIFT_TEST_SHELL_THROW.
+        if(line=="__nift_test_throw_runtime__")throw std::runtime_error("injected shell-loop failure");
+        if(line=="__nift_test_throw_bad_alloc__")throw std::bad_alloc();
+        if(line=="__nift_test_throw_int__")throw 42;
+#endif
         if(pending.empty()&&(line=="exit"||line=="quit"))break;
         if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);
 #ifndef _WIN32
@@ -2806,7 +2821,18 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     }
     return 0;
     };
-    auto status = loop();
+    // Exception boundary: anything escaping the loop is an internal error
+    // (status 70), and both cleanup domains below still run exactly once.
+    // Without it std::terminate ran and neither the jobs nor the script
+    // resources were finalized.
+    int status = 70;
+    try {
+        status = loop();
+    } catch (const std::exception& e) {
+        console::error(std::string("internal error: ") + e.what());
+    } catch (...) {
+        console::error("internal error: unknown exception");
+    }
     // Every loop exit (including shell exit/status paths) settles both domains.
     // Keep the CP21 owner alive until its bounded finish, then independently
     // finalize legacy script resources even when job cleanup reports a fault.
