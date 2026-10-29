@@ -10,8 +10,12 @@ progress beyond what is measured.
 
 ## 1. Foundation
 
-- Implementation base: the local CP19 + CP23 integration candidate `38d4d87f`
-  (branch `cp23-integration`), pending its focused independent review.
+- Implementation base: the local CP19 + CP23 integration candidate `3ed13209`
+  (tree `61ccc5df`, branch `cp23-integration`), independently accepted with
+  qualifications (owner, 2026-10-29). Full `test-rt-vm` on it is NOT passed:
+  inherited CP23 failures (8 VM parity differences, `vm_subset`
+  async-capture, `vm_records_coverage` path-handle, CP22 default
+  `sleep_many`) are open and stay visible in every CP25-R run.
 - CP25-R work lives on branch `cp25-fallback-retirement`, one attributable
   commit per refusal family, separate from any CP19 performance or portability
   correction (comparator sort included).
@@ -116,3 +120,15 @@ Each refusal reason gets exactly one class:
 Families are addressed together where one cause explains several reasons.
 For example, statically certain legacy run-time Errors share one mechanism:
 an Error raised when execution reaches it, instead of refusing the unit.
+
+## 6. Inventory tool (G1)
+
+`make cp25r-inventory` (tests/runtime2/cp25/inventory.py) regenerates the
+inventory from the candidate binary and fails on any reason without a row in
+`tests/runtime2/cp25/classification.tsv`. The fallback list comes from real
+runs (`NIFT_VM=1` through rt-diff over the shared corpora and smoke scripts,
+as `test-rt-vm` sets them up). `classify-all` is supplementary: it compiles
+without the run path's switches, so its thread/coroutine reasons are
+artefacts (class H) and it does not see `coro-module`. Labs (`labs-src`)
+contains no `.f` scripts. The regression-suite and package repositories are
+not available locally.
