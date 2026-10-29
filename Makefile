@@ -4362,6 +4362,38 @@ test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
 include tests/runtime2/cp19/resources.mk
 
 include tests/runtime2/cp19/jobs.mk
+include tests/runtime2/cp19/certification.mk
+# CP19 certification edges (one per line: certification_guard_selftest.sh removes each).
+test-cp19-certify: test-cp19-functional
+test-cp19-certify: test-cp19-mutants
+test-cp19-certify: test-cp19-sanitize
+test-cp19-functional: test-cp19-jobs
+test-cp19-functional: test-cp19-session
+test-cp19-functional: test-cp19-resources
+test-cp19-functional: test-cp19-proof
+test-cp19-functional: test-cp19-operand-windows
+test-cp19-functional: test-cp19-job-cli
+test-cp19-functional: test-cp19-resource-cli
+test-cp19-functional: test-cp19-session-cli
+test-cp19-mutants: test-cp19-job-mutants
+test-cp19-mutants: test-cp19-proof-mutants
+test-cp19-mutants: test-cp19-resource-mutants
+test-cp19-mutants: test-cp19-session-mutants
+test-cp19-mutants: test-cp19-session-mutants-switch
+test-cp19-mutants: test-cp19-admission-mutants
+test-cp19-mutants: test-cp19-admission-mutants-switch
+test-cp19-mutants: test-cp19-resource-alloc
+test-cp19-mutants: test-cp19-proof-alloc
+test-cp19-sanitize: test-cp19-session-sanitize
+test-cp19-sanitize: test-cp19-proof-sanitize
+test-cp19-sanitize: test-cp19-admission-sanitize
+ifeq ($(shell uname -s),Linux)
+test-cp19-certify: test-cp19-host
+test-cp19-host: test-cp19-cleanup-cli
+test-cp19-sanitize: test-cp19-host-sanitize
+endif
+CERTIFY_RUNTIME2_GATES += test-cp19-certify
+certify-targets: test-cp19-certify
 
 # Durable mutant-1 kernel witness survives CP19 bounded session-end cleanup.
 ifeq ($(shell uname -s),Linux)

@@ -109,13 +109,37 @@ edges=("test-rt-host: test-runtime2-f6-cleanup" \
        "test-rt-vm-sanitize: test-runtime2-cp22-tsan" \
        "test-v45-job-control: test-cp21-interactive-host" \
        "test-v45-job-control: test-cp21-interactive-host-mutants" \
-       "test-v45-job-control: test-cp21-make-failure-control")
+       "test-v45-job-control: test-cp21-make-failure-control" \
+       "test-cp19-certify: test-cp19-functional" \
+       "test-cp19-certify: test-cp19-mutants" \
+       "test-cp19-certify: test-cp19-sanitize" \
+       "test-cp19-functional: test-cp19-jobs" \
+       "test-cp19-functional: test-cp19-session" \
+       "test-cp19-functional: test-cp19-resources" \
+       "test-cp19-functional: test-cp19-proof" \
+       "test-cp19-functional: test-cp19-operand-windows" \
+       "test-cp19-functional: test-cp19-job-cli" \
+       "test-cp19-functional: test-cp19-resource-cli" \
+       "test-cp19-functional: test-cp19-session-cli" \
+       "test-cp19-mutants: test-cp19-job-mutants" \
+       "test-cp19-mutants: test-cp19-proof-mutants" \
+       "test-cp19-mutants: test-cp19-resource-mutants" \
+       "test-cp19-mutants: test-cp19-session-mutants" \
+       "test-cp19-mutants: test-cp19-session-mutants-switch" \
+       "test-cp19-mutants: test-cp19-admission-mutants" \
+       "test-cp19-mutants: test-cp19-admission-mutants-switch" \
+       "test-cp19-mutants: test-cp19-resource-alloc" \
+       "test-cp19-mutants: test-cp19-proof-alloc" \
+       "test-cp19-sanitize: test-cp19-session-sanitize" \
+       "test-cp19-sanitize: test-cp19-proof-sanitize" \
+       "test-cp19-sanitize: test-cp19-admission-sanitize")
 if [ "$(uname -s)" = Linux ]; then
     edges+=("test-v45-job-control: test-cp21-terminal-recovery" "test-v45-job-control: test-cp21-terminal-recovery-mutants" \
             "test-v45-job-control: test-cp21-d3-mandatory" \
             "test-cp21-fd-inheritance: test-cp21-fd-protocol-unit" \
             "test-cp21-d3-mandatory: test-cp21-d3-mutant" \
             "test-cp21-d3-mandatory: test-cp21-parser-target-mutant")
+    edges+=("test-cp19-certify: test-cp19-host" "test-cp19-host: test-cp19-cleanup-cli" "test-cp19-sanitize: test-cp19-host-sanitize")
 fi
 for edge in "${edges[@]}"; do
     name="${edge##* }"

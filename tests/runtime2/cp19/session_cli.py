@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """Real shell/-i/.niftrc state on the shared VM; refusal gets no coverage credit."""
-import argparse,json,os,subprocess,tempfile
+import argparse,json,os,subprocess,sys,tempfile
 from pathlib import Path
+# CP14B comparator profile (tests/runtime2/cp14b/comparator_profile.py): the VM compiles
+# sort(comparator) only on the frozen libstdc++ 20260321; elsewhere a VM session refuses the
+# statement (method:sort). That case is checked against its exact documented refusal and
+# reported as UNVERIFIED COMPARATOR COVERAGE; NIFT_CP14B_REQUIRE_COMPARATOR=1 (milestone
+# GCC 15.2 run) makes a refusing binary fail. Every other case is unchanged.
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'cp14b'))
+import comparator_profile as cprof
+COMPARATOR_CASES={'array_sort'}
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text('')
+prof=cprof.profile(binary);unverified=0
 cases=[
  ('invocation_readonly_number',['-i'],'x:=5\nprint("ONCE");args.push(3)\nx\nargs.stringify()\nexit\n','',4),
  ('invocation_readonly',['-i'],'x:=5\nprint("ONCE");args.push("bad")\nx\nargs.stringify()\nexit\n','',4),
@@ -63,6 +72,14 @@ for name,argv,stdin,rc,units in cases:
    with a.out.open('a') as f:f.write(json.dumps(r)+'\n')
    channels=(p.returncode,p.stdout,p.stderr);count+=1
    if mode=='0':baseline=channels;continue
+   if name in COMPARATOR_CASES and prof.found=='refused':
+    # Documented contract off the frozen profile: the session refuses the statement
+    # before execution; earlier statements ran on the VM; nothing ran on legacy.
+    assert channels==(0,'','error: NIFT_VM session refused: method:sort\n'),r
+    assert rows and rows[-1]['outcome']=='require-error' and rows[-1]['reason']=='method:sort',r
+    assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome']=='vm' for s in rows[:-1]),r
+    assert rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,r
+    unverified+=1;continue
    if name == 'cow':
     # Accepted D-040 array value-copy semantics; retain the raw legacy alias
     # result as evidence instead of pretending these channels are identical.
@@ -72,4 +89,7 @@ for name,argv,stdin,rc,units in cases:
    assert len(rows)==units,(name,units,r)
    assert len([s for s in rows if s['outcome']=='vm-error']) == (1 if name in ('invocation_readonly','invocation_readonly_number') else 0),r
    assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome'] in ('vm','vm-error') for s in rows),r
-print(f'PASS real session entry checks (parity and explicit D-040 witness): {count} observations')
+if unverified:print(f'SKIP UNVERIFIED COMPARATOR COVERAGE: session_cli.py: {unverified} VM-session comparator '
+  'observation(s) refused with method:sort on an unverified libstdc++ profile; the exact session refusal was '
+  'checked; this is not comparator certification (milestone needs the GCC 15.2/20260321 run)')
+print(f'PASS real session entry checks (parity and explicit D-040 witness): {count} observations'+f'; comparator profile {prof.found}')
