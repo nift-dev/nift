@@ -17,9 +17,13 @@ NIFT_VM=require) modes:
             managed-file diagnostic, file unchanged, job terminated by the job
             table. Scope: a statement that itself needs the deleted directory
             (cd .., pwd, exists(...)) still raises from a throwing
-            std::filesystem call; the boundary then ends the session cleanly
-            with status 70 instead of aborting (independent review F1; making
-            those helpers non-throwing is a separate follow-up).
+            std::filesystem call. The session then ends cleanly with status
+            70 instead of aborting: in legacy through the shell boundary
+            ("internal error: filesystem error: ...", the open file reported
+            once); in a VM session through the VM's own internal-failure
+            handling ("NIFT_VM internal failure: ...", finished as cancelled,
+            the file discarded silently). Independent review F1; making those
+            helpers non-throwing is a separate follow-up (obligation F1).
   inject-*  test-only binary (NIFT_TEST_SHELL_THROW) throwing
             std::runtime_error, std::bad_alloc or a non-std value from inside
             the loop. Exit 70, one "internal error" diagnostic naming it, the
@@ -138,12 +142,25 @@ def check(case, r, mode):
         # the VM through its own internal-failure handling), never an abort.
         if r["rc"] != 70:
             problems.append(f"rc {r['rc']}, want 70")
-        if not re.search(r"internal (error|failure)", err):
-            problems.append("no internal error/failure diagnostic")
+        # Exact per-engine channel (delta review D1): legacy must go through
+        # the shell boundary's one "internal error: filesystem error:" line and
+        # report the open file once; a VM session must report its own internal
+        # failure, never the shell's line, and (finishing as cancelled) discard
+        # the file silently.
+        if mode == "0":
+            if len(internal) != 1 or not internal[0].startswith("internal error: filesystem error:"):
+                problems.append(f"internal diagnostics {internal!r}, want exactly one 'internal error: filesystem error:'")
+            want = 1
+        else:
+            if "NIFT_VM internal failure:" not in err:
+                problems.append("no 'NIFT_VM internal failure:' diagnostic")
+            if internal:
+                problems.append(f"shell boundary diagnostic {internal!r} in a VM session")
+            want = 0
         if "after" in r["stdout"]:
             problems.append("statement after the failure ran")
         return [x for x in problems if "managed-file diagnostics" not in x] + (
-            [] if mode != "0" or len(left_open) == 1 else [f"{len(left_open)} managed-file diagnostics, want 1"])
+            [] if len(left_open) == want else [f"{len(left_open)} managed-file diagnostics, want exactly {want}"])
     if case in EXPECT_INTERNAL:
         if r["rc"] != 70:
             problems.append(f"rc {r['rc']}, want 70")
@@ -161,12 +178,41 @@ def check(case, r, mode):
     return problems
 
 
+def check_controls():
+    """Negative controls for the natural-cwd-builtin checks (delta review D1):
+    each synthetic result is wrong in exactly one way and must be rejected."""
+    good = {"rc": 70, "stdout": "", "job_pid": 1, "job_survived": False, "job_term_marker": True,
+            "file": "original"}
+    fs = "error: internal error: filesystem error: cannot get current path\n"
+    vm = "error: NIFT_VM internal failure: filesystem error\n"
+    leg_open = "warning: managed file left open: keep.txt\n"
+    cases = [  # (mode, stderr, description)
+        ("0", vm + leg_open, "legacy without the shell boundary line"),
+        ("0", fs + fs + leg_open, "legacy with two boundary lines"),
+        ("0", fs, "legacy without the open-file report"),
+        ("1", vm + leg_open, "VM session reporting the file"),
+        ("1", fs, "VM session through the shell boundary"),
+        ("require", "", "VM session without its internal-failure line"),
+    ]
+    failures = 0
+    if check("natural-cwd-builtin", dict(good, stderr=fs + leg_open), "0") or \
+            check("natural-cwd-builtin", dict(good, stderr=vm), "1"):
+        failures += 1
+        print("FAIL control: a correct natural-cwd-builtin result was rejected")
+    for mode, err, what in cases:
+        if not check("natural-cwd-builtin", dict(good, stderr=err), mode):
+            failures += 1
+            print(f"FAIL control not detected: {what}")
+    print(f"{'ok  ' if not failures else 'FAIL'} natural-cwd-builtin negative controls: {len(cases)} rejected, 2 accepted")
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True, help="production binary")
     ap.add_argument("--inject", required=True, help="NIFT_TEST_SHELL_THROW binary")
     a = ap.parse_args()
-    failures = 0
+    failures = check_controls()
     for mode in ("0", "1", "require"):
         plan = [("natural", a.nift), ("natural-cwd-builtin", a.nift), ("control", a.inject)] + \
                [(c, a.inject) for c in MAGIC]
