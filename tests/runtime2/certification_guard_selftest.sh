@@ -139,7 +139,11 @@ if [ "$(uname -s)" = Linux ]; then
             "test-cp21-fd-inheritance: test-cp21-fd-protocol-unit" \
             "test-cp21-d3-mandatory: test-cp21-d3-mutant" \
             "test-cp21-d3-mandatory: test-cp21-parser-target-mutant")
-    edges+=("test-cp19-certify: test-cp19-host" "test-cp19-host: test-cp19-cleanup-cli" "test-cp19-sanitize: test-cp19-host-sanitize")
+    edges+=("test-cp19-certify: test-cp19-host" "test-cp19-host: test-cp19-cleanup-cli" "test-cp19-sanitize: test-cp19-host-sanitize"
+           "test-cp23-certify: test-runtime2-cp23" "test-cp23-certify: test-cp23-cancellation"
+           "test-cp23-certify: test-cp23-cp19-combined" "test-cp23-certify: test-cp23-mutants"
+           "test-cp23-certify: test-cp23-allocation" "test-cp23-certify: test-runtime2-cp23-sanitize"
+           "test-cp23-certify: test-runtime2-cp23-tsan")
 fi
 for edge in "${edges[@]}"; do
     name="${edge##* }"

@@ -4508,3 +4508,16 @@ test-runtime2-cp23-sanitize: $(addprefix $(TEST_DIR)/rt-san/,$(CP23_SAN_UNITS))
 test-runtime2-cp23-tsan: $(addprefix $(TEST_DIR)/rt-tsan/,$(CP23_TSAN_UNITS))
 	@set -e; for unit in $(CP23_TSAN_UNITS); do \
 	  env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 timeout 180 "$(TEST_DIR)/rt-tsan/$$unit"; done
+include tests/runtime2/cp23/certification.mk
+# CP23 certification edges (one per line: certification_guard_selftest.sh removes each).
+ifeq ($(shell uname -s),Linux)
+test-cp23-certify: test-runtime2-cp23
+test-cp23-certify: test-cp23-cancellation
+test-cp23-certify: test-cp23-cp19-combined
+test-cp23-certify: test-cp23-mutants
+test-cp23-certify: test-cp23-allocation
+test-cp23-certify: test-runtime2-cp23-sanitize
+test-cp23-certify: test-runtime2-cp23-tsan
+endif
+CERTIFY_RUNTIME2_GATES += test-cp23-certify
+certify-targets: test-cp23-certify

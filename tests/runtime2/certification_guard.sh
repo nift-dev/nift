@@ -13,7 +13,7 @@ REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
           test-rt-parser test-sha256 test-site-dx
           test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants test-runtime2-cp14b-mutants test-runtime2-cp18 test-runtime2-cp18-switch test-runtime2-cp18-sanitize test-runtime2-cp18-cow
-          test-runtime2-cp22-mutants test-cp19-certify)
+          test-runtime2-cp22-mutants test-cp19-certify test-cp23-certify)
 WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys
@@ -156,6 +156,12 @@ if sys.platform.startswith('linux'):
               ('test-cp19-sanitize', 'test-cp19-host-sanitize')]
 if not sys.platform.startswith('win'):
     EDGES += [('test', 'test-cp19-shell-exception')]
+# CP23 certification reachability (CP19 x CP23 integration, 2026-10-29): Linux local gates.
+if sys.platform.startswith('linux'):
+    EDGES += [('test-cp23-certify', 'test-runtime2-cp23'), ('test-cp23-certify', 'test-cp23-cancellation'),
+              ('test-cp23-certify', 'test-cp23-cp19-combined'), ('test-cp23-certify', 'test-cp23-mutants'),
+              ('test-cp23-certify', 'test-cp23-allocation'), ('test-cp23-certify', 'test-runtime2-cp23-sanitize'),
+              ('test-cp23-certify', 'test-runtime2-cp23-tsan')]
 # Classified, not certified: needs an owner-designated frozen legacy oracle (CP19_LEGACY_ORACLE).
 print('PENDING test-cp19-proof-cli: CP19_LEGACY_ORACLE (frozen legacy binary) not designated; owner decision; not in certify-targets')
 
