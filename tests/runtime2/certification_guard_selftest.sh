@@ -78,6 +78,7 @@ edges=("test-rt-host: test-runtime2-f6-cleanup" \
        "test-rt-vm: test-runtime2-cp13b" \
        "test-rt-vm: test-rt-source-map" \
        "test-rt-vm: test-rt-error-oom" \
+       "test-rt-vm: test-cp25r" \
        "test-rt-vm-sanitize: test-rt-source-map-sanitize" \
        "test-rt-vm-sanitize: test-rt-source-map-tsan" \
        "test-rt-vm-sanitize: test-rt-error-oom-sanitize" \

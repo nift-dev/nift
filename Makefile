@@ -468,6 +468,7 @@ test-runtime2-cp13b-mutants: $(TARGET)
 test-rt-vm: test-runtime2-cp13b
 test-rt-vm: test-rt-source-map
 test-rt-vm: test-rt-error-oom
+test-rt-vm: test-cp25r
 test-rt-vm-sanitize: test-rt-source-map-sanitize
 test-rt-vm-sanitize: test-rt-source-map-tsan
 test-rt-vm-sanitize: test-rt-error-oom-sanitize
@@ -4526,6 +4527,16 @@ test-runtime2-cp23-tsan: $(addprefix $(TEST_DIR)/rt-tsan/,$(CP23_TSAN_UNITS))
 	@set -e; for unit in $(CP23_TSAN_UNITS); do \
 	  env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 timeout 180 "$(TEST_DIR)/rt-tsan/$$unit"; done
 include tests/runtime2/cp23/certification.mk
+# CP25-R (D-057) legacy/VM differentials for corrected refusal families (G3), and
+# the classified refusal inventory (G1; not a certification edge: regenerated
+# from the candidate binary, `--check` fails on an unclassified reason).
+.PHONY: test-cp25r cp25r-inventory
+test-cp25r: $(TARGET)
+	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
+cp25r-inventory: $(TARGET)
+	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
+	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \
+	  --markdown "$(TEST_DIR)/cp25r-inventory/INVENTORY.md" --check
 # CP23 certification edges (one per line: certification_guard_selftest.sh removes each).
 ifeq ($(shell uname -s),Linux)
 test-cp23-certify: test-runtime2-cp23
