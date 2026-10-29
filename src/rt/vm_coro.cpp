@@ -222,7 +222,8 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
                 // This wait was never admitted. Remove its borrowed-future
                 // observer so error completion cannot wait on that future.
                 coro.foreign_waits.erase(std::remove_if(coro.foreign_waits.begin(), coro.foreign_waits.end(),
-                    [&](const Coro::ForeignWait& wait) { return wait.task == coro.current; }), coro.foreign_waits.end());
+                    [&](const Coro::ForeignWait& wait) { return wait.task == coro.current; }),
+                    coro.foreign_waits.end());
                 if (!coro.tasks[coro.current].body_done)
                     load(vm, coro.current, R, K, proto, base, pc);
                 return 0;

@@ -4,6 +4,7 @@
 // parent FutureObject references one, while the worker owns only immutable
 // compiled code and TransferGraph wire data.
 #include "rt/isolate_task.h"
+#include "rt/parallel_task_start.h"
 #include "rt/proto.h"
 #include "rt/shared_gc.h"
 
@@ -187,8 +188,5 @@ void notify_parallel_wait_states(const std::shared_ptr<ParallelTaskRecord>& reco
 // Runs one record's isolate task on the calling worker thread, publishes its
 // wire result/error/output, wakes waiters and releases the admission lane.
 void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record);
-// Snapshots source Values and queues a task. False with `error` when the
-// limit is exhausted or the OS thread cannot be created.
-bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string& error);
 
 }  // namespace nift::rt
