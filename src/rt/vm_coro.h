@@ -149,7 +149,7 @@ struct Vm::Coro {
     int await_parallel(Vm& vm, const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                        const Instr*& pc, Fault& fault, FutureObject* future, bool join);
     // Waits for any parallel completion after `observed` or the next due timer.
-    void wait_parallel(Vm& vm, std::uint64_t observed);
+    bool wait_parallel(Vm& vm, std::uint64_t observed, Fault& fault);
     // Per-proto global slots a task of that proto can reach (build once).
     static void build_snapshot(Coro& coro, const std::vector<const Proto*>& protos);
 

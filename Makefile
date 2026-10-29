@@ -372,6 +372,9 @@ test-cp23-shared-unit: $(RT_CP23_SHARED_UNIT)
 CP23_CORE := $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
 CP23_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(CP23_CORE))
 CP23_TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(CP23_CORE))
+$(TEST_DIR)/rt/cp23-admission-unit: tests/runtime2/cp23/admission_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-resource-unit: tests/runtime2/cp23/resource_unit.cpp $(CP23_CORE:.cpp=.o)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
@@ -4273,10 +4276,10 @@ test-rt-host-mutants: test-runtime2-cp17-unwind-mutants
 # CP23 local lanes. Reference-host performance and platform certification are
 # separate owner/integrator obligations; these targets never provision hosts.
 CP23_NORMAL_UNITS := isolate-transfer-unit isolate-task-unit cp23-parallel-unit cp23-shared-unit \
-	cp23-ownership-unit cp23-contention-unit cp23-resource-unit
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit
 CP23_SAN_UNITS := isolate-transfer-unit cp23-isolate_task-unit cp23-parallel-unit cp23-shared-unit \
-	cp23-ownership-unit cp23-contention-unit cp23-resource-unit
-CP23_TSAN_UNITS := cp23-parallel-unit cp23-shared-unit cp23-ownership-unit cp23-contention-unit cp23-resource-unit
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit
+CP23_TSAN_UNITS := cp23-parallel-unit cp23-shared-unit cp23-ownership-unit cp23-contention-unit cp23-resource-unit cp23-admission-unit
 .PHONY: test-runtime2-cp23 test-runtime2-cp23-sanitize test-runtime2-cp23-tsan
 test-runtime2-cp23: $(TARGET) $(CP13B_SWITCH_NIFT) $(addprefix $(TEST_DIR)/rt/,$(CP23_NORMAL_UNITS))
 	@set -e; for unit in $(CP23_NORMAL_UNITS); do timeout 180 "$(TEST_DIR)/rt/$$unit"; done

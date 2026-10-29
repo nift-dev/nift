@@ -53,6 +53,7 @@ public:
     // graph; `root` is assigned only on success.
     TransferStatus decode(const TransferProtoMap& protos, Value& root, std::string& error) const;
 
+    std::size_t storage_bytes() const noexcept; // bounded helper-admission estimate
     std::size_t node_count() const noexcept { return nodes_.size(); }
     bool empty() const noexcept { return nodes_.empty(); }
     void clear() noexcept;

@@ -24,7 +24,9 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
         return entry->closed || cancelled(task) ||
                entry->buffer.size() < (entry->capacity == 0 ? 1u : entry->capacity);
     };
-    wait_shared(lock, r.cv, ready);
+    if (!wait_shared(lock, r.cv, ready)) {
+        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+    }
     if (entry->closed) {
         fail(error, "runtime.channel_closed", "send: channel is closed");
         return false;
@@ -40,7 +42,12 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
     r.cv.notify_all();
     if (entry->capacity != 0) return true;
     // A rendezvous send completes only when a receiver takes the value.
-    wait_shared(lock, r.cv, [&] { return item->consumed || entry->closed || cancelled(task); });
+    if (!wait_shared(lock, r.cv, [&] { return item->consumed || entry->closed || cancelled(task); })) {
+        const auto at = std::find(entry->buffer.begin(), entry->buffer.end(), item);
+        if (at != entry->buffer.end()) entry->buffer.erase(at);
+        r.cv.notify_all();
+        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+    }
     if (item->consumed) return true;
     if (cancelled(task)) {
         take_task_cancelled(task);
@@ -67,7 +74,9 @@ bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
     TransferGraph graph;
     {
         std::unique_lock<std::recursive_mutex> lock(r.mutex);
-        wait_shared(lock, r.cv, [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); });
+        if (!wait_shared(lock, r.cv, [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); })) {
+            fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+        }
         if (cancelled(task)) {
             take_task_cancelled(task);
             fail(error, "runtime.cancelled", "task: cancelled while waiting to receive");

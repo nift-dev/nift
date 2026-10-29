@@ -24,10 +24,10 @@ void Vm::coro_abort_parallel() noexcept {
         }
         notify_parallel_wait_states(record);
     }
-    shared_detail::registry().cv.notify_all();
+    shared_detail::notify_shared_cancellation();
     for (const auto& record : coro_->parallel_live) {
         if (!record || record->complete()) continue;
-        ParallelBlock blocked;
+        ParallelBlock blocked(ParallelWaitKind::Cleanup);
         std::unique_lock<std::mutex> lock(record->mutex);
         record->cv.wait(lock, [&] { return record->state != ParallelTaskState::Pending; });
     }

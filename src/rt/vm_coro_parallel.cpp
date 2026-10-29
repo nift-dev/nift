@@ -272,15 +272,19 @@ void Vm::Coro::flush_parallel_outputs(Vm& vm) {
     }
 }
 
-void Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed) {
+bool Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed, Fault& fault) {
     Coro& coro = *vm.coro_;
     const std::shared_ptr<ParallelWait> state = coro.parallel_wait;
-    if (!state) return;
+    if (!state) return true;
     std::unique_lock<std::mutex> lock(state->mutex);
     const auto ready = [&state, observed] { return state->generation != observed; };
     lock.unlock();
     {
     ParallelBlock blocked;
+    if (!blocked.admitted()) {
+        fault.code = "limit.exceeded"; fault.catchable = false;
+        return raise(fault, StopReason::Error, "parallel blocking wait limit exceeded");
+    }
     lock.lock();
     if (coro.timers.empty()) {
         state->cv.wait(lock, ready);
@@ -290,6 +294,7 @@ void Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed) {
     lock.unlock();
     }
     if (!coro.timers.empty() && coro.timers.top().at <= Clock::now()) fire_due(coro, Clock::now());
+    return true;
 }
 
 }  // namespace nift::rt

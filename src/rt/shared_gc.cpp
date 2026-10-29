@@ -74,6 +74,12 @@ void shared_collect() noexcept {
         auto* n = all; all = all->all_next;
         n->pin.reset();  // may erase its registry entry; all_next was saved
     }
+    // No graph can retain an edge to an unregistered node: backing creation
+    // and task identity registration precede shared_note_edges(). Under this
+    // same registry lock an empty registry therefore starts a fresh epoch.
+    // Do not keep every later pure-timer session on the full graph-scan path.
+    if (r.entries.empty() && r.tasks.empty())
+        possible_cycles.store(false, std::memory_order_relaxed);
     collecting = false;
 }
 }

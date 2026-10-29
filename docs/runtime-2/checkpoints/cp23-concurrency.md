@@ -198,8 +198,9 @@ index as its own callable.
 ### Pool, cancellation and shutdown
 
 A reusable FIFO pool has a CPU-permit limit (default min(8, hardware count),
-explicit environment range 1..256). Admission capacity is
-max(64, min(1024, permits*64)); saturation returns an explicit task-admission
+explicit environment range 1..256). Outstanding-task admission is a separate
+resource budget: 16,384 unfinished records by default, independent of CPU
+permits (see the sleeping-task correction below). Saturation returns an explicit task-admission
 failure rather than growing an unbounded queue. This is refusal backpressure,
 not an indefinitely blocking spawn operation.
 
@@ -207,7 +208,8 @@ An isolate stays on its OS thread. Blocking Host calls, resource-context closure
 return their CPU permit. The FIFO reader/writer witness requires progress with
 one permit; native I/O does not pin it. Reusable compensating workers provide progress for
 nested waits and producer/consumer loops while keeping thread count bounded
-by admission capacity. Resuming workers take priority over new queued work.
+by `permits + blocking_capacity`, independently of the outstanding-task budget. Resuming workers
+use a separate condition variable and take priority over new queued work.
 No worker is detached. Shutdown first closes admission and worker creation,
 cancels queued/running work, wakes native waits, and joins every thread.
 
@@ -285,3 +287,85 @@ are drained. Native blocking work still observes cancellation cooperatively and
 can delay shutdown. One CPU permit is supported, including compensating workers
 for blocked waits; simultaneous CPU overlap is asserted only with two or more
 permits. Status witnesses use channel synchronization rather than sleep timing.
+
+### Sleeping-task admission correction (after R2)
+
+The old `active_` admission counter counted all unfinished work: queued,
+executing, timer-suspended, native/shared-wait blocked, and completion cleanup.
+It was not a CPU counter. Completed records retained by future handles no longer
+consume this budget once worker cleanup is finished. The CPU counter is
+`computing_`; `blocked_` includes parked OS workers and workers awaiting a new
+permit, and `resuming_` gives those returning workers priority.
+
+The former `64 * permits` capacity incorrectly made 200 valid sleepers fail on
+one/two CPU permits. The corrected default is a fixed 16,384 unfinished neutral
+records, covering the accepted 10,000-sleeper workload with bounded headroom.
+It is a count of queued/executing/storage obligations, not a promise of 16,384
+OS stacks or CPU slots. The C++ embedding constructor may deliberately choose a
+smaller task budget (clamped to 1..16,384); the CLI always uses the fixed default.
+Budget exhaustion retains the existing task-admission diagnostic. No unbounded
+queue or fallback after effects is introduced.
+
+CPU execution is still bounded by the requested permits. A timer suspension
+returns its CPU permit. Timers do not count against the separate 1,024 ordinary
+blocking-worker budget; physical reusable workers are bounded by `permits + blocking_capacity`
+(default `permits + 1,024`). Timer/cleanup compensation is separately capped
+at 64 additional workers, so plain sleepers do not create thousands of OS
+threads. The ordinary blocking budget retains the former policy's largest
+possible capacity rather than reducing supported await chains. Embedders may
+explicitly configure a smaller blocking budget (the saturation test uses 64).
+Ordinary blocking I/O, shared waits and foreign-future waits reserve that stack
+budget only while actually blocked, not while waiting to reacquire a CPU permit.
+Exhaustion reports the existing uncatchable `limit.exceeded` VM fault, through
+normal VM unwinding and resource finalization. It does not escape as a C++
+exception, become Internal or become cancellation. Rendezvous rejection removes
+its unconsumed item. Timer and emergency cleanup waits retain progress without
+being rejected by the ordinary blocking budget. Uninterruptible native work can
+still delay shutdown; no forced thread termination is added.
+
+To multiplex the required plain sleeping tasks without one OS thread per task,
+a worker may execute bounded queued work while its timer is suspended. This is
+restricted to a conservative finite straight-line opcode whitelist (loads,
+moves, returns and non-negative literal sleeps) with no
+calls, jumps, handlers, callbacks, shared waits or native I/O. Unknown/new opcodes
+are ineligible. In particular an awaiter of the sleeping ancestor is never run
+on that ancestor's C++ stack. Small input/constant/atom descriptions (at most 256 KiB), matching arity and a
+bounded global window are required. At least 4 MiB of the helper's own heap
+budget must remain above the thread's current charged heap before selection;
+otherwise it stays queued for ordinary dispatch. This prevents nested thread
+accounting from spuriously rejecting an individually valid isolate. Low-budget
+isolates are covered by a 32 KiB positive regression. Nesting is bounded at 32; every nested VM retains
+its own atom and transfer-heap scopes on the same OS thread. Helpers borrow the
+worker's existing CPU permit. Other work continues on the normal bounded pool.
+A timer never resumes before its deadline; completion order otherwise remains
+unspecified under the existing happens-before contract.
+
+Zero-duration sleep validation and a worker HandleTable which has never created
+a resource retain their CPU permit; neither can perform a blocking Host action
+or lifecycle settlement. The context still closes and reports normally. Actual
+resource cleanup continues to return the permit. Separately, an empty neutral
+registry resets its cycle-scan epoch under the registry lock: backing/task
+registration precedes edge publication, so no live edge is hidden. This prevents
+a previous session's transferred future from imposing full graph scans on later
+pure-timer runs while retaining cycle reclamation within every nonempty epoch.
+
+Permanent admission tests cover 200 and 10,000 sleepers at 1/2/4/8 permits,
+repeated awaits, suspended cancellation, heap constants, a pending-ancestor
+awaiter, CPU-slot parking, sampled executing-slot bounds, physical-worker bounds,
+blocking receiver/foreign-await/rendezvous/full-buffer exhaustion, 100-level
+await-chain compatibility at every permit count, cancelled shutdown and zero
+registry survivors. The ownership suite retains a genuine explicitly configured
+64-record admission-limit witness. Allocation mode `timers` injects failures in
+four concurrent sleeping tasks, including nested execution. Real topology and
+CPU-parking mutants are required to fail their specific completed-suite witnesses.
+Local 10,000-sleeper latency remains exploratory; the unchanged <0.2 s gate must
+be assessed on the reference host and is not certified by these local runs.
+
+The overload investigation also exposed a missed shutdown cancellation wake:
+record cancellation uses the task mutex while shared waits use the registry
+mutex. Cancellation notifications now acquire the registry mutex after releasing
+the task mutex, preventing a notification from falling between a false wait
+predicate and the condition-variable sleep. The same synchronisation applies
+to explicit cancellation, emergency task cleanup and pool destruction. This
+changes no Error or cancellation-completion precedence. Diagnostic-only rescue
+notifications used to identify the race are absent from the regression suite.

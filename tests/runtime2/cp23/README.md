@@ -128,3 +128,28 @@ construction still propagate Internal rather than becoming cancellation.
 On Linux the resource suite also cancels a reader blocked in native FIFO I/O,
 then releases it with a writer and checks catchable cancellation plus descriptor
 and registry balance. The same case runs under ASan/LSan/UBSan and TSan.
+
+## Sleeping-task admission follow-up
+
+The aggregate now includes `cp23-admission-unit` (also ASan/LSan/UBSan and
+TSan). It runs 200 and 10,000 sleeping tasks at each of 1/2/4/8 CPU permits,
+checks repeated observation, cancellation, pending-ancestor safety, heap
+constants, CPU parking, executing-slot and worker bounds, receiver/send/foreign-await resource
+exhaustion and clean shutdown. A 100-level await chain must retain its R2 result at every permit count.
+The default outstanding budget is 16,384, the ordinary blocking budget is 1,024,
+and timer/cleanup compensation is capped at 64;
+`ownership_unit` explicitly configures 64 solely to exercise real task-budget
+exhaustion. It does not configure more CPU permits to make sleepers pass.
+
+```
+python3 tests/runtime2/cp23/admission.py --nift ./nift \
+ --switch .build/cp13b/nift-switch --negative-control /path/to/frozen-R2-nift \
+ --output /tmp/cp23-admission.json
+```
+
+This adds an actual pre-fix binary control and checks CLI VM-only execution in
+both dispatch modes. Reference-host latency is never inferred from local wall
+times. Allocation mode `timers` checks four concurrent sleepers with one-shot
+and persistent allocation failure. The mutation lane adds real topology-limit
+and retained-timer-permit defects, each requiring a completed admission suite and
+its own signature; normal, dead, timeout and unrelated inputs must be rejected.

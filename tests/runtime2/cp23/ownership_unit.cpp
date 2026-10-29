@@ -78,7 +78,7 @@ void pool_lifetime() {
  std::shared_ptr<const Program> program(std::move(code.program));
  auto map=std::make_shared<ProgramTransferMap>(*program);
  SharedOpError op;Value channel=shared_make_channel(0,op);
- auto pool=std::make_shared<ParallelRuntime>(1);
+ auto pool=std::make_shared<ParallelRuntime>(1,64);
  std::vector<std::shared_ptr<ParallelTaskRecord>> records;
  for(int i=0;i<64;++i){
   auto r=std::make_shared<ParallelTaskRecord>();r->program=program;r->proto_map=map;r->runtime=pool;

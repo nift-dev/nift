@@ -6,6 +6,7 @@
 #include "rt/natives/host_stream_handles.h"
 
 #include <new>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -31,7 +32,12 @@ void Vm::abandon_unwound_handle(const Value& value) {
 
 void Vm::close_handle_runtime(VmResult& result) {
     if (!handle_context_open_) return;
-    ParallelBlock blocked; // worker cleanup may close/flush blocking Host streams
+    // A worker table which has never created a resource has no blocking
+    // cleanup hook or pending lifecycle ticket. Still close the context and
+    // produce its normal report, retaining the CPU permit for this cold case.
+    std::optional<ParallelBlock> blocked;
+    if (!options_.current_task || handle_table_.stats().created != 0)
+        blocked.emplace(ParallelWaitKind::Cleanup);
     const handles::CloseReport close = handle_table_.close_context(handle_context_);
     handle_context_open_ = false;
     // CP17 x CP18: a cleanup report lost to an allocation failure (a dying

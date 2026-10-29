@@ -27,8 +27,7 @@ bool shared_cancel(const Value& task_value, SharedOpError& error) {
     if (wake) {
         record->cv.notify_all();
         notify_parallel_wait_states(record);
-        Registry& r = registry();
-        r.cv.notify_all();
+        notify_shared_cancellation();
     }
     return true;
 }

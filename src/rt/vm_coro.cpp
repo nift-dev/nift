@@ -216,7 +216,17 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
             return 2;
         }
         if (!coro.parallel_live.empty() || !coro.foreign_waits.empty()) {
-            coro.wait_parallel(vm, observed);
+            if (!coro.wait_parallel(vm, observed, fault)) {
+                // Restore the suspended frame/handler/handle roots before
+                // taking the ordinary VM fault path; never unwind C++ here.
+                // This wait was never admitted. Remove its borrowed-future
+                // observer so error completion cannot wait on that future.
+                coro.foreign_waits.erase(std::remove_if(coro.foreign_waits.begin(), coro.foreign_waits.end(),
+                    [&](const Coro::ForeignWait& wait) { return wait.task == coro.current; }), coro.foreign_waits.end());
+                if (!coro.tasks[coro.current].body_done)
+                    load(vm, coro.current, R, K, proto, base, pc);
+                return 0;
+            }
             continue;
         }
         if (coro.timers.empty()) {
@@ -227,7 +237,11 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
 #if NIFT_CORO_MUTANT == 3
         coro.wake->wait_until(coro.timers.top().at - std::chrono::milliseconds(150));  // M3: early wake-up
 #else
-        coro.wake->wait_until(coro.timers.top().at);
+        if (ParallelRuntime::help_timer(coro.timers.top().at)) {
+            fire_due(coro, Clock::now());
+            continue;
+        }
+        { ParallelBlock timer_wait(ParallelWaitKind::Timer); coro.wake->wait_until(coro.timers.top().at); }
 #endif
         fire_due(coro, Clock::now());
     }

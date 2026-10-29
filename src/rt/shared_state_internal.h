@@ -48,20 +48,29 @@ struct Registry {
 };
 
 template<class Mutex, class Condition, class Predicate>
-void wait_shared(std::unique_lock<Mutex>& lock, Condition& cv, Predicate ready) {
+bool wait_shared(std::unique_lock<Mutex>& lock, Condition& cv, Predicate ready) {
     while (!ready()) {
         lock.unlock();
         {
             ParallelBlock blocked;
             lock.lock();
+            if (!blocked.admitted()) return ready();
             cv.wait(lock, ready);
             lock.unlock();
         }
         lock.lock();  // predicate can change while reacquiring the CPU permit
     }
+    return true;
 }
 
 Registry& registry();
+// Cancellation is stored under the task mutex. Pair its notification with the
+// shared wait mutex so a waiter cannot test false and miss the only wake.
+inline void notify_shared_cancellation() {
+    Registry& r = registry();
+    std::lock_guard<std::recursive_mutex> lock(r.mutex);
+    r.cv.notify_all();
+}
 
 inline void fail(SharedOpError& error, const char* code, std::string message) {
     error.code = code;
