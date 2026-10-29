@@ -49,9 +49,22 @@ VmResult VmSession::finish(bool cancelled) {
     job_result.host_fault = false;
 #endif
     auto result = vm_->finish_session_resources(cancel_pending_);
-    result.host_fault = job_result.host_fault;
-    result.host_fault_message = job_result.host_fault_message;
+    // CP23 reconciliation item 6: resource and job cleanup faults are
+    // independent; neither replaces the other (both are kept, resource first).
+    const auto merge_host_fault = [](VmResult& into, const VmResult& from) {
+        if (!from.host_fault) return;
+        if (into.host_fault && !from.host_fault_message.empty())
+            into.host_fault_message += into.host_fault_message.empty() ? from.host_fault_message
+                                                                        : "; " + from.host_fault_message;
+        else if (!into.host_fault) into.host_fault_message = from.host_fault_message;
+        into.host_fault = true;
+    };
+    VmResult faults;  // host faults only: resource cleanup first, then jobs
+    merge_host_fault(faults, result);
+    merge_host_fault(faults, job_result);
     if (result.reason == StopReason::None && job_result.reason != StopReason::None) result = std::move(job_result);
+    result.host_fault = faults.host_fault;
+    result.host_fault_message = std::move(faults.host_fault_message);
     vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
     return result;
