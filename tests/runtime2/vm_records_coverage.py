@@ -344,8 +344,10 @@ REFUSED = [
      '  f(a[i])\n  i += 1\n}\n', 'path-in-call-argument'),
     ('path-member-branch', 'fn(f(s)) {\n  return 0\n}\no := {"j": 1}\ni := 0\nwhile (i < 2) {\n  if (i > 0) {\n'
      '    o = {"k": [1]}\n  }\n  f(o.k)\n  i += 1\n}\n', 'path-in-call-argument'),
+    # CP23 admits atomic<int> (CP22: callable:atomic<int>); the first refusal is
+    # now the mutating place argument (test corrected in CP25-R, 2026-10-30).
     ('path-handle', 'fn(f(s)) {\n  s += 1\n  return 0\n}\nc := atomic<int>(5)\no := {"h": c}\nf(o.h)\nprint(c)\n',
-     'callable:atomic<int>'),
+     'alias-argument'),
     # CP12b modules: the unit compiles linked, here refused for its missing module
     # (a path rooted at an imported binding: vm_modules.py path-arg-imported).
     ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'import-missing'),
@@ -361,6 +363,10 @@ REFUSED = [
     ("push-index-loop", 'a := [[1]]\nb := []\ni := 0\nwhile (i < 1) { b.push(a[0]); i += 1 }\nprint(b.stringify())\n',
      "aliasing"),
 ]
+
+
+# Refused programs whose legacy result is pinned (the fallback must keep it).
+LEGACY_RESULT = {"path-handle": (b"6\n", b"", 0)}
 
 
 def run(nift, d, mode, timeout):
@@ -422,6 +428,8 @@ def main():
                         vm, st = run(nift, d, "1", a.timeout)
                         if vm != legacy or not st or st.get("vm_executions", 0) != 0:
                             failures.append(f"{name}: not refused before execution or output differs")
+                        elif name in LEGACY_RESULT and legacy != LEGACY_RESULT[name]:
+                            failures.append(f"{name}: legacy result {legacy} != {LEGACY_RESULT[name]}")
                 shutil.rmtree(d, ignore_errors=True)
         for name, source, want in outer_cases():
             d = tempfile.mkdtemp(dir=work)
