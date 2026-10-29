@@ -611,6 +611,15 @@ def recursion_budget_matches(a, b):
     return True
 
 
+def trace_continues(a, b):
+    """Owner 2026-10-30: under the D-001#4 recursion-budget class only (A
+    stopped at legacy's 64-frame limit, B went on), B's Host trace may extend
+    A's: A's events, in emission order and byte for byte, are exactly the
+    first events of B's, and B's further events come after all of them. A
+    modified, reordered or missing common event is never approved."""
+    return a["trace"] == b["trace"][:len(a["trace"])]
+
+
 sys.path.insert(0, os.path.join(REPO, "tests", "runtime2"))
 import vm_policies  # noqa: E402  (the shared approved-difference policies, CP12)
 
@@ -730,6 +739,9 @@ def apply_policies(entry, a, b, diffs, rules, used=None):
                 rule = candidate
                 break
         if rule is None and class_rule is not None and diff["channel"] in CLASS_CHANNELS:
+            rule = class_rule
+        if (rule is None and class_rule is not None and diff["channel"] == "trace"
+                and class_rule["class"] == "recursion-budget" and trace_continues(a, b)):
             rule = class_rule
         if rule:
             approved.append({"channel": diff["channel"], "policy": rule["id"], "decision": rule["decision"]})

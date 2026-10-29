@@ -2081,6 +2081,7 @@ test-runtime2-rt-diff: $(TARGET)
 # normalisations document, and its policies approve only exact differences.
 test-runtime2-rt-diff-selftest: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/rt_diff_selftest.sh
+	$(PYTHON) tests/runtime2/rt_diff_trace_policy_selftest.py
 
 # Runtime 2.0 CP01 (review defect D1): modified-mode timestamp races.
 test-runtime2-modified-race: $(TARGET)
