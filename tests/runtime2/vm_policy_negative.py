@@ -22,6 +22,7 @@ import vm_policies  # noqa: E402
 
 A, C = "approved", "diff"
 NUM, DIAG, REC = "D-018a numbers", "D-018c diagnostics", "D-001#4 recursion"
+INTERP = "D-018c interpolation"
 
 
 def d(line, col, msg):
@@ -233,6 +234,38 @@ CASES += [
     ("other host failure not recognised", (b"", d(1, 15, b"read_file: cannot open path"), 1),
      (b"", d(1, 22, b"read_file: cannot open path"), 1), TE,
      b"fn(work(p)) { return read_file(p) }\nprint(work(\"x\"))\n", C, None),
+]
+
+# Owner 2026-10-30: D-018c subcase for arithmetic Errors raised inside `$[...]`
+# (legacy: at the string, or at `print` with `print: `; VM: the operation).
+SRC_IP = b"x := 2.5\nprint(\"v=$[x % 3].\")\n"
+SRC_IS = b"x := 0\ns := \"v=$[1 / x]\"\n"
+SRC_IAMB = b"fn(z()) { return 0 }\na := z()\nb := z()\ns := \"v=$[1 / a] $[1 / b]\"\n"
+SRC_IMULTI = b"x := 0\nprint(\"a\", \"b$[1 / x]\")\n"
+SRC_IOUT = b"x := 0\nprint(1 / x)\n"
+MOD_I = b"modulo requires integer-valued operands"
+CASES += [
+    ("interpolation in print: operation vs print", (b"", d(2, 1, b"print: " + MOD_I), 1),
+     (b"", d(2, 12, MOD_I), 1), TE, SRC_IP, A, INTERP),
+    # Already D-018c proper: legacy reports the declaration statement (no prefix).
+    ("interpolation in a declaration: operation vs string", (b"", d(2, 6, b"division by zero"), 1),
+     (b"", d(2, 11, b"division by zero"), 1), TE, SRC_IS, A, DIAG),
+    ("interpolation: VM at the wrong operation column", (b"", d(2, 1, b"print: " + MOD_I), 1),
+     (b"", d(2, 13, MOD_I), 1), TE, SRC_IP, C, None),
+    ("interpolation: legacy not at the print or string", (b"", d(2, 2, b"print: " + MOD_I), 1),
+     (b"", d(2, 12, MOD_I), 1), TE, SRC_IP, C, None),
+    ("interpolation: message changed", (b"", d(2, 1, b"print: " + MOD_I), 1),
+     (b"", d(2, 12, b"modulo by zero"), 1), TE, SRC_IP, C, None),
+    ("print prefix dropped outside any interpolation", (b"", d(2, 1, b"print: division by zero"), 1),
+     (b"", d(2, 7, b"division by zero"), 1), TE, SRC_IOUT, C, None),
+    ("print with two arguments: origin not attributable", (b"", d(2, 1, b"print: division by zero"), 1),
+     (b"", d(2, 18, b"division by zero"), 1), TE, SRC_IMULTI, C, None),
+    ("two operations can fail: ambiguous origin", (b"", d(4, 6, b"division by zero"), 1),
+     (b"", d(4, 11, b"division by zero"), 1), TE, SRC_IAMB, C, None),
+    ("interpolation: side effect lost", (b"side\n", d(2, 6, b"division by zero"), 1),
+     (b"", d(2, 11, b"division by zero"), 1), TE, SRC_IS, C, None),
+    ("interpolation: non-arithmetic error", (b"", d(2, 6, b"value has no member: zz"), 1),
+     (b"", d(2, 11, b"value has no member: zz"), 1), TE, SRC_IS, C, None),
 ]
 
 

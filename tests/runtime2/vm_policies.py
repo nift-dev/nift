@@ -61,7 +61,8 @@ DIAGNOSTIC = re.compile(rb"^error: (.*):(\d+):(\d+): ([^\n]*)\n\Z")
 RETURN_PREFIX = b"return: "
 TASK_CONTEXTS = (b"thread: ", b"future: ")
 
-POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix", "D-040 independent copy")
+POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix", "D-040 independent copy",
+            "D-018c interpolation")
 
 
 IMPORT_PREFIX = b"import: "
@@ -188,6 +189,59 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     return not mapped or _fields_ok(source, root, legacy_msg, vm_msg, site)
 
 
+PRINT_PREFIX = b"print: "
+
+
+def interpolation_origin(legacy_err, vm_err, st, source=None):
+    """D-018c subcase (owner, 2026-10-30): an arithmetic Error raised by an
+    operation inside `$[...]`. Legacy reports it at the interpolated string
+    literal, or, when that string is the single argument of `print`, at the
+    print statement with a `print: ` prefix; the VM reports the failing
+    operation itself. Approved only when:
+      - both report one diagnostic in the same file, the message is one of
+        the arithmetic errors (vm_sites.ARITHMETIC) and, with any `print: `
+        prefix removed, identical;
+      - legacy's position is the start of an interpolated String (no
+        prefix), or of a `print(<that string>)` call with exactly one
+        argument (prefix), never anything else;
+      - the string holds no nested interpolated string;
+      - exactly one operation inside that string can raise the message
+        (vm_sites.expected_site, constants evaluated exactly), and the VM's
+        position is that operation.
+    Everything else (stdout, exit status) must already be equal (caller)."""
+    lm, vm = DIAGNOSTIC.match(legacy_err), DIAGNOSTIC.match(vm_err)
+    if not lm or not vm or lm.group(1) != vm.group(1):
+        return False
+    legacy_msg, vm_msg = lm.group(4), vm.group(4)
+    prefixed = legacy_msg.startswith(PRINT_PREFIX)
+    if (legacy_msg[len(PRINT_PREFIX):] if prefixed else legacy_msg) != vm_msg or vm_msg not in vm_sites.ARITHMETIC:
+        return False
+    source = _source_bytes(source, st)
+    root = vm_sites.parse(source) if source else None
+    if root is None:
+        return False
+    offset = vm_sites.offset_of(source, int(lm.group(2)), int(lm.group(3)))
+    if offset is None:
+        return False
+
+    def interpolated(n):
+        return n.kind == "String" and any(c.kind != "StringPart" for c in n.children)
+
+    string = None
+    for n in root.walk():
+        if n.begin != offset:
+            continue
+        if not prefixed and interpolated(n):
+            string = n
+        elif (prefixed and n.kind == "Call" and len(n.children) == 2 and n.children[0].kind == "Ident"
+              and source[n.children[0].begin:n.children[0].end] == b"print" and interpolated(n.children[1])):
+            string = n.children[1]
+    if string is None or any(interpolated(n) for n in string.walk() if n is not string):
+        return False
+    site = vm_sites.expected_site(source, vm_msg, (string.begin, string.end))
+    return site is not None and site == (int(vm.group(2)), int(vm.group(3)))
+
+
 def _return_prefix(legacy, vm, st, source):
     """D-009#5: the VM reports the same diagnostic at the same position; the
     only difference is one or more legacy `return: ` prefixes."""
@@ -272,4 +326,7 @@ def _classify(legacy, vm, st, source=None):
     if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
             and diagnostics_match(legacy[1], vm[1], st, source)):
         return "approved", "D-018c diagnostics"
+    if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
+            and interpolation_origin(legacy[1], vm[1], st, source)):
+        return "approved", "D-018c interpolation"
     return "diff", None

@@ -1398,3 +1398,22 @@ Tests: `tests/runtime2/cp25/const/` (loop cases against an oracle, the same
 layout run once outside a loop, with legacy shown to differ where it does);
 `semantics/loop_const.f` with its `.r2` goldens, approved in the VM lane by
 `tools/rt-diff/policies/d009-const-vm.json`.
+
+## D-059 — D-018c subcase: arithmetic errors inside `$[...]` (owner, 2026-10-30; CP25-R)
+
+An arithmetic Error (division or modulo by zero, non-integer modulo
+operands, 64-bit overflow, non-finite result) raised by an operation inside
+an interpolation is reported by the VM at the failing operation. Legacy
+reports it at the interpolated string, or, when the string is the single
+argument of `print`, at the print statement with a `print: ` prefix; that
+prefix may be omitted for such an error. Message text (prefix aside), error
+kind, catchability, evaluation order and earlier side effects are unchanged;
+errors outside interpolation keep their existing policies.
+
+Recognised only by `vm_policies.interpolation_origin` ("D-018c
+interpolation"): one diagnostic each, same file, an arithmetic message equal
+after removing the prefix, legacy's position at that string or at a
+one-argument `print` of it, no nested interpolated string, and exactly one
+operation inside the string that can raise the message, located
+independently from the AST, at the VM's position. Controls:
+`tests/runtime2/vm_policy_negative.py`.
