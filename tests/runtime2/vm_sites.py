@@ -22,6 +22,7 @@ and never assigned: the value a message field (index, key) must carry when
 legacy's wording omits it.
 """
 import hashlib
+import math
 import os
 import re
 import subprocess
@@ -217,7 +218,7 @@ def evaluate(source, root, node):
         if node.op == "/":
             if b == 0:
                 raise _Err(b"division by zero")
-            return a / b
+            return _finite(a / b)
         if node.op == "%":
             if b == 0:
                 raise _Err(b"modulo by zero")
@@ -231,8 +232,17 @@ def evaluate(source, root, node):
         r = {"+": a + b, "-": a - b, "*": a * b}[node.op]
         if isinstance(r, int) and not INT64[0] <= r <= INT64[1]:
             raise _Err(b"signed 64-bit integer overflow")
-        return r
+        return _finite(r)
     return None
+
+
+def _finite(v):
+    """CP25-R: a fraction result that is not finite is the Error the
+    ARITHMETIC list names ("arithmetic result is not finite"); before, the
+    oracle evaluated it to inf and could never locate that Error."""
+    if isinstance(v, float) and not math.isfinite(v):
+        raise _Err(b"arithmetic result is not finite")
+    return v
 
 
 def _fails(source, root, node, message):

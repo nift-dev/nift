@@ -264,6 +264,10 @@ CASES += [
      (b"", d(4, 11, b"division by zero"), 1), TE, SRC_IAMB, C, None),
     ("interpolation: side effect lost", (b"side\n", d(2, 6, b"division by zero"), 1),
      (b"", d(2, 11, b"division by zero"), 1), TE, SRC_IS, C, None),
+    ("interpolation: non-finite result located", (b"", d(2, 1, b"print: arithmetic result is not finite"), 1),
+     (b"", d(2, 12, b"arithmetic result is not finite"), 1), TE, b"x := 1e308\nprint(\"v=$[x * 10].\")\n", A, INTERP),
+    ("interpolation: finite result claimed not finite", (b"", d(2, 1, b"print: arithmetic result is not finite"), 1),
+     (b"", d(2, 12, b"arithmetic result is not finite"), 1), TE, b"x := 1e300\nprint(\"v=$[x * 10].\")\n", C, None),
     ("interpolation: non-arithmetic error", (b"", d(2, 6, b"value has no member: zz"), 1),
      (b"", d(2, 11, b"value has no member: zz"), 1), TE, SRC_IS, C, None),
 ]
