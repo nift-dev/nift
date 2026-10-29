@@ -198,10 +198,12 @@ MASK2 = [  # review round 2 (mask2.py): the evidence the *buggy* VM emits itself
 CASES += MASK2
 
 # Owner 2026-10-30 (CP23 parity attribution): D-018c recognises `return: `
-# after a `thread: ` / `future: ` context prefix. Everything else stays a
-# difference.
+# after a `thread: ` / `future: ` context prefix, and the location of the
+# sha256_file host failure. Everything else stays a difference.
 SRC_TH = b"fn(bad()) { return 1 / 0 }\nt := thread(bad)\nprint(t.join())\n"
 SRC_FU = b"fn[async](bad()) { return 1 / 0 }\nf := bad()\nprint(await f)\n"
+SRC_SHA = b"fn(work(p)) { return sha256_file(p) }\nt := thread(work, \"x\")\nprint(t.join())\n"
+SRC_SHA2 = b"fn(work(p)) { return sha256_file(p) + sha256_file(p) }\nprint(work(\"x\"))\n"
 TE = st(outcome="vm-error", large_in_loop_path=0)
 CASES += [
     ("thread return prefix, actual node", (b"", d(1, 13, b"thread: return: division by zero"), 1),
@@ -220,6 +222,17 @@ CASES += [
      (b"", d(1, 20, b"task: division by zero"), 1), TE, SRC_TH, C, None),
     ("mutex context lost (CP23 defect)", (b"", d(1, 14, b"thread: mutex: unlock by non-owner"), 1),
      (b"", d(1, 14, b"mutex: unlock by non-owner"), 1), TE, b"fn(bad(m)) { m.unlock(); return true }\n", C, None),
+    ("sha256_file at the failing call", (b"", d(1, 15, b"sha256_file: cannot open path"), 1),
+     (b"", d(1, 22, b"sha256_file: cannot open path"), 1), TE, SRC_SHA, A, DIAG),
+    ("sha256_file, VM at another column", (b"", d(1, 15, b"sha256_file: cannot open path"), 1),
+     (b"", d(1, 24, b"sha256_file: cannot open path"), 1), TE, SRC_SHA, C, None),
+    ("sha256_file, wording changed", (b"", d(1, 15, b"sha256_file: cannot open path"), 1),
+     (b"", d(1, 22, b"sha256_file: no such file"), 1), TE, SRC_SHA, C, None),
+    ("sha256_file, call not unique", (b"", d(1, 15, b"sha256_file: cannot open path"), 1),
+     (b"", d(1, 22, b"sha256_file: cannot open path"), 1), TE, SRC_SHA2, C, None),
+    ("other host failure not recognised", (b"", d(1, 15, b"read_file: cannot open path"), 1),
+     (b"", d(1, 22, b"read_file: cannot open path"), 1), TE,
+     b"fn(work(p)) { return read_file(p) }\nprint(work(\"x\"))\n", C, None),
 ]
 
 

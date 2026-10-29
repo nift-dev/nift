@@ -136,6 +136,13 @@ def _candidates(source, root, message):
     if m:
         return [n for n in nodes if n.kind == "Assign" and n.children and n.children[0].kind == "Index"
                 and text(source, n.children[0].children[1]) == m.group(1)]
+    # Owner 2026-10-30: the one host-operation failure approved for D-018c
+    # location recognition. The failing node is a call of that built-in by
+    # name; expected_site still requires it to be unique where legacy reports.
+    m = re.match(rb"^(sha256_file): cannot open path\Z", message)
+    if m:
+        return [n for n in nodes if n.kind == "Call" and n.children and n.children[0].kind == "Ident"
+                and text(source, n.children[0]) == m.group(1)]
     ops = {b"division by zero": ("/", "/="), b"modulo by zero": ("%", "%="),
            b"modulo requires integer-valued operands": ("%", "%="),
            b"signed 64-bit integer overflow": ("+", "-", "*", "/", "%", "+=", "-=", "*=", "/=", "%=", "neg"),
