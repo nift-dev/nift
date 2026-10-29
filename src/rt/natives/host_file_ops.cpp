@@ -4,6 +4,7 @@
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_file_handles_internal.h"
 #include "rt/natives/host_stream_handles.h"
+#include "rt/shared_state.h"
 
 namespace nift::rt::natives {
 using namespace host_handle_detail;
@@ -15,7 +16,17 @@ Status handle_close(const Context& context, const Value* args, std::uint32_t arg
     }
     if (args[0].handle_kind() == HandleKind::File) return file_close(context, args, argc, out, error);
     if (args[0].handle_kind() == HandleKind::Stream) return stream_close(context, args, argc, out, error);
-    error = "close: expected a file or stream handle";
+    if (args[0].handle_kind() == HandleKind::Channel) {
+        SharedOpError failure;
+        if (!shared_channel_close(args[0], failure)) {
+            error = failure.message;
+            if (context.host.error_code) *context.host.error_code = failure.code;
+            return Status::Recoverable;
+        }
+        out = Value();
+        return Status::Ok;
+    }
+    error = "close: expected a file, stream or channel handle";
     return Status::Error;
 }
 

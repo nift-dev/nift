@@ -264,6 +264,7 @@ void cooperative_switches(CompileLimits& limits) {
     };
     limits.cooperative_threads = on("NIFT_VM_COOPERATIVE_THREADS");
     limits.cooperative_observe = on("NIFT_VM_COOPERATIVE_OBSERVE");
+    limits.parallel_tasks = !limits.cooperative_threads;
 }
 
 }  // namespace nift::rt

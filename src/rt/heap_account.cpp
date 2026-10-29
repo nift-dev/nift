@@ -146,6 +146,8 @@ void heap_charge(std::size_t bytes) noexcept {
     charged_bytes += bytes;
 }
 
+void heap_uncharge(std::size_t bytes) noexcept { live_bytes -= bytes; charged_bytes -= bytes; }
+
 std::size_t heap_charged_bytes() noexcept { return charged_bytes; }
 
 std::size_t heap_footprint(const HeapObject* object) noexcept { return exact_bytes(raw_footprint(object)); }

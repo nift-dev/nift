@@ -118,7 +118,11 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     if (session_ && !session_lambda_captures(node_id(node), node, upvalue_names, upvalue_loop,
                                             upvalue_readonly, upvalue_const_array)) return false;
     // Async captures include prior-command cells; preserve CP22 refusal.
-    if ((node.flags & kFlagAsync) && !upvalue_names.empty()) return fail(node, "coro-capture");
+    // CP23: a parallel task receives transferred copies of its captures, so the
+    // shared-cell refusal does not apply there. Sessions keep the refusal
+    // (their coroutine units are refused anyway: session:coroutine).
+    if ((node.flags & kFlagAsync) && !upvalue_names.empty() && (!parallel_tasks_ || session_))
+        return fail(node, "coro-capture");
     if (program_ == nullptr || program_->protos.size() >= 0xffff) return fail(node, "limit:lambdas");
     const auto slot = static_cast<std::uint16_t>(program_->protos.size());
     program_->protos.push_back(nullptr);

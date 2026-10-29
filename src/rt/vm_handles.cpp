@@ -1,4 +1,5 @@
 #include "rt/vm_handles.h"
+#include "rt/parallel_task.h"
 
 #include "rt/handles/file_resource.h"
 #include "rt/cell.h"
@@ -11,10 +12,13 @@
 
 namespace nift::rt {
 
-Vm::~Vm() { handle_table_.shutdown_noexcept(); }
+// Vm::~Vm is in vm_parallel_cleanup.cpp (workers settle before the table shuts down).
 
 VmResult Vm::finish_session_resources(bool cancelled) {
     VmResult result;
+    // Item 4: no worker may outlive the session's resource contexts. Session
+    // coroutine units are refused (session:coroutine), so normally none exist.
+    coro_abort_parallel();
     if (cancelled && handle_context_open_) handle_table_.cancel_context(handle_context_);
     if (options_.return_value) *options_.return_value = Value();
     if (options_.session_globals) for (auto& value : *options_.session_globals) {
@@ -55,6 +59,7 @@ void Vm::abandon_unwound_handle(const Value& value) {
 
 void Vm::close_handle_runtime(VmResult& result, bool on_error) {
     if (!handle_context_open_) return;
+    ParallelBlock blocked; // worker cleanup may close/flush blocking Host streams
     const handles::CloseReport close = handle_table_.close_context(handle_context_, on_error);
     handle_context_open_ = false;
     // CP17 x CP18: a cleanup report lost to an allocation failure (a dying

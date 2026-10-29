@@ -188,6 +188,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
     if (!no_alias(node.b, node)) return false;
+    if (kinds(node.a) & kKindAtomic) return atomic_store(node, b);
     return assign_value(node, b);
 }
 
@@ -258,6 +259,7 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     return builder_ok();
 }
 
+
 bool UnitCompiler::compound_assign(const Node& node) {
     const Node& target = ast_.at(node.a);
     if (const StructFieldInfo* field = struct_target(target))
@@ -271,6 +273,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
+    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
     // `+=` on two numbers or two strings, the others on numbers (legacy
     // errors and prepared array concatenation are refused).
     const KindSet l = kinds(node.a), r = kinds(node.b);
@@ -305,6 +308,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
+    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     return compound_op(node, b);
 }
@@ -317,6 +321,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     if (found->const_array) return fail(target, "declare-const");
     if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;
+    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, dst, true);
     if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t work = 0;

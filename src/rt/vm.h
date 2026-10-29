@@ -31,6 +31,7 @@
 // process stops before the host runs out of memory.
 #include "rt/handles/table.h"
 #include "rt/heap_account.h"
+#include "rt/transfer_heap.h"
 #include "Diagnostic.h"
 #include "rt/proto.h"
 #include "rt/source_map.h"
@@ -41,9 +42,17 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace nift::rt {
+
+struct ParallelRuntime;
+struct ParallelOutput;
+struct ParallelTaskRecord;
+struct ParallelWait;
+class ProgramTransferMap;
+class TransferProtoMap;
 
 inline constexpr std::size_t kMaxEvidenceLines = 4096;
 
@@ -72,6 +81,28 @@ struct VmOptions {
     // than returned in VmResult::return_text. The CLI sets it; embedders keep
     // the value separate.
     bool return_in_output = false;
+    // CP23: capture the TopReturn value without rendering it. The isolate task
+    // wrapper transfers any Value, including ones the renderer does not print.
+    bool return_value_only = false;
+    // CP23: the cooperative CP22 path (no OS workers). Default false; the CLI
+    // sets it from NIFT_VM_COOPERATIVE_THREADS=1.
+    bool cooperative_tasks = false;
+    // CP23: the bounded worker admission shared by an isolate and every nested
+    // isolate it spawns. Null with cooperative_tasks (or before the Vm starts).
+    std::shared_ptr<ParallelRuntime> parallel;
+    std::shared_ptr<ParallelOutput> parallel_output;
+    // CP23: the shared record of the worker task running this Vm (null for the
+    // parent run), used for cooperative cancellation checks.
+    std::shared_ptr<ParallelTaskRecord> current_task;
+    // CP23: the wait state shared by an isolate family so cancellation wakes
+    // every blocked await/join in the family.
+    std::shared_ptr<ParallelWait> parallel_wait;
+    // Keeps an isolate's cloned Program alive while its worker tasks run.
+    std::shared_ptr<const Program> program_keepalive;
+    // CP23: canonical wire map of the isolate's cloned Program. Worker
+    // TransferGraphs use the root program's proto indices at every depth, so
+    // a transferred task result can be decoded in any isolate.
+    std::shared_ptr<const TransferProtoMap> transfer_map;
 };
 
 struct VmResult {
@@ -142,11 +173,29 @@ public:
     void clear_session_execution();
     void retire_session_slots(const std::vector<std::uint16_t>& slots);
 
+    // CP23: the value of the last TopReturn, kept in this VM's heap until the
+    // caller releases it (ideally after encoding it with TransferGraph on the
+    // same thread). Never a raw value passed to another isolate.
+    bool has_return_value() const noexcept { return has_return_value_; }
+    const Value* return_value() const noexcept { return has_return_value_ ? &return_value_ : nullptr; }
+    Value take_return_value() noexcept {
+        has_return_value_ = false;
+        return std::move(return_value_);
+    }
+    // CP23: the original Value of an uncaught catchable Error of this run, for
+    // encoding it through TransferGraph before this Vm is destroyed.
+    bool has_uncaught_error() const noexcept { return has_uncaught_error_; }
+    Value take_uncaught_error() noexcept {
+        has_uncaught_error_ = false;
+        return std::move(uncaught_error_);
+    }
+
     // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
     struct Coro;
     struct CoroDelete { void operator()(Coro* coro) const noexcept; };
 
 private:
+    TransferHeapBoundary transfer_heap_boundary_;
     Value& global_slot(std::size_t slot) {
         return options_.session_globals ? options_.session_globals->at(slot) : stack_[slot];
     }
@@ -211,6 +260,8 @@ private:
     bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
     bool origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
     bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
+    bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,
+                          Fault& fault);
     bool collection(const Instr&,Value*,Fault&,const Proto*);
     bool op_collection_sort(const Instr&, Value*, Fault&, const Proto*);
     bool op_collection_step(const Instr&, Value*, Fault&);
@@ -236,11 +287,16 @@ private:
     Value* struct_location(std::int64_t);
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
     void flush_if_needed(std::string& output);
+    void drain_parallel_output(std::string& output);
+    void finish_run(VmResult& result, std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);
     void collection_error_context(VmResult&, const Fault&, const Proto*, const Instr*) const;
     void error_result(VmResult& result, const Fault& fault, const Proto* proto, const Instr* pc) const;
     std::uint32_t report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const;
+    bool cancellation_requested() const;
+    bool raise_catchable(Fault& fault, std::string code, std::string message, const Proto* proto, std::uint32_t offset);
+    bool raise_cancelled(Fault& fault, const Proto* proto, std::uint32_t offset);
     bool memory_ok(Fault& fault) {
         const std::size_t live = live_heap_bytes();
         if (live > heap_peak_) heap_peak_ = live;
@@ -265,15 +321,19 @@ private:
     int coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size_t& base, const Instr*& pc,
                       std::string& output, VmResult& result, Fault& fault);
     void coro_teardown(VmResult& result);
+    void coro_abort_parallel() noexcept;
     int coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                         const Instr*& pc, Fault& fault);
     std::unique_ptr<Coro, CoroDelete> coro_;
+    std::shared_ptr<const TransferProtoMap> transfer_map_owner_;
+    const TransferProtoMap* transfer_map_ = nullptr;
 
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
                                       const Proto*, std::size_t base, const Instr* pc);
     bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;
+    std::uint64_t shared_owner_token_ = 0;
     std::shared_ptr<handles::HandleTable> handle_table_owner_;
     handles::HandleTable& handle_table_;  // one Script context per run or persistent session
     handles::ContextId handle_context_ = 0;
@@ -293,6 +353,11 @@ private:
     std::vector<std::uint64_t> large_lines_, derived_lines_;
     bool evidence_truncated_ = false;
     bool beyond_legacy_depth_ = false;
+    Value return_value_;  // CP23: the last TopReturn value (see take_return_value)
+    bool has_return_value_ = false;
+    Value uncaught_error_;  // CP23: original uncaught Error (see take_uncaught_error)
+    bool has_uncaught_error_ = false;
+    std::string* coro_output_ = nullptr;  // CP23: output of the running coroutine unit
     std::size_t next_frame_check_ = kLegacyMaxDepth;  // Call takes its slow path at this depth
     std::size_t heap_limit_ = 0;  // heap_budget minus the stacks' bytes: the live-heap bound
     std::size_t global_taken_ = 0;  // C6: globals nulled by global_take and not yet put back

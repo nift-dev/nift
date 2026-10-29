@@ -1,4 +1,5 @@
 #include "rt/vm_report.h"
+#include "rt/parallel_task.h"
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
@@ -8,6 +9,7 @@
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
 #include "rt/native.h"
+#include "rt/shared_state.h"
 #include "rt/render.h"
 #include "rt/vm_ops.h"
 
@@ -131,8 +133,18 @@ bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& outp
         if (is_cell(R[in.a + k])) return internal(fault, "cell reached a native");
     switch (static_cast<NativeId>(in.b)) {
         case NativeId::Print: {
+            drain_parallel_output(output);
             const std::size_t before = output.size();
-            if (!native_print(R[in.a], output, fault.message))
+            Value printable = R[in.a];
+            if (printable.is(Kind::Handle) && printable.handle_kind() == HandleKind::Atomic) {
+                SharedOpError error;
+                Value loaded;
+                if (!shared_atomic_load(printable, loaded, error))
+                    return raise_catchable(fault, error.code.empty() ? "runtime.invalid_argument" : error.code,
+                                           error.message, proto, report_offset(fault, proto, &in));
+                printable = std::move(loaded);
+            }
+            if (!native_print(printable, output, fault.message))
                 return raise(fault, StopReason::Error, fault.message);
             for (std::size_t k = before; k < output.size(); ++k) lines_ += output[k] == '\n';
             R[in.a] = Value();
@@ -181,8 +193,19 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
 
 bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto) {
     if (const auto* note = note_at(proto, &in)) result.return_inspection = note->session_inspection;
+    // CP23: the last TopReturn value, transferred out by isolate tasks. Only
+    // an isolate (return_value_only) retains it: a persistent CP19 session VM
+    // must not keep an extra reference to a command's value (and the
+    // resources it may own) beyond that command.
+    if (options_.return_value_only) {
+        return_value_ = R[in.a];
+        has_return_value_ = true;
+    }
+    // CP19: an eval/session command receives the value itself; an isolate task
+    // (return_value_only) renders nothing; otherwise the rendered text.
     if (options_.return_value) *options_.return_value = R[in.a];
-    else if (!append_rendered(R[in.a], result.return_text)) return internal(fault, "script return value");
+    else if (!options_.return_value_only && !append_rendered(R[in.a], result.return_text))
+        return internal(fault, "script return value");
     result.returned = true;
     return pop_handlers_for_frame(0, fault);
 }

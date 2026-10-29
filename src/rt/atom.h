@@ -36,6 +36,9 @@ public:
     static std::size_t entry_bytes(std::string_view text) noexcept;
 
     AtomTable();
+    ~AtomTable();
+    AtomTable(const AtomTable&) = delete;
+    AtomTable& operator=(const AtomTable&) = delete;
     Atom intern(std::string_view text);
     // Returns false when `text` has never been interned (lookups of unknown
     // keys can then fail without growing the table).
@@ -45,8 +48,21 @@ public:
     static AtomTable& current();
 
 private:
+    std::size_t charged_ = 0;
     std::vector<std::unique_ptr<std::string>> names_;
     std::unordered_map<std::string_view, std::uint32_t> ids_;
+};
+
+// A task owns its symbol domain even when its OS worker is reused.
+class AtomTableScope {
+public:
+    AtomTableScope();
+    ~AtomTableScope();
+    AtomTableScope(const AtomTableScope&) = delete;
+    AtomTableScope& operator=(const AtomTableScope&) = delete;
+private:
+    AtomTable table_;
+    AtomTable* previous_;
 };
 
 inline Atom atom(std::string_view text) { return AtomTable::current().intern(text); }

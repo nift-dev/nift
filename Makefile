@@ -324,6 +324,80 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 	"$(RT_NATIVE_BUDGET)"
 	"$(RT_HEAP_LIMIT_ZERO)"
 
+# CP23 milestone 1: thread-neutral isolate value transfer (aliases, cycles,
+# atoms by text, errors, cells, functions, refused futures/handles).
+RT_ISOLATE_TRANSFER_UNIT := $(TEST_DIR)/rt/isolate-transfer-unit$(EXEEXT)
+$(RT_ISOLATE_TRANSFER_UNIT): tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+
+test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
+	"$(RT_ISOLATE_TRANSFER_UNIT)"
+
+# CP23 milestone 2: isolate task entry/result API (wrapper execution, cloned
+# constants, TransferGraph arguments/globals/result; no worker threads yet).
+RT_ISOLATE_TASK_UNIT := $(TEST_DIR)/rt/isolate-task-unit$(EXEEXT)
+$(RT_ISOLATE_TASK_UNIT): tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+
+test-cp23-isolate-task-unit: $(RT_ISOLATE_TASK_UNIT)
+	"$(RT_ISOLATE_TASK_UNIT)"
+
+# CP23 milestone 3: parallel async/thread() on bounded OS workers (await/join,
+# error transfer, nested spawn, drain, done/status and a two-worker CPU check).
+RT_CP23_PARALLEL_UNIT := $(TEST_DIR)/rt/cp23-parallel-unit$(EXEEXT)
+$(RT_CP23_PARALLEL_UNIT): tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+
+test-cp23-parallel-unit: $(RT_CP23_PARALLEL_UNIT)
+	"$(RT_CP23_PARALLEL_UNIT)"
+
+# CP23 milestone 4: shared mutex/atomic/channel registry, cancellation, close
+# sentinel and operator support across OS workers.
+RT_CP23_SHARED_UNIT := $(TEST_DIR)/rt/cp23-shared-unit$(EXEEXT)
+$(RT_CP23_SHARED_UNIT): tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
+		tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+
+test-cp23-shared-unit: $(RT_CP23_SHARED_UNIT)
+	"$(RT_CP23_SHARED_UNIT)"
+
+# CP23 lanes reuse instrumented objects so every test covers the same runtime.
+CP23_CORE := $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
+CP23_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(CP23_CORE))
+CP23_TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(CP23_CORE))
+$(TEST_DIR)/rt/cp23-resource-unit: tests/runtime2/cp23/resource_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
+$(TEST_DIR)/rt/cp23-contention-unit: tests/runtime2/cp23/contention_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
+$(TEST_DIR)/rt/cp23-allocation-unit: tests/runtime2/cp23/allocation_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
+$(TEST_DIR)/rt/cp23-ownership-unit: tests/runtime2/cp23/ownership_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
+$(TEST_DIR)/rt-san/isolate-transfer-unit: tests/rt/isolate_transfer_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+$(TEST_DIR)/rt-san/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+$(TEST_DIR)/rt-tsan/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(TSAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(TSAN_FLAGS) $< $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+test-cp23-ownership-unit: $(TEST_DIR)/rt/cp23-ownership-unit
+	"$<"
+test-cp23-shared-unit-sanitize: $(TEST_DIR)/rt-san/cp23-shared-unit
+	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$<"
+
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
@@ -4111,7 +4185,7 @@ $(RT_CORO_UNIT): tests/rt/coro_unit.cpp $(RT_VM_DEPS) $(RT_VALUE_SOURCES:.cpp=.o
 CP22_RUN = $(PYTHON) tests/runtime2/cp22/run.py
 .PHONY: test-runtime2-cp22 test-runtime2-cp22-sanitize test-runtime2-cp22-tsan test-runtime2-cp22-mutants
 test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
-	"$(RT_CORO_UNIT)"
+	NIFT_VM_COOPERATIVE_THREADS=1 "$(RT_CORO_UNIT)"
 	$(CP22_RUN) --nift "$(CURDIR)/$(TARGET)" --mode legacy
 	set -e; for b in "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(CP13B_SWITCH_NIFT)"; do \
 	  for m in vm refuse default vm-only trace; do $(CP22_RUN) --nift "$$b" --mode $$m; done; \
@@ -4125,8 +4199,8 @@ test-runtime2-cp22-sanitize: $(SAN_TARGET)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp \
 		-o "$(TEST_DIR)/rt-san/coro-unit"
-	ulimit -f 100000; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
-		timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
+	ulimit -f 100000; NIFT_VM_COOPERATIVE_THREADS=1 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+		UBSAN_OPTIONS=halt_on_error=1 timeout 1200 "$(TEST_DIR)/rt-san/coro-unit"
 	set -e; for m in vm refuse default vm-only; do env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 	  UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 $(CP22_RUN) --nift "$(CURDIR)/$(SAN_TARGET)" --mode $$m; done
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 CP22_TIMEOUT=600 \
@@ -4415,3 +4489,22 @@ endif
 test-cp21-interactive-host-mutants: test-cp21-mutant1-controls
 # Retain the actual mutation objects for source/object/binary provenance.
 .SECONDARY: $(foreach m,1 2 3 4 5 6,$(TEST_DIR)/cp21-mutants/$(m)/Spawn.o)
+# CP23 local lanes. Reference-host performance and platform certification are
+# separate owner/integrator obligations; these targets never provision hosts.
+CP23_NORMAL_UNITS := isolate-transfer-unit isolate-task-unit cp23-parallel-unit cp23-shared-unit \
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit
+CP23_SAN_UNITS := isolate-transfer-unit cp23-isolate_task-unit cp23-parallel-unit cp23-shared-unit \
+	cp23-ownership-unit cp23-contention-unit cp23-resource-unit
+CP23_TSAN_UNITS := cp23-parallel-unit cp23-shared-unit cp23-ownership-unit cp23-contention-unit cp23-resource-unit
+.PHONY: test-runtime2-cp23 test-runtime2-cp23-sanitize test-runtime2-cp23-tsan
+test-runtime2-cp23: $(TARGET) $(CP13B_SWITCH_NIFT) $(addprefix $(TEST_DIR)/rt/,$(CP23_NORMAL_UNITS))
+	@set -e; for unit in $(CP23_NORMAL_UNITS); do timeout 180 "$(TEST_DIR)/rt/$$unit"; done
+	$(PYTHON) tests/runtime2/cp23/compatibility.py --nift "$(CURDIR)/$(TARGET)" --output "$(TEST_DIR)/cp23-compatibility.json"
+	$(PYTHON) tests/runtime2/cp23/compatibility.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --output "$(TEST_DIR)/cp23-compatibility-switch.json"
+test-runtime2-cp23-sanitize: $(addprefix $(TEST_DIR)/rt-san/,$(CP23_SAN_UNITS))
+	@set -e; for unit in $(CP23_SAN_UNITS); do \
+	  env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+	  timeout 180 "$(TEST_DIR)/rt-san/$$unit"; done
+test-runtime2-cp23-tsan: $(addprefix $(TEST_DIR)/rt-tsan/,$(CP23_TSAN_UNITS))
+	@set -e; for unit in $(CP23_TSAN_UNITS); do \
+	  env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 timeout 180 "$(TEST_DIR)/rt-tsan/$$unit"; done

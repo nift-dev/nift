@@ -114,7 +114,9 @@ void Inference::statement(NodeId id) {
             const TyRef v = expr(n.b);
             const Node& target = ast_.at(n.a);
             if (target.kind == NodeKind::Ident) {
-                if (TyRef* var = find(ast_.text(target))) { merge_local(*var, v); record(n.a, *var); }
+                if (TyRef* var = find(ast_.text(target))) {
+                    if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }  // CP23: atomic store
+                    merge_local(*var, v); record(n.a, *var); }
             } else if (target.kind == NodeKind::Index) {
                 expr(target.b);
                 add_element(target.a, v);
@@ -136,6 +138,7 @@ void Inference::statement(NodeId id) {
             else if (target.kind == NodeKind::Ident)
                 var = find(ast_.text(target));
             if (!var) break;
+            if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }
             Op op = Op::Add;
             switch (n.op) {
                 case Op::SubAssign: op = Op::Sub; break;
@@ -158,7 +161,8 @@ void Inference::statement(NodeId id) {
             else if (target.kind == NodeKind::Ident)
                 var = find(ast_.text(target));
             if (var) {
-                merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
+                if (!((*var)->kinds & kKindAtomic))
+                    merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
                 record(n.a, *var);
             }
             break;

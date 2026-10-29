@@ -40,8 +40,13 @@ bool reject(UnitPlan& plan, const Node& node, std::string reason) {
 
 bool admit_function(const Ast& ast, NodeId id, UnitPlan& plan) {
     const Node& fn = ast.at(id);
-    // CP22: `fn[async]` is admitted (a coroutine unit); `@fn` bodies and methods are not.
-    if (fn.flags & (kFlagDeferredBody | kFlagMethod)) return reject(plan, fn, "fn-flags");
+    // CP22: `fn[async]` is admitted (a coroutine unit); methods are not.
+    // CP23: `@fn[async]` is admitted too. Its body was parsed in deferred mode;
+    // template-only forms become Opaque and are still refused by the script
+    // runner, so the deferred template semantics are not silently changed.
+    // A plain deferred `@fn` stays refused.
+    if (fn.flags & kFlagMethod) return reject(plan, fn, "fn-flags");
+    if ((fn.flags & kFlagDeferredBody) && !(fn.flags & kFlagAsync)) return reject(plan, fn, "fn-flags");
     if (fn.flags & kFlagAsync) plan.coroutines = true;
     if (fn.a == kNoNode || fn.b == kNoNode) return reject(plan, fn, "fn-shape");
     const std::string_view name = ast.text(ast.at(fn.a));

@@ -61,7 +61,12 @@ NodeId ExprParser::primary_name(Token token) {
             advance();
             const NodeId lambda = lambda_if_any(token.begin, true);
             if (lambda != kNoNode || why_ != OpaqueReason::None) return lambda;
-            return fail(OpaqueReason::LegacyRuntimeError);
+            // `async(callable, ...)` is the removed call form. Parse it as a
+            // call so the compiler can report legacy's exact diagnostic
+            // instead of an opaque generic parse failure.
+            name_base_ = true;
+            collection_base_ = false;
+            return postfix(leaf(NodeKind::Ident, token), token.begin);
         }
     }
     if (first == 'a' && word.size() == 6 && word.substr(1) == std::string_view("tomic")) {

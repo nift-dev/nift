@@ -17,6 +17,9 @@ Receiver receiver_family(KindSet kinds) {
     if (kinds == kKindNull) return Receiver::Null;
     if (kinds == kKindFile) return Receiver::File;
     if (kinds == kKindStream) return Receiver::Stream;
+    if (kinds == kKindMutex) return Receiver::Mutex;
+    if ((kinds & ~kKindAtomic) == 0) return Receiver::Atomic;
+    if (kinds == kKindChannel) return Receiver::Channel;
     return Receiver::None;
 }
 

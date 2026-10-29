@@ -93,6 +93,7 @@ TyRef builtin_result(const Ast& ast_, const natives::BuiltinSpec& spec, const Ty
             t->fields["size"] = kinds_ty(kKindInt);
             return t;
         }
+        case BuiltinId::SharedRecv: case BuiltinId::MutexGet: return any_ty();  // registry values
         case BuiltinId::ObjPick: case BuiltinId::ObjOmit: {  // a subset of the receiver's members
             if (recv->any) return open_ty(kKindObject);
             auto t = std::make_shared<Ty>(*recv);

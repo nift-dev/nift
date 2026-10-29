@@ -31,6 +31,8 @@ Clock::time_point deadline_after(std::int64_t milliseconds) {
 
 bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R, Fault& fault,
                      bool thread) {
+    if (!vm.options_.cooperative_tasks && vm.options_.parallel)
+        return spawn_parallel(vm, in, callee, function, R, fault, thread);
     Coro& coro = *vm.coro_;
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
     std::uint32_t id = 0;
@@ -93,6 +95,8 @@ int Vm::Coro::await(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
     if (future == nullptr || future->thread != join)
 #endif
         return raise(fault, StopReason::Error, "await: expected future") ? 1 : 0;
+    if (future->parallel)
+        return coro.await_parallel(vm, in, R, K, proto, base, pc, fault, future, join);
     if (future->state == FutureState::Pending) {
         future->waiters.push_back(coro.current);
         heap_retally(future);
@@ -119,7 +123,7 @@ int Vm::Coro::await(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
         fault.catchable = true;
 #if NIFT_CORO_MUTANT == 8
         SourceOrigin origin;  // M8: the Error re-stamped with the await site
-        if (vm.origin_at(proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
+        if (vm.origin_at(proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())], origin, fault))
             fault.error = clone_error_with_origin(fault.error, origin);
 #endif
         return 0;
@@ -158,6 +162,10 @@ int Vm::Coro::sleep(Vm& vm, const Instr& in, Value*& R, const Value*& K, const P
 // of the run queue.
 int Vm::Coro::yield(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                     const Instr*& pc, Fault& fault) {
+    if (vm.cancellation_requested()) {
+        vm.raise_cancelled(fault, proto, proto->offsets[static_cast<std::size_t>(pc - proto->code.data())]);
+        return 0;
+    }
     Coro& coro = *vm.coro_;
     ++pc;
     if (--coro.budget != 0) return 1;

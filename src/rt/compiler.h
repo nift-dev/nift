@@ -78,6 +78,10 @@ struct CompileLimits {
     // legacy threads execute in parallel, and until the owner decides the
     // execution model a unit calling thread() is refused (`callable:thread`).
     bool cooperative_threads = false;
+    // CP23: the default execution model admits parallel async/thread() tasks
+    // and skips the cooperative-only admission rules. NIFT_VM_COOPERATIVE_THREADS=1
+    // turns this off (script_runner), preserving the CP22 deterministic path.
+    bool parallel_tasks = false;
     // CP22, non-contractual test switch: admit programs that observe scheduling
     // (record §12.1 A5) so VM-only scheduler tests can run. Off by default.
     bool cooperative_observe = false;

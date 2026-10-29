@@ -50,6 +50,7 @@ bool heap_accounting_overflowed() noexcept;
 // that moment), and never released here: the atom table lives as long as
 // its thread. Reclaiming it at context end is CP23's (context lifetime).
 void heap_charge(std::size_t bytes) noexcept;
+void heap_uncharge(std::size_t bytes) noexcept;
 // Bytes charged through heap_charge on this thread (tests, stats).
 std::size_t heap_charged_bytes() noexcept;
 

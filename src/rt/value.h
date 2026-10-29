@@ -60,6 +60,7 @@ enum class HandleKind : std::uint8_t {
     None, Timer, File, Process, Module, Future, Mutex, Atomic, Ffi, Custom,
     Stream,   // CP16: an open Host stream (legacy "\x1fnift:stream:N")
     Command,  // CP16: a cmd() pipeline builder (legacy "\x1fnift:cmd:N"); started groups are Process
+    Channel,  // CP23: a shared channel handle (registry id, not a heap object)
 };
 
 // CP17/D-035: a counted handle boxed on the VM heap. The box holds one

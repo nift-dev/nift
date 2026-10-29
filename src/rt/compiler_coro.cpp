@@ -224,8 +224,10 @@ private:
             return member_name(callee) == "push" && kinds_.of(callee.a) == kKindArray;
         if (callee.kind != NodeKind::Ident) return false;
         const std::string_view name = ast_.text(callee);
+        if (name == "async" || name == "await") return true;  // removed call forms report their own diagnostic
         if (plan_.index.count(name)) return true;
         if (thread_builtin(call.a)) return true;  // handles reach a thread's snapshot (legacy shares them)
+        if (name == "cancel") return k == kKindFuture || k == kKindThread;  // CP23 cooperative cancellation
         if (name == "type") return k == kKindFuture || k == kKindThread || !(k & kKindTask);
         // A call through a binding (a lambda value): legacy binds the value.
         return (kinds_.of(call.a) & kKindFunction) && !(kinds_.of(call.a) & kKindUnknown);
@@ -322,7 +324,7 @@ bool async_recursion(const Ast& ast, NodeId root, const UnitPlan& plan, std::uin
 bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                           const CompileLimits& limits, std::string& reason, std::uint32_t& offset) {
     if (!plan.coroutines) return true;
-    for (NodeId id = 0; !limits.cooperative_threads && id < ast.size(); ++id) {  // legacy threads run in parallel
+    for (NodeId id = 0; !(limits.cooperative_threads || limits.parallel_tasks) && id < ast.size(); ++id) {
         const Node& n = ast.at(id);
         if (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
             ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"))
@@ -330,32 +332,32 @@ bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, con
     }
     offset = ast.at(root).begin;
     if (limits.linked) { reason = "coro-module"; return false; }
-    if (!plan.structs.empty()) {
+    if (!plan.structs.empty() && !limits.parallel_tasks) {
         reason = "coro-struct";
         offset = ast.at(plan.structs.front().decl).begin;
         return false;
     }
-    if (async_recursion(ast, root, plan, offset)) {
+    if (!limits.parallel_tasks && async_recursion(ast, root, plan, offset)) {
         reason = "coro-async-recursion";
         return false;
     }
     return FutureFlow(ast, plan, kinds).run(root, reason, offset);  // cooperative admission: after compiling
 }
 
-bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset) {
+bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset, bool parallel) {
     for (std::size_t p = 0; p < program.protos.size(); ++p) {
         const Proto& proto = *program.protos[p];
         for (std::size_t pc = 0; pc < proto.code.size(); ++pc) {
             const Instr& in = proto.code[pc];
             const char* why = nullptr;
             switch (in.op) {
-                case OpCode::Closure: if (in.c != 0 && NIFT_CORO_MUTANT != 18) why = "coro-capture"; break;
+                case OpCode::Closure: if (in.c != 0 && !parallel && NIFT_CORO_MUTANT != 18) why = "coro-capture"; break;
                 case OpCode::NewCell: case OpCode::NewSourceSlot: case OpCode::CopyCellLocation:
                 case OpCode::CellAnchor: case OpCode::CellSlot: case OpCode::CellTake:
-                    if (p == 0) why = "coro-main-cell";
+                    if (p == 0 && !parallel) why = "coro-main-cell";
                     break;
                 case OpCode::CollectionCall: case OpCode::CollectionSort: case OpCode::CollectionStep:
-                    why = "coro-collection-callback";
+                    if (!parallel) why = "coro-collection-callback";
                     break;
                 default: break;
             }

@@ -345,6 +345,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     compiler.set_module_names(&limits.module_names);
     compiler.set_session(limits.session);
     if (expression_result) compiler.expression_result();
+    compiler.set_parallel_tasks(limits.parallel_tasks);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -356,6 +357,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             probe.probe_unknown();
             if (expression_result) probe.expression_result();
             probe.set_module_names(&limits.module_names);
+            probe.set_parallel_tasks(limits.parallel_tasks);
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
                 result.reason = probe.reason();
@@ -366,8 +368,9 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
         program->has_coroutines = true;
-        if (!check_coroutine_program(*program, result.reason, result.offset)) return result;
-        if (!check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
+        if (!check_coroutine_program(*program, result.reason, result.offset, limits.parallel_tasks)) return result;
+        if (!limits.parallel_tasks &&
+            !check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
             return result;
     }
     if (limits.session && limits.session->coherent_recompile)

@@ -3,6 +3,7 @@
 #include "HostTrace.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/parallel_task.h"
 #include "rt/string.h"
 
 #include <utility>
@@ -35,10 +36,17 @@ int Vm::op_coro(const Instr& in, Value*& R, const Value*& K, const Proto*& proto
         case OpCode::FutureOp: {
             const FutureObject* future = future_of(R[in.b]);
             if (future == nullptr) return internal(fault, "future method receiver") ? 1 : 0;
-            Value out = in.c == 0 ? Value::boolean(future->state != FutureState::Pending)
-                                  : make_string(future->state == FutureState::Pending  ? "running"
-                                                : future->state == FutureState::Failed ? "error"
-                                                                                       : "done");
+            FutureState state = future->state;
+            if (future->parallel) {
+                const ParallelTaskState parallel = future->parallel->snapshot_state();
+                state = parallel == ParallelTaskState::Pending ? FutureState::Pending
+                        : parallel == ParallelTaskState::Done  ? FutureState::Done
+                                                               : FutureState::Failed;
+            }
+            Value out = in.c == 0 ? Value::boolean(state != FutureState::Pending)
+                                  : make_string(state == FutureState::Pending  ? "running"
+                                                : state == FutureState::Failed ? "error"
+                                                                               : "done");
             R[in.a] = std::move(out);
             ++pc;
             return memory_ok(fault) ? 1 : 0;
@@ -57,9 +65,19 @@ int Vm::coro_call_value(const Instr& in, Value*& R, const Value*& K, const Proto
     const Value& callee = R[in.b];
     const FunctionObject* f = callee.is(Kind::Function) ? callee.heap_as<FunctionObject>() : nullptr;
     const Proto* code = f != nullptr ? static_cast<const Proto*>(f->code) : nullptr;
-    if (in.c & 0x8000u) {  // `thread(f, …)`: the compiler admits a synchronous function with matching arity
-        if (code == nullptr || code->is_async || (in.c & 0x7fffu) != code->nparams)
-            return internal(fault, "thread callee") ? 1 : 0;
+    if (in.c & 0x8000u) {  // `thread(callee, …)`: runtime callee and arity validation
+        if (code == nullptr)
+            return raise(fault, StopReason::Error, "thread: first argument must be callable") ? 1 : 0;
+        if (code->is_async) return raise(fault, StopReason::Error, "thread: invalid async callable") ? 1 : 0;
+        const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
+        if (argc != code->nparams) {
+            const Note* note = note_of(proto, &in);
+            if (f->is_lambda)
+                return raise(fault, StopReason::Error, "thread: lambda argument count mismatch") ? 1 : 0;
+            return raise(fault, StopReason::Error,
+                         "thread: callable argument count mismatch: " +
+                             std::string(note != nullptr && !note->text.empty() ? note->text : "callable")) ? 1 : 0;
+        }
         const Value function = callee;
         if (!Coro::spawn(*this, in, code, function, R, fault, true)) return 0;
         ++pc;
@@ -95,8 +113,13 @@ bool Vm::coro_uncaught(Fault& fault, VmResult& result, Value*& R, const Value*& 
         coro.pending_report = false;
         return false;
     }
+    if (fault.code == "runtime.cancelled") coro_abort_parallel();  // rt-lint: allow-string-compare cancellation
     const std::uint32_t id = coro.current;
     if (id == 0) {
+        if (fault.catchable && fault.error.is(Kind::Error)) {
+            uncaught_error_ = fault.error;
+            has_uncaught_error_ = true;
+        }
         error_result(result, fault, proto, pc);
         task_position(result);
     } else {
@@ -137,6 +160,7 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
                       std::string& output, VmResult& result, Fault& fault) {
     Coro& coro = *coro_;
     if (coro.current != 0) return internal(fault, "main end outside main") ? 1 : 0;
+    drain_parallel_output(output);
     if (options_.return_in_output && result.returned) {
         if (!result.return_text.empty()) {
             output += result.return_text;
@@ -150,8 +174,9 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
 #if NIFT_CORO_MUTANT == 7
     return 2;  // M7: the tasks still running are not drained
 #endif
-    if (coro.tasks.front().children == 0) {
+    if (coro.tasks.front().children == 0 && coro.parallel_live.empty()) {
         coro.tasks.front().body_done = true;
+        coro.flush_parallel_outputs(*this);
         return 2;
     }
     Coro::save(*this, proto, base, pc);
@@ -162,6 +187,7 @@ int Vm::coro_main_end(Value*& R, const Value*& K, const Proto*& proto, std::size
 // End of the run (every path): tasks still alive (only after an internal
 // stop, or mutant M7) are abandoned; every Value they hold is released once.
 void Vm::coro_teardown(VmResult& result) {
+    coro_abort_parallel();
     Coro& coro = *coro_;
     const std::string label = coro.tasks.empty() ? std::string() : coro.tasks.front().label;
     if (!coro.tasks.empty()) Coro::release(coro.tasks.front());  // a suspended main's record (else empty)
@@ -177,6 +203,7 @@ void Vm::coro_teardown(VmResult& result) {
     coro.last_result = Value();
     if (!coro.tasks.empty()) coro.tasks.front().future = Value();  // main's internal accounting future
     if (coro.trace) nift::trace::detail::context() = label;
+    if (coro.parallel && !options_.current_task) coro.parallel->wait_idle();
     result.coro = true;
     result.coro_spawned = coro.spawned;
     result.coro_switches = coro.switches;

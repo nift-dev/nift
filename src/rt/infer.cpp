@@ -3,10 +3,12 @@
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/text_type.h"
+#include "rt/infer_atomic.h"
 #include "rt/infer_builtins.h"
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/number.h"
+#include <cmath>
 #include <memory>
 #include <string>
 // rt-lint: cold-file compile-time analysis, once per unit
@@ -296,7 +298,7 @@ TyRef Inference::expr(NodeId id) {
         }
         case NodeKind::Assign: case NodeKind::CompoundAssign:
             statement(id); t = expr(n.a); break;
-        case NodeKind::IncDec: { t=with_text_number(kinds_ty(kKindNumber),expr(n.a)->legacy_text_number);break; }
+        case NodeKind::IncDec: t = incdec_result(expr(n.a)); break;
         case NodeKind::Call: t = call(n); break;
         case NodeKind::Await: t = awaited(expr(n.a)); break;  // CP22
         default: t = any_ty(); break;  // not compiled (the compiler refuses it)

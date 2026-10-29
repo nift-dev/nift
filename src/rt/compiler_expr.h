@@ -44,6 +44,7 @@ public:
     void probe_unknown() { probe_ = true; }
     void set_session(SessionCompileContext* session);
     void expression_result() { expression_result_ = true; }
+    void set_parallel_tasks(bool enabled) { parallel_tasks_ = enabled; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 private:
     SessionCompileContext* session_ = nullptr;
@@ -140,6 +141,9 @@ private:
     bool return_statement(const Node& node);
     bool assign_value(const Node& node, const Binding& b);
     bool compound_op(const Node& node, const Binding& b);
+    bool atomic_update(const Node& node, const Binding& b, std::uint16_t dst, bool expression);
+    bool atomic_store(const Node& node, const Binding& b);
+    bool atomic_read(NodeId id, std::uint16_t source, std::uint16_t& dst);
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
@@ -336,6 +340,7 @@ private:
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;
+    bool parallel_tasks_ = false;
     const Ast& ast_;
     const UnitPlan& plan_;
     const UnitKinds& kinds_;
