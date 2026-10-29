@@ -205,7 +205,9 @@ bool shared_mutex_lock(const Value& handle, std::uint64_t owner,
         fail(error, "runtime.invalid_argument", "mutex: recursive lock is not supported");
         return false;
     }
-    wait_shared(lock, r.cv, [&] { return !entry->locked || cancelled(task); });
+    if (!wait_shared(lock, r.cv, [&] { return !entry->locked || cancelled(task); })) {
+        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+    }
     if (cancelled(task)) {
         take_task_cancelled(task);
         fail(error, "runtime.cancelled", "task: cancelled while waiting for a mutex");

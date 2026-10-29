@@ -5,6 +5,7 @@
 #include "rt/future.h"
 #include "rt/aggregate.h"
 #include "rt/atom.h"
+#include "rt/heap_account.h"
 #include "rt/shared_state_internal.h"
 #include <chrono>
 #include "rt/shared_state.h"
@@ -64,13 +65,18 @@ std::shared_ptr<ParallelRuntime> ParallelRuntime::from_environment() {
     return std::make_shared<ParallelRuntime>(limit);
 }
 
-namespace { thread_local ParallelRuntime* running_pool = nullptr; }
+namespace {
+thread_local ParallelRuntime* running_pool = nullptr;
+thread_local std::size_t timer_help_depth = 0;
+constexpr std::size_t kTimerHelpDepth = 32;
+}
 
-ParallelRuntime::ParallelRuntime(std::size_t limit)
-    : limit_(std::max<std::size_t>(1, std::min<std::size_t>(256, limit))),
-      capacity_(std::max<std::size_t>(64, std::min<std::size_t>(1024, limit_ * 64))) {
+ParallelRuntime::ParallelRuntime(std::size_t limit, std::size_t task_capacity, std::size_t blocking_capacity)
+    : blocking_capacity_(std::max<std::size_t>(1, std::min(kBlockedCapacity, blocking_capacity))),
+      limit_(std::max<std::size_t>(1, std::min<std::size_t>(256, limit))),
+      capacity_(std::max<std::size_t>(1, std::min(kTaskCapacity, task_capacity))) {
     (void)shared_detail::registry(); // initialize allocating CV state before any noexcept teardown
-    workers_.reserve(capacity_);
+    workers_.reserve(limit_ + blocking_capacity_);
 }
 ParallelRuntime::~ParallelRuntime() {
     { std::lock_guard<std::mutex> lock(mutex_); stopping_ = true; }
@@ -81,13 +87,14 @@ ParallelRuntime::~ParallelRuntime() {
           if (record->state == ParallelTaskState::Pending) record->cancelled = true; }
         notify_parallel_wait_states(record);
     }
-    cv_.notify_all(); shared_detail::registry().cv.notify_all();
+    cv_.notify_all(); resume_cv_.notify_all(); shared_detail::notify_shared_cancellation();
     for (auto& thread : workers_) if (thread.joinable()) thread.join();
     shared_collect();
 }
 void ParallelRuntime::ensure_worker_locked() {
-    if (!stopping_ && !queue_.empty() && workers_.size() < capacity_ &&
-        workers_.size() < std::min(limit_, active_) + blocked_)
+    if (!stopping_ && !queue_.empty() && workers_.size() < limit_ + blocking_capacity_ &&
+        workers_.size() < std::min(limit_, active_) + native_blocked_ +
+                           std::min(kTimerWorkerCapacity, transient_blocked_))
         workers_.emplace_back([this] { worker_loop(); });
 }
 bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::string& error) {
@@ -120,40 +127,78 @@ void ParallelRuntime::worker_loop() {
             if (stopping_ && queue_.empty()) break;
             record = std::move(queue_.front()); queue_.pop_front(); ++computing_;
         }
-        try { run_parallel_task(record); }
-        catch (...) {
-            record->options.current_task.reset();
-            { std::lock_guard<std::mutex> lock(record->mutex);
-              record->state = ParallelTaskState::Failed;
-              record->failure_message = "task failed";
-              record->failure_code.clear(); record->failure_catchable = false;
-              record->failure_reason = StopReason::Internal; }
-            notify_parallel_wait_states(record); record->cv.notify_all();
-        }
-        record.reset();  // destroy neutral task storage before idle is visible
-        shared_collect();
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            --computing_; --active_;
-        }
-        cv_.notify_all();
+        execute_record(std::move(record), true);
     }
     running_pool = nullptr;
 }
-void ParallelRuntime::block_worker() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    --computing_; ++blocked_;
-    try { ensure_worker_locked(); } catch (...) { ++computing_; --blocked_; throw; }
+void ParallelRuntime::execute_record(std::shared_ptr<ParallelTaskRecord> record, bool owns_cpu) {
+    try { run_parallel_task(record); }
+    catch (...) {
+        record->options.current_task.reset();
+        { std::lock_guard<std::mutex> lock(record->mutex);
+          record->state = ParallelTaskState::Failed;
+          record->failure_message = "task failed";
+          record->failure_code.clear(); record->failure_catchable = false;
+          record->failure_reason = StopReason::Internal; }
+        notify_parallel_wait_states(record); record->cv.notify_all();
+    }
+    record.reset();
+    shared_collect();
+    { std::lock_guard<std::mutex> lock(mutex_); --active_; if (owns_cpu) --computing_; }
+    if (owns_cpu) resume_cv_.notify_one();
     cv_.notify_all();
 }
-void ParallelRuntime::resume_worker() {
+bool ParallelRuntime::help_timer(std::chrono::steady_clock::time_point deadline) {
+    auto* pool = running_pool;
+    if (!pool || timer_help_depth == kTimerHelpDepth ||
+        std::chrono::steady_clock::now() >= deadline) return false;
+    std::shared_ptr<ParallelTaskRecord> record;
+    {
+        std::lock_guard<std::mutex> lock(pool->mutex_);
+        // This OS thread already owns one CPU permit. A resumed thread gets
+        // priority; do not consume a second permit for nested execution.
+        if (pool->stopping_ || pool->queue_.empty() || pool->resuming_ ||
+            !pool->queue_.front()->timer_help_safe) return false;
+        // Nested VMs share this OS thread's heap accounting. Small immutable
+        // inputs and fixed headroom prevent an otherwise valid isolate from
+        // failing its own budget merely because it was selected as a helper.
+        constexpr std::size_t headroom = 4u << 20;
+        const auto budget = pool->queue_.front()->options.heap_budget;
+        if (budget < headroom || live_heap_bytes() > budget - headroom) return false;
+        record = std::move(pool->queue_.front()); pool->queue_.pop_front();
+    }
+    ++timer_help_depth;
+    pool->execute_record(std::move(record), false);
+    --timer_help_depth;
+    return true;
+}
+bool ParallelRuntime::block_worker(ParallelWaitKind kind) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const bool native = kind == ParallelWaitKind::Blocking;
+    if (native && native_blocked_ == blocking_capacity_) return false;
+    --computing_; ++blocked_;
+    if (native) ++native_blocked_; else ++transient_blocked_;
+    try { ensure_worker_locked(); }
+    catch (...) {
+        ++computing_; --blocked_;
+        if (native) --native_blocked_; else --transient_blocked_;
+        throw;
+    }
+    resume_cv_.notify_one();
+    cv_.notify_all();
+    return true;
+}
+void ParallelRuntime::resume_worker(ParallelWaitKind kind) {
     std::unique_lock<std::mutex> lock(mutex_);
     ++resuming_;
-    cv_.wait(lock, [&] { return computing_ < limit_; });
+    if (kind == ParallelWaitKind::Blocking) --native_blocked_; else --transient_blocked_;
+    resume_cv_.wait(lock, [&] { return computing_ < limit_; });
     --resuming_; --blocked_; ++computing_;
 }
-ParallelBlock::ParallelBlock() : runtime_(running_pool) { if (runtime_) runtime_->block_worker(); }
-ParallelBlock::~ParallelBlock() { if (runtime_) runtime_->resume_worker(); }
+ParallelBlock::ParallelBlock(ParallelWaitKind kind) : runtime_(running_pool), kind_(kind) {
+    if (runtime_ && !runtime_->block_worker(kind_)) { admitted_ = false; runtime_ = nullptr; }
+}
+ParallelBlock::~ParallelBlock() { if (runtime_) runtime_->resume_worker(kind_); }
 bool ParallelRuntime::try_acquire(std::string& error) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (active_ >= limit_) { error = "parallel worker limit exceeded"; return false; }
@@ -164,6 +209,8 @@ void ParallelRuntime::release() {
     cv_.notify_all();
 }
 std::size_t ParallelRuntime::active() const { std::lock_guard<std::mutex> lock(mutex_); return active_; }
+std::size_t ParallelRuntime::executing() const { std::lock_guard<std::mutex> lock(mutex_); return computing_; }
+std::size_t ParallelRuntime::blocked() const { std::lock_guard<std::mutex> lock(mutex_); return blocked_; }
 std::size_t ParallelRuntime::worker_count() const { std::lock_guard<std::mutex> lock(mutex_); return workers_.size(); }
 bool ParallelRuntime::cancel_queued(const std::shared_ptr<ParallelTaskRecord>& record) {
     {
@@ -233,6 +280,7 @@ void notify_parallel_wait_states(const std::shared_ptr<ParallelTaskRecord>& reco
     if (!record) return;
     std::lock_guard<std::mutex> lock(record->mutex);
     for (const auto& state : record->wait_states) notify_wait_state(state);
+    for (const auto& observer : record->wait_observers) notify_wait_state(observer.state);
 }
 
 void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
@@ -321,60 +369,6 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     record->cv.notify_all();
     notify_parallel_wait_states(record);
 
-}
-
-bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string& error) {
-    auto runtime = record->runtime.lock();
-    if (!runtime) {
-        error = "parallel runtime is not available";
-        return false;
-    }
-    if (!record->program || !record->proto_map || record->program->protos.empty() ||
-        std::any_of(record->program->protos.begin(), record->program->protos.end(),
-                    [](const auto& p) { return !p; })) {
-        error = "missing task program/map"; return false;
-    }
-    if (record->input.has_program_snapshot &&
-        std::any_of(record->program->protos.begin(), record->program->protos.end(),
-                    [](const auto& p) { return !p->constants.empty(); })) {
-        error = "snapshot metadata contains Values"; return false;
-    }
-    // Direct embedding callers have the same source-thread snapshot boundary.
-    if (!record->input.has_program_snapshot) {
-        if (!record->program || !record->proto_map) { error = "missing task program/map"; return false; }
-        if (!record->input.has_seed_graph) {
-            Value seeds = make_array();
-            const auto g = record->program->main().nregs;
-            for (std::size_t i = 0; i < g; ++i)
-                array_push(seeds, i < record->input.globals.size() ? record->input.globals[i] : Value());
-            for (const auto& v : record->input.args) array_push(seeds, v);
-            if (record->input.seed_graph.encode(seeds, *record->proto_map, error) != TransferStatus::Ok) return false;
-            record->input.has_seed_graph = true;
-            record->input.argc = record->input.args.size();
-            record->input.args.clear(); record->input.globals.clear();
-        }
-        std::shared_ptr<const Program> image;
-        if (!snapshot_isolate_program(*record->program, *record->proto_map, record->input, image, error)) return false;
-        record->program = std::move(image);
-        record->options.program_keepalive = record->program;
-    }
-    // Ignored embedding vectors must not retain parent-isolate Values either.
-    record->input.args.clear(); record->input.globals.clear();
-    record->input.proto_map = record->proto_map.get();
-    record->options.program_keepalive = record->program;
-    if (!record->options.parallel_output) {
-        record->options.parallel_output = std::make_shared<ParallelOutput>();
-        record->output_root = true;
-    }
-    // Workers borrow the pool; the owning root keeps it alive and joins it.
-    record->runtime = runtime;
-    record->options.parallel = std::shared_ptr<ParallelRuntime>(runtime.get(), [](ParallelRuntime*) {});
-    try { return runtime->submit(record, error); }
-    catch (const std::bad_alloc&) { throw; }
-    catch (const std::exception& failure) {
-        record->failure_reason = StopReason::Internal;
-        error = std::string("cannot enqueue parallel task: ") + failure.what(); return false;
-    }
 }
 
 } // namespace nift::rt

@@ -215,6 +215,18 @@ def check_vm(nift, name, policy):
     return problems
 
 
+def default_policy_ok(name, policy, legacy, vm):
+    """CP23 owner-approved uncaught parallel join context, one exact fixture.
+    Cooperative VM and legacy expectations remain separate and unchanged.
+    No location, exit, stdout, or unrelated diagnostic difference is allowed.
+    """
+    if name != "th_error_uncaught.f" or policy != "CP23:uncaught-thread-boundary":
+        return False
+    original = (b"start\n", b"error: $ROOT/th_error_uncaught.f:1:13: boom\n", 1)
+    projected = (original[0], b"error: $ROOT/th_error_uncaught.f:1:13: thread: boom\n", 1)
+    return legacy == original and vm == projected
+
+
 def check_default(nift, name, policy):
     """The contractual default (no switches, NIFT_VM=1): either the fixture
     runs on the VM with the expected output, or it is refused before
@@ -224,7 +236,11 @@ def check_default(nift, name, policy):
     if bad:
         return [bad], None
     if st.get("outcome") in ("vm", "vm-error"):
-        want = golden(CASES, name, ".r2") if policy else golden(CASES, name)
+        default_policy = dict(table(HERE / "DEFAULT_EXPECT.tsv")).get(name)
+        want = golden(CASES, name, ".parallel") if default_policy else (
+            golden(CASES, name, ".r2") if policy else golden(CASES, name))
+        if default_policy and not default_policy_ok(name, default_policy, golden(CASES, name), want):
+            return [f"invalid default diagnostic contract: {name} ({default_policy})"], None
         if st.get("vm_executions") != 1 or st.get("legacy_executions") != 0:
             return [f"not one VM execution ({st})"], None
         return ([] if result == want else [f"VM {result!r} != expected {want!r}"]), "vm"

@@ -13,6 +13,7 @@ namespace {
 
 Status recoverable(const Context& context, const SharedOpError& failure, std::string& error) {
     error = failure.message;
+    if (failure.code == "limit.exceeded") return Status::Limit; // rt-lint: allow-string-compare resource limit
     if (context.host.error_code) *context.host.error_code = failure.code;
     return Status::Recoverable;
 }

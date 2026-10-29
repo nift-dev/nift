@@ -92,8 +92,16 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     Value out;
     std::string message;
     natives::Status status;
-    if (options_.current_task && blocking_host(spec.id)) {
+    // Coro::sleep validates/traces with a zero-duration native call. It does
+    // not block; the timer suspension returns the permit separately.
+    if (options_.current_task && blocking_host(spec.id) &&
+        !(spec.id == natives::BuiltinId::HostSleep && in.c == 1 &&
+          R[in.a].is(Kind::Int) && R[in.a].as_int() == 0)) {
         ParallelBlock blocked;
+        if (!blocked.admitted()) {
+            fault.code = "limit.exceeded"; fault.catchable = false;
+            return raise(fault, StopReason::Error, "parallel blocking wait limit exceeded");
+        }
         status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
     } else status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
     switch (status) {

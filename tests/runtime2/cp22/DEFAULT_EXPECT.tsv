@@ -1,0 +1,2 @@
+# Owner-approved CP23 parallel default-lane diagnostic; legacy and cooperative VM goldens are preserved.
+th_error_uncaught.f	CP23:uncaught-thread-boundary

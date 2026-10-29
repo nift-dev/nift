@@ -26,6 +26,7 @@ void Vm::Coro::charge(Task& task, bool suspended) noexcept {
 }
 
 void Vm::Coro::release(Task& task) noexcept {
+    task.parallel_await.reset();
     std::vector<Value>().swap(task.stack);
     std::vector<std::uint8_t>().swap(task.ready);
     std::vector<Frame>().swap(task.frames);
@@ -216,7 +217,17 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
             return 2;
         }
         if (!coro.parallel_live.empty() || !coro.foreign_waits.empty()) {
-            coro.wait_parallel(vm, observed);
+            if (!coro.wait_parallel(vm, observed, fault)) {
+                // Restore the suspended frame/handler/handle roots before
+                // taking the ordinary VM fault path; never unwind C++ here.
+                // Detach only this task's refused await before restoring
+                // its roots. Other tasks and schedulers keep their leases;
+                // final teardown separately releases any abandoned tasks.
+                coro.clear_parallel_await(coro.current);
+                if (!coro.tasks[coro.current].body_done)
+                    load(vm, coro.current, R, K, proto, base, pc);
+                return 0;
+            }
             continue;
         }
         if (coro.timers.empty()) {
@@ -227,7 +238,11 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
 #if NIFT_CORO_MUTANT == 3
         coro.wake->wait_until(coro.timers.top().at - std::chrono::milliseconds(150));  // M3: early wake-up
 #else
-        coro.wake->wait_until(coro.timers.top().at);
+        if (ParallelRuntime::help_timer(coro.timers.top().at)) {
+            fire_due(coro, Clock::now());
+            continue;
+        }
+        { ParallelBlock timer_wait(ParallelWaitKind::Timer); coro.wake->wait_until(coro.timers.top().at); }
 #endif
         fire_due(coro, Clock::now());
     }
@@ -271,6 +286,7 @@ void Vm::Coro::finish(Vm& vm, std::uint32_t id) {
 void Vm::Coro::end_body(Vm& vm, std::uint32_t id) {
     Coro& coro = *vm.coro_;
     Task& task = coro.tasks[id];
+    coro.clear_parallel_await(id);
     task.body_done = true;
     task.state = State::Finishing;
 #if NIFT_CORO_MUTANT == 4

@@ -128,3 +128,47 @@ construction still propagate Internal rather than becoming cancellation.
 On Linux the resource suite also cancels a reader blocked in native FIFO I/O,
 then releases it with a writer and checks catchable cancellation plus descriptor
 and registry balance. The same case runs under ASan/LSan/UBSan and TSan.
+
+## Sleeping-task admission follow-up
+
+The aggregate now includes `cp23-admission-unit` (also ASan/LSan/UBSan and
+TSan). It runs 200 and 10,000 sleeping tasks at each of 1/2/4/8 CPU permits,
+checks repeated observation, cancellation, pending-ancestor safety, heap
+constants, CPU parking, executing-slot and worker bounds, receiver/send/foreign-await resource
+exhaustion and clean shutdown. A 100-level await chain must retain its R2 result at every permit count.
+The default outstanding budget is 16,384, the ordinary blocking budget is 1,024,
+and timer/cleanup compensation is capped at 64;
+`ownership_unit` explicitly configures 64 solely to exercise real task-budget
+exhaustion. It does not configure more CPU permits to make sleepers pass.
+
+```
+python3 tests/runtime2/cp23/admission.py --nift ./nift \
+ --switch .build/cp13b/nift-switch --negative-control /path/to/frozen-R2-nift \
+ --output /tmp/cp23-admission.json
+```
+
+This adds an actual pre-fix binary control and checks CLI VM-only execution in
+both dispatch modes. Reference-host latency is never inferred from local wall
+times. Allocation mode `timers` checks four concurrent sleepers with one-shot
+and persistent allocation failure. The mutation lane adds real topology-limit
+and retained-timer-permit defects, each requiring a completed admission suite and
+its own signature; normal, dead, timeout and unrelated inputs must be rejected.
+
+Uncaught thread reporting is checked by `cp23-reporting-unit` in the normal,
+ASan/UBSan/LSan and TSan aggregates. `thread_diagnostics.py --nift PATH
+--switch PATH --r2 PATH --output FILE` records 24 VM executions against a
+frozen R2 binary: direct and nested uncaught prefixes are corrected, while
+caught Error identity/messages, internal catches, rethrows, ordinary mutex
+errors and division diagnostics retain R2 behaviour. The thread-reporting
+mutant must fail the completed reporting suite; a timeout is not detection.
+
+R4 adds the `cp23-rejected-wait-unit` normal/sanitized aggregates. Its neutral
+record witnesses inspect local waiter IDs and foreign observer leases, preserve
+an unrelated owner target and another scheduler sharing the same target, cancel
+an admitted wait, then complete a subsequent wait successfully. The
+`rejected-wait-cleanup` compiled mutant must fail its completed suite; timeout
+and unrelated failures remain invalid detections. Allocation mode `waiting`
+exercises pending local and foreign awaits and publication/teardown failures.
+`default_controls.py` checks the exact one-fixture CP22 default contract against
+actual R2 and corrupt-prefix/location/statistics controls. The complete CP22
+default lane is required on both dispatch builds, beyond the sleep-only probe.
