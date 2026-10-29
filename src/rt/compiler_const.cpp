@@ -9,17 +9,15 @@ namespace nift::rt::detail {
 // (division or modulo by zero, operand types) come before the const Error;
 // the operation runs on a copy and is never stored.
 //
-// In loop-evaluator code (D-009 #2: const is immutable everywhere; D-058: an
-// assignment to an immutable binding fails before its right-hand side is
-// evaluated, in every context) the write raises at the actual location
-// (D-009 #5). Legacy's loop evaluator never enforces a const declared there,
-// evaluates a plain assignment's value before rejecting an outer const, and
-// reports an outer const's write in a loop-called function at the call site:
-// approved differences. A compound assignment in loop code stays refused: its
-// order at top level (legacy: value and operation first) is an open decision.
+// D-058 (owner, 2026-10-30): the same order in every context, loop-evaluator
+// code included (D-009 #2: const is immutable everywhere, also when declared
+// in a loop; D-009 #5: the Error is reported at the write). Approved
+// differences from legacy's loop evaluator: it never enforces a const
+// declared there, evaluates a plain assignment's value before rejecting an
+// outer const, rejects a compound assignment to an outer const before its
+// value, and reports a write in a loop-called function at the call site.
 bool UnitCompiler::const_write(const Node& node, const Node* value, const std::uint16_t* result,
                                const Binding& b, bool update) {
-    if (loop_reachable() && node.kind == NodeKind::CompoundAssign) return fail(node, "const-loop-compound-order");
     const std::uint16_t mark = fb_->top();
     std::uint16_t reg = 0;
     if (!temp(reg)) return false;

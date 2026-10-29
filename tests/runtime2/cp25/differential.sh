@@ -26,11 +26,14 @@ run --cases "$D/const/loop-outside-increment.txt" --values "$D/const/values.txt"
 run --cases "$D/const/loop-outside-increment.txt" --values "$D/const/values.txt" \
     --contexts "$D/const/loop-callee-contexts.txt" --oracle-contexts "$D/const/loop-callee-oracle.txt" --or-refused type:
 run --cases "$D/const/loop-outside-decrement.txt" --contexts "$D/const/loop-contexts.txt"
-# Compound assignment to a const in loop code stays refused: whether it rejects
-# before its value at top level too (legacy: value and operation first) is
-# open (D-058).
+# D-058: a compound assignment evaluates its value and operation (with their
+# errors) before the const Error in every context, loop code included.
 run --cases "$D/const/loop-compound.txt" --values "$D/const/values.txt" --contexts "$D/const/loop-contexts.txt" \
-    --expect-refusal
+    --oracle-contexts "$D/const/loop-oracle.txt" --or-refused type:
+run --cases "$D/const/operation-cases.txt" --values "$D/const/values.txt" --contexts "$D/const/loop-contexts.txt" \
+    --oracle-contexts "$D/const/loop-oracle.txt" --oracle-may-match --or-refused type: --or-refused context:
+run --cases "$D/const/loop-outside-operation.txt" --values "$D/const/values.txt" --contexts "$D/const/loop-contexts.txt" \
+    --oracle-contexts "$D/const/loop-oracle.txt" --oracle-may-match --or-refused type: --or-refused context:
 # A const that is only read (here: passed by value) runs on the VM in every context, loops included.
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/contexts.txt"
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/loop-contexts.txt"

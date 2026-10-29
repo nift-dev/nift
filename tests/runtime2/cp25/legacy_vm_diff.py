@@ -66,6 +66,9 @@ def main():
     ap.add_argument("--output")
     ap.add_argument("--oracle-contexts",
                     help="approved difference: per-context oracle (same names as --contexts)")
+    ap.add_argument("--oracle-may-match", action="store_true",
+                    help="with --oracle-contexts: legacy may already behave like the oracle for some cases "
+                         "(counted as parity); at least one case must still differ")
     ap.add_argument("--or-refused", action="append", default=[],
                     help="a case may instead be refused for a reason with this prefix (an unrelated refusal "
                          "the same construct gets without the corrected rule); counted separately")
@@ -88,7 +91,7 @@ def main():
     for (cname, ctext), (vname, vtext), (xname, xtext) in itertools.product(blocks(a.cases), values, contexts):
         oracle = place(ctext, vtext, oracles[xname]) if oracles else None
         cases.append((f"{cname}/{vname}/{xname}", place(ctext, vtext, xtext), oracle))
-    rows, failures, refused_other = [], 0, 0
+    rows, failures, refused_other, oracle_same = [], 0, 0, 0
     for name, source, oracle in cases:
         problems = []
         lrc, lout, lerr, _ = run_norm(binary, "0", source)
@@ -105,7 +108,10 @@ def main():
                 problems.append(f"VM differs from the decision's oracle: oracle rc={orc} out={oout!r} err={oerr!r} | "
                                 f"vm rc={vrc} out={vout!r} err={verr!r}")
             if (lrc, lout, lerr) == (orc, oout, oerr):
-                problems.append("legacy already follows the decision here: not an approved difference")
+                if a.oracle_may_match:
+                    oracle_same += 1
+                else:
+                    problems.append("legacy already follows the decision here: not an approved difference")
         elif a.expect_refusal:
             if st.get("outcome") == "vm": problems.append("VM executed a case expected to be refused")
         else:
@@ -121,6 +127,12 @@ def main():
             print(f"FAIL {name}: " + "; ".join(problems)[:600])
     if a.output: Path(a.output).write_text(json.dumps(rows, indent=1) + "\n")
     extra = f" ({refused_other} refused as allowed: {', '.join(a.or_refused)})" if a.or_refused else ""
+    if a.oracle_contexts:
+        differ = len(rows) - refused_other - oracle_same
+        extra += f" ({differ} approved differences from legacy, {oracle_same} where legacy already agrees)"
+        if a.oracle_may_match and differ == 0:
+            failures += 1
+            print("FAIL no case differs from legacy: nothing here is an approved difference")
     print(f"{'PASS' if not failures else 'FAIL'} legacy/VM differential: {len(rows)} cases, {failures} failure(s){extra}")
     return 1 if failures else 0
 

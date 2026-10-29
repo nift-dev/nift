@@ -1370,32 +1370,31 @@ D-036 remains the record that no permanent legacy fallback is accepted: the
 template engine is a scheduled post-release retirement (CP25-L), not a
 permanent fallback.
 
-## D-058 — Writes to immutable bindings (owner, 2026-10-29; CP25-R)
+## D-058 — Writes to immutable bindings (owner, 2026-10-29, final 2026-10-30; CP25-R)
 
-Recorded from the owner's CP25-R const decision. It refines D-009 #2 (const
-is immutable everywhere) and applies D-009 #5 (errors at the actual location).
+Refines D-009 #2 (const is immutable everywhere) and applies D-009 #5 (errors
+at the actual location). The contract is the same in every context: top
+level, functions, loop-evaluator code and loop-called functions.
 
-1. **Approved: loop code.** A `const`/`immut` binding is immutable in
-   loop-evaluator code too, including one declared inside the loop (legacy
-   never enforces it there). The Error is reported where the write is,
-   including inside a loop-called function (legacy: at the call site).
-2. **Approved: plain assignment.** An assignment to an immutable binding fails
-   before its right-hand side is evaluated, in every context. At top level and
-   in functions this is legacy's behaviour; in loop code legacy evaluates the
-   value first for a const declared outside the loop (approved difference).
-   Completed side effects of earlier statements and expressions are kept.
-3. **Increment/decrement** keep legacy's order everywhere: the numeric-operand
-   check, then the const Error (they have no right-hand side).
-4. **Open: compound assignment.** The owner's rule ("fails before evaluating
-   the right-hand side") would also change top-level behaviour: legacy
-   evaluates the value and computes the operation first, so `c /= 0` reports
-   division by zero and `c += f()` runs `f`, before the const Error
-   (`semantics.md` lists top-level const as unchanged). Reported to the owner
-   as a conflict on 2026-10-29. Until decided: top level and functions keep
-   legacy's order (CP25-R parity); loop code refuses
-   (`const-loop-compound-order`).
+| Operation | Contract |
+| --- | --- |
+| Plain assignment to a const | Rejected before the right-hand side is evaluated |
+| Compound assignment to a const | The right-hand side and the operation are evaluated first (their side effects and errors, e.g. division by zero, come first); then the write is rejected |
+| `++` / `--` on a const | Legacy's order: the numeric-operand check, then the const Error |
+| Const declared inside a loop | Immutable (D-009 #2) |
+| Error location | The write itself (D-009 #5) |
 
-Tests: `tests/runtime2/cp25/const/` (loop cases against a same-layout oracle
-outside the loop, with legacy shown to differ; compound loop cases asserted as
-refusals); `semantics/loop_const.f` with its `.r2` goldens, approved in the VM
-lane by `tools/rt-diff/policies/d009-const-vm.json`.
+This is legacy's top-level behaviour (`semantics.md`: top-level const
+unchanged). The owner's earlier proposal (2026-10-29) to reject compound
+assignments before their value too is superseded: it would have changed
+established top-level behaviour.
+
+Approved differences from legacy's loop evaluator: it never enforces a const
+declared in the loop; for a const declared outside it, it evaluates a plain
+assignment's value before rejecting and rejects a compound assignment before
+its value; it reports a write in a loop-called function at the call site.
+
+Tests: `tests/runtime2/cp25/const/` (loop cases against an oracle, the same
+layout run once outside a loop, with legacy shown to differ where it does);
+`semantics/loop_const.f` with its `.r2` goldens, approved in the VM lane by
+`tools/rt-diff/policies/d009-const-vm.json`.

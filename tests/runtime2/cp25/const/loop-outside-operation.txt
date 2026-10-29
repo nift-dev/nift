@@ -1,0 +1,42 @@
+=== outer-compound-add-same
+const c := {V}
+---
+print("before")
+c += {V}
+print("after")
+=== outer-compound-sub-int
+const c := {V}
+---
+print("before")
+c -= 1
+print("after")
+=== outer-compound-div-zero
+const c := {V}
+---
+print("before")
+c /= 0
+print("after")
+=== outer-compound-mod-zero
+const c := {V}
+---
+print("before")
+c %= 0
+print("after")
+=== outer-compound-mul-large
+const c := {V}
+---
+print("before")
+c *= 9007199254740991
+print("after")
+=== outer-increment
+const c := {V}
+---
+print("before")
+c++
+print("after")
+=== outer-decrement-expression
+const c := {V}
+---
+print("before")
+print(c--)
+print("after")
