@@ -59,6 +59,7 @@ vm_sites.require_tool()
 RECURSION_ERROR = re.compile(rb"^error: [^\n]*: callable recursion depth exceeded: [A-Za-z_][A-Za-z0-9_]*\n\Z")
 DIAGNOSTIC = re.compile(rb"^error: (.*):(\d+):(\d+): ([^\n]*)\n\Z")
 RETURN_PREFIX = b"return: "
+TASK_CONTEXTS = (b"thread: ", b"future: ")
 
 POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix", "D-040 independent copy")
 
@@ -140,6 +141,15 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     legacy_pos = (int(lm.group(2)), int(lm.group(3)))
     vm_pos = (int(vm.group(2)), int(vm.group(3)))
     legacy_msg, vm_msg = _strip_return(lm.group(4)), vm.group(4)
+    # Owner 2026-10-30 (CP23 parity attribution): an error raised in a thread
+    # or future keeps its `thread: ` / `future: ` context prefix on both
+    # sides; legacy's redundant `return: ` prefixes directly after it are
+    # removed exactly as at the front. Nothing else is stripped, and the
+    # failing node is located from the message without the context prefix.
+    for ctx in TASK_CONTEXTS:
+        if legacy_msg.startswith(ctx) and vm_msg.startswith(ctx):
+            legacy_msg, vm_msg = _strip_return(legacy_msg[len(ctx):]), vm_msg[len(ctx):]
+            break
     # CP12b modules: the error is in an imported module's file (the path
     # both report): its source is the one the positions refer to.
     reported_file = lm.group(1).decode(errors="replace")

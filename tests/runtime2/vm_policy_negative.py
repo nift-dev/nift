@@ -197,6 +197,31 @@ MASK2 = [  # review round 2 (mask2.py): the evidence the *buggy* VM emits itself
 ]
 CASES += MASK2
 
+# Owner 2026-10-30 (CP23 parity attribution): D-018c recognises `return: `
+# after a `thread: ` / `future: ` context prefix. Everything else stays a
+# difference.
+SRC_TH = b"fn(bad()) { return 1 / 0 }\nt := thread(bad)\nprint(t.join())\n"
+SRC_FU = b"fn[async](bad()) { return 1 / 0 }\nf := bad()\nprint(await f)\n"
+TE = st(outcome="vm-error", large_in_loop_path=0)
+CASES += [
+    ("thread return prefix, actual node", (b"", d(1, 13, b"thread: return: division by zero"), 1),
+     (b"", d(1, 20, b"thread: division by zero"), 1), TE, SRC_TH, A, DIAG),
+    ("future return prefix, actual node", (b"", d(1, 20, b"future: return: division by zero"), 1),
+     (b"", d(1, 27, b"future: division by zero"), 1), TE, SRC_FU, A, DIAG),
+    ("thread prefix, VM at the return", (b"", d(1, 13, b"thread: return: division by zero"), 1),
+     (b"", d(1, 13, b"thread: division by zero"), 1), TE, SRC_TH, C, None),
+    ("thread prefix dropped by the VM", (b"", d(1, 13, b"thread: return: division by zero"), 1),
+     (b"", d(1, 20, b"division by zero"), 1), TE, SRC_TH, C, None),
+    ("thread prefix, other message", (b"", d(1, 13, b"thread: return: division by zero"), 1),
+     (b"", d(1, 20, b"thread: modulo by zero"), 1), TE, SRC_TH, C, None),
+    ("thread vs future context", (b"", d(1, 13, b"thread: return: division by zero"), 1),
+     (b"", d(1, 20, b"future: division by zero"), 1), TE, SRC_TH, C, None),
+    ("other prefix is not stripped", (b"", d(1, 13, b"task: return: division by zero"), 1),
+     (b"", d(1, 20, b"task: division by zero"), 1), TE, SRC_TH, C, None),
+    ("mutex context lost (CP23 defect)", (b"", d(1, 14, b"thread: mutex: unlock by non-owner"), 1),
+     (b"", d(1, 14, b"mutex: unlock by non-owner"), 1), TE, b"fn(bad(m)) { m.unlock(); return true }\n", C, None),
+]
+
 
 def main():
     failures = 0
