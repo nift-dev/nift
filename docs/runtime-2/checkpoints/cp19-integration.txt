@@ -1,0 +1,138 @@
+CP19 R2: local integration onto runtime-2 (integrator: Claude, 2026-10-29)
+
+IDENTITY
+Foundation: runtime-2 475f5192f6ca510d19602e42041d6e10a88efc78,
+  tree 339bb7fc60ac3245e7e4d6a4ddc54476a321811b. The local and origin tips
+  were equal when checked on 2026-10-29.
+Accepted CP19 R2: 846bba1e6247a5730c0f58494cf9dc22b412c2e6,
+  tree 1695836cf7d5cebababdd8f46f0edb21836e57fb, with independent functional
+  acceptance with qualifications.
+R2 was built on the foundation (60 commits), so integration is a
+fast-forward. There were no conflicts, and no accepted semantics changed. The
+integrated tree is exactly the accepted tree 1695836c, plus this record.
+Diff 475f5192..846bba1e: 279 files, +984,643 / -499.
+  - 973,417 lines are committed evidence under docs/evidence (about 19 MB;
+    runtime2-cp19-r1 and runtime2-cp19-shared-eval).
+  - The rest is src/rt (139 files), src/CLI.cpp, src/shell (3 files), the
+    tests and the records.
+Frozen packages, re-hashed on the owner's machine: 422 + 648 + 224 = 1,294
+  entries, 0 mismatches. The manifest hashes equal verification.json.
+
+COMBINED-TREE GATES (fresh, on this tree, GCC 13.3 / libstdc++ 20240904,
+local 2-vCPU container)
+Every gate below was executed for this record; nothing is inherited.
+Binaries built here: nift 4e8c1576..., nift-switch 3580427d...,
+nift-sanitize 81efe39b.... Leak detection was on (detect_leaks=1,
+halt_on_error=1).
+  build, rt-lint, test integrity                 PASS
+  certification guard and self-test              PASS
+  parser statement-state unit (repeated finalization) PASS
+  test-cp19-cleanup-cli                          PASS 72 cases x 2 dispatches
+  test-cp19-cleanup-cli on nift-sanitize         PASS 72 cases (ASan/LSan/UBSan;
+                                                 CP19_ASAN_PRELOAD=libasan so
+                                                 the fault shim can preload)
+  test-cp19-jobs / -job-cli                      PASS 106 checks x 2
+  test-cp19-session                              PASS 405 checks x 2
+  test-cp19-resources / -resource-cli            PASS 168 checks x 2; 16 cases
+  test-cp19-proof                                PASS 393 checks
+  test-cp19-job/proof/resource/session/admission-mutants
+                                                 PASS 2/14/6/7/13 mutants with
+                                                 their controls
+  test-cp19-resource-alloc / -proof-alloc        PASS 231 points (1,618 checks);
+                                                 722 points (5,019 checks)
+  test-cp19-session/proof/admission-sanitize     PASS
+  sanitized jobs, resources, resource-alloc      PASS 106/168/1,618 x 2
+  test-v45-job-control (full CP21 aggregate)     PASS, including the
+                                                 mutant-1 kernel observer and
+                                                 its 5 controls, and 14
+                                                 terminal-audit guards
+  test-cp20-r1, -shell-spawn, -shell-spawn-mutants PASS (22/0)
+  test-runtime2-f6-cleanup / -mutants / -sanitize PASS
+  test-runtime2-cp17-handles, test-runtime2-cp22 PASS
+
+NOT PASSING HERE, with the cause
+  test-cp19-session-cli: FAILS on this toolchain.
+    The case is array_sort: a.sort(cmpv) inside a VM session.
+    compiler_collection_sort.cpp compiles a comparator sort only when
+    __GLIBCXX__ == 20260321, the GCC 15.2 profile validated by CP14B. Here it
+    is 20240904, so the VM refuses method:sort.
+    Inside a VM session a refusal is a hard error: it prints "NIFT_VM session
+    refused: method:sort" and no result, where legacy prints [1,2,3].
+    Scripts fall back to legacy correctly. This is not an integration defect:
+    the test assumes the validated toolchain, and the review ran on it.
+    It is a cross-platform obligation. On macOS (libc++), Windows and other
+    GCC versions, VM sessions reject comparator sorts.
+  test-cp19-proof-cli: NOT RUN.
+    It requires CP19_LEGACY_ORACLE, "the frozen legacy binary", which no
+    package names. The R2 review did not run it either. It needs the owner to
+    choose the oracle binary.
+
+C++ EXCEPTION PATH IN THE SHELL LOOP (handover obligation): REPRODUCED
+Nothing above the shell-loop lambda has a handler: there is none in
+run_script_shell_loop, run_cli or main, and no terminate handler. With GCC,
+an exception that finds no handler calls std::terminate without unwinding.
+So neither cleanup domain runs: the JobTable destructor does not run either,
+contrary to the review's assumption.
+
+Reproduced with no fault injection, on the integrated binary, in both legacy
+(NIFT_VM=0) and VM-session (NIFT_VM unset) mode:
+  - Steps: open a managed file with unsaved changes; start a background job
+    (sleep N &); mkdir gone; cd gone; rmdir ../gone.
+  - shell_prompt_text() then calls the throwing fs::current_path(). It throws
+    filesystem_error, which escapes the loop.
+  - The process aborts with exit status 134 ("terminate called after throwing
+    an instance of std::filesystem::filesystem_error").
+  - The "managed file left open" diagnostic is lost, and the rest of the
+    input is never executed.
+  - On Linux the background job still dies, but only through the kernel:
+    Host stages default to die_with_parent (PR_SET_PDEATHSIG SIGKILL). No
+    such backstop exists on macOS.
+  - Inherited, not introduced by CP19: the same call is in v4.12.0 and in
+    the foundation.
+  - Other exception sources reaching the loop (std::bad_alloc) take the same
+    path. Both std::stoi calls in the job and exit builtins are already
+    guarded.
+
+Smallest correction: proposed, NOT applied, for owner review.
+  1. Trigger: shell_prompt_text() uses fs::current_path(std::error_code&). A
+     deleted working directory then shows "?".
+  2. Backstop: in run_script_shell_loop, `status = loop()` goes inside
+     try/catch. On an exception it prints "internal error: <what>", uses
+     status 70 and falls through to the existing post-loop cleanup.
+Prototype in a scratch copy, then deleted:
+  - Backstop alone: exit 70, the internal error and the managed-file
+    diagnostic; both domains settle.
+  - Both changes: the shell continues, and at EOF it settles normally.
+  - test-cp19-cleanup-cli passes 72 x 2 on the corrected build.
+Affected tests: add an "exception" lane to tests/runtime2/cp19/cleanup_cli.py
+(deleted working directory), asserting no abort, both diagnostics, nonzero
+status and that the job is gone.
+
+INHERITED CP22 GOLDEN r_f3_member_print_default (recorded only, no edit)
+  - The golden 1,3,2,6 is legacy output on a pool of exactly 2 workers. With
+    3 or more, task c runs at once and the order is 3,1,2,6. The legacy pool
+    is max(2, hardware_concurrency) with no override.
+  - It passes on 2-vCPU hosts and fails on larger ones.
+  - Proposed fix: restructure the fixture so it does not depend on the core
+    count (create c only after `await x`), keeping its coro-observe:print
+    refusal purpose.
+
+PERFORMANCE
+The four CP18 million-catch comparisons remain FAILED at <= 1.0, unchanged
+(retained R1 observations):
+  default caught 1.005634820, default caught_cell 1.010119190,
+  switch caught 1.008258728, switch caught_cell 1.011953511.
+No waiver. The authoritative website and scripting campaign is planned and
+not executed; it awaits owner authorisation.
+
+OBLIGATIONS CARRIED FORWARD
+  - Shell-loop exception path: the correction above needs owner adjudication
+    before final release certification.
+  - VM-session comparator sort off the validated toolchain, and
+    cross-platform job and terminal behaviour (the new F2 observer is
+    Linux-only).
+  - test-cp19-proof-cli oracle choice.
+  - VM callable:run refused; persistent session:coroutine atomically refused;
+    CP22 section 6.1.
+  - CP22 golden r_f3_member_print_default; the million-catch gates; the
+    performance decision.
