@@ -21,7 +21,7 @@ make -j8 nift .build/cp13b/nift-switch \
 ```
 
 Run each unit with a bounded timeout. `ownership_unit` checks source/worker
-symbols, captured closures, graph identity, shared and task-record cycles,
+symbols (including 70,000 unrelated source names), captured closures, graph identity, shared and task-record cycles,
 cyclic imported heap reclamation, 20,000-deep graphs, a 64-task saturated pool,
 reuse, queued cancellation, outstanding-work destruction, nested one-permit
 progress, mutex cancellation, and output happens-before boundaries.

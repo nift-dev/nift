@@ -17,7 +17,7 @@ mutants=[
  ('reclamation','src/rt/shared_gc.cpp','void shared_collect() noexcept {','void shared_collect() noexcept { return;','CHECK failed: shared_registry_live_for_test()==0'),
  ('future-identity','src/rt/compare.cpp','return f->parallel ? static_cast<const void*>(f->parallel.get()) : static_cast<const void*>(f);','return static_cast<const void*>(f);','CHECK failed: equal(f,decoded)'),
  ('callable-domain','src/rt/isolate_transfer_decode.cpp','if (n.proto_domain != protos_.domain())','if (false)','CHECK failed: graph.decode(second,out,why)==TransferStatus::ProtoUnavailable'),
- ('atom-member','src/rt/isolate_snapshot.cpp','*operand = atoms[*operand];','if (in.op == OpCode::GetMember && input.atom_names[*operand] == "y") *operand = static_cast<std::uint16_t>(atom("x").id); else *operand = atoms[*operand];','output=[40]'),
+ ('atom-member','src/rt/isolate_snapshot.cpp','*operand = found->second;','if (in.op == OpCode::GetMember && atom_text(Atom{found->second}) == "y") *operand = static_cast<std::uint16_t>(atom("x").id); else *operand = found->second;','output=[40]'),
 ]
 def detected(name,signature,code,output):
  if name=='atom-member':signature='output=[40\n]'

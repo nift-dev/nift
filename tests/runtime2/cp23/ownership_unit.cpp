@@ -1,5 +1,6 @@
 // Regression witnesses for CP23's isolate, scheduler and neutral ownership boundaries.
 #include "rt/parallel_task.h"
+#include "rt/atom.h"
 #include "rt/shared_state.h"
 #include "rt/shared_gc.h"
 #include "rt/aggregate.h"
@@ -129,6 +130,18 @@ void callable_domain() {
  CHECK(graph.decode(second,out,why)==TransferStatus::ProtoUnavailable);
  CHECK(out.is(Kind::Null));
 }
+void large_symbol_context() {
+ AtomTableScope symbols;
+ CompileLimits limits;limits.parallel_tasks=true;
+ const std::string source="fn[async](f()){o:={\"x\":41};return o.x+1};print(await f())";
+ auto compiled=rt_vm_tool::compile(source,limits);CHECK(compiled.program!=nullptr);if(!compiled.program)return;
+ for(int i=0;i<70000;++i)atom("unused-symbol-"+std::to_string(i));
+ CHECK(AtomTable::current().size()>65536);
+ auto map=SourceMap::single("large-symbols.f",source);VmOptions options;
+ options.parallel=std::make_shared<ParallelRuntime>(1);options.source_map=&map;
+ Vm vm(*compiled.program,options);std::string output;auto result=vm.run(output);
+ CHECK(result.reason==StopReason::None);CHECK(output=="42\n");
+}
 void deep_graph() {
  EmptyMap map;Value value=Value::integer(7);
  for(int i=0;i<20000;++i){Value parent=make_array();array_push(parent,value);value=std::move(parent);}
@@ -173,7 +186,7 @@ void cyclic_heap() {
 }
 }
 int main() {
- neutral_cycles(); cyclic_heap(); deep_graph(); callable_domain(); pool_lifetime(); cancel_before_dispatch();
+ neutral_cycles(); cyclic_heap(); deep_graph(); large_symbol_context(); callable_domain(); pool_lifetime(); cancel_before_dispatch();
  vm_case("m:=mutex(0);m.lock();fn[async](p()){m.lock();m.unlock();return 1};a:=p();sleep(20);cancel(a);try{await a}catch(e){print(e.code)};m.unlock()", "runtime.cancelled\n");
  vm_case("fn[async](slow()){sleep(40);return 0};fn[async](fast()){print(\"before\");return 0};a:=slow();b:=fast();await b;print(\"after\");await a", "before\nafter\n");
  vm_case("c:=channel(0);fn[async](p()){print(\"before\");send(c,1);sleep(20);return 0};a:=p();recv(c);print(\"after\");await a", "before\nafter\n");

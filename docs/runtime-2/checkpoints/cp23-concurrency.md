@@ -181,7 +181,9 @@ assert independent acceptance or integration.
 The submitting thread snapshots metadata and all constant Values before a
 worker starts. Queue records contain immutable metadata without Values and
 thread-neutral graphs; even ignored embedding args/globals are cleared on the
-source thread. Worker clones remap all six atom operands: ObjectSet, NewStruct,
+source thread. Only bytecode-referenced atom names are copied; a source table with 70,000
+unrelated names does not overflow the worker operand namespace. Worker clones
+remap all six atom operands: ObjectSet, NewStruct,
 StructAdd, FieldSet, GetMember and FieldGet. Each task has a fresh AtomTable;
 reusable workers do not accumulate task symbols indefinitely. Constants,
 arguments, globals and callable captures are decoded in the destination heap.

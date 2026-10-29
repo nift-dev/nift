@@ -3,10 +3,22 @@
 #include "rt/atom.h"
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 namespace nift::rt {
+namespace {
+const std::uint16_t* atom_operand(const Instr& in) {
+    switch (in.op) {
+        case OpCode::ObjectSet: case OpCode::NewStruct:
+        case OpCode::StructAdd: case OpCode::FieldSet: return &in.b;
+        case OpCode::GetMember: case OpCode::FieldGet: return &in.c;
+        default: return nullptr;
+    }
+}
+}
 bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map,
                               IsolateTaskInput& input, std::shared_ptr<const Program>& metadata,
                               std::string& error) {
+    std::unordered_set<std::uint16_t> used_atoms;
     auto copy = std::make_shared<Program>();
     copy->has_collection_boundaries = source.has_collection_boundaries;
     copy->has_coroutines = source.has_coroutines;
@@ -22,6 +34,7 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         dst.nparams = src.nparams; dst.nregs = src.nregs;
         dst.collection_expression_view = src.collection_expression_view;
         dst.code = src.code; dst.offsets = src.offsets;
+        for (const auto& in : src.code) if (auto operand = atom_operand(in)) used_atoms.insert(*operand);
         dst.notes = src.notes; dst.note_table = src.note_table;
         if (src.collection_entry) dst.collection_entry = copy->protos.at(indices.at(src.collection_entry)).get();
         input.constant_counts.push_back(src.constants.size());
@@ -31,8 +44,10 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
     }
     if (input.constants_graph.encode(constants, map, error) != TransferStatus::Ok) return false;
     auto& table = AtomTable::current();
-    for (std::size_t i = 0; i < table.size(); ++i)
-        input.atom_names.emplace_back(table.text(Atom{static_cast<std::uint32_t>(i)}));
+    for (auto id : used_atoms) {
+        if (id >= table.size()) { error = "invalid source atom operand"; return false; }
+        input.atom_names.emplace_back(id, table.text(Atom{id}));
+    }
     input.has_program_snapshot = true;
     metadata = std::move(copy);
     return true;
@@ -40,26 +55,19 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
 
 bool remap_isolate_atoms(Program& clone, const IsolateTaskInput& input, std::string& error) {
     if (input.has_program_snapshot) {
-        std::vector<std::uint16_t> atoms;
-        atoms.reserve(input.atom_names.size());
+        std::unordered_map<std::uint16_t, std::uint16_t> atoms;
         for (const auto& name : input.atom_names) {
-            const auto id = atom(name).id;
+            const auto id = atom(name.second).id;
             if (id > std::numeric_limits<std::uint16_t>::max())
                 { error = "isolate atom operand limit exceeded"; return false; }
-            atoms.push_back(static_cast<std::uint16_t>(id));
+            atoms.emplace(name.first, static_cast<std::uint16_t>(id));
         }
         for (auto& proto : clone.protos) for (auto& in : proto->code) {
-            std::uint16_t* operand = nullptr;
-            switch (in.op) {
-                case OpCode::ObjectSet: case OpCode::NewStruct:
-                case OpCode::StructAdd: case OpCode::FieldSet: operand = &in.b; break;
-                case OpCode::GetMember: case OpCode::FieldGet: operand = &in.c; break;
-                default: break;
-            }
-            if (operand) {
-                if (*operand >= atoms.size())
-                    { error = "invalid source atom operand"; return false; }
-                *operand = atoms[*operand];
+            if (auto source = atom_operand(in)) {
+                const auto found = atoms.find(*source);
+                if (found == atoms.end()) { error = "invalid source atom operand"; return false; }
+                auto* operand = (in.op == OpCode::GetMember || in.op == OpCode::FieldGet) ? &in.c : &in.b;
+                *operand = found->second;
             }
         }
     }

@@ -48,7 +48,7 @@ struct IsolateTaskInput {
     TransferGraph constants_graph;
     std::vector<std::size_t> constant_counts;
     std::vector<std::uint32_t> proto_wires;
-    std::vector<std::string> atom_names;
+    std::vector<std::pair<std::uint16_t, std::string>> atom_names;
 };
 
 struct IsolateTaskOutcome {
