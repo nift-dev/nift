@@ -191,9 +191,16 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 }
 
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
-                                          const std::string& fallback, bool stops) {
-    return "error: " + where + ": NIFT_VM session refused: " + reason + ": " + describe_refusal(reason) +
-           " is not supported by the Runtime 2.0 VM yet\n" +
+                                          const std::string& fallback, bool stops,
+                                          const std::string& interrupted_file) {
+    const std::string head = "error: " + where + ": NIFT_VM session refused: " + reason + ": " +
+                             describe_refusal(reason) + " is not supported by the Runtime 2.0 VM yet\n";
+    if (!interrupted_file.empty())
+        return head + refusal_notes(("note: this statement was not executed; earlier statements in this session may "
+                                     "already have executed\nnote: initialisation from " + interrupted_file +
+                                     " was interrupted here; later statements in it were not run\n"
+                                     "note: the session continues at the prompt\n").c_str(), fallback);
+    return head +
            refusal_notes(stops ? "note: this statement was not executed; earlier statements in this session may "
                                  "already have executed\n"
                                  "note: the session stopped here: no later input was run (exit status 1)\n"

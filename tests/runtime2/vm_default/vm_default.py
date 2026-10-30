@@ -671,6 +671,53 @@ def main():
               "refusal stop after save(): the saved write is kept, the later unsaved write is reported, exit 1",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} file={(d / 'saved.txt').read_text()!r}")
 
+        # 15. Owner ruling (startup files on a terminal): ~/.niftrc or the file
+        # of `nift -i file` refused while stdin is a tty stops at the refused
+        # statement (earlier statements ran once, later ones not), prints the
+        # diagnostic with the "interrupted" note and continues at a usable
+        # prompt. Piped, the session still stops with exit 1 before running it.
+        startup = ('print("{tag}-START")\ntouch("{tag}-early.txt")\nfn(greet()){{return "hello"}}\nearly := 5\n'
+                   'r := run("echo", "x")\ntouch("{tag}-late.txt")\nlate := 6\n')
+        typed = ["print(early)", "print(greet())", 'touch("typed.txt")', "print(late)", "exit"]
+        for label, args, name, tag in (("~/.niftrc", [], ".niftrc", "RC"), ("nift -i file", ["-i", "init.f"],
+                                                                            "init.f", "INIT")):
+            d = work / f"startup-{tag.lower()}"
+            d.mkdir()
+            (d / name).write_text(startup.format(tag=tag))
+            if tag == "INIT":
+                (d / ".niftrc").write_text('print("RC-START")\n')  # -i file never loads ~/.niftrc (order kept)
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, typed)
+            diag = (f"error: {path}:5:6: NIFT_VM session refused: {REASON}: {RUN_FEATURE} is not supported by the "
+                    "Runtime 2.0 VM yet\n" + STATEMENT_NOTE +
+                    f"note: initialisation from {path} was interrupted here; later statements in it were not run\n"
+                    "note: the session continues at the prompt\n"
+                    f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{' -i init.f' if args else ''}\n"
+                    f"note: please report unsupported programs at {ISSUES}\n")
+            check(status == 0 and (d / f"{tag}-early.txt").exists() and out.count(f"{tag}-START") == 1 and
+                  (tag == "RC" or "RC-START" not in out),
+                  f"{label} on a tty: earlier statements ran exactly once, initialisation order kept (no rerun)",
+                  f"status={status} out={out!r}")
+            after = out.split(diag, 1)[-1]
+            check(not (d / f"{tag}-late.txt").exists() and "NIFT_VM session refused: unresolved-name" in after and
+                  "\n6\n" not in after,
+                  f"{label} on a tty: later statements of the file did not run (`late` is not defined)",
+                  f"out={out!r}")
+            check(diag in out and "no part of it ran" not in out,
+                  f"{label} on a tty: full diagnostic with the interrupted note", f"out={out!r}")
+            check(diag in out and out.split(diag, 1)[1].startswith("5\nhello\n") and (d / "typed.txt").exists(),
+                  f"{label} on a tty: usable prompt - a typed statement works and uses a definition made before "
+                  "the refusal", f"out={out!r}")
+            for f in (f"{tag}-early.txt", f"{tag}-late.txt", "typed.txt"):
+                if (d / f).exists():
+                    (d / f).unlink()
+            proc, rows = run(nift, d, args, {"HOME": str(d)}, stdin="\n".join(typed) + "\n")
+            check(proc.returncode == 1 and "the session stopped here" in proc.stderr and
+                  "initialisation from" not in proc.stderr and not (d / "typed.txt").exists() and
+                  not (d / f"{tag}-late.txt").exists() and "5" not in proc.stdout.split(),
+                  f"{label} piped: the session still stops with exit 1 (unchanged)",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",
                                                                              {"NIFT_VM": "1"})):

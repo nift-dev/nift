@@ -37,7 +37,11 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 // `stops`: a non-interactive session (stdin not a terminal; the initial unit
 // of -i; ~/.niftrc) stops at a refusal with exit status 1 (owner ruling,
 // Option A); a typed REPL on a terminal continues at the prompt.
+// `interrupted_file`: a startup file (~/.niftrc, `nift -i file`) refused on a
+// terminal - its earlier statements ran, it stops here and the session
+// continues at the prompt (owner ruling); the notes say so.
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
-                                          const std::string& fallback, bool stops);
+                                          const std::string& fallback, bool stops,
+                                          const std::string& interrupted_file = std::string());
 
 } // namespace nift::rt

@@ -1665,7 +1665,8 @@ static const std::string* shell_source_line = nullptr;
 static std::size_t shell_source_line_number = 0;
 
 static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
-                                   std::size_t first_line, bool stops) {
+                                   std::size_t first_line, bool stops,
+                                   const std::string& interrupted_file = std::string()) {
     session_refusal_reported = true;
     std::string label = result.refusal_path.empty() ? path : result.refusal_path;
     std::size_t line = result.refusal_line ? result.refusal_line : 1;
@@ -1676,9 +1677,44 @@ static void report_session_refusal(const nift::rt::SessionResult& result, const 
     }
     std::cout.flush();
     std::cerr << nift::rt::vm_session_refusal_diagnostic(label + ':' + std::to_string(line) + ':' +
-                                                         std::to_string(column), result.refusal, path, stops)
+                                                         std::to_string(column), result.refusal, path, stops,
+                                                         interrupted_file)
               << std::flush;
 }
+
+static bool stdin_is_terminal() {
+#ifndef _WIN32
+    return isatty(STDIN_FILENO) != 0;
+#else
+    return _isatty(_fileno(stdin)) != 0;
+#endif
+}
+
+// Owner ruling (startup files on a terminal): when ~/.niftrc or the file of
+// `nift -i file` is refused while stdin is a terminal, the file stops at the
+// refused top-level statement - the statements before it run (as one unit,
+// exactly once), none after it - and the session continues at the prompt.
+// Returns the byte offset where the refused top-level statement starts, or 0
+// when nothing before it can run (refusal in an imported module, no position).
+static std::size_t startup_file_cut(const nift::rt::SessionResult& result, const std::string& source,
+                                    const std::string& path) {
+    if (!result.refusal_line || (!result.refusal_path.empty() && result.refusal_path != path)) return 0;
+    std::size_t offset = 0;
+    for (std::size_t line = 1; line < result.refusal_line && offset < source.size(); ++offset)
+        if (source[offset] == '\n') ++line;
+    offset += result.refusal_column ? result.refusal_column - 1 : 0;
+    nift::rt::Ast ast(source);
+    const auto parsed = nift::rt::parse_script(ast);
+    if (!parsed.ok) return 0;
+    const auto& root = ast.at(parsed.root);
+    std::size_t cut = 0;
+    for (std::uint32_t k = 0; k < root.count; ++k) {
+        const std::size_t begin = ast.at(ast.list(root)[k]).begin;
+        if (begin <= offset) cut = begin;
+    }
+    return cut;
+}
+static bool startup_prefix_running = false;
 
 static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
                                     const std::string& path, bool inspect = true,
@@ -1697,6 +1733,22 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     if ((mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) &&
         result.execution.reason != nift::rt::StopReason::Internal) return 0;
     if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) {
+        if (startup_prefix_running) return 1;  // the prefix of an interrupted startup file: nothing ran
+        const bool startup_file = display == SessionDisplay::Rc ||
+            (display == SessionDisplay::Script && path != "<command-line>" && path != "<stdin>");
+        if (startup_file && stdin_is_terminal()) {
+            const std::size_t cut = startup_file_cut(result, source, path);
+            if (cut) {
+                startup_prefix_running = true;
+                const int prefix_status = run_vm_session_statement(session, source.substr(0, cut), path, inspect,
+                                                                   display, first_line);
+                startup_prefix_running = false;
+                if (prefix_status == 70) return 70;
+            }
+            report_session_refusal(result, path, first_line, false, path);
+            session_refusal_reported = false;
+            return 0;
+        }
         report_session_refusal(result, path, first_line,
                                display != SessionDisplay::Repl || session_stops_on_refusal);
         return 1;
