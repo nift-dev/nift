@@ -11,7 +11,16 @@ legacy fallback.
 Execution engine is proven by NIFT_VM_STATS records (vm_executions /
 legacy_executions), never by output alone. Website builds keep the legacy
 renderer: byte-identical output under the default and NIFT_VM=0, and no VM
-statistics record. Interactive sessions are VM-owned by default (D-054).
+statistics record. Interactive sessions are VM-owned by default (D-054) and a
+refused session unit gets the same full diagnostic, located in the user's terms
+(`<stdin>:line:column` over the whole input stream, or the -i unit's path).
+
+A non-native --platform cannot be honoured by the VM (its platform() is always
+`native`): under the default/require policy every script entry (file, -e/-c,
+stdin, -i, the REPL) is refused before any effect with the stable refusal id
+`platform-non-native`; NIFT_VM=1 records the fallback and runs legacy;
+NIFT_VM=0 is legacy. A refusal inside an imported module names the module
+position and nothing in the main program or the module runs.
 
 Negative controls: the same predicates must reject the old default
 (NIFT_VM=0 standing in for "unset = legacy") and a fallback environment
@@ -63,23 +72,38 @@ def run(nift, cwd, args, extra, stdin=None, stats=True):
     return proc, rows
 
 
-def expected_diagnostic(where, hint):
-    return (f"error: {where}: not compiled for the VM ({REASON}): the call `run()` is not supported by the "
-            "Runtime 2.0 VM yet\n"
-            "note: the program was not executed: no part of it ran\n"
-            f"note: to run it on the legacy interpreter: NIFT_VM=0 nift {hint}\n"
+RUN_FEATURE = "the call `run()`"
+PLATFORM_REASON = "platform-non-native"
+PLATFORM_FEATURE = "a non-native `--platform` selection (the VM's `platform()` is always `native`)"
+PLATFORM_SCRIPT = 'touch("side.txt")\nprint(platform())\n'
+
+
+def notes(hint):
+    return ("note: the program was not executed: no part of it ran\n"
+            f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{(' ' + hint) if hint else ''}\n"
             f"note: please report unsupported programs at {ISSUES}\n")
 
 
-def diagnostic_problems(stderr, where, hint):
+def expected_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
+    return (f"error: {where}: not compiled for the VM ({reason}): {feature} is not supported by the "
+            "Runtime 2.0 VM yet\n" + notes(hint))
+
+
+def expected_session_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
+    return (f"error: {where}: NIFT_VM session refused: {reason}: {feature} is not supported by the "
+            "Runtime 2.0 VM yet\n" + notes(hint))
+
+
+def diagnostic_problems(stderr, where, hint, reason=REASON, feature=RUN_FEATURE, session=False):
     """Every required part, and the exact deterministic text."""
     problems = []
-    parts = [where, "not compiled for the VM", REASON, "the call `run()`", "not executed",
-             f"NIFT_VM=0 nift {hint}", ISSUES]
+    parts = [where + ":", "NIFT_VM session refused" if session else "not compiled for the VM", reason, feature,
+             "not executed", f"NIFT_VM=0 nift{(' ' + hint) if hint else ''}\n", ISSUES]
     for part in parts:
         if part not in stderr:
             problems.append(f"missing {part!r}")
-    if stderr != expected_diagnostic(where, hint):
+    expected = (expected_session_diagnostic if session else expected_diagnostic)(where, hint, reason, feature)
+    if stderr != expected:
         problems.append(f"stderr {stderr!r}")
     return problems
 
@@ -235,26 +259,147 @@ def main():
         check(outputs["default"] == outputs["legacy"] and outputs["default"],
               "website build output is byte-identical under the default and NIFT_VM=0")
 
-        # 7. Interactive session (non-tty stdin): VM-owned by default (D-054).
+        # 7. Interactive session (non-tty stdin): VM-owned by default (D-054). A
+        # refused unit gets the full diagnostic at its position in the input
+        # stream; the session keeps its state and continues (VM-default contract
+        # upgrade from the short `NIFT_VM session refused: <reason>` line).
         d = work / "session"
         d.mkdir()
         lines = 'x := 4\nprint(x)\nr := run("echo", "hi")\nprint(x + 1)\n'
-        proc, rows = run(nift, d, [], {}, stdin=lines)
-        check(proc.returncode == 0 and proc.stdout == "4\n5\n" and
-              proc.stderr == "error: NIFT_VM session refused: callable:run\n" and
-              [r.get("outcome") for r in rows] == ["vm", "vm", "require-error", "vm"] and
-              all(r.get("legacy_executions", 0) == 0 for r in rows),
-              "default REPL session is VM-owned; a refused unit keeps state and never falls back",
-              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        sessions = {}
+        for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
+            proc, rows = run(nift, d, [], extra, stdin=lines)
+            sessions[label] = (proc.returncode, proc.stdout, proc.stderr, [r.get("outcome") for r in rows])
+            problems = diagnostic_problems(proc.stderr, "<stdin>:3:6", "", session=True)
+            check(proc.returncode == 0 and proc.stdout == "4\n5\n" and not problems and
+                  [r.get("outcome") for r in rows] == ["vm", "vm", "require-error", "vm"] and
+                  rows[2].get("reason") == REASON and (rows[2].get("line"), rows[2].get("column")) == (1, 6) and
+                  all(r.get("legacy_executions", 0) == 0 for r in rows),
+                  f"REPL session (NIFT_VM {label}) is VM-owned; a refused unit gets the full diagnostic at "
+                  "<stdin>:3:6, keeps state and never falls back",
+                  f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
+        check(sessions["unset"] == sessions["require"], "REPL session: NIFT_VM=require is identical to the default",
+              repr(sessions))
+        # A multi-line unit: the position is the stream line of the refused call.
+        proc, rows = run(nift, d, ["-i"], {}, stdin='x := 4\nif(x > 1) {\n  r := run("echo", "hi")\n}\nprint(x + 1)\n')
+        problems = diagnostic_problems(proc.stderr, "<stdin>:3:8", "-i", session=True)
+        check(proc.returncode == 0 and proc.stdout == "5\n" and not problems,
+              "nift -i on piped stdin: a multi-line refused unit is located at its stream line (<stdin>:3:8)",
+              f"rc={proc.returncode} out={proc.stdout!r} {problems}")
         proc, rows = run(nift, d, [], {"NIFT_VM": "0"}, stdin=lines.replace("print(x + 1)", "print(type(r))"))
         check(proc.returncode == 0 and proc.stdout == "4\nobject\n" and rows == [],
               "NIFT_VM=0 REPL session is legacy", f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
         (d / "case.f").write_text(UNSUPPORTED)
         proc, rows = run(nift, d, ["-i", "case.f"], {}, stdin="")
-        check(proc.returncode == 1 and proc.stdout == "" and not (d / "side.txt").exists() and
-              "NIFT_VM session refused: callable:run" in proc.stderr and
+        where = f"{(d / 'case.f').resolve().as_posix()}:{REFUSED_AT[0]}:{REFUSED_AT[1]}"
+        problems = diagnostic_problems(proc.stderr, where, "-i case.f", session=True)
+        check(proc.returncode == 1 and proc.stdout == "" and not (d / "side.txt").exists() and not problems and
               all(r.get("legacy_executions", 0) == 0 and r.get("vm_executions", 0) == 0 for r in rows),
-              "-i script: VM-owned session refuses the initial unit before effects",
+              "-i script: VM-owned session refuses the initial unit before effects, full diagnostic at the file "
+              "position", f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
+        proc, rows = run(nift, d, ["-i", "-e", 'touch("t.txt");r := run("echo", "hi")'], {}, stdin="")
+        problems = diagnostic_problems(proc.stderr, "<command-line>:1:21",
+                                       "-i -e 'touch(\"t.txt\");r := run(\"echo\", \"hi\")'", session=True)
+        check(proc.returncode == 1 and proc.stdout == "" and not (d / "t.txt").exists() and not problems,
+              "-i -e: the initial unit is refused before effects with the full, shell-quoted diagnostic",
+              f"rc={proc.returncode} out={proc.stdout!r} {problems}")
+
+        # 8. --platform=<non-native>: the VM cannot honour it (platform() is
+        # always native), so the default/require policy refuses every script
+        # entry before any effect; NIFT_VM=1 falls back; NIFT_VM=0 is legacy.
+        d = work / "platform"
+        d.mkdir()
+        (d / "p.f").write_text(PLATFORM_SCRIPT)
+        where = f"{(d / 'p.f').resolve().as_posix()}:1:1"
+
+        def clean():
+            for name in ("side.txt", "t.txt", "r.txt"):
+                if (d / name).exists():
+                    (d / name).unlink()
+
+        def platform_refused(args, stdin, where, hint, label, extra):
+            clean()
+            proc, rows = run(nift, d, args, extra, stdin=stdin)
+            problems = diagnostic_problems(proc.stderr, where, hint, PLATFORM_REASON, PLATFORM_FEATURE)
+            effects = [n for n in ("side.txt", "t.txt", "r.txt") if (d / n).exists()]
+            check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
+                  len(rows) == 1 and rows[0].get("outcome") == "require-error" and
+                  rows[0].get("reason") == PLATFORM_REASON and rows[0].get("vm_executions") == 0 and
+                  rows[0].get("legacy_executions") == 0,
+                  f"--platform non-native refused before effects with the full diagnostic: {label}",
+                  f"rc={proc.returncode} out={proc.stdout!r} effects={effects} {problems} rows={rows}")
+            return proc
+
+        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"})):
+            platform_refused(["--platform=linux", "p.f"], None, where, "--platform=linux p.f",
+                             f"script file (NIFT_VM {label})", extra)
+            platform_refused(["p.f", "--platform=windows"], None, where, "p.f --platform=windows",
+                             f"script file, selector after the path (NIFT_VM {label})", extra)
+        platform_refused(["--platform=windows", "-e", 'touch("t.txt")'], None, "<command-line>:1:1",
+                         "--platform=windows -e 'touch(\"t.txt\")'", "-e program", {})
+        platform_refused(["--platform=linux", "-c", 'touch("t.txt")'], None, "<command-line>:1:1",
+                         "--platform=linux -c 'touch(\"t.txt\")'", "-c program", {})
+        platform_refused(["--platform=linux", "-"], 'touch("t.txt")\n', "<stdin>:1:1", "--platform=linux -",
+                         "stdin program", {})
+        platform_refused(["--platform=linux", "-i", "p.f"], "", where, "--platform=linux -i p.f",
+                         "-i script", {})
+        platform_refused(["--platform=linux", "-i", "-e", 'touch("t.txt")'], 'touch("r.txt")\n',
+                         "<command-line>:1:1", "--platform=linux -i -e 'touch(\"t.txt\")'", "-i -e program", {})
+        platform_refused(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', "<stdin>:1:1",
+                         "--platform=linux", "REPL session (NIFT_VM unset)", {})
+        platform_refused(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', "<stdin>:1:1",
+                         "--platform=linux", "REPL session (NIFT_VM require)", {"NIFT_VM": "require"})
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "0"})
+        check(proc.returncode == 0 and proc.stdout == "linux\n" and proc.stderr == "" and (d / "side.txt").exists()
+              and rows == [], "--platform=linux under NIFT_VM=0 runs on legacy and honours the platform",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "1"})
+        check(proc.returncode == 0 and proc.stdout == "linux\n" and proc.stderr == "" and (d / "side.txt").exists()
+              and len(rows) == 1 and rows[0].get("outcome") == "fallback" and
+              rows[0].get("reason") == PLATFORM_REASON and rows[0].get("legacy_executions") == 1 and
+              rows[0].get("vm_executions") == 0,
+              "--platform=linux under NIFT_VM=1 records the fallback and runs legacy (no hint)",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "1"}, stdin='touch("r.txt")\n')
+        check(proc.returncode == 0 and proc.stderr == "" and (d / "r.txt").exists(),
+              "--platform=linux REPL under NIFT_VM=1 keeps its (VM-owned) session unchanged",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "0"}, stdin='touch("r.txt")\nprint(platform())\n')
+        check(proc.returncode == 0 and proc.stdout == "linux\n" and (d / "r.txt").exists() and rows == [],
+              "--platform=linux REPL under NIFT_VM=0 is legacy and honours the platform",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        for label, args in (("--platform=native", ["--platform=native", "p.f"]), ("no selector", ["p.f"])):
+            clean()
+            proc, rows = run(nift, d, args, {})
+            check(proc.returncode == 0 and proc.stdout == "native\n" and proc.stderr == "" and
+                  (d / "side.txt").exists() and len(rows) == 1 and rows[0].get("outcome") == "vm" and
+                  rows[0].get("vm_executions") == 1 and rows[0].get("legacy_executions") == 0,
+                  f"{label}: the script runs on the VM by default, as before",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+
+        # 9. A refusal inside an imported module: located in the module, and
+        # nothing in the main program or the module ran.
+        d = work / "module"
+        d.mkdir()
+        (d / "m.nft").write_text('touch("mod-side.txt")\nfn(go()) {\n  r := run("echo", "hi")\n  return r\n}\n'
+                                 'export(go)\n')
+        (d / "main.f").write_text('touch("main-side.txt")\nprint("before")\nimport("m.nft")\nprint(type(go()))\n')
+        for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
+            proc, rows = run(nift, d, ["main.f"], extra)
+            effects = [n for n in ("main-side.txt", "mod-side.txt") if (d / n).exists()]
+            problems = diagnostic_problems(proc.stderr, f"{(d / 'm.nft').resolve().as_posix()}:3:8", "main.f")
+            check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
+                  len(rows) == 1 and rows[0].get("outcome") == "require-error" and rows[0].get("reason") == REASON
+                  and rows[0].get("vm_executions") == 0 and rows[0].get("legacy_executions") == 0,
+                  f"refusal inside an imported module (NIFT_VM {label}): module position, no effect from main "
+                  "or module", f"rc={proc.returncode} out={proc.stdout!r} effects={effects} {problems} rows={rows}")
+        proc, rows = run(nift, d, ["main.f"], {"NIFT_VM": "0"})
+        check(proc.returncode == 0 and proc.stdout == "before\nobject\n" and (d / "main-side.txt").exists() and
+              (d / "mod-side.txt").exists() and rows == [], "the module program runs on legacy under NIFT_VM=0",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
 
         # Negative controls: the predicates reject the old default and a fallback environment.
@@ -269,11 +414,32 @@ def main():
         d.mkdir()
         check(bool(supported_problems(nift, d, {"NIFT_VM": "0"})),
               "control: VM-execution predicate rejects a legacy run with matching output")
+        # The REPL/platform predicates must reject the fallback environment (a
+        # default that silently became NIFT_VM=1 passes every != Off check).
+        d = work / "control-platform"
+        d.mkdir()
+        (d / "p.f").write_text(PLATFORM_SCRIPT)
+        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "1"})
+        check(proc.returncode != 1 or (d / "side.txt").exists() or bool(diagnostic_problems(
+              proc.stderr, f"{(d / 'p.f').resolve().as_posix()}:1:1", "--platform=linux p.f", PLATFORM_REASON,
+              PLATFORM_FEATURE)), "control: platform refusal predicate rejects NIFT_VM=1")
+        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "1"}, stdin='touch("r.txt")\n')
+        check(proc.returncode != 1 or (d / "r.txt").exists(),
+              "control: REPL platform refusal predicate rejects NIFT_VM=1")
         good = expected_diagnostic("p.f:1:1", "p.f")
         check(not diagnostic_problems(good, "p.f:1:1", "p.f"), "control: diagnostic predicate accepts the format")
         for drop in ("not executed", "NIFT_VM=0 nift p.f", ISSUES, REASON, "p.f:1:1", "the call `run()`"):
             check(bool(diagnostic_problems(good.replace(drop, "X"), "p.f:1:1", "p.f")),
                   f"control: diagnostic predicate rejects a diagnostic without {drop!r}")
+        good = expected_session_diagnostic("<stdin>:3:6", "")
+        check(not diagnostic_problems(good, "<stdin>:3:6", "", session=True),
+              "control: session diagnostic predicate accepts the format")
+        check(bool(diagnostic_problems(f"error: NIFT_VM session refused: {REASON}\n", "<stdin>:3:6", "",
+                                       session=True)),
+              "control: session diagnostic predicate rejects the old short refusal line")
+        for drop in ("not executed", "NIFT_VM=0 nift\n", ISSUES, REASON, "<stdin>:3:6", "the call `run()`"):
+            check(bool(diagnostic_problems(good.replace(drop, "X"), "<stdin>:3:6", "", session=True)),
+                  f"control: session diagnostic predicate rejects a diagnostic without {drop!r}")
 
     print("PASS VM-default policy" if not FAILS else f"FAIL VM-default policy ({len(FAILS)} failures)")
     return 0 if not FAILS else 1

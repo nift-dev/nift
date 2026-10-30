@@ -41,6 +41,7 @@ constexpr Family kFamilies[] = {
     {"context:", "a context-dependent legacy behaviour (%)"},
     {"struct-", "this struct feature"},
     {"session:", "this statement in an interactive session (%)"},
+    {"platform-non-native", "a non-native `--platform` selection (the VM's `platform()` is always `native`)"},
     {"aliasing", "shared references to arrays or objects (aliasing)"},
     {"alias-argument", "passing an aliased array or object as an argument"},
     {"path-in-call-argument", "an element path as a call argument"},
@@ -172,12 +173,23 @@ std::string legacy_command_hint(const std::string& fallback) {
     return out;
 }
 
-std::string vm_refusal_diagnostic(const std::string& where, const std::string& reason, const std::string& fallback) {
-    return "error: " + where + ": not compiled for the VM (" + reason + "): " + describe_refusal(reason) +
-           " is not supported by the Runtime 2.0 VM yet\n"
-           "note: the program was not executed: no part of it ran\n"
+namespace {
+std::string refusal_notes(const std::string& fallback) {
+    return "note: the program was not executed: no part of it ran\n"
            "note: to run it on the legacy interpreter: " + legacy_command_hint(fallback) + "\n"
            "note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n";
+}
+} // namespace
+
+std::string vm_refusal_diagnostic(const std::string& where, const std::string& reason, const std::string& fallback) {
+    return "error: " + where + ": not compiled for the VM (" + reason + "): " + describe_refusal(reason) +
+           " is not supported by the Runtime 2.0 VM yet\n" + refusal_notes(fallback);
+}
+
+std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
+                                          const std::string& fallback) {
+    return "error: " + where + ": NIFT_VM session refused: " + reason + ": " + describe_refusal(reason) +
+           " is not supported by the Runtime 2.0 VM yet\n" + refusal_notes(fallback);
 }
 
 } // namespace nift::rt

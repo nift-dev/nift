@@ -1,4 +1,4 @@
-import argparse,json,os,subprocess,tempfile
+import argparse,json,os,re,subprocess,tempfile
 from pathlib import Path
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True);a=ap.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
@@ -30,8 +30,17 @@ for name,source,expected,reason in cases:
    row=dict(case=name,mode=mode,status=p.returncode,stdout=p.stdout,stderr=p.stderr,stats=rows);records.append(row)
    a.out.write_text(json.dumps(records,indent=2)+'\n')
    assert p.returncode==0 and p.stdout==expected,row
-   assert p.stderr==f'error: NIFT_VM session refused: {reason}\n',row
    refused=[s for s in rows if s['outcome']=='require-error'];assert len(refused)==1,row
+   # VM-default policy: the full refusal diagnostic. Every unit here is one stdin
+   # line, so the refused unit's stream line is its record index + its own line.
+   at=rows.index(refused[0])+refused[0]['line']
+   assert refused[0]['line']>=1 and refused[0]['column']>=1,row
+   head=re.escape(f"error: <stdin>:{at}:{refused[0]['column']}: NIFT_VM session refused: {reason}: ")
+   assert re.fullmatch(head+r'[^\n]+ is not supported by the Runtime 2\.0 VM yet\n'
+                       'note: the program was not executed: no part of it ran\n'
+                       'note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
+                       'note: please report unsupported programs at https://github\\.com/nift-dev/nift/issues\n',
+                       p.stderr),row
    assert refused[0]['reason']==reason and refused[0]['vm_executions']==refused[0]['legacy_executions']==0,row
    assert all(s['legacy_executions']==0 for s in rows),row
    assert len([s for s in rows if s['vm_executions']==1])==len(rows)-1,row

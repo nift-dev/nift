@@ -1641,9 +1641,29 @@ static int finish_vm_session(nift::rt::VmSession& session, int status) {
     }
     return status;
 }
+// A refused session unit (VM-default policy): the full refusal diagnostic, as
+// for files, located in the user's terms. REPL/stdin input is `<stdin>` with the
+// line counted over the whole input stream (`first_line` is the stream line the
+// unit starts on); a script, -c/-e or ~/.niftrc unit keeps its own path; a
+// refusal inside an imported module names the module.
+static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
+                                   std::size_t first_line) {
+    std::string label = result.refusal_path.empty() ? path : result.refusal_path;
+    std::size_t line = result.refusal_line ? result.refusal_line : 1;
+    const std::size_t column = result.refusal_column ? result.refusal_column : 1;
+    if (label == path && path == "<repl>") {
+        label = "<stdin>";
+        line += first_line - 1;
+    }
+    std::cout.flush();
+    std::cerr << nift::rt::vm_session_refusal_diagnostic(label + ':' + std::to_string(line) + ':' +
+                                                         std::to_string(column), result.refusal, path)
+              << std::flush;
+}
+
 static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
                                     const std::string& path, bool inspect = true,
-                                    SessionDisplay display = SessionDisplay::Repl) {
+                                    SessionDisplay display = SessionDisplay::Repl, std::size_t first_line = 1) {
     bool expression = false;
     if (inspect) {
         nift::rt::Ast ast(source);
@@ -1657,7 +1677,10 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     const auto mode = nift::rt::vm_mode_from_environment();
     if ((mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) &&
         result.execution.reason != nift::rt::StopReason::Internal) return 0;
-    if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) { console::error("NIFT_VM session refused: " + result.refusal); return 1; }
+    if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) {
+        report_session_refusal(result, path, first_line);
+        return 1;
+    }
     if (result.execution.reason != nift::rt::StopReason::None) {
         std::string message = result.execution.message;
         if (display == SessionDisplay::Rc) message = "niftrc: " + message;
@@ -1713,6 +1736,15 @@ static int run_script_source(const std::string& source, const fs::path& source_p
             return validate_only ? 65 : 1;
         }
         if (validate_only) return 0;
+    }
+    // The VM cannot honour a non-native --platform (its platform() is always
+    // `native`), so such a unit is refused before anything runs under the
+    // default/require policy; NIFT_VM=1 records the fallback and runs legacy as
+    // before; NIFT_VM=0 never gets here.
+    if (target != "native") {
+        int refused_exit = 0;
+        if (nift::rt::refuse_unit_on_vm(source, source_path, "platform-non-native", refused_exit))
+            return refused_exit;
     }
     if (interactive_after && target == "native" && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
         nift::rt::VmSession session(session_options());
@@ -2784,6 +2816,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
                 if (!rr.ok) { console::error("niftrc: " + rr.error.message); return 1; } }
         }
     }
+    std::size_t input_line = 0, pending_line = 1;  // stdin line numbers, for refusal locations
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());
 #ifndef _WIN32
         std::string line;ShellRead r;
@@ -2801,6 +2834,8 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if(line=="__nift_test_throw_bad_alloc__")throw std::bad_alloc();
         if(line=="__nift_test_throw_int__")throw 42;
 #endif
+        ++input_line;
+        if(pending.empty()) pending_line=input_line;
         if(pending.empty()&&(line=="exit"||line=="quit"))break;
         if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);
 #ifndef _WIN32
@@ -2826,7 +2861,8 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
         if (session) {
-            const auto status = run_vm_session_statement(*session, pending, "<repl>");
+            const auto status = run_vm_session_statement(*session, pending, "<repl>", true,
+                                                         SessionDisplay::Repl, pending_line);
             pending.clear(); if (status == 70) return status; continue;
         }
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
@@ -2922,6 +2958,14 @@ int run_cli(int argc, char** argv) {
     }
     if (command.empty()) {
         if (!platform_selected) return run_script_shell();
+        // A VM-owned session cannot honour a non-native platform: refused under
+        // the default/require policy before the session (or ~/.niftrc) starts.
+        // NIFT_VM=1 keeps its session unchanged; NIFT_VM=0 is legacy.
+        if (selected_platform != "native" && nift::rt::vm_mode_from_environment() == nift::rt::VmMode::Require) {
+            int refused_exit = 0;
+            if (nift::rt::refuse_unit_on_vm(std::string(), fs::path("<stdin>"), "platform-non-native", refused_exit))
+                return refused_exit;
+        }
         ScriptRenderHost host(fs::current_path(), selected_platform);
         TrackedInfo info; Parser parser(host, info);
         parser.set_script_invocation("<repl>", {});

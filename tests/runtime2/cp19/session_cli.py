@@ -75,7 +75,12 @@ for name,argv,stdin,rc,units in cases:
    if name in COMPARATOR_CASES and prof.found=='refused':
     # Documented contract off the frozen profile: the session refuses the statement
     # before execution; earlier statements ran on the VM; nothing ran on legacy.
-    assert channels==(0,'','error: NIFT_VM session refused: method:sort\n'),r
+    # VM-default policy: the full refusal diagnostic, located in the input stream.
+    assert channels==(0,'','error: <stdin>:3:1: NIFT_VM session refused: method:sort: the method call `.sort()` '
+                      'is not supported by the Runtime 2.0 VM yet\n'
+                      'note: the program was not executed: no part of it ran\n'
+                      'note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
+                      'note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n'),r
     assert rows and rows[-1]['outcome']=='require-error' and rows[-1]['reason']=='method:sort',r
     assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome']=='vm' for s in rows[:-1]),r
     assert rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,r

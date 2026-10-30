@@ -141,6 +141,19 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
     return true;
 }
 
+bool refuse_unit_on_vm(const std::string& source, const std::filesystem::path& source_path,
+                       const std::string& reason, int& exit_code) {
+    const VmMode mode = vm_mode_from_environment();
+    if (mode == VmMode::Off) return false;
+    Stats stats;
+    stats.source_bytes = source.size();
+    stats.path = source_path.generic_string();
+    stats.reason = reason;
+    stats.line = 1;
+    stats.column = 1;
+    return not_compiled(stats, mode, source_path, exit_code);
+}
+
 bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
                            std::string& error, int& exit_code) {
     const VmMode mode = vm_mode_from_environment();

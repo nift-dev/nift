@@ -15,6 +15,10 @@ struct SessionResult {
     bool admitted = false;
     std::string refusal;
     std::uint32_t offset = 0;
+    // Where the refusal points (the unit's source map): path, 1-based line and
+    // column; line 0 when the refusal has no source position.
+    std::string refusal_path;
+    std::size_t refusal_line = 0, refusal_column = 0;
     VmResult execution;
     Value value;
     bool presentation = false;

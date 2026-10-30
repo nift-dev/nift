@@ -270,6 +270,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
         const auto at = source_map->at(compiled.offset);
         stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = at.path;
         stats.line = at.line; stats.column = at.column;
+        result.refusal_path = at.path; result.refusal_line = at.line; result.refusal_column = at.column;
         detail::report(stats); return result;
     }
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
