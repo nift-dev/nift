@@ -395,6 +395,9 @@ def main():
                                  'export(go)\n')
         (d / "main.f").write_text('touch("main-side.txt")\nprint("before")\nimport("m.nft")\nprint(type(go()))\n')
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
+            for name in ("main-side.txt", "mod-side.txt"):
+                if (d / name).exists():
+                    (d / name).unlink()
             proc, rows = run(nift, d, ["main.f"], extra)
             effects = [n for n in ("main-side.txt", "mod-side.txt") if (d / n).exists()]
             problems = diagnostic_problems(proc.stderr, f"{(d / 'm.nft').resolve().as_posix()}:3:8", "main.f")
