@@ -56,6 +56,8 @@ def run(nift, path, cwd, mode, extra, timeout):
     if mode:
         env["NIFT_VM"] = mode
         env["NIFT_VM_STATS"] = stats
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     if os.path.exists(stats):
         os.unlink(stats)
     try:

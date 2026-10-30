@@ -127,6 +127,8 @@ def run(nift, path, vm):
         stats.unlink()
     if vm:
         env.update({"NIFT_VM": "require", "NIFT_VM_STATS": str(stats), "NIFT_VM_COOPERATIVE_THREADS": "1"})
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     try:
         p = subprocess.run([nift, path.name], cwd=path.parent, env=env, capture_output=True, timeout=TIMEOUT,
                            stdin=subprocess.DEVNULL)

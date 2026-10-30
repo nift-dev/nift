@@ -138,6 +138,8 @@ def run(nift, folder, name, vm=None, extra=None, trace=None, switches=True):
             # pending); `*_default.f` fixtures check the default refusal.
             if switches and not name.endswith("_default.f"):
                 env.update(SWITCHES)
+        else:
+            env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
         env.update(extra or {})
         fds = ()
         if trace is not None:

@@ -70,7 +70,7 @@ def check(args, work, item):
     if want == "vm-textual":
         want = "postfix-receiver:member" if ctx in ("loop", "fnloop") else "vm"
     src = CONTEXTS[ctx].format(f=FUNCS, e=expr)
-    a = run(args.nift, work, src, {})
+    a = run(args.nift, work, src, {"NIFT_VM": "0"})  # legacy oracle: explicit (VM-default policy)
     b = run(args.nift, work, src, {"NIFT_VM": "1", "NIFT_VM_STATS": "stats.jsonl"})
     st = b[3]
     problems = []

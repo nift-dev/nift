@@ -441,7 +441,7 @@ std::size_t run_batch(const std::string& nift, const std::string& dir, std::vect
         std::ofstream program(dir + "/p.f", std::ios::binary);
         for (std::size_t n = from; n < to; ++n) program << program_lines(cases[n], n);
     }
-    const std::string command = "cd '" + dir + "' && env -u NIFT_VM -u NIFT_VM_STATS '" + nift +
+    const std::string command = "cd '" + dir + "' && env -u NIFT_VM_STATS NIFT_VM=0 '" + nift +
                                 "' p.f > out.txt 2> err.txt < /dev/null";
     const int status = std::system(command.c_str());
     std::istringstream out(slurp(dir + "/out.txt"));

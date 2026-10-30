@@ -102,6 +102,8 @@ def run(nift, d, mode, extra):
     stats = os.path.join(d, ".stats")
     if mode:
         env.update({"NIFT_VM": mode, "NIFT_VM_STATS": stats})
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     for leftover in ("log.txt", stats, ".trace"):
         if os.path.exists(os.path.join(d, leftover)):
             os.unlink(os.path.join(d, leftover))

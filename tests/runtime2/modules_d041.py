@@ -47,6 +47,10 @@ def check_step(nift, root, work, step):
     for key in ("NIFT_VM", "NIFT_VM_STATS"):
         if key in os.environ:
             env[key] = os.environ[key]
+    # Unset means the legacy oracle here; since the VM-default policy an unset
+    # NIFT_VM requires the VM, so legacy is selected explicitly.
+    if not env.get("NIFT_VM"):
+        env["NIFT_VM"] = "0"
     p = subprocess.run(["timeout", "60", nift, *step["run"]], cwd=root, env=env, capture_output=True)
     out, err = norm(p.stdout, work), norm(p.stderr, work)
     label = " ".join(step["run"])

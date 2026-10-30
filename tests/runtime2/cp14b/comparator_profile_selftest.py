@@ -31,7 +31,10 @@ def stats(**kw):
 
 
 VERIFIED = dict(out="[1,2]\n", err="", exit=0, stats=stats())
-REFUSED = dict(out="", err="error: $CASE/case.f:2:3: NIFT_VM=require: not compiled for the VM (method:sort)\n",
+REFUSED = dict(out="", err="error: $CASE/case.f:2:3: not compiled for the VM (method:sort): the method call `.sort()` "
+               "is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\n"
+               "note: to run it on the legacy interpreter: NIFT_VM=0 nift case.f\n"
+               "note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
                exit=1, stats=stats(outcome="require-error", reason="method:sort", vm_executions=0))
 HARNESS = dict(out="", err="not compiled: method:sort\n", exit=2,
                stats=stats(outcome="require-error", reason="", vm_executions=0))

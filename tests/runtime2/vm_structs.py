@@ -107,7 +107,7 @@ def check(args, work, item):
     else:
         with open(os.path.join(d, "main.f"), "w") as f:
             f.write(src)
-    a = run(args.nift, d, {})
+    a = run(args.nift, d, {"NIFT_VM": "0"})  # legacy oracle: explicit (VM-default policy)
     b = run(args.nift, d, {"NIFT_VM": "1", "NIFT_VM_STATS": os.path.join(d, "stats.jsonl")})
     source = open(os.path.join(d, "main.f"), "rb").read()
     verdict, policy = vm_policies.classify((a[1], a[2], a[0]), (b[1], b[2], b[0]), b[3], source)

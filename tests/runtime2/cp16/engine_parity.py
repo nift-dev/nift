@@ -129,6 +129,8 @@ def run_nift(nift, root, args, engine, stats_path):
            "CP16_PARITY_VAR": "v-1", "NIFT_VM_STATS": stats_path}
     if engine == "vm":
         env["NIFT_VM"] = "1"
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     rfd, wfd = os.pipe()
     os.set_inheritable(wfd, True)
     env["NIFT_TRACE_HOST"] = str(wfd)

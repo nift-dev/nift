@@ -79,6 +79,8 @@ def run(nift, d, source, mode):
             env[k] = os.environ[k]
     if mode:
         env.update({"NIFT_VM": mode, "NIFT_VM_STATS": stats})
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     p = subprocess.run([nift, "p.f"], cwd=d, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
     st = None
     if mode and os.path.exists(stats):
