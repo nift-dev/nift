@@ -37,10 +37,12 @@ for name,source,expected,reason in cases:
    assert refused[0]['line']>=1 and refused[0]['column']>=1,row
    head=re.escape(f"error: <stdin>:{at}:{refused[0]['column']}: NIFT_VM session refused: {reason}: ")
    assert re.fullmatch(head+r'[^\n]+ is not supported by the Runtime 2\.0 VM yet\n'
-                       'note: the program was not executed: no part of it ran\n'
+                       'note: this statement was not executed; any earlier statements in this session had '
+                       'already run\n'
                        'note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
                        'note: please report unsupported programs at https://github\\.com/nift-dev/nift/issues\n',
                        p.stderr),row
+   assert 'no part of it ran' not in p.stderr,row  # earlier statements of the session ran
    assert refused[0]['reason']==reason and refused[0]['vm_executions']==refused[0]['legacy_executions']==0,row
    assert all(s['legacy_executions']==0 for s in rows),row
    assert len([s for s in rows if s['vm_executions']==1])==len(rows)-1,row

@@ -82,8 +82,14 @@ RUN_FEATURE = "the call `run()`"
 PLATFORM_SCRIPT = 'touch("side.txt")\nprint(platform())\n'
 
 
-def notes(hint):
-    return ("note: the program was not executed: no part of it ran\n"
+PROGRAM_NOTE = "note: the program was not executed: no part of it ran\n"
+# A session refuses one statement: earlier statements have run and later ones
+# still run, so its note must never claim that nothing ran.
+SESSION_NOTE = "note: this statement was not executed; any earlier statements in this session had already run\n"
+
+
+def notes(hint, executed=PROGRAM_NOTE):
+    return (executed +
             f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{(' ' + hint) if hint else ''}\n"
             f"note: please report unsupported programs at {ISSUES}\n")
 
@@ -95,7 +101,7 @@ def expected_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
 
 def expected_session_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
     return (f"error: {where}: NIFT_VM session refused: {reason}: {feature} is not supported by the "
-            "Runtime 2.0 VM yet\n" + notes(hint))
+            "Runtime 2.0 VM yet\n" + notes(hint, SESSION_NOTE))
 
 
 def diagnostic_problems(stderr, where, hint, reason=REASON, feature=RUN_FEATURE, session=False):
@@ -106,6 +112,8 @@ def diagnostic_problems(stderr, where, hint, reason=REASON, feature=RUN_FEATURE,
     for part in parts:
         if part not in stderr:
             problems.append(f"missing {part!r}")
+    if session and "no part of it ran" in stderr:
+        problems.append("session note claims that no part of it ran")
     expected = (expected_session_diagnostic if session else expected_diagnostic)(where, hint, reason, feature)
     if stderr != expected:
         problems.append(f"stderr {stderr!r}")
@@ -266,7 +274,10 @@ def main():
         # 7. Interactive session (non-tty stdin): VM-owned by default (D-054). A
         # refused unit gets the full diagnostic at its position in the input
         # stream; the session keeps its state and continues (VM-default contract
-        # upgrade from the short `NIFT_VM session refused: <reason>` line).
+        # upgrade from the short `NIFT_VM session refused: <reason>` line). The
+        # continuation and exit status 0 asserted here are the CURRENT behaviour,
+        # pending the owner's ruling on whether a non-interactive shell should
+        # stop with exit 1 at a refusal; the note names only the statement.
         d = work / "session"
         d.mkdir()
         lines = 'x := 4\nprint(x)\nr := run("echo", "hi")\nprint(x + 1)\n'
@@ -280,7 +291,8 @@ def main():
                   rows[2].get("reason") == REASON and (rows[2].get("line"), rows[2].get("column")) == (1, 6) and
                   all(r.get("legacy_executions", 0) == 0 for r in rows),
                   f"REPL session (NIFT_VM {label}) is VM-owned; a refused unit gets the full diagnostic at "
-                  "<stdin>:3:6, keeps state and never falls back",
+                  "<stdin>:3:6, keeps state and never falls back (continuation/exit 0: current behaviour, "
+                  "pending owner ruling)",
                   f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
         check(sessions["unset"] == sessions["require"], "REPL session: NIFT_VM=require is identical to the default",
               repr(sessions))
@@ -475,6 +487,20 @@ def main():
               "build hook: a child `nift child.f` is refused by the VM default; the site renders unchanged",
               f"rc={proc.returncode} err={proc.stderr!r} child={result}")
 
+        # 12. A refusal inside `$[...]` shell command interpolation gets the full
+        # session diagnostic (location in the expression, hint, issues URL), the
+        # command does not run, and the session continues (current behaviour).
+        d = work / "interpolation"
+        d.mkdir()
+        proc, rows = run(nift, d, [], {}, stdin='print("A")\necho $[run("echo","x")]\nprint("B")\n')
+        expected = ("error: command interpolation failed: $[run(echo,x)]: <interpolation>:1:1: NIFT_VM session "
+                    f"refused: {REASON}: {RUN_FEATURE} is not supported by the Runtime 2.0 VM yet\n" +
+                    notes("", SESSION_NOTE))
+        check(proc.returncode == 0 and proc.stdout == "A\nB\n" and proc.stderr == expected and
+              "no part of it ran" not in proc.stderr,
+              "$[...] interpolation refusal: full session diagnostic, command not run, session continues",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",
                                                                              {"NIFT_VM": "1"})):
@@ -501,6 +527,8 @@ def main():
             check(bool(diagnostic_problems(good.replace(drop, "X"), "p.f:1:1", "p.f")),
                   f"control: diagnostic predicate rejects a diagnostic without {drop!r}")
         good = expected_session_diagnostic("<stdin>:3:6", "")
+        check(bool(diagnostic_problems(good.replace(SESSION_NOTE, PROGRAM_NOTE), "<stdin>:3:6", "", session=True)),
+              "control: session diagnostic predicate rejects the program note (no part of it ran)")
         check(not diagnostic_problems(good, "<stdin>:3:6", "", session=True),
               "control: session diagnostic predicate accepts the format")
         check(bool(diagnostic_problems(f"error: NIFT_VM session refused: {REASON}\n", "<stdin>:3:6", "",

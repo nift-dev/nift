@@ -76,9 +76,11 @@ for name,argv,stdin,rc,units in cases:
     # Documented contract off the frozen profile: the session refuses the statement
     # before execution; earlier statements ran on the VM; nothing ran on legacy.
     # VM-default policy: the full refusal diagnostic, located in the input stream.
+    assert 'no part of it ran' not in channels[2],r  # earlier statements did run
     assert channels==(0,'','error: <stdin>:3:1: NIFT_VM session refused: method:sort: the method call `.sort()` '
                       'is not supported by the Runtime 2.0 VM yet\n'
-                      'note: the program was not executed: no part of it ran\n'
+                      'note: this statement was not executed; any earlier statements in this session had '
+                      'already run\n'
                       'note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
                       'note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n'),r
     assert rows and rows[-1]['outcome']=='require-error' and rows[-1]['reason']=='method:sort',r

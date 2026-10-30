@@ -173,8 +173,11 @@ std::string legacy_command_hint(const std::string& fallback) {
 }
 
 namespace {
-std::string refusal_notes(const std::string& fallback) {
-    return "note: the program was not executed: no part of it ran\n"
+// `executed` is the not-executed statement: a whole program for a file, -e/-c,
+// stdin or eval unit; one statement for a session, whose earlier statements
+// have already run (and whose later ones still run).
+std::string refusal_notes(const char* executed, const std::string& fallback) {
+    return std::string(executed) +
            "note: to run it on the legacy interpreter: " + legacy_command_hint(fallback) + "\n"
            "note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n";
 }
@@ -182,13 +185,16 @@ std::string refusal_notes(const std::string& fallback) {
 
 std::string vm_refusal_diagnostic(const std::string& where, const std::string& reason, const std::string& fallback) {
     return "error: " + where + ": not compiled for the VM (" + reason + "): " + describe_refusal(reason) +
-           " is not supported by the Runtime 2.0 VM yet\n" + refusal_notes(fallback);
+           " is not supported by the Runtime 2.0 VM yet\n" +
+           refusal_notes("note: the program was not executed: no part of it ran\n", fallback);
 }
 
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
                                           const std::string& fallback) {
     return "error: " + where + ": NIFT_VM session refused: " + reason + ": " + describe_refusal(reason) +
-           " is not supported by the Runtime 2.0 VM yet\n" + refusal_notes(fallback);
+           " is not supported by the Runtime 2.0 VM yet\n" +
+           refusal_notes("note: this statement was not executed; any earlier statements in this session had "
+                         "already run\n", fallback);
 }
 
 } // namespace nift::rt

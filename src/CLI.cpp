@@ -2042,7 +2042,19 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
             if (result.execution.reason == nift::rt::StopReason::Internal) {
                 if (terminal) *terminal = true;
                 eval_error = result.execution.message;
-            } else if (!result.admitted) eval_error = "NIFT_VM session refused: " + result.refusal;
+            } else if (!result.admitted) {
+                // The full session refusal diagnostic (as for statements), its
+                // `error: ` label and final newline left to console::error.
+                const std::string where = (result.refusal_path.empty() ? std::string("<interpolation>")
+                                                                      : result.refusal_path) + ':' +
+                    std::to_string(result.refusal_line ? result.refusal_line : 1) + ':' +
+                    std::to_string(result.refusal_column ? result.refusal_column : 1);
+                std::string text = nift::rt::vm_session_refusal_diagnostic(where, result.refusal, "<interpolation>");
+                if (text.rfind("error: ", 0) == 0) text.erase(0, 7);
+                if (!text.empty() && text.back() == '\n') text.pop_back();
+                error = "command interpolation failed: $[" + expression + "]: " + text;
+                return false;
+            }
             else if (result.execution.reason != nift::rt::StopReason::None) eval_error = result.execution.message;
             else evaluated = nift::rt::eval_result_to_legacy(result.value, value, eval_error);
         } else evaluated = parser.eval_expression(expression, value, eval_error);
