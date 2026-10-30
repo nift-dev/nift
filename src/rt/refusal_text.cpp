@@ -41,7 +41,6 @@ constexpr Family kFamilies[] = {
     {"context:", "a context-dependent legacy behaviour (%)"},
     {"struct-", "this struct feature"},
     {"session:", "this statement in an interactive session (%)"},
-    {"platform-non-native", "a non-native `--platform` selection (the VM's `platform()` is always `native`)"},
     {"aliasing", "shared references to arrays or objects (aliasing)"},
     {"alias-argument", "passing an aliased array or object as an argument"},
     {"path-in-call-argument", "an element path as a call argument"},

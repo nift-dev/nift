@@ -268,9 +268,8 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
 #endif
         ++refusals_; result.refusal = compiled.reason; result.offset = compiled.offset;
         const auto at = source_map->at(compiled.offset);
-        stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = at.path;
-        stats.line = at.line; stats.column = at.column;
-        result.refusal_path = at.path; result.refusal_line = at.line; result.refusal_column = at.column;
+        stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = result.refusal_path = at.path;
+        stats.line = result.refusal_line = at.line; stats.column = result.refusal_column = at.column;
         detail::report(stats); return result;
     }
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {

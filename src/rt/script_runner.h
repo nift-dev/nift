@@ -53,16 +53,6 @@ VmMode vm_mode_from_environment();
 // path legacy diagnostics name.
 bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code);
 
-// A unit the VM cannot honour for a reason outside its source (e.g. the
-// `platform-non-native` invocation: the VM's platform() is always native),
-// located at the start of the unit (1:1). Same contract as run_script_on_vm:
-// NIFT_VM=0 returns false untouched; the default/require refuses it before
-// anything runs (full diagnostic, exit 1); NIFT_VM=1 records the usual
-// fallback and returns false (the caller runs legacy); classify modes record
-// the fallback and exit 0 without running.
-bool refuse_unit_on_vm(const std::string& source, const std::filesystem::path& source_path,
-                       const std::string& reason, int& exit_code);
-
 // eval entry: true means selected/handled here; false means the caller must
 // evaluate the untouched expression on legacy. A VM failure never retries.
 // Execution success fills value. Classification never executes or fills value.

@@ -15,12 +15,13 @@ statistics record. Interactive sessions are VM-owned by default (D-054) and a
 refused session unit gets the same full diagnostic, located in the user's terms
 (`<stdin>:line:column` over the whole input stream, or the -i unit's path).
 
-A non-native --platform cannot be honoured by the VM (its platform() is always
-`native`): under the default/require policy every script entry (file, -e/-c,
-stdin, -i, the REPL) is refused before any effect with the stable refusal id
-`platform-non-native`; NIFT_VM=1 records the fallback and runs legacy;
-NIFT_VM=0 is legacy. A refusal inside an imported module names the module
-position and nothing in the main program or the module runs.
+--platform=<target> is honoured by the VM (platform() returns the selection,
+as legacy's script host does), so every script entry (file, -e/-c, stdin, -i,
+the REPL) with any platform runs on the VM under the default policy, never on
+legacy; an unsupported program with a platform selection is refused like any
+other, and its legacy instruction keeps the selector. NIFT_VM=0 is legacy.
+A refusal inside an imported module names the module position and nothing in
+the main program or the module runs.
 
 Negative controls: the same predicates must reject the old default
 (NIFT_VM=0 standing in for "unset = legacy") and a fallback environment
@@ -73,8 +74,6 @@ def run(nift, cwd, args, extra, stdin=None, stats=True):
 
 
 RUN_FEATURE = "the call `run()`"
-PLATFORM_REASON = "platform-non-native"
-PLATFORM_FEATURE = "a non-native `--platform` selection (the VM's `platform()` is always `native`)"
 PLATFORM_SCRIPT = 'touch("side.txt")\nprint(platform())\n'
 
 
@@ -304,82 +303,89 @@ def main():
               "-i -e: the initial unit is refused before effects with the full, shell-quoted diagnostic",
               f"rc={proc.returncode} out={proc.stdout!r} {problems}")
 
-        # 8. --platform=<non-native>: the VM cannot honour it (platform() is
-        # always native), so the default/require policy refuses every script
-        # entry before any effect; NIFT_VM=1 falls back; NIFT_VM=0 is legacy.
+        # 8. --platform=<target>: the VM honours the selection (platform()), so
+        # every script entry runs on the VM by default with legacy's output, and
+        # an unsupported program is refused (never run on legacy) with a legacy
+        # instruction that keeps the selector. NIFT_VM=0 is legacy.
         d = work / "platform"
         d.mkdir()
         (d / "p.f").write_text(PLATFORM_SCRIPT)
-        where = f"{(d / 'p.f').resolve().as_posix()}:1:1"
+        (d / "case.f").write_text(UNSUPPORTED)
 
         def clean():
             for name in ("side.txt", "t.txt", "r.txt"):
                 if (d / name).exists():
                     (d / name).unlink()
 
-        def platform_refused(args, stdin, where, hint, label, extra):
+        def on_vm(args, stdin, extra, out, effect, label, units=1):
             clean()
             proc, rows = run(nift, d, args, extra, stdin=stdin)
-            problems = diagnostic_problems(proc.stderr, where, hint, PLATFORM_REASON, PLATFORM_FEATURE)
-            effects = [n for n in ("side.txt", "t.txt", "r.txt") if (d / n).exists()]
-            check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
-                  len(rows) == 1 and rows[0].get("outcome") == "require-error" and
-                  rows[0].get("reason") == PLATFORM_REASON and rows[0].get("vm_executions") == 0 and
-                  rows[0].get("legacy_executions") == 0,
-                  f"--platform non-native refused before effects with the full diagnostic: {label}",
-                  f"rc={proc.returncode} out={proc.stdout!r} effects={effects} {problems} rows={rows}")
-            return proc
+            check(proc.returncode == 0 and proc.stdout == out and proc.stderr == "" and (d / effect).exists() and
+                  len(rows) == units and all(r.get("outcome") == "vm" and r.get("vm_executions") == 1 and
+                                             r.get("legacy_executions") == 0 for r in rows),
+                  f"--platform: {label} runs on the VM and reports the selection",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
 
-        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"})):
-            platform_refused(["--platform=linux", "p.f"], None, where, "--platform=linux p.f",
-                             f"script file (NIFT_VM {label})", extra)
-            platform_refused(["p.f", "--platform=windows"], None, where, "p.f --platform=windows",
-                             f"script file, selector after the path (NIFT_VM {label})", extra)
-        platform_refused(["--platform=windows", "-e", 'touch("t.txt")'], None, "<command-line>:1:1",
-                         "--platform=windows -e 'touch(\"t.txt\")'", "-e program", {})
-        platform_refused(["--platform=linux", "-c", 'touch("t.txt")'], None, "<command-line>:1:1",
-                         "--platform=linux -c 'touch(\"t.txt\")'", "-c program", {})
-        platform_refused(["--platform=linux", "-"], 'touch("t.txt")\n', "<stdin>:1:1", "--platform=linux -",
-                         "stdin program", {})
-        platform_refused(["--platform=linux", "-i", "p.f"], "", where, "--platform=linux -i p.f",
-                         "-i script", {})
-        platform_refused(["--platform=linux", "-i", "-e", 'touch("t.txt")'], 'touch("r.txt")\n',
-                         "<command-line>:1:1", "--platform=linux -i -e 'touch(\"t.txt\")'", "-i -e program", {})
-        platform_refused(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', "<stdin>:1:1",
-                         "--platform=linux", "REPL session (NIFT_VM unset)", {})
-        platform_refused(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', "<stdin>:1:1",
-                         "--platform=linux", "REPL session (NIFT_VM require)", {"NIFT_VM": "require"})
+        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"}),
+                             ("1", {"NIFT_VM": "1"})):
+            on_vm(["--platform=linux", "p.f"], None, extra, "linux\n", "side.txt", f"script file (NIFT_VM {label})")
+        on_vm(["p.f", "--platform=windows"], None, {}, "windows\n", "side.txt", "selector after the script path")
+        on_vm(["--platform=my.custom", "-e", 'touch("t.txt");print(platform())'], None, {}, "my.custom\n", "t.txt",
+              "-e program")
+        on_vm(["--platform=linux", "-c", 'touch("t.txt");print(platform())'], None, {}, "linux\n", "t.txt",
+              "-c program")
+        on_vm(["--platform=linux", "-"], 'touch("t.txt")\nprint(platform())\n', {}, "linux\n", "t.txt",
+              "stdin program")
+        on_vm(["--platform=linux", "-i", "p.f"], "print(platform())\n", {}, "linux\nlinux\n", "side.txt",
+              "-i script and the session after it", units=2)
+        on_vm(["--platform=linux", "-i", "-e", 'touch("t.txt")'], "print(platform())\n", {}, "linux\n", "t.txt",
+              "-i -e program and the session after it", units=2)
+        on_vm(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', {}, "linux\n", "r.txt",
+              "REPL session", units=2)
+        for label, args in (("--platform=native", ["--platform=native", "p.f"]), ("no selector", ["p.f"])):
+            on_vm(args, None, {}, "native\n", "side.txt", f"{label} (as before)")
         clean()
         proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "0"})
         check(proc.returncode == 0 and proc.stdout == "linux\n" and proc.stderr == "" and (d / "side.txt").exists()
-              and rows == [], "--platform=linux under NIFT_VM=0 runs on legacy and honours the platform",
-              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
-        clean()
-        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "1"})
-        check(proc.returncode == 0 and proc.stdout == "linux\n" and proc.stderr == "" and (d / "side.txt").exists()
-              and len(rows) == 1 and rows[0].get("outcome") == "fallback" and
-              rows[0].get("reason") == PLATFORM_REASON and rows[0].get("legacy_executions") == 1 and
-              rows[0].get("vm_executions") == 0,
-              "--platform=linux under NIFT_VM=1 records the fallback and runs legacy (no hint)",
-              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
-        clean()
-        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "1"}, stdin='touch("r.txt")\n')
-        check(proc.returncode == 0 and proc.stderr == "" and (d / "r.txt").exists(),
-              "--platform=linux REPL under NIFT_VM=1 keeps its (VM-owned) session unchanged",
+              and rows == [], "--platform=linux under NIFT_VM=0 runs on legacy with the same output",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
         clean()
         proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "0"}, stdin='touch("r.txt")\nprint(platform())\n')
         check(proc.returncode == 0 and proc.stdout == "linux\n" and (d / "r.txt").exists() and rows == [],
-              "--platform=linux REPL under NIFT_VM=0 is legacy and honours the platform",
+              "--platform=linux REPL under NIFT_VM=0 is legacy with the same output",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
-        for label, args in (("--platform=native", ["--platform=native", "p.f"]), ("no selector", ["p.f"])):
-            clean()
-            proc, rows = run(nift, d, args, {})
-            check(proc.returncode == 0 and proc.stdout == "native\n" and proc.stderr == "" and
-                  (d / "side.txt").exists() and len(rows) == 1 and rows[0].get("outcome") == "vm" and
-                  rows[0].get("vm_executions") == 1 and rows[0].get("legacy_executions") == 0,
-                  f"{label}: the script runs on the VM by default, as before",
-                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+        # An unsupported program with a platform selection: refused before any
+        # effect (never run on legacy), full diagnostic, selector in the hint.
+        for args, where, hint, label in (
+                (["--platform=linux", "case.f"], f"{(d / 'case.f').resolve().as_posix()}:7:6",
+                 "--platform=linux case.f", "script file"),
+                (["--platform=windows", "-e", 'touch("t.txt")\nr := run("echo", "hi")'], "<command-line>:2:6",
+                 "--platform=windows -e 'touch(\"t.txt\")\nr := run(\"echo\", \"hi\")'", "-e program"),
+                (["--platform=linux", "-"], "<stdin>:2:6", "--platform=linux -", "stdin program")):
+            for mode, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
+                clean()
+                proc, rows = run(nift, d, args, extra,
+                                 stdin='touch("t.txt")\nr := run("echo", "hi")\n' if args[-1] == "-" else None)
+                effects = [n for n in ("side.txt", "t.txt") if (d / n).exists()]
+                problems = diagnostic_problems(proc.stderr, where, hint)
+                check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
+                      [r.get("outcome") for r in rows] == ["require-error"] and
+                      rows[0].get("legacy_executions") == 0 and rows[0].get("vm_executions") == 0,
+                      f"--platform: unsupported {label} refused before effects, never legacy (NIFT_VM {mode})",
+                      f"rc={proc.returncode} out={proc.stdout!r} effects={effects} {problems} rows={rows}")
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux"], {}, stdin='x := 1\nr := run("echo", "hi")\nprint(x)\n')
+        problems = diagnostic_problems(proc.stderr, "<stdin>:2:6", "--platform=linux", session=True)
+        check(proc.returncode == 0 and proc.stdout == "1\n" and not problems and
+              [r.get("outcome") for r in rows] == ["vm", "require-error", "vm"],
+              "--platform REPL: a refused unit gets the full session diagnostic, selector in the hint",
+              f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
+        clean()
+        proc, rows = run(nift, d, ["--platform=linux", "case.f"], {"NIFT_VM": "1"})
+        check(proc.returncode == 0 and proc.stdout == "before\nobject\n" and (d / "side.txt").exists() and
+              len(rows) == 1 and rows[0].get("outcome") == "fallback" and rows[0].get("legacy_executions") == 1,
+              "--platform under NIFT_VM=1: an unsupported program still falls back to legacy",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
 
         # 9. A refusal inside an imported module: located in the module, and
         # nothing in the main program or the module ran.
@@ -414,18 +420,14 @@ def main():
         d.mkdir()
         check(bool(supported_problems(nift, d, {"NIFT_VM": "0"})),
               "control: VM-execution predicate rejects a legacy run with matching output")
-        # The REPL/platform predicates must reject the fallback environment (a
-        # default that silently became NIFT_VM=1 passes every != Off check).
+        # The platform predicate must reject the old routing (a selection run on
+        # legacy, as NIFT_VM=0 stands in for it), even with identical output.
         d = work / "control-platform"
         d.mkdir()
         (d / "p.f").write_text(PLATFORM_SCRIPT)
-        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "1"})
-        check(proc.returncode != 1 or (d / "side.txt").exists() or bool(diagnostic_problems(
-              proc.stderr, f"{(d / 'p.f').resolve().as_posix()}:1:1", "--platform=linux p.f", PLATFORM_REASON,
-              PLATFORM_FEATURE)), "control: platform refusal predicate rejects NIFT_VM=1")
-        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "1"}, stdin='touch("r.txt")\n')
-        check(proc.returncode != 1 or (d / "r.txt").exists(),
-              "control: REPL platform refusal predicate rejects NIFT_VM=1")
+        proc, rows = run(nift, d, ["--platform=linux", "p.f"], {"NIFT_VM": "0"})
+        check(proc.stdout == "linux\n" and not (len(rows) == 1 and rows[0].get("outcome") == "vm"),
+              "control: platform VM-execution predicate rejects a legacy run with matching output")
         good = expected_diagnostic("p.f:1:1", "p.f")
         check(not diagnostic_problems(good, "p.f:1:1", "p.f"), "control: diagnostic predicate accepts the format")
         for drop in ("not executed", "NIFT_VM=0 nift p.f", ISSUES, REASON, "p.f:1:1", "the call `run()`"):

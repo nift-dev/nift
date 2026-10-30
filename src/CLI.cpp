@@ -33,6 +33,7 @@
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
 #include "rt/refusal_text.h"
+#include "rt/natives/host_env.h"
 #include "rt/session.h"
 #include "rt/script_runner_options.h"
 #include "rt/eval_result.h"
@@ -1737,16 +1738,10 @@ static int run_script_source(const std::string& source, const fs::path& source_p
         }
         if (validate_only) return 0;
     }
-    // The VM cannot honour a non-native --platform (its platform() is always
-    // `native`), so such a unit is refused before anything runs under the
-    // default/require policy; NIFT_VM=1 records the fallback and runs legacy as
-    // before; NIFT_VM=0 never gets here.
-    if (target != "native") {
-        int refused_exit = 0;
-        if (nift::rt::refuse_unit_on_vm(source, source_path, "platform-non-native", refused_exit))
-            return refused_exit;
-    }
-    if (interactive_after && target == "native" && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
+    // Every --platform selection runs on the VM like `native`: the VM's
+    // platform() returns the selection (rt/natives/host_env.h, set in run_cli),
+    // exactly as legacy's ScriptRenderHost does.
+    if (interactive_after && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
         nift::rt::VmSession session(session_options());
         session.initialize_invocation(cmd, script_args);
         const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
@@ -1758,7 +1753,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     }
     // Runtime 2.0: the VM by default (VM required, no fallback); NIFT_VM=1 falls
     // back; returns false to run legacy unchanged (NIFT_VM=0, or a mode-1 fallback).
-    if (!interactive_after && target == "native") {
+    if (!interactive_after) {
         int vm_exit = 0;
         if (nift::rt::run_script_on_vm(source, source_path, vm_exit)) return vm_exit;
     }
@@ -2946,6 +2941,9 @@ int run_cli(int argc, char** argv) {
     for (auto& arg : normalized_storage) normalized_argv.push_back(arg.data());
     argc = static_cast<int>(normalized_argv.size());
     argv = normalized_argv.data();
+    // The VM's platform() reports the selection, as legacy's script host does
+    // (set once, before any VM code runs; website builds never consult it).
+    nift::rt::natives::set_script_platform(selected_platform);
 
     const std::string command = argc > 1 ? argv[1] : "";
     const bool platform_capable_command = command.empty() || command == "build" ||
@@ -2958,14 +2956,6 @@ int run_cli(int argc, char** argv) {
     }
     if (command.empty()) {
         if (!platform_selected) return run_script_shell();
-        // A VM-owned session cannot honour a non-native platform: refused under
-        // the default/require policy before the session (or ~/.niftrc) starts.
-        // NIFT_VM=1 keeps its session unchanged; NIFT_VM=0 is legacy.
-        if (selected_platform != "native" && nift::rt::vm_mode_from_environment() == nift::rt::VmMode::Require) {
-            int refused_exit = 0;
-            if (nift::rt::refuse_unit_on_vm(std::string(), fs::path("<stdin>"), "platform-non-native", refused_exit))
-                return refused_exit;
-        }
         ScriptRenderHost host(fs::current_path(), selected_platform);
         TrackedInfo info; Parser parser(host, info);
         parser.set_script_invocation("<repl>", {});
