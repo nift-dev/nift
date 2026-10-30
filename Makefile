@@ -410,6 +410,18 @@ $(TEST_DIR)/rt-tsan/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_TSAN_OBJE
 	$(CXX) $(TSAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(TSAN_FLAGS) $< $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 test-cp23-ownership-unit: $(TEST_DIR)/rt/cp23-ownership-unit
 	"$<"
+# Snapshot constants (owner 2026-10-30): the bulk-initialised constants graph
+# equals per-element construction. Normal, ASan/UBSan/LSan and TSan builds; not
+# part of the CP23 certification unit lists, which are unchanged.
+$(TEST_DIR)/rt/cp23-snapshot-constants-unit: tests/runtime2/cp23/snapshot_constants_unit.cpp $(CP23_CORE:.cpp=.o)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
+.PHONY: test-cp23-snapshot-constants
+test-cp23-snapshot-constants: $(TEST_DIR)/rt/cp23-snapshot-constants-unit $(TEST_DIR)/rt-san/cp23-snapshot_constants-unit $(TEST_DIR)/rt-tsan/cp23-snapshot_constants-unit
+	timeout 180 "$(TEST_DIR)/rt/cp23-snapshot-constants-unit"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+	  timeout 180 "$(TEST_DIR)/rt-san/cp23-snapshot_constants-unit"
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 timeout 180 "$(TEST_DIR)/rt-tsan/cp23-snapshot_constants-unit"
 test-cp23-shared-unit-sanitize: $(TEST_DIR)/rt-san/cp23-shared-unit
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$<"
 
