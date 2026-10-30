@@ -111,16 +111,38 @@ SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& pa
 
 } // namespace
 
+namespace {
+// The accepted NIFT_VM values (owner ruling): unset, require, 0, 1, classify,
+// classify-all. Anything else, the empty value included, is invalid.
+bool parse_vm_mode(const char* value, VmMode& mode) {
+    if (!value) { mode = VmMode::Require; return true; }  // unset: the VM is required
+    const std::string text(value);
+    if (text == "require") mode = VmMode::Require;
+    else if (text == "0") mode = VmMode::Off;
+    else if (text == "1") mode = VmMode::On;
+    else if (text == "classify") mode = VmMode::Classify;
+    else if (text == "classify-all") mode = VmMode::ClassifyAll;
+    else return false;
+    return true;
+}
+} // namespace
+
 VmMode vm_mode_from_environment() {
+    // VM-default policy: unset requires the VM (no legacy fallback); only an
+    // explicit NIFT_VM=0 selects the legacy interpreter. The CLI rejects an
+    // invalid value before any scripting entry runs (vm_mode_configuration_error);
+    // anywhere else an invalid value fails closed: the VM is required.
+    VmMode mode = VmMode::Require;
+    return parse_vm_mode(std::getenv("NIFT_VM"), mode) ? mode : VmMode::Require;
+}
+
+std::string vm_mode_configuration_error() {
     const char* value = std::getenv("NIFT_VM");
-    // VM-default policy: unset or empty requires the VM (no legacy fallback);
-    // only an explicit NIFT_VM=0 selects the legacy interpreter.
-    if (!value || !*value) return VmMode::Require;
-    if (std::string(value) == "0") return VmMode::Off;
-    if (std::string(value) == "require") return VmMode::Require;
-    if (std::string(value) == "classify") return VmMode::Classify;
-    if (std::string(value) == "classify-all") return VmMode::ClassifyAll;
-    return VmMode::On;
+    VmMode mode = VmMode::Require;
+    if (parse_vm_mode(value, mode)) return std::string();
+    return std::string("invalid NIFT_VM value '") + value + "'" + (*value ? "" : " (empty)") +
+           ": accepted values are unset (the VM is required; the default), require, 0 (the legacy "
+           "interpreter), 1 (the VM with legacy fallback), classify, classify-all; nothing was run";
 }
 
 bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code) {

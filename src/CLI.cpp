@@ -2954,6 +2954,17 @@ int run_cli(int argc, char** argv) {
         console::error("--platform is only valid for script execution, the REPL, and build");
         return 2;
     }
+    // Owner ruling: an unknown NIFT_VM value (the empty value included) is a
+    // configuration error on every scripting entry point, reported before any
+    // user program (or import, or ~/.niftrc) runs. Website builds and the other
+    // project commands never consult NIFT_VM and are not checked.
+    const bool scripting_command = command.empty() || command == "-e" || command == "-c" || command == "-i" ||
+        command == "-" || command == "eval" || command == "--no-process" || command.rfind("--fs-root=", 0) == 0 ||
+        (filesystem::file_exists(command) && !fs::is_directory(command));
+    if (scripting_command) {
+        const std::string vm_error = nift::rt::vm_mode_configuration_error();
+        if (!vm_error.empty()) { console::error(vm_error); return 1; }
+    }
     if (command.empty()) {
         if (!platform_selected) return run_script_shell();
         ScriptRenderHost host(fs::current_path(), selected_platform);

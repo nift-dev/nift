@@ -46,6 +46,11 @@ namespace nift::rt {
 
 enum class VmMode { Off, On, Require, Classify, ClassifyAll };
 VmMode vm_mode_from_environment();
+// Empty when NIFT_VM is unset or one of the accepted values (require, 0, 1,
+// classify, classify-all); otherwise the configuration error naming the value
+// and the accepted values. The CLI checks it before any scripting entry point
+// runs anything (file, -e/-c, stdin, eval, the REPL/-i, with any --platform).
+std::string vm_mode_configuration_error();
 
 // Returns true when the script was handled here (its exit status in
 // `exit_code`); false when the caller must run it on the legacy engine.

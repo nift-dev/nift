@@ -2,11 +2,16 @@
 """VM-default policy: the VM is the default scripting engine, with no silent
 legacy fallback.
 
-  NIFT_VM unset/empty  VM required: an unsupported program is refused before
+  NIFT_VM unset        VM required: an unsupported program is refused before
                        any effect, with the full diagnostic and exit status 1
   NIFT_VM=require      identical to the default
   NIFT_VM=0            explicit legacy interpreter (escape hatch), unchanged
   NIFT_VM=1            VM first with legacy fallback, unchanged (no hint)
+  classify[-all]       test tooling, unchanged
+  anything else        (empty, off, false, banana, ...) a configuration error on
+                       every scripting entry point: exit 1, the value and the
+                       accepted values named, nothing run (owner ruling);
+                       website builds never consult NIFT_VM
 
 Execution engine is proven by NIFT_VM_STATS records (vm_executions /
 legacy_executions), never by output alone. Website builds keep the legacy
@@ -181,7 +186,7 @@ def main():
         work = Path(work)
 
         # 1. Default runs a supported script on the VM (stats prove the engine).
-        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"})):
+        for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
             d = work / f"supported-{label}"
             d.mkdir()
             problems = supported_problems(nift, d, extra)
@@ -189,14 +194,14 @@ def main():
 
         # 2. Default (and empty, require) refuses an unsupported script before any effect.
         results = {}
-        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"})):
+        for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
             d = work / f"refused-{label}"
             d.mkdir()
             problems, proc = refusal_problems(nift, d, extra)
             results[label] = (proc.returncode, proc.stdout, proc.stderr.replace(str(d.resolve()), "$D"))
             check(not problems, f"unsupported script refused with the full diagnostic (NIFT_VM {label})",
                   "; ".join(problems))
-        check(results["unset"] == results["require"] == results["empty"],
+        check(results["unset"] == results["require"],
               "NIFT_VM=require is identical to the default", repr(results))
 
         # 3. NIFT_VM=0 runs the same unsupported script on legacy successfully.
@@ -326,7 +331,7 @@ def main():
                   f"--platform: {label} runs on the VM and reports the selection",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
 
-        for label, extra in (("unset", {}), ("empty", {"NIFT_VM": ""}), ("require", {"NIFT_VM": "require"}),
+        for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"}),
                              ("1", {"NIFT_VM": "1"})):
             on_vm(["--platform=linux", "p.f"], None, extra, "linux\n", "side.txt", f"script file (NIFT_VM {label})")
         on_vm(["p.f", "--platform=windows"], None, {}, "windows\n", "side.txt", "selector after the script path")
@@ -410,6 +415,65 @@ def main():
         check(proc.returncode == 0 and proc.stdout == "before\nobject\n" and (d / "main-side.txt").exists() and
               (d / "mod-side.txt").exists() and rows == [], "the module program runs on legacy under NIFT_VM=0",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
+
+        # 10. Owner ruling: only unset, require, 0, 1, classify and classify-all
+        # are accepted. Any other value, the empty one included, is rejected on
+        # every scripting entry point before anything (imports, ~/.niftrc) runs.
+        d = work / "invalid"
+        d.mkdir()
+        (d / "ok.f").write_text('touch("side.txt")\nprint("ran")\n')
+        (d / "m.nft").write_text('touch("mod-side.txt")\nfn(go()) {\n  return 1\n}\nexport(go)\n')
+        (d / "main.f").write_text('import("m.nft")\ntouch("side.txt")\nprint(go())\n')
+        (d / "home").mkdir()
+        (d / "home/.niftrc").write_text('touch("rc-side.txt")\n')
+        entries = (("script file", ["ok.f"], None), ("module program", ["main.f"], None),
+                   ("-e", ["-e", 'touch("side.txt")'], None), ("-c", ["-c", 'touch("side.txt")'], None),
+                   ("stdin", ["-"], 'touch("side.txt")\n'), ("eval", ["eval", 'touch("side.txt")'], None),
+                   ("REPL", [], 'touch("side.txt")\n'), ("-i", ["-i"], 'touch("side.txt")\n'),
+                   ("-i script", ["-i", "ok.f"], ""), ("--platform", ["--platform=linux", "ok.f"], None),
+                   ("--platform REPL", ["--platform=linux"], 'touch("side.txt")\n'))
+        accepted = ("unset", "require", "0 (", "1 (", "classify", "classify-all")
+        for value in ("", "off", "false", "banana"):
+            shown = f"'{value}'" + (" (empty)" if value == "" else "")
+            message = (f"error: invalid NIFT_VM value {shown}: accepted values are unset (the VM is required; the "
+                       "default), require, 0 (the legacy interpreter), 1 (the VM with legacy fallback), classify, "
+                       "classify-all; nothing was run\n")
+            for label, args, stdin in entries:
+                for name in ("side.txt", "mod-side.txt", "rc-side.txt"):
+                    if (d / name).exists():
+                        (d / name).unlink()
+                proc, rows = run(nift, d, args, {"NIFT_VM": value, "HOME": str(d / "home")}, stdin=stdin)
+                effects = [n for n in ("side.txt", "mod-side.txt", "rc-side.txt") if (d / n).exists()]
+                check(proc.returncode == 1 and proc.stdout == "" and proc.stderr == message and
+                      all(a in proc.stderr for a in accepted) and not effects and rows == [],
+                      f"NIFT_VM={value!r} rejected before anything runs: {label}",
+                      f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} effects={effects} rows={rows}")
+        # Website builds never consult NIFT_VM: an invalid value changes nothing.
+        root = work / "site-invalid"
+        site(root)
+        proc, rows = run(nift, root, ["build", "--all"], {"NIFT_VM": "banana"})
+        check(proc.returncode == 0 and tree(root / "public") == outputs["default"] and
+              (root / "hook-marker.txt").exists() and rows == [],
+              "website build with NIFT_VM=banana is unchanged (builds never read NIFT_VM)",
+              f"rc={proc.returncode} err={proc.stderr!r}")
+
+        # 11. Build hooks: a child `nift child.f` spawned by a hook inherits the
+        # VM default and is refused (nonzero, before effects); the website and
+        # template rendering of the same build are unchanged.
+        root = work / "site-hook"
+        site(root)
+        (root / "child.f").write_text(UNSUPPORTED)
+        (root / "scripts/pre.f").write_text(
+            f'try {{ touch("hook-marker.txt") }} catch(e) {{ }}\nr := run({json.dumps(nift)}, "child.f")\n'
+            'f := file("child-result.json")\nf.open("w")\nf.write(r.stringify())\nf.save()\nf.close()\n')
+        proc, rows = run(nift, root, ["build", "--all"], {})
+        result = json.loads((root / "child-result.json").read_text()) if (root / "child-result.json").exists() \
+            else {}
+        check(proc.returncode == 0 and tree(root / "public") == outputs["default"] and
+              result.get("exit_code") == 1 and "not compiled for the VM (callable:run)" in result.get("stderr", "")
+              and result.get("stdout") == "" and not (root / "side.txt").exists(),
+              "build hook: a child `nift child.f` is refused by the VM default; the site renders unchanged",
+              f"rc={proc.returncode} err={proc.stderr!r} child={result}")
 
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",

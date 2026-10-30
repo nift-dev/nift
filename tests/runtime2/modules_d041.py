@@ -48,8 +48,12 @@ def check_step(nift, root, work, step):
         if key in os.environ:
             env[key] = os.environ[key]
     # Unset means the legacy oracle here; since the VM-default policy an unset
-    # NIFT_VM requires the VM, so legacy is selected explicitly.
-    if not env.get("NIFT_VM"):
+    # NIFT_VM requires the VM, so legacy is selected explicitly. An empty value
+    # is not a lane (nift rejects it as a configuration error): refuse it here
+    # rather than silently running some engine.
+    if env.get("NIFT_VM") == "":
+        sys.exit("NIFT_VM is empty: use 0 (legacy), 1, require, classify or classify-all, or leave it unset")
+    if "NIFT_VM" not in env:
         env["NIFT_VM"] = "0"
     p = subprocess.run(["timeout", "60", nift, *step["run"]], cwd=root, env=env, capture_output=True)
     out, err = norm(p.stdout, work), norm(p.stderr, work)
