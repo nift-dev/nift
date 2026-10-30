@@ -718,6 +718,81 @@ def main():
                   f"{label} piped: the session still stops with exit 1 (unchanged)",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
 
+        # 16. A refusal while running a shell-form segment (a user function or
+        # builtin called in command form) abandons the whole logical line, as a
+        # refused `$[...]` does: no later `||`/`;`/`&&` segment runs.
+        d = work / "shell-form"
+        d.mkdir()
+        cases = (("user function, `||`", ['fn(f(a)) { return a.size() }', 'f 3 || touch FALLBACK.txt'],
+                  ["FALLBACK.txt"]),
+                 ("user function, `;`", ['fn(f(a)) { return a.size() }', 'f 3; touch AFTER.txt'], ["AFTER.txt"]),
+                 ("user function, `&&` after success", ['fn(f(a)) { return a.size() }',
+                                                         'touch OK.txt && f 3 && touch AND.txt; touch SEMI.txt'],
+                  ["AND.txt", "SEMI.txt"]),
+                 ("builtin, `||`", ['pwd a b || touch FALLBACK2.txt'], ["FALLBACK2.txt"]))
+        witnesses = ("FALLBACK.txt", "AFTER.txt", "OK.txt", "AND.txt", "SEMI.txt", "FALLBACK2.txt", "later.txt",
+                     "typed.txt")
+        for label, lines, never in cases:
+            for name in witnesses:
+                if (d / name).exists():
+                    (d / name).unlink()
+            proc, rows = run(nift, d, [], {}, stdin="\n".join(lines + ['touch("later.txt")']) + "\n")
+            present = [n for n in witnesses if (d / n).exists()]
+            check(proc.returncode == 1 and not any(n in present for n in never + ["later.txt"]) and
+                  "NIFT_VM session refused" in proc.stderr and "the session stopped here" in proc.stderr and
+                  ("OK.txt" in present) == ("OK.txt" in lines[-1]),
+                  f"shell-form refusal abandons the line (piped, {label}): no later segment or input ran",
+                  f"rc={proc.returncode} files={present} err={proc.stderr!r}")
+            for name in witnesses:
+                if (d / name).exists():
+                    (d / name).unlink()
+            status, out = run_tty(nift, d, [], {}, lines + ['touch("typed.txt")', "exit"])
+            present = [n for n in witnesses if (d / n).exists()]
+            check(status == 0 and not any(n in present for n in never) and "typed.txt" in present and
+                  "the session continues" in out,
+                  f"shell-form refusal abandons the line (tty, {label}): nothing later on the line, usable prompt",
+                  f"status={status} files={present} out={out!r}")
+
+        # 17. A refusal inside a function defined by earlier input is not given
+        # the current unit's stdin line (the session keeps no line for the
+        # defining unit): a truthful location instead.
+        d = work / "earlier-unit"
+        d.mkdir()
+        source = 'fn(f(a)) {\n  print("in f")\n  return a.size()\n}\nprint("x")\nprint(f("3"))\n'
+        where = "<stdin>: in earlier input, at line 3, column 10 of the unit that defined it"
+        proc, rows = run(nift, d, [], {}, stdin=source)
+        check(proc.returncode == 1 and proc.stdout == "x\n" and
+              proc.stderr.startswith(f"error: {where}: NIFT_VM session refused: type:length: ") and
+              "<stdin>:8:" not in proc.stderr,
+              "refusal inside an earlier unit's function: truthful location, no current-unit offset (piped)",
+              f"rc={proc.returncode} err={proc.stderr!r}")
+        status, out = run_tty(nift, d, [], {}, source.rstrip("\n").split("\n") + ["exit"])
+        check(status == 0 and f"error: {where}: NIFT_VM session refused: type:length: " in out and
+              "<stdin>:8:" not in out,
+              "refusal inside an earlier unit's function: truthful location (tty)", f"out={out!r}")
+        proc, rows = run(nift, d, [], {}, stdin='fn(f(a)) { return a.size() }\nf 3\n')
+        check(proc.returncode == 1 and "<stdin>: in earlier input, at line 1, column 19 " in proc.stderr and
+              "<stdin>:2:19" not in proc.stderr,
+              "shell-form call into an earlier unit: truthful location", f"err={proc.stderr!r}")
+
+        # 18. A startup file whose reported refusal is not the earliest one:
+        # the interruption point is the earliest refusal in source order, the
+        # statements before it run exactly once, and no refusal is dropped.
+        for label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"earliest-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text('print("s1")\ntouch("s1.txt")\nfn(g()) { return run("a") }\nprint("s3")\n'
+                                  'touch("s3.txt")\ns := 1\ns.foo()\n')
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ["print(7)", "exit"])
+            check(status == 0 and out.count("s1\n") == 1 and (d / "s1.txt").exists() and
+                  not (d / "s3.txt").exists() and "s3" not in out and
+                  f"error: {path}:3:18: NIFT_VM session refused: callable:run" in out and
+                  f"{path}:7:" not in out and out.count("NIFT_VM session refused") == 1 and
+                  "was interrupted here" in out and out.rstrip().endswith("7"),
+                  f"{label} on a tty: interrupted at the earliest refusal (3:18); s1 ran once, s3 never",
+                  f"status={status} out={out!r}")
+
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",
                                                                              {"NIFT_VM": "1"})):

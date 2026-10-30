@@ -1671,13 +1671,21 @@ static void report_session_refusal(const nift::rt::SessionResult& result, const 
     std::string label = result.refusal_path.empty() ? path : result.refusal_path;
     std::size_t line = result.refusal_line ? result.refusal_line : 1;
     const std::size_t column = result.refusal_column ? result.refusal_column : 1;
-    if (label == path && path == "<repl>") {
-        label = "<stdin>";
-        line += first_line - 1;
+    std::string where;
+    if (label == "<repl>" && !result.refusal_in_unit) {
+        // Inside earlier input (a function defined by an earlier unit): the
+        // session keeps no stdin line for that unit, so say what is known.
+        where = "<stdin>: in earlier input, at line " + std::to_string(line) + ", column " +
+                std::to_string(column) + " of the unit that defined it";
+    } else {
+        if (label == path && path == "<repl>") {
+            label = "<stdin>";
+            line += first_line - 1;
+        }
+        where = label + ':' + std::to_string(line) + ':' + std::to_string(column);
     }
     std::cout.flush();
-    std::cerr << nift::rt::vm_session_refusal_diagnostic(label + ':' + std::to_string(line) + ':' +
-                                                         std::to_string(column), result.refusal, path, stops,
+    std::cerr << nift::rt::vm_session_refusal_diagnostic(where, result.refusal, path, stops,
                                                          interrupted_file)
               << std::flush;
 }
@@ -1715,6 +1723,8 @@ static std::size_t startup_file_cut(const nift::rt::SessionResult& result, const
     return cut;
 }
 static bool startup_prefix_running = false;
+static bool startup_prefix_refused = false;
+static nift::rt::SessionResult startup_prefix_refusal;
 
 static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
                                     const std::string& path, bool inspect = true,
@@ -1733,19 +1743,29 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     if ((mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) &&
         result.execution.reason != nift::rt::StopReason::Internal) return 0;
     if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) {
-        if (startup_prefix_running) return 1;  // the prefix of an interrupted startup file: nothing ran
+        if (startup_prefix_running) {  // the prefix of an interrupted startup file: nothing ran;
+            startup_prefix_refused = true;  // its (earlier) refusal is reported by the caller
+            startup_prefix_refusal = result;
+            return 1;
+        }
         const bool startup_file = display == SessionDisplay::Rc ||
             (display == SessionDisplay::Script && path != "<command-line>" && path != "<stdin>");
         if (startup_file && stdin_is_terminal()) {
-            const std::size_t cut = startup_file_cut(result, source, path);
-            if (cut) {
-                startup_prefix_running = true;
+            // The interruption point is the earliest refusal in source order: a
+            // refused prefix moves it earlier, until the prefix before it is
+            // admitted (and runs, once) or nothing precedes it.
+            nift::rt::SessionResult earliest = result;
+            for (std::size_t cut = startup_file_cut(earliest, source, path); cut;
+                 cut = startup_file_cut(earliest, source, path)) {
+                startup_prefix_running = true; startup_prefix_refused = false;
                 const int prefix_status = run_vm_session_statement(session, source.substr(0, cut), path, inspect,
                                                                    display, first_line);
                 startup_prefix_running = false;
                 if (prefix_status == 70) return 70;
+                if (!startup_prefix_refused) break;
+                earliest = startup_prefix_refusal;
             }
-            report_session_refusal(result, path, first_line, false, path);
+            report_session_refusal(earliest, path, first_line, false, path);
             session_refusal_reported = false;
             return 0;
         }
@@ -2667,6 +2687,10 @@ static int execute_shell_command(Parser& parser,
                 break;
         }
         if (session && last == 70 && segment.first.kind != nift::shell::CommandKind::External) return 70;
+        // A refusal reported while running this segment (a shell-form call of a
+        // user function or builtin, `cd`, ...) abandons the whole logical line,
+        // as a refused `$[...]` does: no later `;`/`&&`/`||` segment runs.
+        if (session_refusal_reported) return 2;
         if (exit_requested) break;
     }
     if (exit_requested_out) *exit_requested_out = exit_requested;
