@@ -27,7 +27,19 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         indices.emplace(source.protos[i].get(), i);
         copy->protos.push_back(std::make_unique<Proto>());
     }
-    Value constants = make_array();
+    // The flattened constants array is local and unpublished: nothing outside
+    // this function can reach it, and it lives only until encode() below reads
+    // it. Fill it in one pass at exactly reserved capacity. Per-element
+    // array_push would relocate the whole array on every push in checked builds
+    // (NIFT_RT_RELOCATE_ON_MUTATION), which is quadratic in the constant count.
+    // `items` is the only reference into it and no other operation on
+    // `constants` happens before encode(); the reserved capacity means no
+    // push_back reallocates, so the heap tally make_array recorded stays exact.
+    std::size_t constant_total = 0;
+    for (const auto& proto : source.protos) constant_total += proto->constants.size();
+    Value constants = make_array(constant_total);
+    std::vector<Value>& items = array_mut(constants);
+    bool holds_identity = false;
     for (std::size_t i = 0; i < source.protos.size(); ++i) {
         const auto& src = *source.protos[i]; auto& dst = *copy->protos[i];
         dst.name = src.name; dst.is_async = src.is_async;
@@ -38,10 +50,16 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         dst.notes = src.notes; dst.note_table = src.note_table;
         if (src.collection_entry) dst.collection_entry = copy->protos.at(indices.at(src.collection_entry)).get();
         input.constant_counts.push_back(src.constants.size());
-        for (const auto& v : src.constants) array_push(constants, v);
+        for (const auto& v : src.constants) {
+            holds_identity = holds_identity || may_contain_identity(v);
+            items.push_back(v);
+        }
         std::uint32_t wire = std::numeric_limits<std::uint32_t>::max();
         (void)map.index_of(&src, wire); input.proto_wires.push_back(wire);
     }
+    // array_mut marks raw storage conservatively; keep the exact identity
+    // summary that per-element stores would have left (aggregate.h).
+    if (!holds_identity) clear_may_hold_identity(constants.heap());
     if (input.constants_graph.encode(constants, map, error) != TransferStatus::Ok) return false;
     auto& table = AtomTable::current();
     for (auto id : used_atoms) {
