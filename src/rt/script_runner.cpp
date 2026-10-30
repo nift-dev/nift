@@ -16,6 +16,7 @@
 #include "rt/opcodes.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
+#include "rt/refusal_text.h"
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
@@ -74,9 +75,14 @@ bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, 
         report(stats);
         return false;
     }
+    // VM required (the default, or NIFT_VM=require): refused before anything
+    // ran, with the full user-facing diagnostic (rt/refusal_text.h).
     stats.outcome = "require-error";
     report(stats);
-    error_line(path, stats, "NIFT_VM=require: not compiled for the VM (" + stats.reason + ")");
+    std::cout.flush();
+    const std::string where = path.generic_string() + ':' + std::to_string(stats.line) + ':' +
+                              std::to_string(stats.column);
+    std::cerr << vm_refusal_diagnostic(where, stats.reason, path.generic_string()) << std::flush;
     exit_code = 1;
     return true;
 }
@@ -107,7 +113,10 @@ SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& pa
 
 VmMode vm_mode_from_environment() {
     const char* value = std::getenv("NIFT_VM");
-    if (!value || !*value || std::string(value) == "0") return VmMode::Off;
+    // VM-default policy: unset or empty requires the VM (no legacy fallback);
+    // only an explicit NIFT_VM=0 selects the legacy interpreter.
+    if (!value || !*value) return VmMode::Require;
+    if (std::string(value) == "0") return VmMode::Off;
     if (std::string(value) == "require") return VmMode::Require;
     if (std::string(value) == "classify") return VmMode::Classify;
     if (std::string(value) == "classify-all") return VmMode::ClassifyAll;

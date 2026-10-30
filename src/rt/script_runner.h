@@ -1,7 +1,15 @@
 #pragma once
-// Opt-in execution of whole script programs on the Runtime 2.0 VM (CP11).
+// Execution of whole script programs on the Runtime 2.0 VM (CP11; VM by
+// default since the VM-default policy).
 //
 // Environment:
+//   NIFT_VM unset or empty (default)  the VM is required: as NIFT_VM=require.
+//                    An unsupported program is refused before anything runs,
+//                    with one diagnostic on stderr (location, feature, refusal
+//                    reason, the NIFT_VM=0 instruction, the issue tracker;
+//                    rt/refusal_text.h) and exit status 1. No legacy fallback.
+//   NIFT_VM=0        explicit legacy interpreter (compatibility escape hatch):
+//                    nothing here runs and nift behaves exactly as before.
 //   NIFT_VM=1        compile and run eligible scripts on the VM; everything
 //                    else (parse errors, Opaque nodes, unsupported constructs)
 //                    runs on the legacy engine unchanged. The choice is made
@@ -9,7 +17,7 @@
 //                    unit runs entirely on one engine, exactly once; program
 //                    errors on the VM are reported by the VM as legacy would.
 //   NIFT_VM=require  as 1, but never use the legacy engine: an ineligible
-//                    script is reported as an error (honest benchmarking).
+//                    script is reported as an error (identical to the default).
 //   NIFT_VM=classify test tooling: parse and compile only, report the outcome
 //                    (`compiled` or `fallback`, NIFT_VM_STATS) and exit 0
 //                    without running the script on either engine.
@@ -28,7 +36,7 @@
 //                    legacy_executions: 0 or 1, never both).
 //   NIFT_VM_STATS=<path>  the same line appended to <path> instead.
 //   NIFT_VM_DUMP=1   the compiled bytecode on stderr.
-// Unset (or 0), nothing here runs and nift behaves exactly as before.
+// Only NIFT_VM=0 bypasses this file (the legacy interpreter).
 #include "RuntimeValue.h"
 
 #include <filesystem>

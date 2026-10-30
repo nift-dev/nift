@@ -32,6 +32,7 @@
 #include "rt/parser.h"
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
+#include "rt/refusal_text.h"
 #include "rt/session.h"
 #include "rt/script_runner_options.h"
 #include "rt/eval_result.h"
@@ -1723,7 +1724,8 @@ static int run_script_source(const std::string& source, const fs::path& source_p
         parser.set_script_invocation(cmd, script_args);
         return run_script_shell_loop(parser, false, &session);
     }
-    // Runtime 2.0 CP11: opt-in VM (NIFT_VM=1); returns false to run legacy unchanged.
+    // Runtime 2.0: the VM by default (VM required, no fallback); NIFT_VM=1 falls
+    // back; returns false to run legacy unchanged (NIFT_VM=0, or a mode-1 fallback).
     if (!interactive_after && target == "native") {
         int vm_exit = 0;
         if (nift::rt::run_script_on_vm(source, source_path, vm_exit)) return vm_exit;
@@ -2868,6 +2870,9 @@ static int run_script_shell() {
 }
 
 int run_cli(int argc, char** argv) {
+    // VM-default policy: a refused program names the exact invocation to rerun
+    // on the legacy interpreter (NIFT_VM=0 nift ...), as the user typed it.
+    nift::rt::set_invocation_arguments(argc, argv);
     // --platform is a global execution/build selector and may appear before or
     // after the command/script.  `--` is a hard boundary: anything after it is
     // passed through literally and is never interpreted as a Nift option.
