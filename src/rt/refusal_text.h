@@ -30,8 +30,10 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 // REPL, a shell reading stdin, the initial unit of `nift -i`, ~/.niftrc). The
 // headline keeps the established `NIFT_VM session refused: <reason>` text; the
 // not-executed note names only the refused statement (earlier statements of
-// the session have run; the session continues), the other notes are identical. `where` is `<stdin>:line:column` for interactive input
-// (the line counted over the whole input stream) or the unit's path.
+// the session have run; the session continues), the other notes are
+// identical. `where` is `<stdin>:line:column` for interactive input (the line
+// counted over the whole input stream), `<interpolation>:line:column` for a
+// `$[...]` shell interpolation, or the unit's path.
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
                                           const std::string& fallback);
 
