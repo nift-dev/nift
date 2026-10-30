@@ -1647,8 +1647,22 @@ static int finish_vm_session(nift::rt::VmSession& session, int status) {
 // line counted over the whole input stream (`first_line` is the stream line the
 // unit starts on); a script, -c/-e or ~/.niftrc unit keeps its own path; a
 // refusal inside an imported module names the module.
+//
+// Owner ruling (Option A): a non-interactive session - stdin is not a terminal
+// (isatty, as the shell's line reader already decides), e.g. piped input to
+// `nift` or `nift -i`, a script piped after `nift -i file` - stops at the first
+// refusal: diagnostic, no later statement, normal cleanup, exit status 1, earlier
+// effects kept. A typed REPL on a terminal reports it and returns to the prompt
+// (the refused statement publishes nothing: admission is transactional). The
+// loop sets session_stops_on_refusal from isatty and reads
+// session_refusal_reported after every statement/command (including a refused
+// `$[...]` interpolation).
+static bool session_stops_on_refusal = true;
+static bool session_refusal_reported = false;
+
 static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
-                                   std::size_t first_line) {
+                                   std::size_t first_line, bool stops) {
+    session_refusal_reported = true;
     std::string label = result.refusal_path.empty() ? path : result.refusal_path;
     std::size_t line = result.refusal_line ? result.refusal_line : 1;
     const std::size_t column = result.refusal_column ? result.refusal_column : 1;
@@ -1658,7 +1672,7 @@ static void report_session_refusal(const nift::rt::SessionResult& result, const 
     }
     std::cout.flush();
     std::cerr << nift::rt::vm_session_refusal_diagnostic(label + ':' + std::to_string(line) + ':' +
-                                                         std::to_string(column), result.refusal, path)
+                                                         std::to_string(column), result.refusal, path, stops)
               << std::flush;
 }
 
@@ -1679,7 +1693,8 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     if ((mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) &&
         result.execution.reason != nift::rt::StopReason::Internal) return 0;
     if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) {
-        report_session_refusal(result, path, first_line);
+        report_session_refusal(result, path, first_line,
+                               display != SessionDisplay::Repl || session_stops_on_refusal);
         return 1;
     }
     if (result.execution.reason != nift::rt::StopReason::None) {
@@ -2049,7 +2064,9 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
                                                                       : result.refusal_path) + ':' +
                     std::to_string(result.refusal_line ? result.refusal_line : 1) + ':' +
                     std::to_string(result.refusal_column ? result.refusal_column : 1);
-                std::string text = nift::rt::vm_session_refusal_diagnostic(where, result.refusal, "<interpolation>");
+                session_refusal_reported = true;
+                std::string text = nift::rt::vm_session_refusal_diagnostic(where, result.refusal, "<interpolation>",
+                                                                          session_stops_on_refusal);
                 if (text.rfind("error: ", 0) == 0) text.erase(0, 7);
                 if (!text.empty() && text.back() == '\n') text.pop_back();
                 error = "command interpolation failed: $[" + expression + "]: " + text;
@@ -2812,8 +2829,11 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     const bool interactive = isatty(STDIN_FILENO);
     jobs.set_interactive(interactive);
 #else
-    jobs.set_interactive(_isatty(_fileno(stdin)) != 0);
+    const bool interactive = _isatty(_fileno(stdin)) != 0;
+    jobs.set_interactive(interactive);
 #endif
+    session_stops_on_refusal = !interactive;  // Option A (see report_session_refusal)
+    session_refusal_reported = false;
     if (load_rc) if (const char* home = std::getenv("HOME")) {
         fs::path rc = fs::path(home) / ".niftrc";
         if (filesystem::file_exists(rc)) {
@@ -2862,6 +2882,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
             const auto status = execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code,session);
             if (status == 70) return status;
             pending.clear();
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) return 1; }
             if(exit_requested) return exit_code;
             continue;
         }
@@ -2870,7 +2891,9 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if (session) {
             const auto status = run_vm_session_statement(*session, pending, "<repl>", true,
                                                          SessionDisplay::Repl, pending_line);
-            pending.clear(); if (status == 70) return status; continue;
+            pending.clear(); if (status == 70) return status;
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) return 1; }
+            continue;
         }
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
         if(!rr.ok){ console::error(rr.error.message);continue; }

@@ -38,7 +38,11 @@ import json
 import os
 import subprocess
 import sys
+import pty
+import select
+import signal
 import tempfile
+import time
 from pathlib import Path
 
 FAILS = []
@@ -85,7 +89,11 @@ PLATFORM_SCRIPT = 'touch("side.txt")\nprint(platform())\n'
 PROGRAM_NOTE = "note: the program was not executed: no part of it ran\n"
 # A session refuses one statement: earlier statements have run and later ones
 # still run, so its note must never claim that nothing ran.
-SESSION_NOTE = "note: this statement was not executed; any earlier statements in this session had already run\n"
+STATEMENT_NOTE = "note: this statement was not executed; earlier statements in this session may already have executed\n"
+# Owner ruling (Option A): a non-interactive session stops at the refusal; a
+# typed REPL on a terminal continues at the prompt.
+SESSION_NOTE = STATEMENT_NOTE + "note: the session stopped here: no later input was run (exit status 1)\n"
+TTY_SESSION_NOTE = STATEMENT_NOTE + "note: the session continues; the statement left no definitions or effects\n"
 
 
 def notes(hint, executed=PROGRAM_NOTE):
@@ -94,14 +102,59 @@ def notes(hint, executed=PROGRAM_NOTE):
             f"note: please report unsupported programs at {ISSUES}\n")
 
 
+def run_tty(nift, cwd, args, extra, lines, settle=0.4):
+    """Type `lines` into nift on a real terminal (pty); returns (status, output
+    with the line editor's redraws removed)."""
+    env = base_env(extra)
+    env.update(HOME=str(cwd), TERM="dumb", NO_COLOR="1")
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.chdir(cwd)
+        os.execve(nift, [nift, *args], env)
+    out = b""
+
+    def drain(seconds):
+        nonlocal out
+        end = time.time() + seconds
+        while time.time() < end:
+            ready, _, _ = select.select([fd], [], [], 0.05)
+            if ready:
+                try:
+                    data = os.read(fd, 4096)
+                except OSError:
+                    return
+                if not data:
+                    return
+                out += data
+    for line in lines:
+        drain(settle)
+        os.write(fd, (line + "\r").encode())
+    drain(2.0)
+    deadline = time.time() + 20
+    while True:
+        done, status = os.waitpid(pid, os.WNOHANG)
+        if done:
+            break
+        if time.time() > deadline:
+            os.kill(pid, signal.SIGKILL)
+            done, status = os.waitpid(pid, 0)
+            break
+        drain(0.2)
+    os.close(fd)
+    text = out.decode(errors="replace").replace("\r\n", "\n")
+    # Keep only completed lines (the editor redraws `\r\x1b[2K<prompt><partial>`).
+    kept = [chunk.split("\r")[-1] for chunk in text.split("\n")]
+    return os.waitstatus_to_exitcode(status), "\n".join(k for k in kept if not k.startswith("\x1b[2K"))
+
+
 def expected_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
     return (f"error: {where}: not compiled for the VM ({reason}): {feature} is not supported by the "
             "Runtime 2.0 VM yet\n" + notes(hint))
 
 
-def expected_session_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE):
+def expected_session_diagnostic(where, hint, reason=REASON, feature=RUN_FEATURE, note=SESSION_NOTE):
     return (f"error: {where}: NIFT_VM session refused: {reason}: {feature} is not supported by the "
-            "Runtime 2.0 VM yet\n" + notes(hint, SESSION_NOTE))
+            "Runtime 2.0 VM yet\n" + notes(hint, note))
 
 
 def diagnostic_problems(stderr, where, hint, reason=REASON, feature=RUN_FEATURE, session=False):
@@ -271,40 +324,88 @@ def main():
         check(outputs["default"] == outputs["legacy"] and outputs["default"],
               "website build output is byte-identical under the default and NIFT_VM=0")
 
-        # 7. Interactive session (non-tty stdin): VM-owned by default (D-054). A
-        # refused unit gets the full diagnostic at its position in the input
-        # stream; the session keeps its state and continues (VM-default contract
-        # upgrade from the short `NIFT_VM session refused: <reason>` line). The
-        # continuation and exit status 0 asserted here are the CURRENT behaviour,
-        # pending the owner's ruling on whether a non-interactive shell should
-        # stop with exit 1 at a refusal; the note names only the statement.
+        # 7. Sessions are VM-owned by default (D-054). Owner ruling (Option A):
+        # a non-interactive session (stdin not a terminal) stops at the first
+        # refusal - full positioned diagnostic, the refused statement and every
+        # later one not run, earlier effects kept, cleanup, exit status 1; a
+        # typed REPL on a terminal reports it and returns to the prompt.
         d = work / "session"
         d.mkdir()
-        lines = 'x := 4\nprint(x)\nr := run("echo", "hi")\nprint(x + 1)\n'
+        lines = 'x := 4\nprint(x)\ntouch("early.txt")\nr := run("echo", "hi");touch("refused.txt")\n' \
+                'print("B")\ntouch("late.txt")\n'
         sessions = {}
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
+            for name in ("early.txt", "refused.txt", "late.txt"):
+                if (d / name).exists():
+                    (d / name).unlink()
             proc, rows = run(nift, d, [], extra, stdin=lines)
             sessions[label] = (proc.returncode, proc.stdout, proc.stderr, [r.get("outcome") for r in rows])
-            problems = diagnostic_problems(proc.stderr, "<stdin>:3:6", "", session=True)
-            check(proc.returncode == 0 and proc.stdout == "4\n5\n" and not problems and
-                  [r.get("outcome") for r in rows] == ["vm", "vm", "require-error", "vm"] and
-                  rows[2].get("reason") == REASON and (rows[2].get("line"), rows[2].get("column")) == (1, 6) and
+            problems = diagnostic_problems(proc.stderr, "<stdin>:4:6", "", session=True)
+            check(proc.returncode == 1, f"piped session (NIFT_VM {label}): exit status 1 at the refusal",
+                  f"rc={proc.returncode}")
+            check(proc.stdout == "4\n" and (d / "early.txt").exists(),
+                  f"piped session (NIFT_VM {label}): earlier statements ran and their effects are kept",
+                  f"out={proc.stdout!r}")
+            check(not (d / "refused.txt").exists(),
+                  f"piped session (NIFT_VM {label}): the refused statement did not run")
+            check("B" not in proc.stdout and not (d / "late.txt").exists(),
+                  f"piped session (NIFT_VM {label}): no later statement ran", f"out={proc.stdout!r}")
+            check(not problems and "no part of it ran" not in proc.stderr,
+                  f"piped session (NIFT_VM {label}): accurate positioned diagnostic (statement not executed, "
+                  "earlier statements may have, session stopped)", "; ".join(problems))
+            check([r.get("outcome") for r in rows] == ["vm", "vm", "vm", "require-error"] and
+                  rows[3].get("reason") == REASON and (rows[3].get("line"), rows[3].get("column")) == (1, 6) and
                   all(r.get("legacy_executions", 0) == 0 for r in rows),
-                  f"REPL session (NIFT_VM {label}) is VM-owned; a refused unit gets the full diagnostic at "
-                  "<stdin>:3:6, keeps state and never falls back (continuation/exit 0: current behaviour, "
-                  "pending owner ruling)",
-                  f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
+                  f"piped session (NIFT_VM {label}): VM-owned, never falls back", f"rows={rows}")
         check(sessions["unset"] == sessions["require"], "REPL session: NIFT_VM=require is identical to the default",
               repr(sessions))
         # A multi-line unit: the position is the stream line of the refused call.
         proc, rows = run(nift, d, ["-i"], {}, stdin='x := 4\nif(x > 1) {\n  r := run("echo", "hi")\n}\nprint(x + 1)\n')
         problems = diagnostic_problems(proc.stderr, "<stdin>:3:8", "-i", session=True)
-        check(proc.returncode == 0 and proc.stdout == "5\n" and not problems,
+        check(proc.returncode == 1 and proc.stdout == "" and not problems,
               "nift -i on piped stdin: a multi-line refused unit is located at its stream line (<stdin>:3:8)",
               f"rc={proc.returncode} out={proc.stdout!r} {problems}")
-        proc, rows = run(nift, d, [], {"NIFT_VM": "0"}, stdin=lines.replace("print(x + 1)", "print(type(r))"))
-        check(proc.returncode == 0 and proc.stdout == "4\nobject\n" and rows == [],
-              "NIFT_VM=0 REPL session is legacy", f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+        for name in ("early.txt", "refused.txt", "late.txt"):
+            if (d / name).exists():
+                (d / name).unlink()
+        proc, rows = run(nift, d, [], {"NIFT_VM": "0"}, stdin=lines + "print(type(r))\n")
+        check(proc.returncode == 0 and proc.stdout == "4\nnull\nB\nobject\n" and rows == [] and
+              all((d / n).exists() for n in ("early.txt", "refused.txt", "late.txt")),
+              "NIFT_VM=0 piped session is legacy and unchanged (runs every statement, exit 0)",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+        # Cleanup at the stop: a background job and an unsaved managed file of
+        # earlier statements are finalized (the job is gone, nothing is saved).
+        proc, rows = run(nift, d, [], {}, stdin='command /bin/sleep 30 &\nf := file("held.txt")\nf.open("w")\n'
+                                                'f.write("unsaved")\nr := run("echo", "hi")\nf.save()\n')
+        job = proc.stdout.split()[1] if proc.stdout.startswith("[1] ") else ""
+        time.sleep(0.3)
+        alive = False
+        if job.isdigit():
+            try:
+                os.kill(int(job), 0)
+                alive = True
+            except OSError:
+                pass
+        check(proc.returncode == 1 and job.isdigit() and not alive and
+              (not (d / "held.txt").exists() or (d / "held.txt").read_text() == ""),
+              "piped session stop: earlier background job and managed file are cleaned up, nothing later ran",
+              f"rc={proc.returncode} out={proc.stdout!r} alive={alive} err={proc.stderr!r}")
+        if alive:
+            os.kill(int(job), signal.SIGKILL)
+        # A typed REPL on a terminal: reported, back at the prompt, usable; the
+        # refused statement published nothing (no definition, no effect).
+        for name in ("early.txt", "refused.txt"):
+            if (d / name).exists():
+                (d / name).unlink()
+        status, out = run_tty(nift, d, [], {}, ['print("A")', 'touch("early.txt")',
+                                                'fn(gdef()){return 1};touch("refused.txt");r := run("echo")',
+                                                "print(5)", "gdef()", "exit"])
+        tty_diag = expected_session_diagnostic("<stdin>:3:48", "", note=TTY_SESSION_NOTE)
+        check("A\n" in out and (d / "early.txt").exists() and tty_diag in out and
+              not (d / "refused.txt").exists() and "\n5\n" in out and "callable:gdef" in out and status == 0 and
+              "no part of it ran" not in out,
+              "tty REPL: refusal reported, statement not run and left no definition, later statement works",
+              f"status={status} out={out!r}")
         (d / "case.f").write_text(UNSUPPORTED)
         proc, rows = run(nift, d, ["-i", "case.f"], {}, stdin="")
         where = f"{(d / 'case.f').resolve().as_posix()}:{REFUSED_AT[0]}:{REFUSED_AT[1]}"
@@ -393,8 +494,8 @@ def main():
         clean()
         proc, rows = run(nift, d, ["--platform=linux"], {}, stdin='x := 1\nr := run("echo", "hi")\nprint(x)\n')
         problems = diagnostic_problems(proc.stderr, "<stdin>:2:6", "--platform=linux", session=True)
-        check(proc.returncode == 0 and proc.stdout == "1\n" and not problems and
-              [r.get("outcome") for r in rows] == ["vm", "require-error", "vm"],
+        check(proc.returncode == 1 and proc.stdout == "" and not problems and
+              [r.get("outcome") for r in rows] == ["vm", "require-error"],
               "--platform REPL: a refused unit gets the full session diagnostic, selector in the hint",
               f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
         clean()
@@ -487,19 +588,29 @@ def main():
               "build hook: a child `nift child.f` is refused by the VM default; the site renders unchanged",
               f"rc={proc.returncode} err={proc.stderr!r} child={result}")
 
-        # 12. A refusal inside `$[...]` shell command interpolation gets the full
+        # 12. A refusal inside `$[...]` shell command interpolation: the full
         # session diagnostic (location in the expression, hint, issues URL), the
-        # command does not run, and the session continues (current behaviour).
+        # containing command does not run; a non-interactive session stops with
+        # exit 1, a tty REPL returns to the prompt.
         d = work / "interpolation"
         d.mkdir()
-        proc, rows = run(nift, d, [], {}, stdin='print("A")\necho $[run("echo","x")]\nprint("B")\n')
+        proc, rows = run(nift, d, [], {}, stdin='print("A")\ncommand /usr/bin/touch made.txt $[run("echo","x")]\n'
+                                                'print("B")\n')
         expected = ("error: command interpolation failed: $[run(echo,x)]: <interpolation>:1:1: NIFT_VM session "
                     f"refused: {REASON}: {RUN_FEATURE} is not supported by the Runtime 2.0 VM yet\n" +
                     notes("", SESSION_NOTE))
-        check(proc.returncode == 0 and proc.stdout == "A\nB\n" and proc.stderr == expected and
-              "no part of it ran" not in proc.stderr,
-              "$[...] interpolation refusal: full session diagnostic, command not run, session continues",
+        check(proc.returncode == 1 and proc.stdout == "A\n" and proc.stderr == expected and
+              not (d / "made.txt").exists() and "no part of it ran" not in proc.stderr,
+              "$[...] refusal (piped): full diagnostic, the command did not run, session stopped with exit 1",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+        status, out = run_tty(nift, d, [], {}, ['print("A")', 'command /usr/bin/touch made.txt $[run("echo","x")]',
+                                                'print(7)', "exit"])
+        expected = ("error: command interpolation failed: $[run(echo,x)]: <interpolation>:1:1: NIFT_VM session "
+                    f"refused: {REASON}: {RUN_FEATURE} is not supported by the Runtime 2.0 VM yet\n" +
+                    notes("", TTY_SESSION_NOTE))
+        check(expected in out and not (d / "made.txt").exists() and "\n7\n" in out and status == 0,
+              "$[...] refusal (tty REPL): full diagnostic, the command did not run, back at a usable prompt",
+              f"status={status} out={out!r}")
 
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",

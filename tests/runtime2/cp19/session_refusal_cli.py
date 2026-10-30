@@ -1,5 +1,7 @@
-import argparse,json,os,re,subprocess,tempfile
+import argparse,json,os,re,subprocess,sys,tempfile
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from tty_session import run_tty
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True);a=ap.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
@@ -29,21 +31,34 @@ for name,source,expected,reason in cases:
    rows=[json.loads(x) for x in stats.read_text().splitlines()]
    row=dict(case=name,mode=mode,status=p.returncode,stdout=p.stdout,stderr=p.stderr,stats=rows);records.append(row)
    a.out.write_text(json.dumps(records,indent=2)+'\n')
-   assert p.returncode==0 and p.stdout==expected,row
-   refused=[s for s in rows if s['outcome']=='require-error'];assert len(refused)==1,row
-   # VM-default policy: the full refusal diagnostic. Every unit here is one stdin
-   # line, so the refused unit's stream line is its record index + its own line.
+   # Owner ruling (Option A): piped (non-tty) input stops at the first refusal:
+   # exit 1, nothing of the refused statement (FORBIDDEN) or any later one ran.
+   assert p.returncode==1 and p.stdout=='',row
+   refused=[s for s in rows if s['outcome']=='require-error'];assert len(refused)==1 and rows[-1] is refused[0],row
+   # The full refusal diagnostic. Every unit here is one stdin line, so the
+   # refused unit's stream line is its record index + its own line.
    at=rows.index(refused[0])+refused[0]['line']
    assert refused[0]['line']>=1 and refused[0]['column']>=1,row
    head=re.escape(f"error: <stdin>:{at}:{refused[0]['column']}: NIFT_VM session refused: {reason}: ")
-   assert re.fullmatch(head+r'[^\n]+ is not supported by the Runtime 2\.0 VM yet\n'
-                       'note: this statement was not executed; any earlier statements in this session had '
-                       'already run\n'
-                       'note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
-                       'note: please report unsupported programs at https://github\\.com/nift-dev/nift/issues\n',
+   notes=('note: this statement was not executed; earlier statements in this session may already have executed\n'
+          '{stop}note: to run it on the legacy interpreter: NIFT_VM=0 nift -i\n'
+          'note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n')
+   stop='note: the session stopped here: no later input was run (exit status 1)\n'
+   assert re.fullmatch(head+r'[^\n]+ is not supported by the Runtime 2\.0 VM yet\n'+re.escape(notes.format(stop=stop)),
                        p.stderr),row
    assert 'no part of it ran' not in p.stderr,row  # earlier statements of the session ran
    assert refused[0]['reason']==reason and refused[0]['vm_executions']==refused[0]['legacy_executions']==0,row
    assert all(s['legacy_executions']==0 for s in rows),row
    assert len([s for s in rows if s['vm_executions']==1])==len(rows)-1,row
-print(f'PASS session refusal/state preservation: {len(records)} observations, never counted as VM execution')
+   # The typed REPL (a real terminal) continues: the refused statement left no
+   # definition or effect (FORBIDDEN never printed) and the state the later
+   # statements read is exactly the state before it.
+   tenv=dict(env);tenv.pop('NIFT_VM_STATS')
+   status,out=run_tty([binary,'-i'],td,tenv,source.rstrip('\n').split('\n'))
+   cont='note: the session continues; the statement left no definitions or effects\n'
+   tail=out.split(notes.format(stop=cont),1)
+   row['tty']=dict(status=status,output=out)
+   assert status==0 and 'FORBIDDEN' not in out and len(tail)==2 and tail[1]==expected,row
+   assert re.search(head.replace(re.escape(f"<stdin>:{at}:"),r'<stdin>:\d+:'),out),row
+print(f'PASS session refusal/state preservation: {len(records)} piped observations stop with exit 1 (Option A), '
+      'tty REPL continues with the state preserved; never counted as VM execution')

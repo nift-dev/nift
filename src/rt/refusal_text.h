@@ -34,7 +34,10 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 // identical. `where` is `<stdin>:line:column` for interactive input (the line
 // counted over the whole input stream), `<interpolation>:line:column` for a
 // `$[...]` shell interpolation, or the unit's path.
+// `stops`: a non-interactive session (stdin not a terminal; the initial unit
+// of -i; ~/.niftrc) stops at a refusal with exit status 1 (owner ruling,
+// Option A); a typed REPL on a terminal continues at the prompt.
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
-                                          const std::string& fallback);
+                                          const std::string& fallback, bool stops);
 
 } // namespace nift::rt

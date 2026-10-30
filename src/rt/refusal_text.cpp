@@ -190,11 +190,16 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 }
 
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
-                                          const std::string& fallback) {
+                                          const std::string& fallback, bool stops) {
     return "error: " + where + ": NIFT_VM session refused: " + reason + ": " + describe_refusal(reason) +
            " is not supported by the Runtime 2.0 VM yet\n" +
-           refusal_notes("note: this statement was not executed; any earlier statements in this session had "
-                         "already run\n", fallback);
+           refusal_notes(stops ? "note: this statement was not executed; earlier statements in this session may "
+                                 "already have executed\n"
+                                 "note: the session stopped here: no later input was run (exit status 1)\n"
+                               : "note: this statement was not executed; earlier statements in this session may "
+                                 "already have executed\n"
+                                 "note: the session continues; the statement left no definitions or effects\n",
+                         fallback);
 }
 
 } // namespace nift::rt

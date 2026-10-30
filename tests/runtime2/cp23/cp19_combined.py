@@ -22,13 +22,17 @@ Script cases (managed file "keep.txt" holds unsaved changes in each):
                     so "original" becomes "dirtynal").
 Shell cases (interactive session on stdin, NIFT_VM=1 and require):
   job-blocked-script  a background job runs a script whose parallel task is
-                    blocked forever; the session refuses a coroutine command
-                    atomically (session:coroutine), continues, and at EOF the
-                    job table terminates the job: the script process is gone,
-                    the session's own managed file is reported once.
+                    blocked forever; at EOF the job table terminates the job:
+                    the script process is gone, the session's own managed file
+                    is reported once.
   job-exit-status   the same, ending with `exit 7`: the session finishes as
                     cancelled (accepted CP19 semantics), the file is discarded
                     silently, and the job is still terminated.
+  job-refusal-stop  the same, then a coroutine command the session refuses
+                    (session:coroutine): owner ruling Option A, a piped session
+                    stops there with exit 1 (no later statement runs: no
+                    "after"), finishing as cancelled like a failing exit (file
+                    discarded silently) with the job still terminated.
 Eval cases (NIFT_VM=1 and require, 10 runs each; integration review F1): a
 worker's top-level return never becomes the `nift eval` result.
 """
@@ -121,8 +125,9 @@ def run_shell(binary, mode, case, td):
     lines = [DIRTY.rstrip(";"),
              f'sh {root / "wrap.sh"} &',
              f'sh -c "while [ ! -s {root / "child.pid"} ]; do sleep 0.05; done; sleep 0.3"',
-             'fn[async](g()){return 6}',
-             'print("after")']
+             'print("before")']
+    if case == "job-refusal-stop":
+        lines += ['fn[async](g()){return 6}', 'print("after")']
     if case == "job-exit-status":
         lines.append("exit 7")
     env = {k: v for k, v in os.environ.items() if not k.startswith("NIFT_")}
@@ -147,9 +152,11 @@ def check_shell(case, r):
     if r["child_pid"] is None: problems.append("job never started")
     if r["child_survived"]: problems.append("script job survived the session")
     if r["child_file"] != "child-original": problems.append("the job's unsaved changes were written")
-    if err.count("NIFT_VM session refused: session:coroutine") != 1:
-        problems.append("coroutine command not refused exactly once with session:coroutine")
-    if "after" not in r["stdout"]: problems.append("session did not continue after the refusal")
+    refusals = err.count("NIFT_VM session refused: session:coroutine")
+    if refusals != (1 if case == "job-refusal-stop" else 0):
+        problems.append(f"{refusals} session:coroutine refusals")
+    if "before" not in r["stdout"]: problems.append("earlier statement did not run")
+    if "after" in r["stdout"]: problems.append("a statement after the refusal ran")
     if "child" in r["stdout"].split(): problems.append("the blocked script completed")
     if r["file"] != "original": problems.append("session's unsaved changes were written")
     if "terminate called" in err or r["rc"] < 0: problems.append("aborted")
@@ -157,6 +164,10 @@ def check_shell(case, r):
     if case == "job-blocked-script":
         if r["rc"] != 1: problems.append(f"rc {r['rc']}, want 1")
         if n != 1: problems.append(f"{n} managed-file reports, want 1")
+    elif case == "job-refusal-stop":
+        if r["rc"] != 1: problems.append(f"rc {r['rc']}, want 1")
+        if n != 0: problems.append(f"{n} managed-file reports, want 0 (cancelled session)")
+        if "the session stopped here" not in err: problems.append("no session-stopped note")
     else:
         if r["rc"] != 7: problems.append(f"rc {r['rc']}, want 7")
         if n != 0: problems.append(f"{n} managed-file reports, want 0 (cancelled session)")
@@ -202,7 +213,7 @@ def main():
                 else:
                     print(f"ok   {label}: rc {r['rc']}, VM 1 / legacy 0, {r['seconds']} s")
         for mode in ("1", "require"):
-            for case in ("job-blocked-script", "job-exit-status"):
+            for case in ("job-blocked-script", "job-exit-status", "job-refusal-stop"):
                 with tempfile.TemporaryDirectory(prefix="cp23-cp19-shell-") as td:
                     r = run_shell(binary, mode, case, td)
                 problems = check_shell(case, r)
@@ -212,7 +223,7 @@ def main():
                     failures += 1
                     print(f"FAIL {label}: " + "; ".join(problems) + f"\n  stderr: {r['stderr'][-300:]!r}")
                 else:
-                    print(f"ok   {label}: rc {r['rc']}, job terminated, refusal atomic")
+                    print(f"ok   {label}: rc {r['rc']}, job terminated")
         for mode in ("1", "require"):
             for case, (expr, want) in EVAL_CASES.items():
                 outs = run_eval(binary, mode, expr)
