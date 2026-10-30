@@ -23,6 +23,7 @@ import vm_policies  # noqa: E402
 A, C = "approved", "diff"
 NUM, DIAG, REC = "D-018a numbers", "D-018c diagnostics", "D-001#4 recursion"
 INTERP = "D-018c interpolation"
+TH = "CP23 thread host-error context"
 
 
 def d(line, col, msg):
@@ -270,6 +271,41 @@ CASES += [
      (b"", d(2, 12, b"arithmetic result is not finite"), 1), TE, b"x := 1e300\nprint(\"v=$[x * 10].\")\n", C, None),
     ("interpolation: non-arithmetic error", (b"", d(2, 6, b"value has no member: zz"), 1),
      (b"", d(2, 11, b"value has no member: zz"), 1), TE, SRC_IS, C, None),
+]
+
+# D-060 (owner, 2026-10-30): an uncaught Host Error crossing a thread boundary
+# keeps `thread: ` per boundary on the VM; legacy reports the bare message.
+W = b"fn(work(p)) { return sha256_file(p) }\n"
+SRC_T1 = W + b"t := thread(work, \"x\")\nprint(t.join())\n"
+SRC_T2 = W + b"fn(outer(p)) { t := thread(work, p)\nreturn t.join() }\nt2 := thread(outer, \"x\")\nprint(t2.join())\n"
+SRC_TSYNC = W + b"print(work(\"x\"))\n"
+SRC_TBOTH = W + b"print(work(\"y\"))\nt := thread(work, \"x\")\nprint(t.join())\n"
+SRC_TTRY = W + b"t := thread(work, \"x\")\ntry { print(t.join()) } catch(e) { print(1) }\n"
+SHA = b"sha256_file: cannot open path"
+CASES += [
+    ("thread host error: one boundary", (b"", d(1, 15, SHA), 1), (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_T1,
+     A, TH),
+    ("thread host error: two nested boundaries", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: thread: " + SHA), 1), TE, SRC_T2, A, TH),
+    ("thread host error: one prefix for two boundaries", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_T2, C, None),
+    ("thread host error: two prefixes for one boundary", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: thread: " + SHA), 1), TE, SRC_T1, C, None),
+    ("thread prefix on a synchronous host error", (b"", d(1, 15, b"return: " + SHA), 1),
+     (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_TSYNC, C, None),
+    ("thread prefix where the function is also called directly", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_TBOTH, C, None),
+    ("thread prefix in a program with try/catch", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_TTRY, C, None),
+    ("thread prefix: host message changed", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 22, b"thread: sha256_file: no such file"), 1), TE, SRC_T1, C, None),
+    ("thread prefix: VM at another column", (b"", d(1, 15, SHA), 1),
+     (b"", d(1, 24, b"thread: " + SHA), 1), TE, SRC_T1, C, None),
+    ("thread prefix: other host operation", (b"", d(1, 15, b"read_file: cannot open path"), 1),
+     (b"", d(1, 22, b"thread: read_file: cannot open path"), 1), TE,
+     b"fn(work(p)) { return read_file(p) }\nt := thread(work, \"x\")\nprint(t.join())\n", C, None),
+    ("thread prefix: stdout differs", (b"a\n", d(1, 15, SHA), 1), (b"", d(1, 22, b"thread: " + SHA), 1), TE, SRC_T1,
+     C, None),
 ]
 
 

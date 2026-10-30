@@ -655,6 +655,7 @@ def _d018(policy):
 CLASS_RULES = {
     "recursion-budget": recursion_budget_matches,
     "d018-diagnostics": _d018("D-018c diagnostics"),
+    "cp23-thread-host-context": _d018("CP23 thread host-error context"),  # D-060
 }
 
 

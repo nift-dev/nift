@@ -258,6 +258,7 @@ def rt_diff(args, work):
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--policy", "tools/rt-diff/policies/d040-vm.json",
            "--policy", "tools/rt-diff/policies/d009-const-vm.json",
+           "--policy", "tools/rt-diff/policies/cp23-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
            "--timeout", str(max(60, args.timeout)),
            "--b-vm-stats",
@@ -281,6 +282,7 @@ def rt_diff(args, work):
     evidence = {
         "cp11-recursion-budget-class": lambda v: v.get("beyond_legacy_depth"),
         "cp12-d018-diagnostics": lambda v: v["outcome"] == "vm-error",
+        "cp23-thread-host-context": lambda v: v["outcome"] == "vm-error",
     }
     approvals = collections.Counter()
     for r in report["results"]:

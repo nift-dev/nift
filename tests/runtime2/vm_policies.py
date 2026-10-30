@@ -62,7 +62,7 @@ RETURN_PREFIX = b"return: "
 TASK_CONTEXTS = (b"thread: ", b"future: ")
 
 POLICIES = ("D-001#4 recursion", "D-018c diagnostics", "D-009#5 return prefix", "D-040 independent copy",
-            "D-018c interpolation")
+            "D-018c interpolation", "CP23 thread host-error context")
 
 
 IMPORT_PREFIX = b"import: "
@@ -242,6 +242,94 @@ def interpolation_origin(legacy_err, vm_err, st, source=None):
     return site is not None and site == (int(vm.group(2)), int(vm.group(3)))
 
 
+THREAD_PREFIX = b"thread: "
+THREAD_HOST_ERRORS = re.compile(rb"^sha256_file: cannot open path\Z")
+
+
+def thread_host_context(legacy_err, vm_err, st, source=None):
+    """D-060 (owner, 2026-10-30): an uncaught Host-operation Error raised in a
+    thread and reported after `join` keeps a `thread: ` context prefix on
+    the VM (CP23 R3/R4 thread-reporting contract); legacy reports the bare
+    Host message. Approved only when:
+      - one diagnostic each, same file; the VM message is exactly one
+        `thread: ` followed by legacy's message, which is an approved Host
+        failure (THREAD_HOST_ERRORS: sha256_file's "cannot open path");
+      - the location is equal, or differs only as the D-018c host-location
+        rule allows: the unique failing call inside the statement legacy
+        reports (vm_sites.expected_site), at the VM's position;
+      - that call lies in a named function F that is only ever started as a
+        thread (never called directly), each `thread(F, ...)` either at top
+        level or inside a function that is itself only started as a thread,
+        all at one depth; the number of `thread: ` prefixes equals that
+        depth (nested boundaries get one prefix each);
+      - the program has no try/catch (the Error is genuinely uncaught).
+    The prefix must never appear on a synchronous or caught Host error."""
+    lm, vm = DIAGNOSTIC.match(legacy_err), DIAGNOSTIC.match(vm_err)
+    if not lm or not vm or lm.group(1) != vm.group(1):
+        return False
+    legacy_msg, vm_msg = lm.group(4), vm.group(4)
+    prefixes = 0
+    while vm_msg.startswith(THREAD_PREFIX):
+        prefixes += 1
+        vm_msg = vm_msg[len(THREAD_PREFIX):]
+    if prefixes == 0 or vm_msg != legacy_msg or not THREAD_HOST_ERRORS.match(legacy_msg):
+        return False
+    source = _source_bytes(source, st)
+    root = vm_sites.parse(source) if source else None
+    if root is None or any(n.kind == "Try" for n in root.walk()):
+        return False
+    vm_pos = (int(vm.group(2)), int(vm.group(3)))
+    if (int(lm.group(2)), int(lm.group(3))) != vm_pos:
+        offset = vm_sites.offset_of(source, int(lm.group(2)), int(lm.group(3)))
+        reported = vm_sites.statement_at(source, root, offset) if offset is not None else None
+        if reported is None or vm_sites.expected_site(source, legacy_msg, vm_sites.region_of(reported)) != vm_pos:
+            return False
+    vm_offset = vm_sites.offset_of(source, *vm_pos)
+    call = next((n for n in root.walk() if n.kind == "Call" and n.begin == vm_offset), None)
+    if call is None:
+        return False
+
+    def enclosing(n):
+        """The innermost FnDecl around n; a Lambda first means not recognised."""
+        p = n.parent
+        while p is not None:
+            if p.kind == "Lambda":
+                return False
+            if p.kind == "FnDecl":
+                return p
+            p = p.parent
+        return None
+
+    def name_of(fn):
+        return source[fn.children[0].begin:fn.children[0].end] if fn.children and fn.children[0].kind == "Ident" \
+            else None
+
+    calls = [n for n in root.walk() if n.kind == "Call" and n.children and n.children[0].kind == "Ident"]
+
+    def depth(fn, seen):
+        """Thread boundaries between top level and fn, or None if not unique."""
+        name = name_of(fn)
+        if name is None or name in seen:
+            return None
+        found = set()
+        for n in calls:
+            callee = source[n.children[0].begin:n.children[0].end]
+            if callee == name:
+                return None  # also called directly: the Error may be synchronous
+            if callee == b"thread" and len(n.children) >= 2 and n.children[1].kind == "Ident" and \
+                    source[n.children[1].begin:n.children[1].end] == name:
+                outer = enclosing(n)
+                if outer is False:
+                    return None
+                found.add(1 if outer is None else (lambda d: None if d is None else d + 1)(depth(outer, seen | {name})))
+        if len(found) != 1 or None in found:
+            return None  # never started, or started at different depths
+        return found.pop()
+
+    fn = enclosing(call)
+    return bool(fn) and depth(fn, frozenset()) == prefixes
+
+
 def _return_prefix(legacy, vm, st, source):
     """D-009#5: the VM reports the same diagnostic at the same position; the
     only difference is one or more legacy `return: ` prefixes."""
@@ -329,4 +417,7 @@ def _classify(legacy, vm, st, source=None):
     if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
             and interpolation_origin(legacy[1], vm[1], st, source)):
         return "approved", "D-018c interpolation"
+    if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
+            and thread_host_context(legacy[1], vm[1], st, source)):
+        return "approved", "CP23 thread host-error context"
     return "diff", None

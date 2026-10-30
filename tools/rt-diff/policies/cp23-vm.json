@@ -1,0 +1,9 @@
+[
+ {
+  "id": "cp23-thread-host-context",
+  "decision": "D-060#1",
+  "class": "cp23-thread-host-context",
+  "justification": "D-060 (owner, 2026-10-30): an uncaught sha256_file Host Error raised in a thread keeps one `thread: ` context prefix per genuine thread boundary on the VM (CP23 R3/R4 thread-reporting contract); legacy reports the bare message. Classified by vm_policies.thread_host_context: message identical after the prefixes, location equal or the D-018c failing call, the function only ever started as a thread (boundary depth equal to the prefix count), no try/catch, stdout and exit equal.",
+  "test": "tests/runtime2/vm_policy_negative.py (D-060 positive and negative controls)"
+ }
+]

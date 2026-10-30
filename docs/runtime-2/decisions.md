@@ -1417,3 +1417,25 @@ one-argument `print` of it, no nested interpolated string, and exactly one
 operation inside the string that can raise the message, located
 independently from the AST, at the VM's position. Controls:
 `tests/runtime2/vm_policy_negative.py`.
+
+## D-060 — Thread context on uncaught Host errors (owner, 2026-10-30; CP23 R4 integration)
+
+1. An uncaught Host-operation Error raised inside a thread and reported
+   through `join` keeps one `thread: ` context prefix per genuine thread
+   boundary on the VM (the CP23 R3/R4 thread-reporting contract); legacy
+   reports the bare Host message (`sha256_file: cannot open path`). This is
+   an approved diagnostic difference. The production diagnostic is not
+   changed and no legacy golden is changed.
+2. Recognised only by `vm_policies.thread_host_context` ("CP23 thread
+   host-error context", rt-diff class `cp23-thread-host-context`): the
+   Host message is identical after the prefixes and is an approved Host
+   failure (sha256_file's "cannot open path" only); the location is equal
+   or the D-018c failing call (checked independently of the prefix); the
+   failing function is only ever started as a thread, at one depth equal
+   to the prefix count; the program has no try/catch; stdout and exit are
+   equal. A caught or synchronous Host error never acquires the prefix
+   (checked on the VM: synchronous `sha256_file` reports the bare message,
+   a caught one is caught on both engines).
+3. Error identity, code, catchability and provenance are unchanged.
+
+Controls: `tests/runtime2/vm_policy_negative.py`.
