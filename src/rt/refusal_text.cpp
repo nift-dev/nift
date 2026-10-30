@@ -173,9 +173,10 @@ std::string legacy_command_hint(const std::string& fallback) {
 }
 
 namespace {
-// `executed` is the not-executed statement: a whole program for a file, -e/-c,
+// `executed` is the not-executed note: a whole program for a file, -e/-c,
 // stdin or eval unit; one statement for a session, whose earlier statements
-// have already run (and whose later ones still run).
+// may have run (what happens next - stop or continue at a tty prompt - is the
+// session's own note).
 std::string refusal_notes(const char* executed, const std::string& fallback) {
     return std::string(executed) +
            "note: to run it on the legacy interpreter: " + legacy_command_hint(fallback) + "\n"

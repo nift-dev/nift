@@ -31,8 +31,12 @@ Shell cases (interactive session on stdin, NIFT_VM=1 and require):
   job-refusal-stop  the same, then a coroutine command the session refuses
                     (session:coroutine): owner ruling Option A, a piped session
                     stops there with exit 1 (no later statement runs: no
-                    "after"), finishing as cancelled like a failing exit (file
-                    discarded silently) with the job still terminated.
+                    "after"); it finishes like end of input, so the unsaved
+                    file is reported once (owner ruling: never discarded
+                    silently) and the job is terminated.
+  job-refusal-tty   the same input typed on a real terminal: the REPL refuses
+                    the command atomically, continues ("after" printed), and
+                    on `exit` terminates the job and reports the file once.
 Eval cases (NIFT_VM=1 and require, 10 runs each; integration review F1): a
 worker's top-level return never becomes the `nift eval` result.
 """
@@ -46,6 +50,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cp19"))
+from tty_session import run_tty  # noqa: E402
 
 LEFT_OPEN = re.compile(r"managed file left open[^\n]*keep\.txt")
 SPIN = 'fn[async](spin(n)){i:=0;s:=0;while(i<n){s+=i;i+=1};return s};'
@@ -126,14 +133,18 @@ def run_shell(binary, mode, case, td):
              f'sh {root / "wrap.sh"} &',
              f'sh -c "while [ ! -s {root / "child.pid"} ]; do sleep 0.05; done; sleep 0.3"',
              'print("before")']
-    if case == "job-refusal-stop":
+    if case in ("job-refusal-stop", "job-refusal-tty"):
         lines += ['fn[async](g()){return 6}', 'print("after")']
     if case == "job-exit-status":
         lines.append("exit 7")
     env = {k: v for k, v in os.environ.items() if not k.startswith("NIFT_")}
     env.update(HOME=td, NO_COLOR="1", NIFT_VM=mode)
-    p = subprocess.run([binary], input="\n".join(lines) + "\n", cwd=td, env=env, capture_output=True, text=True,
-                       timeout=60)
+    if case == "job-refusal-tty":
+        status, out = run_tty([binary], td, env, lines + ["exit"])
+        p = argparse.Namespace(returncode=status, stdout=out, stderr=out)
+    else:
+        p = subprocess.run([binary], input="\n".join(lines) + "\n", cwd=td, env=env, capture_output=True, text=True,
+                           timeout=60)
     pidfile = root / "child.pid"
     pid = int(pidfile.read_text().strip()) if pidfile.exists() and pidfile.read_text().strip() else None
     deadline = time.monotonic() + 3
@@ -153,10 +164,12 @@ def check_shell(case, r):
     if r["child_survived"]: problems.append("script job survived the session")
     if r["child_file"] != "child-original": problems.append("the job's unsaved changes were written")
     refusals = err.count("NIFT_VM session refused: session:coroutine")
-    if refusals != (1 if case == "job-refusal-stop" else 0):
+    if refusals != (1 if case in ("job-refusal-stop", "job-refusal-tty") else 0):
         problems.append(f"{refusals} session:coroutine refusals")
     if "before" not in r["stdout"]: problems.append("earlier statement did not run")
-    if "after" in r["stdout"]: problems.append("a statement after the refusal ran")
+    if case == "job-refusal-tty":
+        if "after" not in r["stdout"]: problems.append("the tty REPL did not continue after the refusal")
+    elif "after" in r["stdout"]: problems.append("a statement after the refusal ran")
     if "child" in r["stdout"].split(): problems.append("the blocked script completed")
     if r["file"] != "original": problems.append("session's unsaved changes were written")
     if "terminate called" in err or r["rc"] < 0: problems.append("aborted")
@@ -166,8 +179,12 @@ def check_shell(case, r):
         if n != 1: problems.append(f"{n} managed-file reports, want 1")
     elif case == "job-refusal-stop":
         if r["rc"] != 1: problems.append(f"rc {r['rc']}, want 1")
-        if n != 0: problems.append(f"{n} managed-file reports, want 0 (cancelled session)")
+        if n != 1: problems.append(f"{n} managed-file reports, want 1 (reported, not discarded silently)")
         if "the session stopped here" not in err: problems.append("no session-stopped note")
+    elif case == "job-refusal-tty":
+        if r["rc"] != 1: problems.append(f"rc {r['rc']}, want 1 (the unsaved file is reported at exit)")
+        if n != 1: problems.append(f"{n} managed-file reports, want 1")
+        if "the session continues" not in err: problems.append("no session-continues note")
     else:
         if r["rc"] != 7: problems.append(f"rc {r['rc']}, want 7")
         if n != 0: problems.append(f"{n} managed-file reports, want 0 (cancelled session)")
@@ -213,7 +230,7 @@ def main():
                 else:
                     print(f"ok   {label}: rc {r['rc']}, VM 1 / legacy 0, {r['seconds']} s")
         for mode in ("1", "require"):
-            for case in ("job-blocked-script", "job-exit-status", "job-refusal-stop"):
+            for case in ("job-blocked-script", "job-exit-status", "job-refusal-stop", "job-refusal-tty"):
                 with tempfile.TemporaryDirectory(prefix="cp23-cp19-shell-") as td:
                     r = run_shell(binary, mode, case, td)
                 problems = check_shell(case, r)

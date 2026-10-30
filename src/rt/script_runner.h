@@ -3,7 +3,9 @@
 // default since the VM-default policy).
 //
 // Environment:
-//   NIFT_VM unset or empty (default)  the VM is required: as NIFT_VM=require.
+//   NIFT_VM unset (default)  the VM is required: as NIFT_VM=require. Any value
+//                    other than those listed here (the empty one included) is
+//                    a configuration error (vm_mode_configuration_error).
 //                    An unsupported program is refused before anything runs,
 //                    with one diagnostic on stderr (location, feature, refusal
 //                    reason, the NIFT_VM=0 instruction, the issue tracker;

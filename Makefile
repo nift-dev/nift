@@ -4563,8 +4563,9 @@ endif
 CERTIFY_RUNTIME2_GATES += test-cp23-certify
 certify-targets: test-cp23-certify
 # VM-default policy: the VM is the default scripting engine with no silent
-# legacy fallback (unset/empty NIFT_VM == require; NIFT_VM=0 is the explicit
-# legacy interpreter; NIFT_VM=1 still falls back). Website builds stay legacy.
+# legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
+# interpreter; NIFT_VM=1 still falls back; any other value, empty included, is
+# a configuration error). Website builds stay legacy.
 .PHONY: test-runtime2-vm-default
 test-runtime2-vm-default: $(TARGET)
 	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)"

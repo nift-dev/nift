@@ -596,7 +596,8 @@ def main():
         d.mkdir()
         proc, rows = run(nift, d, [], {}, stdin='print("A")\ncommand /usr/bin/touch made.txt $[run("echo","x")]\n'
                                                 'print("B")\n')
-        expected = ("error: command interpolation failed: $[run(echo,x)]: <interpolation>:1:1: NIFT_VM session "
+        # Located at the stdin line and the column of `run`, quoted as typed.
+        expected = ('error: command interpolation failed: $[run("echo","x")]: <stdin>:2:35: NIFT_VM session '
                     f"refused: {REASON}: {RUN_FEATURE} is not supported by the Runtime 2.0 VM yet\n" +
                     notes("", SESSION_NOTE))
         check(proc.returncode == 1 and proc.stdout == "A\n" and proc.stderr == expected and
@@ -605,12 +606,70 @@ def main():
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
         status, out = run_tty(nift, d, [], {}, ['print("A")', 'command /usr/bin/touch made.txt $[run("echo","x")]',
                                                 'print(7)', "exit"])
-        expected = ("error: command interpolation failed: $[run(echo,x)]: <interpolation>:1:1: NIFT_VM session "
+        expected = ('error: command interpolation failed: $[run("echo","x")]: <stdin>:2:35: NIFT_VM session '
                     f"refused: {REASON}: {RUN_FEATURE} is not supported by the Runtime 2.0 VM yet\n" +
                     notes("", TTY_SESSION_NOTE))
         check(expected in out and not (d / "made.txt").exists() and "\n7\n" in out and status == 0,
               "$[...] refusal (tty REPL): full diagnostic, the command did not run, back at a usable prompt",
               f"status={status} out={out!r}")
+
+        # 13. A refused `$[...]` abandons the whole command line: no later `;`
+        # segment, `&&`/`||` branch or pipeline stage runs (piped: then the
+        # session stops with exit 1; tty: back at a usable prompt).
+        lines = (("`;`", 'touch s1.txt; echo $[run("x")]; touch s2.txt', ["s1.txt"], ["s2.txt"]),
+                 ("`||`", 'echo A $[run("x")] || touch fallback.txt', [], ["fallback.txt"]),
+                 ("`&&`", 'touch a1.txt && echo $[run("x")] && touch a2.txt', ["a1.txt"], ["a2.txt"]),
+                 ("`;` then `||`", 'echo A $[run("x")] ; touch b.txt || touch c.txt', [], ["b.txt", "c.txt"]),
+                 ("pipeline", 'touch q0.txt; /bin/echo hi | /usr/bin/tee p1.txt $[run("x")] | /usr/bin/tee p2.txt',
+                  ["q0.txt"], ["p1.txt", "p2.txt"]),
+                 ("pipeline first stage", 'echo $[run("x")] | /usr/bin/tee p3.txt', [], ["p3.txt"]))
+        names = ("s1.txt", "s2.txt", "fallback.txt", "a1.txt", "a2.txt", "b.txt", "c.txt", "q0.txt", "p1.txt",
+                 "p2.txt", "p3.txt", "later.txt", "after.txt")
+        for label, line, made, never in lines:
+            for name in names:
+                if (d / name).exists():
+                    (d / name).unlink()
+            proc, rows = run(nift, d, [], {}, stdin=line + '\ntouch later.txt\n')
+            check(proc.returncode == 1 and all((d / n).exists() for n in made) and
+                  not any((d / n).exists() for n in never + ["later.txt"]) and "A" not in proc.stdout and
+                  proc.stderr.count("NIFT_VM session refused: callable:run") == 1 and
+                  "the session stopped here" in proc.stderr,
+                  f"$[...] refusal abandons the whole line ({label}, piped): earlier segments ran, nothing after",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} "
+                  f"files={[n for n in names if (d / n).exists()]}")
+            for name in names:
+                if (d / name).exists():
+                    (d / name).unlink()
+            status, out = run_tty(nift, d, [], {}, [line, 'touch("after.txt")', "exit"])
+            check(status == 0 and all((d / n).exists() for n in made) and (d / "after.txt").exists() and
+                  not any((d / n).exists() for n in never) and "FALLBACK" not in out and
+                  "the session continues" in out,
+                  f"$[...] refusal abandons the whole line ({label}, tty): back at a usable prompt",
+                  f"status={status} out={out!r} files={[n for n in names if (d / n).exists()]}")
+
+        # 14. A refusal stop does not silently discard unsaved managed-file
+        # changes: they are not committed (the file on disk is unchanged) but
+        # reported like at end of input; saved writes are kept; exit 1.
+        d = work / "refusal-files"
+        d.mkdir()
+        (d / "keep.txt").write_text("original")
+        proc, rows = run(nift, d, [], {}, stdin='f := file("keep.txt")\nf.open("rw")\nf.write("dirty")\n'
+                                                'r := run("echo", "hi")\nprint("LATER")\n')
+        left_open = f"error: managed file left open: {(d / 'keep.txt').resolve().as_posix()} (unsaved changes discarded)\n"
+        check(proc.returncode == 1 and (d / "keep.txt").read_text() == "original" and left_open in proc.stderr and
+              "NIFT_VM session refused: callable:run" in proc.stderr and "LATER" not in proc.stdout and
+              proc.stderr.index("NIFT_VM session refused") < proc.stderr.index("managed file left open"),
+              "refusal stop: unsaved changes not committed but reported (left open), refusal shown, LATER not "
+              "run, exit 1", f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} "
+                            f"file={(d / 'keep.txt').read_text()!r}")
+        (d / "saved.txt").write_text("")
+        proc, rows = run(nift, d, [], {}, stdin='g := file("saved.txt")\ng.open("w")\ng.write("one")\ng.save()\n'
+                                                'g.write("two")\nr := run("echo", "hi")\nprint("LATER")\n')
+        left_open = f"error: managed file left open: {(d / 'saved.txt').resolve().as_posix()} (unsaved changes discarded)\n"
+        check(proc.returncode == 1 and (d / "saved.txt").read_text() == "one" and left_open in proc.stderr and
+              "NIFT_VM session refused: callable:run" in proc.stderr and "LATER" not in proc.stdout,
+              "refusal stop after save(): the saved write is kept, the later unsaved write is reported, exit 1",
+              f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} file={(d / 'saved.txt').read_text()!r}")
 
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",

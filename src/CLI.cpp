@@ -1627,9 +1627,9 @@ static nift::rt::VmOptions session_options() {
     nift::rt::detail::limits_from_environment(options);
     return options;
 }
-static int finish_vm_session(nift::rt::VmSession& session, int status) {
+static int finish_vm_session(nift::rt::VmSession& session, int status, bool cancelled) {
     try {
-        const auto result = session.finish(status != 0);
+        const auto result = session.finish(cancelled);
         if (result.host_fault && !result.host_fault_message.empty() && result.host_fault_message != result.message)
             console::error(result.host_fault_message);
         if (result.reason != nift::rt::StopReason::None) {
@@ -1659,6 +1659,10 @@ static int finish_vm_session(nift::rt::VmSession& session, int status) {
 // `$[...]` interpolation).
 static bool session_stops_on_refusal = true;
 static bool session_refusal_reported = false;
+// The shell line being executed and its stdin line number (set by the loop),
+// so a refused `$[...]` is located and quoted as typed: `<stdin>:L:C`.
+static const std::string* shell_source_line = nullptr;
+static std::size_t shell_source_line_number = 0;
 
 static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
                                    std::size_t first_line, bool stops) {
@@ -1761,7 +1765,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
         session.initialize_invocation(cmd, script_args);
         const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
                                                     SessionDisplay::Script);
-        if (status != 0) return finish_vm_session(session, status);
+        if (status != 0) return finish_vm_session(session, status, status != 0);
         ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host, info);
         parser.set_script_invocation(cmd, script_args);
         return run_script_shell_loop(parser, false, &session);
@@ -1865,6 +1869,9 @@ struct ShellWord {
     // One entry per character: 1 when the character was quoted or escaped and
     // must not act as a glob metacharacter or shell operator.
     std::vector<unsigned char> quoted;
+    // One entry per character: its byte offset in the source line (the
+    // interpolation diagnostic quotes and locates `$[...]` in the user's terms).
+    std::vector<std::size_t> origin;
     bool operator_token = false;
 };
 
@@ -1872,16 +1879,20 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
     std::vector<ShellWord> out;
     std::string cur;
     std::vector<unsigned char> mask;
+    std::vector<std::size_t> origin;
     bool sq = false, dq = false, esc = false;
+    std::size_t i = 0;
     auto flush = [&]() {
         if (!cur.empty()) {
             ShellWord word;
             word.text = cur;
             word.quoted = mask;
+            word.origin = origin;
             out.push_back(std::move(word));
         }
         cur.clear();
         mask.clear();
+        origin.clear();
     };
     auto push_operator = [&](const std::string& op) {
         flush();
@@ -1891,11 +1902,12 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         word.operator_token = true;
         out.push_back(std::move(word));
     };
-    for (std::size_t i = 0; i < line.size(); ++i) {
+    for (i = 0; i < line.size(); ++i) {
         const char c = line[i];
         if (esc) {
             cur += c;
             mask.push_back(1);
+            origin.push_back(i);
             esc = false;
             continue;
         }
@@ -1905,6 +1917,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         if (sq || dq) {
             cur += c;
             mask.push_back(1);
+            origin.push_back(i);
             continue;
         }
 
@@ -1914,6 +1927,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
             if (i + 2 < line.size() && line.compare(i, 3, ">&1") == 0) {
                 cur.clear();
                 mask.clear();
+                origin.clear();
                 push_operator("2>&1");
                 i += 2;
                 continue;
@@ -1921,12 +1935,14 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
             if (i + 1 < line.size() && line[i + 1] == '>') {
                 cur.clear();
                 mask.clear();
+                origin.clear();
                 push_operator("2>>");
                 i += 1;
                 continue;
             }
             cur.clear();
             mask.clear();
+            origin.clear();
             push_operator("2>");
             continue;
         }
@@ -1948,6 +1964,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         }
         cur += c;
         mask.push_back(0);
+        origin.push_back(i);
     }
     flush();
 
@@ -2060,16 +2077,26 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
             } else if (!result.admitted) {
                 // The full session refusal diagnostic (as for statements), its
                 // `error: ` label and final newline left to console::error.
-                const std::string where = (result.refusal_path.empty() ? std::string("<interpolation>")
-                                                                      : result.refusal_path) + ':' +
+                std::string where = (result.refusal_path.empty() ? std::string("<interpolation>")
+                                                                : result.refusal_path) + ':' +
                     std::to_string(result.refusal_line ? result.refusal_line : 1) + ':' +
                     std::to_string(result.refusal_column ? result.refusal_column : 1);
+                std::string shown = "$[" + expression + "]";
+                if (shell_source_line && shell_source_line_number && close < word.origin.size()) {
+                    // The source text and position as typed (quotes are shell
+                    // syntax and gone from `expression`).
+                    const std::size_t from = word.origin[i], to = word.origin[close];
+                    if (from <= to && to < shell_source_line->size()) shown = shell_source_line->substr(from, to - from + 1);
+                    const std::size_t at = result.refusal_column && i + 1 + result.refusal_column < word.origin.size()
+                        ? word.origin[i + 1 + result.refusal_column] : from;
+                    where = "<stdin>:" + std::to_string(shell_source_line_number) + ':' + std::to_string(at + 1);
+                }
                 session_refusal_reported = true;
                 std::string text = nift::rt::vm_session_refusal_diagnostic(where, result.refusal, "<interpolation>",
                                                                           session_stops_on_refusal);
                 if (text.rfind("error: ", 0) == 0) text.erase(0, 7);
                 if (!text.empty() && text.back() == '\n') text.pop_back();
-                error = "command interpolation failed: $[" + expression + "]: " + text;
+                error = "command interpolation failed: " + shown + ": " + text;
                 return false;
             }
             else if (result.execution.reason != nift::rt::StopReason::None) eval_error = result.execution.message;
@@ -2098,6 +2125,12 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
                           word.quoted.begin() + static_cast<std::ptrdiff_t>(close + 1));
         word.quoted.insert(word.quoted.begin() + static_cast<std::ptrdiff_t>(i),
                            rendered.size(), quoted ? 1 : 0);
+        if (close < word.origin.size()) {
+            const std::size_t from = word.origin[i];
+            word.origin.erase(word.origin.begin() + static_cast<std::ptrdiff_t>(i),
+                              word.origin.begin() + static_cast<std::ptrdiff_t>(close + 1));
+            word.origin.insert(word.origin.begin() + static_cast<std::ptrdiff_t>(i), rendered.size(), from);
+        } else word.origin.clear();
         i += rendered.size();
     }
     return true;
@@ -2283,7 +2316,8 @@ static int dispatch_shell_state(Parser& parser,
             if (print_errors) console::error("cd: too many arguments");
             return 2;
         }
-        if (session) return run_vm_session_statement(*session, expression, "<repl>");
+        if (session) return run_vm_session_statement(*session, expression, "<repl>", true, SessionDisplay::Repl,
+                                                     shell_source_line_number ? shell_source_line_number : 1);
     auto result = parser.run_statement(expression, "<repl>");
         if (!result.ok) {
             if (print_errors) console::error(result.error.message);
@@ -2304,7 +2338,8 @@ static int run_nift_command(Parser& parser,
         return 2;
     }
     const std::string expression = shell_nift_call(tokens, name_index);
-    if (session) return run_vm_session_statement(*session, expression, "<repl>");
+    if (session) return run_vm_session_statement(*session, expression, "<repl>", true, SessionDisplay::Repl,
+                                                   shell_source_line_number ? shell_source_line_number : 1);
     auto result = parser.run_statement(expression, "<repl>");
     if (result.ok) {
         if (!result.output.empty()) std::cout << result.output << '\n';
@@ -2499,6 +2534,9 @@ static int execute_shell_command(Parser& parser,
             if (!command_token_interpolate_word(parser, word, error, session, &terminal)) {
                 if (print_errors) console::error(error);
                 if (terminal) return 70;
+                // A refused `$[...]` abandons the whole command line: no later
+                // segment, `;`/`&&`/`||` branch or pipeline stage runs.
+                if (session_refusal_reported) return 2;
                 interpolation_failed = true;
                 last = 2;
                 break;
@@ -2813,6 +2851,11 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         session->initialize_invocation("<repl>", {});
     }
     std::unique_ptr<nift::shell::JobTable> legacy_jobs;
+    // A refusal stop (Option A) finishes the session like end of input, not as
+    // cancelled: unsaved managed files are reported (and still not committed),
+    // while the status stays 1. An explicit failing `exit` keeps its silent
+    // cancelled finish.
+    bool refusal_stop = false;
     const auto loop = [&]() -> int {
     std::string pending;
     nift::shell::JobTable* session_jobs = nullptr;
@@ -2879,10 +2922,12 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         const auto snapshot=make_shell_snapshot(parser, session);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
+            shell_source_line = &trimmed; shell_source_line_number = pending_line;
             const auto status = execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code,session);
+            shell_source_line = nullptr; shell_source_line_number = 0;
             if (status == 70) return status;
             pending.clear();
-            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) return 1; }
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) { refusal_stop = true; return 1; } }
             if(exit_requested) return exit_code;
             continue;
         }
@@ -2892,7 +2937,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
             const auto status = run_vm_session_statement(*session, pending, "<repl>", true,
                                                          SessionDisplay::Repl, pending_line);
             pending.clear(); if (status == 70) return status;
-            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) return 1; }
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) { refusal_stop = true; return 1; } }
             continue;
         }
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
@@ -2926,7 +2971,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if (!status) status = 1;
     }
     if (!resources_ok && !status) status = 1;
-    return session ? finish_vm_session(*session, status) : status;
+    return session ? finish_vm_session(*session, status, refusal_stop ? false : status != 0) : status;
 }
 
 static int run_script_shell() {
