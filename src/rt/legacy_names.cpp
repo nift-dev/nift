@@ -24,15 +24,14 @@ constexpr std::string_view kNames[] = {
     "is_bytes", "is_collection", "is_dir", "is_enum", "is_file", "is_float", "is_function", "is_int", "is_null",
     "is_number", "is_object", "is_string", "is_struct", "jobs", "js", "json", "jsx", "lambda", "loop", "ls",
     "make_dir", "map", "max", "min", "minify", "mkdir", "modified", "module_path", "move", "mutex", "mv", "name",
-    "native", "netlify", "null", "ofstream", "open", "open_bytes", "os", "package_path", "page", "path", "platform",
-    "prepend", "prettify", "print", "prique", "project", "project_root", "ptr", "pwd", "queue", "range", "read",
-    "read_all", "read_all_bytes", "read_bytes", "read_line", "read_val", "remove", "render", "replace",
-    "replace_once", "return", "revert", "rm", "run", "same", "save", "script", "section", "secure_random_bytes",
-    "seek", "self", "set", "setenv", "sha256", "sha256_file", "sleep", "sorted_map", "split", "stack", "stat",
-    "status", "stringify", "struct", "supabase", "svg", "tell", "this", "thread", "throw", "timer", "title", "touch",
-    "track", "tracked", "true", "try", "type", "u16", "u32", "u64", "u8", "unsetenv", "untrack", "unwatch",
-    "url_encode", "validate", "vercel", "void", "wait", "warn", "watch", "which", "while", "write", "write_line",
-    "write_val", "xml",
+    "netlify", "null", "ofstream", "open", "open_bytes", "os", "package_path", "page", "path", "platform", "prepend",
+    "prettify", "print", "prique", "project", "project_root", "ptr", "pwd", "queue", "range", "read", "read_all",
+    "read_all_bytes", "read_bytes", "read_line", "read_val", "remove", "render", "replace", "replace_once", "return",
+    "revert", "rm", "run", "same", "save", "script", "section", "secure_random_bytes", "seek", "self", "set",
+    "setenv", "sha256", "sha256_file", "sleep", "sorted_map", "split", "stack", "stat", "status", "stringify",
+    "struct", "supabase", "svg", "tell", "this", "thread", "throw", "timer", "title", "touch", "track", "tracked",
+    "true", "try", "type", "u16", "u32", "u64", "u8", "unsetenv", "untrack", "unwatch", "url_encode", "validate",
+    "vercel", "void", "wait", "warn", "watch", "which", "while", "write", "write_line", "write_val", "xml",
 };
 
 constexpr std::string_view kMethods[] = {
