@@ -25,6 +25,7 @@ Must not change unless a decision in `decisions.md` approves it.
 | Candidates for deliberate language changes (break, argument evaluation, value-based typing, declarations in loops, aliasing, catchable errors) | D-015 table (proposed, not yet scheduled) | — |
 | User functions shadow built-ins of the same name | D-009 #3, D-014 | to be scheduled |
 | `exit` in `~/.niftrc` / `nift -i file` on a terminal is refused (the file stops there, the session continues at the prompt) instead of ending the session with status 1; migration: drop the line | D-061 | VM default |
+| A write to the script invocation bindings (`args = …`, `cmd = …`, `args[i] = …`, compound/increment) is rejected before execution (`invocation-assign:<name>`, nothing of the program runs) instead of failing fatally at the statement after earlier statements ran; migration: declare a new binding (`my_args := args`) or replace it with a top-level `args := …` before any use | D-062 #2 | weekend args/cmd |
 
 ## Syntax compatibility (D-045, owner, 2026-10-20)
 

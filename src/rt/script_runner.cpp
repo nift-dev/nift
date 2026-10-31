@@ -155,6 +155,9 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
     stats.path = source_path.generic_string();
     try {
         const std::vector<InvocationBinding> invocation = invocation_bindings(command, arguments);
+#if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 1  // test-only: no script bindings (args_cmd/mutants.sh)
+        return run_unit(source, source_path, mode, stats, exit_code, nullptr, nullptr);
+#endif
         return run_unit(source, source_path, mode, stats, exit_code, nullptr, &invocation);
     } catch (const std::bad_alloc&) {
         internal_failure(stats, source_path, "out of memory (std::bad_alloc)", exit_code);

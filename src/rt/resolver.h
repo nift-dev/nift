@@ -73,6 +73,13 @@ struct Binding {
     int struct_id = -1;
 };
 
+// D-062 (owner, 2026-10-31): a write to an invocation binding (`args = …`,
+// `cmd = …`, an element, compound or increment) is a program error rejected
+// before execution, `invocation-assign:<name>`; otherwise `other`.
+inline std::string write_refusal(const Binding* b, std::string_view name, const char* other) {
+    return b && b->invocation ? "invocation-assign:" + std::string(name) : std::string(other);
+}
+
 class Scopes {
 public:
     void push() { scopes_.emplace_back(); }

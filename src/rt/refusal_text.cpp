@@ -32,6 +32,7 @@ constexpr Family kFamilies[] = {
     {"statement:Export", "an export statement in this position"},
     {"statement:", "the `%` statement"},
     {"import-link", "this combination of imported modules"},
+    {"import-scope:invocation-binding", "an imported module that names the entry script's `args` or `cmd`"},
     {"import-", "this form of import"},
     {"module-host-op:", "the host operation `%()` in a program with imports"},
     {"module-return", "a return statement in an imported module"},
@@ -182,9 +183,27 @@ std::string refusal_notes(const char* executed, const std::string& fallback) {
            "note: to run it on the legacy interpreter: " + legacy_command_hint(fallback) + "\n"
            "note: please report unsupported programs at https://github.com/nift-dev/nift/issues\n";
 }
+
+// D-062: a write to `args`/`cmd` is a program error rejected before execution,
+// not a missing VM feature: no "not supported yet", no legacy instruction
+// (legacy fails on it too) and no request to report it.
+constexpr std::string_view kInvocationAssign = "invocation-assign:";
+bool invocation_assign(const std::string& reason) { return reason.rfind(kInvocationAssign, 0) == 0; }
+std::string invocation_assign_text(const std::string& reason) {
+    return "cannot assign to `" + reason.substr(kInvocationAssign.size()) +
+           "`: the script invocation bindings `args` and `cmd` are read-only\n";
+}
+std::string invocation_assign_hint(const std::string& reason) {
+    const std::string name = reason.substr(kInvocationAssign.size());
+    return "note: declare a new binding instead (`my_" + name + " := " + name + "`), or replace it with a top-level `" +
+           name + " := ...` before any use of it\n";
+}
 } // namespace
 
 std::string vm_refusal_diagnostic(const std::string& where, const std::string& reason, const std::string& fallback) {
+    if (invocation_assign(reason))
+        return "error: " + where + ": " + reason + ": " + invocation_assign_text(reason) +
+               "note: the program was not executed: no part of it ran\n" + invocation_assign_hint(reason);
     return "error: " + where + ": not compiled for the VM (" + reason + "): " + describe_refusal(reason) +
            " is not supported by the Runtime 2.0 VM yet\n" +
            refusal_notes("note: the program was not executed: no part of it ran\n", fallback);
@@ -193,23 +212,26 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
                                           const std::string& fallback, bool stops,
                                           const std::string& interrupted_file, const std::string& interrupted_at) {
+    const bool program_error = invocation_assign(reason);
     const std::string head = "error: " + where + ": NIFT_VM session refused: " + reason + ": " +
-                             describe_refusal(reason) + " is not supported by the Runtime 2.0 VM yet\n";
+        (program_error ? invocation_assign_text(reason)
+                       : describe_refusal(reason) + " is not supported by the Runtime 2.0 VM yet\n");
+    const auto notes = [&](const std::string& executed) {
+        return program_error ? executed + invocation_assign_hint(reason) : refusal_notes(executed.c_str(), fallback);
+    };
     if (!interrupted_file.empty()) {
         const std::string at = interrupted_at.empty() ? std::string("here") : "at " + interrupted_at;
-        return head + refusal_notes(("note: this statement was not executed; earlier statements in this session may "
-                                     "already have executed\nnote: initialisation from " + interrupted_file +
-                                     " was interrupted " + at + "; later statements in it were not run\n"
-                                     "note: the session continues at the prompt\n").c_str(), fallback);
+        return head + notes("note: this statement was not executed; earlier statements in this session may "
+                            "already have executed\nnote: initialisation from " + interrupted_file +
+                            " was interrupted " + at + "; later statements in it were not run\n"
+                            "note: the session continues at the prompt\n");
     }
-    return head +
-           refusal_notes(stops ? "note: this statement was not executed; earlier statements in this session may "
-                                 "already have executed\n"
-                                 "note: the session stopped here: no later input was run (exit status 1)\n"
-                               : "note: this statement was not executed; earlier statements in this session may "
-                                 "already have executed\n"
-                                 "note: the session continues; the statement left no definitions or effects\n",
-                         fallback);
+    return head + notes(stops ? "note: this statement was not executed; earlier statements in this session may "
+                                "already have executed\n"
+                                "note: the session stopped here: no later input was run (exit status 1)\n"
+                              : "note: this statement was not executed; earlier statements in this session may "
+                                "already have executed\n"
+                                "note: the session continues; the statement left no definitions or effects\n");
 }
 
 } // namespace nift::rt

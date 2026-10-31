@@ -218,9 +218,13 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
                 if (!seen.second && seen.first->second != m)
                     { refuse(m, units[m].ast->at(units[m].root).begin, "import-name-clash"); return out; }
             }
-    // The entry's invocation bindings are the entry's (no unit can declare
-    // them: reserved names, refused by the compiler).
-    for (std::string_view name : entry_names) owner.emplace(name, 0);
+    // The entry's invocation bindings are the entry's (a module cannot declare
+    // them: reserved names, refused by the compiler); `invocation` keeps those
+    // the entry does not replace by its own top-level declaration.
+    Names invocation;
+#if !(defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 4)  // test-only control (args_cmd/mutants.sh)
+    for (std::string_view name : entry_names) if (owner.emplace(name, 0).second) invocation.insert(name);
+#endif
     // A unit names another unit's binding or function only where it
     // imports it (legacy isolates module scopes).
     for (std::size_t m = 0; m < count; ++m) {
@@ -231,7 +235,11 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             const std::string_view name = units[m].ast->text(units[m].ast->at(id));
             const auto o = owner.find(name);
             if (o == owner.end() || o->second == m || imported.count(name)) continue;
-            { refuse(m, units[m].ast->at(id).begin, "import-scope"); return out; }
+            // A TEMPORARY limitation for the invocation bindings (owner, 2026-10-31):
+            // legacy lets a module function called from the entry see them.
+            refuse(m, units[m].ast->at(id).begin,
+                   invocation.count(name) ? "import-scope:invocation-binding" : "import-scope");
+            return out;
         }
     }
     for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),

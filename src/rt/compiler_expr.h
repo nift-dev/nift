@@ -44,9 +44,9 @@ public:
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 private:
     SessionCompileContext* session_ = nullptr; const std::vector<InvocationBinding>* invocation_ = nullptr;
+    std::unordered_set<NodeId> invocation_shadows_;  // top-level `args := …` targets (rt/compiler_invocation.h)
     std::unordered_map<std::string, Binding> session_bindings_;
-    bool session_function(NodeId id);
-    bool session_admit(); bool invocation_prologue();  // the latter: rt/compiler_invocation.h
+    bool session_function(NodeId id); bool session_admit(); bool invocation_prologue();
     bool session_render(NodeId id);
     bool session_order_call_types(const Node&, NodeId, std::uint16_t, bool&);
     bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);

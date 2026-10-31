@@ -4570,3 +4570,13 @@ certify-targets: test-cp23-certify
 test-runtime2-vm-default: $(TARGET)
 	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-vm-default
+# Script invocation bindings `cmd`/`args` on the VM (weekend-args-cmd.md):
+# parity with NIFT_VM=0 on every entry point, refusals before any effect, the
+# VM-session `cmd(...)` bug. The mutants target rebuilds one object per mutant
+# (-DNIFT_ARGSCMD_MUTANT=n) and requires each to fail the suite.
+.PHONY: test-runtime2-args-cmd test-runtime2-args-cmd-mutants
+test-runtime2-args-cmd: $(TARGET)
+	$(PYTHON) tests/runtime2/args_cmd/args_cmd.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-args-cmd-mutants: $(TARGET)
+	bash tests/runtime2/args_cmd/mutants.sh
+test-rt-vm: test-runtime2-args-cmd
