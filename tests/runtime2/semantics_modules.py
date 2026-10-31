@@ -10,7 +10,7 @@ directory's absolute path replaced by `$P`), expected.exit. It is also an
 rt-diff workspace (rt-diff.workspace names `p`). --record writes the
 expected files from the binary (legacy is the oracle, D-015); without it the
 binary must reproduce them exactly. NIFT_VM in the environment selects the
-engine (unset: legacy).
+engine (unset: legacy, passed to nift as NIFT_VM=0; empty is rejected).
 """
 import argparse
 import os
@@ -29,6 +29,14 @@ def run(nift, probe, work):
     for key in ("NIFT_VM", "NIFT_VM_STATS"):
         if key in os.environ:
             env[key] = os.environ[key]
+    # Unset means the legacy oracle here; since the VM-default policy an unset
+    # NIFT_VM requires the VM, so legacy is selected explicitly. An empty value
+    # is not a lane (nift rejects it as a configuration error): refuse it here
+    # rather than silently running some engine.
+    if env.get("NIFT_VM") == "":
+        sys.exit("NIFT_VM is empty: use 0 (legacy), 1, require, classify or classify-all, or leave it unset")
+    if "NIFT_VM" not in env:
+        env["NIFT_VM"] = "0"
     p = subprocess.run(["timeout", "30", nift, "main.f"], cwd=os.path.join(dst, "p"), env=env, capture_output=True)
     norm = lambda b: b.replace(os.path.realpath(dst).encode(), b"$P").replace(dst.encode(), b"$P")  # noqa: E731
     return norm(p.stdout), norm(p.stderr), str(p.returncode).encode() + b"\n"

@@ -26,6 +26,10 @@ struct CompileResult {
     std::unique_ptr<Program> program;  // null when the unit must fall back
     std::string reason;
     std::uint32_t offset = 0;
+    // True only when `offset` is the position the refusal was recorded at
+    // (a node, a parse error); false for a limit or a whole-unit refusal,
+    // whose offset is then just the unit's start (never shown as a position).
+    bool positioned = false;
 };
 
 // `root` must be the Program node of a successful parse_script.

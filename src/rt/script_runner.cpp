@@ -16,6 +16,7 @@
 #include "rt/opcodes.h"
 #include "rt/parser.h"
 #include "rt/refusal_inventory.h"
+#include "rt/refusal_text.h"
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
@@ -74,9 +75,15 @@ bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, 
         report(stats);
         return false;
     }
+    // VM required (the default, or NIFT_VM=require): refused before anything
+    // ran, with the full user-facing diagnostic (rt/refusal_text.h).
     stats.outcome = "require-error";
     report(stats);
-    error_line(path, stats, "NIFT_VM=require: not compiled for the VM (" + stats.reason + ")");
+    std::cout.flush();
+    const std::string where = stats.positioned
+        ? path.generic_string() + ':' + std::to_string(stats.line) + ':' + std::to_string(stats.column)
+        : path.generic_string() + " (the VM gave no exact position)";
+    std::cerr << vm_refusal_diagnostic(where, stats.reason, path.generic_string()) << std::flush;
     exit_code = 1;
     return true;
 }
@@ -105,13 +112,38 @@ SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& pa
 
 } // namespace
 
+namespace {
+// The accepted NIFT_VM values (owner ruling): unset, require, 0, 1, classify,
+// classify-all. Anything else, the empty value included, is invalid.
+bool parse_vm_mode(const char* value, VmMode& mode) {
+    if (!value) { mode = VmMode::Require; return true; }  // unset: the VM is required
+    const std::string text(value);
+    if (text == "require") mode = VmMode::Require;
+    else if (text == "0") mode = VmMode::Off;
+    else if (text == "1") mode = VmMode::On;
+    else if (text == "classify") mode = VmMode::Classify;
+    else if (text == "classify-all") mode = VmMode::ClassifyAll;
+    else return false;
+    return true;
+}
+} // namespace
+
 VmMode vm_mode_from_environment() {
+    // VM-default policy: unset requires the VM (no legacy fallback); only an
+    // explicit NIFT_VM=0 selects the legacy interpreter. The CLI rejects an
+    // invalid value before any scripting entry runs (vm_mode_configuration_error);
+    // anywhere else an invalid value fails closed: the VM is required.
+    VmMode mode = VmMode::Require;
+    return parse_vm_mode(std::getenv("NIFT_VM"), mode) ? mode : VmMode::Require;
+}
+
+std::string vm_mode_configuration_error() {
     const char* value = std::getenv("NIFT_VM");
-    if (!value || !*value || std::string(value) == "0") return VmMode::Off;
-    if (std::string(value) == "require") return VmMode::Require;
-    if (std::string(value) == "classify") return VmMode::Classify;
-    if (std::string(value) == "classify-all") return VmMode::ClassifyAll;
-    return VmMode::On;
+    VmMode mode = VmMode::Require;
+    if (parse_vm_mode(value, mode)) return std::string();
+    return std::string("invalid NIFT_VM value '") + value + "'" + (*value ? "" : " (empty)") +
+           ": accepted values are unset (the VM is required; the default), require, 0 (the legacy "
+           "interpreter), 1 (the VM with legacy fallback), classify, classify-all; nothing was run";
 }
 
 bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code) {
@@ -295,7 +327,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         const ParseResult relinked = parse_script(linked_ast);
         if (!relinked.ok || first_opaque_node(linked_ast, relinked.root) != kNoNode) {
             stats.reason = "import-link";  // every module parsed alone: never expected
-            locate_into(stats, source, 0);
+            locate_into(stats, source, 0); stats.positioned = false;
             return not_compiled(stats, mode, source_path, exit_code);
         }
         unit_root = relinked.root;
@@ -308,7 +340,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
         stats.reason = compiled.reason;
-        locate_linked(compiled.offset);
+        locate_linked(compiled.offset); stats.positioned = compiled.positioned;
         return not_compiled(stats, mode, report_path, exit_code);
     }
     // R1 (owner, 2026-10-21): linking reads all modules before execution.

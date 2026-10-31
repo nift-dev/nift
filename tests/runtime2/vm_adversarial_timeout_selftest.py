@@ -23,8 +23,9 @@ sys.path.insert(0, HERE)
 import vm_adversarial as adv  # noqa: E402
 
 FAKE = """#!/bin/sh
-# $NIFT_VM unset: legacy; set: the VM. Attempt counters live in the cwd.
-engine=${NIFT_VM:+vm}; engine=${engine:-legacy}
+# NIFT_VM=0: legacy (explicit since the VM-default policy); otherwise the VM.
+# Attempt counters live in the cwd.
+case "${NIFT_VM:-}" in 0) engine=legacy ;; *) engine=vm ;; esac
 n=$(cat .n.$engine 2>/dev/null || echo 0); n=$((n + 1)); echo $n > .n.$engine
 case "$MODE:$engine:$n" in
   divergent:legacy:*) sleep 6 ;;

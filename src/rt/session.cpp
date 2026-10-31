@@ -204,6 +204,23 @@ SessionResult VmSession::execute_safe(const std::string& source, const std::stri
         active_ = false; close(); throw;
     }
 }
+namespace {
+// A unit the parser does not structure: refused with the position of its
+// first Opaque region (or the parse error), never an invented offset 0.
+CompileResult refused_unparsed(const Ast& ast, const ParseResult& parsed, std::uint32_t unit_begin) {
+    CompileResult compiled;
+    compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
+    const NodeId opaque = parsed.ok ? first_opaque_node(ast, parsed.root) : kNoNode;
+    compiled.offset = opaque != kNoNode ? ast.at(opaque).begin : parsed.ok ? unit_begin : parsed.error.offset;
+    // An Opaque region that spans leading blanks (an expression range) starts
+    // at its first character of text.
+    while (opaque != kNoNode && compiled.offset < ast.at(opaque).end && (ast.source()[compiled.offset] == ' ' ||
+           ast.source()[compiled.offset] == '\t' || ast.source()[compiled.offset] == '\n')) ++compiled.offset;
+    compiled.positioned = opaque != kNoNode || !parsed.ok;
+    return compiled;
+}
+} // namespace
+
 SessionResult VmSession::execute_unit(const std::string& source, std::string path, std::string& output,
                                       bool expression, bool inspect_tail, bool coherent,
                                       double prior_parse_us, double prior_compile_us) {
@@ -255,7 +272,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     CompileResult compiled;
     if (parsed.ok && first_opaque_node(ast, parsed.root) == kNoNode)
         compiled = expression ? compile_eval_program(ast, parsed.root, limits) : compile_unit(ast, parsed.root, limits);
-    else compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
+    else compiled = refused_unparsed(ast, parsed, text.unit_begin);
     stats.compile_us = prior_compile_us + std::chrono::duration<double, std::micro>(
         std::chrono::steady_clock::now() - parse_done).count();
     if (!compiled.program && !coherent &&
@@ -266,11 +283,11 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 1
         namespace_ = pending;  // M1: leak partial compiler publication on refusal
 #endif
-        ++refusals_; result.refusal = compiled.reason; result.offset = compiled.offset;
-        const auto at = source_map->at(compiled.offset);
-        stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = at.path;
-        stats.line = at.line; stats.column = at.column;
-        detail::report(stats); return result;
+        ++refusals_; result.refusal = compiled.reason; result.refusal_positioned = compiled.positioned;
+        const auto at = source_map->at(result.offset = compiled.offset);
+        stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = result.refusal_path = at.path;
+        stats.line = result.refusal_line = at.line; stats.column = result.refusal_column = at.column;
+        result.refusal_in_unit = compiled.offset >= text.unit_begin; detail::report(stats); return result;
     }
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
         stats.outcome = "compiled"; detail::report(stats); return result;

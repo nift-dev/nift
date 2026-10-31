@@ -32,6 +32,8 @@
 #include "rt/parser.h"
 #include "rt/prevalidate.h"
 #include "rt/script_runner.h"
+#include "rt/refusal_text.h"
+#include "rt/natives/host_env.h"
 #include "rt/session.h"
 #include "rt/script_runner_options.h"
 #include "rt/eval_result.h"
@@ -1625,9 +1627,9 @@ static nift::rt::VmOptions session_options() {
     nift::rt::detail::limits_from_environment(options);
     return options;
 }
-static int finish_vm_session(nift::rt::VmSession& session, int status) {
+static int finish_vm_session(nift::rt::VmSession& session, int status, bool cancelled) {
     try {
-        const auto result = session.finish(status != 0);
+        const auto result = session.finish(cancelled);
         if (result.host_fault && !result.host_fault_message.empty() && result.host_fault_message != result.message)
             console::error(result.host_fault_message);
         if (result.reason != nift::rt::StopReason::None) {
@@ -1640,9 +1642,99 @@ static int finish_vm_session(nift::rt::VmSession& session, int status) {
     }
     return status;
 }
+// A refused session unit (VM-default policy): the full refusal diagnostic, as
+// for files, located in the user's terms. REPL/stdin input is `<stdin>` with the
+// line counted over the whole input stream (`first_line` is the stream line the
+// unit starts on); a script, -c/-e or ~/.niftrc unit keeps its own path; a
+// refusal inside an imported module names the module.
+//
+// Owner ruling (Option A): a non-interactive session - stdin is not a terminal
+// (isatty, as the shell's line reader already decides), e.g. piped input to
+// `nift` or `nift -i`, a script piped after `nift -i file` - stops at the first
+// refusal: diagnostic, no later statement, normal cleanup, exit status 1, earlier
+// effects kept. A typed REPL on a terminal reports it and returns to the prompt
+// (the refused statement publishes nothing: admission is transactional). The
+// loop sets session_stops_on_refusal from isatty and reads
+// session_refusal_reported after every statement/command (including a refused
+// `$[...]` interpolation).
+static bool session_stops_on_refusal = true;
+static bool session_refusal_reported = false;
+// The shell line being executed and its stdin line number (set by the loop),
+// so a refused `$[...]` is located and quoted as typed: `<stdin>:L:C`.
+static const std::string* shell_source_line = nullptr;
+static std::size_t shell_source_line_number = 0;
+// Owner ruling (startup files on a terminal): ~/.niftrc and the file of
+// `nift -i file` run statement by statement (run_vm_startup_file); while one
+// runs, this names it (a refusal then interrupts its initialisation) and
+// startup_statement_at says where the refused statement starts.
+static const std::string* startup_file_running = nullptr;
+static std::string startup_statement_at;
+
+// Where a session refusal points, in the user's terms (shared by statements,
+// shell builtins and `$[...]`). `path` is the refused unit's own path and
+// `first_line` the stdin line it starts on. A position in an earlier unit's
+// retained source (refusal_in_unit false) keeps that unit's path (~/.niftrc,
+// an -i file) or, for earlier stdin input whose stdin line the session does
+// not keep, is labelled as such; only a position in the unit itself is offset.
+// `start_line` (reported coordinates) is the line where the unit's own text
+// starts when it is padded to its place in a file or a shell line. A refusal
+// whose position the compiler or parser did not record (refusal_positioned
+// false: a limit, a whole-unit refusal) is never shown as a position: the
+// unit's start line is reported, labelled as such.
+static std::string session_refusal_where(const nift::rt::SessionResult& result, const std::string& path,
+                                         std::size_t first_line, std::size_t start_line = 0) {
+    std::string label = result.refusal_path.empty() ? path : result.refusal_path;
+    std::size_t line = result.refusal_line;
+    const std::size_t column = result.refusal_column;
+    const auto shown = [&](const std::string& name) { return name == "<repl>" ? std::string("<stdin>") : name; };
+    if (!result.refusal_positioned || !line) {
+        if (result.refusal_in_unit && label == path)
+            return shown(path) + ':' + std::to_string(start_line ? start_line : first_line) +
+                   " (the start line of the refused input; the VM gave no exact position)";
+        return shown(label) + " (the VM gave no exact position)";
+    }
+    if (!result.refusal_in_unit && label == "<repl>")
+        return "<stdin>: in earlier input, at line " + std::to_string(line) + ", column " +
+               std::to_string(column) + " of the unit that defined it";
+    if (result.refusal_in_unit && label == path && path == "<repl>") {
+        label = "<stdin>";
+        line += first_line - 1;
+    }
+    return label + ':' + std::to_string(line) + ':' + std::to_string(column ? column : 1);
+}
+
+static std::size_t startup_statement_line = 0;
+static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
+                                   std::size_t first_line, bool stops,
+                                   const std::string& interrupted_file = std::string(),
+                                   const std::string& interrupted_at = std::string()) {
+    session_refusal_reported = true;
+    const std::string where = startup_file_running
+        ? session_refusal_where(result, path, first_line, startup_statement_line)
+        : session_refusal_where(result, path, first_line);
+    const std::string interrupted = !interrupted_file.empty() || !startup_file_running ? interrupted_file
+                                                                                     : *startup_file_running;
+    const std::string interrupted_where = !interrupted_file.empty() ? interrupted_at : startup_statement_at;
+    std::cout.flush();
+    std::cerr << nift::rt::vm_session_refusal_diagnostic(where, result.refusal, path, stops,
+                                                         interrupted, interrupted_where)
+              << std::flush;
+}
+
+static bool stdin_is_terminal() {
+#ifndef _WIN32
+    return isatty(STDIN_FILENO) != 0;
+#else
+    return _isatty(_fileno(stdin)) != 0;
+#endif
+}
+
+
+static constexpr int kStartupInterrupted = -2;
+
 static int run_vm_session_statement(nift::rt::VmSession& session, const std::string& source,
                                     const std::string& path, bool inspect = true,
-                                    SessionDisplay display = SessionDisplay::Repl) {
+                                    SessionDisplay display = SessionDisplay::Repl, std::size_t first_line = 1) {
     bool expression = false;
     if (inspect) {
         nift::rt::Ast ast(source);
@@ -1656,7 +1748,12 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     const auto mode = nift::rt::vm_mode_from_environment();
     if ((mode == nift::rt::VmMode::Classify || mode == nift::rt::VmMode::ClassifyAll) &&
         result.execution.reason != nift::rt::StopReason::Internal) return 0;
-    if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) { console::error("NIFT_VM session refused: " + result.refusal); return 1; }
+    if (!result.admitted && result.execution.reason != nift::rt::StopReason::Internal) {
+        report_session_refusal(result, path, first_line,
+                               display != SessionDisplay::Repl || session_stops_on_refusal);
+        if (startup_file_running) { session_refusal_reported = false; return kStartupInterrupted; }
+        return 1;
+    }
     if (result.execution.reason != nift::rt::StopReason::None) {
         std::string message = result.execution.message;
         if (display == SessionDisplay::Rc) message = "niftrc: " + message;
@@ -1688,6 +1785,80 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     return 0;
 }
 
+// A startup file (~/.niftrc, `nift -i file`). Not a terminal: one unit, as
+// before (refused or rejected as a whole before anything runs, exit 1). On a
+// terminal (owner ruling): the Nift parser's own top-level statement
+// boundaries (parse_script_statements) split the file; in source order each
+// statement is admitted and run as one session unit, without value echo and
+// without shell-line dispatch (a startup file is Nift only). The first
+// refused statement and everything after it never run; a syntax error (the
+// parser's, or prevalidation's first rejection) stops the file before the
+// statement that contains it. Either is reported at its true position with
+// the "initialisation ... interrupted" notes, and 0 is returned: the session
+// continues at the prompt. Units are padded with the file's earlier line
+// breaks and the statement's column, so positions are the file's own.
+static int run_vm_startup_file(nift::rt::VmSession& session, const std::string& source, const std::string& path,
+                               bool inspect, SessionDisplay display) {
+    if (!stdin_is_terminal()) return run_vm_session_statement(session, source, path, inspect, display);
+    nift::rt::Ast ast(source);
+    std::vector<nift::rt::NodeId> statements;
+    const auto parsed = nift::rt::parse_script_statements(ast, statements);
+    std::uint32_t error_at = static_cast<std::uint32_t>(-1);
+    std::string error_message;
+    std::uint32_t error_statement = 0;  // where the top-level statement containing the error starts
+    if (!parsed.ok) {
+        error_at = parsed.error.offset; error_message = parsed.error.message;
+        error_statement = parsed.error.statement_begin;
+    }
+    const char* prevalidate_mode = std::getenv("NIFT_PREVALIDATE");
+    if (!(prevalidate_mode && std::string(prevalidate_mode) == "off")) {
+        const auto verdict = nift::rt::prevalidate(source);
+        if (!verdict.ok && verdict.offset < error_at) {
+            error_at = verdict.offset; error_message = verdict.message;
+            error_statement = verdict.offset;  // refined below to its top-level statement's start
+            for (const auto id : statements)
+                if (ast.at(id).begin <= verdict.offset && verdict.offset < ast.at(id).end) error_statement = ast.at(id).begin;
+        }
+    }
+    const auto interrupted_note = [&](std::size_t line) {
+        return "note: initialisation from " + path + " was interrupted at line " + std::to_string(line) +
+               "; later statements in it were not run\nnote: the session continues at the prompt\n";
+    };
+    for (std::size_t k = 0; k < statements.size(); ++k) {
+        const auto& node = ast.at(statements[k]);
+        if (node.end > error_at) break;  // the statement containing the error never runs
+        const std::size_t begin = node.begin;
+        const std::size_t end = k + 1 < statements.size() && ast.at(statements[k + 1]).begin <= error_at
+            ? ast.at(statements[k + 1]).begin : (error_at != static_cast<std::uint32_t>(-1) || k + 1 < statements.size()
+                                                     ? node.end : source.size());
+        const auto at = nift::rt::locate(source, static_cast<std::uint32_t>(begin));
+        std::string unit(at.line - 1, '\n');
+        unit.append(at.column - 1, ' ');
+        unit += source.substr(begin, end - begin);
+        startup_file_running = &path;
+        // The interrupted statement is quoted when it is short and on one line
+        // (e.g. `exit`), so the note names what stopped the file.
+        const std::string text = source.substr(begin, node.end - begin);
+        startup_statement_at = "line " + std::to_string(at.line) +
+            (text.size() <= 60 && text.find('\n') == std::string::npos ? " (`" + text + "`)" : std::string());
+        startup_statement_line = at.line;
+        // inspect=false for both files: the same path as a script statement,
+        // never a REPL value echo.
+        const int status = run_vm_session_statement(session, unit, path, false, display);
+        startup_file_running = nullptr;
+        if (status == kStartupInterrupted) return 0;
+        if (status != 0) return status;
+    }
+    if (error_at != static_cast<std::uint32_t>(-1)) {
+        const auto at = nift::rt::locate(source, error_at);
+        std::cout.flush();
+        std::cerr << "error: " << path << ':' << at.line << ':' << at.column << ": " << error_message << '\n'
+                  << "note: no part of that statement was executed\n"
+                  << interrupted_note(nift::rt::locate(source, error_statement).line) << std::flush;
+    }
+    return 0;
+}
+
 static int run_script_source(const std::string& source, const fs::path& source_path,
                              const std::string& cmd, const std::vector<std::string>& script_args,
                              const fs::path& host_root, bool interactive_after = false, const std::string& target = "native") {
@@ -1701,7 +1872,12 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     if (!(prevalidate_mode && std::string(prevalidate_mode) == "off")) {
         const auto verdict = nift::rt::prevalidate(source);
         const bool validate_only = prevalidate_mode && std::string(prevalidate_mode) == "only";
-        if (!verdict.ok) {
+        // A tty `-i file` is a startup file (owner ruling): its statements
+        // before the first syntax error run, so run_vm_startup_file reports it.
+        const bool tty_startup = interactive_after && !validate_only && stdin_is_terminal() &&
+            source_path.generic_string() != "<command-line>" && source_path.generic_string() != "<stdin>" &&
+            nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off;
+        if (!verdict.ok && !tty_startup) {
             const auto where = nift::rt::locate(source, verdict.offset);
             // The gate's check mode also needs the code and the rule (as
             // `rt-parse-dump prevalidate` prints them); a normal run prints
@@ -1713,18 +1889,24 @@ static int run_script_source(const std::string& source, const fs::path& source_p
         }
         if (validate_only) return 0;
     }
-    if (interactive_after && target == "native" && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
+    // Every --platform selection runs on the VM like `native`: the VM's
+    // platform() returns the selection (rt/natives/host_env.h, set in run_cli),
+    // exactly as legacy's ScriptRenderHost does.
+    if (interactive_after && nift::rt::vm_mode_from_environment() != nift::rt::VmMode::Off) {
         nift::rt::VmSession session(session_options());
         session.initialize_invocation(cmd, script_args);
-        const int status = run_vm_session_statement(session, source, source_path.generic_string(), false,
-                                                    SessionDisplay::Script);
-        if (status != 0) return finish_vm_session(session, status);
+        const std::string path = source_path.generic_string();
+        const int status = path != "<command-line>" && path != "<stdin>"
+            ? run_vm_startup_file(session, source, path, false, SessionDisplay::Script)
+            : run_vm_session_statement(session, source, path, false, SessionDisplay::Script);
+        if (status != 0) return finish_vm_session(session, status, status != 0);
         ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host, info);
         parser.set_script_invocation(cmd, script_args);
         return run_script_shell_loop(parser, false, &session);
     }
-    // Runtime 2.0 CP11: opt-in VM (NIFT_VM=1); returns false to run legacy unchanged.
-    if (!interactive_after && target == "native") {
+    // Runtime 2.0: the VM by default (VM required, no fallback); NIFT_VM=1 falls
+    // back; returns false to run legacy unchanged (NIFT_VM=0, or a mode-1 fallback).
+    if (!interactive_after) {
         int vm_exit = 0;
         if (nift::rt::run_script_on_vm(source, source_path, vm_exit)) return vm_exit;
     }
@@ -1821,6 +2003,9 @@ struct ShellWord {
     // One entry per character: 1 when the character was quoted or escaped and
     // must not act as a glob metacharacter or shell operator.
     std::vector<unsigned char> quoted;
+    // One entry per character: its byte offset in the source line (the
+    // interpolation diagnostic quotes and locates `$[...]` in the user's terms).
+    std::vector<std::size_t> origin;
     bool operator_token = false;
 };
 
@@ -1828,16 +2013,20 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
     std::vector<ShellWord> out;
     std::string cur;
     std::vector<unsigned char> mask;
+    std::vector<std::size_t> origin;
     bool sq = false, dq = false, esc = false;
+    std::size_t i = 0;
     auto flush = [&]() {
         if (!cur.empty()) {
             ShellWord word;
             word.text = cur;
             word.quoted = mask;
+            word.origin = origin;
             out.push_back(std::move(word));
         }
         cur.clear();
         mask.clear();
+        origin.clear();
     };
     auto push_operator = [&](const std::string& op) {
         flush();
@@ -1847,11 +2036,12 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         word.operator_token = true;
         out.push_back(std::move(word));
     };
-    for (std::size_t i = 0; i < line.size(); ++i) {
+    for (i = 0; i < line.size(); ++i) {
         const char c = line[i];
         if (esc) {
             cur += c;
             mask.push_back(1);
+            origin.push_back(i);
             esc = false;
             continue;
         }
@@ -1861,6 +2051,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         if (sq || dq) {
             cur += c;
             mask.push_back(1);
+            origin.push_back(i);
             continue;
         }
 
@@ -1870,6 +2061,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
             if (i + 2 < line.size() && line.compare(i, 3, ">&1") == 0) {
                 cur.clear();
                 mask.clear();
+                origin.clear();
                 push_operator("2>&1");
                 i += 2;
                 continue;
@@ -1877,12 +2069,14 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
             if (i + 1 < line.size() && line[i + 1] == '>') {
                 cur.clear();
                 mask.clear();
+                origin.clear();
                 push_operator("2>>");
                 i += 1;
                 continue;
             }
             cur.clear();
             mask.clear();
+            origin.clear();
             push_operator("2>");
             continue;
         }
@@ -1904,6 +2098,7 @@ static std::vector<ShellWord> shell_words(const std::string& line) {
         }
         cur += c;
         mask.push_back(0);
+        origin.push_back(i);
     }
     flush();
 
@@ -2008,12 +2203,39 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
         bool evaluated = false;
         if (session) {
             std::string output;
-            const auto result = session->evaluate(expression, "<interpolation>", output);
+            // Evaluated as a unit of the current input placed at its column in
+            // the line (spaces before it), so the session's source origins
+            // locate a refusal in the user's terms (the line: shell_source_line_number).
+            std::string unit = expression;
+            std::size_t pad = 0;
+            if (shell_source_line_number && i + 2 < word.origin.size()) pad = word.origin[i + 2];
+            unit = std::string(pad, ' ') + expression;
+            const auto result = session->evaluate(unit, "<repl>", output);
             if (!output.empty()) std::cout << output;
             if (result.execution.reason == nift::rt::StopReason::Internal) {
                 if (terminal) *terminal = true;
                 eval_error = result.execution.message;
-            } else if (!result.admitted) eval_error = "NIFT_VM session refused: " + result.refusal;
+            } else if (!result.admitted) {
+                // The full session refusal diagnostic (as for statements), its
+                // `error: ` label and final newline left to console::error.
+                const std::size_t line_number = shell_source_line_number ? shell_source_line_number : 1;
+                const std::string where = session_refusal_where(result, "<repl>", line_number, line_number);
+                std::string shown = "$[" + expression + "]";
+                if (shell_source_line && shell_source_line_number && close < word.origin.size()) {
+                    // The source text as typed (quotes are shell syntax and gone
+                    // from `expression`).
+                    const std::size_t from = word.origin[i], to = word.origin[close];
+                    if (from <= to && to < shell_source_line->size()) shown = shell_source_line->substr(from, to - from + 1);
+                }
+                session_refusal_reported = true;
+                std::string text = nift::rt::vm_session_refusal_diagnostic(
+                    where, result.refusal, "<interpolation>", session_stops_on_refusal,
+                    startup_file_running ? *startup_file_running : std::string(), startup_statement_at);
+                if (text.rfind("error: ", 0) == 0) text.erase(0, 7);
+                if (!text.empty() && text.back() == '\n') text.pop_back();
+                error = "command interpolation failed: " + shown + ": " + text;
+                return false;
+            }
             else if (result.execution.reason != nift::rt::StopReason::None) eval_error = result.execution.message;
             else evaluated = nift::rt::eval_result_to_legacy(result.value, value, eval_error);
         } else evaluated = parser.eval_expression(expression, value, eval_error);
@@ -2040,6 +2262,12 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
                           word.quoted.begin() + static_cast<std::ptrdiff_t>(close + 1));
         word.quoted.insert(word.quoted.begin() + static_cast<std::ptrdiff_t>(i),
                            rendered.size(), quoted ? 1 : 0);
+        if (close < word.origin.size()) {
+            const std::size_t from = word.origin[i];
+            word.origin.erase(word.origin.begin() + static_cast<std::ptrdiff_t>(i),
+                              word.origin.begin() + static_cast<std::ptrdiff_t>(close + 1));
+            word.origin.insert(word.origin.begin() + static_cast<std::ptrdiff_t>(i), rendered.size(), from);
+        } else word.origin.clear();
         i += rendered.size();
     }
     return true;
@@ -2225,7 +2453,8 @@ static int dispatch_shell_state(Parser& parser,
             if (print_errors) console::error("cd: too many arguments");
             return 2;
         }
-        if (session) return run_vm_session_statement(*session, expression, "<repl>");
+        if (session) return run_vm_session_statement(*session, expression, "<repl>", true, SessionDisplay::Repl,
+                                                     shell_source_line_number ? shell_source_line_number : 1);
     auto result = parser.run_statement(expression, "<repl>");
         if (!result.ok) {
             if (print_errors) console::error(result.error.message);
@@ -2246,7 +2475,8 @@ static int run_nift_command(Parser& parser,
         return 2;
     }
     const std::string expression = shell_nift_call(tokens, name_index);
-    if (session) return run_vm_session_statement(*session, expression, "<repl>");
+    if (session) return run_vm_session_statement(*session, expression, "<repl>", true, SessionDisplay::Repl,
+                                                   shell_source_line_number ? shell_source_line_number : 1);
     auto result = parser.run_statement(expression, "<repl>");
     if (result.ok) {
         if (!result.output.empty()) std::cout << result.output << '\n';
@@ -2409,6 +2639,11 @@ static int execute_shell_command(Parser& parser,
     int exit_code = 0;
     int last = 0;
     for (auto& segment : plan.segments) {
+        // Owner invariant, the one propagation point for every dispatch path
+        // (interpolation, shell builtins, shell-form Nift calls, externals,
+        // pipelines, redirections, `&`): once a VM refusal has been reported
+        // while this logical command line runs, no later segment executes.
+        if (session_refusal_reported) return 2;
         const bool should = segment.connector.empty() ||
             (segment.connector == "&&" ? last == 0 :
              segment.connector == "||" ? last != 0 : true);
@@ -2755,6 +2990,11 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         session->initialize_invocation("<repl>", {});
     }
     std::unique_ptr<nift::shell::JobTable> legacy_jobs;
+    // A refusal stop (Option A) finishes the session like end of input, not as
+    // cancelled: unsaved managed files are reported (and still not committed),
+    // while the status stays 1. An explicit failing `exit` keeps its silent
+    // cancelled finish.
+    bool refusal_stop = false;
     const auto loop = [&]() -> int {
     std::string pending;
     nift::shell::JobTable* session_jobs = nullptr;
@@ -2771,17 +3011,22 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
     const bool interactive = isatty(STDIN_FILENO);
     jobs.set_interactive(interactive);
 #else
-    jobs.set_interactive(_isatty(_fileno(stdin)) != 0);
+    const bool interactive = _isatty(_fileno(stdin)) != 0;
+    jobs.set_interactive(interactive);
 #endif
+    session_stops_on_refusal = !interactive;  // Option A (see report_session_refusal)
+    session_refusal_reported = false;
     if (load_rc) if (const char* home = std::getenv("HOME")) {
         fs::path rc = fs::path(home) / ".niftrc";
         if (filesystem::file_exists(rc)) {
             if (session) {
-                if (run_vm_session_statement(*session, filesystem::read_file(rc), rc.generic_string(), true, SessionDisplay::Rc)) return 1;
+                if (run_vm_startup_file(*session, filesystem::read_file(rc), rc.generic_string(), true,
+                                        SessionDisplay::Rc)) return 1;
             } else { auto rr = parser.run_statement(filesystem::read_file(rc), rc);
                 if (!rr.ok) { console::error("niftrc: " + rr.error.message); return 1; } }
         }
     }
+    std::size_t input_line = 0, pending_line = 1;  // stdin line numbers, for refusal locations
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());
 #ifndef _WIN32
         std::string line;ShellRead r;
@@ -2799,6 +3044,8 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if(line=="__nift_test_throw_bad_alloc__")throw std::bad_alloc();
         if(line=="__nift_test_throw_int__")throw 42;
 #endif
+        ++input_line;
+        if(pending.empty()) pending_line=input_line;
         if(pending.empty()&&(line=="exit"||line=="quit"))break;
         if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);
 #ifndef _WIN32
@@ -2815,17 +3062,23 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         const auto snapshot=make_shell_snapshot(parser, session);
         if(!nift::shell::is_nift_statement_line(toks,trimmed,snapshot)){
             bool exit_requested=false; int exit_code=0;
+            shell_source_line = &trimmed; shell_source_line_number = pending_line;
             const auto status = execute_shell_command(parser,trimmed,true,&jobs,&snapshot,&exit_requested,&exit_code,session);
+            shell_source_line = nullptr; shell_source_line_number = 0;
             if (status == 70) return status;
             pending.clear();
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) { refusal_stop = true; return 1; } }
             if(exit_requested) return exit_code;
             continue;
         }
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
         if (session) {
-            const auto status = run_vm_session_statement(*session, pending, "<repl>");
-            pending.clear(); if (status == 70) return status; continue;
+            const auto status = run_vm_session_statement(*session, pending, "<repl>", true,
+                                                         SessionDisplay::Repl, pending_line);
+            pending.clear(); if (status == 70) return status;
+            if (session_refusal_reported) { session_refusal_reported = false; if (!interactive) { refusal_stop = true; return 1; } }
+            continue;
         }
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
         if(!rr.ok){ console::error(rr.error.message);continue; }
@@ -2858,7 +3111,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc, nift::rt::VmSessi
         if (!status) status = 1;
     }
     if (!resources_ok && !status) status = 1;
-    return session ? finish_vm_session(*session, status) : status;
+    return session ? finish_vm_session(*session, status, refusal_stop ? false : status != 0) : status;
 }
 
 static int run_script_shell() {
@@ -2868,6 +3121,9 @@ static int run_script_shell() {
 }
 
 int run_cli(int argc, char** argv) {
+    // VM-default policy: a refused program names the exact invocation to rerun
+    // on the legacy interpreter (NIFT_VM=0 nift ...), as the user typed it.
+    nift::rt::set_invocation_arguments(argc, argv);
     // --platform is a global execution/build selector and may appear before or
     // after the command/script.  `--` is a hard boundary: anything after it is
     // passed through literally and is never interpreted as a Nift option.
@@ -2905,6 +3161,9 @@ int run_cli(int argc, char** argv) {
     for (auto& arg : normalized_storage) normalized_argv.push_back(arg.data());
     argc = static_cast<int>(normalized_argv.size());
     argv = normalized_argv.data();
+    // The VM's platform() reports the selection, as legacy's script host does
+    // (set once, before any VM code runs; website builds never consult it).
+    nift::rt::natives::set_script_platform(selected_platform);
 
     const std::string command = argc > 1 ? argv[1] : "";
     const bool platform_capable_command = command.empty() || command == "build" ||
@@ -2914,6 +3173,17 @@ int run_cli(int argc, char** argv) {
     if (platform_selected && !platform_capable_command) {
         console::error("--platform is only valid for script execution, the REPL, and build");
         return 2;
+    }
+    // Owner ruling: an unknown NIFT_VM value (the empty value included) is a
+    // configuration error on every scripting entry point, reported before any
+    // user program (or import, or ~/.niftrc) runs. Website builds and the other
+    // project commands never consult NIFT_VM and are not checked.
+    const bool scripting_command = command.empty() || command == "-e" || command == "-c" || command == "-i" ||
+        command == "-" || command == "eval" || command == "--no-process" || command.rfind("--fs-root=", 0) == 0 ||
+        (filesystem::file_exists(command) && !fs::is_directory(command));
+    if (scripting_command) {
+        const std::string vm_error = nift::rt::vm_mode_configuration_error();
+        if (!vm_error.empty()) { console::error(vm_error); return 1; }
     }
     if (command.empty()) {
         if (!platform_selected) return run_script_shell();

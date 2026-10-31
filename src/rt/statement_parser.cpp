@@ -54,8 +54,9 @@ bool StatementParser::block(std::uint32_t begin, std::uint32_t end, std::vector<
     while (i < end) {
         i = skip_space(src_, i, end);
         if (i >= end) break;
+        const std::uint32_t start = i;
         if (!may_start_keyword(src_[i])) {
-            if (!general_stmt(i, end, out)) return false;
+            if (!general_stmt(i, end, out)) { error_.statement_begin = start; return false; }
             continue;
         }
         bool stop = false;
@@ -73,9 +74,9 @@ bool StatementParser::block(std::uint32_t begin, std::uint32_t end, std::vector<
         if (step == Step::NoMatch) step = throw_stmt(i, end, out);
         if (step == Step::NoMatch) step = jump_stmt(i, end, out, "break", NodeKind::Break);
         if (step == Step::NoMatch) step = jump_stmt(i, end, out, "continue", NodeKind::Continue);
-        if (step == Step::Error) return false;
+        if (step == Step::Error) { error_.statement_begin = start; return false; }
         if (stop) return true;
-        if (step == Step::NoMatch && !general_stmt(i, end, out)) return false;
+        if (step == Step::NoMatch && !general_stmt(i, end, out)) { error_.statement_begin = start; return false; }
     }
     return true;
 }

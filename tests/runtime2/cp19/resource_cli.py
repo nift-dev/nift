@@ -1,6 +1,11 @@
 """Cross-command resource contracts; differential parity is asserted only where normative."""
-import argparse,json,os,subprocess,tempfile
+import argparse,json,os,subprocess,sys,tempfile
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from tty_session import run_tty
+# Owner ruling (Option A): piped (non-tty) sessions stop at the first refusal
+# with exit 1 (status/units below); `tty_needle` cases also type the input on a
+# real terminal, where the REPL continues and the refused unit left no effect.
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);rows=[]
 cases=[
  dict(name='file',source='f:=file("p");f.open("r")\nf.read_all()\nf.close()\nexit\n',errors=0,needle='original',parity=True),
@@ -15,8 +20,8 @@ cases=[
  dict(name='temporary-unwind',source='fn(temp()){f:=file("p");f.open("rw");f.write("dirty");throw error("primary")};temp()\ntick:=1\ntick\nexit\n',errors=1,needle='1\n',diagnostic='primary',contract='D-056 exceptional abandonment'),
  dict(name='normal-abandonment',source='fn(temp()){f:=file("p");f.open("r")};temp()\ntick:=1\ntick\nexit\n',errors=1,needle='1\n',diagnostic='managed file left open',contract='D-056 normal abandonment'),
  dict(name='completed-before-error',source='fn(temp()){f:=file("p");f.open("r")};temp();throw error("primary")\ntick:=1\ntick\nexit\n',errors=2,needle='1\n',diagnostic='primary',contract='D-056 preserve primary and independent completed obligation'),
- dict(name='refusal-atomic',source='f:=file("p");f.open("r")\nf.close();a:=[f]\nf.read_all()\nf.close()\nexit\n',errors=1,needle='original',diagnostic='NIFT_VM session refused: host-handle-flow',refusals=1,contract='D-054 and inherited W13 positions'),
- dict(name='capture-refusal',source='f:=file("p");f.open("r")\nfn(capture()){f.close()}\nf.read_all()\nf.close()\nexit\n',errors=1,needle='original',diagnostic='NIFT_VM session refused: host-handle-flow',refusals=1,contract='Inherited W13 capture barrier across units'),
+ dict(name='refusal-atomic',source='f:=file("p");f.open("r")\nf.close();a:=[f]\nf.read_all()\nf.close()\nexit\n',errors=2,status=1,left_open=True,needle='',stdout='null\n',units=2,tty_needle='original',diagnostic='NIFT_VM session refused: host-handle-flow',refusals=1,contract='D-054 and inherited W13 positions'),
+ dict(name='capture-refusal',source='f:=file("p");f.open("r")\nfn(capture()){f.close()}\nf.read_all()\nf.close()\nexit\n',errors=2,status=1,left_open=True,needle='',stdout='null\n',units=2,tty_needle='original',diagnostic='NIFT_VM session refused: host-handle-flow',refusals=1,contract='Inherited W13 capture barrier across units'),
  dict(name='unrelated-widening',source='f:=file("p");f.open("r");a:=[1]\na.push("wide")\nf.read_all()\nf.close()\nexit\n',errors=0,needle='original',parity=True),
  dict(name='end-obligation',source='f:=file("p");f.open("rw");f.write("dirty")\nexit\n',errors=1,status=1,diagnostic='unsaved changes discarded',contract='D-056 session finalization'),
 ]
@@ -40,12 +45,21 @@ for case in cases:
    assert r.returncode==case.get('status',0),row
    assert sum(x.startswith('error: ') for x in r.stderr.splitlines())==case['errors'],row
    assert case.get('needle','') in r.stdout and case.get('diagnostic','') in r.stderr,row
+   if 'stdout' in case:assert r.stdout==case['stdout'],row  # exactly the earlier statement's output, nothing later
+   # A refusal stop finalizes like end of input (owner ruling): the open file is reported, not silently dropped.
+   if case.get('left_open'):assert 'managed file left open: ' in r.stderr and r.stderr.index('session refused')<r.stderr.index('left open'),row
    assert row['p']=='original\n' and row['out']==case.get('out'),row
    if case.get('parity'):assert channels==oracle,(oracle,row)
    if vm_oracle is None:vm_oracle=channels
    else:assert channels==vm_oracle,row
-   expected=len(case['source'].splitlines())-1+int(bool(case.get('rc') or case.get('initial') or case.get('inline')))
+   expected=case.get('units',len(case['source'].splitlines())-1+int(bool(case.get('rc') or case.get('initial') or case.get('inline'))))
    assert len(counters)==expected,row
    refused=sum(x['vm_executions']==0 for x in counters);assert refused==case.get('refusals',0),row
    assert all(x['legacy_executions']==0 and x['vm_executions'] in [0,1] for x in counters),row
+   if 'tty_needle' in case:
+    (root/'p').write_text('original\n');tenv=dict(env);tenv.pop('NIFT_VM_STATS')
+    status,out=run_tty(argv,root,tenv,case['source'].rstrip('\n').split('\n'))
+    row['tty']=dict(status=status,output=out);a.out.write_text(json.dumps(rows,indent=2)+'\n')
+    assert status==0 and case['diagnostic'] in out and 'the session continues' in out and out.startswith('null\n'),row
+    assert case['tty_needle'] in out.split('the session continues',1)[1] and (root/'p').read_text()=='original\n',row
 print('PASS resource CLI: 16 cases, explicit D-056/W13 classifications, both VM modes and legacy observations')

@@ -59,6 +59,8 @@ def one(nift, d, vm):
         os.unlink(stats)
     if vm:
         env.update({"NIFT_VM": "require", "NIFT_VM_STATS": stats})
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     t0 = time.perf_counter()
     p = subprocess.run([nift, "p.f"], cwd=d, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=600)
     wall = time.perf_counter() - t0

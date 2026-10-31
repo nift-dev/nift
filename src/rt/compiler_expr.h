@@ -30,7 +30,7 @@ public:
     // Compiles main (proto 0) and every function (proto k + 1) into `program`.
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
-    std::uint32_t offset() const { return offset_; }
+    std::uint32_t offset() const { return offset_; } bool positioned() const { return positioned_; }
     // kKindUnknown (something the compiler refuses anyway) is never treated
     // as acceptable (review CP12 round 1, D1). A unit whose refusal involved
     // it is compiled a second time in probe mode, where Unknown defers as
@@ -394,7 +394,7 @@ private:
     int depth_ = 0;
     static constexpr int kMaxExpressionNesting = 48;
     std::string reason_;
-    std::uint32_t offset_ = 0;
+    std::uint32_t offset_ = 0; bool positioned_ = false;  // positioned_: offset_ recorded by fail()
 };
 
 } // namespace nift::rt::detail

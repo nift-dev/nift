@@ -24,6 +24,7 @@ Must not change unless a decision in `decisions.md` approves it.
 | Recursion limit raised from 64 | Design report; D-001 | CP11–CP12 |
 | Candidates for deliberate language changes (break, argument evaluation, value-based typing, declarations in loops, aliasing, catchable errors) | D-015 table (proposed, not yet scheduled) | — |
 | User functions shadow built-ins of the same name | D-009 #3, D-014 | to be scheduled |
+| `exit` in `~/.niftrc` / `nift -i file` on a terminal is refused (the file stops there, the session continues at the prompt) instead of ending the session with status 1; migration: drop the line | D-061 | VM default |
 
 ## Syntax compatibility (D-045, owner, 2026-10-20)
 

@@ -11,6 +11,7 @@ struct Stats {
     std::string outcome;  // vm | vm-error | fallback | require-error | internal-error | compiled
     std::string reason;
     std::size_t line = 0, column = 0;
+    bool positioned = true;  // false: line/column are not a recorded position (never shown as one)
     double parse_us = 0, compile_us = 0, execute_us = 0;
     std::size_t protos = 0, instructions = 0, source_bytes = 0;
     bool beyond_legacy_depth = false;

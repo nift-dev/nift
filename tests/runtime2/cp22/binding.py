@@ -38,6 +38,8 @@ def run(nift, name, vm):
                "LC_ALL": "C", "TZ": "UTC"}
         if vm:
             env["NIFT_VM"] = vm
+        else:
+            env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
         try:
             p = subprocess.run([nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL, capture_output=True,
                                timeout=TIMEOUT)

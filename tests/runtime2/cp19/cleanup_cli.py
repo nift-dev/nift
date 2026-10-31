@@ -78,15 +78,16 @@ for mode in ['default', '0', '1', 'require']:
                                ['ERROR: AddressSanitizer', 'ERROR: LeakSanitizer',
                                 'AddressSanitizer:DEADLYSIGNAL', 'runtime error:']), row
                 assert status is not None, row
-                if mode in ['1', 'require'] and file_error:
+                # VM-default policy: the default session is VM-owned, as require.
+                if mode in ['default', '1', 'require'] and file_error:
                     assert stats and sum(x['vm_executions'] for x in stats) >= 1, row
                     assert all(x['legacy_executions'] == 0 for x in stats), row
                 # Accepted VM cancellation (nonzero explicit exit) discards unsaved
                 # resources without an unclosed-file Error; legacy reports it.
-                reports_file = file_error and not (mode in ['1', 'require'] and end == 'exit 7')
+                reports_file = file_error and not (mode in ['default', '1', 'require'] and end == 'exit 7')
                 assert text.count('managed file left open') == int(reports_file), row
                 assert text.count('failed to restore terminal') == int(fault), row
-                if reports_file and fault and mode in ['default', '0']:
+                if reports_file and fault and mode == '0':
                     assert text.index('managed file left open') < text.index('failed to restore terminal'), row
                 # A requested nonzero shell status survives cleanup diagnostics.
                 expected = 7 if end == 'exit 7' else int(file_error or fault)

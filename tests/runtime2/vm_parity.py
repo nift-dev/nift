@@ -45,6 +45,8 @@ def run(nift, script, cwd, mode, stats, timeout):
     if mode:
         env["NIFT_VM"] = mode
         env["NIFT_VM_STATS"] = stats
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     try:
         out_path, err_path = os.path.join(cwd, ".stdout"), os.path.join(cwd, ".stderr")
         with open(out_path, "wb") as out, open(err_path, "wb") as err:
@@ -253,7 +255,14 @@ def rt_diff(args, work):
     # had passed (CP12 round-2 certify: FLAKY test-rt-vm-mutants).
     corpora = ["tests/runtime2/vm-corpus", "tests/runtime2/semantics", "tests/runtime2/rt-diff-corpus",
                "tests/conformance/cases", "docs/evidence/cp410-competitiveness/probes"]
-    cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", args.nift, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
+    # The A side is the legacy oracle. rt-diff passes a minimal environment and
+    # an unset NIFT_VM requires the VM (VM-default policy), so select legacy
+    # explicitly with a wrapper around the same binary.
+    legacy = os.path.join(work, "nift-legacy")
+    with open(legacy, "w") as f:
+        f.write("#!/bin/sh\nNIFT_VM=0\nexport NIFT_VM\nexec '%s' \"$@\"\n" % args.nift.replace("'", "'\\''"))
+    os.chmod(legacy, 0o755)
+    cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", legacy, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            "--policy", "tools/rt-diff/policies/d040-vm.json",

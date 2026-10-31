@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace nift::rt {
 
@@ -27,6 +28,9 @@ struct ParseError {
     static constexpr const char* kCode = "syntax.invalid_statement";
     std::string message;
     std::uint32_t offset = 0;  // byte offset of the reported position
+    // Byte offset where the top-level statement containing the error starts
+    // (set as the error unwinds; the outermost block sets it last).
+    std::uint32_t statement_begin = 0;
 };
 
 struct ParseResult {
@@ -42,6 +46,12 @@ struct Location {
 
 // Parses a whole script. `ast` must have been constructed over the same text.
 ParseResult parse_script(Ast& ast);
+
+// As parse_script, also yielding the top-level statements in source order:
+// all of them on success; when the script does not parse, the ones completed
+// before the error (the parser's own boundaries, lexical context included).
+// Used to run a startup file statement by statement on a terminal.
+ParseResult parse_script_statements(Ast& ast, std::vector<NodeId>& complete);
 // Parse a source range into the same arena; offsets remain in the original source.
 ParseResult parse_script_range(Ast& ast, std::uint32_t begin, std::uint32_t end);
 

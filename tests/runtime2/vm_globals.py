@@ -97,7 +97,7 @@ def run(nift, work, src, env):
 
 
 def compare(nift, work, src):
-    a = run(nift, work, src, {})
+    a = run(nift, work, src, {"NIFT_VM": "0"})  # legacy oracle: explicit (VM-default policy)
     b = run(nift, work, src, {"NIFT_VM": "1", "NIFT_VM_STATS": "stats.jsonl"})
     verdict, policy = vm_policies.classify((a[1], a[2], a[0]), (b[1], b[2], b[0]), b[3], src)
     outcome = b[3].get("outcome")

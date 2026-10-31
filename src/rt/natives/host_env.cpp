@@ -32,7 +32,18 @@ char** environment_block() { return _environ; }
 char** environment_block() { return ::environ; }
 #endif
 
+std::string& platform_selection() {
+    static std::string selection = "native";
+    return selection;
+}
+
 } // namespace
+
+void set_script_platform(std::string platform) {
+    platform_selection() = platform.empty() ? "native" : std::move(platform);
+}
+
+const std::string& script_platform() { return platform_selection(); }
 
 Status host_getenv(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     std::string name;
@@ -147,7 +158,7 @@ Status host_platform(const Context& context, const Value* args, std::uint32_t ar
     call.set_arg("");
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
     host::Observation obs;
-    obs.platform = "native";
+    obs.platform = script_platform();
     if (finish_host(call, obs.platform, obs, error) != Status::Ok) return Status::Error;
     out = make_string(obs.platform);
     return Status::Ok;

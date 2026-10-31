@@ -43,6 +43,8 @@ def run(nift, work, name, mode, budget=None):
         env["NIFT_VM_STATS"] = stats
         if budget:
             env["NIFT_VM_HEAP_BUDGET"] = str(budget)
+    else:
+        env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
     try:
         p = subprocess.run(["timeout", "120", nift, name], cwd=d, env=env,
                            stdin=subprocess.DEVNULL, capture_output=True, timeout=135)

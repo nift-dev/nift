@@ -11,7 +11,8 @@ probe, never from a failed test:
   verified  the probe runs on the VM (outcome vm, one VM execution, no legacy
             execution) and prints exactly the sorted array;
   refused   the probe is refused before execution with exactly
-            "NIFT_VM=require: not compiled for the VM (method:sort)" and VM
+            "not compiled for the VM (method:sort)" (the complete VM-default
+            refusal diagnostic, REFUSAL below) and VM
             statistics outcome require-error / reason method:sort.
 Anything else raises ProfileError: a crash, a missing binary, an internal
 error, an unexpected refusal or VM execution with the wrong output.
@@ -37,7 +38,12 @@ from functional import run
 
 FROZEN_GLIBCXX = "20260321"
 PROBE = "a := [2, 1]\na.sort((x, y) => x < y)\nprint(a.stringify())"
-REFUSAL = re.compile(r"\Aerror: \$CASE/case\.f:\d+:\d+: NIFT_VM=require: not compiled for the VM \(method:sort\)\n\Z")
+# VM-default policy: the complete refusal diagnostic (src/rt/refusal_text.cpp).
+REFUSAL = re.compile(r"\Aerror: \$CASE/case\.f:\d+:\d+: not compiled for the VM \(method:sort\): the method call "
+                     r"`\.sort\(\)` is not supported by the Runtime 2\.0 VM yet\n"
+                     r"note: the program was not executed: no part of it ran\n"
+                     r"note: to run it on the legacy interpreter: NIFT_VM=0 nift case\.f\n"
+                     r"note: please report unsupported programs at https://github\.com/nift-dev/nift/issues\n\Z")
 # A comparator case: a .sort( call with exactly one top-level argument (the
 # arity the production gate guards; zero or two arguments never reach it).
 # Misclassification cannot pass: a tagged non-comparator case must then show

@@ -1439,3 +1439,25 @@ independently from the AST, at the VM's position. Controls:
 3. Error identity, code, catchability and provenance are unchanged.
 
 Controls: `tests/runtime2/vm_policy_negative.py`.
+
+## D-061 — `exit` in a terminal startup file (owner, 2026-10-31; VM default)
+
+1. A bare `exit` in `~/.niftrc` or in the file of `nift -i file` is an
+   unsupported Nift statement, not a request to end the session (it is never
+   the shell's `exit` command). On a terminal the VM refuses it before it
+   runs: the refusal names it ("initialisation from <file> was interrupted at
+   line L (`exit`); later statements in it were not run"), the file stops
+   there and no later statement of it runs, the effects of earlier
+   statements are kept, and the session continues at a usable prompt.
+2. Legacy fails on it at startup ("unknown value or malformed expression:
+   exit") and ends the session with status 1. This departure is approved
+   explicitly. Without a terminal nothing changes: the file is refused as a
+   whole and the exit status is 1, as in legacy.
+3. Migration note: a startup file that relied on `exit` ending the session
+   no longer does so on a terminal; remove the line (or end the session from
+   the prompt). Recorded in `compatibility.md` (Approved breaks) and
+   `tests/runtime2/vm_default/REFUSAL_MATRIX.md`.
+
+Witness: `tests/runtime2/vm_default/vm_default.py` §18c (`.niftrc` and
+`-i file` on a pty: earlier effect kept, nothing later runs, the prompt then
+works; legacy under `NIFT_VM=0` exits 1; piped exits 1).

@@ -24,6 +24,9 @@ for mode in ['0','1','require']:
 with tempfile.TemporaryDirectory(prefix='cp19-run-') as td:
  env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM='require',NO_COLOR='1')
  r=subprocess.run([a.nift,'-i'],input='run("touch forbidden")\nx:=7\nx\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=15)
- assert not (Path(td)/'forbidden').exists() and '7' in r.stdout and 'callable:run' in r.stderr,(r.stdout,r.stderr)
+ # Owner ruling (Option A): piped (non-tty) input stops at the refusal with exit 1;
+ # no later statement runs.
+ assert not (Path(td)/'forbidden').exists() and '7' not in r.stdout and 'callable:run' in r.stderr,(r.stdout,r.stderr)
+ assert r.returncode==1 and 'the session stopped here' in r.stderr,(r.returncode,r.stderr)
  rows.append(dict(case='run-refusal',stdout=r.stdout,stderr=r.stderr,status=r.returncode))
 a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(rows,indent=2)+'\n');print('PASS CP19 session jobs CLI: EOF/exit, rc persistence, compiled commands, no run fallback')
