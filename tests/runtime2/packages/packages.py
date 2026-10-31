@@ -712,8 +712,22 @@ def section_f():
     refused("F private args read by a function called before its declaration", {
         "p.f": 'fn(n()) { return args.size() }\nx := n()\nargs := [1]\nexport(x)\n', "m.f": 'import("p.f")\nprint(x)\n'},
         "import-scope:invocation-ambiguous", "p.f:1:18", args=a)
-    refused("F export of the private args", {"p.f": 'args := [1]\nexport(args)\n', "m.f": 'import("p.f")\nprint(1)\n'},
-            "import-scope:invocation-ambiguous", "p.f:2:1", args=a)
+    # Exported into the entry: legacy's own error at the import (a program error).
+    files = {"p.f": 'args := [1]\nexport(args)\n', "m.f": 'print("before")\nimport("p.f")\nprint(1)\n'}
+    vm_root, lg_root = tree(files), tree(files)
+    vm, rows = run(["m.f", *a], vm_root)
+    legacy, _ = run(["m.f", *a], lg_root, "0")
+    check(vm.returncode == 1 and vm.stdout == "" and
+          error_line(vm.stderr).replace(str(vm_root), "R") == error_line(legacy.stderr).replace(str(lg_root), "R") and
+          "export collides with existing binding: args" in vm.stderr and "not supported" not in vm.stderr and
+          any(r.get("reason") == "import-scope:invocation-export" for r in rows),
+          "F export of the private args into the entry: legacy's error, a program error",
+          repr((vm.stderr, legacy.stderr, rows)))
+    shutil.rmtree(vm_root)
+    shutil.rmtree(lg_root)
+    refused("F export of the private args into another module (not proved)",
+            {"p.f": 'args := [1]\nexport(args)\n', "q.f": 'import("p.f")\nfn(h()) { return 1 }\nexport(h)\n',
+             "m.f": 'import("q.f")\nprint(h())\n'}, "import-scope:invocation-ambiguous", "p.f:2:1", args=a)
     refused("F a local named args in a module function", {"p.f": 'fn(h()) { args := [1]\n return args[0] }\nexport(h)\n',
                                                           "m.f": 'import("p.f")\nprint(h())\n'}, "binding-name-reserved",
             args=a)
@@ -770,6 +784,106 @@ def section_l():
         check('#include "rt/' not in text, "L " + name + " includes nothing from src/rt")
 
 
+def section_r():
+    """Review of 3cd39c9c: provenance, legacy's first-executed order, the early-return note, display names."""
+    sib = 'fn(s()) { return "sib" }\nexport(s)\n'
+    # Package -> absolute import -> relative import: no frozen provenance (legacy's error).
+    root = tree({**package("demo", "X"), ".nift/packages/demo/src/inner.f": 'import("./sib.f")\nfn(o()) { return s() }\n'
+                 'export(o)\n', ".nift/packages/demo/src/sib.f": sib, "m.f": EARLY + 'import("demo")\nprint(o())\n'})
+    (root / ".nift/packages/demo/src/main.f").write_text('import("%s/.nift/packages/demo/src/inner.f")\nexport(o)\n' % root)
+    lg = Path(tempfile.mkdtemp(dir=WORK))
+    shutil.rmtree(lg)
+    shutil.copytree(root, lg)
+    (lg / ".nift/packages/demo/src/main.f").write_text('import("%s/.nift/packages/demo/src/inner.f")\nexport(o)\n' % lg)
+    vm, rows = run(["m.f"], root)
+    legacy, _ = run(["m.f"], lg, "0")
+    check(vm.returncode == 1 and vm.stdout == "" and
+          error_line(vm.stderr).replace(str(root), "R") == error_line(legacy.stderr).replace(str(lg), "R") and
+          "package-relative import has no frozen package provenance" in vm.stderr and NOTE in vm.stderr,
+          "R absolute import below a package, then relative: legacy's provenance error", repr((vm.stderr, legacy.stderr)))
+    shutil.rmtree(root)
+    shutil.rmtree(lg)
+    # The same with the absolute target outside the package (legacy's text, not "escapes").
+    root = tree({**package("demo", "X"), "out/o.f": 'import("./sib.f")\nfn(o()) { return s() }\nexport(o)\n',
+                 "out/sib.f": sib, "m.f": EARLY + 'import("demo")\nprint(o())\n'})
+    (root / ".nift/packages/demo/src/main.f").write_text('import("%s/out/o.f")\nexport(o)\n' % root)
+    vm, _ = run(["m.f"], root)
+    legacy, _ = run(["m.f"], root, "0")
+    check(error_line(vm.stderr) == error_line(legacy.stderr) and "no frozen package provenance" in vm.stderr,
+          "R absolute import outside the package, then relative: legacy's text", repr((vm.stderr, legacy.stderr)))
+    shutil.rmtree(root)
+    # Legacy's first-executed order.
+    same_error_as_legacy("R module that does not parse stops the walk",
+                         {"bad.f": 'fn(f() {\n', "m.f": EARLY + 'import("bad.f")\nimport("missing.f")\n'},
+                         reason="module-error:syntax")
+    same_error_as_legacy("R module that does not parse (alone)", {"bad.f": 'fn(f() {\n', "m.f": EARLY + 'import("bad.f")\n'},
+                         reason="module-error:syntax")
+    same_error_as_legacy("R legacy-runtime-error region in a module stops the walk",
+                         {"mod.f": 'f := (a,) => a\nimport("missing.f")\n', "m.f": EARLY + 'import("mod.f")\n'},
+                         reason="module-error:syntax")
+    for label, files, at in (
+            ("R invocation-init before a later missing import",
+             {"a.f": 'n := args.size()\nfn(f()) { return n }\nexport(f)\n', "m.f": 'import("a.f")\nimport("missing.f")\n'},
+             "R/a.f:1:6"),
+            ("R invocation-init before a later export-missing in the same module",
+             {"b.f": 'n := args.size()\nexport(nope)\n', "m.f": 'import("b.f")\n'}, "R/b.f:1:6"),
+            ("R invocation-init through a function before a later missing import",
+             {"a.f": 'fn(n()) { return args.size() }\ny := n()\nexport(y)\n', "m.f": 'import("a.f")\nimport("missing.f")\n'},
+             "R/a.f:1:18")):
+        root = tree(files)
+        vm, rows = run(["m.f", "x"], root)
+        legacy, _ = run(["m.f", "x"], root, "0")
+        check(vm.returncode == 1 and vm.stdout == "" and error_line(vm.stderr).replace(str(root), "R").startswith(
+              "error: " + at + ":") and any(r.get("reason") == "import-scope:invocation-init" for r in rows) and
+              "unknown value or malformed expression: args" in legacy.stderr,
+              label, repr((vm.stderr, legacy.stderr)))
+        shutil.rmtree(root)
+    root = tree({"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'})
+    vm, rows = run(["m.f"], root)
+    legacy, _ = run(["m.f"], root, "0")
+    check(vm.returncode == 1 and "m.f:2:1:" in error_line(vm.stderr) and "m.f:2:1:" in error_line(legacy.stderr) and
+          any(r.get("reason") == "static-error:redeclared" for r in rows),
+          "R an entry compile-time error before a later graph error wins", repr((vm.stderr, legacy.stderr, rows)))
+    shutil.rmtree(root)
+    # The early-return note only for an unconditional top-level `return`.
+    for label, files in (("R conditional return in the entry: no note",
+                          {"m.f": 'x := 0\nif (x == 1) { return }\nprint("b")\nimport("missing.f")\n'}),
+                         ("R conditional return in a module: no note",
+                          {"mod.f": 'if (false) { return }\nimport("missing.f")\nfn(f()) { return 1 }\nexport(f)\n',
+                           "m.f": 'import("mod.f")\n'})):
+        vm, _ = same_error_as_legacy(label, files)
+        check("legacy would stop there" not in vm.stderr, label + ": note absent", vm.stderr)
+    # Determinism across these orders too.
+    files = {"bad.f": 'fn(f() {\n', "a.f": 'n := args.size()\nexport(n)\n', "m.f": 'import("bad.f")\nimport("a.f")\n'}
+    seen = set()
+    for order in itertools.permutations(list(files)):
+        root = Path(tempfile.mkdtemp(dir=WORK))
+        for rel in order:
+            (root / rel).write_text(files[rel])
+        vm, _ = run(["m.f", "x"], root)
+        seen.add(error_line(vm.stderr).replace(str(root), "R"))
+        shutil.rmtree(root)
+    check(len(seen) == 1 and "R/bad.f:1:1:" in next(iter(seen)), "R determinism: syntax error first", repr(seen))
+    # Display names are whole identifiers (12 private-args modules).
+    files = {"x%d.f" % k: 'args := [%d]\nfn(f%d()) { return args[0] }\nexport(f%d)\n' % (k, k, k) for k in range(1, 13)}
+    files["x11.f"] = 'const args := [11]\nfn(f11()) { args.push(1)\n return 1 }\nexport(f11)\n'
+    files["m.f"] = "".join('import("x%d.f")\n' % k for k in range(1, 13)) + "print(f1())\nprint(f12())\nprint(f11())\n"
+    vm = parity("R 12 modules with private args", files)
+    check("cannot mutate const array: args\n" in vm.stderr and "nift__" not in vm.stderr,
+          "R display names at module index >= 10", vm.stderr)
+    # classify / classify-all report program errors as program errors.
+    root = tree({"m.f": EARLY + 'import("missing.f")\n'})
+    for mode in ("classify", "classify-all"):
+        p, rows = run(["m.f"], root, mode)
+        check(any(r.get("outcome") == "program-error" and r.get("reason") == "import-error:missing" for r in rows),
+              "R NIFT_VM=%s: outcome program-error" % mode, repr(rows))
+        if mode == "classify-all":
+            check('"detail":"program-error"' in json.dumps(rows).replace(" ", "") or
+                  any("program-error" in json.dumps(r.get("reasons", "")) for r in rows),
+                  "R classify-all inventory marks the program error", repr(rows))
+    shutil.rmtree(root)
+
+
 def main():
     global NIFT, WORK
     parser = argparse.ArgumentParser()
@@ -782,7 +896,7 @@ def main():
     try:
         for name, fn in (("a", section_a), ("b", section_b), ("c", section_c), ("d", section_d), ("e", section_e),
                          ("f", section_f), ("g", section_g),
-                         ("l", section_l)):
+                         ("l", section_l), ("r", section_r)):
             if not opts.only or name in opts.only:
                 fn()
     finally:

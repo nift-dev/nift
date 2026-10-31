@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,6 +54,7 @@ struct LinkedUnit {
     std::uint32_t offset = 0;  // its offset in that module's text
     bool positioned = false;   // `offset` is a recorded position (each refusal site says so)
     bool program_error = false;  // the graph found an invalid program: graph.error
+    std::string message;         // a link-level program error's text (import-scope:invocation-export)
     // import-scope:invocation-init through a function: the initialising mention.
     bool note = false;
     std::size_t note_where = 0;
@@ -63,6 +65,13 @@ struct LinkedUnit {
     std::vector<int> depth;    // per module: import nesting (entry 0)
     std::vector<std::string> prefix;  // per module: legacy's frame prefixes for errors while it initialises
     std::vector<std::pair<std::string, std::string>> renames;  // generated name, original name
+    // A program error: the entry's statements before the one it happens under,
+    // linked (blanked from there on, offsets kept), so a compile-time program
+    // error earlier in execution order can be found and reported first.
+    std::string prefix_source;
+    std::shared_ptr<const Ast> prefix_ast;
+    NodeId prefix_root = kNoNode;
+    std::shared_ptr<const LinkedUnit> prefix_link;
     std::vector<std::string_view> module_names;  // declared outside functions in imported modules
 
     struct Location {

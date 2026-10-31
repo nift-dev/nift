@@ -909,6 +909,28 @@ and 8 new files.
 - The rename itself (private-declaration detection, rename ids, generated names,
   display names and segment mapping) is ~110 lines, within its ~200.
 
+### Review of 3cd39c9c (REJECT): corrections
+
+| Finding | Correction |
+|---|---|
+| BLOCKER `r2`: package → absolute import → relative import ran | `Module::package_provenance`, as legacy's frozen provenance: a package entry has it, a relative import inherits it, an absolute import has none. A relative import from a module with a package root but no provenance is `import-error:package-escape` with legacy's text `package-relative import has no frozen package provenance`, checked before containment, as legacy does (this also gives `r1` legacy's text). |
+| `d1`/`d2`: unparsable modules and legacy-runtime-error regions | Modules are prevalidated at load with legacy's own check (`rt/prevalidate.h`, honouring `NIFT_PREVALIDATE=off`). The first failure ends the walk as `module-error:syntax`, with legacy's text, prefixes and position. |
+| `h4`: invocation-init before later graph errors | A module's top-level read of the entry's `args`/`cmd` is checked in statement order during the walk. A read reached through functions, under an earlier entry statement, is found through the entry prefix (below). |
+| `d3/e2.f`: entry compile-time error before a graph error | When the graph has a program error, the entry's statements before the one it happens under are linked and compiled (`rt/module_link_prefix`, `earlier_compile_error`). An invocation-init, or a compile-time program error (`static-error:*`, `invocation-assign:*`) found there, is reported instead. A compile-time error earlier inside the failing module itself is not looked for (recorded limit). |
+| `h3`: the early-return note | Only for a top-level statement that is itself a `return`. A `return` inside a branch no longer gives the note, in the entry or in modules. |
+| `f6`: display names at module index ≥ 10 | Generated names are replaced only as whole identifiers. |
+| classify / inventory; invocation-ambiguous wording | Under `NIFT_VM=classify` and `classify-all` the outcome is `program-error`, and inventory items are marked with the detail `program-error`. A private `args` exported into the entry is the program error `import-scope:invocation-export`, with legacy's text `export collides with existing binding: args` at the entry's import. Exported into another module it stays the capability refusal `import-scope:invocation-ambiguous`. |
+
+Tests: section R of `packages.py`. Mutation controls 16–20 were added:
+
+| Control | Removes |
+|---|---|
+| 16 | the provenance check |
+| 17 | load-time prevalidation |
+| 18 | whole-identifier display |
+| 19 | the unconditional-`return` rule |
+| 20 | the entry prefix |
+
 ## 9. Evidence (scratch, not committed)
 
 Under `/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/packages/`:

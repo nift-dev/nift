@@ -1,12 +1,10 @@
 #include "rt/module_graph.h"
 
 #include "FileSystem.h"
-#include "rt/literal.h"
 #include "rt/module_loader.h"
 #include "rt/module_scan.h"
 #include "rt/package_resolve.h"
 #include "rt/parser.h"
-#include "rt/string.h"
 #include "rt/unit_check.h"
 
 #include <algorithm>
@@ -61,7 +59,7 @@ public:
     // A program error at a recorded position; `importing` adds the statement
     // being imported as the innermost frame. Ends the walk.
     bool error(std::size_t where, std::uint32_t offset, std::string id, const std::string& text,
-               const Frame* importing = nullptr) {
+               const Frame* importing = nullptr, bool in_unit = true) {
 #if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 11  // test-only (packages/mutants.sh)
         if (!graph_.ok && !graph_.program_error) { stopped_ = true; return false; }
 #endif
@@ -78,7 +76,9 @@ public:
         if (importing) prefix += importing->at_import ? "@import: " : "import: ";
 #endif
         e.message = prefix + text;
-        early_return(importing);
+        // The entry's top-level statement the error happens under (its import).
+        e.entry_item = !frames_.empty() ? frames_.front().item : importing ? importing->item : current_item_;
+        early_return(importing, in_unit);
         graph_.ok = false;
         graph_.program_error = true;
         stopped_ = true;
@@ -88,7 +88,8 @@ public:
     // One initialisation of unit `index` (legacy's order: its imports run at
     // their statements, depth first).
     bool visit(std::size_t index, const Ast& ast, NodeId root, const fs::path& base, std::vector<fs::path>& active) {
-        check_placement(index, ast, root);
+        const char* misplaced = first_misplaced(ast, root, misplaced_at_);
+        if (misplaced) refuse(index, misplaced_at_, misplaced);
         // Names bound in this unit, with the module that originally declared
         // them: an import may rebind a name to the same declaration (the
         // shared instance, D-041), never to a different one.
@@ -108,6 +109,15 @@ public:
             if (index > 0) {
                 const std::uint32_t ret = first_return(ast, items[k], true);
                 if (ret != UINT32_MAX) return return_error(index, ret);
+            }
+            if (index > 0 && !private_invocation(ast, root, options_.invocation_names)) {
+                NodeId node = kNoNode;
+                const std::uint32_t read = invocation_read(ast, items[k], options_.invocation_names, node);
+                if (read != UINT32_MAX)
+                    return error(index, read, "import-scope:invocation-init",
+                                 "an imported module reads the entry script's `" + std::string(ast.text(ast.at(node))) +
+                                     "` while it initialises; `args` and `cmd` are visible to its functions only "
+                                     "after the import");
             }
             if (index > 0 && export_without_name(ast, st))
                 return error(index, st.begin, "module-error:export-name", "export requires a binding name");
@@ -147,6 +157,7 @@ private:
         std::string argument;
         if (!literal_argument(ast, st, argument)) return refuse(index, st.begin, "import-dynamic"), 0;
         fs::path root = graph_.modules[index]->package_root;  // inherited, as legacy's ModuleEnv
+        bool provenance = false;  // legacy: frozen only for a package entry and relative imports below it
         fs::path path;
         const bool package = package_shaped(argument);
         if (package) {
@@ -157,12 +168,21 @@ private:
                              r.error, &frame), -1;
             path = r.entry;
             root = r.root;
+            provenance = true;
         } else {
             std::replace(argument.begin(), argument.end(), '\\', '/');
             path = argument;
             const bool relative = path.is_relative();
             if (relative) path = base / path;
             path = fs::absolute(path).lexically_normal();
+            provenance = relative && graph_.modules[index]->package_provenance;
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 16  // test-only (packages/mutants.sh)
+            if (false)
+#else
+            if (relative && !root.empty() && !graph_.modules[index]->package_provenance)
+#endif
+                return error(index, st.begin, "import-error:package-escape",
+                             "package-relative import has no frozen package provenance", &frame), -1;
 #if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 10  // test-only (packages/mutants.sh)
             if (false)
 #else
@@ -180,7 +200,7 @@ private:
             return error(index, st.begin, "import-error:cycle", "script import cycle through " + path.generic_string(),
                          &frame), -1;
         bool fresh = false, parsed = true;
-        const int loaded = load(index, st, path, identity, root, frame, target, fresh, parsed);
+        const int loaded = load(index, st, path, identity, root, provenance, frame, target, fresh, parsed);
         if (loaded <= 0) return loaded;
         Module& mod = *graph_.modules[target];
         ++mod.legacy_initialisations;
@@ -204,18 +224,9 @@ private:
         return ok ? 1 : -1;
     }
 
-    static bool literal_argument(const Ast& ast, const Node& st, std::string& out) {
-        if (st.a == kNoNode) return false;
-        const Node& arg = ast.at(st.a);
-        Value value;
-        if (arg.kind != NodeKind::String || arg.count != 0) return false;
-        if (!decode_string_literal(ast.text(arg), value)) return false;
-        out = std::string(string_view_of(value));
-        return true;  // empty: a package name (legacy: invalid package name)
-    }
-
     int load(std::size_t importer, const Node& st, const fs::path& path, const fs::path& identity,
-             const fs::path& package_root, const Frame& frame, std::size_t& index, bool& fresh, bool& parsed_ok) {
+             const fs::path& package_root, bool provenance, const Frame& frame, std::size_t& index, bool& fresh,
+             bool& parsed_ok) {
         const auto known = by_identity_.find(identity.generic_string());
         if (known != by_identity_.end()) {
             index = known->second;
@@ -236,6 +247,7 @@ private:
         mod->path = path;
         mod->identity = identity;
         mod->package_root = package_root;
+        mod->package_provenance = provenance;
         mod->source = std::move(source.text);
         mod->ast = std::make_unique<Ast>(mod->source);
         const ParseResult parsed = parse_script(*mod->ast);
@@ -244,6 +256,16 @@ private:
         fresh = true;
         by_identity_.emplace(identity.generic_string(), index);
         graph_.modules.push_back(std::move(mod));
+        // Legacy validates a module when it loads it, before any of its
+        // statements runs: the first failure there ends the program (D-022 #3).
+        std::uint32_t bad = 0;
+        std::string message;
+        if (!module_prevalidates(graph_.modules[index]->source, bad, message)) {
+            frames_.push_back(frame);
+            error(index, bad, "module-error:syntax", message, nullptr, false);
+            frames_.pop_back();
+            return -1;
+        }
         if (!parsed.ok) {
             parsed_ok = false;
             frames_.push_back(frame);
@@ -278,27 +300,24 @@ private:
         return false;
     }
 
-    // The first top-level `return` before the failing statement on the active
-    // chain, outermost first: legacy would stop there and never reach it.
-    void early_return(const Frame* importing) {
+    // The first unconditional top-level `return` before the failing statement
+    // on the active chain, outermost first: legacy would stop there first.
+    // `in_unit`: the error is at a statement of graph_.error.where (else at
+    // its import, before any of its statements).
+    void early_return(const Frame* importing, bool in_unit) {
         std::vector<std::pair<std::size_t, std::uint32_t>> chain;  // (unit, top-level item)
         for (const Frame& f : frames_) chain.push_back({f.unit, f.item});
-        const std::size_t innermost = importing ? importing->unit : graph_.error.where;
-        chain.push_back({innermost, current_item_});
-        for (std::size_t c = 0; c < chain.size(); ++c) {
-            const auto [unit, item] = chain[c];
+        if (importing) chain.push_back({importing->unit, current_item_});
+        else if (in_unit) chain.push_back({graph_.error.where, current_item_});
+        for (const auto& [unit, item] : chain) {
             const Ast& ast = unit == 0 ? *entry_ : *graph_.modules[unit]->ast;
             const NodeId root = unit == 0 ? entry_root_ : graph_.modules[unit]->root;
-            const Node& program = ast.at(root);
-            const NodeId* items = ast.list(program);
-            for (std::uint32_t k = 0; k < item && k < program.count; ++k) {
-                const std::uint32_t at = first_return(ast, items[k], false);
-                if (at == UINT32_MAX) continue;
-                graph_.error.early_return = true;
-                graph_.error.early_where = unit;
-                graph_.error.early_offset = at;
-                return;
-            }
+            const std::uint32_t at = first_unconditional_return(ast, root, item);
+            if (at == UINT32_MAX) continue;
+            graph_.error.early_return = true;
+            graph_.error.early_where = unit;
+            graph_.error.early_offset = at;
+            return;
         }
     }
 
@@ -336,24 +355,6 @@ private:
         return true;
     }
 
-    // Imports and exports only as top-level statements (refused otherwise,
-    // at the first in text order). `return <value>` is checked in order.
-    void check_placement(std::size_t index, const Ast& ast, NodeId root) {
-        const Node& program = ast.at(root);
-        const NodeId* items = ast.list(program);
-        const NodeId* last = items + program.count;
-        const auto top = [&](NodeId id) { return std::find(items, last, id) != last; };
-        std::uint32_t at = UINT32_MAX;
-        const char* reason = nullptr;
-        walk(ast, root, [&](NodeId id, bool) {
-            const Node& n = ast.at(id);
-            const char* r = n.kind == NodeKind::Import && !top(id)   ? "import-nested"
-                            : n.kind == NodeKind::Export && !top(id) ? "export-nested"
-                                                                     : nullptr;
-            if (r && n.begin < at) { at = n.begin; reason = r; }
-        });
-        if (reason) refuse(index, at, reason);
-    }
 
 public:
     const Ast* entry_ = nullptr;
@@ -367,6 +368,7 @@ private:
     std::vector<Frame> frames_;   // the active imports, outermost first
     std::vector<bool> tainted_;   // per module: a refusal may have hidden bound names
     std::uint32_t current_item_ = 0;
+    std::uint32_t misplaced_at_ = 0;
     bool stopped_ = false;
 };
 

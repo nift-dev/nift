@@ -1,6 +1,7 @@
 #include "rt/module_link.h"
 
 #include "rt/module_invocation.h"
+#include "rt/module_link_prefix.h"
 
 #include <algorithm>
 #include <functional>
@@ -169,6 +170,40 @@ private:
     const std::vector<std::string>& generated_;  // per module, per private name (two slots)
 };
 
+// Generated names for private bindings: absent from every unit's text and
+// from each other (C1); module_names views them in the heap-stable modules.
+std::vector<std::string> name_private_bindings(LinkedUnit& out, const std::vector<UnitView>& units,
+                                               const InvocationPlan& plan) {
+    const std::size_t count = units.size();
+    std::vector<std::string> generated(count * 2);
+    for (std::size_t m = 1; m < count; ++m)
+        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g) {
+            const std::string base = "nift__" + std::string(plan.private_names[m][g]) + "__m" + std::to_string(m);
+            std::string name = base;
+            const auto used = [&](const std::string& candidate) {
+                for (const UnitView& u : units) if (u.source.find(candidate) != std::string_view::npos) return true;
+                for (const std::string& other : generated) if (other == candidate) return true;
+                return false;
+            };
+#if !(defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 15)  // test-only (packages/mutants.sh)
+            for (int k = 1; used(name); ++k) name = base + "_" + std::to_string(k);
+#endif
+            generated[m * 2 + g] = name;
+            out.renames.push_back({name, std::string(plan.private_names[m][g])});
+        }
+    for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),
+                                                                     units[m].top.end());
+    for (std::size_t m = 1; m < count; ++m) {  // views into the (heap-stable) module, never into a moved string
+        Module& mod = *out.graph.modules[m];
+        mod.generated_names.clear();
+        mod.generated_names.reserve(2);
+        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g)
+            mod.generated_names.push_back(generated[m * 2 + g]);
+        for (const std::string& name : mod.generated_names) out.module_names.push_back(name);
+    }
+    return generated;
+}
+
 } // namespace
 
 LinkedUnit::Location LinkedUnit::locate(std::size_t offset) const {
@@ -193,13 +228,27 @@ std::string LinkedUnit::display(std::string text) const {
 #if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 14  // test-only (packages/mutants.sh)
     return text;
 #endif
+    // Whole identifiers only: `nift__args__m1` is not replaced inside `nift__args__m11`.
+    const auto ident = [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    };
     for (const auto& [generated, original] : renames)
         for (std::size_t at = text.find(generated); at != std::string::npos; at = text.find(generated, at)) {
+            const std::size_t end = at + generated.size();
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 18  // test-only: substrings replaced (packages/mutants.sh)
+            if (false) {
+#else
+            if ((at > 0 && ident(text[at - 1])) || (end < text.size() && ident(text[end]))) {
+#endif
+                at = end;
+                continue;
+            }
             text.replace(at, generated.size(), original);
             at += original.size();
         }
     return text;
 }
+
 
 LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source, const fs::path& entry_path,
                      const std::vector<std::string_view>& entry_names) {
@@ -227,11 +276,13 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
     };
     ModuleGraphOptions options;
     options.policy = InitPolicy::RefuseReinitialisation;  // D-041 #2: until both engines initialise once
+    options.invocation_names = entry_names;
     out.graph = build_module_graph(entry, root, entry_path, options);
     if (out.graph.program_error) {  // an invalid program (D-NEXT-packages): rejected with its error
         const GraphError& e = out.graph.error;
         refuse(e.where, e.offset, e.id, e.positioned);
         out.program_error = true;
+        link_prefix(out, entry, root, entry_source, entry_path, entry_names);
         return out;
     }
     if (!out.graph.ok) {
@@ -312,38 +363,13 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
     }
     if (!plan.ok) {
         refuse(plan.where, plan.offset, plan.reason, plan.positioned);
+        out.message = plan.message;
         out.note = plan.note;
         out.note_where = plan.note_where;
         out.note_offset = plan.note_offset;
         return out;
     }
-    // Generated names for private bindings: absent from every unit's text.
-    std::vector<std::string> generated(count * 2);
-    for (std::size_t m = 1; m < count; ++m)
-        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g) {
-            const std::string base = "nift__" + std::string(plan.private_names[m][g]) + "__m" + std::to_string(m);
-            std::string name = base;
-            const auto used = [&](const std::string& candidate) {
-                for (const UnitView& u : units) if (u.source.find(candidate) != std::string_view::npos) return true;
-                for (const std::string& other : generated) if (other == candidate) return true;
-                return false;
-            };
-#if !(defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 15)  // test-only (packages/mutants.sh)
-            for (int k = 1; used(name); ++k) name = base + "_" + std::to_string(k);
-#endif
-            generated[m * 2 + g] = name;
-            out.renames.push_back({name, std::string(plan.private_names[m][g])});
-        }
-    for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),
-                                                                     units[m].top.end());
-    for (std::size_t m = 1; m < count; ++m) {  // views into the (heap-stable) module, never into a moved string
-        Module& mod = *out.graph.modules[m];
-        mod.generated_names.clear();
-        mod.generated_names.reserve(2);
-        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g)
-            mod.generated_names.push_back(generated[m * 2 + g]);
-        for (const std::string& name : mod.generated_names) out.module_names.push_back(name);
-    }
+    const std::vector<std::string> generated = name_private_bindings(out, units, plan);
     out.depth.assign(count, 0);
     out.prefix.assign(count, std::string());
     Linker(out, units, plan, generated).emit(0);

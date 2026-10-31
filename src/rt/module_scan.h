@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -47,5 +48,28 @@ bool export_without_name(const Ast& ast, const Node& st);
 // bindings, and functions, structs and enums declared anywhere (legacy's
 // global tables). Declared after the import too (conservative).
 std::vector<std::string_view> importer_names(const Ast& ast, NodeId root);
+
+// An import's plain string-literal argument (empty included: a package name).
+bool literal_argument(const Ast& ast, const Node& st, std::string& out);
+
+// The offset of the first top-level statement before `item` that is itself
+// a `return` (unconditional), or UINT32_MAX.
+std::uint32_t first_unconditional_return(const Ast& ast, NodeId root, std::uint32_t item);
+
+// The first read of one of `names` outside functions and lambdas in one
+// statement (UINT32_MAX: none), its node in `node`.
+std::uint32_t invocation_read(const Ast& ast, NodeId statement, const std::vector<std::string_view>& names,
+                              NodeId& node);
+
+// The first import or export (in text order) that is not a top-level
+// statement: "import-nested" / "export-nested" at `at`, or nullptr.
+const char* first_misplaced(const Ast& ast, NodeId root, std::uint32_t& at);
+
+// Legacy's load-time validation of a module (D-022 #3, rt/prevalidate.h;
+// NIFT_PREVALIDATE=off skips it, as legacy): false with the first failure.
+bool module_prevalidates(const std::string& source, std::uint32_t& offset, std::string& message);
+
+// The unit declares one of `names` by a plain top-level statement.
+bool private_invocation(const Ast& ast, NodeId root, const std::vector<std::string_view>& names);
 
 } // namespace nift::rt

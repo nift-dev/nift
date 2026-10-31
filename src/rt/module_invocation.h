@@ -37,6 +37,7 @@ struct InvocationPlan {
     std::size_t where = 0;
     std::uint32_t offset = 0;
     bool positioned = false;
+    std::string message;  // a program error (invocation-export): legacy's text with its prefix
     bool note = false;  // invocation-init through a function: the initialising mention
     std::size_t note_where = 0;
     std::uint32_t note_offset = 0;

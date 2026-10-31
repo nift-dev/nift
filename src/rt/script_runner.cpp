@@ -64,7 +64,7 @@ void error_line(const std::filesystem::path& path, const Stats& stats, const std
 // The unit cannot run on the VM. Under NIFT_VM=require that is an error.
 bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, int& exit_code) {
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
-        stats.outcome = "fallback";
+        stats.outcome = stats.program_message.empty() ? "fallback" : "program-error";
         report(stats);
         exit_code = 0;
         return true;
@@ -293,7 +293,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
                     static_cast<std::uint32_t>(at.offset));
     };
     if (link.linked && !link.ok) {
-        describe_link_refusal(link, source_path, source, stats, report_path);
+        if (!earlier_compile_error(link, source_path, source, invocation, stats, report_path))
+            describe_link_refusal(link, source_path, source, stats, report_path);
         return not_compiled(stats, mode, report_path, exit_code);
     }
     Ast linked_ast(link.linked ? std::string_view(link.text) : std::string_view());

@@ -148,7 +148,10 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
             const Module& module = *link.graph.modules[link.where];
             at = {module.source, module.path.generic_string(), static_cast<std::uint32_t>(link.offset)};
         }
-        record(link.reason, at, false, {});
+        // An invalid program (D-NEXT-packages) is listed as a program error, not a VM gap.
+        const bool program_error = link.program_error || !link.message.empty() ||
+                                   link.reason == "import-scope:invocation-init";
+        record(link.reason, at, false, program_error ? "program-error" : std::string());
         inventory.complete = false;
         inventory.stop = link.reason;
         return inventory;

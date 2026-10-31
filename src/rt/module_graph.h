@@ -28,7 +28,10 @@
 //   import-error:package-lock  the package read lock cannot be acquired
 //   import-error:missing       the module cannot be read
 //   import-error:cycle         a module imports itself through the active chain
-//   import-error:package-escape a package-relative import leaves its package
+//   import-error:package-escape a package-relative import leaves its package,
+//                              or has no frozen package provenance (absolute import below a package)
+//   module-error:syntax        a module fails legacy's load-time prevalidation (rt/prevalidate.h)
+//   import-scope:invocation-init  a module's top-level code reads the entry's args/cmd
 //   module-error:return-value  `return <value>` outside functions in a module
 //   module-error:export-missing / export-duplicate / export-name
 // Order (determinism rule): the first program error in legacy's execution
@@ -66,6 +69,10 @@ enum class InitPolicy {
 struct ModuleGraphOptions {
     InitPolicy policy = InitPolicy::OncePerContext;
     std::filesystem::path project_root;  // non-empty: imports must stay inside (legacy's enforced root)
+    // The entry script's invocation bindings (`args`, `cmd`): a module's
+    // top-level read of one is the program error import-scope:invocation-init,
+    // in execution order (rt/module_invocation.h for reads through functions).
+    std::vector<std::string_view> invocation_names;
 };
 
 struct ModuleImport {
@@ -76,6 +83,7 @@ struct ModuleImport {
 struct Module {
     std::filesystem::path path;      // absolute, normalised (the import base is its directory)
     std::filesystem::path package_root;  // non-empty: loaded from (or below) a package (legacy's ModuleEnv)
+    bool package_provenance = false;     // legacy's frozen provenance: a package entry, or relative below one
     std::filesystem::path identity;  // module_identity(path)
     std::string source;              // owned; `ast` views it
     std::unique_ptr<Ast> ast;
@@ -98,6 +106,7 @@ struct GraphError {
     bool return_note = false;
     std::size_t return_where = 0;
     std::uint32_t return_offset = 0;
+    std::uint32_t entry_item = 0;  // the entry's top-level statement under which it happens
     // A top-level `return` earlier on the active chain: legacy stops there first.
     bool early_return = false;
     std::size_t early_where = 0;

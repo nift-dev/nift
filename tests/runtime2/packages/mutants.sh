@@ -22,6 +22,11 @@
 #                             the reported position must follow, and this mutant breaks it.
 #  14 module_link.cpp         generated names shown in messages (no display names)
 #  15 module_link.cpp         a fixed generated name, never checked for collisions
+#  16 module_graph.cpp        no frozen-provenance check (relative import below an absolute one)
+#  17 module_scan.cpp         modules not prevalidated at load (syntax errors no longer stop the walk)
+#  18 module_link.cpp         display names replaced as substrings (nift__args__m1 inside ..m11)
+#  19 module_scan.cpp         the early-return note for any nested `return`
+#  20 module_link_prefix.cpp  no entry prefix (earlier invocation-init / compile errors lose)
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
@@ -35,7 +40,9 @@ for spec in 1:src/rt/package_resolve.cpp 2:src/rt/package_resolve.cpp 3:src/Pack
             4:src/rt/package_resolve.cpp 5:src/rt/package_resolve.cpp 6:src/rt/module_graph.cpp \
             7:src/rt/module_invocation.cpp 8:src/rt/module_invocation.cpp 9:src/rt/module_invocation.cpp \
             10:src/rt/module_graph.cpp 11:src/rt/module_graph.cpp 12:src/rt/module_graph.cpp \
-            13:src/rt/module_link.cpp 14:src/rt/module_link.cpp 15:src/rt/module_link.cpp; do
+            13:src/rt/module_link.cpp 14:src/rt/module_link.cpp 15:src/rt/module_link.cpp \
+            16:src/rt/module_graph.cpp 17:src/rt/module_scan.cpp 18:src/rt/module_link.cpp \
+            19:src/rt/module_scan.cpp 20:src/rt/module_link_prefix.cpp; do
     n=${spec%%:*}; one=${spec#*:}
     obj=${one%.cpp}.o; mobj="$TMP/m$n-$(basename "$obj")"
     plan=$(make -s -n nift -W "$one")

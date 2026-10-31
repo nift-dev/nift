@@ -1,6 +1,9 @@
 #include "rt/link_diagnostic.h"
 
+#include "rt/compiler.h"
+#include "rt/compiler_coro_admit.h"
 #include "rt/parser.h"
+#include "rt/session_invocation.h"
 
 // rt-lint: cold-file refusal reporting, once per refused unit
 
@@ -29,6 +32,46 @@ std::string at(const LinkedUnit& link, std::size_t module, std::uint32_t offset,
 
 } // namespace
 
+bool earlier_compile_error(const LinkedUnit& link, const std::filesystem::path& source_path,
+                           const std::string& source, std::vector<InvocationBinding>* invocation,
+                           detail::Stats& stats, std::filesystem::path& report_path) {
+    if (!link.program_error || !link.prefix_link || !link.prefix_ast) return false;
+    const LinkedUnit& pre = *link.prefix_link;
+    Ast linked_ast(pre.linked ? std::string_view(pre.text) : std::string_view());
+    NodeId root = link.prefix_root;
+    if (pre.linked) {
+        const ParseResult relinked = parse_script(linked_ast);
+        if (!relinked.ok) return false;
+        root = relinked.root;
+    }
+    const Ast& ast = pre.linked ? linked_ast : *link.prefix_ast;
+    CompileLimits limits;
+    limits.module_names = pre.module_names;
+    limits.link = &pre;
+    cooperative_switches(limits);
+    limits.invocation = invocation;
+    if (invocation)
+        locate_invocation_shadows(*invocation, ast, root,
+                                  [&](std::uint32_t at) { return !pre.linked || pre.locate(at).module == 0; });
+    const CompileResult compiled = compile_unit(ast, root, limits);
+    const std::string& r = compiled.reason;
+    if (compiled.program || !compiled.positioned ||
+        (r.rfind("static-error:", 0) != 0 && r.rfind("invocation-assign:", 0) != 0))
+        return false;
+    const LinkedUnit::Location where = pre.linked ? pre.locate(compiled.offset)
+                                                  : LinkedUnit::Location{0, compiled.offset};
+    const Where w = where.module == 0 ? Where{source_path, &source}
+                                      : Where{pre.graph.modules[where.module]->path,
+                                              &pre.graph.modules[where.module]->source};
+    report_path = w.path;
+    const Location l = locate(*w.source, static_cast<std::uint32_t>(where.offset));
+    stats.reason = pre.display(r);
+    stats.line = l.line;
+    stats.column = l.column;
+    stats.positioned = true;
+    return true;
+}
+
 void describe_link_refusal(const LinkedUnit& link, const std::filesystem::path& source_path, const std::string& source,
                            detail::Stats& stats, std::filesystem::path& report_path) {
     stats.reason = link.reason;
@@ -51,6 +94,11 @@ void describe_link_refusal(const LinkedUnit& link, const std::filesystem::path& 
                                   at(link, e.early_where, e.early_offset, source_path, source) +
                                   " comes before this; legacy would stop there without reaching it" +
                                   (e.early_where == 0 ? " (exit 0)" : "") + "\n";
+        return;
+    }
+    if (!link.message.empty()) {  // a link-level program error with legacy's text
+        stats.program_message = link.message;
+        stats.program_note = "note: the program was not executed: no part of it ran\n";
         return;
     }
     if (link.reason == "import-scope:invocation-init") {  // a program error legacy fails on when it runs
