@@ -218,8 +218,22 @@ the six pre-existing unclassified reasons of the base
 
 ## 12. Local runs
 
-Recorded in the candidate report (exit codes of `make nift`, `test-rt-lint`,
-the suites and mutants, `test-runtime2-vm-default`,
-`test-runtime2-closures-s1-stress`, `test-runtime2-cp22`,
-`test-runtime2-cp23`). The full `test-rt-vm` and the sanitizer lanes run on
-Linode on the frozen tip.
+Run on commit `f09c7137` (tree `61edaf2b`), through the host's heavy-job
+gate; the only later commit adds this section (documentation only).
+
+| Gate | Exit |
+| --- | --- |
+| `make nift` | 0 |
+| `make test-rt-lint` (0 problems) | 0 |
+| `tests/runtime2/refsem_a.py` (190 checks) | 0 |
+| `tests/runtime2/weekend_collections.py` (273 checks) | 0 |
+| `tests/runtime2/refsem/mutants.sh` (15 of 15 caught) | 0 |
+| `tests/runtime2/collections/mutants.sh` (all caught) | 0 |
+| `make test-runtime2-vm-default` | 0 |
+| `make test-runtime2-closures-s1-stress` | 0 |
+| `make test-runtime2-cp22` | 0 |
+| `make test-runtime2-cp23` | 0 |
+
+The CP25-R inventory (section 11) was taken on `a43472ed`; the later guard
+refinement (`7c1fc2b4`) only admits more programs, and was not re-inventoried.
+The full `test-rt-vm`, rt-diff and the sanitizer lanes are not run locally.
