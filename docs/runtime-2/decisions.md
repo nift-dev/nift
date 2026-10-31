@@ -1461,3 +1461,54 @@ Controls: `tests/runtime2/vm_policy_negative.py`.
 Witness: `tests/runtime2/vm_default/vm_default.py` §18c (`.niftrc` and
 `-i file` on a pty: earlier effect kept, nothing later runs, the prompt then
 works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
+
+## D-063 — map, set and stack are values on the VM (owner, 2026-10-31; weekend collections)
+
+(D-062 is claimed by `cand/args-cmd`; renumber at integration if needed.)
+
+Owner rulings for the weekend collections candidate (`cand/collections`,
+`checkpoints/weekend-collections.md`):
+
+1. **Value semantics, an intentional departure from legacy** (where
+   collections are references). `b := a` gives an independent copy; copying is
+   **deep** and the same for assignment, function arguments, returns, closure
+   capture (values read through a closure), container insertion and
+   extraction, struct fields, `for` values and thread arguments, returns and
+   captures. Copy-on-write is allowed only as an unobservable optimisation.
+   This applies D-040 #3 ("maps and sets are values") to stacks as well.
+2. **Self-insertion snapshots**: `m.set(k, m)`, `k.push(k)`, `s.add(s)` store
+   the receiver's value before the call; ordinary values stay acyclic (D-040
+   addendum). Legacy's "would create a cyclic reference" error disappears.
+3. **`same()` follows D-040 #4**: identity only for identity-bearing values.
+   Collections (like arrays, objects and structs) are ordinary values and
+   `same()` on them is legacy's error text "same: operands must be
+   identity-bearing values" (legacy: `true`/`false` by storage). Callables and
+   file/stream handles compare by identity (legacy-equal). `same()` on shared
+   concurrency or task handles is refused before execution until the owner
+   decides (legacy rejects them; open question in the checkpoint).
+4. **Everything observable apart from copying is legacy's**: constructors
+   (exact `map()`/`set()`/`stack()`), methods and their return values, key and
+   member rules (bool, number, string, and legacy's tagged strings that are
+   values here: collections structurally, callables by identity), insertion
+   order, stack order (iteration top first, `stringify` bottom first),
+   equality per kind, `type()` "collection", the binding type "string",
+   `stringify`/`prettify`, `for` forms and errors, and every error text,
+   position and (un)catchability. Anything not modelled is refused before
+   execution (checkpoint §3), never reinterpreted.
+5. **Value kind.** `rt::Kind::Collection = 15` uses the **last free value of
+   the 4-bit kind tag**; one tag serves map, set and stack (the sub-kind is in
+   the object). A later kind needs the tag mask widened (tag bits 4-6 are
+   unused). No `Value` redesign.
+6. Threads may carry collections (a copy, `WireKind::Collection`), where
+   legacy refuses them ("non-transferable resource"): part of the approved
+   value-semantics break.
+
+Migration (`compatibility.md`, Approved breaks): code that relied on two
+names sharing one collection must pass the collection back (`m = fill(m)`,
+`return m`) or keep it in one binding; `copy()`/`deepcopy()` are no longer
+needed to separate copies; `same()` cannot test collection sharing.
+
+Witnesses: `tests/runtime2/collections/approved/*.f` (VM golden and legacy
+witness for each difference), `parity/*.f`, `refuse/*.f`, the heap checks and
+ten mutation controls (`make test-runtime2-collections`,
+`test-runtime2-collections-mutants`).

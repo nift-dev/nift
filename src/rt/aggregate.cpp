@@ -391,6 +391,7 @@ void map_set(Value& map, Value key, Value value) {
         heap_retally(map.heap());
         return;
     }
+    note_store(&c, key);  // a key may be a callable or a collection holding one
     c.items.push_back(static_cast<Value&&>(key));
     c.items.push_back(static_cast<Value&&>(value));
     index_appended(c);
@@ -402,6 +403,8 @@ void map_set(Value& map, Value key, Value value) {
 void set_add(Value& set, Value member) {
     if (find_entry(*set.heap_as<CollectionObject>(), member) >= 0) return;
     CollectionObject& c = collection_mut(set);
+    check_not_self(&c, member);
+    note_store(&c, member);  // members may be callables or collections
     c.items.push_back(static_cast<Value&&>(member));
     index_appended(c);
     heap_retally(set.heap());

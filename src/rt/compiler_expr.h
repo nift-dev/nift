@@ -107,6 +107,8 @@ private:
     bool keyed_mutation(const Node& node, std::uint16_t dst, int method);
     bool keyed_read_call(const Node& node, std::uint16_t dst, int method);
     bool keyed_key_ok(const Node& node, int method);
+    bool unit_makes_collections();
+    int makes_collections_ = -1;
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);

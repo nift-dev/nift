@@ -27,6 +27,31 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (kinds(args[k]) & (kKindShared | kKindTask))
                 return fail(ast_.at(args[k]), "same:shared-handle");
+    // D-063: legacy's collections are tagged strings. A built-in that renders,
+    // hashes, converts or compares them as such (html_escape(m), sha256(m),
+    // validate(s, m), [m].contains(m), [m].join(",")) would observe the tag;
+    // only these accept a map/set/stack argument (or element) here.
+    if (unit_makes_collections()) {
+        using natives::BuiltinId;
+        const auto id = spec.id;
+        const bool value_ok = id == BuiltinId::FnType || id == BuiltinId::FnCopy || id == BuiltinId::FnDeepcopy ||
+                              id == BuiltinId::FnSame || (id >= BuiltinId::FnIsNull && id <= BuiltinId::FnIsEnum) ||
+                              spec.receiver == natives::Receiver::Map || spec.receiver == natives::Receiver::Set ||
+                              spec.receiver == natives::Receiver::Stack;
+        if (!value_ok)
+            for (std::uint32_t k = 0; k < node.count; ++k)
+                if ((kinds(args[k]) & kKindCollection) && !(kinds(args[k]) & kKindUnknown))
+                    return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
+        const bool inspects = id == BuiltinId::ArrContains || id == BuiltinId::ArrIndexOf ||
+                              id == BuiltinId::ArrJoin || id == BuiltinId::ArrUnique || id == BuiltinId::ArrSum ||
+                              id == BuiltinId::ArrMin || id == BuiltinId::ArrMax || id == BuiltinId::ArrFromEntries ||
+                              id == BuiltinId::ObjMergeDeep;
+        if (inspects && receiver != kNoNode) {
+            const auto found = kinds_.receiver_elements.find(receiver);
+            if (found != kinds_.receiver_elements.end() && (found->second & kKindCollection))
+                return fail(node, "collection-element:" + std::string(spec.name));
+        }
+    }
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));
@@ -48,5 +73,20 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
     if (receiver != kNoNode && spec.may_fail && !loop_reachable() && node.count > 0 && may_fault(args[0]))
         return fail(ast_.at(args[0]), "builtin-arg-fault-context");
     return true;
+}
+// D-063: does the unit construct a map, set or stack anywhere (the only
+// source of collections: the unit is closed, threads and modules included)?
+// Without one, "any kind" values (top) hold no collection.
+bool UnitCompiler::unit_makes_collections() {
+    if (makes_collections_ < 0) {
+        makes_collections_ = 0;
+        for (NodeId id = 0; id < ast_.size() && !makes_collections_; ++id) {
+            const Node& n = ast_.at(id);
+            if (n.kind != NodeKind::Call || n.count != 0 || ast_.at(n.a).kind != NodeKind::Ident) continue;
+            const std::string_view name = text(ast_.at(n.a));
+            if (name == "map" || name == "set" || name == "stack") makes_collections_ = 1;
+        }
+    }
+    return makes_collections_ == 1;
 }
 } // namespace nift::rt::detail

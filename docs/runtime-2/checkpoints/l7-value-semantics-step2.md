@@ -193,6 +193,9 @@ failures, at `-O1` and under ASan/UBSan. It covers:
 Maps and sets have no VM value kind yet (CP15B). Their value-layer tests
 arrive with that kind; the language-level self-insertion fixtures for maps
 and sets are in the L7 suite (class W).
+*Update (D-063, weekend collections):* map, set and stack now have the VM
+value kind `Kind::Collection`, the last free value (15) of the 4-bit tag;
+see `weekend-collections.md`.
 
 Existing suites still pass: `value_unit` (its struct case now asserts value
 semantics), `value_regress`, `value_round2` and `value_property` (1.87M

@@ -44,6 +44,8 @@ constexpr Family kFamilies[] = {
     {"collection-callback:", "the callback method `.%()` on a map, set or stack"},
     {"collection-const", "mutating a const map, set or stack"},
     {"collection-loop-binding", "mutating a map, set or stack through a loop binding"},
+    {"collection-argument:", "a map, set or stack as an argument of `%()`"},
+    {"collection-element:", "`.%()` on an array or object that may hold a map, set or stack"},
     {"collection-identity-key", "a struct or handle as a map key or set member"},
     {"same:shared-handle", "`same()` on a mutex, atomic, channel, future or thread"},
     {"context:", "a context-dependent legacy behaviour (%)"},

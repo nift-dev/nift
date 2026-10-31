@@ -8,7 +8,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
         const Node& callee = ast_.at(expr.a);
         // D-063: a stack's push is a keyed mutator (compiler_keyed.cpp).
         if (text(ast_.at(callee.b)) == "push" &&  // rt-lint: allow-string-compare compile time
-            !((kinds(callee.a) & kKindCollection) && !(kinds(callee.a) & kKindUnknown))) {
+            !(kinds(callee.a) != 0 && (kinds(callee.a) & ~kKindCollection) == 0)) {
             const Node& receiver = ast_.at(callee.a);
             if (!plain_postfix(expr) || !plain_postfix(callee) || !no_trailing_comma(expr)) return false;
             std::uint16_t reg = 0, value = 0;

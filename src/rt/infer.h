@@ -143,6 +143,10 @@ struct UnitKinds {
     std::unordered_set<NodeId> collection_arrays;
     std::unordered_map<NodeId,NodeId> bindings;
     std::unordered_map<NodeId,KindSet> collection_elements;
+    // D-063: for the receiver of a built-in method on an array or object, the
+    // kinds of its elements/members (a native that inspects them refuses
+    // map/set/stack elements, see builtin_arguments_ok).
+    std::unordered_map<NodeId,KindSet> receiver_elements;
     std::unordered_set<NodeId> collection_text_numbers;
     // CP22: expressions whose value is, or may contain at any depth, a future.
     std::unordered_set<NodeId> future_holders;

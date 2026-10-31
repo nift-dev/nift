@@ -61,7 +61,9 @@ natives::Receiver keyed_receiver(KindSet kinds) {
 int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     const KindSet k = kinds(callee.a);
-    if (!(k & kKindCollection) || (k & kKindUnknown)) return -1;
+    // Only a receiver that is certainly a collection: a mixed or "any" value
+    // keeps the existing method refusals (builtin-receiver, method:...).
+    if (!(k & kKindCollection) || (k & ~kKindCollection)) return -1;
     const std::string name(text(ast_.at(callee.b)));
     if (k != kKindMap && k != kKindSet && k != kKindStack)
         return fail(callee, "collection-receiver:" + name) ? 1 : 0;  // a value that may be of several kinds
