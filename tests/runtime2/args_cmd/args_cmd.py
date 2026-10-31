@@ -27,6 +27,10 @@ sessions.
      `is_script_invocation` exception: supported where it is an ordinary
      top-level binding; any use before it, or a shadow in a block or function,
      stays refused before any effect; `cmd(...)` stays the built-in
+  9  heap accounting: a script that never names the bindings ends with zero
+     live heap at stop; one that uses `args` ends with the same live heap as
+     the equivalent array literal (the closures-s1 stress regression on
+     b30bc637: unused invocation values were kept alive, 128 bytes)
 
 Mutation controls: tests/runtime2/args_cmd/mutants.sh builds binaries without
 the binding, with a wrong value, without the `cmd(...)` precedence and without
@@ -351,6 +355,24 @@ def suite(root):
                        ("args shadowed, cmd still bound", 'args := []\nprint(cmd + ":" + args.size().to_string())\n')):
         (work / "sh.f").write_text(src)
         parity("shadow: " + label, [NIFT, "sh.f", "a", "b"], work, home)
+
+    # 9. Live heap at stop (NIFT_VM_STATS heap_live).
+    def live(src, argv):
+        (work / "heap.f").write_text(src)
+        p, rows = run([NIFT, "heap.f", *argv], work, None, home)
+        return p.returncode, [r.get("heap_live") for r in rows]
+    for label, src in (("no bindings named", 'x := 1 + 2\nprint(x)\n'),
+                       ("only scalars", 'n := 3\nfn(f()) { return n }\nprint(f())\n')):
+        rc, heap = live(src, ["a", "b c"])
+        check(rc == 0 and heap == [0], "heap: " + label + ": zero live heap at stop with arguments", repr((rc, heap)))
+    rc_args, heap_args = live('print(args.size())\nprint(args[1])\n', ["a", "b c"])
+    rc_lit, heap_lit = live('x := ["a", "b c"]\nprint(x.size())\nprint(x[1])\n', [])
+    check(rc_args == rc_lit == 0 and heap_args == heap_lit and len(heap_args) == 1,
+          "heap: args ends with the live heap of the equivalent array literal", repr((heap_args, heap_lit)))
+    rc_cmd, heap_cmd = live('print(cmd)\n', ["a"])
+    rc_s, heap_s = live('print("heap.f")\n', [])
+    check(rc_cmd == rc_s == 0 and heap_cmd == heap_s, "heap: cmd ends with the live heap of the string literal",
+          repr((heap_cmd, heap_s)))
 
     print("args/cmd: %d failure(s)" % len(FAILS))
     return 1 if FAILS else 0

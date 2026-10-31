@@ -103,7 +103,7 @@ struct EvalResult { nift::RuntimeValue& value; std::string& error; };
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code, EvalResult* eval = nullptr,
-              const std::vector<InvocationBinding>* invocation = nullptr);
+              std::vector<InvocationBinding>* invocation = nullptr);
 
 SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& path, const std::string& source) {
     return link.linked ? SourceMap::linked(link, path.generic_string(), source)
@@ -154,7 +154,7 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
     stats.source_bytes = source.size();
     stats.path = source_path.generic_string();
     try {
-        const std::vector<InvocationBinding> invocation = invocation_bindings(command, arguments);
+        std::vector<InvocationBinding> invocation = invocation_bindings(command, arguments);
 #if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 1  // test-only: no script bindings (args_cmd/mutants.sh)
         return run_unit(source, source_path, mode, stats, exit_code, nullptr, nullptr);
 #endif
@@ -259,7 +259,7 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
 }
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
-              int& exit_code, EvalResult* eval, const std::vector<InvocationBinding>* invocation) {
+              int& exit_code, EvalResult* eval, std::vector<InvocationBinding>* invocation) {
     if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats, eval != nullptr, invocation);
     const auto t0 = Clock::now();
     Ast ast(source);
@@ -316,6 +316,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
+    if (invocation) invocation->clear();  // the program holds what it uses; the rest is not live heap
     if (!compiled.program) {
         stats.reason = compiled.reason;
         locate_linked(compiled.offset); stats.positioned = compiled.positioned;
