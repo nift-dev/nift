@@ -1708,10 +1708,13 @@ review rejected the candidate; these rulings amend 4, 6, 7, 9 and 11 above
   measure).** CP25-R corpora (589 shared units, 608 execute entries): no
   refusal beyond the four the first guard already made. `tests/` (1,757
   `.f`): the new refusals are the loop-mutation and aliasing probes
-  (`for-s2`, `cp12c-probes`, `capture_origins`, `closures-s1`). Two common
+  (`for-s2`, `cp12c-probes`, `capture_origins`, `closures-s1`). Three common
   shapes are newly refused although Phase B would print the same: an in-place
-  update of the array a `for` iterates (`for (x : a) { a[i] = x * 2 }`), and
-  a global array that helper functions mutate, passed to a function that only
-  reads it. Admitting them needs index reasoning and a call graph; the guard
+  update of the array a `for` iterates (`for (x : a) { a[i] = x * 2 }`), a
+  write through the loop binding (`for (row : grid) { row.push(0) }`, which
+  already writes through on the VM and in legacy), and a global array that
+  helper functions mutate, passed to a function that only reads it. Admitting
+  them needs index reasoning, a call graph and a place model of loop
+  bindings; the guard
   is not grown further pending the owner's choice (keep it, narrow arrays and
   objects further, or bring Phase B forward).

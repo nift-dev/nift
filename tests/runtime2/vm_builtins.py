@@ -187,7 +187,6 @@ SUPPORTED = {
 # array element) is integer negation, refused in loop code
 # (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
 SUPPORTED_TOP = [
-    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n"),
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n"),
     # The one place the two readings meet: JSON except for one fallback
     # spelling (`.5`). As JSON `-0` stays -0; read as Nift it is 0.
@@ -313,7 +312,11 @@ UNSUPPORTED = [
     ("w9-escaped-string", 'je := {"s": "caf\\u00e9"}\nprint(je.s)\n', "opaque:legacy-runtime-error"),
     ("n-q2-abs-arity", "x := -2\nprint(x.abs(1))\n", "builtin-arity:abs"),
     ("cp16-replace-once", 's := "aa"\nprint(s.replace_once("a", "b"))\n', "method:replace_once"),
-    ("cp17-collection", "s := stack()\nprint(1)\n", "callable:stack"),
+    # D-063 (base candidate): stack() compiles since the weekend collections;
+    # the cp17-collection refusal entry is retired. D-NEXT-refsem #1: sort()
+    # returns its receiver, so `b := a.sort()` would alias `a` in Phase B: the
+    # guard refuses it (it was a supported F4 program).
+    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n", "reference-guard:shared"),
 ]
 
 
@@ -425,7 +428,10 @@ def budget_checks(nift, work, timeout):
 # checked method argument and reports the method's type message, in loop code
 # the fault itself; a checked argument that can fault (`q.split(h.sep)`: a
 # member read) is refused there. The same bodies stay supported in loop code.
-REFUSED_IN_CONTEXT = {("shapes", "top"): "builtin-arg-fault-context", ("shapes", "if"): "builtin-arg-fault-context",
+# D-NEXT-refsem #1: in loop contexts `shapes` reaches the Phase A guard (its
+# `head := h.l.first(); head.push(9)` would change h in Phase B).
+REFUSED_IN_CONTEXT = {("shapes", "loop"): "reference-guard:inflow", ("shapes", "fn-loop"): "reference-guard:inflow",
+                      ("shapes", "top"): "builtin-arg-fault-context", ("shapes", "if"): "builtin-arg-fault-context",
                       ("shapes", "fn-top"): "builtin-arg-fault-context"}
 
 

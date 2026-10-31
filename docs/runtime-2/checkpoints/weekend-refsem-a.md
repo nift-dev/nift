@@ -373,10 +373,12 @@ above. Common workloads, probed directly (base / tip):
 | build with `push`, then `for` to sum; `while` index updates; `filter`/`map` chains; a local passed to a reading helper; a global appended to from a helper called in a loop; rows of rows | VM | VM |
 | `for (x : a) { a[i] = x * 2; i += 1 }` (update the iterated array in place) | VM | refused (`lent`) |
 | a global array mutated by helper functions, then passed to a function that only reads it | VM | refused (`lent`) |
+| `for (row : grid) { row.push(0) }` (the loop binding is a place: it writes through, legacy-equal) | VM | refused (`lent`) |
 
-The last two print the same in Phase B, but the guard cannot show it
-without index reasoning (which positions a loop body writes) and a call
-graph (which functions a call can reach). That is new inference machinery,
+The last three print the same in Phase B, but the guard cannot show it
+without index reasoning (which positions a loop body writes), a call graph
+(which functions a call can reach) and a model of the loop binding as a
+place rather than a second holder. That is new inference machinery,
 so per the owner's guidance the guard is **not grown further**: the choice
 between keeping it, narrowing arrays and objects further, and bringing Phase
 B forward is the owner's (section 10).
