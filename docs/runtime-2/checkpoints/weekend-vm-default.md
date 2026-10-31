@@ -112,3 +112,23 @@ unresolved-name probes use a genuinely unbound name). `weekend/r2` fast-forwarde
   implementation notes in `weekend-args-cmd.md`; write-before-shadow generic wording;
   a module with several `args` mentions may report a later one (real position; fixed by the
   packages ordering rule).
+
+## coro-module integration (2026-11-01)
+
+`cand/coro-module` integrated via `integ/coro-module`: merge `9bc18099` of `9d8f90c6`
+(parents `9b2f40a6`, `9d8f90c6`), follow-ups `f6716908` (cooperative refusal claims no
+position: test), `32f4797d` (classification location), `b89299b5` (vm_default position witness
+moved to the cooperative model; the parallel default now runs that unit). `weekend/r2`
+fast-forwarded to `b89299b5`.
+- Candidate evidence (identities kept distinct): Review 3 ACCEPT and full Linode test-rt-vm on
+  `c30b3138`; inherited CP22 mutant-13 witness fix and cp22-mutants 1-25 on `9d8f90c6`.
+- Combined pre-flight: 1,757 fixtures classified against `2dbcde8e`; all 103 outcome changes are
+  coro-module's own fixtures.
+- Linode on `b89299b5` (first run with the 4-core prebuild): every gate exit 0, cp22-mutants 25/25,
+  coro-module and args-cmd mutants, session CLI x2, prebuild 1078 s + full test-rt-vm 1484 s
+  (vs ~4177 s serial before), no OOM. Note: a packages job ran for under a minute during this
+  run's test-rt-vm before being stopped and re-queued; all results passed.
+- Owner ruling: competing capability refusals keep compiler-stage precedence (link-time refusals
+  before coroutine admission); deterministic, truthful positions, no effects.
+- Open (LOW): `private-async` can point at an unrelated call when a module async function is used
+  as a value (real position; whole-unit approximation).
