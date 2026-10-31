@@ -49,7 +49,11 @@ bool open_and_lock(const fs::path& path, bool exclusive, void*& file) {
     file = static_cast<void*>(handle);
     return true;
 #else
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 3  // test-only (packages/mutants.sh)
+    const int fd = ::open(path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_TRUNC, 0644);
+#else
     const int fd = ::open(path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW, 0644);
+#endif
     if (fd < 0) return false;
     struct stat status{};
     if (::fstat(fd, &status) != 0 || !S_ISREG(status.st_mode) || ::flock(fd, exclusive ? LOCK_EX : LOCK_SH) != 0) {
@@ -234,6 +238,27 @@ bool PackageTransaction::acquire_read(std::string& error) {
     if(!lock_identity_valid()){error="package read lock identity changed";return false;}
     bool journal_present=false;if(!journal_file_state(journal_path_,journal_present,error))return false;
     if(journal_present){error="unfinished package transaction; run a package command to recover it";return false;}
+    return true;
+}
+
+bool PackageTransaction::acquire_read_existing_store(std::string& error, bool& store_present) {
+    store_present = false;
+    if (locked_) { store_present = true; return !exclusive_; }
+    std::error_code ec;
+    const fs::file_status status = fs::symlink_status(nift_root_, ec);
+    if (status.type() == fs::file_type::not_found) return true;
+    store_present = true;
+    fs::create_directories(nift_root_, ec);  // exists: creates nothing; a non-directory fails as in acquire_read
+    if (ec) { error = "cannot create package lock directory: " + ec.message(); return false; }
+    if (!open_and_lock(nift_root_/".packages-transaction.lock", false, lock_file_)) {
+        error = "cannot acquire package read lock";
+        return false;
+    }
+    locked_ = true; exclusive_ = false;
+    if (!lock_identity_valid()) { error = "package read lock identity changed"; return false; }
+    bool journal_present = false;
+    if (!journal_file_state(journal_path_, journal_present, error)) return false;
+    if (journal_present) { error = "unfinished package transaction; run a package command to recover it"; return false; }
     return true;
 }
 

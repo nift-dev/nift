@@ -22,6 +22,13 @@ public:
 
     bool acquire(std::string& error);
     bool acquire_read(std::string& error);
+    // Runtime 2.0 VM package imports (D-NEXT-packages #2): the shared read lock
+    // of an *existing* store, never creating `.nift/`. Without `.nift/` it takes
+    // no lock and reports `store_present = false`. Otherwise it is acquire_read's
+    // lock (the same file, open_and_lock, identity and journal checks): the lock
+    // file is created atomically if missing, never truncated. The legacy
+    // acquire_read is unchanged.
+    bool acquire_read_existing_store(std::string& error, bool& store_present);
     bool lock_identity_valid() const;
     bool create_staging(std::filesystem::path& staging_root, std::string& error);
     bool commit(const std::vector<Operation>& operations,
