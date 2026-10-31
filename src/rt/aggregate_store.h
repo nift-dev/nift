@@ -28,21 +28,48 @@ namespace nift::rt::aggregate_detail {
 
 // Amortised schedule (D9, D-NEXT-refsem). Moving the whole storage on every
 // mutation made a growing container quadratic in checked builds (200,000
-// inserts: about 770 s under ASan). Storage of at most kAlwaysRelocate
-// elements is still moved on EVERY mutation, so a stale reference into a
-// small aggregate faults deterministically at its next use (every stale-
-// reference control and fixture is small). Larger storage is moved once every
-// size / kAlwaysRelocate mutations (a per-thread tick), so the moved volume
-// stays at most about 2 * kAlwaysRelocate elements per mutation and a stale
-// reference into a large aggregate still faults within that many mutations.
+// inserts: about 770 s under ASan). The rules, in order:
+//   * storage of at most kAlwaysRelocate elements moves on EVERY mutation;
+//   * larger storage moves on the first mutation after a reference or pointer
+//     into it was handed out (array_items, array_mut, object_get, ...: the
+//     kStorageLent bit), so "take a reference, mutate once, use it" faults
+//     deterministically at the use, as for small storage. These moves draw on
+//     a per-thread credit that every mutation refills by kCredit elements
+//     (kInitialCredit to start), so the moved volume stays linear in the
+//     number of mutations even when reads and writes of a huge container
+//     interleave;
+//   * otherwise (no reference handed out, or the credit spent) once every
+//     size / kAlwaysRelocate + 1 mutations (a per-thread tick).
+// A pure insert loop (the 200,000-element stress fixtures) hands out nothing
+// and stays linear.
 inline constexpr std::size_t kAlwaysRelocate = 256;
+inline constexpr std::uint64_t kCredit = 2 * kAlwaysRelocate;
+inline constexpr std::uint64_t kInitialCredit = std::uint64_t{1} << 21;
 
-inline bool relocation_due(std::size_t size) noexcept {
+inline void note_lent(const HeapObject* object) noexcept {
+#ifdef NIFT_RT_RELOCATE_ON_MUTATION
+    const_cast<HeapObject*>(object)->tag |= kStorageLent;  // the header's own bookkeeping (never const storage)
+#else
+    (void)object;
+#endif
+}
+
+inline bool relocation_due(HeapObject* object, std::size_t size) noexcept {
 #if defined(NIFT_RT_RELOCATION_MUTANT)
-    (void)size;
+    (void)object; (void)size;
     return false;  // test-only: relocation off (the stale-reference controls must then pass silently)
 #else
+    thread_local std::uint64_t credit = kInitialCredit;
+    credit += kCredit;
+    const bool lent = (object->tag & kStorageLent) != 0;
+    object->tag = static_cast<std::uint8_t>(object->tag & ~kStorageLent);
     if (size <= kAlwaysRelocate) return true;
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 19)
+    if (lent && credit >= size) {  // R19 drops this: the first mutation after a hand-out may skip the move
+        credit -= size;
+        return true;
+    }
+#endif
     thread_local std::uint64_t tick = 0;
     return ++tick % (size / kAlwaysRelocate + 1) == 0;
 #endif
@@ -64,20 +91,23 @@ inline void relocate_storage(HeapObject* object) {
     switch (object->kind()) {
         case Kind::Array: {
             auto& items = static_cast<ArrayObject*>(object)->items;
-            if (relocation_due(items.size())) relocate(items);
+            if (relocation_due(object, items.size())) relocate(items);
             return;
         }
-        case Kind::Struct: relocate(static_cast<StructObject*>(object)->fields); return;  // small by construction
+        case Kind::Struct:  // small by construction: always moved
+            (void)relocation_due(object, 0);
+            relocate(static_cast<StructObject*>(object)->fields);
+            return;
         case Kind::Object: {
             auto* o = static_cast<ObjectObject*>(object);
-            if (!relocation_due(o->entries.size())) return;
+            if (!relocation_due(object, o->entries.size())) return;
             relocate(o->entries);
             relocate(o->index);
             return;
         }
         case Kind::Collection: {
             auto* c = static_cast<CollectionObject*>(object);
-            if (!relocation_due(c->items.size())) return;
+            if (!relocation_due(object, c->items.size())) return;
             relocate(c->items);
             relocate(c->index);
             return;

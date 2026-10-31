@@ -46,6 +46,9 @@ struct BytesObject : HeapObject {
 // never missing). Plain data therefore never needs a walk: an aggregate whose
 // bit is clear holds no identity-bearing value anywhere below it.
 inline constexpr std::uint8_t kMayHoldIdentity = 0x80;
+// Checked builds only (rt/aggregate_store.h): a reference or pointer into this
+// aggregate's storage was handed out since its storage last moved.
+inline constexpr std::uint8_t kStorageLent = 0x40;
 inline bool may_hold_identity(const HeapObject* object) noexcept { return (object->tag & kMayHoldIdentity) != 0; }
 inline void mark_may_hold_identity(HeapObject* object) noexcept { object->tag |= kMayHoldIdentity; }
 inline void clear_may_hold_identity(HeapObject* object) noexcept {

@@ -9,7 +9,8 @@
 //
 //   value_round2            run the checks
 //   value_round2 stale-array | stale-object | stale-string | stale-map | stale-set |
-//                stale-stack | stale-struct | stale-large-array
+//                stale-stack | stale-struct | stale-large-array | stale-large-map |
+//                stale-large-set | stale-large-stack | stale-large-object
 //                           deliberately use a stale reference; under
 //                           AddressSanitizer this must abort (the sanitizer
 //                           target expects a failure exit)
@@ -187,13 +188,41 @@ int stale(const std::string& what) {
         const Value* held = struct_get(p, atom("v"));
         struct_set(alias, atom("v"), I(2));
         std::printf("%zu\n", string_view_of(*held).size());
-    } else if (what == "stale-large-array") {  // D9 amortised schedule: within size / 256 + 1 mutations
+    } else if (what == "stale-large-array") {  // D9: the first mutation after a hand-out moves large storage
         Value a = make_array();
         array_push(a, make_string("an element long enough for the heap"));
-        for (int k = 1; k < 1000; ++k) array_push(a, I(k));
+        for (int k = 1; k < 5000; ++k) array_push(a, I(k));
         const Value& held = array_items(a)[0];
-        for (int k = 0; k < 8; ++k) array_push(a, I(k));
+        array_push(a, I(0));  // one mutation
         std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-large-map") {
+        Value m = make_collection(CollectionKind::Map);
+        map_set(m, I(0), make_string("a value long enough for the heap"));
+        for (int k = 1; k < 5000; ++k) map_set(m, I(k), I(k));
+        const Value& held = collection_items(m)[1];
+        map_set(m, I(-1), I(0));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-large-set") {
+        Value s = make_collection(CollectionKind::Set);
+        set_add(s, make_string("a member long enough for the heap"));
+        for (int k = 1; k < 5000; ++k) set_add(s, I(k));
+        const Value& held = collection_items(s)[0];
+        set_add(s, I(-1));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-large-stack") {
+        Value k = make_collection(CollectionKind::Stack);
+        stack_push(k, make_string("an element long enough for the heap"));
+        for (int j = 1; j < 5000; ++j) stack_push(k, I(j));
+        const Value& held = collection_items(k)[0];
+        stack_push(k, I(-1));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-large-object") {
+        Value o = make_object();
+        object_set(o, atom("k0"), make_string("a member value long enough for the heap"));
+        for (int j = 1; j < 600; ++j) object_set(o, atom("k" + std::to_string(j)), I(j));
+        const Value* held = object_get(o, atom("k0"));
+        object_set(o, atom("k1"), I(-1));  // replaces a value: the storage does not grow
+        std::printf("%zu\n", string_view_of(*held).size());
     } else if (what == "stale-string") {
         Value s = make_string(std::string(40, 's'));
         const std::string_view held = string_view_of(s);

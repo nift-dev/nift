@@ -78,6 +78,7 @@ CollectionKind collection_kind(const Value& collection) { return collection.heap
 std::size_t collection_size(const Value& collection) { return entries(*collection.heap_as<CollectionObject>()); }
 
 const std::vector<Value>& collection_items(const Value& collection) {
+    note_lent(collection.heap());
     return collection.heap_as<CollectionObject>()->items;
 }
 

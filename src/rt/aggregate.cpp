@@ -101,11 +101,15 @@ Value make_array(std::size_t reserve) {
     return owned;
 }
 
-const std::vector<Value>& array_items(const Value& array) { return array.heap_as<ArrayObject>()->items; }
+const std::vector<Value>& array_items(const Value& array) {
+    note_lent(array.heap());
+    return array.heap_as<ArrayObject>()->items;
+}
 
 std::vector<Value>& array_mut(Value& array) {
     if (!unshare(array)) relocate_storage(array.heap());
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
+    note_lent(array.heap());
     return array.heap_as<ArrayObject>()->items;
 }
 
@@ -129,7 +133,7 @@ Value* array_slot_mut(Value& array, std::size_t index) {
     return &array_mut(array)[index];
 }
 
-std::size_t array_size(const Value& array) { return array_items(array).size(); }
+std::size_t array_size(const Value& array) { return array.heap_as<ArrayObject>()->items.size(); }
 
 Value make_object() {
     auto* object = new ObjectObject();
@@ -140,10 +144,12 @@ Value make_object() {
 std::size_t object_size(const Value& object) { return object.heap_as<ObjectObject>()->entries.size(); }
 
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object) {
+    note_lent(object.heap());
     return object.heap_as<ObjectObject>()->entries;
 }
 
 const Value* object_get(const Value& object, Atom key) {
+    note_lent(object.heap());
     const auto* o = object.heap_as<ObjectObject>();
     const std::ptrdiff_t at = find_position(*o, key);
     return at < 0 ? nullptr : &o->entries[static_cast<std::size_t>(at)].second;
@@ -181,6 +187,7 @@ Value* object_slot_mut(Value& object, Atom key) {
     if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
     ObjectObject& o = object_mut(object);
     mark_may_hold_identity(&o);
+    note_lent(&o);
     return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
 }
 

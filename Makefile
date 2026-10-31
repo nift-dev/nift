@@ -540,7 +540,8 @@ test-rt-value-sanitize:
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-round2"
 	# Reference safety is enforced: a reference held across a mutation must abort.
-	for m in stale-array stale-object stale-string stale-map stale-set stale-stack stale-struct stale-large-array; do \
+	for m in stale-array stale-object stale-string stale-map stale-set stale-stack stale-struct stale-large-array \
+		stale-large-map stale-large-set stale-large-stack stale-large-object; do \
 		if ASAN_OPTIONS=detect_leaks=0 "$(TEST_DIR)/rt-san/value-round2" $$m 2>"$(TEST_DIR)/rt-san/$$m.log"; then \
 			echo "FAIL: stale reference ($$m) not detected"; exit 1; fi; \
 		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
