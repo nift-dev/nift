@@ -12,7 +12,7 @@ g6_identity.f vm
 g7_lambda_too_few.f vm-error
 g7_named_too_many.f vm-error
 g7_noncallable.f vm-error
-g8_value_semantics.f vm
+g8_value_semantics.f fallback:reference-guard:inflow  # D-NEXT-refsem #1: x := get() would alias b in Phase B
 g9_recursion_binding.f recursion
 g10_d038_caller_local.f fallback:free-name  # D-038: legacy 5; VM free-name (inventory free-name:dynamic-caller)
 g11_module_lambda.f vm
@@ -24,7 +24,8 @@ g1_mutual_cycles.f cycle  # D-040 approved difference: legacy false; VM runtime.
 g7_member_named_too_many.f vm-error
 g12_cell_not_observable.f vm
 g4_closure_restore.f vm
-g1_aggregate_cycle.f cycle  # D-040 approved difference: cycle through a captured array
+g1_aggregate_cycle.f fallback:reference-guard:shared  # D-NEXT-refsem #1: the closure returns the mutated array (Phase B: an alias); the cycle witness is g1_aggregate_cycle_cell.f
+g1_aggregate_cycle_cell.f cycle  # D-040/D-NEXT-refsem #4: cycle through a captured array, the guard admits it
 g13_lambda_variadic.f fallback:lambda-variadic
 g13_spread_callable.f fallback:spread
 g14_binding_function_type.f vm-error
@@ -35,7 +36,8 @@ g16_late_local.f fallback:free-name
 g16_lambda_late.f fallback:free-name
 g17_push_unknown.f vm-error
 g1_object_cycle.f cycle
-g1_index_cycle.f cycle
+g1_index_cycle.f fallback:reference-guard:shared  # D-NEXT-refsem #1: the closure returns the mutated array; the cycle witness is g1_index_cycle_cell.f
+g1_index_cycle_cell.f cycle  # D-NEXT-refsem #4: the same through an element store
 g1_push_upvalue_cycle.f cycle
 g1_nested_setupvalue_cycle.f cycle
 g14_object_lambda_param.f vm

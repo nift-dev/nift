@@ -26,8 +26,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "for-s2-bench")
 
 BODIES = [("minimal scalar", "min_for.f", "min_while.f"),
-          ("arithmetic", "arith_for.f", "arith_while.f"),
-          ("modify element", "write_for.f", "write_while.f")]
+          ("arithmetic", "arith_for.f", "arith_while.f")]
+# D-NEXT-refsem #1: write_for.f writes the array its `for` iterates, which the
+# Phase A forward-compatibility guard refuses (Phase B iterates the live
+# array); the bench checks that refusal and measures the write loop's memory
+# with write_while.f.
+GUARDED = {"write_for.f": "reference-guard:lent"}
 
 
 def run_once(nift, work, name, budget, stats_name):
@@ -107,11 +111,17 @@ def main():
             print(f"{label:16} for={fu/1000:7.2f} ms  while={wu/1000:7.2f} ms  "
                   f"ratio={ratio:5.3f}  {state}  heap_peak={f['heap_peak']} rss={f['rss_kb']} kB")
 
+        for name, reason in GUARDED.items():
+            st, code, _, _ = run_once(nift, work, name, args.budget, f"guard-{name}.json")
+            ok = code == 1 and st and st.get("outcome") == "require-error" and st.get("reason") == reason
+            print(f"{name}: refused before effects ({reason}): {'ok' if ok else 'FAIL'}")
+            if not ok:
+                failures += 1
         # Memory: the write loop must not copy the array. A copy would roughly
         # double heap_peak and fail an 18 MB budget.
         print("memory (write loop, no copy):")
         for budget in (8000000, 17000000, 18000000, 24000000):
-            st, code, _, rss = run_once(nift, work, "write_for.f", budget, f"mem-{budget}.json")
+            st, code, _, rss = run_once(nift, work, "write_while.f", budget, f"mem-{budget}.json")
             outcome = (st or {}).get("outcome")
             peak = (st or {}).get("heap_peak")
             live = (st or {}).get("heap_live")

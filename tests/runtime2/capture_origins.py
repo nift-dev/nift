@@ -57,6 +57,39 @@ GOLDENS["selector_missing_side_effect"] = "1\nafter-write\n"
 cases.update({'nested_source_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>()=>x[0]}\ng:=h()\na=[]\nprint(g())\n', 'nested_decl_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{f:=()=>x[0];return f}}\ng:=h()\na=[]\nprint(g())\n', 'nested_active_caller': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>x[0]}}\ng:=h()\na=[]\nfn(invoke(cb)){cb()}\ninvoke(g)\n', 'nested_third_escape': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>()=>x[0]}}\ng:=h()\ng=g()\na=[]\nprint(g())\n'})
 
 
+# D-NEXT-refsem #1 (the Phase A forward-compatibility guard, review of
+# ad9d842f): these cases mutate the iterated source while the loop holds it
+# (`lent`: Phase B iterates the live array), or mutate an element through the
+# loop binding, which a closure keeps (`shared-part`: Phase B aliases the
+# element). The VM refuses them before any effect; NIFT_VM=1 runs legacy.
+GUARDED = {
+    "callback_read_write": "reference-guard:shared-part",
+    "callback_write": "reference-guard:shared-part",
+    "capture_named_aggregate": "reference-guard:shared-part",
+    "capture_named_repeated": "reference-guard:shared-part",
+    "capture_source_after": "reference-guard:lent",
+    "capture_source_repeated": "reference-guard:lent",
+    "frame_escape": "reference-guard:lent",
+    "named_aggregate_block_element_after": "reference-guard:shared-part",
+    "named_aggregate_block_element_before": "reference-guard:shared-part",
+    "named_aggregate_block_source_after": "reference-guard:lent",
+    "named_aggregate_block_source_before": "reference-guard:lent",
+    "named_aggregate_expr_element_after": "reference-guard:shared-part",
+    "named_aggregate_expr_element_before": "reference-guard:shared-part",
+    "named_aggregate_expr_source_after": "reference-guard:lent",
+    "named_aggregate_expr_source_before": "reference-guard:lent",
+    "named_scalar_block_source_after": "reference-guard:lent",
+    "named_scalar_block_source_before": "reference-guard:lent",
+    "named_scalar_expr_source_after": "reference-guard:lent",
+    "named_scalar_expr_source_before": "reference-guard:lent",
+    "parameter_escape": "reference-guard:lent",
+    "read_before": "reference-guard:shared-part",
+    "rebound_cached_owner": "reference-guard:shared-part",
+    "selector_missing_cached_write": "reference-guard:shared-part",
+    "selector_missing_side_effect": "reference-guard:shared-part",
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -81,13 +114,20 @@ def main():
                 results[mode] = result
                 rows.append({"case": name, "mode": mode, "stdout": result[0].decode(),
                              "stderr": result[1].decode(), "exit": result[2], "stats": telemetry})
-                if mode != "0" and (not telemetry or telemetry.get("vm_executions") != 1 or
+                if mode != "0" and name in GUARDED:
+                    want = "fallback" if mode == "1" else "require-error"
+                    if (not telemetry or telemetry.get("outcome") != want or telemetry.get("vm_executions") != 0 or
+                            telemetry.get("reason") != GUARDED[name]):
+                        failures += 1
+                        print(f"FAIL {name}/{mode}: expected {want}/{GUARDED[name]} before effects: {telemetry}")
+                elif mode != "0" and (not telemetry or telemetry.get("vm_executions") != 1 or
                         telemetry.get("outcome") != ("vm-error" if name in ERROR_CASES else "vm")):
                     failures += 1
                     print(f"FAIL {name}/{mode}: required VM execution: {telemetry}")
             expected_exit = 1 if name in ERROR_CASES else 0
+            refused = name in GUARDED and results["require"][0] == b"" and results["require"][2] == 1
             if (results["0"][2] != expected_exit or results["0"] != results["1"] or
-                    results["0"] != results["require"]):
+                    (results["0"] != results["require"] and not refused)):
                 failures += 1
                 print(f"FAIL {name}: {results}")
             elif name in GOLDENS and results["0"][0].decode() != GOLDENS[name]:

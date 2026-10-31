@@ -1,10 +1,13 @@
 // rt-diff gen.py --seed 7 index 2
+// D-NEXT-refsem #1: the three copies below are explicit (deepcopy) so the
+// Phase A guard admits the program (legacy aliased here, D-040; with the
+// copies legacy and the VM agree). The selftest needs only the module import.
 import("mod1.f")
 print(mf2((7 * 100)))
 a3 := [(7 % 1)]
 w4 := 0
 while(w4 < 1) {
-  al5 := a3
+  al5 := deepcopy(a3)
   al5.push(4)
   print(a3.stringify())
   print(al5.stringify())
@@ -34,10 +37,10 @@ for(fe8 : [1, 2, 3, 4]) {
 }
 fn(mut9(xs)) { xs.push(99); return xs.length() }
 a10 := [1, 2]
-print(mut9(a10))
+print(mut9(deepcopy(a10)))
 print(a10.stringify())
 s11 := "p" + "p"
-for(e12 : a3) {
+for(e12 : deepcopy(a3)) {
   print(e12)
   print("item $[e12]")
   a3.push((42 % 3))
