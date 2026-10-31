@@ -803,6 +803,34 @@ def section_r():
           "R absolute import below a package, then relative: legacy's provenance error", repr((vm.stderr, legacy.stderr)))
     shutil.rmtree(root)
     shutil.rmtree(lg)
+    # The other side of the boundary: provenance kept through relative imports (two levels, subdirectories).
+    parity("R provenance kept: package -> relative -> relative", {
+        **package("demo", 'import("./sub/a.f")\nexport(av)\n'),
+        ".nift/packages/demo/src/sub/a.f": 'import("../b.f")\nfn(av()) { return "a+" + bv() }\nexport(av)\n',
+        ".nift/packages/demo/src/b.f": 'import("./c/d.f")\nfn(bv()) { return "b+" + dv() }\nexport(bv)\n',
+        ".nift/packages/demo/src/c/d.f": 'fn(dv()) { return "d" }\nexport(dv)\n',
+        "m.f": 'import("demo")\nprint(av())\n'}, expect="a+b+d\n")
+    # Kept provenance, then an absolute import (inside the package): that module has none (legacy's error).
+    root = tree({**package("demo", 'import("./rel.f")\nexport(o)\n'),
+                 ".nift/packages/demo/src/rel.f": "X", ".nift/packages/demo/src/abs.f":
+                 'import("./sib.f")\nfn(o()) { return s() }\nexport(o)\n', ".nift/packages/demo/src/sib.f": sib,
+                 "m.f": EARLY + 'import("demo")\nprint(o())\n'})
+    (root / ".nift/packages/demo/src/rel.f").write_text('import("%s/.nift/packages/demo/src/abs.f")\nexport(o)\n' % root)
+    vm, _ = run(["m.f"], root)
+    legacy, _ = run(["m.f"], root, "0")
+    check(vm.returncode == 1 and error_line(vm.stderr) == error_line(legacy.stderr) and
+          "no frozen package provenance" in vm.stderr, "R provenance kept, then absolute, then relative: legacy's error",
+          repr((vm.stderr, legacy.stderr)))
+    shutil.rmtree(root)
+    # An absolute import below a package whose module imports nothing relatively: fine (no false refusal).
+    root = tree({**package("demo", "X"), ".nift/packages/demo/src/abs.f": 'fn(o()) { return "abs" }\nexport(o)\n',
+                 "m.f": 'import("demo")\nprint(o())\n'})
+    (root / ".nift/packages/demo/src/main.f").write_text('import("%s/.nift/packages/demo/src/abs.f")\nexport(o)\n' % root)
+    vm, _ = run(["m.f"], root)
+    legacy, _ = run(["m.f"], root, "0")
+    check(vm.returncode == legacy.returncode == 0 and vm.stdout == legacy.stdout == "abs\n",
+          "R absolute import below a package without relative imports runs", repr((vm.stderr, legacy.stderr)))
+    shutil.rmtree(root)
     # The same with the absolute target outside the package (legacy's text, not "escapes").
     root = tree({**package("demo", "X"), "out/o.f": 'import("./sib.f")\nfn(o()) { return s() }\nexport(o)\n',
                  "out/sib.f": sib, "m.f": EARLY + 'import("demo")\nprint(o())\n'})

@@ -424,7 +424,9 @@ def main():
                         failures.append(f"{name}: output differs\n  legacy {legacy}\n  vm     {vm}")
                 else:
                     _, cst = run(nift, d, "classify", a.timeout)
-                    if not cst or cst["outcome"] != "fallback" or cst["reason"] != reason:
+                    # A program error (D-NEXT-packages, e.g. import-error:*) is classified as such.
+                    want = "program-error" if reason.startswith(("import-error:", "module-error:")) else "fallback"
+                    if not cst or cst["outcome"] != want or cst["reason"] != reason:
                         failures.append(f"{name}: expected refused ({reason}), got {cst and (cst['outcome'], cst['reason'])}")
                     else:
                         vm, st = run(nift, d, "1", a.timeout)

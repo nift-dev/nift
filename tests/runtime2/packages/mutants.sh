@@ -9,7 +9,7 @@
 #   4 package_resolve.cpp     the lock is never released (held while the program runs)
 #   5 package_resolve.cpp     no lock is taken (nor the journal checked)
 #   6 module_graph.cpp        every frame prefix spelled `import: `
-#   7 module_invocation.cpp   module top-level reads of the entry's args admitted
+#   7 module_scan.cpp         module top-level reads not checked in statement order (a later error wins)
 #   8 module_invocation.cpp   the init-reach closure is not followed (no fixed point)
 #   9 module_invocation.cpp   rename by spelling (modules without their own args renamed too)
 #  10 module_graph.cpp        no package-relative containment
@@ -38,7 +38,7 @@ fi
 fail=0
 for spec in 1:src/rt/package_resolve.cpp 2:src/rt/package_resolve.cpp 3:src/PackageTransaction.cpp \
             4:src/rt/package_resolve.cpp 5:src/rt/package_resolve.cpp 6:src/rt/module_graph.cpp \
-            7:src/rt/module_invocation.cpp 8:src/rt/module_invocation.cpp 9:src/rt/module_invocation.cpp \
+            7:src/rt/module_scan.cpp 8:src/rt/module_invocation.cpp 9:src/rt/module_invocation.cpp \
             10:src/rt/module_graph.cpp 11:src/rt/module_graph.cpp 12:src/rt/module_graph.cpp \
             13:src/rt/module_link.cpp 14:src/rt/module_link.cpp 15:src/rt/module_link.cpp \
             16:src/rt/module_graph.cpp 17:src/rt/module_scan.cpp 18:src/rt/module_link.cpp \

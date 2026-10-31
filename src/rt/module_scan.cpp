@@ -86,6 +86,9 @@ std::uint32_t invocation_read(const Ast& ast, NodeId statement, const std::vecto
     // As module_link's collect(): declared names, member keys and export
     // arguments are not reads; function and lambda bodies are not walked.
     std::uint32_t at = UINT32_MAX;
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 7  // test-only (packages/mutants.sh)
+    return at;
+#endif
     std::vector<NodeId> stack{statement};
     while (!stack.empty()) {
         const NodeId id = stack.back();

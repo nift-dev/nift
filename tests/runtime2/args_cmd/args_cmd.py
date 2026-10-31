@@ -303,10 +303,13 @@ def suite(root):
                                           ('print(%s)\n' % (name + '.join(",")' if name == "args" else name)
                                            if entry_names_it else 'print("main")\n'))
                 if exported:
+                    # Into the entry: legacy's own error at the import, a program error (D-NEXT-packages).
                     vm, rows = run([NIFT, "main.f", "a"], d, None, home)
-                    check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-ambiguous)" in vm.stderr
-                          and "lib.f:2:1" in vm.stderr and not any(r.get("vm_executions") for r in rows),
-                          label + ": refused before any effect at the export",
+                    check(vm.returncode == 1 and vm.stdout == "" and
+                          "main.f:2:1: import: export collides with existing binding: " + name + "\n" in vm.stderr
+                          and "not supported" not in vm.stderr and not any(r.get("vm_executions") for r in rows)
+                          and any(r.get("reason") == "import-scope:invocation-export" for r in rows),
+                          label + ": rejected before any effect with legacy's error at the import",
                           repr((vm.returncode, vm.stdout, vm.stderr[:240])))
                 else:
                     parity(label + ": the module's own binding, as legacy", [NIFT, "main.f", "a"], d, home)

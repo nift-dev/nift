@@ -24,6 +24,7 @@ import tempfile
 CASES = [
     {
         "name": "import-error:package",
+        "outcome": "program-error",  # D-NEXT-packages: an invalid program, not a VM gap
         "files": {"main.f": 'import("nopkg")\nprint(1)\n'},
         "first": "import-error:package",
         "certain": {"import-error:package"},
@@ -44,6 +45,7 @@ CASES = [
     },
     {
         "name": "import-error:missing",
+        "outcome": "program-error",
         "files": {"main.f": 'import("./nope.nft")\nprint(1)\n'},
         "first": "import-error:missing",
         "certain": {"import-error:missing"},
@@ -184,7 +186,7 @@ def check_case(nift, work, case):
         if every.get("outcome") != "compiled" or every.get("reasons"):
             return [f"classify-all expected compiled with no blockers, got {every.get('outcome')}/{every.get('reasons')}"]
         return []
-    if classify.get("outcome") != "fallback":
+    if classify.get("outcome") != case.get("outcome", "fallback"):
         problems.append(f"classify unexpectedly {classify.get('outcome')}/{classify.get('reason')}")
     if every_proc.returncode != 0 or every_proc.stdout:
         problems.append(f"classify-all executed or failed (exit {every_proc.returncode}, stdout {every_proc.stdout[:80]!r})")
