@@ -4,6 +4,7 @@
 
 #include "rt/natives/array_methods.h"
 #include "rt/natives/bytes_methods.h"
+#include "rt/natives/collection_methods.h"
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_ops.h"
 #include "rt/natives/host_stream_handles.h"
@@ -51,6 +52,8 @@ constexpr NativeFn kFunctions[] = {
     shared_mutex, shared_atomic_int, shared_atomic_bool, shared_channel, shared_send, shared_recv, shared_cancel,
     mutex_lock, mutex_try_lock, mutex_unlock, mutex_locked, mutex_get, mutex_set,
     atomic_load, atomic_store, atomic_exchange, atomic_fetch_add, atomic_fetch_sub, atomic_compare_exchange,
+    fn_map, fn_set, fn_stack, coll_get, coll_contains, coll_size, coll_empty, coll_contains, coll_size, coll_empty,
+    coll_top, coll_front, coll_contains, coll_size, coll_empty, fn_same,
 };
 
 constexpr BuiltinSpec kSpecs[] = {

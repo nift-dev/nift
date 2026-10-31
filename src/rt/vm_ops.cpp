@@ -177,6 +177,7 @@ std::int64_t binding_tag(const Value& value) {
         case Kind::String: return 4;
         case Kind::Function: return 4;  // legacy callables are tagged strings
         case Kind::Future: return 4;    // so are legacy futures (CP22, probe s6)
+        case Kind::Collection: return 4;  // and legacy collections ("\x1fnift:collection:N", D-063)
         case Kind::Array: return 5;
         case Kind::Object: return 6;
         case Kind::Bytes: return 7;

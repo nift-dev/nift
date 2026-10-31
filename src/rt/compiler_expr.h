@@ -101,6 +101,11 @@ private:
     bool collection_call(const Node& node, std::uint16_t dst, int method);
     bool comparator_sort(const Node& node, std::uint16_t dst, const Binding& binding);
     bool array_mutation(const Node& node, std::uint16_t dst, int method);
+    // D-063 (compiler_keyed.cpp): a map/set/stack method (-1: the receiver is
+    // not a collection; 0 refused; 1 compiled) and its bare-binding mutators.
+    int keyed_method_call(const Node& node, std::uint16_t dst);
+    bool keyed_mutation(const Node& node, std::uint16_t dst, int method);
+    bool keyed_read_call(const Node& node, std::uint16_t dst, int method);
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);

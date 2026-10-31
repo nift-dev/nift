@@ -19,6 +19,14 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
             if ((k_arg & kKindUnknown) && !unknown_defers(k_arg))
                 return fail(arg, "builtin-plain-arg:" + std::string(spec.name));
         }
+    // D-063 / D-040 #4: same() compares identity. Shared concurrency handles
+    // and task handles are identity values here but an error in legacy: not
+    // compiled (no unapproved difference). Ordinary values (arrays, objects,
+    // structs, collections) are the approved D-040 #4 error at run time.
+    if (spec.id == natives::BuiltinId::FnSame)
+        for (std::uint32_t k = 0; k < node.count; ++k)
+            if (kinds(args[k]) & (kKindShared | kKindTask))
+                return fail(ast_.at(args[k]), "same:shared-handle");
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));

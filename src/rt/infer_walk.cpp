@@ -1,4 +1,5 @@
 #include "rt/infer_walk.h"
+#include "rt/aggregate.h"
 
 #include "rt/number.h"
 #include "rt/session_mutation_shape.h"
@@ -26,6 +27,10 @@ KindSet Inference::value_kinds(const Value& v) {
     if (v.is(Kind::Bool)) return kKindBool;
     if (v.is(Kind::String)) return kKindString;
     if (v.is_number()) return number_is_integer(v) ? kKindInt : kKindFrac;
+    if (v.is(Kind::Collection)) {  // D-063: a struct field initialised with map()/set()/stack()
+        const CollectionKind k = collection_kind(v);
+        return k == CollectionKind::Map ? kKindMap : k == CollectionKind::Set ? kKindSet : kKindStack;
+    }
     return kKindAll;
 }
 

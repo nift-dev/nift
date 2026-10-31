@@ -20,6 +20,9 @@ Receiver receiver_family(KindSet kinds) {
     if (kinds == kKindMutex) return Receiver::Mutex;
     if ((kinds & ~kKindAtomic) == 0) return Receiver::Atomic;
     if (kinds == kKindChannel) return Receiver::Channel;
+    if (kinds == kKindMap) return Receiver::Map;      // D-063
+    if (kinds == kKindSet) return Receiver::Set;
+    if (kinds == kKindStack) return Receiver::Stack;
     return Receiver::None;
 }
 

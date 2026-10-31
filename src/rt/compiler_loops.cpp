@@ -45,8 +45,15 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     const Node& iterable = ast_.at(header.a);
     const KindSet source_kinds = kinds(header.a);
     const bool unknown = (source_kinds & kKindUnknown) != 0;
-    const bool has_array = (source_kinds & kKindArray) != 0;
-    const bool has_object = (source_kinds & kKindObject) != 0;
+    // D-063: a map/set/stack is iterated as legacy does: a set or a stack as
+    // a snapshot array of its members (a stack top first), a map by its typed
+    // entries (pair form). The snapshot is taken at the header (a value: the
+    // body's mutations of the collection are not seen; legacy materialises
+    // sets and stacks the same way and iterates a map's live entry vector).
+    const bool keyed = source_kinds == kKindMap || source_kinds == kKindSet || source_kinds == kKindStack;
+    if (!unknown && (source_kinds & kKindCollection) && !keyed) return fail(node, "for-collection");
+    const bool has_array = (source_kinds & kKindArray) != 0 || (keyed && source_kinds != kKindMap);
+    const bool has_object = (source_kinds & kKindObject) != 0 || source_kinds == kKindMap;
     if (unknown) return fail(node, "type:for-source");
     if (has_array && has_object) return fail(node, "type:for-source-union");
 
@@ -56,17 +63,17 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     else if (state.pair && has_object) state.mode = 1;
     else if (!has_array && !has_object) state.force_mode = 2;
     else if (state.pair && has_array) state.force_mode = 3;
-    else state.force_mode = 4;  // single over an object
+    else state.force_mode = source_kinds == kKindMap ? 5 : 4;  // single over an object (5: a map)
     state.error_only = state.force_mode >= 0;
 
-    if (!state.error_only) for_source_binding(iterable, state.place);
+    if (!state.error_only && !keyed) for_source_binding(iterable, state.place);
     if (state.place != nullptr) {
         // Keep binding identity stable: declaring the loop name below can
         // reallocate the scope vector and must not scroll the source binding.
         state.source_holder = *state.place;
         state.place = &state.source_holder;
     }
-    if (iterable.kind == NodeKind::Ident) state.source_name = text(iterable);
+    if (iterable.kind == NodeKind::Ident && !keyed) state.source_name = text(iterable);
     state.live = !state.error_only && state.place != nullptr;
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1
     state.snapshot_mutant = state.live;  // M1: a snapshot instead of live re-reads

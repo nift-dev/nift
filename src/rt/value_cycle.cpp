@@ -109,7 +109,7 @@ private:
                 return;
             }
             case Kind::Handle: visit_handle(v); return;
-            case Kind::Array: case Kind::Object: case Kind::Struct: visit_aggregate(v); return;
+            case Kind::Array: case Kind::Object: case Kind::Struct: case Kind::Collection: visit_aggregate(v); return;
             default: return;
         }
     }
@@ -138,6 +138,8 @@ private:
             for (const Value& child : array_items(v)) consider(child, any);
         } else if (v.is(Kind::Object)) {
             for (const auto& entry : object_entries(v)) consider(entry.second, any);
+        } else if (v.is(Kind::Collection)) {  // D-063
+            for (const Value& child : collection_items(v)) consider(child, any);
         } else {
             for (const auto& field : struct_fields(v)) consider(field.second, any);
         }

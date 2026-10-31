@@ -90,4 +90,29 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         default:return any_ty();
     }
 }
+// D-063: map/set/stack methods. A store through a bare binding widens that
+// binding's element type (map values, stack elements); with value semantics
+// (copies never share) the per-binding element type is sound. Set members are
+// scalars by legacy's rule (any other value is a run-time error).
+TyRef Inference::keyed_result(const Node& n,const TyRef& recv,const std::vector<TyRef>& values,
+                              std::string_view name) {
+    const NodeId receiver=ast_.at(n.a).a;
+    const auto element=[&]{TyRef e=element_of(recv,nullptr,false);
+        if(recv->kinds==kKindSet)return kinds_ty(kKindBool|kKindNumber|kKindString);
+        return e;};
+    if(name=="stringify"||name=="prettify"||name=="highlight")return kinds_ty(kKindString);
+    if(name=="size")return kinds_ty(kKindInt);
+    if(name=="empty"||name=="contains")return kinds_ty(kKindBool);
+    if(name=="clear")return kinds_ty(kKindNull);
+    if(recv->kinds==kKindMap) {
+        if(name=="set"){if(values.size()==2){add_element(receiver,values[1]);return values[1];}return any_ty();}
+        if(name=="get"||name=="remove")return element();
+    } else if(recv->kinds==kKindSet) {
+        if((name=="add"||name=="remove")&&values.size()==1)return values[0];
+    } else if(recv->kinds==kKindStack) {
+        if(name=="push"){if(values.size()==1){add_element(receiver,values[0]);return values[0];}return any_ty();}
+        if(name=="pop"||name=="top"||name=="front")return element();
+    }
+    return any_ty();
+}
 } // namespace nift::rt::infer_detail

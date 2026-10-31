@@ -108,6 +108,17 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
             return struct_type(left) == struct_type(right) && struct_fields(left).size() == struct_fields(right).size()
                        ? Shallow::Descend
                        : Shallow::Unequal;
+        case Kind::Collection: {  // D-063, legacy's per-kind rules (ParserExpression.cpp structural_equal)
+            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+            const CollectionKind k = collection_kind(left);
+            if (k != collection_kind(right) || collection_size(left) != collection_size(right))
+                return Shallow::Unequal;
+            if (k != CollectionKind::Set) return collection_size(left) ? Shallow::Descend : Shallow::Equal;
+            // Set members are scalars: size plus membership decides.
+            for (const Value& member : collection_items(left))
+                if (collection_find(right, member) < 0) return Shallow::Unequal;
+            return Shallow::Equal;
+        }
         case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
         case Kind::Function: same = left.heap() == right.heap(); break;
         case Kind::Future: same = future_identity(left) == future_identity(right); break;  // identity
@@ -152,13 +163,25 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
         const Value& l = *top.left;
         const bool array = l.is(Kind::Array);
         const bool instance = l.is(Kind::Struct);
-        if (top.next == (array ? array_size(l) : instance ? struct_fields(l).size() : object_size(l))) {
+        const bool collection = l.is(Kind::Collection);  // a stack (in order) or a map (by key)
+        if (top.next == (array ? array_size(l) : instance ? struct_fields(l).size()
+                                               : collection ? collection_size(l) : object_size(l))) {
             open.pop_back();
             continue;
         }
         const Value* a = nullptr;
         const Value* b = nullptr;
-        if (array) {
+        if (collection) {
+            const auto& items = collection_items(l);
+            if (collection_kind(l) == CollectionKind::Stack) {
+                a = &items[top.next];
+                b = &collection_items(*top.right)[top.next];
+            } else {  // map: the entry with an equal key, then the values
+                a = &items[top.next * 2 + 1];
+                const std::ptrdiff_t at = collection_find(*top.right, items[top.next * 2]);
+                b = at < 0 ? nullptr : &collection_items(*top.right)[static_cast<std::size_t>(at) * 2 + 1];
+            }
+        } else if (array) {
             a = &array_items(l)[top.next];
             b = &array_items(*top.right)[top.next];
         } else if (instance) {  // same type: same field order (declaration order)
@@ -214,7 +237,7 @@ bool truthy(const Value& value) {
         case Kind::Bytes: return !bytes_of(value).empty();
         case Kind::Array: return array_size(value) != 0;
         case Kind::Object: return object_size(value) != 0;
-        default: return true;  // functions, structs, handles, errors
+        default: return true;  // collections (legacy: a non-empty marker string), functions, structs, ...  // functions, structs, handles, errors
     }
 }
 
@@ -233,6 +256,10 @@ std::uint64_t leaf_hash(const Value& value) {
         case Kind::Future: return mix(14, reinterpret_cast<std::uintptr_t>(future_identity(value)));
         case Kind::Error: return mix(13, hash_text(value.heap_as<ErrorObject>()->message));
         case Kind::Handle: return mix(mix(12, value.handle_id()), value.handle_generation());
+        // D-063: equal collections have the same kind and size (contents are
+        // order-independent for maps and sets, so they are not folded in).
+        case Kind::Collection:
+            return mix(mix(15, static_cast<std::uint64_t>(collection_kind(value))), collection_size(value));
         default: return mix(static_cast<std::uint64_t>(value.kind()), reinterpret_cast<std::uintptr_t>(value.heap()));
     }
 }

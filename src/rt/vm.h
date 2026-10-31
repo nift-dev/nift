@@ -260,6 +260,7 @@ private:
     bool pop_handlers_for_frame(std::size_t depth, Fault& fault);
     bool origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
     bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
+    bool op_keyed_mutate(const Instr&, Value*, Fault&, const Proto*);  // D-063 (vm_keyed.cpp)
     bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,
                           Fault& fault);
     bool collection(const Instr&,Value*,Fault&,const Proto*);

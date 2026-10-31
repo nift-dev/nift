@@ -16,7 +16,7 @@ const TyRef& empty_ty() {
 const TyRef& top_ty() {
     static const TyRef a = [] {
         auto t = std::make_shared<Ty>();
-        t->kinds = kKindAll;
+        t->kinds = kKindAll | kKindCollection;  // D-063: a collection may be anywhere below
         t->any = true;
         return TyRef(t);
     }();
@@ -120,6 +120,8 @@ TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long po
     } else if (!by_member && (t->kinds & kKindArray) && t->elem) {
         out = unite(out, t->elem);
     }
+    // D-063: a map's values or a stack's elements (set members are scalars).
+    if (!by_member && (t->kinds & kKindCollection) && !(t->kinds & kKindArray) && t->elem) out = unite(out, t->elem);
     if (t->kinds & kKindObject) {
         if(t->elem)out=unite(out,t->elem);
         if (key) {

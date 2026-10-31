@@ -31,6 +31,7 @@ static_assert(natives::kBytes == kKindBytes, "the bytes bit must match CP12's By
 static_assert(natives::kHandle == kKindHandle && natives::kFile == kKindFile &&
                   natives::kStream == kKindStream,
               "CP17 handle bits must match CP12's kind bits");
+static_assert(natives::kMap == kKindMap && natives::kSet == kKindSet && natives::kStack == kKindStack);
 static_assert(natives::kMutex == kKindMutex && natives::kAtomicInt == kKindAtomicInt &&
                   natives::kAtomicBool == kKindAtomicBool && natives::kChannel == kKindChannel,
               "CP23 shared kinds must match CP12's kind bits");

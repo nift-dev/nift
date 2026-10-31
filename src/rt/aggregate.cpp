@@ -1,5 +1,6 @@
 #include "rt/aggregate.h"
 
+#include "rt/compare.h"
 #include "rt/heap_account.h"
 
 #include <cstdlib>
@@ -46,6 +47,11 @@ void relocate_storage(HeapObject* object) {
         auto* o = static_cast<ObjectObject*>(object);
         relocate(o->entries);
         relocate(o->index);
+    }
+    if (object->kind() == Kind::Collection) {
+        auto* c = static_cast<CollectionObject*>(object);
+        relocate(c->items);
+        relocate(c->index);
     }
 }
 
@@ -139,6 +145,17 @@ bool unshare(Value& value) {
         auto* st = new StructObject(source->type_name);
         copy.reset(st);
         st->fields = source->fields;
+    } else if (value.is(Kind::Collection)) {
+        const auto* source = value.heap_as<CollectionObject>();
+        auto* c = new CollectionObject(source->sub);
+        copy.reset(c);
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 1
+        // M1: an observable copy-on-write: the "clone" is the shared original.
+        copy.reset();
+        return false;
+#endif
+        c->items = source->items;
+        c->index = source->index;
     } else {
         return false;
     }
@@ -286,6 +303,147 @@ Value* struct_slot_mut(Value& instance, Atom field) {
     auto* s = instance.heap_as<StructObject>();
     mark_may_hold_identity(s);
     return &s->fields[static_cast<std::size_t>(field_position(*s, field))].second;
+}
+
+} // namespace nift::rt
+
+// ---- Weekend collections (D-063) ----
+namespace nift::rt {
+namespace {
+
+bool keyed(const CollectionObject& c) { return c.sub != CollectionKind::Stack; }
+std::size_t stride(const CollectionObject& c) { return c.sub == CollectionKind::Map ? 2 : 1; }
+std::size_t entries(const CollectionObject& c) { return c.items.size() / stride(c); }
+const Value& key_at(const CollectionObject& c, std::size_t entry) { return c.items[entry * stride(c)]; }
+
+void reindex(CollectionObject& c) {
+    const std::size_t n = entries(c);
+    if (!keyed(c) || n < CollectionObject::kIndexThreshold) { c.index.clear(); return; }
+    std::size_t capacity = 16;
+    while (capacity < n * 2) capacity <<= 1;
+    c.index.assign(capacity, 0);
+    const std::size_t mask = capacity - 1;
+    for (std::size_t i = 0; i < n; ++i) {
+        std::size_t slot = static_cast<std::size_t>(hash(key_at(c, i))) & mask;
+        while (c.index[slot] != 0) slot = (slot + 1) & mask;
+        c.index[slot] = static_cast<std::uint32_t>(i + 1);
+    }
+}
+
+std::ptrdiff_t find_entry(const CollectionObject& c, const Value& key) {
+    if (!keyed(c)) return -1;
+    if (c.index.empty()) {
+        for (std::size_t i = 0, n = entries(c); i < n; ++i)
+            if (equal(key_at(c, i), key)) return static_cast<std::ptrdiff_t>(i);
+        return -1;
+    }
+    const std::size_t mask = c.index.size() - 1;
+    for (std::size_t slot = static_cast<std::size_t>(hash(key)) & mask;; slot = (slot + 1) & mask) {
+        const std::uint32_t at = c.index[slot];
+        if (at == 0) return -1;
+        if (equal(key_at(c, at - 1), key)) return static_cast<std::ptrdiff_t>(at - 1);
+    }
+}
+
+// A new entry was appended: index it (or build the index at the threshold).
+void index_appended(CollectionObject& c) {
+    const std::size_t n = entries(c);
+    if (n == CollectionObject::kIndexThreshold || n * 2 > c.index.size()) { reindex(c); return; }
+    if (c.index.empty()) return;
+    const std::size_t mask = c.index.size() - 1;
+    std::size_t slot = static_cast<std::size_t>(hash(key_at(c, n - 1))) & mask;
+    while (c.index[slot] != 0) slot = (slot + 1) & mask;
+    c.index[slot] = static_cast<std::uint32_t>(n);
+}
+
+CollectionObject& collection_mut(Value& collection) {
+    if (!unshare(collection)) relocate_storage(collection.heap());
+    return *collection.heap_as<CollectionObject>();
+}
+
+} // namespace
+
+Value make_collection(CollectionKind kind) {
+    auto* c = new CollectionObject(kind);
+    heap_retally(c);
+    return Value::adopt(c);
+}
+
+CollectionKind collection_kind(const Value& collection) { return collection.heap_as<CollectionObject>()->sub; }
+
+std::size_t collection_size(const Value& collection) { return entries(*collection.heap_as<CollectionObject>()); }
+
+const std::vector<Value>& collection_items(const Value& collection) {
+    return collection.heap_as<CollectionObject>()->items;
+}
+
+std::ptrdiff_t collection_find(const Value& collection, const Value& key) {
+    return find_entry(*collection.heap_as<CollectionObject>(), key);
+}
+
+void map_set(Value& map, Value key, Value value) {
+    const std::ptrdiff_t at = find_entry(*map.heap_as<CollectionObject>(), key);
+    CollectionObject& c = collection_mut(map);
+    check_not_self(&c, value);
+    note_store(&c, value);
+    if (at >= 0) {
+        c.items[static_cast<std::size_t>(at) * 2 + 1] = static_cast<Value&&>(value);
+        heap_retally(map.heap());
+        return;
+    }
+    c.items.push_back(static_cast<Value&&>(key));
+    c.items.push_back(static_cast<Value&&>(value));
+    index_appended(c);
+    heap_retally(map.heap());
+}
+
+void set_add(Value& set, Value member) {
+    if (find_entry(*set.heap_as<CollectionObject>(), member) >= 0) return;
+    CollectionObject& c = collection_mut(set);
+    c.items.push_back(static_cast<Value&&>(member));
+    index_appended(c);
+    heap_retally(set.heap());
+}
+
+void collection_erase(Value& collection, std::size_t position) {
+    CollectionObject& c = collection_mut(collection);
+    const std::size_t s = stride(c);
+    c.items.erase(c.items.begin() + static_cast<std::ptrdiff_t>(position * s),
+                  c.items.begin() + static_cast<std::ptrdiff_t>(position * s + s));
+    reindex(c);
+    heap_retally(collection.heap());
+}
+
+void stack_push(Value& stack, Value item) {
+    CollectionObject& c = collection_mut(stack);
+    check_not_self(&c, item);
+    note_store(&c, item);
+    c.items.push_back(static_cast<Value&&>(item));
+    heap_retally(stack.heap());
+}
+
+void stack_pop(Value& stack) {
+    CollectionObject& c = collection_mut(stack);
+    c.items.pop_back();
+    heap_retally(stack.heap());
+}
+
+void collection_clear(Value& collection) {
+    CollectionObject& c = collection_mut(collection);
+    c.items.clear();
+    c.index.clear();
+    heap_retally(collection.heap());
+}
+
+void rebuild_collection_index(CollectionObject& collection) { reindex(collection); }
+
+const char* collection_kind_name(CollectionKind kind) {
+    switch (kind) {
+        case CollectionKind::Map: return "map";
+        case CollectionKind::Set: return "set";
+        case CollectionKind::Stack: return "stack";
+    }
+    return "collection";
 }
 
 } // namespace nift::rt

@@ -333,7 +333,7 @@ VmResult Vm::run(std::string& output) {
     OP(SessionRender) { if (!op_session_render(*pc, R, result, fault, proto)) FAIL(); NEXT(); }
     OP(TopReturn) { if (!op_top_return(*pc, R, result, fault, proto)) FAIL(); CORO_END }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); CORO_END }
-    OP(ArrayMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
+    OP(ArrayMutate) OP(KeyedMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
     OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }

@@ -87,6 +87,14 @@ inline constexpr KindSet kKindAtomicBool = 1u << 18;
 inline constexpr KindSet kKindAtomic = kKindAtomicInt | kKindAtomicBool;
 inline constexpr KindSet kKindChannel = 1u << 19;
 inline constexpr KindSet kKindShared = kKindMutex | kKindAtomic | kKindChannel;
+// Weekend collections (D-063): map(), set() and stack() values (rt::Kind::
+// Collection). Outside kKindAll like the handle bits, so no generic value
+// operation admits one by accident; top_ty (every kind at every depth)
+// includes them, so a collection can never hide behind "anything".
+inline constexpr KindSet kKindMap = 1u << 20;
+inline constexpr KindSet kKindSet = 1u << 21;
+inline constexpr KindSet kKindStack = 1u << 22;
+inline constexpr KindSet kKindCollection = kKindMap | kKindSet | kKindStack;
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -103,6 +111,8 @@ static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
 static_assert(kKindMutex == (1u << 16) && kKindAtomicInt == (1u << 17) &&
               kKindAtomicBool == (1u << 18) && kKindChannel == (1u << 19));
 static_assert((kKindAll & kKindShared) == 0 && (kKindUnknown & kKindShared) == 0);
+static_assert((kKindAll & kKindCollection) == 0 && (kKindShared & kKindCollection) == 0 &&
+              (kKindCollection & (kKindHandle | kKindFile | kKindStream | kKindTask | kKindUnknown)) == 0);
 
 struct SessionInferenceProof {
     std::unordered_set<std::uint64_t> historical_calls;

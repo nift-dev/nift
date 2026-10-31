@@ -91,6 +91,8 @@ private:
     // be, enqueue the ones that grew, and return the union of their returns.
     TyRef collection_callables(const TyRef&,const std::vector<TyRef>&,bool&);
     TyRef collection_result(const Node&, const TyRef&, const std::vector<TyRef>&, int);
+    // D-063: a method of a map/set/stack value (stores widen the binding's element type).
+    TyRef keyed_result(const Node&, const TyRef&, const std::vector<TyRef>&, std::string_view);
     TyRef call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew);
     // The unit of a lambda expression, creating it on first sight.
     std::size_t lambda_unit(NodeId node);

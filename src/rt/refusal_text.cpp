@@ -38,6 +38,13 @@ constexpr Family kFamilies[] = {
     {"export-struct", "exporting a struct from a module"},
     {"coro-", "this coroutine or async usage"},
     {"interpolation:", "this string interpolation (%)"},
+    // D-063 collections (bounded subset)
+    {"for-collection", "a for loop over a map, set or stack"},
+    {"collection-receiver:", "`.%()` on a value that may be different kinds of collection or other values"},
+    {"collection-callback:", "the callback method `.%()` on a map, set or stack"},
+    {"collection-const", "mutating a const map, set or stack"},
+    {"collection-loop-binding", "mutating a map, set or stack through a loop binding"},
+    {"same:shared-handle", "`same()` on a mutex, atomic, channel, future or thread"},
     {"context:", "a context-dependent legacy behaviour (%)"},
     {"struct-", "this struct feature"},
     {"session:", "this statement in an interactive session (%)"},

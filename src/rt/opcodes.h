@@ -110,6 +110,7 @@ namespace nift::rt {
     X(CollectionStep) /* private CP14B state-window operation */ \
     X(CollectionCall) /* checked ordinary-frame collection callback */ \
     X(ArrayMutate) /* synchronous bare-binding mutation */ \
+    X(KeyedMutate) /* D-063: map/set/stack bare-binding mutation (rt/keyed.h) */ \
     X(SessionRender) /* append a compound REPL statement value, never stdout */ \
     X(SessionNumeric) /* CP19 numeric operand guard for widened readers */ \
     X(Spawn)      /* R[a] = future of protos[b](R[a] .. ); c: argc, bit 15: + argc type regs (CP22) */ \

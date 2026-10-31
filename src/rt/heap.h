@@ -110,6 +110,23 @@ struct StructObject : HeapObject {
     explicit StructObject(Atom type) : HeapObject(Kind::Struct), type_name(type) {}
 };
 
+// Weekend collections (D-063): map(), set() and stack() are ordinary values
+// with copy-on-write, exactly like arrays (D-040): copies share the object
+// until one is mutated through rt::collection_* (aggregate.h), which clones it
+// first when it is shared. `items` holds, for a map, key/value pairs flattened
+// (key at 2i, value at 2i + 1, insertion order); for a set its members
+// (insertion order); for a stack its elements bottom to top. Map keys and set
+// members are bool, number or string (legacy's rule). From kIndexThreshold
+// entries an open-addressing index (rt::hash of the key -> entry + 1) is kept.
+enum class CollectionKind : std::uint8_t { Map, Set, Stack };
+struct CollectionObject : HeapObject {
+    static constexpr std::size_t kIndexThreshold = 8;
+    CollectionKind sub;
+    std::vector<Value> items;
+    std::vector<std::uint32_t> index;  // map/set only; empty below the threshold
+    explicit CollectionObject(CollectionKind k) : HeapObject(Kind::Collection), sub(k) {}
+};
+
 // Immutable error value (legacy RuntimeErrorData): message, code, category,
 // origin and an optional cause chain (at most 16 links).
 struct ErrorObject : HeapObject {

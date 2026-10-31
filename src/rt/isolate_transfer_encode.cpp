@@ -75,6 +75,10 @@ private:
                 break;
             case Kind::Array: node.kind = WireKind::Array; break;
             case Kind::Object: node.kind = WireKind::Object; break;
+            case Kind::Collection:  // D-063: a value, copied like an array
+                node.kind = WireKind::Collection;
+                node.binding_type = static_cast<std::int64_t>(collection_kind(value));
+                break;
             case Kind::Struct:
                 node.kind = WireKind::Struct;
                 node.name = std::string(atom_text(struct_type(value)));
@@ -183,6 +187,14 @@ private:
     }
     TransferStatus add_children(const Value& value, std::uint32_t id, std::string& error) {
         switch (value.kind()) {
+            case Kind::Collection:
+                for (const Value& child : collection_items(value)) {
+                    std::uint32_t child_id = 0;
+                    TransferStatus status = add(child, child_id, error);
+                    if (status != TransferStatus::Ok) return status;
+                    nodes_[id].children.push_back(child_id);
+                }
+                return TransferStatus::Ok;
             case Kind::Array:
                 for (const Value& child : array_items(value)) {
                     std::uint32_t child_id = 0;

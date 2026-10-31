@@ -207,3 +207,23 @@ NIFT_RT_BUILTIN(AtomicExchange, "exchange", Atomic, 1, 1, kInt | kBool, Fixed, f
 NIFT_RT_BUILTIN(AtomicFetchAdd, "fetch_add", Atomic, 1, 1, kInt, Fixed, false, 100)
 NIFT_RT_BUILTIN(AtomicFetchSub, "fetch_sub", Atomic, 1, 1, kInt, Fixed, false, 100)
 NIFT_RT_BUILTIN(AtomicCompareExchange, "compare_exchange", Atomic, 2, 2, kBool, Fixed, false, 100)
+
+// ---- Weekend collections (D-063): map/set/stack values and same() ----
+// Constructors take no arguments (legacy: exactly `map()`); mutators are
+// compiled onto the bare binding (KeyedMutate), not natives.
+NIFT_RT_BUILTIN(FnMap, "map", None, 0, 0, kMap, Fixed, false, 100)
+NIFT_RT_BUILTIN(FnSet, "set", None, 0, 0, kSet, Fixed, false, 100)
+NIFT_RT_BUILTIN(FnStack, "stack", None, 0, 0, kStack, Fixed, false, 100)
+NIFT_RT_BUILTIN(MapGet, "get", Map, 1, 1, kAny, ElementOf, true, 100)
+NIFT_RT_BUILTIN(MapContains, "contains", Map, 1, 1, kBool, Fixed, false, 100)
+NIFT_RT_BUILTIN(MapSize, "size", Map, 0, 0, kInt, Fixed, false, 60)
+NIFT_RT_BUILTIN(MapEmpty, "empty", Map, 0, 0, kBool, Fixed, false, 60)
+NIFT_RT_BUILTIN(SetContains, "contains", Set, 1, 1, kBool, Fixed, true, 100)
+NIFT_RT_BUILTIN(SetSize, "size", Set, 0, 0, kInt, Fixed, false, 60)
+NIFT_RT_BUILTIN(SetEmpty, "empty", Set, 0, 0, kBool, Fixed, false, 60)
+NIFT_RT_BUILTIN(StackTop, "top", Stack, 0, 0, kAny, ElementOf, true, 60)
+NIFT_RT_BUILTIN(StackFront, "front", Stack, 0, 0, kAny, ElementOf, true, 60)
+NIFT_RT_BUILTIN(StackContains, "contains", Stack, 1, 1, kBool, Fixed, false, 100)
+NIFT_RT_BUILTIN(StackSize, "size", Stack, 0, 0, kInt, Fixed, false, 60)
+NIFT_RT_BUILTIN(StackEmpty, "empty", Stack, 0, 0, kBool, Fixed, false, 60)
+NIFT_RT_BUILTIN(FnSame, "same", None, 2, 2, kBool, Fixed, true, 100)

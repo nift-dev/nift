@@ -76,8 +76,35 @@ Value* array_slot_mut(Value& array, std::size_t index);
 Value* object_slot_mut(Value& object, Atom key);
 Value* struct_slot_mut(Value& instance, Atom field);
 
-// Makes `value` (Array, Object or Struct) uniquely owned; returns true if it
-// cloned. The clone keeps the identity summary bit.
+// Weekend collections (D-063): map(), set() and stack() values. Same
+// copy-on-write and reference contract as arrays: every mutator below unshares
+// first (a shared collection is cloned shallowly; nested values stay shared
+// until they are mutated themselves), so copies are deep in effect and never
+// observably share. Map keys and set members must be bool, number or string
+// (the caller checks; legacy's error texts). Keys compare with rt::equal
+// (1 == 1.0, "1" != 1, true != 1, NaN never matches, so each NaN is new).
+Value make_collection(CollectionKind kind);
+CollectionKind collection_kind(const Value& collection);
+// Entries for a map, members/elements otherwise.
+std::size_t collection_size(const Value& collection);
+const std::vector<Value>& collection_items(const Value& collection);
+// Map/set: the entry (map) or member (set) position of `key`, or -1.
+std::ptrdiff_t collection_find(const Value& collection, const Value& key);
+// Map: insert at the end or replace the value in place (position kept).
+void map_set(Value& map, Value key, Value value);
+// Set: append `member` unless an equal member is present.
+void set_add(Value& set, Value member);
+// Map/set: erase entry/member `position` (order of the others kept).
+void collection_erase(Value& collection, std::size_t position);
+void stack_push(Value& stack, Value item);
+void stack_pop(Value& stack);
+void collection_clear(Value& collection);
+const char* collection_kind_name(CollectionKind kind);
+// Rebuilds the key index from `items` (decoders that fill items directly).
+void rebuild_collection_index(CollectionObject& collection);
+
+// Makes `value` (Array, Object, Struct or Collection) uniquely owned; returns
+// true if it cloned. The clone keeps the identity summary bit.
 bool unshare(Value& value);
 
 // O(1): a callable, a handle, or an aggregate whose identity summary bit is
@@ -86,7 +113,8 @@ bool unshare(Value& value);
 inline bool may_contain_identity(const Value& value) noexcept {
     switch (value.kind()) {
         case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: return true;
-        case Kind::Array: case Kind::Object: case Kind::Struct: return may_hold_identity(value.heap());
+        case Kind::Array: case Kind::Object: case Kind::Struct: case Kind::Collection:
+            return may_hold_identity(value.heap());
         default: return false;
     }
 }

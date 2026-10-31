@@ -171,6 +171,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
+    if (int r = keyed_method_call(node, dst); r >= 0) return r == 1;  // D-063 map/set/stack
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;
     if (int r = future_method(node, dst); r >= 0) return r == 1;  // CP22
     if (error_method_call(node, dst, name, callee.a)) return true;

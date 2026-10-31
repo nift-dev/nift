@@ -63,6 +63,7 @@ private:
         Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Struct, Error, Cell, Function,
         SharedHandle,  // CP23: registry id, never a live VM heap object
         TaskHandle,    // CP23: shared ParallelTaskRecord identity, never a FutureObject pointer
+        Collection,    // D-063: map/set/stack (sub-kind in binding_type); children are its items
     };
 
     struct Node {

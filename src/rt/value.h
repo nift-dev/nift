@@ -26,7 +26,12 @@ Value make_string(std::string_view text);  // rt/string.h; befriended for inline
 // after Array (rt/aggregate.cpp relies on it for a one-compare fast path).
 enum class Kind : std::uint8_t {
     Null, Bool, Int, Double, Decimal, String, Bytes, Array, Object, Function, Struct, Handle, Error, Cell,
-    Future  // CP22: the value an async call returns (rt/future.h); the last free 4-bit tag
+    Future,  // CP22: the value an async call returns (rt/future.h)
+    // Weekend collections (D-063): map(), set() and stack() values (rt/heap.h
+    // CollectionObject, sub-kind in the object). This takes the LAST free
+    // 4-bit tag (15): a further kind needs the tag mask widened (bits 4-6 of
+    // HeapObject::tag are unused; bit 7 is the identity summary).
+    Collection
 };
 const char* kind_name(Kind kind);
 
@@ -50,7 +55,10 @@ static_assert(sizeof(HeapObject) == 8, "HeapObject header must stay 8 bytes");
 static_assert(static_cast<unsigned>(Kind::Cell) <= HeapObject::kKindMask, "every Kind must fit the tag's low bits");
 static_assert(static_cast<unsigned>(Kind::Cell) == 13, "Cell is the 14th kind");
 static_assert(static_cast<unsigned>(Kind::Future) == 14 && static_cast<unsigned>(Kind::Future) <= HeapObject::kKindMask,
-              "Future is the 15th kind (4-bit tag; one value remains)");
+              "Future is the 15th kind");
+static_assert(static_cast<unsigned>(Kind::Collection) == 15 &&
+                  static_cast<unsigned>(Kind::Collection) == HeapObject::kKindMask,
+              "Collection is the 16th kind and uses the last value of the 4-bit tag (D-063)");
 void destroy_heap_object(HeapObject* object) noexcept;
 
 // Handle kinds are typed tags, never strings (decision 5). Values carry
@@ -215,6 +223,7 @@ private:
         switch (k) {
             case Kind::Decimal: case Kind::String: case Kind::Bytes: case Kind::Array: case Kind::Object:
             case Kind::Function: case Kind::Struct: case Kind::Error: case Kind::Cell: case Kind::Future:
+            case Kind::Collection:
                 return true;
             default: return false;
         }

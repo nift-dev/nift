@@ -8,6 +8,7 @@ bool Vm::collection(const Instr& in,Value* R,Fault& fault,const Proto* proto) {
         case OpCode::CollectionStep:return op_collection_step(in,R,fault);
         case OpCode::CollectionSort:return op_collection_sort(in,R,fault,proto);
         case OpCode::ArrayMutate:return op_array_mutate(in,R,fault,proto);
+        case OpCode::KeyedMutate:return op_keyed_mutate(in,R,fault,proto);
         default:return internal(fault,"collection opcode");
     }
 }

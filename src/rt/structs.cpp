@@ -1,4 +1,5 @@
 #include "rt/structs.h"
+#include "rt/aggregate.h"
 
 #include "rt/literal.h"
 #include "rt/native.h"
@@ -28,6 +29,15 @@ bool constant(const Ast& ast, NodeId id, Value& out) {
         case NodeKind::True: out = Value::boolean(true); return true;
         case NodeKind::False: out = Value::boolean(false); return true;
         case NodeKind::Null: out = Value::null(); return true;
+        case NodeKind::Call: {  // D-063: `map()`, `set()`, `stack()` (an empty value; copies never share)
+            const std::string_view t = ast.text(n);
+            if (n.count != 0) return false;
+            if (t == "map()") out = make_collection(CollectionKind::Map);
+            else if (t == "set()") out = make_collection(CollectionKind::Set);
+            else if (t == "stack()") out = make_collection(CollectionKind::Stack);
+            else return false;
+            return true;
+        }
         case NodeKind::Unary:
             return n.op == Op::Neg && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Number &&
                    decode_negative_number_literal(ast.text(ast.at(n.a)), out) == NegativeLiteral::Decoded;
