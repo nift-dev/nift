@@ -690,7 +690,8 @@ def main():
             status, out = run_tty(nift, d, args, {}, typed)
             diag = (f"error: {path}:5:6: NIFT_VM session refused: {REASON}: {RUN_FEATURE} is not supported by the "
                     "Runtime 2.0 VM yet\n" + STATEMENT_NOTE +
-                    f"note: initialisation from {path} was interrupted here; later statements in it were not run\n"
+                    f"note: initialisation from {path} was interrupted at its statement at line 5, column 1; later "
+                    "statements in it were not run\n"
                     "note: the session continues at the prompt\n"
                     f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{' -i init.f' if args else ''}\n"
                     f"note: please report unsupported programs at {ISSUES}\n")
@@ -775,23 +776,80 @@ def main():
               "<stdin>:2:19" not in proc.stderr,
               "shell-form call into an earlier unit: truthful location", f"err={proc.stderr!r}")
 
-        # 18. A startup file whose reported refusal is not the earliest one:
-        # the interruption point is the earliest refusal in source order, the
-        # statements before it run exactly once, and no refusal is dropped.
+        # 17b. `$[...]` uses the same location logic: a refusal inside a function
+        # from earlier stdin input gets the labelled earlier-input location (not
+        # an offset into the shell line); one from ~/.niftrc keeps its path.
+        d = work / "interp-earlier"
+        d.mkdir()
+        line = 'echo $[f(3)+0+0+0+0+0+0+0+0+0+0+0+0]'
+        earlier = "<stdin>: in earlier input, at line 1, column 19 of the unit that defined it"
+        proc, rows = run(nift, d, [], {}, stdin='fn(f(a)) { return a.size() }\n' + line + '\n')
+        check(proc.returncode == 1 and f": {earlier}: NIFT_VM session refused: type:length" in proc.stderr and
+              "<stdin>:2:" not in proc.stderr,
+              "$[...] calling an earlier-stdin function: labelled earlier-input location (piped)",
+              f"err={proc.stderr!r}")
+        status, out = run_tty(nift, d, [], {}, ['fn(f(a)) { return a.size() }', line, "exit"])
+        check(f": {earlier}: NIFT_VM session refused: type:length" in out and "<stdin>:2:" not in out,
+              "$[...] calling an earlier-stdin function: labelled earlier-input location (tty)", f"out={out!r}")
+        d = work / "interp-rc"
+        d.mkdir()
+        (d / ".niftrc").write_text('x := 1\n\n\nfn(f(a)) {\n  return a.size()\n}\n')
+        rc = (d / ".niftrc").resolve().as_posix()
+        proc, rows = run(nift, d, [], {"HOME": str(d)}, stdin='echo $[f(3)]\n')
+        check(proc.returncode == 1 and f": {rc}:5:10: NIFT_VM session refused: type:length" in proc.stderr and
+              "<stdin>:1:" not in proc.stderr,
+              "$[...] calling a ~/.niftrc function: the .niftrc position (piped)", f"err={proc.stderr!r}")
+        status, out = run_tty(nift, d, [], {}, ['echo $[f(3)]', "exit"])
+        check(f": {rc}:5:10: NIFT_VM session refused: type:length" in out and "<stdin>:1:" not in out,
+              "$[...] calling a ~/.niftrc function: the .niftrc position (tty)", f"out={out!r}")
+
+        # 17c. `-i -e` on a tty: the initial unit is not a startup file; a refusal
+        # stops the session with exit 1 (documented in REFUSAL_MATRIX.md).
+        d = work / "ie-tty"
+        d.mkdir()
+        status, out = run_tty(nift, d, ["-i", "-e", 'touch("e.txt");r := run("echo", "hi")'], {},
+                              ['touch("typed.txt")', "exit"])
+        check(status == 1 and "the session stopped here" in out and not (d / "e.txt").exists() and
+              not (d / "typed.txt").exists(),
+              "-i -e on a tty: refused initial unit stops the session with exit 1, nothing typed runs",
+              f"status={status} out={out!r}")
+
+        # 18. Startup files on a terminal run statement by statement through the
+        # session, like typed input (owner ruling): the first statement the VM
+        # refuses and everything after it never run; each earlier statement
+        # runs exactly once; the refusal names the refused position and the
+        # interrupted statement. Piped: the whole file is refused, nothing runs.
+        init = ('print("s1")\nn := 0\nn += 1\nfn(g(a)) { return a.size() }\nprint("s3")\ntouch("s3.txt")\n'
+                'g(3)\nprint("s5")\ntouch("s5.txt")\n')
         for label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
-            d = work / f"earliest-{name.strip('.').replace('.', '-')}"
+            d = work / f"incremental-{name.strip('.').replace('.', '-')}"
             d.mkdir()
-            (d / name).write_text('print("s1")\ntouch("s1.txt")\nfn(g()) { return run("a") }\nprint("s3")\n'
-                                  'touch("s3.txt")\ns := 1\ns.foo()\n')
+            (d / name).write_text(init)
             path = (d / name).resolve().as_posix()
-            status, out = run_tty(nift, d, args, {}, ["print(7)", "exit"])
-            check(status == 0 and out.count("s1\n") == 1 and (d / "s1.txt").exists() and
-                  not (d / "s3.txt").exists() and "s3" not in out and
-                  f"error: {path}:3:18: NIFT_VM session refused: callable:run" in out and
-                  f"{path}:7:" not in out and out.count("NIFT_VM session refused") == 1 and
-                  "was interrupted here" in out and out.rstrip().endswith("7"),
-                  f"{label} on a tty: interrupted at the earliest refusal (3:18); s1 ran once, s3 never",
-                  f"status={status} out={out!r}")
+            status, out = run_tty(nift, d, args, {}, ["print(n)", "print(7)", "exit"])
+            diag = (f"error: {path}:4:19: NIFT_VM session refused: type:length: ")
+            note = (f"note: initialisation from {path} was interrupted at its statement at line 7, column 1; later "
+                    "statements in it were not run\nnote: the session continues at the prompt\n")
+            check(status == 0 and out.startswith("s1\ns3\n") and out.count("s1") == 1 and
+                  out.count("s3\n") == 1 and (d / "s3.txt").exists(),
+                  f"{label} on a tty: statements before the refused one ran, each exactly once", f"out={out!r}")
+            check("s5" not in out and not (d / "s5.txt").exists(),
+                  f"{label} on a tty: the refused statement and everything after it never ran", f"out={out!r}")
+            check(diag in out and note in out and out.count("NIFT_VM session refused") == 1,
+                  f"{label} on a tty: the refused position (in g) and the interrupted statement (line 7) reported",
+                  f"out={out!r}")
+            check(out.split(note, 1)[-1].split("\n", 4)[2:4] == ["1", "7"],
+                  f"{label} on a tty: usable prompt, definitions from before the refusal usable (n == 1: once)",
+                  f"out={out!r}")
+            for f in ("s3.txt", "s5.txt"):
+                if (d / f).exists():
+                    (d / f).unlink()
+            proc, rows = run(nift, d, args, {"HOME": str(d)}, stdin="print(n)\n")
+            check(proc.returncode == 1 and proc.stdout == "" and not (d / "s3.txt").exists() and
+                  f"error: {path}:4:19: NIFT_VM session refused" in proc.stderr and
+                  "the session stopped here" in proc.stderr,
+                  f"{label} piped: the whole file is refused before anything runs, exit 1",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background

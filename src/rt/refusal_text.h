@@ -42,6 +42,7 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
 // continues at the prompt (owner ruling); the notes say so.
 std::string vm_session_refusal_diagnostic(const std::string& where, const std::string& reason,
                                           const std::string& fallback, bool stops,
-                                          const std::string& interrupted_file = std::string());
+                                          const std::string& interrupted_file = std::string(),
+                                          const std::string& interrupted_at = std::string());
 
 } // namespace nift::rt
