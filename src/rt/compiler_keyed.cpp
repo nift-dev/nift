@@ -119,7 +119,11 @@ bool UnitCompiler::key_kinds_ok(NodeId arg) {
 #if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 11)
     if (k & kKindCollection) return fail(ast_.at(arg), "collection-mutable-key");
 #endif
-    if (k & (kKindObject | kKindStruct | kKindHandle | kKindShared | kKindTask))
+    // An object is a value legacy rejects as a key at run time; it is
+    // refused here under its own reason (review of ad9d842f: it was reported
+    // as "a struct or handle").
+    if (k & kKindObject) return fail(ast_.at(arg), "collection-object-key");
+    if (k & (kKindStruct | kKindHandle | kKindShared | kKindTask))
         return fail(ast_.at(arg), "collection-identity-key");
     return true;
 }

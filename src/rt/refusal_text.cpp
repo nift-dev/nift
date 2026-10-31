@@ -48,6 +48,7 @@ constexpr Family kFamilies[] = {
     {"collection-element:", "`.%()` on an array or object that may hold a map, set or stack"},
     {"collection-callback-key:", "a callback of `.%()` that may return a map, set or stack"},
     {"collection-identity-key", "a struct or handle as a map key or set member"},
+    {"collection-object-key", "an object as a map key or set member"},
     {"collection-mutable-key", "a map, set or stack (a mutable reference) as a map key or set member"},
     {"reference-guard:", "an array or object use whose output would change once arrays and objects are references (%)"},
     {"eval:collection-result", "a map, set or stack as the result of `nift eval`"},
