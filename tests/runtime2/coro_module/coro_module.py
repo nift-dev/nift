@@ -359,6 +359,11 @@ def extras(nift, work):
     check(got.returncode == 1 and got.stdout == "" and rows and rows[0].get("reason") == "coro-module" and
           rows[0].get("vm_executions") == 0, "cooperative model: CP22's whole-unit coro-module refusal stays",
           json.dumps(rows))
+    # A whole-program refusal has no position of its own (Review 8 / Review 3
+    # integration hazard): never the unit's start shown as one.
+    check("main.f (the VM gave no exact position): not compiled for the VM (coro-module)" in got.stderr and
+          "main.f:1:1" not in got.stderr, "cooperative model: coro-module claims no exact position",
+          repr(got.stderr[:300]))
     got, rows = run(nift, d, {})
     check(got.returncode == 0 and got.stdout == "pre\n4\n", "parallel default: the same unit runs",
           repr((got.stdout, got.stderr)))
