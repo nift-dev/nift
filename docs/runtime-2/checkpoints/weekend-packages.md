@@ -527,6 +527,69 @@ no module-binding redesign, but it is not free.
 4. `import-scope:invocation-init` is conservative for module code that is never
    executed (§4.5).
 
+### 4.7 Owner conditions on the follow-up approvals (2026-11-01)
+
+These bind the implementation and its review. All of it goes through this
+checkpoint's independent review and Linode certification.
+
+**C1. Narrow `args`/`cmd` rename.**
+- **What is renamed.** Only the private `args`/`cmd` bindings that a module declares
+  itself (§4.5), and only internally in the linked text.
+- **Names.** The original names are kept in every diagnostic, error message and
+  source report.
+  - Positions map back through the segment map to the original span.
+  - The display-name hook supplies `args`/`cmd` to every message that quotes a
+    binding name.
+- **No collisions.** The generated name must not collide with any declaration or use
+  in any unit, or with any other linker-generated name.
+  - It is chosen against the union of all units' identifiers and the linker's
+    generated names, and checked.
+  - A collision that remains is an internal refusal, never a silent rebinding.
+- **Shadowing and nested imports.**
+  - Lexical shadowing is unchanged. A function parameter or local named `args`
+    stays `param-name-reserved` / `binding-name-reserved`, as everywhere, so no
+    shadow inside a renamed module can be missed.
+  - Each module's rename is decided by that module's own top-level declaration, so
+    resolution stays correct across nested imports. A module without its own
+    declaration still refers to the entry's binding (§4.5), even if it imports, or is
+    imported by, a module that has one.
+- **Unchanged:** the entry script's injected `args`/`cmd`; module functions reaching
+  the entry's bindings where resolution proves it; the pre-effect refusal of
+  unsupported init-time access (`invocation-init`, `invocation-ambiguous`).
+- **Size stop.** If the rename work runs well beyond ~200 lines, stop and report
+  before continuing.
+
+**C2. `PackageTransaction` extension.**
+- **One function.** One narrow, clearly named VM-facing function on
+  `PackageTransaction`: `acquire_read_existing_store(std::string& error, bool&
+  store_present)`. There is no configuration abstraction.
+- **Reuse.** It reuses the existing lock implementation and primitives
+  (`open_and_lock`, `lock_identity_valid`, the journal check). No locking algorithm
+  is copied into `src/rt`.
+- **Locking guarantees.** Atomic create-or-open of the lock file inside an existing
+  `.nift/`, correct concurrent access, release on every path (destructor).
+- **Legacy unchanged.** Legacy call paths and behaviour stay exactly as they are,
+  verified by focused regression tests (§6). D8 rules out changing legacy behaviour,
+  not extending shared infrastructure.
+- **Independence.** The package code stays independent of VM internals.
+  - `PackageTransaction`, `PackageMetadata.h` and `PackageGraphLock.h` include
+    nothing from `src/rt`.
+  - The dependency runs one way: `src/rt/package_resolve` calls the shared package
+    code.
+  - This lets the infrastructure survive the eventual removal of legacy without
+    duplication. It does not authorise any CP25-L work now.
+
+**C3. `export(<non-name>)`.**
+- **Classification.** A program error, `module-error:export-name`, with legacy's text
+  `export requires a binding name`.
+- **Position.** It is reported at the actual `export(...)` expression (the statement
+  start, which is also where legacy reports it: `nonid.f:1:1`), with `positioned`
+  set.
+- **Effect.** Exit 1, rejected before any effect.
+- **Classification in the inventory.** It is classified as a program error in the
+  inventory and `classification.tsv`, not as `import-opaque`.
+- **Valid exports.** Valid `export(name)` statements are unaffected.
+
 ## 5. Implementation plan
 
 The work starts after `integ/args-cmd` is in `weekend/r2`, and is rebased onto it.
@@ -655,7 +718,12 @@ with no `.nift/`: nothing is created.
 **Inventory re-collect.** Rows 1–31 and row 34 leave the fallback list as program
 errors; the other import rows are unchanged.
 
-**Legacy package behaviour unchanged (owner, 2026-11-01).**
+**Legacy package behaviour unchanged (owner, 2026-11-01; C2).**
+- Focused regression: legacy's `acquire_read`/`acquire` call paths are unchanged.
+  - `.nift/` and the lock are still created by a legacy failing import.
+  - The exclusive writer path still blocks readers.
+  - The journal error is unchanged.
+- An include check: no `src/rt` header is reachable from `PackageTransaction.*`.
 - The `PackageTransaction` diff is additive: a review check asserts that no existing
   line changes.
 - All of these pass under `NIFT_VM=0`, before and after the change:
@@ -667,7 +735,34 @@ errors; the other import rows are unchanged.
   - the `package_graph_*_unit` tests.
 - Legacy outputs for the §9 `lg/` probes are compared before and after.
 
-**Narrow rename (§4.5).**
+**Narrow rename (§4.5, C1).** Required tests (owner):
+- Two imported modules each declare their own private `args`. Neither sees the
+  other's value, and neither picks up the entry's `args`. The entry's `args` is
+  unchanged.
+- A module declares a private `args` and exports a function that references it.
+  After import, the function still reads its own module's binding, when called from
+  the entry and from another module.
+- Nested imports:
+  - a private-`args` module importing a module without one, which reads the entry's
+    binding;
+  - the reverse;
+  - re-export through a middle module.
+- Exports of the private `args` binding itself (D-046 #2 location semantics).
+- Shadowing:
+  - the entry's top-level `args := …` beside a private module `args`;
+  - parameter and local forms stay refused.
+- Reassignment of the private binding at top level and in its functions. It is
+  ordinary and mutable; the injected bindings stay read-only (D-062 #2).
+- Generated-name collision: a unit that already uses the would-be generated name
+  forces a different choice. A planted collision is refused, not rebound.
+- Mutation controls, each of which must fail a test:
+  - renaming by spelling (entry-binding reads in a non-declaring module also
+    renamed);
+  - renaming the entry's binding;
+  - leaking the rename into another module;
+  - a fixed generated name;
+  - missing display names.
+
 - A private `args` is read and assigned at top level and in the module's functions,
   next to a module that reads the entry's `args`.
 - Errors that quote the name (const assignment, const-array mutation, arity, refusal
@@ -675,8 +770,15 @@ errors; the other import rows are unchanged.
 - A mutant that renames by spelling, or that extends the rename to another clashing
   name, must fail.
 
-**`export(<non-name>)`.**
-- Legacy text and position at depth 1 and 2.
+**`export(<non-name>)` (C3).**
+- Arguments: a literal (`export(1)`, `export("x")`), a call (`export(f())`), a member
+  (`export(o.x)`), an arithmetic expression (`export(x + 1)`), and a lambda.
+- Each gives legacy's text at legacy's position, depth 1 and 2.
+- Pre-effect checks: marker files and output from earlier entry statements and from
+  previously imported modules must not appear.
+- It competes in statement order with a missing import and with `export-missing`.
+- Valid `export(name)` forms (a binding, a function, a re-exported import) still
+  pass unchanged.
 - It competes in statement order with a missing import.
 - Pre-effect markers as above.
 
@@ -698,6 +800,7 @@ as default.
 | Follow-up 1 | Narrow rename for a module's private `args`/`cmd` approved (§4.5) |
 | Follow-up 2 | VM-only, non-creating read-lock function in `PackageTransaction`; legacy byte-identical, with legacy package tests run under `NIFT_VM=0` (§5, §6) |
 | Follow-up 3 | `export(<non-name>)` is a program error in this checkpoint (§4.3) |
+| Conditions | Detailed conditions C1–C3 on the three follow-ups (§4.7); their required tests are in §6 |
 
 No open questions remain. Implementation waits for the coordinator's go-ahead after
 `args`/`cmd` lands in `weekend/r2`.
