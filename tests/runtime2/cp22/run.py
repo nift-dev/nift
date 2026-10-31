@@ -99,6 +99,12 @@ MUTANTS = {
         "refuse/r_r3_sleep_ternary_join.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
     24: ("A3 handler edge dropped (a throw in try skips the Sleep)", {
         "refuse/r_r3_handler_skips_sleep.f": {"stdout": b"20000\n", "exit": 0, "outcome": "vm"}}),
+    # coro-module review 2 (B1, pre-existing): a named async function stored
+    # as an object literal's value escaped coro-async-value; legacy fails it
+    # ("future: invalid async callable"), the VM ran it.
+    25: ("coro-async-value skips an object literal's value", {
+        "refuse/r_async_value_object.f": {"stdout": b"9\n", "exit": 0, "outcome": "vm"},
+        "refuse/r_async_value_object_alias.f": {"stdout": b"9\n", "exit": 0, "outcome": "vm"}}),
     13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
                                                                               "outcome": "vm"}}),
 }

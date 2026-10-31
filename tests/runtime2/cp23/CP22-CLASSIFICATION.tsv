@@ -2,6 +2,11 @@
 # fixture	CP22 reason	CP23 outcome	CP23 reason	policy
 r_capture.f	coro-capture	vm	-	legacy-golden
 r_async_value.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_alias.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_nested.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_arg.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_unused.f	coro-async-value	require-error	coro-async-value	preserved-refusal
 r_flow_print.f	coro-future-flow:Call	require-error	coro-future-flow:Call	preserved-refusal
 r_flow_concat.f	coro-future-flow:Binary	require-error	coro-future-flow:Binary	preserved-refusal
 r_flow_stringify.f	coro-future-flow:Member	require-error	coro-future-flow:Member	preserved-refusal

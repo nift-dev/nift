@@ -9,7 +9,8 @@
 // rt-lint: cold-file compile-time coroutine admission, once per unit
 
 // Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):
-// 18 captured cells admitted (coro-capture off). Normal builds contain none.
+// 18 captured cells admitted (coro-capture off); 25 an object literal's value
+// skipped by coro-async-value. Normal builds contain none.
 #ifndef NIFT_CORO_MUTANT
 #define NIFT_CORO_MUTANT 0
 #endif
@@ -164,15 +165,20 @@ private:
     }
 
     // An identifier read as a value (not a declaration's, parameter's,
-    // member's or property's name, nor an assignment target).
+    // member's or property's name, nor an assignment target). A property's,
+    // a struct field's initialiser and a for loop's iterated expression are
+    // values: `{"f": asq}` stores the function (review coro-module R2 B1;
+    // mutant 25: an object literal's value skipped).
     bool value_position(NodeId id, NodeId parent) const {
         if (parent == kNoNode) return false;
         const Node& p = ast_.at(parent);
         switch (p.kind) {
-            case NodeKind::FnDecl: case NodeKind::Param: case NodeKind::Property: case NodeKind::ForBinding:
-            case NodeKind::Pattern: case NodeKind::StructDecl: case NodeKind::StructField: case NodeKind::Import:
-            case NodeKind::Export: case NodeKind::Try:
+            case NodeKind::FnDecl: case NodeKind::Param: case NodeKind::Pattern: case NodeKind::StructDecl:
+            case NodeKind::Import: case NodeKind::Export: case NodeKind::Try:
                 return false;
+            case NodeKind::Property: return p.b == id && NIFT_CORO_MUTANT != 25;
+            case NodeKind::StructField: return p.b == id;
+            case NodeKind::ForBinding: return p.a == id;
             case NodeKind::Member: case NodeKind::SafeMember: return p.a == id;
             case NodeKind::Declare: case NodeKind::Assign: case NodeKind::CompoundAssign: case NodeKind::IncDec:
                 return p.a != id;

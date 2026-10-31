@@ -203,6 +203,15 @@ void check_refusals() {
     const struct { const char* source; const char* reason; } cases[] = {
         {"fn(mk()) { n := 1; f := async () => n; return await f() }\nprint(mk())\n", "coro-capture"},
         {"fn[async](add(a, b)) { return a + b }\ng := add\nprint(await g(1, 2))\n", "coro-async-value"},
+        // A named async function stored in an object literal (direct, nested,
+        // read back through a binding, passed in an argument).
+        {"fn[async](asq(x)) { return x * x }\no := {\"f\": asq}\nprint(await o.f(3))\n", "coro-async-value"},
+        {"fn[async](asq(x)) { return x * x }\no := {\"in\": {\"f\": asq}}\nprint(await o.in.f(3))\n",
+         "coro-async-value"},
+        {"fn[async](asq(x)) { return x * x }\no := {\"f\": asq}\ng := o.f\nprint(await g(3))\n", "coro-async-value"},
+        {"fn[async](asq(x)) { return x * x }\nfn(call(p)) { return await p.f(3) }\nprint(call({\"f\": asq}))\n",
+         "coro-async-value"},
+        {"fn[async](asq(x)) { return x * x }\no := {\"k\": 2}\nprint(await asq(o.k))\n", ""},
         {"fn[async](f(a)) { return a }\np := f(1)\nprint(p)\n", "coro-future-flow:Call"},
         {"fn[async](f(a)) { return a }\np := f(1)\ns := \"x\" + p\n", "coro-future-flow:Binary"},
         {"x := 5\nprint(await x)\n", "await-outside-coroutine-unit"},

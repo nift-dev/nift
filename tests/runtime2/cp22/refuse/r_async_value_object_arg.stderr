@@ -1,0 +1,1 @@
+error: $ROOT/r_async_value_object_arg.f:1:1: return: future: invalid async callable
