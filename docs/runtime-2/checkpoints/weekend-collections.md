@@ -1,7 +1,8 @@
 # Weekend candidate: map, set and stack values on the VM (cand/collections)
 
-Status: **candidate, frozen for independent review** (not reviewed, not
-integrated). Branch `cand/collections`, base local `weekend/r2` @`10c41015`.
+Status: **candidate, corrected after review** (`513bd70d` rejected; the
+correction commits follow it; not integrated). Owner rulings of 2026-11-01
+are in section 8. Branch `cand/collections`, base local `weekend/r2` @`10c41015`.
 Decision: **D-063** (`../decisions.md`). Contract tests:
 `tests/runtime2/collections/` (`make test-runtime2-collections`).
 
@@ -60,16 +61,44 @@ study `release-plan/proposals/collections-coro-module.md` §A1 (re-verified).
 4. **Identity (`same`).** Collections, arrays, objects and structs are
    ordinary values and have no identity: `same()` on them is legacy's error
    text "same: operands must be identity-bearing values" (D-040 #4; approved
-   difference where legacy answers true/false). Callables compare by identity
-   (legacy-equal). File/stream handles compare by identity. `same()` on a
-   mutex, atomic, channel, future or thread is **refused before execution**
-   (`same:shared-handle`): legacy rejects them, `rt::same` would compare them.
+   difference where legacy answers true/false: arrays bound to names, structs,
+   collections; for a plain object name legacy errors too). Callables compare
+   by identity (legacy-equal). File/stream handles compare by identity.
+   **Mutex, atomic, channel, future and thread** compare by identity (owner
+   ruling 2026-11-01, approved difference: legacy errors): the same resource
+   or task is `true`, independently created ones are `false`, also after a
+   handle went through a thread and back. The comparison is `rt::same`: a
+   shared handle's stable (kind, id, generation), a future's or thread's task
+   record (`FutureObject::parallel`, else the future object, both live while
+   compared; never a reusable address of a dead object). Nothing is retained,
+   transferred or released by it. The arguments must be **plain names**
+   (`same:argument-shape`, a compatibility limitation, see 3).
 5. **Everything else is legacy's:** methods, return values, key rules,
    insertion order, stack order, equality, `type`, `stringify`/`prettify`,
-   iteration order and error forms, texts, positions and (un)catchability.
+   iteration order and error forms, texts, positions and (un)catchability,
+   except map iteration under mutation (7).
    Collection keys/members compare structurally, callables by identity.
 6. **Bounded subset.** Whatever is not modelled is refused before any effect
    (section 3), never reinterpreted.
+7. **Snapshot iteration** (owner ruling 2026-11-01, a deliberate Runtime 2.0
+   semantic change). `for ((k, v) : m)` visits the entries `m` had at loop
+   entry, in its insertion order (no new order guarantee): insertions,
+   removals and value updates made by the body change `m` but not the active
+   snapshot. Sets and stacks were already snapshots in legacy (materialised
+   arrays); legacy iterates a map's live entry vector with the entry count
+   fixed at entry, so it skips appended entries (legacy-equal here), shows
+   updated values, shifts to the next entry after a removal and reads past
+   the end when the loop outlives a removal (undefined behaviour).
+   Consequence for a removal (the review's `p/a6.f`): an entry removed by the
+   body is still visited, and the body sees the live map. In
+   `for ((kk, vv) : mp) { mp.remove(2); ... }` over `{1: "a", 2: "b"}` the
+   first pass removes 2; the second pass visits the snapshot's `(2, "b")`
+   and `mp.remove(2)` fails with legacy's fatal "remove: key not found" at
+   2:23. That is the snapshot semantics, not a defect: removing a key that is
+   no longer present is an error in both engines; guard it with
+   `mp.contains(k)`. Fixtures: `approved/snapshot_update.f`,
+   `snapshot_remove.f`, `snapshot_insert.f`, `snapshot_remove_visited.f`
+   (a6; legacy undefined, no witness), `parity/snapshot_append.f`.
 
 ### Value-kind slot
 
@@ -88,19 +117,48 @@ redesign: `Value` stays 16 bytes, `HeapObject` 8.
 | `queue()`, `prique()`, `sorted_map()`, `sorted_set()` | `callable:<name>` | not in this slice; no corpus hits |
 | `map(1)` | `builtin-arity:map` | legacy: "undefined callable" |
 | `const m := map()` | `declare-const` | const collections not modelled (legacy's const-check order) |
-| a mutator through a `for` loop binding | `collection-loop-binding` | legacy aliases the iterated element |
+| a mutator called directly on a `for` loop binding (`for (x : a) { x.set(1, 1) }`) | `collection-loop-binding` | legacy aliases the iterated element. The refusal is narrow: a mutation through a copy of the binding (`y := x; y.set(...)`) or inside a function it is passed to runs, with value semantics (the container is unchanged; legacy changes it): that is the approved copy difference of 2.1 (loop values are copies), not a gap |
 | callback methods `m.map(...)`, `s.filter(...)`, ... | `collection-callback:<name>` | not in this slice; no corpus hits |
 | a method on a non-binding receiver `a[0].size()`, `f().get(1)` | `method:<name>` | legacy rejects it ("malformed expression") |
 | a receiver that may be several kinds (`c := map(); c = stack()` on one path) | `collection-receiver:<name>` | no static receiver |
 | a struct, plain object, handle or task as a key/member | `collection-identity-key` | legacy compares tagged structs/handles by identity |
-| `same()` on shared/task handles | `same:shared-handle` | see 2.4 |
+| `same("f", "f")`, `same(g(), x)`: any argument that is not a plain name, in every program (also without collections) | `same:argument-shape` | **compatibility limitation**: legacy reads an argument's text as a binding name first (`same("f","f")` compares the binding `f`; `same("a","a")` is "unknown value…: a") and evaluates other shapes up to twice |
 | `"$[m]"`, `"x" + m` | `interpolation:unknown-type`, `type:+` | legacy renders a tag / errors |
 | a collection as an argument of a built-in other than `type`/`is_*`/`copy`/`deepcopy`/`same` (`html_escape(m)`, `[m].contains(m)`) | `collection-argument:<name>` | legacy renders/compares the tag string |
-| `contains/indexOf/join/unique/sum/min/max/from_entries/merge_deep` on an array/object that may hold a collection | `collection-element:<name>` | idem |
+| `contains/indexOf/join/unique/sum/min/max/from_entries/merge_deep` on an array/object that may have a collection as a direct element or member | `collection-element:<name>` | idem |
+| `a.sort()` over an array whose elements may be collections | `collection-element:sort` | legacy sorts the tag strings |
+| `max(a)` / `min(a)` with an array argument whose elements may be collections | `collection-argument:max` / `min` | legacy compares the tag strings |
+| a key or comparator callback that may return a collection (`sort_by`, `group_by`, `index_by`, `unique_by`, `min_by`, `max_by`, `count_by`; an element of `group_by_each`'s key array; `sort(cmp)`) | `collection-callback-key:<name>` | legacy keys on / compares the tag string |
+| `mx.set(v)` / `send(ch, v)` with a value that may hold a collection at any depth | `collection-argument:set` / `send` | legacy: "contains a non-transferable resource" (before the lock check) |
 | arity errors in loop code | `builtin-arity:<name>` | legacy's loop-evaluator report not established (outside loops the legacy fatal error is compiled) |
 | `m.length()` | `method:length` | legacy: malformed expression |
 | piped/tty session statements over collections | `session:binding-shape-contract` | persistent sessions out of scope (D-054 shapes) |
-| `nift eval 'map()'` (a collection as the eval result) | error "eval: collection values have no legacy representation", exit 2 | legacy prints the tag string |
+| a session expression statement whose shown value is or may hold a collection (`map()`, `[set()]`, `f()` returning one; also inside a line) | `session:collection-result` | legacy shows it (stringify form or tag) |
+| a map/set/stack mutator as a session expression statement (`m.set(1, 2)`) | `session:collection-mutator` | legacy shows nothing for a statement that mutated; the VM would show the return value |
+| `nift eval 'map()'`, `nift eval '[set()]'` | `eval:collection-result` | legacy prints the tag string |
+
+The refusals above are only for operations whose legacy meaning sees the tag
+string (owner guidance 2026-11-01). Plain nesting and the ordinary
+operations run and are legacy-equal: collections in arrays/objects and
+arrays/objects in collections, `stringify`/`prettify`/`highlight`,
+`size`/`first`/`last`/`slice`/`take`/`drop`/`chunk`/`flatten`, `keys`/`values`/
+`entries`/`get`/`has`/`merge`/`pick`/`omit`, `contains`/`indexOf`/`unique` on
+arrays whose collections are nested deeper (`[[m]].contains([m])`),
+`stack.contains([m])`, `sort`/`max`/`min` over numbers or deeper nesting (both
+engines report "incomparable"), key callbacks returning scalars, the bool
+callbacks (`filter`, `any`, `all`, `find`, `find_index`, `count`,
+`partition`: both engines require a bool), `map`/`reduce` results, `==`, and
+`mx.set`/`send` with plain values (`parity/nesting_ok.f`,
+`parity/snapshot_append.f`, the `scalar_of_collection`/`print_in_session`/
+`eval_scalar_of_collection` session cases). Audited against `NIFT_VM=0`:
+every native built-in (`builtin_list.inc`) and every array method
+(`collection.h`); the remaining ones either take no collection or fail with
+the same text in both engines.
+
+Pre-existing, noted only: a heap budget stop ("memory budget exceeded", exit
+70) carries no source position and does not say that none is available (the
+release rule "never fabricate a position; say when none is available" is
+met for every collection diagnostic here, not yet for the budget stop).
 
 ## 4. Implementation
 
@@ -131,7 +189,14 @@ snapshot at the header: a set/stack becomes legacy's materialised array
 (stack top first), a map is read through `ObjectKeys`/`ObjectLookup` with its
 typed keys (`compiler_loops.cpp`, `infer_for.cpp`, `vm_iter.cpp`). Struct
 fields may be initialised with `map()`, `set()` or `stack()` (an empty
-constant; copies never share).
+constant; copies never share). Tag-observing uses (section 3): the resolver
+marks a unit that constructs a collection (`UnitPlan::collections`; without
+one no value holds a collection); inference records expressions with a
+collection as a direct element (`collection_elements_of`), at any depth
+(`collection_holders`) and array method calls that compare or key on one
+(`collection_inspections`); `compiler_native_args.cpp`,
+`compiler_collection.cpp`, `compiler.cpp` (eval/session result),
+`compiler_session.cpp` and `compiler_stmt_expr.cpp` refuse from those.
 
 ## 5. Corpus (CP25-R inventory)
 
@@ -168,22 +233,37 @@ there.
 
 `make test-runtime2-collections` (`tests/runtime2/weekend_collections.py`):
 
-* `parity/` (32): legacy and VM give identical stdout, stderr and exit status,
+* `parity/` (34): legacy and VM give identical stdout, stderr and exit status,
   and the VM ran the program: every method and return value, typed keys,
   indexed maps/sets (300 entries, removal, `1 == 1.0`), collection and callable
   keys, equality, iteration (order, mutation during the loop, loop metadata,
   through a function), nesting read-only, every error text/position (in
   `try`, in a return expression, in loop code, argument faults), `print`,
   binding types, struct-field initialisers, closure reads, `same()` on
-  callables, the frequency/BFS probe shapes.
-* `approved/` (14): the value-semantics differences, each with the VM golden
+  callables, the frequency/BFS probe shapes; plain nesting and ordinary use
+  next to every new refusal (`nesting_ok.f`), appended entries during a map
+  or set loop (`snapshot_append.f`), `same()` on a plain object name.
+* `approved/` (26): the value-semantics differences, each with the VM golden
   (`.vm`) and the legacy witness (`.legacy`), which must differ: assignment,
   arguments, returns, closures, container insertion and extraction, deep
   nesting (stack in map in map in array), self- and mutual insertion, struct
-  fields, thread arguments/returns/captures, `same()` on collections.
-* `refuse/` (23): refused before any effect (every fixture prints first;
-  exit 1; "no part of it ran"; exact reason), section 3, plus the owner's two
-  array cases (see 7).
+  fields, thread arguments/returns/captures, `same()` on collections, structs
+  and arrays (`same_array*.f`: legacy true/false); `same()` identity of mutex,
+  atomic, channel, thread, future and of a handle through a thread; snapshot
+  iteration (update, removal, removal plus insertion, and the review's a6,
+  whose legacy behaviour is undefined: `NAME.legacy-undefined`, VM golden
+  only).
+* `refuse/` (35): refused before any effect (every fixture prints first;
+  exit 1; "no part of it ran"; exact reason; for the new ones the position,
+  `NAME.at`), section 3, the review's repros (`same` with a string literal,
+  in a program without collections too; `sort` over collections, also as a
+  statement and through a call; `max`/`min` of an array of collections;
+  `group_by`/`sort_by`/`count_by`/`group_by_each`/`min_by`/`unique_by` keys;
+  `mx.set([m])`), and `a.push(a)` on an array (the existing `aliasing` rule:
+  arrays are unchanged).
+* sessions (11, `SESSIONS` in the runner): piped sessions and `nift eval`;
+  a refused statement leaves earlier output, runs nothing of itself or later
+  (exit 1), with reason and position; plain collection use matches legacy.
 * heap: budget stops before growth for map/set/stack and for the clone of a
   shared collection (a same-size unshared map fits the same budget), exact
   peak, live heap at stop equal to a control program after collections were
@@ -191,20 +271,26 @@ there.
 
 Mutation controls, `make test-runtime2-collections-mutants`
 (`tests/runtime2/collections/mutants.sh`, one translation unit rebuilt per
-mutant): each must fail the suite.
+mutant): each must fail the suite (counts as `mutants.sh` prints them,
+the suite's summary line included).
 
 | # | Defect | Caught by |
 | --- | --- | --- |
-| 1 | a shared collection is mutated without a clone (observable COW) | 21 checks |
-| 2 | an assignment/argument copy aliases (refcount 2 mutated in place) | 12 |
+| 1 | a shared collection is mutated without a clone (observable COW) | 27 checks |
+| 2 | an assignment/argument copy aliases (refcount 2 mutated in place) | 18 |
 | 3 | the binding is taken before the arguments run (no self-snapshot) | 2 |
-| 4 | the mutated collection is never put back | 55 |
+| 4 | the mutated collection is never put back | 67 |
 | 5 | a map insert is never counted on the heap | 3 |
 | 6 | map equality depends on entry order | 2 |
 | 7 | a stack iterates bottom first | 2 |
 | 8 | `1.0` does not hash like `1` (indexed lookups miss) | 2 |
 | 9 | a transferred collection loses its kind | 3 |
 | 10 | `same()` exposes the storage identity of collections | 5 |
+| 11 | `same()` admits arguments that are not plain names | 12 |
+| 12 | the element/array-argument/shared-store checks of built-ins are dropped | 12 |
+| 13 | key/comparator callbacks may return collections | 19 |
+| 14 | a collection may be the shown eval/session result | 11 |
+| 15 | a map loop iterates the live map instead of its snapshot | 5 |
 
 A "shallow copy" mutant has no separate form here: with copy-on-write and
 mutation only through unsharing entry points a shallow clone *is* the deep
@@ -216,21 +302,46 @@ Worker lanes added: `test-runtime2-collections-sanitize` (ASan+UBSan) and
 
 ## 7. Open questions for the owner
 
-1. **The owner's array cases.** `a := [[1,2],[3,4]]; b := a; b[0].push(5)` is
-   not valid Nift in either engine (legacy: "unknown value or malformed
-   expression: b[0].push(5)"; VM: refused, `opaque:legacy-runtime-error`);
-   `a := [1,2]; a.push(a)` gives `[1,2,[1,2]]` in legacy and is refused by the
-   VM (`aliasing`, the existing array admission rule). Both are recorded as
-   refusals before effect. The collection equivalents (nested extraction,
-   self-insertion) run with value semantics. Should the VM's array admission
-   rules (pre-existing, outside this slice) now also admit array aliasing
-   shapes with D-040 value semantics as an approved break?
-2. **`same()` on mutex/atomic/channel/future/thread** is refused here. D-040
-   #4 lists handles as identity-bearing; legacy errors. Admit with identity
-   (an approved difference) or keep refused?
-3. **Map iteration under mutation**: legacy iterates the live entry vector
-   (undefined if the body inserts and the vector reallocates); the VM iterates
-   the header snapshot. Recorded as part of the value-semantics break.
-4. **Collection keys** compare structurally (legacy's rule too), as snapshots.
+1. **`same()` argument shapes** (compatibility limitation): legacy reads an
+   argument's text as a binding name first, so `same("f", "f")` is `true`
+   for a binding `f`, and evaluates non-name arguments up to twice. The VM
+   refuses every non-name argument before any effect. Supporting legacy's
+   string-names-a-binding reading would need a decision (it is not a value
+   semantics); the refusal stays until then.
+2. **Collection keys** compare structurally (legacy's rule too), as snapshots.
    Legacy re-reads an aliased key collection; a key mutated after insertion
    cannot happen here.
+3. Pre-existing on the base, outside this slice: the VM accepts `channel()` /
+   `channel(1)`, which legacy reports as "undefined callable: channel" (so
+   `approved/same_channel.f` has a legacy witness that fails earlier), and an
+   unbuffered `send` with no receiver blocks without output. Map removal is
+   O(n) (insertion order is kept by erasing and reindexing; legacy also
+   erases from its entry vector); not changed.
+
+## 8. Owner rulings (2026-11-01) and the correction
+
+1. **Arrays stay unchanged**: no value semantics for arrays, the existing
+   admission rules (`a.push(a)` stays `aliasing`). The earlier examples
+   `b[0].push(5)` and `a.push(a)` set no requirement; the invalid-Nift
+   fixture `refuse/array_nested_push.f` was removed.
+2. **`same()` on identity-bearing handles** is an identity comparison
+   (2.4): implemented. It fitted without shared-state changes: `rt::same`
+   already compared shared handles by (kind, id, generation) and tasks by
+   their record; the compiler refusal `same:shared-handle` was removed and
+   CP22's future-flow check admits a future or thread as a `same()`
+   argument (`compiler_coro.cpp`, a read like `type()`). No ownership,
+   transfer or lifetime code changed.
+3. **Snapshot iteration for maps** (2.7), recorded in D-063 and in
+   `compatibility.md` (Approved breaks).
+
+Review findings fixed: `same()` argument shapes (blocker 1); built-ins that
+see the tag through array contents or callback results (blocker 2: element,
+argument, callback-key and shared-store checks; the inference sets in
+`infer.h`); collection-valued session statements and `nift eval` results,
+session mutator echoes, and the converter's false "no legacy representation"
+text (blocker 3: now refused at compile time; the converter's message says
+the VM cannot show it and that no position is available); `same()` on
+arrays/objects/structs recorded in `compatibility.md`; loop-binding refusal
+and budget-stop positions documented (3); Makefile block order, a duplicated
+comment on `truthy`, misleading indentation in `isolate_transfer_decode.cpp`
+(the warning the mutant builds print; `compiler_loops.cpp` builds clean).

@@ -1483,9 +1483,15 @@ Owner rulings for the weekend collections candidate (`cand/collections`,
    Collections (like arrays, objects and structs) are ordinary values and
    `same()` on them is legacy's error text "same: operands must be
    identity-bearing values" (legacy: `true`/`false` by storage). Callables and
-   file/stream handles compare by identity (legacy-equal). `same()` on shared
-   concurrency or task handles is refused before execution until the owner
-   decides (legacy rejects them; open question in the checkpoint).
+   file/stream handles compare by identity (legacy-equal). **Owner ruling
+   2026-11-01:** mutex, atomic, channel, future and thread compare by
+   identity too (approved difference; legacy errors): the same resource or
+   task is `true`, independently created ones `false`, by the stable handle
+   (kind, id, generation) or the task record, never a reusable address; no
+   ownership, transfer or lifetime change. Compatibility limitation: the
+   arguments must be plain names (`same:argument-shape`, refused before any
+   effect in every program): legacy reads a string argument as a binding name
+   (`same("f", "f")`) and may evaluate other shapes twice.
 4. **Everything observable apart from copying is legacy's**: constructors
    (exact `map()`/`set()`/`stack()`), methods and their return values, key and
    member rules (bool, number, string, and legacy's tagged strings that are
@@ -1501,14 +1507,28 @@ Owner rulings for the weekend collections candidate (`cand/collections`,
    unused). No `Value` redesign.
 6. Threads may carry collections (a copy, `WireKind::Collection`), where
    legacy refuses them ("non-transferable resource"): part of the approved
-   value-semantics break.
+   value-semantics break. Stores into shared state (`mx.set(v)`, `send`) of a
+   value holding a collection stay refused (`collection-argument:`).
+7. **Snapshot iteration (owner ruling 2026-11-01; a deliberate Runtime 2.0
+   semantic change):** `for ((k, v) : m)` visits the entries captured at loop
+   entry, in the documented insertion order (no new order guarantee);
+   insertions, removals and value updates by the body do not affect the
+   active snapshot. Legacy iterates the live entry vector over the count at
+   entry (appended entries are skipped in both; it shows updates, shifts
+   after a removal and is undefined when the loop outlives one). A removed
+   entry is still visited; a body that removes the visited key again
+   (`mp.remove(2)` on each pass) fails with "remove: key not found" on the
+   second visit, which is this semantics (guard with `contains`).
 
 Migration (`compatibility.md`, Approved breaks): code that relied on two
 names sharing one collection must pass the collection back (`m = fill(m)`,
 `return m`) or keep it in one binding; `copy()`/`deepcopy()` are no longer
-needed to separate copies; `same()` cannot test collection sharing.
+needed to separate copies; `same()` cannot test collection sharing; a map
+loop that mutates its map sees the entries of loop entry (re-read the map
+after the loop, or guard a removal with `contains`); write `same(a, b)` with
+binding names, never `same("a", "b")`.
 
 Witnesses: `tests/runtime2/collections/approved/*.f` (VM golden and legacy
 witness for each difference), `parity/*.f`, `refuse/*.f`, the heap checks and
-ten mutation controls (`make test-runtime2-collections`,
+fifteen mutation controls (`make test-runtime2-collections`,
 `test-runtime2-collections-mutants`).
