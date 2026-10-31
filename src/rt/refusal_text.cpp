@@ -36,6 +36,8 @@ constexpr Family kFamilies[] = {
     {"module-host-op:", "the host operation `%()` in a program with imports"},
     {"module-return", "a return statement in an imported module"},
     {"export-struct", "exporting a struct from a module"},
+    {"coro-module-init-task", "starting a task while an imported module initialises"},
+    {"coro-module-capture", "a task that captures an imported module's state"},
     {"coro-", "this coroutine or async usage"},
     {"interpolation:", "this string interpolation (%)"},
     {"context:", "a context-dependent legacy behaviour (%)"},

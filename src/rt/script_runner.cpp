@@ -333,7 +333,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         unit_root = relinked.root;
     }
     CompileLimits limits;
-    limits.module_names = link.module_names; limits.linked = link.linked; cooperative_switches(limits);
+    limits.module_names = link.module_names; limits.link = &link; cooperative_switches(limits);
     CompileResult compiled = eval ? compile_eval_program(ast, make_eval_program(ast, parsed.root), limits)
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();

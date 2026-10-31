@@ -171,6 +171,7 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
         unit_source = link.text;
         unit_root = relinked.root;
         limits.module_names = link.module_names;
+        limits.link = &link;  // classify-all sees coro-module-init-task / -capture (no switches: not coro-module)
     }
     Ast& ast = link.linked ? *linked_ast : entry;
     const auto map_linked = [&](std::uint32_t offset) -> MappedSource {

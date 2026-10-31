@@ -1,12 +1,17 @@
 #include "rt/compiler_coro_admit.h"
 
 #include "rt/compiler_coro_loops.h"
+#include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
 
 #include <cstdlib>
 #include <string_view>
 #include <vector>
+
+#ifndef NIFT_CORO_MODULE_MUTANT  // test-only switch (rt/compiler_coro_module.cpp)
+#define NIFT_CORO_MODULE_MUTANT 0
+#endif
 
 // rt-lint: cold-file compile-time cooperative admission, once per coroutine unit
 
@@ -265,6 +270,11 @@ void cooperative_switches(CompileLimits& limits) {
     limits.cooperative_threads = on("NIFT_VM_COOPERATIVE_THREADS");
     limits.cooperative_observe = on("NIFT_VM_COOPERATIVE_OBSERVE");
     limits.parallel_tasks = !limits.cooperative_threads;
+    // CP22's whole-unit `coro-module` refusal stays for the cooperative model
+    // (D-055 #2: no proof for linked units); the parallel model admits them.
+#if NIFT_CORO_MODULE_MUTANT != 8  // test-only (tests/runtime2/coro_module/mutants.sh): never coro-module
+    limits.linked = limits.link != nullptr && limits.link->linked && limits.cooperative_threads;
+#endif
 }
 
 }  // namespace nift::rt

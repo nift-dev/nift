@@ -4,6 +4,7 @@
 // refuses, and the post-compile bytecode checks (docs cp22-coroutines.md §5).
 #include "rt/ast.h"
 #include "rt/compiler.h"
+#include "rt/compiler_coro_module.h"  // linked (module-importing) coroutine units
 #include "rt/infer.h"
 #include "rt/proto.h"
 #include "rt/resolver.h"
