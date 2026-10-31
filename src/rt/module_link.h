@@ -43,6 +43,7 @@ struct LinkedUnit {
     std::string reason;
     std::size_t where = 0;     // module of the refused construct
     std::uint32_t offset = 0;  // its offset in that module's text
+    bool positioned = false;   // `offset` is a recorded position (each refusal site says so)
     ModuleGraph graph;
     std::string text;          // the linked program (when linked && ok)
     std::vector<LinkSegment> segments;

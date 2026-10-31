@@ -85,6 +85,7 @@ std::string native_name(std::uint16_t b) {
 class Admission {
 public:
     Admission(const Program& program, bool observe) : program_(program), observe_(observe) {}
+    bool positioned() const { return positioned_; }
 
     bool run(std::string& reason, std::uint32_t& offset) {
 #if NIFT_CORO_MUTANT == 12
@@ -109,7 +110,10 @@ private:
     const Proto& proto(std::size_t p) const { return *program_.protos[p]; }
     bool fail(std::size_t p, std::size_t pc, std::string why, std::string& reason, std::uint32_t& offset) const {
         reason = std::move(why);
-        offset = pc < proto(p).offsets.size() ? proto(p).offsets[pc] : 0;
+        // An instruction without a recorded source offset gives no position
+        // (never an invented offset 0 shown as one).
+        positioned_ = pc < proto(p).offsets.size();
+        offset = positioned_ ? proto(p).offsets[pc] : 0;
         return false;
     }
 
@@ -244,6 +248,7 @@ private:
 
     const Program& program_;
     bool observe_;
+    mutable bool positioned_ = false;  // the refusal's offset is a recorded instruction offset
     std::vector<bool> task_;
     std::vector<bool> value_call_;
     std::vector<std::vector<std::uint16_t>> edges_;
@@ -253,8 +258,11 @@ private:
 }  // namespace
 
 bool check_cooperative_admission(const Program& program, bool observe, std::string& reason,
-                                 std::uint32_t& offset) {
-    return Admission(program, observe).run(reason, offset);
+                                 std::uint32_t& offset, bool& positioned) {
+    Admission admission(program, observe);
+    const bool ok = admission.run(reason, offset);
+    positioned = !ok && admission.positioned();
+    return ok;
 }
 
 void cooperative_switches(CompileLimits& limits) {

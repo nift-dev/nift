@@ -322,16 +322,21 @@ bool async_recursion(const Ast& ast, NodeId root, const UnitPlan& plan, std::uin
 }  // namespace
 
 bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
-                          const CompileLimits& limits, std::string& reason, std::uint32_t& offset) {
+                          const CompileLimits& limits, std::string& reason, std::uint32_t& offset,
+                          bool& positioned) {
+    positioned = false;
     if (!plan.coroutines) return true;
     for (NodeId id = 0; !(limits.cooperative_threads || limits.parallel_tasks) && id < ast.size(); ++id) {
         const Node& n = ast.at(id);
         if (n.kind == NodeKind::Call && n.a != kNoNode && ast.at(n.a).kind == NodeKind::Ident &&
             ast.text(ast.at(n.a)) == "thread" && !plan.index.count("thread"))
-            return reason = "callable:thread", offset = ast.at(n.a).begin, false;
+            return reason = "callable:thread", offset = ast.at(n.a).begin, positioned = true, false;
     }
-    offset = ast.at(root).begin;
-    if (limits.linked) { reason = "coro-module"; return false; }
+    // A coroutine unit that imports modules: a whole-program refusal with no
+    // position of its own (the unit's start is not one; Review 8).
+    if (limits.linked) { reason = "coro-module"; offset = 0; positioned = false; return false; }
+    // Every refusal below records the offset of the node it refuses.
+    positioned = true;
     if (!plan.structs.empty() && !limits.parallel_tasks) {
         reason = "coro-struct";
         offset = ast.at(plan.structs.front().decl).begin;
@@ -341,10 +346,14 @@ bool check_coroutine_unit(const Ast& ast, NodeId root, const UnitPlan& plan, con
         reason = "coro-async-recursion";
         return false;
     }
-    return FutureFlow(ast, plan, kinds).run(root, reason, offset);  // cooperative admission: after compiling
+    const bool ok = FutureFlow(ast, plan, kinds).run(root, reason, offset);  // cooperative admission: after compiling
+    positioned = !ok;
+    return ok;
 }
 
-bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset, bool parallel) {
+bool check_coroutine_program(const Program& program, std::string& reason, std::uint32_t& offset, bool& positioned,
+                             bool parallel) {
+    positioned = false;
     for (std::size_t p = 0; p < program.protos.size(); ++p) {
         const Proto& proto = *program.protos[p];
         for (std::size_t pc = 0; pc < proto.code.size(); ++pc) {
@@ -363,7 +372,9 @@ bool check_coroutine_program(const Program& program, std::string& reason, std::u
             }
             if (why == nullptr) continue;
             reason = why;
-            offset = pc < proto.offsets.size() ? proto.offsets[pc] : 0;
+            // No recorded offset for the instruction: no position (never offset 0 shown as one).
+            positioned = pc < proto.offsets.size();
+            offset = positioned ? proto.offsets[pc] : 0;
             return false;
         }
     }

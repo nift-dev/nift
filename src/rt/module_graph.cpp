@@ -62,12 +62,16 @@ class GraphBuilder {
 public:
     GraphBuilder(ModuleGraph& graph, const ModuleGraphOptions& options) : graph_(graph), options_(options) {}
 
+    // Every refusal is at a recorded position: `offset` is the start of the
+    // refused construct (an import or export statement, a parse error, an
+    // Opaque region) in module `where`.
     bool refuse(std::size_t where, std::uint32_t offset, std::string reason) {
         if (graph_.ok) {
             graph_.ok = false;
             graph_.reason = std::move(reason);
             graph_.where = where;
             graph_.offset = offset;
+            graph_.positioned = true;
         }
         return false;
     }
@@ -75,7 +79,6 @@ public:
     // One initialisation of unit `index` (legacy's order: its imports run at
     // their statements, depth first).
     bool visit(std::size_t index, const Ast& ast, NodeId root, const fs::path& base, std::vector<fs::path>& active) {
-        if (active.size() > kMaxModuleDepth) return refuse(index, 0, "import-limit");
         if (!check_placement(index, ast, root)) return false;
         // Names bound in this unit, with the module that originally declared
         // them: an import may rebind a name to the same declaration (the
@@ -140,6 +143,10 @@ private:
                 return refuse(index, st.begin, "import-reinitialised");
             return true;
         }
+        // The import that would nest initialisations deeper than the limit is
+        // refused at its own statement (Review 8: not at 1:1 of the module it
+        // names). The same condition and order as a check on entering it.
+        if (active.size() >= kMaxModuleDepth) return refuse(index, st.begin, "import-limit");
         active.push_back(identity);
         const bool ok = visit(target, *mod.ast, mod.root, mod.path.parent_path(), active);
         active.pop_back();

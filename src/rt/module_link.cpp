@@ -1,6 +1,7 @@
 #include "rt/module_link.h"
 
 #include <algorithm>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -183,16 +184,20 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
     }
     if (!imports) return out;
     out.linked = true;
-    const auto refuse = [&](std::size_t where, std::uint32_t offset, std::string reason) {
+    const auto refuse = [&](std::size_t where, std::uint32_t offset, std::string reason, bool positioned) {
         out.ok = false;
         out.where = where;
         out.offset = offset;
+        out.positioned = positioned;
         out.reason = std::move(reason);
     };
     ModuleGraphOptions options;
     options.policy = InitPolicy::RefuseReinitialisation;  // D-041 #2: until both engines initialise once
     out.graph = build_module_graph(entry, root, entry_path, options);
-    if (!out.graph.ok) { refuse(out.graph.where, out.graph.offset, out.graph.reason); return out; }
+    if (!out.graph.ok) {
+        refuse(out.graph.where, out.graph.offset, out.graph.reason, out.graph.positioned);
+        return out;
+    }
     const std::size_t count = out.graph.modules.size();
     std::vector<UnitView> units(count);
     for (std::size_t m = 0; m < count; ++m) {
@@ -203,20 +208,37 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
         collect(units[m]);
         std::uint32_t at = 0;
         if (m > 0 && has_top_level_return(*units[m].ast, units[m].root, at)) {
-            refuse(m, at, "module-return");
+            refuse(m, at, "module-return", true);  // the `return` statement
             return out;
         }
     }
     // Names declared outside functions, and function names, are the unit's
     // own: no other unit declares them.
+    // A clash is refused at unit m's own declaration of the name (Review 8:
+    // never at the unit's start): the declared name's text in m's source.
+    // Of several clashing names, the first in m's text.
     std::unordered_map<std::string_view, std::size_t> owner;
-    for (std::size_t m = 0; m < count; ++m)
+    for (std::size_t m = 0; m < count; ++m) {
+        const std::string_view text = units[m].source;
+        const std::less<const char*> before;
+        bool clash = false, positioned = false;
+        std::uint32_t at = 0;
         for (const Names* set : {&units[m].top, &units[m].fns})
             for (std::string_view name : *set) {
                 const auto seen = owner.emplace(name, m);
-                if (!seen.second && seen.first->second != m)
-                    { refuse(m, units[m].ast->at(units[m].root).begin, "import-name-clash"); return out; }
+                if (seen.second || seen.first->second == m) continue;
+                // Declared names view the unit's source (Ast::text); otherwise no position.
+                const bool inside = !before(name.data(), text.data()) &&
+                                    before(name.data(), text.data() + text.size());
+                const std::uint32_t offset = inside ? static_cast<std::uint32_t>(name.data() - text.data()) : 0;
+                if (!clash || (inside && (!positioned || offset < at))) {
+                    at = offset;
+                    positioned = inside;
+                }
+                clash = true;
             }
+        if (clash) { refuse(m, at, "import-name-clash", positioned); return out; }
+    }
     // A unit names another unit's binding or function only where it
     // imports it (legacy isolates module scopes).
     for (std::size_t m = 0; m < count; ++m) {
@@ -227,7 +249,7 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             const std::string_view name = units[m].ast->text(units[m].ast->at(id));
             const auto o = owner.find(name);
             if (o == owner.end() || o->second == m || imported.count(name)) continue;
-            { refuse(m, units[m].ast->at(id).begin, "import-scope"); return out; }
+            { refuse(m, units[m].ast->at(id).begin, "import-scope", true); return out; }  // the use
         }
     }
     for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),

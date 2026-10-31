@@ -4569,4 +4569,6 @@ certify-targets: test-cp23-certify
 .PHONY: test-runtime2-vm-default
 test-runtime2-vm-default: $(TARGET)
 	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)" \
+	  --work-prefix vm-default-e2b2s5p2s1-inside-middle-block-before-
 test-rt-vm: test-runtime2-vm-default
