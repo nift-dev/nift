@@ -239,7 +239,7 @@ private:
     bool op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto);
     void result_stats(VmResult& result);
     bool op_new_cell(const Instr& in, Value* R, Fault& fault);
-    bool op_cell_cached(const Instr& in, Value* R, Fault& fault);
+    bool op_cell_cached(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     bool op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note);
     bool op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);
     bool op_closure(const Instr& in, Value* R, Fault& fault);
@@ -266,6 +266,10 @@ private:
     // `stored` into the struct instance or collection `receiver` would close a
     // reference cycle; raises the catchable runtime.reference_cycle Error with
     // `legacy_text` when legacy refuses the same store, else the generic text.
+    // D-NEXT-refsem #4: a store into a captured cell that would close a
+    // reference cycle raises the catchable runtime.reference_cycle (the cell
+    // keeps its value).
+    bool refuse_cell_cycle(Fault& fault, const Proto* proto, const Instr& in, CellObject* cell, const Value& stored);
     bool refuse_reference_cycle(Fault& fault, const Proto* proto, const Instr& in, const HeapObject* receiver,
                                 const Value& stored, const std::string& legacy_text);
     bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,

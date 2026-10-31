@@ -37,7 +37,18 @@ struct Facts {
     bool returned = false;  // a parameter returned as it is (an escape, checked at the call sites)
     bool isolated = false;  // an async function's or lambda's parameter: given copies
     std::uint32_t param_k = 0;
-    int owner = -1;         // the function declaring it (-1: main or a global)
+    int owner = -1;         // the body declaring it (-1: main or a global; a lambda: lambda_owner)
+    bool declared = false;  // `owner` is known (a declaration, parameter or loop binding)
+    std::vector<NodeId> mut_sites;  // every in-place mutation rooted here (the lent rule)
+};
+
+// A lending: a binding's value (or a part) handed for the duration of a call,
+// a native's callback run or a loop to a holder the guard does not track
+// (a parameter that does not escape, a native, a loop binding).
+struct Lend {
+    NodeId decl = kNoNode;
+    NodeId region = kNoNode;  // the call or for node: its source span
+    NodeId value = kNoNode;   // the lent expression (mutations inside it end before the lending starts)
 };
 
 class Guard {
@@ -64,6 +75,7 @@ private:
         NodeId decl = kNoNode;
         bool whole = false;
         bool known = false;
+        bool opaque = false;  // held by a struct instance (no binding tracks it)
     };
     Root root_of(NodeId id, int owner);
 
@@ -102,6 +114,33 @@ private:
     // result, so its old value is never observed again (if no other holder).
     void idiom(const Node& assign, NodeId d, int owner);
 
+    // A lambda's own body: a distinct owner per lambda (captures are cells).
+    static int lambda_owner(NodeId lambda) { return -4 - static_cast<int>(lambda); }
+
+    // Referenced from a body other than its declaring one (or from two
+    // bodies), or in a session: code the binding's own frame does not run
+    // may reach it (a callee, a callback, a later statement).
+    bool outside(NodeId d) const;
+
+    // The call or loop node `region` may run user code: a user function, a
+    // callable value, a native given a callable that is not a lambda literal,
+    // or any such call written inside it.
+    bool user_code(NodeId region) const;
+
+    static bool within(const Node& site, const Node& region) {
+        return site.begin >= region.begin && site.end <= region.end;
+    }
+
+    void lend(NodeId value, NodeId region, int owner);
+
+    // Lambda literal arguments of a native: their parameters receive parts
+    // of `root` (or of something unknown when root is kNoNode).
+    void tie_callbacks(const Node& call, NodeId root, bool known);
+
+    bool callable_value(NodeId arg) const;
+
+    void native_operands(const Node& n, NodeId receiver, NodeId id, int owner);
+
     // ---- escapes (fixpoint) ----
     bool mutated(const Facts& f) const { return f.mut_top || f.mut_nested || !f.idioms.empty(); }
 
@@ -128,6 +167,10 @@ private:
     std::vector<std::pair<NodeId, int>> calls_;
     std::vector<NodeId> free_reads_, unknown_, unknown_mutations_;
     std::unordered_set<NodeId> idiom_args_;
+    std::unordered_map<NodeId, std::vector<int>> owners_;  // decl -> the bodies referencing it
+    std::vector<Lend> lends_;
+    std::vector<NodeId> user_calls_;   // calls that may run user code
+    std::vector<bool> fn_value_;       // a user function used as a value (unknown callers)
     int async_depth_ = 0;  // inside an async body: outer bindings are the task's copies
     std::unordered_map<std::uint64_t, NodeId> isolated_;  // (owner, outer binding) -> its task copy
 };

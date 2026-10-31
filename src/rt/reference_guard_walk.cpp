@@ -3,6 +3,8 @@
 #include "rt/builtin_bind.h"
 #include "rt/collection.h"
 
+#include <algorithm>
+
 // rt-lint: cold-file compile-time Phase A forward-compatibility guard: the syntax walk, once per unit
 
 namespace nift::rt::reference_guard_detail {
@@ -12,16 +14,21 @@ NodeId Guard::decl(NodeId ident, int owner) {
     if (found != kinds_.bindings.end()) {
         // In an async body a binding declared outside it is the task's own
         // copy (made at task creation in both models): a distinct holder.
-        const NodeId d = found->second;
+        NodeId d = found->second;
         const auto outer = facts_.find(d);
         const int declared_in = outer == facts_.end() ? -1 : outer->second.owner;
-        if (async_depth_ == 0 || declared_in == owner) return d;
-        const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(owner)) << 32) | d;
-        auto copy = isolated_.find(key);
-        if (copy == isolated_.end())
-            copy = isolated_.emplace(key, static_cast<NodeId>(ast_.size() + isolated_.size())).first;
-        facts(copy->second).owner = owner;
-        return copy->second;
+        if (async_depth_ != 0 && declared_in != owner) {
+            const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(owner)) << 32) | d;
+            auto copy = isolated_.find(key);
+            if (copy == isolated_.end())
+                copy = isolated_.emplace(key, static_cast<NodeId>(ast_.size() + isolated_.size())).first;
+            facts(copy->second).owner = owner;
+            facts(copy->second).declared = true;
+            d = copy->second;
+        }
+        std::vector<int>& seen = owners_[d];
+        if (std::find(seen.begin(), seen.end(), owner) == seen.end()) seen.push_back(owner);
+        return d;
     }
     if (owner >= 0 && plan_.is_method(static_cast<std::size_t>(owner))) {  // an implicit struct field
         const StructInfo& s = plan_.structs[static_cast<std::size_t>(plan_.method_of[owner])];
@@ -39,6 +46,7 @@ void Guard::note_params() {
             p.param_fn = static_cast<int>(f);
             p.param_k = k;
             p.owner = static_cast<int>(f);
+            p.declared = true;
             p.isolated = (fn.flags & kFlagAsync) != 0;  // its arguments are copied at task creation
         }
     }
@@ -48,14 +56,19 @@ Guard::Root Guard::root_of(NodeId id, int owner) {
     const Node& n = at(id);
     switch (n.kind) {
         case NodeKind::Ident: {
-            if (ast_.text(n) == "this") return {kNoNode, false, true};
+            // A struct instance's state (`this`, an implicit field): no binding
+            // tracks it, so a use that may share or mutate an aggregate there
+            // is treated as unknown (D-NEXT-refsem #1).
+            if (ast_.text(n) == "this") return {kNoNode, false, false, true};
             const NodeId d = decl(id, owner);
             if (d == kNoNode) return {kNoNode, true, false};
+            if (!kinds_.bindings.count(id)) return {kNoNode, false, false, true};  // an implicit field
             const Facts& f = facts(d);
             if (f.loop) return {f.loop_root, false, f.loop_root != kNoNode};
             return {d, true, true};
         }
         case NodeKind::Index: case NodeKind::Member: case NodeKind::SafeIndex: case NodeKind::SafeMember: {
+            if (kinds(n.a) & kKindStruct) return {kNoNode, false, false, true};
             Root r = root_of(n.a, owner);
             r.whole = false;
             return r;
@@ -80,7 +93,7 @@ void Guard::retain(NodeId id, int owner) {
     if (!shared(id)) return;
     const Root r = root_of(id, owner);
     if (!r.known) {
-        if (at(id).kind == NodeKind::Ident) unknown_.push_back(id);
+        if (at(id).kind == NodeKind::Ident || r.opaque) unknown_.push_back(id);
         return;
     }
     if (r.decl == kNoNode) return;  // `this` or a fresh value
@@ -93,6 +106,10 @@ void Guard::retain(NodeId id, int owner) {
 
 void Guard::mutate(NodeId receiver, bool whole_receiver, NodeId site, int owner) {
     if (!shared(receiver)) return;
+    // A store into a struct instance's own field mutates the instance (a
+    // reference in both models), not an array or object.
+    const Node& r0 = at(receiver);
+    if ((r0.kind == NodeKind::Ident && ast_.text(r0) == "this") || (kinds(receiver) & kKindStruct)) return;
     const Root r = root_of(receiver, owner);
     if (!r.known) { unknown_mutations_.push_back(site); return; }
     if (r.decl == kNoNode) return;
@@ -100,6 +117,7 @@ void Guard::mutate(NodeId receiver, bool whole_receiver, NodeId site, int owner)
     const bool top = r.whole && whole_receiver;
     (top ? f.mut_top : f.mut_nested) = true;
     if (f.mut_at == kNoNode) f.mut_at = site;
+    f.mut_sites.push_back(site);
 }
 
 void Guard::store_into(NodeId receiver, NodeId value, int owner) {
@@ -131,11 +149,14 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             const NodeId* params = ast_.list(n);
             const int task = (n.flags & kFlagAsync) ? 1 : 0;
             for (std::uint32_t k = 0; k < n.count; ++k) {
-                facts(params[k]).param_fn = -2;
-                facts(params[k]).isolated = task != 0;
+                Facts& p = facts(params[k]);
+                p.param_fn = -2;
+                p.isolated = task != 0;
+                p.owner = lambda_owner(id);
+                p.declared = true;
             }
             async_depth_ += task;
-            walk(n.b, !(n.flags & kFlagBlockBody), -3);  // an expression body is returned
+            walk(n.b, !(n.flags & kFlagBlockBody), lambda_owner(id));  // an expression body is returned
             async_depth_ -= task;
             return;
         }
@@ -144,6 +165,7 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             if (at(n.a).kind == NodeKind::Ident) {
                 Facts& f = facts(n.a);  // the inference keys a declaration by its target name node
                 f.owner = owner;
+                f.declared = true;
                 f.inflows.push_back(n.b);
             }
             walk(n.a, false, owner);
@@ -188,14 +210,23 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             walk(n.a, true, owner);
             return;
         case NodeKind::For: {
+            // The loop holds its iterable (a snapshot in the copy model, the
+            // live value in Phase B) while the body runs: a lending.
             const Node& header = at(n.a);
-            walk(header.a, false, owner);
             const Root r = shared(header.a) ? root_of(header.a, owner) : Root{};
+            lend(header.a, id, owner);
+            walk(header.a, false, owner);
+            // Over an iterable no binding holds (a literal, a constructing
+            // call: fresh at every depth) the loop binding holds an exclusive
+            // part: an independent binding.
+            const bool exclusive = r.decl == kNoNode && !r.opaque && fresh(header.a, true);
             const NodeId* names = ast_.list(header);
             for (std::uint32_t k = 0; k < header.count; ++k) {
                 Facts& f = facts(names[k]);
-                f.loop = true;
+                f.loop = !exclusive;
                 f.loop_root = r.known ? r.decl : kNoNode;
+                f.owner = owner;
+                f.declared = true;
             }
             walk(n.b, false, owner);
             return;
@@ -225,6 +256,10 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             if (n.kind == NodeKind::Ident) {
                 const NodeId d = decl(id, owner);
                 if (d != kNoNode && owner != facts(d).owner) free_reads_.push_back(d);
+                if (d == kNoNode && !kinds_.bindings.count(id)) {  // a user function used as a value
+                    if (const auto fn = plan_.index.find(ast_.text(n)); fn != plan_.index.end())
+                        fn_value_[fn->second - 1u] = true;
+                }
             } else {
                 walk(n.a, false, owner);
                 if (n.kind == NodeKind::Index || n.kind == NodeKind::SafeIndex) walk(n.b, false, owner);
@@ -238,137 +273,6 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             walk_list(n, false, owner);
             return;
     }
-}
-
-bool Guard::escapes(int f, std::uint32_t k) const {
-    return f >= 0 && static_cast<std::size_t>(f) < escape_.size() && k < escape_[f].size() && escape_[f][k];
-}
-
-int Guard::user_function(const Node& n, int owner) const {
-    const Node& callee = at(n.a);
-    if (callee.kind == NodeKind::Ident) {
-        const std::string_view name = ast_.text(callee);
-        if (kinds_.bindings.count(n.a)) return -1;
-        if (const auto fn = plan_.index.find(name); fn != plan_.index.end()) return fn->second - 1;
-        if (const auto s = plan_.struct_index.find(name); s != plan_.struct_index.end()) {
-            const StructInfo& info = plan_.structs[s->second];
-            return info.ctor >= 0 ? static_cast<int>(info.methods[static_cast<std::size_t>(info.ctor)].function)
-                                  : -1;
-        }
-        if (owner >= 0 && plan_.is_method(static_cast<std::size_t>(owner))) {
-            const StructInfo& s = plan_.structs[static_cast<std::size_t>(plan_.method_of[owner])];
-            if (const StructMethodInfo* m = s.method(name)) return static_cast<int>(m->function);
-        }
-        return -1;
-    }
-    if (callee.kind != NodeKind::Member) return -1;
-    int s = -1;
-    if (at(callee.a).kind == NodeKind::Ident && ast_.text(at(callee.a)) == "this" && owner >= 0 &&
-        plan_.is_method(static_cast<std::size_t>(owner)))
-        s = plan_.method_of[owner];
-    else if (const auto found = kinds_.struct_ids.find(callee.a); found != kinds_.struct_ids.end())
-        s = found->second;
-    if (s < 0) return -1;
-    const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(ast_.text(at(callee.b)));
-    return m != nullptr ? static_cast<int>(m->function) : -1;
-}
-
-void Guard::call(NodeId id, bool keep, int owner) {
-    const Node& n = at(id);
-    const Node& callee = at(n.a);
-    const NodeId* args = ast_.list(n);
-    if (keep) retain(id, owner);  // an element-returning method of a binding's value
-    const int f = user_function(n, owner);
-    if (f >= 0) {
-        calls_.push_back({id, f});
-        if (callee.kind == NodeKind::Member) walk(callee.a, false, owner);
-        // An async function's arguments are copied at task creation (both models).
-        const bool task = (at(plan_.functions[static_cast<std::size_t>(f)]).flags & kFlagAsync) != 0;
-        for (std::uint32_t k = 0; k < n.count; ++k)
-            walk(args[k], !task && escapes(f, k) && !idiom_args_.count(args[k]), owner);
-        return;
-    }
-    if (callee.kind == NodeKind::Ident) {
-        const std::string_view name = ast_.text(callee);
-        const bool value_call = kinds_.bindings.count(n.a) != 0;
-        const bool isolate = name == "thread";
-        const bool deep = name == "deepcopy";
-        if (value_call) walk(n.a, false, owner);
-        for (std::uint32_t k = 0; k < n.count; ++k) {
-            // A built-in whose result may hold aggregates may hold the
-            // argument's parts (copy, merge, ...); a callable value's
-            // parameters may escape anywhere.
-            // A built-in returning one of its arguments (validate, min, max:
-            // Selected) keeps the whole value; one whose result may hold
-            // aggregates below its top may hold the argument's parts.
-            const natives::BuiltinSpec* spec = value_call ? nullptr : bind_function(name);
-            const bool whole = spec != nullptr && spec->rule == natives::ResultRule::Selected && name != "copy" &&
-                               name != "deepcopy";
-            const bool part = !isolate && !deep && !value_call && shared(id) && (whole || nested(id));
-            walk(args[k], value_call && !isolate, owner);
-            if (part && shared(args[k])) {
-                const Root r = root_of(args[k], owner);
-                if (r.known && r.decl != kNoNode)
-                    (whole && r.whole ? facts(r.decl).retained_top : facts(r.decl).retained_sub).push_back(args[k]);
-                else if (!r.known && at(args[k]).kind == NodeKind::Ident) unknown_.push_back(args[k]);
-            }
-        }
-        return;
-    }
-    if (callee.kind != NodeKind::Member) {
-        walk(n.a, false, owner);
-        walk_list(n, true, owner);
-        return;
-    }
-    const std::string_view name = ast_.text(at(callee.b));
-    const KindSet recv = kinds(callee.a);
-    walk(callee.a, false, owner);
-    if ((kinds(n.a) & kKindFunction) && !(recv & kKindArray)) {  // `o.f(args)`: a callable member, called
-        for (std::uint32_t k = 0; k < n.count; ++k) walk(args[k], true, owner);
-        return;
-    }
-    if (recv & kKindCollection) {  // map/set/stack stores keep their arguments (references)
-        for (std::uint32_t k = 0; k < n.count; ++k) walk(args[k], true, owner);
-        return;
-    }
-    const int m = collection_method(name);
-    const bool mutator = m >= 0 && m < static_cast<int>(CollectionMethod::Map);
-    if ((recv & kShared) && (mutator || (m < 0 && !pure_method_name(name) && name != "length" &&
-                                         name != "size"))) {
-        const NodeId receiver = callee.a;
-        mutate(receiver, true, id, owner);
-        const bool stores = m == static_cast<int>(CollectionMethod::Push) ||
-                            m == static_cast<int>(CollectionMethod::Insert) ||
-                            m == static_cast<int>(CollectionMethod::Splice);
-        for (std::uint32_t k = 0; k < n.count; ++k) {
-            walk(args[k], stores, owner);
-            if (stores) store_into(receiver, args[k], owner);
-        }
-        return;
-    }
-    // A reading method: a result holding aggregates may hold the
-    // receiver's parts (handled by retain above) or an argument's.
-    for (std::uint32_t k = 0; k < n.count; ++k) {
-        walk(args[k], false, owner);
-        if (shared(id) && shared(args[k]) && (nested(id) || !fresh(id, false))) {
-            const Root r = root_of(args[k], owner);
-            if (r.known && r.decl != kNoNode) facts(r.decl).retained_sub.push_back(args[k]);
-        }
-    }
-}
-
-void Guard::idiom(const Node& assign, NodeId d, int owner) {
-    const Node& value = at(assign.b);
-    if (value.kind != NodeKind::Call) return;
-    const int f = user_function(value, owner);
-    if (f < 0) return;
-    const NodeId* args = ast_.list(value);
-    std::uint32_t uses = 0, position = 0;
-    for (std::uint32_t k = 0; k < value.count; ++k)
-        if (at(args[k]).kind == NodeKind::Ident && decl(args[k], owner) == d) { ++uses; position = k; }
-    if (uses != 1 || !shared(args[position])) return;
-    facts(d).idioms.push_back({assign.b, args[position], f, position});
-    idiom_args_.insert(args[position]);
 }
 
 } // namespace nift::rt::reference_guard_detail

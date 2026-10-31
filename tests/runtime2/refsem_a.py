@@ -17,6 +17,12 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
   sessions      piped sessions (SESSIONS below): a copied array is refused
                 before it runs; ordinary array use matches legacy; map bindings stay
                 refused by the existing session shape contract.
+  phaseb/*.f    admitted programs whose meaning Phase B keeps: the VM runs
+                them, matches legacy, and prints NAME.phaseb, the transcript
+                derived by hand under reference semantics for arrays and
+                objects (D-NEXT-refsem #1; the comment in each says why).
+  modules/*/    module cases (main.f imports m.f): `reason` (refused before
+                any effect) or `phaseb` (as phaseb/ above).
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
                 execution give the same transcript, NAME.vm, both on the VM (D7).
   heap          a refused cycle leaks nothing (4 and 40 refused attempts end
@@ -36,10 +42,14 @@ import tempfile
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "refsem")
 
 
-def run(nift, path, mode, work, budget=None, extra=None):
+def run(nift, path, mode, work, budget=None, extra=None, tree=None):
     d = tempfile.mkdtemp(dir=work)
     name = os.path.basename(path)
-    shutil.copy(path, os.path.join(d, name))
+    if tree:  # a module case: the whole directory
+        for f in os.listdir(tree):
+            shutil.copy(os.path.join(tree, f), os.path.join(d, f))
+    else:
+        shutil.copy(path, os.path.join(d, name))
     stats = os.path.join(d, "stats.jsonl")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode, "NIFT_VM_STATS": stats}
@@ -68,10 +78,21 @@ def run_session(nift, stdin, work, mode="require"):
 
 
 # Piped sessions (D-NEXT-refsem #9: a later statement may mutate any binding,
-# so a copied array is refused; ordinary array use runs).
+# so a copied array, a lending to session code, or a loop over a session
+# array is refused; ordinary array use runs).
 SESSIONS = [
     ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
     ("session_array_map", 'xs := [3, 1, 2]\nys := xs.map((v) => v * 2)\nprint(ys.length())\n', ("parity",)),
+    # Sessions are fully conservative: a session read is typed "anything", so
+    # a top-level loop binding over a session array may hold a part of it
+    # that a later statement could reach.
+    ("session_loop_read", 'a := [1, 2]\nfor (x : a) { print(x) }\n', ("refuse", "", "reference-guard:shared-part")),
+    # Review of ad9d842f: a function from an earlier statement mutates the
+    # binding the call lends (Phase B: [1,2]; the copy model: [1]).
+    ("session_lend_global_callee", 'a := [1]\nfn(f(x)) { a.push(2); print(x.stringify()); return 0 }\nf(a)\n',
+     ("refuse", "", "reference-guard:lent")),
+    ("session_loop_calls_mutator", 'a := [1]\nfn(g()) { a.push(1); return 0 }\nfor (x : a) { g() }\n',
+     ("refuse", "", "reference-guard:shared-part")),
     ("session_array_push", 'a := [1, 2]\na.push(3)\nprint(a.length())\n', ("parity",)),
     # Unchanged from the base (18720d14): a map-typed session binding was already
     # refused by the session shape contract; Phase A does not widen sessions.
@@ -141,6 +162,27 @@ def main():
             check(vr == 1 and vo == "", "refuse %s: exit %d stdout %r (must be 1 and empty)" % (name, vr, vo))
             check("(%s)" % reason in ve and "no part of it ran" in ve,
                   "refuse %s: expected reason %s before effects, got %r" % (name, reason, ve.strip()[:300]))
+        for f in fixtures("phaseb"):
+            name = os.path.basename(f)
+            want = open(f[:-2] + ".phaseb").read()
+            lo, le, lr, _ = run(nift, f, "0", work)
+            vo, ve, vr, st = run(nift, f, "require", work)
+            check(ran_on_vm(st) and (vo, ve, vr) == (lo, le, lr) and vo == want,
+                  "phaseb %s: VM %r/%r/%d legacy %r/%d, Phase B transcript %r" % (name, vo, ve[:200], vr, lo, lr, want))
+        mods = os.path.join(HERE, "modules")
+        for case in sorted(os.listdir(mods)):
+            tree = os.path.join(mods, case)
+            main = os.path.join(tree, "main.f")
+            vo, ve, vr, st = run(nift, main, "require", work, tree=tree)
+            if os.path.exists(os.path.join(tree, "reason")):
+                reason = open(os.path.join(tree, "reason")).read().strip()
+                check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
+                      "module %s: expected %s before effects, got %d %r %r" % (case, reason, vr, vo, ve[:300]))
+            else:
+                want = open(os.path.join(tree, "phaseb")).read()
+                lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
+                check(ran_on_vm(st) and (vo, ve, vr) == (lo, le, lr) and vo == want,
+                      "module %s: VM %r/%r/%d legacy %r, Phase B %r" % (case, vo, ve[:200], vr, lo, want))
         for f in fixtures("equiv"):
             name = os.path.basename(f)
             base = f[:-2]
@@ -176,6 +218,15 @@ def main():
         check(a[2] == 0 and b[2] == 0 and a[0] == "8\n" and b[0] == "80\n" and la is not None and la == lb,
               "heap cycle_refused: exit %d/%d %r/%r, live heap %s != %s (x10): %r" % (a[2], b[2], a[0], b[0], la, lb,
                                                                                      a[1][:200]))
+        # The same through captured cells (closures), against a control with
+        # no refused store: equal live heaps mean nothing was kept or leaked.
+        runs = [run(nift, os.path.join(heap, n), "require", work)
+                for n in ("cell_cycle_refused.f", "cell_cycle_refused_many.f", "cell_cycle_control.f")]
+        lives = [r[3].get("heap_live") if r[3] else None for r in runs]
+        check([r[2] for r in runs] == [0, 0, 0] and [r[0] for r in runs] == ["12\n", "120\n", "12\n"] and
+              lives[0] is not None and lives[0] == lives[1] == lives[2],
+              "heap cell_cycle_refused: exits %s outputs %s live heaps %s: %r" %
+              ([r[2] for r in runs], [r[0] for r in runs], lives, runs[0][1][:200]))
         for fname, budget in (("budget_deepcopy.f", 4_750_000), ("budget_copy.f", 4_750_000),
                               ("budget_snapshot.f", 4_750_000), ("budget_spawn.f", 4_750_000)):
             vo, ve, vr, st = run(nift, os.path.join(heap, fname), "require", work, budget=budget,

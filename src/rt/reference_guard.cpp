@@ -22,6 +22,10 @@ bool Guard::run(NodeId root, std::string& reason, std::uint32_t& offset) {
         unknown_mutations_.clear();
         returns_.assign(plan_.functions.size(), {});
         free_reads_.clear();
+        owners_.clear();
+        lends_.clear();
+        user_calls_.clear();
+        fn_value_.assign(plan_.functions.size(), false);
         note_params();
         walk(root, false, -1);
         if (!grow_escapes()) break;
@@ -117,12 +121,36 @@ bool Guard::grow_escapes() {
             const auto found = facts_.find(params[k]);
             if (found == facts_.end()) continue;
             const Facts& p = found->second;
-            if (!mutated(p) && !p.returned && p.retained_top.empty() && p.retained_sub.empty()) continue;
+            // A parameter a closure captures outlives the call (its cell).
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 18
+            const bool captured = false;  // R18: a parameter a closure captures does not escape
+#else
+            const bool captured = outside(params[k]);
+#endif
+            if (!mutated(p) && !p.returned && p.retained_top.empty() && p.retained_sub.empty() && !captured)
+                continue;
             escape_[fn][k] = true;
             grew = true;
         }
     }
     return grew;
+}
+
+bool Guard::outside(NodeId d) const {
+    const auto f = facts_.find(d);
+    const int owner = f == facts_.end() ? -1 : f->second.owner;
+    if (session_ && owner == -1) return true;  // a session binding: later statements reach it
+    const auto seen = owners_.find(d);
+    if (seen == owners_.end()) return false;
+    if (seen->second.size() >= 2) return true;
+    return f != facts_.end() && f->second.declared && seen->second.front() != owner;
+}
+
+bool Guard::user_code(NodeId region) const {
+    const Node& r = at(region);
+    for (NodeId c : user_calls_)
+        if (within(at(c), r)) return true;
+    return false;
 }
 
 bool Guard::fail(NodeId at_node, const char* route, std::string& reason, std::uint32_t& offset) const {
@@ -136,6 +164,15 @@ bool Guard::check(std::string& reason, std::uint32_t& offset) {
     return true;  // R13: the forward-compatibility guard is off
 #endif
     if (!unknown_mutations_.empty()) return fail(unknown_mutations_.front(), "unresolved", reason, offset);
+    // A loop binding or a native callback's parameter is a part of its
+    // operand's root: captured by a closure, that part outlives the loop.
+    std::vector<std::pair<NodeId, NodeId>> captured_parts;
+    for (const auto& [d, f] : facts_)
+        if (f.loop && shared(d) && outside(d)) {  // a scalar part shares nothing
+            if (f.loop_root != kNoNode) captured_parts.push_back({f.loop_root, d});
+            else unknown_.push_back(d);
+        }
+    for (const auto& [root, part] : captured_parts) facts_[root].retained_sub.push_back(part);
     for (auto& [d, f] : facts_) {
         if (f.loop) continue;  // a part of its iterable's root (checked there)
         // An idiom argument may be mutated at any depth by the callee.
@@ -158,6 +195,37 @@ bool Guard::check(std::string& reason, std::uint32_t& offset) {
                 if (fresh(arg, nested_mutation) || idiom_argument(arg)) continue;
                 return fail(arg, "argument", reason, offset);
             }
+    }
+    // The lent rule (D-NEXT-refsem #1): while a binding's value is lent (to
+    // a call's parameter, a native and its callbacks, a loop), no mutation of
+    // the binding may run; one written inside the region, or one in another
+    // body when the region may run user code, would be seen through the
+    // lent alias in Phase B but not in the copy model.
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 17
+    lends_.clear();  // R17: the lent rule is off (the review's g01/h01/i08/j01 shapes run)
+#endif
+    for (const Lend& lend : lends_) {
+        const auto found = facts_.find(lend.decl);
+        if (found == facts_.end()) continue;
+        const Facts& f = found->second;
+        if (!session_ && !mutated(f)) continue;
+        const Node& region = at(lend.region);
+        for (NodeId site : f.mut_sites)
+            if (site != lend.region && within(at(site), region) && !within(at(site), at(lend.value)))
+                return fail(site, "lent", reason, offset);
+        if (outside(lend.decl) && user_code(lend.region)) return fail(lend.region, "lent", reason, offset);
+    }
+    // A user function used as a value, or any in a session, has callers the
+    // guard cannot see: a parameter it mutates may hold anyone's value.
+    for (std::size_t fn = 0; fn < plan_.functions.size(); ++fn) {
+        if (!session_ && !fn_value_[fn]) continue;
+        const Node& node = at(plan_.functions[fn]);
+        if (node.flags & kFlagAsync) continue;
+        const NodeId* params = ast_.list(node);
+        for (std::uint32_t k = 0; k < node.count; ++k) {
+            const auto p = facts_.find(params[k]);
+            if (p != facts_.end() && mutated(p->second)) return fail(params[k], "argument", reason, offset);
+        }
     }
     if (!unknown_.empty()) {
         // An unresolved holder (an imported binding): only harmless when
@@ -184,11 +252,11 @@ bool Guard::idiom_argument(NodeId arg) const {
         for (const Idiom& idiom : f.idioms) {
             if (idiom.arg != arg) continue;
             // x = f(x): x is exclusive (checked as mutated above) and no
-            // function or lambda reads x as a free name (it would see the
-            // callee's mutation through a second holder).
+            // other body references x (it would see the callee's mutation
+            // through a second holder).
             for (NodeId read : free_reads_)
                 if (read == d) return false;
-            return true;
+            return !outside(d);
         }
     }
     return false;

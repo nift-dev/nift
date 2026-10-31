@@ -27,8 +27,11 @@ declare -A FILE=(
   [13]=src/rt/reference_guard.cpp     # the Phase A forward-compatibility guard is off
   [14]=src/rt/vm_keyed.cpp            # a refused map store happens before the refusal (graph changed)
   [15]=src/rt/isolate_transfer_encode.cpp  # a thread transfer loses aliasing between collections/instances
+  [16]=src/rt/vm_closure.cpp          # a cycle closed through a captured cell is fatal, not catchable
+  [17]=src/rt/reference_guard.cpp     # the lent rule is off (a lent binding mutated during the call or loop)
+  [18]=src/rt/reference_guard.cpp     # a parameter a closure captures does not escape
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

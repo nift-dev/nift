@@ -1,0 +1,4 @@
+caught runtime.reference_cycle
+1
+--- stderr
+--- exit 0
