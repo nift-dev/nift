@@ -48,8 +48,12 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         if (m == M::Sort && !values.empty()) {
             bool grew = false;
             const auto argument=collection_value(element);
-            call_callables(values[0], {argument, argument}, grew);
+            const TyRef order=call_callables(values[0], {argument, argument}, grew);
+            if (plan_.collections && (order->kinds & kKindCollection)) result_.collection_inspections.insert(n.a);  // D-063
         }
+        // D-063: a plain sort compares the elements (legacy: tag strings).
+        if (m == M::Sort && values.empty() && plan_.collections && (element->kinds & kKindCollection))
+            result_.collection_inspections.insert(n.a);
         if(m==M::Push||m==M::Insert){const std::size_t at=m==M::Push?0:1;
             return collection_value(at<values.size()?values[at]:any_ty());}
         if(m==M::Pop||m==M::Remove)return collection_value(element);
@@ -74,6 +78,13 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
             collection_callables(values[0],{result,element},ignored));}
         else result=collection_callables(values[0],{element},grew);
     }
+    // D-063: the key/selector callbacks' results are compared, hashed or
+    // checked as keys (legacy: a collection result is its tag string).
+    const bool keyed_callback=m==M::SortBy||m==M::GroupBy||m==M::IndexBy||m==M::UniqueBy||m==M::MinBy||
+                              m==M::MaxBy||m==M::CountBy||m==M::GroupByEach;
+    // group_by_each's callback returns an array of keys.
+    const KindSet keys=m==M::GroupByEach?(result->kinds|element_of(result,nullptr,false)->kinds):result->kinds;
+    if(keyed_callback&&plan_.collections&&(keys&kKindCollection))result_.collection_inspections.insert(n.a);
     switch(m) {
         case M::Map:return array_type(result);
         case M::Filter:case M::SortBy:case M::UniqueBy:return array_type(element);

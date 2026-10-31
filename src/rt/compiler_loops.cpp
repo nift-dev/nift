@@ -66,14 +66,22 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     else state.force_mode = source_kinds == kKindMap ? 5 : 4;  // single over an object (5: a map)
     state.error_only = state.force_mode >= 0;
 
-    if (!state.error_only && !keyed) for_source_binding(iterable, state.place);
+    // Owner ruling (2026-11-01): a map loop visits the entries captured at
+    // loop entry; the body's insertions, removals and updates do not reach
+    // the active snapshot (M15: the map is re-read live, as an object is).
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 15
+    const bool snapshot = keyed && source_kinds != kKindMap;
+#else
+    const bool snapshot = keyed;
+#endif
+    if (!state.error_only && !snapshot) for_source_binding(iterable, state.place);
     if (state.place != nullptr) {
         // Keep binding identity stable: declaring the loop name below can
         // reallocate the scope vector and must not scroll the source binding.
         state.source_holder = *state.place;
         state.place = &state.source_holder;
     }
-    if (iterable.kind == NodeKind::Ident && !keyed) state.source_name = text(iterable);
+    if (iterable.kind == NodeKind::Ident && !snapshot) state.source_name = text(iterable);
     state.live = !state.error_only && state.place != nullptr;
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1
     state.snapshot_mutant = state.live;  // M1: a snapshot instead of live re-reads

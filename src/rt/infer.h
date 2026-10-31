@@ -143,10 +143,20 @@ struct UnitKinds {
     std::unordered_set<NodeId> collection_arrays;
     std::unordered_map<NodeId,NodeId> bindings;
     std::unordered_map<NodeId,KindSet> collection_elements;
-    // D-063: for the receiver of a built-in method on an array or object, the
-    // kinds of its elements/members (a native that inspects them refuses
-    // map/set/stack elements, see builtin_arguments_ok).
-    std::unordered_map<NodeId,KindSet> receiver_elements;
+    // D-063 (units that construct a collection, UnitPlan::collections).
+    // Legacy's collections are tag strings, which its scalar rules accept:
+    // collection_elements_of: expressions that may have a map, set or stack
+    // as a direct element or member (`[m].contains(x)`, `max(a)` with
+    // a := [m, m]; deeper nesting fails the same way in both engines);
+    // collection_holders: expressions that may hold one at any depth
+    // (legacy's shared-state transfer check and the shown result of an eval
+    // or session statement look at every depth); collection_inspections: the
+    // member nodes of array method calls that would compare or key on a
+    // collection (a plain sort's elements, a key or comparator callback's
+    // result). The compiler refuses those uses only.
+    std::unordered_set<NodeId> collection_elements_of;
+    std::unordered_set<NodeId> collection_holders;
+    std::unordered_set<NodeId> collection_inspections;
     std::unordered_set<NodeId> collection_text_numbers;
     // CP22: expressions whose value is, or may contain at any depth, a future.
     std::unordered_set<NodeId> future_holders;

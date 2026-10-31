@@ -134,6 +134,11 @@ struct UnitPlan {
     // CP22: the unit declares an async function or contains an async lambda
     // (a coroutine unit: Spawn/CallValueAny/Await/Sleep/Yield are emitted).
     bool coroutines = false;
+    // D-063: the unit constructs a map, set or stack (`map()`, `set()`,
+    // `stack()`). The unit is closed (threads and modules included; session
+    // bindings never carry one across statements), so without a constructor
+    // no value of the unit is or holds a collection.
+    bool collections = false;
 };
 
 // Collects the top-level functions of `root` (a Program) and checks the

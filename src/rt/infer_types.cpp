@@ -233,4 +233,16 @@ bool holds_future(const TyRef& t, int depth) {
     return false;
 }
 
+bool holds_collection(const TyRef& t, int depth) {
+    if (!t) return false;
+    if (t->any || (t->kinds & (kKindCollection | kKindUnknown)) || t->struct_id != -1) return true;
+    if (depth > kMaxDepth + 2) return true;  // beyond the cap: may be anything
+    if (holds_collection(t->elem, depth + 1) || holds_collection(t->key, depth + 1)) return true;
+    for (const TyRef& item : t->items)
+        if (holds_collection(item, depth + 1)) return true;
+    for (const auto& field : t->fields)
+        if (holds_collection(field.second, depth + 1)) return true;
+    return false;
+}
+
 } // namespace nift::rt::infer_detail

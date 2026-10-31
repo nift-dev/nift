@@ -62,6 +62,11 @@ bool UnitCompiler::expression_statement(const Node& node) {
     // whose value may be an Error is rendered by legacy's template path
     // (`Error values cannot be rendered as text in $[...]`): refuse it.
     if (session_ && session_->inspect_tail && !in_function_) {
+        // D-063: legacy shows nothing for a statement that mutated at its
+        // top level (last_expression_mutation_), here the value would be
+        // shown; and a collection value has no session form here (below).
+        if (!loop_region() && unit_makes_collections() && keyed_mutator_call(expr))
+            return fail(expr, "session:collection-mutator");
         if (!loop_region()) return session_render(node_id(node));
         std::uint16_t scratch = 0;
         return temp(scratch) && expr_to(node.a, scratch);  // prepared loop statements discard values

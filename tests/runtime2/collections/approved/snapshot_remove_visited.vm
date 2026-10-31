@@ -1,0 +1,5 @@
+1
+a
+--- stderr
+error: snapshot_remove_visited.f:2:23: remove: key not found
+--- exit 1

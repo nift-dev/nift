@@ -372,9 +372,6 @@ TyRef Inference::call(const Node& n) {
             if (session_) if (const auto historical = session_collection_call(n, values, collection)) return historical;
             return result;
         }
-        if (recv->kinds & (kKindArray | kKindObject))  // D-063
-            result_.receiver_elements[callee.a] |=
-                element_of(recv, nullptr, false)->kinds | element_of(recv, nullptr, true)->kinds;
         TyRef result=method_result(ast_, n, recv, values, session_ != nullptr);
         if((result->kinds&kKindNumber)&&key!="size"&&key!="length") {
             result=with_text_number(result,true);

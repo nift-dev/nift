@@ -140,6 +140,14 @@ bool convert_to(const Value& value, nift::RuntimeValue& out, std::string& error,
             }
             error = "typed handles have no legacy representation";
             return false;
+        case Kind::Collection:
+            // D-063: legacy shows these (a tag or stringify form); compiled
+            // units refuse a shown collection result before running
+            // (eval:/session:collection-result). Kept truthful should one
+            // still arrive here; the converter has no source position.
+            error = "a map, set or stack value cannot be shown by the Runtime 2.0 VM yet "
+                    "(no source position is available for this report)";
+            return false;
         default:
             error = std::string(kind_name(value.kind())) + " values have no legacy representation";
             return false;

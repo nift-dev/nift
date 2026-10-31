@@ -150,7 +150,8 @@ private:
         };
         switch (n.kind) {
             case WireKind::Array:
-                for (auto index : n.children) v.heap_as<ArrayObject>()->items.push_back(child(index)); break;
+                for (auto index : n.children) v.heap_as<ArrayObject>()->items.push_back(child(index));
+                break;
             case WireKind::Collection: {
                 auto* c = v.heap_as<CollectionObject>();
                 for (auto index : n.children) c->items.push_back(child(index));
@@ -160,12 +161,15 @@ private:
             case WireKind::Object:
                 for (auto& field : n.fields)
                     v.heap_as<ObjectObject>()->entries.emplace_back(atom(field.first), child(field.second));
-                rebuild_object_index(*v.heap_as<ObjectObject>()); break;
+                rebuild_object_index(*v.heap_as<ObjectObject>());
+                break;
             case WireKind::Struct:
                 for (auto& field : n.fields)
-                    v.heap_as<StructObject>()->fields.emplace_back(atom(field.first), child(field.second)); break;
+                    v.heap_as<StructObject>()->fields.emplace_back(atom(field.first), child(field.second));
+                break;
             case WireKind::Function:
-                for (auto index : n.children) v.heap_as<FunctionObject>()->upvalues.push_back(child(index)); break;
+                for (auto index : n.children) v.heap_as<FunctionObject>()->upvalues.push_back(child(index));
+                break;
             case WireKind::Cell: if (n.has_child) v.heap_as<CellObject>()->value = child(n.child); break;
             case WireKind::Error: if (n.has_child) v.heap_as<ErrorObject>()->cause = child(n.child); break;
             default: break;

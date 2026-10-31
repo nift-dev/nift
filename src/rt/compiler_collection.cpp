@@ -10,6 +10,19 @@ int UnitCompiler::collection_method_call(const Node& node,std::uint16_t dst) {
     const Node& callee=ast_.at(node.a);
     const int method=collection_method(text(ast_.at(callee.b)));
     if(method<0||kinds(callee.a)!=kKindArray)return -1;
+    // D-063: a sort over elements, or a key/comparator callback result, that
+    // may be a map, set or stack: legacy compares its tag string.
+    if(unit_makes_collections()&&kinds_.collection_inspections.count(node.a)) {
+        const std::string name(collection_names[method]);
+        if(static_cast<CollectionMethod>(method)==CollectionMethod::Sort&&node.count==0) {
+            fail(node,"collection-element:"+name);
+            return 0;
+        }
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 13
+        fail(node,"collection-callback-key:"+name);  // M13 drops this check
+        return 0;
+#endif
+    }
     return collection_call(node,dst,method)?1:0;
 }
 bool UnitCompiler::collection_call(const Node& node,std::uint16_t dst,int method_id) {

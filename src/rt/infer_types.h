@@ -71,5 +71,8 @@ KindSet arithmetic_kinds(Op op, KindSet l, KindSet r);
 TyRef async_result(std::uint32_t flags, const TyRef& returns);
 TyRef awaited(const TyRef& t);
 bool holds_future(const TyRef& t, int depth = 0);
+// D-063: whether `t` is or may contain a map, set or stack at any depth (top
+// and struct instances included: their fields are not tracked here).
+bool holds_collection(const TyRef& t, int depth = 0);
 
 } // namespace nift::rt::infer_detail

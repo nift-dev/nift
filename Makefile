@@ -4562,11 +4562,6 @@ test-cp23-certify: test-runtime2-cp23-tsan
 endif
 CERTIFY_RUNTIME2_GATES += test-cp23-certify
 certify-targets: test-cp23-certify
-# VM-default policy: the VM is the default scripting engine with no silent
-# legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
-# interpreter; NIFT_VM=1 still falls back; any other value, empty included, is
-# a configuration error). Website builds stay legacy.
-.PHONY: test-runtime2-vm-default
 # Weekend collections (D-063): map/set/stack values on the VM.
 .PHONY: test-runtime2-collections test-runtime2-collections-mutants
 test-runtime2-collections: $(TARGET)
@@ -4582,6 +4577,11 @@ test-runtime2-collections-tsan: $(TSAN_TARGET)
 	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm: test-runtime2-collections test-runtime2-collections-mutants
 test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collections-tsan
+# VM-default policy: the VM is the default scripting engine with no silent
+# legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
+# interpreter; NIFT_VM=1 still falls back; any other value, empty included, is
+# a configuration error). Website builds stay legacy.
+.PHONY: test-runtime2-vm-default
 test-runtime2-vm-default: $(TARGET)
 	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-vm-default

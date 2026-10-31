@@ -1,0 +1,4 @@
+ran
+--- stderr
+error: same_handle_across_thread.f:1:17: thread: return: same: operands must be identity-bearing values
+--- exit 1

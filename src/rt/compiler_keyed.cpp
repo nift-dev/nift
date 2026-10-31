@@ -54,6 +54,14 @@ natives::Receiver keyed_receiver(KindSet kinds) {
 }
 } // namespace
 
+// D-063: is `node` a call of a map/set/stack mutator (`m.set(k, v)`,
+// `s.add(v)`, `st.push(v)`, `.remove`, `.pop`, `.clear`)?
+bool UnitCompiler::keyed_mutator_call(const Node& node) {
+    if (node.kind != NodeKind::Call || ast_.at(node.a).kind != NodeKind::Member) return false;
+    const Node& callee = ast_.at(node.a);
+    return keyed_mutator(kinds(callee.a), text(ast_.at(callee.b))) >= 0 && (kinds(callee.a) & kKindCollection);
+}
+
 // D-063: methods of map/set/stack values. Read-only methods are natives over
 // the receiver value; mutators are lowered onto the bare binding (legacy
 // accepts collection methods on a bare binding only). Callback methods

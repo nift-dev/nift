@@ -1,0 +1,4 @@
+ran
+--- stderr
+error: same_array.f:4:7: same: operands must be identity-bearing values
+--- exit 1

@@ -31,6 +31,12 @@ void UnitCompiler::set_session(SessionCompileContext* session) {
 bool UnitCompiler::session_render(NodeId id) {
     const auto& node = ast_.at(id);
     const auto expression = node.a;
+    // D-063: legacy shows a map/set/stack statement value (or one inside an
+    // array/object) with its stringify form or tag; the session cannot show
+    // a collection value: refused before the statement runs.
+    if (unit_makes_collections() &&
+        ((kinds(expression) & kKindCollection) || kinds_.collection_holders.count(expression)))
+        return fail(ast_.at(expression), "session:collection-result");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(expression, value)) return false;
     const auto source = std::string(text(node));

@@ -19,39 +19,7 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
             if ((k_arg & kKindUnknown) && !unknown_defers(k_arg))
                 return fail(arg, "builtin-plain-arg:" + std::string(spec.name));
         }
-    // D-063 / D-040 #4: same() compares identity. Shared concurrency handles
-    // and task handles are identity values here but an error in legacy: not
-    // compiled (no unapproved difference). Ordinary values (arrays, objects,
-    // structs, collections) are the approved D-040 #4 error at run time.
-    if (spec.id == natives::BuiltinId::FnSame)
-        for (std::uint32_t k = 0; k < node.count; ++k)
-            if (kinds(args[k]) & (kKindShared | kKindTask))
-                return fail(ast_.at(args[k]), "same:shared-handle");
-    // D-063: legacy's collections are tagged strings. A built-in that renders,
-    // hashes, converts or compares them as such (html_escape(m), sha256(m),
-    // validate(s, m), [m].contains(m), [m].join(",")) would observe the tag;
-    // only these accept a map/set/stack argument (or element) here.
-    if (unit_makes_collections()) {
-        using natives::BuiltinId;
-        const auto id = spec.id;
-        const bool value_ok = id == BuiltinId::FnType || id == BuiltinId::FnCopy || id == BuiltinId::FnDeepcopy ||
-                              id == BuiltinId::FnSame || (id >= BuiltinId::FnIsNull && id <= BuiltinId::FnIsEnum) ||
-                              spec.receiver == natives::Receiver::Map || spec.receiver == natives::Receiver::Set ||
-                              spec.receiver == natives::Receiver::Stack;
-        if (!value_ok)
-            for (std::uint32_t k = 0; k < node.count; ++k)
-                if ((kinds(args[k]) & kKindCollection) && !(kinds(args[k]) & kKindUnknown))
-                    return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
-        const bool inspects = id == BuiltinId::ArrContains || id == BuiltinId::ArrIndexOf ||
-                              id == BuiltinId::ArrJoin || id == BuiltinId::ArrUnique || id == BuiltinId::ArrSum ||
-                              id == BuiltinId::ArrMin || id == BuiltinId::ArrMax || id == BuiltinId::ArrFromEntries ||
-                              id == BuiltinId::ObjMergeDeep;
-        if (inspects && receiver != kNoNode) {
-            const auto found = kinds_.receiver_elements.find(receiver);
-            if (found != kinds_.receiver_elements.end() && (found->second & kKindCollection))
-                return fail(node, "collection-element:" + std::string(spec.name));
-        }
-    }
+    if (!collection_inspection_ok(node, spec, receiver)) return false;
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));
@@ -74,19 +42,59 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         return fail(ast_.at(args[0]), "builtin-arg-fault-context");
     return true;
 }
-// D-063: does the unit construct a map, set or stack anywhere (the only
-// source of collections: the unit is closed, threads and modules included)?
-// Without one, "any kind" values (top) hold no collection.
-bool UnitCompiler::unit_makes_collections() {
-    if (makes_collections_ < 0) {
-        makes_collections_ = 0;
-        for (NodeId id = 0; id < ast_.size() && !makes_collections_; ++id) {
-            const Node& n = ast_.at(id);
-            if (n.kind != NodeKind::Call || n.count != 0 || ast_.at(n.a).kind != NodeKind::Ident) continue;
-            const std::string_view name = text(ast_.at(n.a));
-            if (name == "map" || name == "set" || name == "stack") makes_collections_ = 1;
-        }
+// D-063. same() (D-040 #4, owner ruling 2026-11-01) compares identity; and
+// legacy's collections are tagged strings, so the built-in operations that
+// render, compare or key on one, or store one into shared state, would see
+// (or carry) the tag where the VM has a value. Only those are refused before
+// execution; plain nesting and the other built-ins run.
+bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
+    using natives::BuiltinId;
+    static_cast<void>(receiver);  // unused in mutant 12
+    const NodeId* args = ast_.list(node);
+    const auto id = spec.id;
+    if (id == BuiltinId::FnSame) {
+        // Legacy reads each argument's text as a binding name first (a
+        // location reference, a shared array binding) and evaluates the
+        // others up to twice: `same("f", "f")` compares the binding f,
+        // `same(g(), x)` runs g() twice. Only plain names keep one meaning.
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 11
+        for (std::uint32_t k = 0; k < node.count; ++k)
+            if (ast_.at(args[k]).kind != NodeKind::Ident) return fail(ast_.at(args[k]), "same:argument-shape");
+#endif
+        return true;  // ordinary values: the D-040 #4 error at run time
     }
-    return makes_collections_ == 1;
+    if (!unit_makes_collections()) return true;
+    // Built-ins that only report kinds, copy, or are the collection methods.
+    const bool value_ok = id == BuiltinId::FnType || id == BuiltinId::FnCopy || id == BuiltinId::FnDeepcopy ||
+                          (id >= BuiltinId::FnIsNull && id <= BuiltinId::FnIsEnum) ||
+                          spec.receiver == natives::Receiver::Map || spec.receiver == natives::Receiver::Set ||
+                          spec.receiver == natives::Receiver::Stack;
+    if (value_ok) return true;
+    for (std::uint32_t k = 0; k < node.count; ++k)
+        if ((kinds(args[k]) & kKindCollection) && !(kinds(args[k]) & kKindUnknown))
+            return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 12
+    // Only the operations whose legacy meaning sees the tag (audited against
+    // NIFT_VM=0; plain nesting runs, e.g. `[[m]].contains([m])`, `[a, m]`):
+    // comparisons, rendering and keys over direct elements of the receiver,
+    // or of min()/max()'s array argument ...
+    const bool inspects = id == BuiltinId::ArrContains || id == BuiltinId::ArrIndexOf ||
+                          id == BuiltinId::ArrJoin || id == BuiltinId::ArrUnique || id == BuiltinId::ArrSum ||
+                          id == BuiltinId::ArrMin || id == BuiltinId::ArrMax || id == BuiltinId::ArrFromEntries ||
+                          id == BuiltinId::ObjMergeDeep;
+    if (inspects && receiver != kNoNode && kinds_.collection_elements_of.count(receiver))
+        return fail(node, "collection-element:" + std::string(spec.name));
+    if (id == BuiltinId::FnMin || id == BuiltinId::FnMax)
+        for (std::uint32_t k = 0; k < node.count; ++k)
+            if (kinds_.collection_elements_of.count(args[k]))
+                return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
+    // ... and stores into shared state, where legacy refuses a collection at
+    // any depth ("set value contains a non-transferable resource").
+    if (id == BuiltinId::MutexSet || id == BuiltinId::SharedSend)
+        for (std::uint32_t k = 0; k < node.count; ++k)
+            if (kinds_.collection_holders.count(args[k]))
+                return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
+#endif
+    return true;
 }
 } // namespace nift::rt::detail

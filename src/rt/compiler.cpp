@@ -248,6 +248,15 @@ bool UnitCompiler::return_statement(const Node& node) {
         fb_->emit(in_function_ ? OpCode::ReturnNull : OpCode::Halt);
         return true;
     }
+    // D-063: the shown result of `nift eval` or of a session expression
+    // statement: legacy shows a collection, also inside an array or object
+    // (its tag or stringify form); the VM has no form for it: refused before
+    // anything runs (M14 drops it).
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 14
+    if (expression_result_ && !in_function_ && unit_makes_collections() &&
+        ((kinds(node.a) & kKindCollection) || kinds_.collection_holders.count(node.a)))
+        return fail(ast_.at(node.a), session_ ? "session:collection-result" : "eval:collection-result");
+#endif
     if ((!expression_result_ || in_function_) && !no_alias(node.a, node)) return false;
     if (!in_function_ && !expression_result_ &&
         !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;

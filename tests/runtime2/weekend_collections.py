@@ -11,8 +11,15 @@ Contract: docs/runtime-2/checkpoints/weekend-collections.md.
                 (statistics outcome vm or vm-error, no legacy execution).
   approved/*.f  approved value-semantics differences (D-063): the VM output is
                 NAME.vm, the legacy witness is NAME.legacy, and the two differ.
+                NAME.legacy-undefined instead of NAME.legacy: legacy's behaviour is
+                undefined there (it reads a removed map entry), so it is not run.
   refuse/*.f    refused before any effect: exit 1, no stdout (every fixture
-                prints first), "no part of it ran", and the reason in NAME.reason.
+                prints first), "no part of it ran", the reason in NAME.reason,
+                and (NAME.at, "line:column") the reported position.
+  sessions      piped sessions and `nift eval` (SESSIONS below): a refused
+                statement runs no part of itself (earlier statements' output
+                stays, nothing later runs, exit 1, reason and position), and
+                admitted collection units match legacy.
   heap          budget stops before growth (map, set, stack, and the clone of a
                 shared collection), exact peak accounting, and the live heap at
                 stop back to an identical program's that never filled them.
@@ -52,6 +59,40 @@ def run(nift, path, mode, work, budget=None, extra=None):
     # Diagnostics name the script by its absolute path: drop the per-run directory.
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
     return norm(p.stdout), norm(p.stderr), p.returncode, st
+
+
+def run_session(nift, stdin, work, argv=None, mode="require"):
+    d = tempfile.mkdtemp(dir=work)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
+           "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode}
+    p = subprocess.run(["timeout", "120", nift] + (argv or []), cwd=d, env=env, input=stdin.encode(),
+                       capture_output=True)
+    return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
+
+
+# (name, stdin, argv, expectation): ("refuse", stdout before the refusal,
+# reason, "line:column") or ("parity",). argv None: a piped session.
+SESSIONS = [
+    ("collection_statement", 'print("a")\nmap()\nprint("b")\n', None,
+     ("refuse", "a\n", "session:collection-result", "<stdin>:2:1")),
+    ("collection_in_line", 'print("a")\nprint(1); set()\nprint("b")\n', None,
+     ("refuse", "a\n", "session:collection-result", "<stdin>:2:11")),
+    ("collection_nested", 'print("a")\n[map()]\nprint("b")\n', None,
+     ("refuse", "a\n", "session:collection-result", "<stdin>:2:1")),
+    ("collection_call_result", 'print("a")\nf := () => stack()\nf()\nprint("b")\n', None,
+     ("refuse", "a\n", "session:collection-result", "<stdin>:3:1")),
+    ("mutator_echo", 'print("a")\nm := map(); m.set(1, 2); print(m.size())\nprint("b")\n', None,
+     ("refuse", "a\n", "session:collection-mutator", "<stdin>:2:13")),
+    ("same_string_literal", 'print("a")\nf := () => 1; print(same("f", "f"))\nprint("b")\n', None,
+     ("refuse", "a\n", "same:argument-shape", "<stdin>:2:26")),
+    ("eval_collection", "", ["eval", "map()"], ("refuse", "", "eval:collection-result", "<eval>:1:1")),
+    ("eval_nested_collection", "", ["eval", "[set()]"], ("refuse", "", "eval:collection-result", "<eval>:1:1")),
+    # Plain uses still run.
+    ("scalar_of_collection", 'print("a")\nm := map(); m.size()\nprint("b")\n', None, ("parity",)),
+    ("print_in_session", 'print("a")\nm := map(); print(m.size()); print(m.stringify())\nprint("b")\n', None,
+     ("parity",)),
+    ("eval_scalar_of_collection", "", ["eval", "type(map())"], ("parity",)),
+]
 
 
 def transcript(out, err, rc):
@@ -96,17 +137,21 @@ def main():
             name = os.path.basename(f)
             base = f[:-2]
             vo, ve, vr, st = run(nift, f, "require", work)
-            lo, le, lr, _ = run(nift, f, "0", work)
+            undefined = os.path.exists(base + ".legacy-undefined")
+            lo, le, lr = run(nift, f, "0", work)[:3] if not undefined else ("", "", 0)
             vm_t, legacy_t = transcript(vo, ve, vr), transcript(lo, le, lr)
             if args.update:
                 open(base + ".vm", "w").write(vm_t)
-                open(base + ".legacy", "w").write(legacy_t)
+                if not undefined:
+                    open(base + ".legacy", "w").write(legacy_t)
                 continue
             outcome = st.get("outcome") if st else None
             check(outcome in ("vm", "vm-error"), "approved %s: not run by the VM (outcome %s)" % (name, outcome))
             want_vm = open(base + ".vm").read() if os.path.exists(base + ".vm") else None
             want_legacy = open(base + ".legacy").read() if os.path.exists(base + ".legacy") else None
             check(vm_t == want_vm, "approved %s: VM output\n%s\nexpected\n%s" % (name, vm_t, want_vm))
+            if undefined:
+                continue
             check(legacy_t == want_legacy, "approved %s: legacy witness changed\n%s" % (name, legacy_t))
             check(vm_t != legacy_t, "approved %s: no longer differs from legacy (not an approved difference)" % name)
         # ---- refused before any effect ----
@@ -117,6 +162,21 @@ def main():
             check(vr == 1 and vo == "", "refuse %s: exit %d stdout %r (must be 1 and empty)" % (name, vr, vo))
             check("(%s)" % reason in ve and "no part of it ran" in ve,
                   "refuse %s: expected reason %s before effects, got %r" % (name, reason, ve.strip()[:300]))
+            if os.path.exists(f[:-2] + ".at"):
+                at = "%s:%s: not compiled" % (name, open(f[:-2] + ".at").read().strip())
+                check(ve.startswith("error: " + at), "refuse %s: expected position %s, got %r" % (name, at, ve[:200]))
+        # ---- sessions and eval ----
+        for name, stdin, argv, want in SESSIONS:
+            vo, ve, vr = run_session(nift, stdin, work, argv)
+            if want[0] == "parity":
+                lo, le, lr = run_session(nift, stdin, work, argv, mode="0")
+                check((vo, ve, vr) == (lo, le, lr) and "not compiled" not in ve and "refused" not in ve,
+                      "session %s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo, le, lr, vo, ve, vr))
+                continue
+            _, before, reason, at = want
+            check(vr == 1 and vo == before, "session %s: exit %d stdout %r (want 1, %r)" % (name, vr, vo, before))
+            check(ve.startswith("error: %s: " % at) and reason in ve,
+                  "session %s: expected %s at %s, got %r" % (name, reason, at, ve[:300]))
         if args.update:
             print("updated approved goldens")
             return 0

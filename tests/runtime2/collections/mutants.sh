@@ -21,8 +21,13 @@ declare -A FILE=(
   [8]=src/rt/compare.cpp              # 1.0 does not hash like 1 (indexed lookups miss)
   [9]=src/rt/isolate_transfer_decode.cpp  # a transferred collection loses its kind
   [10]=src/rt/natives/collection_methods.cpp  # same() exposes storage identity of collections
+  [11]=src/rt/compiler_native_args.cpp       # same() admits non-name arguments ("f", calls)
+  [12]=src/rt/compiler_native_args.cpp       # built-ins no longer check arguments/receivers holding collections
+  [13]=src/rt/compiler_collection.cpp        # key/comparator callbacks may return collections
+  [14]=src/rt/compiler.cpp                   # a collection is the shown eval/session result
+  [15]=src/rt/compiler_loops.cpp             # a map loop iterates the live map, not its snapshot
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

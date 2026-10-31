@@ -246,7 +246,7 @@ bool truthy(const Value& value) {
         case Kind::Bytes: return !bytes_of(value).empty();
         case Kind::Array: return array_size(value) != 0;
         case Kind::Object: return object_size(value) != 0;
-        default: return true;  // collections (legacy: a non-empty marker string), functions, structs, ...  // functions, structs, handles, errors
+        default: return true;  // collections (legacy: a non-empty marker string), functions, structs, handles, errors
     }
 }
 
