@@ -24,8 +24,8 @@ number, `§`) unless another file is named.
 | `-i file` / `-i -e` without a tty | The initial unit (nothing of it runs); the session stops | Exit 1 | §7 "-i script ..." and "-i -e ..."; §15 "... piped: the session still stops with exit 1" |
 | `~/.niftrc` without a tty | The whole file (nothing of it runs); the session stops | Exit 1 | §15 "~/.niftrc piped ..." |
 | Typed tty REPL | Current statement only (transactional: no definition or effect) | Back at the prompt; session usable | §7 "tty REPL: refusal reported ..."; `cp19/session_refusal_cli.py` pty runs; `cp23/cp19_combined.py` job-refusal-tty |
-| `~/.niftrc` on a tty | Fed through the shell loop exactly as typed input (the REPL's own statement accumulation): the first refused input and the rest of the file; earlier input ran once | Prompt; session usable | §15 "~/.niftrc on a tty ..."; §18 "~/.niftrc on a tty: ..."; §18b multi-line |
-| `-i file` on a tty | The same path as `~/.niftrc` | Prompt; session usable | §15 "nift -i file on a tty ..."; §18 "nift -i file on a tty: ..."; §18b multi-line |
+| `~/.niftrc` on a tty | Split by the Nift parser's top-level statement boundaries; each statement admitted and run as one session unit (Nift only: no shell-line dispatch, no value echo). The first refused statement, or the statement containing the first syntax error, and the rest of the file; earlier statements ran once | Prompt; session usable | §15; §18 incremental; §18b multi-line; §18c comments/if-else/loops/`;`/no echo/malformed/unterminated/bare expression/`exit`/definition-vs-call; §18d positions |
+| `-i file` on a tty | The same path as `~/.niftrc` (syntax errors included: prevalidation's first rejection stops the file there instead of refusing the whole file) | Prompt; session usable | as for `~/.niftrc` |
 | `-i -e` / `-i -c` on a tty | The initial unit (nothing of it runs); the session stops | Exit 1 | §17c "-i -e on a tty: ..." |
 | Shell-form user function / builtin (`f 3`, `pwd a b`) | Logical command line (no later `;` / `&&` / `\|\|` segment) | Piped: session stops, exit 1. Tty: prompt | §16 (piped and tty, `\|\|`, `;`, `&&`) |
 | `$[...]` interpolation, incl. `;`, `&&`, `\|\|`, pipelines, redirects, `&` | Logical command line (the containing command and every later segment) | Piped: session stops, exit 1. Tty: prompt | §12; §13 (`;`, `\|\|`, `&&`, `;` then `\|\|`, pipeline stages); §19 (redirect, `&`) |
@@ -35,3 +35,28 @@ number, `§`) unless another file is named.
 | `NIFT_VM=1` (fallback mode) | Files, `-e`, `-`, eval: falls back to legacy (no refusal). Sessions are VM-owned: as the default session rows | Files: legacy exit status. Piped session: exit 1. Tty: prompt | §4 "NIFT_VM=1 still falls back"; §19 "NIFT_VM=1 piped session ..."; `cp19/session_refusal_cli.py` (mode 1) |
 | `NIFT_VM=0` | No refusals: the legacy interpreter runs everything | Legacy behaviour (unchanged) | §3; §5 "-e program runs on legacy under NIFT_VM=0"; §7 "NIFT_VM=0 piped session is legacy and unchanged" |
 | Invalid `NIFT_VM` (empty, `off`, ...) | Configuration error before anything runs, on every scripting entry point | Exit 1 | §10 |
+
+## Known limits (tracked, not changed)
+
+- **`$[...]` column drift after quotes.** The shell removes quotes before the
+  expression is evaluated, so a position after a quote inside `$[...]` is
+  shifted left by the quotes before it. Reproducer (piped, no ~/.niftrc):
+  `echo $[print("ab")+run("x")]` reports `<stdin>:1:14` for the unresolved
+  name `ab`; its typed position is `1:15`. The line, the unit and the
+  refusal itself are right; nothing about what ran is misrepresented (the
+  command line never runs).
+- **Cautious note on a whole-file refusal without a terminal.** A piped
+  session that refuses ~/.niftrc or the `-i` file as a whole says "earlier
+  statements in this session may already have executed", although nothing
+  of the file (and, for a first unit, nothing at all) ran. Reproducer:
+  `printf 'x := 1\nr := run("a")\n' > ~/.niftrc; echo | nift` (stdin not a
+  terminal). Expected wording: "no part of it ran". The statement is "may",
+  never a false claim that something ran.
+- **`exit` in a startup file.** Legacy fails on it at startup ("unknown value
+  or malformed expression: exit", exit 1). The VM refuses it before it runs;
+  on a terminal the file is therefore interrupted there and the session
+  continues (the owner's refusal rule); without a terminal the file is
+  refused and the exit status is 1, as in legacy (§18c).
+- **Bare expression statements** (`1+1`, `q`) are refused by the VM in a
+  startup file exactly as in a script file (legacy evaluates them silently);
+  the file is interrupted there on a terminal (§18c).

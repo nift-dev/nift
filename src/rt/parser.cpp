@@ -30,6 +30,17 @@ NodeId make_opaque(Ast& ast, std::uint32_t begin, std::uint32_t end, OpaqueReaso
 ParseResult parse_script(Ast& ast) {
     return parse_script_range(ast, 0, static_cast<std::uint32_t>(ast.source().size()));
 }
+ParseResult parse_script_statements(Ast& ast, std::vector<NodeId>& complete) {
+    ParseResult result;
+    complete.clear();
+    const auto size = static_cast<std::uint32_t>(ast.source().size());
+    ast.reserve(size / 3 + 16);
+    result.ok = detail::parse_block(ast, 0, size, detail::Mode::Strict, complete, result.error);
+    if (!result.ok) return result;
+    result.root = ast.add(NodeKind::Program, 0, size);
+    ast.set_list(result.root, complete);
+    return result;
+}
 ParseResult parse_script_range(Ast& ast, std::uint32_t begin, std::uint32_t end) {
     ParseResult result;
     if (begin > end || end > ast.source().size()) {

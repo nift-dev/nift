@@ -204,6 +204,18 @@ SessionResult VmSession::execute_safe(const std::string& source, const std::stri
         active_ = false; close(); throw;
     }
 }
+namespace {
+// A unit the parser does not structure: refused with the position of its
+// first Opaque region (or the parse error), never an invented offset 0.
+CompileResult refused_unparsed(const Ast& ast, const ParseResult& parsed, std::uint32_t unit_begin) {
+    CompileResult compiled;
+    compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
+    const NodeId opaque = parsed.ok ? first_opaque_node(ast, parsed.root) : kNoNode;
+    compiled.offset = opaque != kNoNode ? ast.at(opaque).begin : parsed.ok ? unit_begin : parsed.error.offset;
+    return compiled;
+}
+} // namespace
+
 SessionResult VmSession::execute_unit(const std::string& source, std::string path, std::string& output,
                                       bool expression, bool inspect_tail, bool coherent,
                                       double prior_parse_us, double prior_compile_us) {
@@ -255,7 +267,7 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
     CompileResult compiled;
     if (parsed.ok && first_opaque_node(ast, parsed.root) == kNoNode)
         compiled = expression ? compile_eval_program(ast, parsed.root, limits) : compile_unit(ast, parsed.root, limits);
-    else compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
+    else compiled = refused_unparsed(ast, parsed, text.unit_begin);
     stats.compile_us = prior_compile_us + std::chrono::duration<double, std::micro>(
         std::chrono::steady_clock::now() - parse_done).count();
     if (!compiled.program && !coherent &&

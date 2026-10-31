@@ -851,9 +851,9 @@ def main():
                   f"{label} piped: the whole file is refused before anything runs, exit 1",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
 
-        # 18b. A startup file on a terminal behaves exactly as if typed: the
-        # REPL's own statement accumulation joins multi-line definitions and
-        # blocks (a physical line is not a statement).
+        # 18b. A startup file on a terminal is split by the Nift parser's own
+        # top-level statement boundaries: multi-line definitions and blocks are
+        # one statement each (a physical line is not a statement).
         multi = ('fn(greet(name)) {\n  print("hi " + name)\n  return 1\n}\nif(1 < 2) {\n  print("block")\n}\n'
                  'greet("a")\nr := run("echo", "x")\nprint("later")\n')
         for label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
@@ -863,13 +863,143 @@ def main():
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['greet("b")', "exit"])
             head = f"error: {path}:9:6: NIFT_VM session refused: callable:run"
-            # Exactly as typed: the if-block's and the call's values are shown too.
-            check(status == 0 and out.startswith("block\nnull\nhi a\n1\n") and out.count("block") == 1 and
+            # No value echo: only what the statements print.
+            check(status == 0 and out.startswith("block\nhi a\nerror: ") and out.count("block") == 1 and
                   out.count("hi a") == 1 and head in out and "\nlater\n" not in out and
                   f"initialisation from {path} was interrupted at line 9" in out and
                   "hi b\n" in out.split(head, 1)[-1],
                   f"{label} on a tty: multi-line fn and if-block run once in order, refusal at 9:6, no later "
                   "print, the multi-line function callable from the prompt", f"status={status} out={out!r}")
+
+        # 18c. Startup files on a terminal are Nift only (owner ruling): no
+        # shell-line dispatch, no value echo, comments / if-else chains / loops /
+        # `;` / bare expressions as in legacy, a syntax error stops the file
+        # before the statement that contains it (earlier statements ran once),
+        # and `exit` is a Nift statement. Piped, the whole file is refused.
+        startup_cases = (
+            ("comments with shell commands",
+             'x := 5\n/*\ntouch("COMMENTED.txt")\nls\nrm -rf nothing\n*/\n// touch("SLASH.txt")\nprint("y=" + x)\n',
+             "y=5\n", [], ["COMMENTED.txt", "SLASH.txt"], None),
+            ("if/else split across lines", 'v := 3\nif(v > 2) {\n  print("big")\n}\nelse {\n  print("small")\n}\n',
+             "big\n", [], [], None),
+            ("else-if chain and a loop", 'v := 0\nn := 0\nwhile(n < 3) {\n  n += 1\n}\nif(n == 1) { print("one") }\n'
+             'else if(n == 3) { print("three") }\nelse { print("other") }\n', "three\n", [], [], None),
+            ("semicolon statements on one line", 'a := 1; b := 2; print(a + b)\nprint("end")\n', "3\nend\n", [], [],
+             None),
+            ("no value echo", 'fn(two()) { return 2 }\ntwo()\nq := 7\nq += 1\nif(q > 1) { print("in") }\n'
+             'print("only")\n', "in\nonly\n", [], [], None),
+            ("malformed statement after valid ones",
+             'print("v1")\ntouch("v1.txt")\nz := (1 +\nprint("v2")\ntouch("v2.txt")\n', "v1\n", ["v1.txt"],
+             ["v2.txt"], ":3:"),
+            ("unterminated final block", 'print("u1")\nfn(f()) {\n  print("x")\n', "u1\n", [], [], ":2:"),
+        )
+        for label, body, printed, made, never, syntax_at in startup_cases:
+            for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"],
+                                                                         "init.f")):
+                d = work / f"sc-{len(label)}-{name.strip('.').replace('.', '-')}-{abs(hash(label)) % 10000}"
+                d.mkdir()
+                (d / name).write_text(body)
+                status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+                problems = []
+                if status != 0: problems.append(f"status {status}")
+                if not out.startswith(printed): problems.append("printed output")
+                if "PROMPT\n" not in out: problems.append("prompt not usable")
+                if "command not found" in out or "... " in out: problems.append("shell dispatch / continuation")
+                if any(not (d / n).exists() for n in made): problems.append("earlier effect missing")
+                if any((d / n).exists() for n in never): problems.append("a later or commented effect happened")
+                if syntax_at:
+                    path = (d / name).resolve().as_posix()
+                    if f"error: {path}{syntax_at}" not in out or "was interrupted at line" not in out or \
+                            "the session continues at the prompt" not in out:
+                        problems.append("syntax error not reported at its position with the interruption notes")
+                elif "error:" in out:
+                    problems.append("unexpected error")
+                check(not problems, f"{where_label} on a tty, {label}: " + ("legacy-shaped run" if not syntax_at else
+                                                                               "earlier statements ran, then the "
+                                                                               "syntax error stopped the file"),
+                      f"{problems} out={out!r}")
+                for n in made + never:
+                    if (d / n).exists():
+                        (d / n).unlink()
+                if syntax_at:
+                    proc, rows = run(nift, d, args, {"HOME": str(d)}, stdin='print("PROMPT")\n')
+                    check(proc.returncode == 1 and "PROMPT" not in proc.stdout and
+                          not any((d / n).exists() for n in made + never) and proc.stdout == "",
+                          f"{where_label} piped, {label}: the whole file is refused before anything runs, exit 1",
+                          f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+        # A bare expression statement is a Nift statement (never a shell command):
+        # the VM refuses it as it does in a script file, so the file is
+        # interrupted there; nothing is reported as "command not found".
+        for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"bare-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text('print("b1")\n1+1\nprint("b2")\n')
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            check(status == 0 and out.startswith("b1\nerror: ") and
+                  f"error: {path}:2:1: NIFT_VM session refused: expression-statement" in out and "b2" not in out and
+                  "command not found" not in out and "was interrupted at line 2" in out and "PROMPT\n" in out,
+                  f"{where_label} on a tty: a bare expression is a refused Nift statement (as in a script file)",
+                  f"status={status} out={out!r}")
+        # `exit` in a startup file is a Nift statement, never the shell's exit:
+        # legacy fails on it at startup (unknown value, exit 1); the VM refuses
+        # it before it runs, so on a tty the file is interrupted there and the
+        # session continues; piped, the file is refused (exit 1) as in legacy.
+        for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"exit-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text('print("e1")\nexit\nprint("e2")\n')
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            check(status == 0 and out.startswith("e1\nerror: ") and "e2" not in out and "PROMPT\n" in out and
+                  "was interrupted at line 2" in out,
+                  f"{where_label} on a tty: `exit` is a refused Nift statement, not the shell's exit; prompt usable",
+                  f"status={status} out={out!r}")
+            status, out = run_tty(nift, d, args, {"NIFT_VM": "0"}, ['print("PROMPT")', "exit"])
+            check(status == 1 and out.startswith("e1\n") and "unknown value or malformed expression: exit" in out and
+                  "e2" not in out, f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error",
+                  f"status={status} out={out!r}")
+            proc, rows = run(nift, d, args, {"HOME": str(d)}, stdin='print("PROMPT")\n')
+            check(proc.returncode == 1 and proc.stdout == "", f"{where_label} piped: `exit` file refused, exit 1",
+                  f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+        # Owner witness: a definition is admitted on its own, never judged by a
+        # later call; the call is refused with a truthful location.
+        for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"defcall-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text('print("before")\nfn(f(x)) {\n  return x.size()\n}\nprint("middle")\n'
+                                  'print(f(3))\nprint("after")\n')
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            check(status == 0 and out.startswith("before\nmiddle\nerror: ") and out.count("before") == 1 and
+                  out.count("middle") == 1 and f"error: {path}:3:10: NIFT_VM session refused: type:length" in out and
+                  "interrupted at line 6" in out and "\nafter" not in out and "PROMPT\n" in out,
+                  f"{where_label} on a tty: definition admitted on its own; the call refused at f's size() "
+                  "(3:10), interrupted at line 6; `after` never runs", f"status={status} out={out!r}")
+
+        # 18d. A refusal without a source position is never given an invented
+        # 1:1: the refused input's start line, labelled as such.
+        d = work / "nopos"
+        d.mkdir()
+        proc, rows = run(nift, d, [], {}, stdin='print(1)\nprint(2)\necho $[if(1){2}]\n')
+        check(proc.returncode == 1 and
+              "<stdin>:3 (the start line of the refused input; the VM gave no exact position)" in proc.stderr and
+              "<stdin>:1:1" not in proc.stderr, "no-position `$[...]` refusal: the input's start line, labelled",
+              f"err={proc.stderr!r}")
+        proc, rows = run(nift, d, [], {}, stdin='print(1)\n  x := `a`\n')
+        check(proc.returncode == 1 and "<stdin>:2:3: NIFT_VM session refused: session:opaque" in proc.stderr,
+              "an Opaque statement is refused at the Opaque region's own position (not 1:1)", f"err={proc.stderr!r}")
+        for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            dd = work / f"nopos-{name.strip('.').replace('.', '-')}"
+            dd.mkdir()
+            (dd / name).write_text('print("p1")\n\n\n\n  x := `a`\nprint("p2")\n')
+            path = (dd / name).resolve().as_posix()
+            status, out = run_tty(nift, dd, args, {}, ['print("PROMPT")', "exit"])
+            check(f"error: {path}:5:3: NIFT_VM session refused: session:opaque" in out and f"{path}:1:1" not in out
+                  and "interrupted at line 5" in out and "p2" not in out,
+                  f"{where_label} on a tty: an Opaque statement at 5:3 is located there (not 1:1)", f"out={out!r}")
+            proc, rows = run(nift, dd, args, {"HOME": str(dd)}, stdin="")
+            check(proc.returncode == 1 and f"{path}:1:1" not in proc.stderr,
+                  f"{where_label} piped: no invented 1:1 for the whole-file refusal", f"err={proc.stderr!r}")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background
