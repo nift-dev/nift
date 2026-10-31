@@ -396,6 +396,13 @@ including from imported modules: none is initialised.
 | `module-error:return-value` | `return <value>` outside functions in an imported module | `return with a value is not allowed in import` (with the frame prefixes) | the importing statement, where legacy reports it (`e_ret.f:2:1`), plus `note: the \`return\` is at ret.f:1:1` |
 | `module-error:export-missing` | `export(x)` where no earlier top-level binding, function or import of the module provides `x` | `export names no existing binding: x` | the `export` statement (legacy: `exm.f:1:1`, `em2.f:3:1`) |
 | `module-error:export-duplicate` | a second `export(x)` | `duplicate export: x` | the second `export` (legacy: `exd.f:3:1`) |
+| `module-error:export-name` | `export(<expr>)` whose argument is not a binding name (owner, 2026-11-01) | `export requires a binding name` | the `export` statement (legacy: `nonid.f:1:1`) |
+
+`export(<non-name>)` is parsed today as an Opaque legacy-runtime-error region
+(`import-opaque:legacy-runtime-error`). The graph recognises that region as an export
+statement with a non-name argument before the generic opaque refusal, and treats it
+as an ordinary statement for competing-error order. This applies in modules. In the
+entry, `export` is the compiler's existing concern and is unchanged.
 
 Verified legacy agreement for the static rules:
 - Legacy does not hoist: `export(f)` before `fn(f())` fails in legacy too.
@@ -405,9 +412,6 @@ Not covered, so these keep feature refusals:
 - **Bare `return`** at a module's top level (`module-return`, renamed
   `module-bare-return`). It is legal in legacy: it ends the module, and later exports
   are not made. That is a VM gap, not a program error.
-- **`export(<non-name>)`.** Legacy says `export requires a binding name`; the VM
-  marks it `import-opaque:legacy-runtime-error`. It is unchanged here and is a
-  candidate for the same treatment later.
 
 **Approved difference.** A `return <value>` that legacy never executes (in an
 untaken branch, `cret.f`: legacy rc 0) is rejected. The rule is static: "a module may
@@ -504,8 +508,11 @@ no module-binding redesign, but it is not free.
 - Estimate: ~120–160 lines across `module_link.cpp`, a small `link_rename` helper, the
   segment map and those message sites, plus tests. Moderate and contained; no compiler
   scope redesign.
-- If the owner prefers not to take on the rename, the fallback is to keep the private
-  declaration refused with `import-scope:invocation-binding`.
+- **Owner ruling (2026-11-01): go ahead with the narrow rename.**
+  - It covers only `args`/`cmd` and the declaring module's own binding. It is not
+    general name-clash renaming; every other clash stays `import-name-clash`.
+  - Messages that quote the name still say `args`/`cmd`.
+  - Tested in phase 2 and left to the independent review.
 
 ### 4.6 Approved differences to record (`D-NEXT-packages`, `compatibility.md`)
 
@@ -528,7 +535,7 @@ The work starts after `integ/args-cmd` is in `weekend/r2`, and is rebased onto i
 
 | File | Change | Size |
 |---|---|---|
-| `src/PackageTransaction.{h,cpp}` (legacy, behaviour-preserving) | Expose the shared lock for an *existing* store: `acquire_read_existing(error, bool& store_present)`. It is the same `open_and_lock`, identity and journal checks, without `create_directories(.nift)`. Legacy's `acquire_read` is unchanged. | ~25 |
+| `src/PackageTransaction.{h,cpp}` (owner, 2026-11-01) | A separate, **VM-only** read-lock function, `acquire_read_existing_store(error, bool& store_present)`. It reuses `open_and_lock` (lock file created if absent, never truncated), `lock_identity_valid` and the journal check, and never creates `.nift/`. Additive only: legacy's `acquire_read`, `acquire` and every legacy call path stay byte-identical; the diff adds lines and changes none. | ~25 |
 | `src/rt/package_resolve.{h,cpp}` (new) | Resolver: `resolve_package(name, project, PackageSnapshot&) -> {entry, root, error text}`. It uses `PackageMetadata.h`/`PackageGraphLock.h`/`FileSystem` and holds the RAII `PackageSnapshot`. | ~170 |
 | `src/rt/module_graph.{h,cpp}` (+ `module_graph_errors.cpp` for rt-lint's 400 lines) | Package branch, `package_root`, containment. `ModuleGraph::error {id, message, frames, where, offset, positioned, notes}`. The walk continues past feature refusals; the first program error is found in execution order. Return-value, export-missing and export-duplicate become program errors; bare return becomes `module-bare-return`. The entry-`return` note. | ~150 |
 | `src/rt/module_link.{h,cpp}`, `rt/module_invocation.{h,cpp}` (new), `rt/link_rename.{h,cpp}` (new) | Graph-error propagation; per-module frame spelling; D-062 #1 lift (`invocation-init`, `invocation-ambiguous`); the private-`args` rename and segment map. | ~60 + ~120 + ~80 |
@@ -648,6 +655,31 @@ with no `.nift/`: nothing is created.
 **Inventory re-collect.** Rows 1–31 and row 34 leave the fallback list as program
 errors; the other import rows are unchanged.
 
+**Legacy package behaviour unchanged (owner, 2026-11-01).**
+- The `PackageTransaction` diff is additive: a review check asserts that no existing
+  line changes.
+- All of these pass under `NIFT_VM=0`, before and after the change:
+  - `make test-v44-packages` (`package_transaction_smoke.py`,
+    `package_hardening_smoke.sh`, …);
+  - `package_metadata_smoke.sh`, `package_refs_smoke.sh`,
+    `package_tools_dogfood.sh`, `package_combined_dogfood.sh`,
+    `package_module_export_smoke.sh`, `package_callable_closure_smoke.sh`;
+  - the `package_graph_*_unit` tests.
+- Legacy outputs for the §9 `lg/` probes are compared before and after.
+
+**Narrow rename (§4.5).**
+- A private `args` is read and assigned at top level and in the module's functions,
+  next to a module that reads the entry's `args`.
+- Errors that quote the name (const assignment, const-array mutation, arity, refusal
+  positions) say `args` and point at the original span.
+- A mutant that renames by spelling, or that extends the rename to another clashing
+  name, must fail.
+
+**`export(<non-name>)`.**
+- Legacy text and position at depth 1 and 2.
+- It competes in statement order with a missing import.
+- Pre-effect markers as above.
+
 **nift-regression-suite.** `contract/v44_packages_smoke.sh`,
 `v46_import_ownership_smoke.sh`, `v46_package_graph_smoke.sh`,
 `v48_package_combined_fixture_smoke.sh` and `v45_integration_smoke.sh`, with the VM
@@ -663,13 +695,12 @@ as default.
 | Q4/Q5 | Identity-based `args`/`cmd`; a private `args :=` is supported; ambiguity is refused (§4.5) |
 | Q6 | Module `return <value>`, `export-missing` and `export-duplicate` are program errors; the entry-`return` case is kept pre-execution, with the real reason (§4.2, §4.3) |
 
-Remaining:
+| Follow-up 1 | Narrow rename for a module's private `args`/`cmd` approved (§4.5) |
+| Follow-up 2 | VM-only, non-creating read-lock function in `PackageTransaction`; legacy byte-identical, with legacy package tests run under `NIFT_VM=0` (§5, §6) |
+| Follow-up 3 | `export(<non-name>)` is a program error in this checkpoint (§4.3) |
 
-1. **Private `args :=`.** The scope report in §4.5 estimates ~200 lines for a linker
-   rename limited to `args`/`cmd`, plus display names. Is that acceptable, or should
-   the private declaration stay refused?
-2. **`export(<non-name>)`** (`export requires a binding name`, currently
-   `import-opaque`). Should it join §4.3 later?
+No open questions remain. Implementation waits for the coordinator's go-ahead after
+`args`/`cmd` lands in `weekend/r2`.
 
 ## 8. Not done in phase 1
 

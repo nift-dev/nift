@@ -1517,7 +1517,15 @@ is a program error (legacy text, stable reason id, truthful position, exit 1, no
      implemented.
 5. **Module program errors** (Q6). A module-level `return <value>`, `export-missing`
    and `export-duplicate` are program errors refused before running, with legacy text,
-   truthful position, exit 1 and a stable reason id. A bare `return` (legal in legacy)
-   stays a feature refusal.
+   truthful position, exit 1 and a stable reason id. So is `export(<non-name>)`
+   (`export requires a binding name`). A bare `return` (legal in legacy) stays a
+   feature refusal.
+6. **Follow-ups** (owner, 2026-11-01).
+   - The private `args`/`cmd` support uses a narrow linker rename, limited to those two
+     names and the declaring module's own binding. It is not general name-clash
+     renaming. Messages still quote `args`/`cmd`.
+   - `PackageTransaction` gets a separate VM-only read-lock function that never
+     creates `.nift/`. Legacy call paths stay byte-identical, verified by the legacy
+     package tests under `NIFT_VM=0`.
 
 Witness: `tests/runtime2/packages/` (phase 2).
