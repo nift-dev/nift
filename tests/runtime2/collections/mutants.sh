@@ -26,8 +26,9 @@ declare -A FILE=(
   [13]=src/rt/compiler_collection.cpp        # key/comparator callbacks may return collections
   [14]=src/rt/compiler.cpp                   # a collection is the shown eval/session result
   [15]=src/rt/compiler_loops.cpp             # a map loop iterates the live map, not its snapshot
+  [16]=src/rt/compiler_native_args.cpp       # mutex(v) accepts a value holding a collection
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

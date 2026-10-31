@@ -1507,8 +1507,10 @@ Owner rulings for the weekend collections candidate (`cand/collections`,
    unused). No `Value` redesign.
 6. Threads may carry collections (a copy, `WireKind::Collection`), where
    legacy refuses them ("non-transferable resource"): part of the approved
-   value-semantics break. Stores into shared state (`mx.set(v)`, `send`) of a
-   value holding a collection stay refused (`collection-argument:`).
+   value-semantics break. Stores into shared state (`mutex(v)`, `mx.set(v)`,
+   `send`) of a value holding a collection at any depth stay refused
+   (`collection-argument:`); the atomics and `channel()` take only numbers
+   or bools.
 7. **Snapshot iteration (owner ruling 2026-11-01; a deliberate Runtime 2.0
    semantic change):** `for ((k, v) : m)` visits the entries captured at loop
    entry, in the documented insertion order (no new order guarantee);
@@ -1530,5 +1532,5 @@ binding names, never `same("a", "b")`.
 
 Witnesses: `tests/runtime2/collections/approved/*.f` (VM golden and legacy
 witness for each difference), `parity/*.f`, `refuse/*.f`, the heap checks and
-fifteen mutation controls (`make test-runtime2-collections`,
+sixteen mutation controls (`make test-runtime2-collections`,
 `test-runtime2-collections-mutants`).

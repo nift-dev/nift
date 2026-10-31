@@ -116,10 +116,12 @@ Status coll_front(const Context&, const Value* args, std::uint32_t argc, Value& 
     return Status::Ok;
 }
 
-// same(a, b) (D-040 #4, D-063): identity of identity-bearing values. The
-// compiler admits it only for callables and file/stream handles, where legacy
-// also compares identity; any other operand (ordinary values: arrays,
-// objects, structs, collections) is legacy's fatal error text.
+// same(a, b) (D-040 #4, D-063): identity of identity-bearing values:
+// callables and file/stream handles (legacy-equal), and mutex, atomic,
+// channel, future and thread (owner ruling 2026-11-01; legacy errors) by
+// their stable handle or task record (rt::same). The compiler admits plain
+// names only. Any other operand (ordinary values: arrays, objects, structs,
+// collections) is legacy's fatal error text.
 Status fn_same(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return fail(error, "same: expected two values");
 #if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 10

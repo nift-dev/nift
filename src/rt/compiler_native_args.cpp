@@ -88,9 +88,17 @@ bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::Bui
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (kinds_.collection_elements_of.count(args[k]))
                 return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
-    // ... and stores into shared state, where legacy refuses a collection at
-    // any depth ("set value contains a non-transferable resource").
-    if (id == BuiltinId::MutexSet || id == BuiltinId::SharedSend)
+    // ... and stores of a value into shared state, where legacy refuses a
+    // collection at any depth ("initial value / set value contains a
+    // non-transferable resource"): mutex(v), mx.set(v), send(ch, v). The
+    // atomics and channel() take numbers or bools (both engines report the
+    // same type error); thread arguments are copies (D-063 #6).
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 16
+    const bool mutex_init = id == BuiltinId::SharedMutex;
+#else
+    const bool mutex_init = false;  // M16: mutex(v) no longer checked
+#endif
+    if (mutex_init || id == BuiltinId::MutexSet || id == BuiltinId::SharedSend)
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (kinds_.collection_holders.count(args[k]))
                 return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));

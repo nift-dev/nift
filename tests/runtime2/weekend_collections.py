@@ -15,7 +15,8 @@ Contract: docs/runtime-2/checkpoints/weekend-collections.md.
                 undefined there (it reads a removed map entry), so it is not run.
   refuse/*.f    refused before any effect: exit 1, no stdout (every fixture
                 prints first), "no part of it ran", the reason in NAME.reason,
-                and (NAME.at, "line:column") the reported position.
+                and (NAME.at, "line:column") the reported position; NAME.with
+                lists imported files copied next to the program.
   sessions      piped sessions and `nift eval` (SESSIONS below): a refused
                 statement runs no part of itself (earlier statements' output
                 stays, nothing later runs, exit 1, reason and position), and
@@ -41,6 +42,12 @@ def run(nift, path, mode, work, budget=None, extra=None):
     d = tempfile.mkdtemp(dir=work)
     name = os.path.basename(path)
     shutil.copy(path, os.path.join(d, name))
+    # NAME.with: further files (relative to the fixture's directory) the
+    # program imports, copied next to it under their base names.
+    with_list = path[:-2] + ".with"
+    if os.path.exists(with_list):
+        for extra_file in open(with_list).read().split():
+            shutil.copy(os.path.join(os.path.dirname(path), extra_file), os.path.join(d, os.path.basename(extra_file)))
     stats = os.path.join(d, "stats.jsonl")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode, "NIFT_VM_STATS": stats}

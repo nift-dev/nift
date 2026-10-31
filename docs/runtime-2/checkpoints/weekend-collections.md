@@ -129,7 +129,7 @@ redesign: `Value` stays 16 bytes, `HeapObject` 8.
 | `a.sort()` over an array whose elements may be collections | `collection-element:sort` | legacy sorts the tag strings |
 | `max(a)` / `min(a)` with an array argument whose elements may be collections | `collection-argument:max` / `min` | legacy compares the tag strings |
 | a key or comparator callback that may return a collection (`sort_by`, `group_by`, `index_by`, `unique_by`, `min_by`, `max_by`, `count_by`; an element of `group_by_each`'s key array; `sort(cmp)`) | `collection-callback-key:<name>` | legacy keys on / compares the tag string |
-| `mx.set(v)` / `send(ch, v)` with a value that may hold a collection at any depth | `collection-argument:set` / `send` | legacy: "contains a non-transferable resource" (before the lock check) |
+| a store of a value into shared state, `mutex(v)`, `mx.set(v)`, `send(ch, v)`, with a value that may hold a collection at any depth (also from a call or an imported module) | `collection-argument:mutex` / `set` / `send` | legacy: "initial value / set value contains a non-transferable resource" (before the lock check). D-063 #6: the other shared-state entry points take numbers or bools (`atomic<int>(v)`, `atomic<bool>(v)`, `store`, `exchange`, `compare_exchange`, `channel(n)`: the same type error in both engines); thread arguments, returns and captures are copies (approved) |
 | arity errors in loop code | `builtin-arity:<name>` | legacy's loop-evaluator report not established (outside loops the legacy fatal error is compiled) |
 | `m.length()` | `method:length` | legacy: malformed expression |
 | piped/tty session statements over collections | `session:binding-shape-contract` | persistent sessions out of scope (D-054 shapes) |
@@ -253,13 +253,15 @@ there.
   iteration (update, removal, removal plus insertion, and the review's a6,
   whose legacy behaviour is undefined: `NAME.legacy-undefined`, VM golden
   only).
-* `refuse/` (35): refused before any effect (every fixture prints first;
+* `refuse/` (40): refused before any effect (every fixture prints first;
   exit 1; "no part of it ran"; exact reason; for the new ones the position,
   `NAME.at`), section 3, the review's repros (`same` with a string literal,
   in a program without collections too; `sort` over collections, also as a
   statement and through a call; `max`/`min` of an array of collections;
   `group_by`/`sort_by`/`count_by`/`group_by_each`/`min_by`/`unique_by` keys;
-  `mx.set([m])`), and `a.push(a)` on an array (the existing `aliasing` rule:
+  `mx.set([m])`; re-review: `mutex(v)` with a collection in an array, an
+  object, two levels down, from a call and from an imported module, whose
+  library the runner copies alongside, `NAME.with`), and `a.push(a)` on an array (the existing `aliasing` rule:
   arrays are unchanged).
 * sessions (11, `SESSIONS` in the runner): piped sessions and `nift eval`;
   a refused statement leaves earlier output, runs nothing of itself or later
@@ -287,10 +289,11 @@ the suite's summary line included).
 | 9 | a transferred collection loses its kind | 3 |
 | 10 | `same()` exposes the storage identity of collections | 5 |
 | 11 | `same()` admits arguments that are not plain names | 12 |
-| 12 | the element/array-argument/shared-store checks of built-ins are dropped | 12 |
+| 12 | the element/array-argument/shared-store checks of built-ins are dropped | 27 |
 | 13 | key/comparator callbacks may return collections | 19 |
 | 14 | a collection may be the shown eval/session result | 11 |
 | 15 | a map loop iterates the live map instead of its snapshot | 5 |
+| 16 | `mutex(v)` no longer checks a value holding a collection | 16 |
 
 A "shallow copy" mutant has no separate form here: with copy-on-write and
 mutation only through unsharing entry points a shallow clone *is* the deep

@@ -1,0 +1,7 @@
+print("ran")
+mx := mutex([map()])
+print("made")
+mx.lock()
+v := mx.get()
+mx.unlock()
+print(type(v))

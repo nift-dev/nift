@@ -1,0 +1,5 @@
+print("ran")
+import("mutex_lib.f")
+a := mk()
+mx := mutex(a)
+print("made")
