@@ -1,7 +1,9 @@
 # Weekend candidate: coroutines in programs that import modules (`coro-module`)
 
 Status: **candidate** on `cand/coro-module`, based on local `weekend/r2` at
-`10c41015` (strict VM default). Not reviewed, not integrated, nothing pushed.
+`10c41015` (strict VM default). Independent review of `fff92edd`: **REJECT**
+(§8). This revision addresses that review. It is not re-reviewed or
+integrated, and nothing is pushed.
 
 ## 1. Problem
 
@@ -81,15 +83,29 @@ parity case.
 It applies to a linked coroutine unit, meaning a unit with static imports that
 declares an async function, contains an async lambda or calls `thread(...)`,
 under the parallel task model (the default). The unit compiles and runs on the
-VM exactly as its inline equivalent would, unless one of two refusals applies.
-Both refusals happen at compile time, before any effect (nothing of the entry
-or of any module runs). Each has a recorded position, at the refused node in
-the file that holds it.
+VM exactly as its inline equivalent would, unless one of four refusals applies
+(two owner rulings, two from the review). All of them happen at compile time,
+before any effect (nothing of the entry or of any module runs). Each has a
+recorded position, at the refused node in the file that holds it. They are
+checked in this order: init-task, private-async, before-import, capture.
+
+Three analysis rules hold for all four refusals (review R2/R3):
+
+- **Built-in callbacks.** A built-in or native callee (`map`, `filter`, `sort`,
+  `reduce`, a native function) given an argument that may be a function (a
+  lambda, a function's name, or a value whose kinds include a function) is a
+  call through a value.
+- **Methods.** A method is never resolved by its name alone. On a receiver
+  that may be an object, a function or unknown, the call is a call through a
+  value, and every user method of that name may also run.
+- **Lambdas in module initialisation.** A lambda created in a module's top
+  level counts as top-level code. Its body is walked, whether it is called,
+  passed on or never used.
 
 **`coro-module-init-task`** (owner ruling: kept refused). Some code in an
 imported module's top level may start a task. A module's top level is its
-statements outside function bodies; a lambda's body runs only if it is called.
-"May start a task" covers:
+statements outside function bodies, including the bodies of lambdas created
+there. "May start a task" covers:
 
 - a `thread(...)` call;
 - a call of an async function;
@@ -127,17 +143,35 @@ task is refused when any of these holds:
 
 The first such task in the text is reported.
 
+**`coro-module-private-async`** (review R1). Code in an imported module calls
+an async function. That covers module function bodies as well as the module's
+top level, and the function may be exported. It also covers a call through a
+value located in module code while the unit has an async lambda. Legacy fails
+any such call ("module-private async callables are unsupported",
+`src/ParserExpression.cpp:4232`). The VM refuses it rather than modelling that
+error. Calling a module's exported async function from the entry is admitted:
+legacy runs that.
+
+**`coro-module-before-import`** (review R4). A task started in the entry may
+reach, by name or through a value, a function of a module whose text comes
+after the spawn: an import later in the file. Legacy's worker does not see
+that function (`undefined callable`), but the linked unit already holds it.
+Spawns in module code are exempt: they run only after that module's own
+imports, or they are init tasks. A spawn inside an entry function counts at
+the function's text position, which is conservative.
+
 **Admitted and equal to legacy** (witnesses in §5):
 
 - tasks (thread or async) whose code runs stateless module functions, through
   any depth of nested imports;
-- module functions that start and join tasks when called after initialisation;
-- async functions defined in modules;
+- module functions that start and join *threads* when called after
+  initialisation (they may not call async functions: private-async);
+- async functions defined in modules, called from the entry;
 - the importer's own globals, snapshotted at the spawn (the task sees the
   value at the spawn, and its writes stay in the task: CP22 L2);
 - exported module values read by the importer and passed into a task by value;
 - tasks started before an import, still running while the module initialises,
-  and joined after it;
+  and joined after it, provided their code reaches no function of that module;
 - Errors thrown in module code, crossing a task boundary and caught by the
   importer (`await`, `join`) or by module code around a join;
 - an uncaught Error from an awaited task, located in the module file.
@@ -165,8 +199,8 @@ difference; the result equals the inline program on the VM):
   `args`/`cmd` in modules are unchanged.
 - `NIFT_VM=1` still falls back to legacy for a refused unit.
 - `NIFT_VM=classify` reports the run's reason. `classify-all` (no run-time
-  switches, inventory tooling F12) now also reports `coro-module-init-task` and
-  `coro-module-capture`. It never reported `coro-module`.
+  switches, inventory tooling F12) now also reports the four new reasons. It
+  never reported `coro-module`.
 
 **Semantics recorded for the owner.** For D-041 #3 ("each isolate gets its
 own instances"), a task does not re-initialise a module. Under this contract
@@ -177,8 +211,14 @@ or fresh instance" is not observable on the VM yet. Legacy copies at spawn.
 
 - Module state is matched by name. A local in a task's code that has the same
   name as an imported module's top-level binding counts as module state.
-- A method call on a receiver that may be an object, function or unknown, and
-  that names no user method, counts as a call through a value.
+- A method call on a receiver that may be an object, function or unknown counts
+  as a call through a value, even when a user method has that name.
+- Any function-valued argument to a built-in or native callee counts as a
+  call through a value.
+- A module top-level lambda's body counts as initialisation code even if it
+  is never called.
+- `before-import` treats a spawn inside an entry function as happening at the
+  function's text position, whenever that function is called.
 - The "may start a task" flag of a function covers lambdas created in its body
   and async lambdas created anywhere in it.
 - `coro-module-init-task` does not ask whether a started task would touch
@@ -187,10 +227,13 @@ or fresh instance" is not observable on the VM yet. Legacy copies at spawn.
 
 ## 4. Implementation
 
-- `src/rt/compiler_coro_module.{h,cpp}` (new, about 320 lines) holds
-  `check_coroutine_modules`, both rules, one AST pass per function and lambda,
-  and memoised call-graph closures. It is cold: it runs once per linked
-  coroutine unit and never for other units.
+- `src/rt/compiler_coro_module.{h,cpp}` (new) holds `check_coroutine_modules`
+  and the four rules.
+- `src/rt/compiler_coro_module_effects.{h,cpp}` (new) holds the analysis: one
+  AST pass per function and lambda, memoised call-graph closures, and what a
+  call through a value may reach.
+- Both are cold: they run once per linked coroutine unit and never for other
+  units.
 - **Shared code:**
   - `src/rt/compiler.cpp` gains one line in `compile_unit_impl`, right after
     the `session:coroutine` refusal and before `check_coroutine_unit`. The
@@ -202,7 +245,7 @@ or fresh instance" is not observable on the VM yet. Legacy copies at spawn.
   - `src/rt/script_runner.cpp` (one line, no line added, still 400) passes
     `&link`.
   - `src/rt/refusal_inventory.cpp` passes `&link` to classify-all.
-  - `src/rt/refusal_text.cpp` has the two diagnostic phrases.
+  - `src/rt/refusal_text.cpp` has the diagnostic phrases.
 - **No runtime change.** Heap, snapshot, transfer, scheduler and SourceMap are
   untouched. Worker errors already map to module files through the shared
   `SourceMap`.
@@ -250,6 +293,13 @@ directory of `.f` files.
   outcome `require-error`, zero executions, the exact reason, the exact
   `file:line:column`, `classify` agreement, `NIFT_VM=1` fallback equal to
   legacy, and legacy's own result printed.
+- **Review cases (61 directories, `tests/runtime2/coro_module/review/`,
+  expectations in `review/EXPECT.tsv`):** every repro from the review of
+  `fff92edd`, copied unchanged.
+  - 10 are parity cases, including both stress programs.
+  - 49 are refusals, checked like the cases above.
+  - 2 are `base-defect`: the inline programs `inl2` and `before-import-inline`,
+    which have no imports. They are reported, not asserted (§7).
 - **Extras:**
   - the cooperative model still gives `coro-module`, and the same unit runs
     under the default;
@@ -257,8 +307,9 @@ directory of `.f` files.
     nothing run.
 
 `make test-runtime2-coro-module-mutants` (`tests/runtime2/coro_module/mutants.sh`,
-a `certify-targets` edge) has 10 mutants. Each one is the normal objects with
-`compiler_coro_module.cpp` and `compiler_coro_admit.cpp` built
+a `certify-targets` edge) has 15 mutants. Each one is the normal objects with
+`compiler_coro_module.cpp`, `compiler_coro_module_effects.cpp` and
+`compiler_coro_admit.cpp` built
 `-DNIFT_CORO_MODULE_MUTANT=n`. Each must differ from the normal binary and fail
 the suite through its named witness:
 
@@ -274,6 +325,16 @@ the suite through its named witness:
 | 8 | the cooperative model admits linked units | the cooperative check |
 | 9 | init-task also applied to the entry | `clean-module-worker` |
 | 10 | by-value arguments counted as task code | `shared-globals-importer` |
+| 11 | built-in callback arguments not seen as calls through a value | `review/mx-evade` |
+| 12 | methods resolved by name alone | `review/struct-collide` |
+| 13 | module top-level lambdas skipped, and init callbacks not seen | `review/init-lam-ok` |
+| 14 | async calls from module code admitted | `review/private-async` |
+| 15 | tasks reaching a later import admitted | `review/before-import-direct` |
+
+The `init-lam` evasion needs both the lambda walk and the callback rule. With
+the callback rule alone, the refusal moves to the `map(k)` call. Mutant 13
+removes both in initialisation code. The position checks of
+`init-through-value` and `review/init-lam-*` pin the lambda walk itself.
 
 `test-runtime2-coro-module-sanitize` and `-tsan` run the suite on the ASan/UBSan
 and TSan builds. They are part of `test-rt-vm-sanitize` and are not run locally.
@@ -292,3 +353,44 @@ and TSan builds. They are part of `test-rt-vm-sanitize` and are not run locally.
    decision that should go with D-041 #3.
 3. **`cancel` in module tasks** is VM-only, because legacy has no `cancel`.
    This is CP23 semantics, recorded here without a new decision.
+4. **Classification of the two review refusals.** `coro-module-private-async`
+   and `coro-module-before-import` refuse programs that legacy itself fails.
+   I recorded them as class I with approval `pending`; there is no ruling yet.
+
+## 7. Pre-existing CP22/CP23 issue (not changed here)
+
+A task whose body calls a function declared after the spawn runs on the VM,
+while legacy's worker fails. This needs no imports. Repro `review/inl2`:
+
+```
+t := thread(target, 3)
+fn(target(x)) { return x * 2 }
+print(t.join())
+```
+
+The VM prints `6` (exit 0). Legacy reports `thread: first argument must be
+callable` (exit 1). `review/before-import-inline` is the same through a
+wrapper function, and legacy reports `thread: return: undefined callable:
+target`. The base binary behaves identically. The module form of this
+(`before-import*`) is refused here as `coro-module-before-import`. The inline
+form belongs to the CP22/CP23 owners.
+
+## 8. Review of `fff92edd` (REJECT) and the changes made
+
+| Finding | Severity | Change |
+|---|---|---|
+| R1: an async function called from module code runs on the VM; legacy fails it (`private-async*`, `module-starts-from-entry`) | BLOCKER | new refusal `coro-module-private-async` |
+| R2: init-task evaded by a built-in callback with a function value, and by skipping module top-level lambdas (`init-lam-*`) | BLOCKER | callback rule; lambda bodies walked in initialisation |
+| R3a: capture evaded by a built-in callback with an aliased function value (`mx-evade`, `map-alias`, `filter-alias`) | HIGH | callback rule |
+| R3b: method calls resolved by bare name (`struct-collide`) | HIGH | an object receiver is always a call through a value |
+| R4: a task started before an import reaches the module's function (`before-import*`) | HIGH | new refusal `coro-module-before-import`; inline form recorded in §7 |
+
+Contract claims corrected in §3:
+
+- "module functions that start tasks" now covers threads only;
+- "async functions defined in modules" now means called from the entry;
+- "tasks across an import" now requires that they reach no function of that
+  module.
+
+The v46 corpus outcome in §2 is unchanged: a compile-only sweep at this
+revision gives the same reason for all 17 units.

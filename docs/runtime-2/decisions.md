@@ -1461,3 +1461,36 @@ Controls: `tests/runtime2/vm_policy_negative.py`.
 Witness: `tests/runtime2/vm_default/vm_default.py` §18c (`.niftrc` and
 `-i file` on a pty: earlier effect kept, nothing later runs, the prompt then
 works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
+
+## D-063 — Coroutines in programs that import modules (owner, 2026-10-31; weekend `coro-module`)
+
+(D-062 is claimed by `cand/args-cmd`.)
+
+1. Under the parallel task model (the default), a coroutine unit with static
+   imports runs on the VM as its linked (inline) program would. The
+   cooperative model (`NIFT_VM_COOPERATIVE_THREADS=1`) keeps CP22's
+   whole-unit `coro-module` refusal.
+2. **Kept refused before any effect: `coro-module-init-task`.** A coroutine or
+   task that may start from a module's top-level initialisation. That covers
+   a direct spawn, one reached through named calls, one reached through a
+   value, and one inside a lambda created there.
+3. **Kept refused before any effect: `coro-module-capture`.** A coroutine that
+   may capture module state across the module/coroutine boundary: it reads or
+   writes an imported module's top-level binding through any reachable code,
+   including function values and built-in callbacks. It is also refused when a
+   module binding may hold a handle.
+4. Out of scope, unchanged:
+   - persistent-session coroutines (`session:coroutine`);
+   - CP24;
+   - metadata Stage A/B;
+   - the `Value` redesign;
+   - package resolution;
+   - `args`/`cmd` in modules.
+
+The independent review of `fff92edd` added two refusals of programs that
+legacy itself fails: `coro-module-private-async` and
+`coro-module-before-import`. Their classification is pending an owner ruling.
+
+Record: `checkpoints/weekend-coro-module.md`. Witnesses:
+`tests/runtime2/coro_module/` (`make test-runtime2-coro-module`, mutants
+`make test-runtime2-coro-module-mutants`).

@@ -38,6 +38,8 @@ constexpr Family kFamilies[] = {
     {"export-struct", "exporting a struct from a module"},
     {"coro-module-init-task", "starting a task while an imported module initialises"},
     {"coro-module-capture", "a task that captures an imported module's state"},
+    {"coro-module-private-async", "calling an async function from an imported module's code"},
+    {"coro-module-before-import", "a task that reaches a module imported after it starts"},
     {"coro-", "this coroutine or async usage"},
     {"interpolation:", "this string interpolation (%)"},
     {"context:", "a context-dependent legacy behaviour (%)"},

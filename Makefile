@@ -4292,7 +4292,8 @@ test-runtime2-coro-module-tsan: $(TSAN_TARGET)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm-sanitize: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
-CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_admit.cpp
+CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_module_effects.cpp \
+	src/rt/compiler_coro_admit.cpp
 CORO_MODULE_MUTANT_DIR := $(TEST_DIR)/coro-module-mutants
 $(CORO_MODULE_MUTANT_DIR)/nift-%: $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CORO_MODULE_SOURCES) \
 		$(RT_VALUE_HEADERS) $(LIBFFI_A)

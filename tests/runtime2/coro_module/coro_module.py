@@ -163,7 +163,7 @@ CASES = [
     ("init-through-value", "refuse", {"vinit.f":
         'fn(work(x)) { return x }\nstarter := (x) => thread(work, x)\nfn(get()) { return 1 }\n'
         'kick := starter(1)\nexport(get)\n', "main.f": 'print("pre")\nimport("vinit.f")\nprint(get())\n'},
-     {"reason": "coro-module-init-task", "at": "vinit.f:4:9", "legacy": "pre / 1, exit 0"}),
+     {"reason": "coro-module-init-task", "at": "vinit.f:2:19", "legacy": "pre / 1, exit 0"}),
     ("init-failing-worker", "refuse", {"failer.f":
         'fn(boom()) { throw error("bad", "user.x") }\nt := thread(boom)\nt.join()\n',
         "main.f": 'print("pre")\nimport("failer.f")\nprint("unreached")\n'},
@@ -218,6 +218,22 @@ CASES = [
 # admitted path still reports ordinary refusals in linked units).
 COOPERATIVE = ("cooperative-model", {**CLEAN, "main.f":
     'print("pre")\nimport("clean.f")\nw := thread(target, 2)\nprint(w.join())\n'})
+
+
+REVIEW = Path(__file__).resolve().parent / "review"
+
+
+def review_cases():
+    """The independent review's repro directories (review/EXPECT.tsv)."""
+    out = []
+    for line in (REVIEW / "EXPECT.tsv").read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        name, kind, reason, at = line.split("\t")
+        files = {f.name: f.read_text() for f in sorted((REVIEW / name).glob("*.f"))}
+        expect = {"reason": reason, "at": at, "legacy": "(review case)"} if kind == "refuse" else {}
+        out.append(("review/" + name, kind, files, expect))
+    return out
 
 
 def check(ok, label, detail=""):
@@ -367,14 +383,22 @@ def main():
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
     if a.list:
-        for name, kind, _, expect in CASES:
+        for name, kind, _, expect in CASES + review_cases():
             print(kind, name, expect.get("reason", ""))
         return 0
     nift = os.path.abspath(a.nift)
     with tempfile.TemporaryDirectory(prefix="coro-module-") as td:
         work = Path(td)
-        for name, kind, files, expect in CASES:
+        for name, kind, files, expect in CASES + review_cases():
             if a.only and a.only != name:
+                continue
+            if kind == "base-defect":  # no imports: reported only (weekend-coro-module.md section 7)
+                d = work / name
+                write(files, d)
+                got, rows = run(nift, d, {})
+                lg, _ = run(nift, d, {"NIFT_VM": "0"})
+                print(f"NOTE {name}: pre-existing inline difference: VM exit {got.returncode} "
+                      f"{got.stdout!r}, legacy exit {lg.returncode}")
                 continue
             if kind == "refuse":
                 case_refuse(nift, name, files, work, expect)

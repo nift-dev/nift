@@ -21,14 +21,20 @@ declare -A WHAT=(
   [6]="a task's arguments ignored (function values passed in)" [7]="module handle state not seen"
   [8]="cooperative model admits linked units (no coro-module)" [9]="init-task also applied to the entry"
   [10]="arguments passed by value counted as task code"
+  [11]="built-in callback arguments (map/filter/...) not seen as calls through a value"
+  [12]="methods resolved by name alone (no call through a value for an object receiver)"
+  [13]="module top-level lambdas skipped and init callbacks not seen (review init-lam evasion)"
+  [14]="async calls from module code admitted"            [15]="tasks reaching a later import admitted"
 )
 declare -A WITNESS=(
   [1]="init-thread:" [2]="capture-thread-state:" [3]="capture-nested-transitive:" [4]="init-transitive:"
   [5]="capture-through-value-call:" [6]="capture-function-argument:" [7]="capture-module-handle:"
   [8]="cooperative model:" [9]="clean-module-worker" [10]="shared-globals-importer"
+  [11]="review/mx-evade:" [12]="review/struct-collide:" [13]="review/init-lam-ok:" [14]="review/private-async:"
+  [15]="review/before-import-direct:"
 )
 LIST=("$@")
-[ ${#LIST[@]} -gt 0 ] || LIST=(1 2 3 4 5 6 7 8 9 10)
+[ ${#LIST[@]} -gt 0 ] || LIST=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
 normal=$(sha256sum "$NIFT" | cut -d' ' -f1)
 failed=0
 for n in "${LIST[@]}"; do

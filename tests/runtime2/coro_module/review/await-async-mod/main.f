@@ -1,0 +1,5 @@
+import("am.f")
+a := twice(1)
+b := twice(2)
+print(await b)
+print(await a)

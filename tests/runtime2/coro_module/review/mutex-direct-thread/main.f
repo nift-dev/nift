@@ -1,0 +1,5 @@
+print("pre")
+import("sm.f")
+a := thread(incr, 0)
+print(a.join())
+print(incr(0))
