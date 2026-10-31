@@ -1,9 +1,11 @@
 # Weekend candidate: coroutines in programs that import modules (`coro-module`)
 
 Status: **candidate** on `cand/coro-module`, based on local `weekend/r2` at
-`10c41015` (strict VM default). Independent review of `fff92edd`: **REJECT**
-(§8). This revision addresses that review. It is not re-reviewed or
-integrated, and nothing is pushed.
+`10c41015` (strict VM default). Independent reviews of `fff92edd` (§8) and of
+`32537bb6` (§9): **REJECT**. This revision addresses both. It is not
+re-reviewed or integrated, and nothing is pushed. The base `coro-async-value`
+correction (§9) is its own commit, which touches only that check and its
+tests and can be taken without the rest.
 
 ## 1. Problem
 
@@ -89,18 +91,27 @@ before any effect (nothing of the entry or of any module runs). Each has a
 recorded position, at the refused node in the file that holds it. They are
 checked in this order: init-task, private-async, before-import, capture.
 
-Three analysis rules hold for all four refusals (review R2/R3):
+Four analysis rules hold for all four refusals (reviews R2/R3 and review 2).
+They rest on the call's structure and on resolved function identity, never on
+a method's spelling:
 
-- **Built-in callbacks.** A built-in or native callee (`map`, `filter`, `sort`,
-  `reduce`, a native function) given an argument that may be a function (a
-  lambda, a function's name, or a value whose kinds include a function) is a
-  call through a value.
+- **Callbacks.** A native function callee, and *every* method call, given an
+  argument that may be a function (a lambda, a function's name, or a value
+  whose kinds include a function) is a call through a value. A user struct
+  method of the same name (`map`, `filter`, `sort`, ...) does not change that:
+  the receiver may be a built-in one (review 2 H1).
 - **Methods.** A method is never resolved by its name alone. On a receiver
   that may be an object, a function or unknown, the call is a call through a
   value, and every user method of that name may also run.
 - **Lambdas in module initialisation.** A lambda created in a module's top
   level counts as top-level code. Its body is walked, whether it is called,
-  passed on or never used.
+  passed on or never used. Creating an async lambda there is not itself a task
+  start: calling it is a call through a value (review 2 L2).
+- **Named async functions as values.** A named async function read as a value
+  (stored in an object, aliased, passed) is a function value that starts a
+  task when called, and a task root whose code is that function's body. The
+  base rule `coro-async-value` refuses such programs anyway (now including the
+  object-literal form, §9); the module rules do not rely on it (review 2 B1).
 
 **`coro-module-init-task`** (owner ruling: kept refused). Some code in an
 imported module's top level may start a task. A module's top level is its
@@ -111,8 +122,9 @@ there. "May start a task" covers:
 - a call of an async function;
 - a call of a named function that may, through any chain of named calls, do
   either of those;
-- a call through a value, while some function value or lambda in the unit
-  may start a task.
+- a call through a value (a binding, a member such as `o.f(x)`, a callback),
+  while some function value in the unit may start a task: a lambda that may,
+  an async lambda, or a named async function used as a value.
 
 The first such node in the text is reported. Imports never run concurrently:
 imports inside functions are refused at link (`import-nested`). An import
@@ -121,7 +133,8 @@ resources" path cannot arise.
 
 **`coro-module-capture`** (owner ruling: kept refused). A task may capture
 module state across the boundary. A task is a `thread(f, ...)` call, a call of
-an async function, or an async lambda. Its code is:
+an async function, an async lambda, or a named async function used as a value
+(reported at that value). Its code is:
 
 - the body;
 - every function it may reach by name;
@@ -143,14 +156,27 @@ task is refused when any of these holds:
 
 The first such task in the text is reported.
 
-**`coro-module-private-async`** (review R1). Code in an imported module calls
-an async function. That covers module function bodies as well as the module's
-top level, and the function may be exported. It also covers a call through a
-value located in module code while the unit has an async lambda. Legacy fails
-any such call ("module-private async callables are unsupported",
-`src/ParserExpression.cpp:4232`). The VM refuses it rather than modelling that
-error. Calling a module's exported async function from the entry is admitted:
-legacy runs that.
+**`coro-module-private-async`** (reviews R1 and 2 B1). Legacy fails a call of
+a *named* async function made from module code, and a call through a value of a
+module's named async function from anywhere ("module-private async callables
+are unsupported", `src/ParserExpression.cpp:4232`; `o := {"f": asq}` then
+`o.f(3)` in the entry fails too). The VM refuses, rather than models, by the
+call's structure:
+
+- a direct call that resolves to a named async function, located in an
+  imported module's text (module function bodies and top level; exported or
+  not);
+- a call through a value (a callee that is not a resolved callable: a binding,
+  a member `o.f(x)`, any other expression; or a native/method callee given a
+  function value, `xs.map(asq)`), located in module code while some named async
+  function is used as a value, or located anywhere while a module's named
+  async function is used as a value.
+
+Calling a module's exported async function directly from the entry is
+admitted: legacy runs that. Async lambdas are not module-private callables:
+legacy runs them when module code calls them, and so does the VM now (review 2
+L1; until `32537bb6` any call through a value in module code was refused while
+the unit had an async lambda).
 
 **`coro-module-before-import`** (review R4). A task started in the entry may
 reach, by name or through a value, a function of a module whose text comes
@@ -166,7 +192,12 @@ the function's text position, which is conservative.
   any depth of nested imports;
 - module functions that start and join *threads* when called after
   initialisation (they may not call async functions: private-async);
-- async functions defined in modules, called from the entry;
+- async functions defined in modules, called directly from the entry;
+- async lambdas created in module code (a function body, or the top level),
+  called after initialisation from module or entry code, including through a
+  member (`o.f(a)` with `o := {"f": async (x) => ...}`), passed out of the
+  module, or exported (`al1b`, `q1`, `q1b`, `q2b`, `lam-export`,
+  `lam-mod-export`);
 - the importer's own globals, snapshotted at the spawn (the task sees the
   value at the spawn, and its writes stay in the task: CP22 L2);
 - exported module values read by the importer and passed into a task by value;
@@ -213,14 +244,20 @@ or fresh instance" is not observable on the VM yet. Legacy copies at spawn.
   name as an imported module's top-level binding counts as module state.
 - A method call on a receiver that may be an object, function or unknown counts
   as a call through a value, even when a user method has that name.
-- Any function-valued argument to a built-in or native callee counts as a
-  call through a value.
+- Any function-valued argument to a native callee or to any method call counts
+  as a call through a value, also when the method is a user method (whose body
+  is already followed by name) and also when the receiver is a user struct.
+- Calls through a value are matched against every function value in the unit:
+  one async lambda, one named async function used as a value or one function
+  value that touches module state anywhere makes every call through a value
+  suspect for the matching rule.
 - A module top-level lambda's body counts as initialisation code even if it
   is never called.
 - `before-import` treats a spawn inside an entry function as happening at the
   function's text position, whenever that function is called.
 - The "may start a task" flag of a function covers lambdas created in its body
-  and async lambdas created anywhere in it.
+  and async lambdas created anywhere in it (in a function body, unlike a
+  module's top level, creating an async lambda counts as a possible start).
 - `coro-module-init-task` does not ask whether a started task would touch
   module state. Starting a task while initialising is refused outright, per the
   ruling.
@@ -257,7 +294,8 @@ or fresh instance" is not observable on the VM yet. Legacy copies at spawn.
   - `module_link.cpp`;
   - `module_graph.cpp`.
 
-  `compiler_coro.cpp` is not edited at all. The new call in `compiler.cpp` is
+  `compiler_coro.cpp` is edited only by the separate base commit of §9, in
+  `FutureFlow::value_position` (no line owned by `cand/diag-positions`). The new call in `compiler.cpp` is
   separated from that candidate's hunk by one unchanged line, and after both
   candidates `compiler.cpp` is 400 lines (the rt-lint limit). On merge,
   `coro-module` (cooperative only) becomes positionless through that
@@ -293,11 +331,14 @@ directory of `.f` files.
   outcome `require-error`, zero executions, the exact reason, the exact
   `file:line:column`, `classify` agreement, `NIFT_VM=1` fallback equal to
   legacy, and legacy's own result printed.
-- **Review cases (61 directories, `tests/runtime2/coro_module/review/`,
-  expectations in `review/EXPECT.tsv`):** every repro from the review of
-  `fff92edd`, copied unchanged.
-  - 10 are parity cases, including both stress programs.
-  - 49 are refusals, checked like the cases above.
+- **Review cases (116 directories, `tests/runtime2/coro_module/review/`,
+  expectations in `review/EXPECT.tsv`):** every repro from the reviews of
+  `fff92edd` (61) and `32537bb6` (44), copied unchanged, and 11 correction
+  witnesses (§9).
+  - 21 are parity cases, including both stress programs.
+  - 93 are refusals, checked like the cases above. A refusal for an unrelated
+    pre-existing reason (`text-type-name`, `struct-*`, `opaque:*`,
+    `import-scope`, ...) is recorded as such, at its own position.
   - 2 are `base-defect`: the inline programs `inl2` and `before-import-inline`,
     which have no imports. They are reported, not asserted (§7).
 - **Extras:**
@@ -307,11 +348,16 @@ directory of `.f` files.
     nothing run.
 
 `make test-runtime2-coro-module-mutants` (`tests/runtime2/coro_module/mutants.sh`,
-a `certify-targets` edge) has 15 mutants. Each one is the normal objects with
-`compiler_coro_module.cpp`, `compiler_coro_module_effects.cpp` and
-`compiler_coro_admit.cpp` built
-`-DNIFT_CORO_MODULE_MUTANT=n`. Each must differ from the normal binary and fail
-the suite through its named witness:
+a `certify-targets` edge) has 19 mutants. Each one is the normal objects with
+`compiler_coro_module.cpp`, `compiler_coro_module_effects.cpp`,
+`compiler_coro_admit.cpp` and `compiler_coro.cpp` built
+`-DNIFT_CORO_MODULE_MUTANT=n`. Mutants 16-18 also build `compiler_coro.cpp`
+with CP22's mutant 25, the base hole of §9. Mutant 16 is that hole alone: its
+witnesses are the inline programs `v3`, `v4` and `p3i` (no imports), while the module
+rules still refuse the linked forms (`p3`, `p7`, `q4`, `q5` pass under it).
+Mutants 17 and 18 remove a module rule on top of the hole, so their witness
+programs actually run on the VM where legacy fails. Each mutant must differ
+from the normal binary and fail the suite through its named witness:
 
 | Mutant | Defect | Witness |
 |---|---|---|
@@ -330,6 +376,10 @@ the suite through its named witness:
 | 13 | module top-level lambdas skipped, and init callbacks not seen | `review/init-lam-ok` |
 | 14 | async calls from module code admitted | `review/private-async` |
 | 15 | tasks reaching a later import admitted | `review/before-import-direct` |
+| 16 | base `coro-async-value` skips an object literal's value (CP22 mutant 25 in `compiler_coro.cpp`) | `review/v4` |
+| 17 | private-async skips member callees, on top of mutant 16 | `review/p3` |
+| 18 | a named async function used as a value is neither a task start nor a task root, on top of mutant 16 | `review/async-value-entry-state` |
+| 19 | a same-named user method exempts a method call from the callback rule | `review/a1` |
 
 The `init-lam` evasion needs both the lambda walk and the callback rule. With
 the callback rule alone, the refusal moves to the `map(k)` call. Mutant 13
@@ -394,3 +444,52 @@ Contract claims corrected in §3:
 
 The v46 corpus outcome in §2 is unchanged: a compile-only sweep at this
 revision gives the same reason for all 17 units.
+
+## 9. Review of `32537bb6` (REJECT) and the changes made
+
+| Finding | Severity | Change |
+|---|---|---|
+| B1: a named async function stored in an object and called as a member (`o := {"f": asq}`, `o.f(x)`) is admitted (`p3`, `p7`, `q4`, `q5`); the inline form runs on the clean base (`v3`, `v4`) | BLOCKER | base commit: `coro-async-value` sees an object literal's value (and a struct field's initialiser, a `for` loop's iterated expression). Module rules: such a value is a task start (init-task) and a task root (capture, before-import); private-async refuses a call through a value in module code while one exists, or anywhere while a module's one does |
+| H1: a user struct method named like a built-in callback method (`map`, `filter`, `sort`) turned the callback rule off (`a1`, `a2`, `s1`) | HIGH | every method call given a function value is a call through a value; the method's name plays no part |
+| L1 (over-refusal): an async lambda called in a module function was refused as private-async; legacy runs it (`al1`) | LOW | private-async no longer refuses calls of async lambdas. `al1` itself now stops earlier at an unrelated pre-existing refusal (`text-type-name`, the lambda body `x * x`; the inline program is refused the same way). `al1b` (body `x * 2`) runs, equal to legacy |
+| L1 (over-refusal): an async lambda created at a module's top level and only called later was refused as init-task at the lambda (`q2`) | LOW | creating an async lambda at the top level is not a task start; calling it there still is (`q3`, now reported at the call). `q2` stops at the same unrelated `text-type-name`; `q2b` and `q1` run, equal to legacy |
+| L2 (over-claim): D-063 #2 and #3 over-claimed coverage "through a value" and "including built-in callbacks" | LOW | D-063 rewritten: what counts as a call through a value, by structure; the whole-unit matching of function values stated |
+
+**Base commit (separate).** `src/rt/compiler_coro.cpp` `FutureFlow::value_position`
+treated every child of a `Property`, `StructField` and `ForBinding` as a name.
+A property's value, a struct field's initialiser and a loop's iterated
+expression are values now. Witnesses: `tests/runtime2/cp22/refuse/r_async_value_object*`
+(direct, read back through a binding, nested object, passed as an argument,
+stored but never called), CP23 default-lane rows, `coro-unit` cases, and CP22
+mutant 25. The never-called form (`r_async_value_object_unused`) is a
+conservative refusal: legacy prints `stored`, as it does for `g := asq` that
+`coro-async-value` already refused. This follows the existing rule that a named
+async function is only ever called directly.
+
+**Through-value shapes now.**
+
+| Shape | Result |
+|---|---|
+| named async function called directly, in the entry (exported from a module or not) | admitted |
+| named async function called directly in module code | refused, `coro-module-private-async` (legacy fails) |
+| named async function used as a value anywhere (object, alias, argument, array, callback) | refused before execution: the module rules where they apply, else `coro-async-value` (legacy fails, or never calls it) |
+| async lambda created in module code, called after initialisation (direct, through a member, exported, returned) | admitted, equal to legacy |
+| async lambda called during a module's initialisation | refused, `coro-module-init-task` (owner ruling) |
+| async lambda whose body reads module state | refused, `coro-module-capture` (owner ruling) |
+| a method call given a function value, whatever the method is called, while some function value touches module state | refused, `coro-module-capture` |
+
+**Still conservatively refused.** Everything in §3's approximation list. In
+particular a call through a value is matched against every function value in
+the unit: a task whose code calls a stateless function value (`[1].map(sq)`)
+is refused as capture when some other function value in the unit touches
+module state (`h := bump` elsewhere), and a module's top level that calls any
+function value is refused as init-task when some function value in the unit
+may start a task. Admitting those would need value-flow tracking, which this
+candidate does not build.
+
+**Tests.** Every review 2 repro is in `review/` unchanged, with an
+`EXPECT.tsv` row, plus correction witnesses (`al1b`, `q1b`, `q2b`,
+`async-value-entry-state`, `export-async-direct`, `lam-export`,
+`lam-mod-export`, `lam-mod-state`, `lam-init-call`, `lam-entry-to-mod`,
+`same-name-method-ok`). The CRLF repro keeps its bytes (`.gitattributes`; the
+harness reads and writes review files as bytes). Mutants 16-19 (§5).

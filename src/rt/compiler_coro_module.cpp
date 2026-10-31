@@ -86,18 +86,23 @@ private:
         return c.by_value && a_.value_state() && kMutant != 5;
     }
 
-    // Legacy refuses any call of an async function made from module code
-    // ("module-private async callables are unsupported", exported or not;
-    // review R1). Refused, not modelled: a named async call located in an
-    // imported module's text, or a call through a value there while the unit
-    // has an async lambda.
+    // Legacy refuses any call of a named async function made from module
+    // code ("module-private async callables are unsupported", exported or
+    // not; review R1), and any call through a value of a module's named
+    // async function, from the entry too (review 2 B1: `o.f(3)` with
+    // `o := {"f": asq}`). Refused, not modelled, by the call's structure:
+    // a direct call resolving to a named async function, located in an
+    // imported module's text; or a call whose callee is not a resolved
+    // callable (a binding, a member: `o.f(x)`, a callback method's argument
+    // `xs.map(asq)`, any other expression), located in module code while a
+    // named async function is used as a value, or anywhere while a module's
+    // one is (mutant 17: member callees skipped). Async lambdas are not
+    // module-private callables: legacy runs them from module code (L1).
     bool private_async(NodeId& at) const {
-        bool async_lambda = false;
-        for (NodeId id = 0; id < ast_.size(); ++id)
-            async_lambda = async_lambda || (ast_.at(id).kind == NodeKind::Lambda && (ast_.at(id).flags & kFlagAsync));
         for (NodeId id = 0; id < ast_.size(); ++id) {  // ids follow the text within a unit; the minimum is kept
             const Node& n = ast_.at(id);
-            if (n.kind != NodeKind::Call || module_of(n.begin) == 0) continue;
+            if (n.kind != NodeKind::Call) continue;
+            const bool in_module = module_of(n.begin) != 0;
             const Node& callee = ast_.at(n.a);
             std::size_t f = 0;
             const bool named = callee.kind == NodeKind::Ident && function(ast_.text(callee), f);
@@ -105,7 +110,17 @@ private:
             const bool known = callee.kind == NodeKind::Ident &&
                                (named || thread_builtin(ast_.text(callee)) || a_.constructor(ast_.text(callee)) ||
                                 lookup_native(ast_.text(callee), native) || bind_function(ast_.text(callee)));
-            if (!(named && is_async(f)) && !(async_lambda && !known && callee.kind != NodeKind::Member)) continue;
+            const bool member = callee.kind == NodeKind::Member || callee.kind == NodeKind::SafeMember;
+            // A built-in callee given a function value calls it (xs.map(asq),
+            // a native function): a call through a value as well.
+            bool callback = false;
+            const NodeId* list = ast_.list(n);
+            for (std::uint32_t k = 0; k < n.count && known && !named; ++k)
+                callback = callback || a_.function_argument(list[k]);
+            const bool through_value = (!known || callback) && !(member && kMutant == 17);
+            const bool hit = (named && is_async(f) && in_module) ||
+                             (through_value && ((in_module && a_.value_async()) || a_.value_async_module()));
+            if (!hit) continue;
             if (at == kNoNode || n.begin < ast_.at(at).begin) at = id;
         }
         return at != kNoNode;
@@ -138,8 +153,13 @@ private:
         for (NodeId id = 0; id < ast_.size(); ++id) {
             const Node& n = ast_.at(id);
             Effects e;
+            std::size_t g = 0;
             if (n.kind == NodeKind::Lambda && (n.flags & kFlagAsync)) {
                 e = walk(n.b, Mode::Task);
+            } else if (n.kind == NodeKind::Ident && a_.async_value(id, g)) {
+                // A named async function used as a value: its body is a
+                // task's code wherever the value is called (review 2 B1).
+                e.refs.push_back(g);
             } else if (n.kind == NodeKind::Call && ast_.at(n.a).kind == NodeKind::Ident) {
                 const std::string_view t = name(n.a);
                 const NodeId* list = ast_.list(n);

@@ -1470,15 +1470,24 @@ works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
    imports runs on the VM as its linked (inline) program would. The
    cooperative model (`NIFT_VM_COOPERATIVE_THREADS=1`) keeps CP22's
    whole-unit `coro-module` refusal.
-2. **Kept refused before any effect: `coro-module-init-task`.** A coroutine or
-   task that may start from a module's top-level initialisation. That covers
-   a direct spawn, one reached through named calls, one reached through a
-   value, and one inside a lambda created there.
-3. **Kept refused before any effect: `coro-module-capture`.** A coroutine that
-   may capture module state across the module/coroutine boundary: it reads or
-   writes an imported module's top-level binding through any reachable code,
-   including function values and built-in callbacks. It is also refused when a
-   module binding may hold a handle.
+2. **Kept refused before any effect: `coro-module-init-task`.** Code in a
+   module's top-level initialisation that may start a task: a `thread()` call,
+   a direct call of a named async function, a named call that may reach
+   either, or a call through a value (a binding, a member such as `o.f(x)`, a
+   method or built-in given a function value) while some function value in
+   the unit may start a task. Lambda bodies created there count as
+   initialisation code. Creating an async lambda there is not itself a task
+   start; calling it during initialisation is.
+3. **Kept refused before any effect: `coro-module-capture`.** A task whose
+   code may read or write an imported module's top-level binding: directly,
+   through functions it reaches by name, through function values and lambdas
+   passed into it, or through a call through a value while some function value
+   or lambda in the unit may touch module state. A call is through a value by
+   its structure (a callee that is not a resolved function, and any method or
+   built-in call given an argument that may be a function), never by the
+   method's name. The analysis does not track which value reaches which call:
+   one such function value anywhere makes every call through a value suspect.
+   It is also refused when a module binding may hold a handle.
 4. Out of scope, unchanged:
    - persistent-session coroutines (`session:coroutine`);
    - CP24;
@@ -1490,6 +1499,17 @@ works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
 The independent review of `fff92edd` added two refusals of programs that
 legacy itself fails: `coro-module-private-async` and
 `coro-module-before-import`. Their classification is pending an owner ruling.
+
+Review of `32537bb6` (owner ruling 2026-11-01): a named async function used as
+a value, including stored in an object literal, stays refused before execution
+(`coro-async-value`, a base CP22 rule; the object-literal form had escaped it).
+Independently of that base rule, the module rules treat such a value as a task
+start and a task root wherever it is called, and `coro-module-private-async`
+also refuses a call through a value in module code while one exists, or
+anywhere while a module's one does (legacy: "module-private async callables are
+unsupported", also for `o.f(3)` from the entry). Async lambdas are not refused
+for being called from module code: legacy runs them. Direct calls of exported
+async functions from the entry stay admitted.
 
 Record: `checkpoints/weekend-coro-module.md`. Witnesses:
 `tests/runtime2/coro_module/` (`make test-runtime2-coro-module`, mutants

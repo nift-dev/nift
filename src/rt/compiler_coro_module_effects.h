@@ -69,9 +69,20 @@ public:
     bool value_spawn() const { return value_spawn_; }      // some function value or lambda may start a task
     bool value_state() const { return value_state_; }      // some function value or lambda may touch module state
     bool module_handles() const { return module_handles_; }  // a module binding may hold a handle
+    // A named async function used as a value (stored, passed, aliased): a
+    // call through a value may then call it (review 2 B1). Any such use, and
+    // one of an async function defined in an imported module.
+    bool value_async() const { return value_async_; }
+    bool value_async_module() const { return value_async_module_; }
+    // `id` is a read of a named async function as a value: the value is the
+    // task's code wherever it is called (a task root, like an async lambda).
+    bool async_value(NodeId id, std::size_t& f) const;
+
+    // An argument that may be a function: a lambda, a function's name, or
+    // a value whose kinds include a function.
+    bool function_argument(NodeId arg) const;
 
 private:
-    bool function_argument(NodeId arg) const;
     void call(const Node& n, Mode mode, Effects& e, std::vector<Item>& work) const;
     const Effects& closure_of(std::size_t f) const;
     void values();
@@ -91,6 +102,9 @@ private:
     bool value_spawn_ = false;
     bool value_state_ = false;
     bool module_handles_ = false;
+    bool value_async_ = false;
+    bool value_async_module_ = false;
+    std::unordered_set<NodeId> async_values_;  // reads of named async functions as values
 };
 
 }  // namespace coro_module

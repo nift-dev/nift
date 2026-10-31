@@ -4292,15 +4292,19 @@ test-runtime2-coro-module-tsan: $(TSAN_TARGET)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm-sanitize: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
+# compiler_coro.cpp (the base coro-async-value check) is built with CP22's
+# mutant 25 (an object literal's value skipped) for mutants 16-18: 16 is that
+# base hole alone; 17 and 18 reopen the module rules' own through-value
+# checks on top of it, so their witnesses run (review 2 B1).
 CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_module_effects.cpp \
-	src/rt/compiler_coro_admit.cpp
+	src/rt/compiler_coro_admit.cpp src/rt/compiler_coro.cpp
 CORO_MODULE_MUTANT_DIR := $(TEST_DIR)/coro-module-mutants
 $(CORO_MODULE_MUTANT_DIR)/nift-%: $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CORO_MODULE_SOURCES) \
 		$(RT_VALUE_HEADERS) $(LIBFFI_A)
 	mkdir -p "$(CORO_MODULE_MUTANT_DIR)/$*"
 	set -e; for f in $(CORO_MODULE_SOURCES); do \
-	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MODULE_MUTANT=$* -c $$f \
-	    -o "$(CORO_MODULE_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
+	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MODULE_MUTANT=$* -DNIFT_CORO_MUTANT=$(if $(filter 16 17 18,$*),25,0) \
+	    -c $$f -o "$(CORO_MODULE_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) \
 		$(addprefix $(CORO_MODULE_MUTANT_DIR)/$*/,$(notdir $(CORO_MODULE_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
 test-runtime2-coro-module-mutants: $(TARGET)

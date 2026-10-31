@@ -230,7 +230,7 @@ def review_cases():
         if not line.strip() or line.startswith("#"):
             continue
         name, kind, reason, at = line.split("\t")
-        files = {f.name: f.read_text() for f in sorted((REVIEW / name).glob("*.f"))}
+        files = {f.name: f.read_bytes().decode() for f in sorted((REVIEW / name).glob("*.f"))}  # bytes: CRLF kept
         expect = {"reason": reason, "at": at, "legacy": "(review case)"} if kind == "refuse" else {}
         out.append(("review/" + name, kind, files, expect))
     return out
@@ -245,7 +245,7 @@ def check(ok, label, detail=""):
 def write(files, root):
     root.mkdir(parents=True, exist_ok=True)
     for name, text in files.items():
-        (root / name).write_text(text)
+        (root / name).write_bytes(text.encode())
 
 
 def run(nift, cwd, extra, args=("main.f",), stdin=None):

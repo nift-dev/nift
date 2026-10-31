@@ -58,8 +58,11 @@ void Analysis::visit(NodeId id, Mode mode, Effects& e, std::vector<Item>& work) 
             // A lambda created during initialisation may run during it
             // (called, or passed to a built-in callback): its body counts
             // as initialisation code (review R2; mutant 13: skipped).
+            // Creating an async lambda starts nothing: a call of it is a
+            // call through a value (value_spawn). Only in a function body
+            // does its creation count, conservatively (review 2 L2).
             if (mode == Mode::Init && kMutant == 13) return;
-            if (n.flags & kFlagAsync) e.spawn = true;
+            if ((n.flags & kFlagAsync) && mode != Mode::Init) e.spawn = true;
             push(n.b, mode == Mode::Init ? Mode::Init : Mode::Task);
             return;
         case NodeKind::Member: case NodeKind::SafeMember:
@@ -121,13 +124,18 @@ void Analysis::call(const Node& n, Mode mode, Effects& e, std::vector<Item>& wor
         // receiver's struct is not known here, so a receiver that may be
         // an object, a function or unknown is a call through a value (a
         // callable field), and every user method of that name may run.
+        // A user method's name never makes the call a user call either
+        // (review 2 H1): on a built-in receiver (an array's map/filter/
+        // sort) the same name is the built-in, which calls its function
+        // arguments. Every method call takes the callback rule (mutant 19:
+        // a same-named user method exempts it).
         const auto m = methods_.find(name(callee.b));
         const bool named = m != methods_.end();
         if (!spawner && named) e.refs.insert(e.refs.end(), m->second.begin(), m->second.end());
         if (!spawner && (!named || kMutant != 12) &&
             (kinds_.of(callee.a) & (kKindFunction | kKindObject | kKindUnknown)))
             e.by_value = true;
-        native_callee = !named;
+        native_callee = kMutant == 19 ? !named : true;
         work.push_back({callee.a, mode});
     } else {
         if (!spawner) e.by_value = true;
@@ -169,10 +177,23 @@ const Effects& Analysis::closure_of(std::size_t f) const {
 // and any lambda.
 void Analysis::values() {
     std::unordered_set<NodeId> callee_or_name;  // and assignment targets (no kind of their own)
+    std::unordered_set<NodeId> not_value;  // names that are no read of a value (export, parameters, ...)
     for (NodeId id = 0; id < ast_.size(); ++id) {
         const Node& n = ast_.at(id);
         if (n.kind == NodeKind::Call || n.kind == NodeKind::FnDecl) callee_or_name.insert(n.a);
         if (n.kind == NodeKind::Member || n.kind == NodeKind::SafeMember) callee_or_name.insert(n.b);
+        switch (n.kind) {
+            case NodeKind::Export: case NodeKind::Import: case NodeKind::FnDecl: case NodeKind::Param:
+            case NodeKind::Pattern: case NodeKind::StructDecl: case NodeKind::Try: case NodeKind::ForBinding: {
+                for (NodeId child : {n.a, n.b, n.c}) not_value.insert(child);
+                const NodeId* list = ast_.list(n);
+                for (std::uint32_t k = 0; k < n.count; ++k) not_value.insert(list[k]);
+                if (n.kind == NodeKind::ForBinding) not_value.erase(n.a);  // the iterated value
+                break;
+            }
+            case NodeKind::StructField: not_value.insert(n.a); break;
+            default: break;
+        }
         const bool target = n.kind == NodeKind::Declare || n.kind == NodeKind::Assign ||
                             n.kind == NodeKind::CompoundAssign || n.kind == NodeKind::IncDec;
         if (!target || n.a == kNoNode || ast_.at(n.a).kind != NodeKind::Ident) continue;
@@ -190,6 +211,16 @@ void Analysis::values() {
             std::size_t f = 0;
             if (!function(ast_.text(n), f)) continue;
             e = closure_of(f);
+            // A named async function as a value: calling the value starts
+            // a task (review 2 B1; mutant 18: not counted).
+            if (is_async(f) && !not_value.count(id)) {
+                if (kMutant != 18) {
+                    e.spawn = true;
+                    async_values_.insert(id);
+                }
+                value_async_ = true;
+                if (module_of(ast_.at(plan_.functions[f]).begin) != 0) value_async_module_ = true;
+            }
         } else {
             continue;
         }
@@ -197,6 +228,10 @@ void Analysis::values() {
         value_state_ = value_state_ || e.state;
     }
 }
+bool Analysis::async_value(NodeId id, std::size_t& f) const {
+    return async_values_.count(id) != 0 && function(name(id), f);
+}
+
 // Legacy captures a module's whole environment: a handle (or a value of
 // unknown kind, refused anyway) anywhere in it may be non-transferable.
 void Analysis::handle(NodeId value) {

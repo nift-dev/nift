@@ -2,8 +2,14 @@
 # Mutation controls for tests/runtime2/coro_module/coro_module.py.
 #   mutants.sh NIFT MUTANT_DIR [N...]
 # Each mutant is the normal build with the module-admission objects
-# (src/rt/compiler_coro_module.cpp, src/rt/compiler_coro_admit.cpp) compiled
+# (src/rt/compiler_coro_module.cpp, src/rt/compiler_coro_module_effects.cpp,
+# src/rt/compiler_coro_admit.cpp, src/rt/compiler_coro.cpp) compiled
 # -DNIFT_CORO_MODULE_MUTANT=n (Makefile rule $(CORO_MODULE_MUTANT_DIR)/nift-n).
+# Mutants 16-18 also build compiler_coro.cpp with CP22's mutant 25 (the base
+# coro-async-value check skips an object literal's value): 16 is that base
+# hole alone (its witness has no imports; the module rules still refuse the
+# linked forms), and 17-18 remove a module rule on top of it, so the witness
+# program actually runs.
 # It must differ from the normal binary, and the suite must fail on it, with
 # the mutant's named witness among the failures. A build failure is a harness
 # failure, never a detection. Each mutant binary is removed after its run.
@@ -25,16 +31,21 @@ declare -A WHAT=(
   [12]="methods resolved by name alone (no call through a value for an object receiver)"
   [13]="module top-level lambdas skipped and init callbacks not seen (review init-lam evasion)"
   [14]="async calls from module code admitted"            [15]="tasks reaching a later import admitted"
+  [16]="base coro-async-value skips an object literal's value (CP22 mutant 25)"
+  [17]="private-async skips member callees (o.f(x)), with the base hole"
+  [18]="a named async function as a value not counted as a spawn or task root, with the base hole"
+  [19]="a same-named user method exempts a built-in callback method (map/filter/sort)"
 )
 declare -A WITNESS=(
   [1]="init-thread:" [2]="capture-thread-state:" [3]="capture-nested-transitive:" [4]="init-transitive:"
   [5]="capture-through-value-call:" [6]="capture-function-argument:" [7]="capture-module-handle:"
   [8]="cooperative model:" [9]="clean-module-worker" [10]="shared-globals-importer"
   [11]="review/mx-evade:" [12]="review/struct-collide:" [13]="review/init-lam-ok:" [14]="review/private-async:"
-  [15]="review/before-import-direct:"
+  [15]="review/before-import-direct:" [16]="review/v4:" [17]="review/p3:" [18]="review/async-value-entry-state:"
+  [19]="review/a1:"
 )
 LIST=("$@")
-[ ${#LIST[@]} -gt 0 ] || LIST=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+[ ${#LIST[@]} -gt 0 ] || LIST=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
 normal=$(sha256sum "$NIFT" | cut -d' ' -f1)
 failed=0
 for n in "${LIST[@]}"; do
