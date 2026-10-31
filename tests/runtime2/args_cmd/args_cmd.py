@@ -300,6 +300,24 @@ def suite(root):
                 check(legacy.stdout.startswith("before\n"), label + ": control: legacy prints before",
                       repr((legacy.returncode, legacy.stdout, legacy.stderr[:160])))
                 shutil.rmtree(d)
+    # A module whose only mention of `args`/`cmd` is a struct or enum *name*
+    # (review of de6e6dde, MEDIUM): refused at that name's real position, never
+    # an invented one (the end of the file) and never "no exact position".
+    for label, lib, at in (
+            ("module struct named args",
+             'fn(h()) { return 1 }\nexport(h)\nstruct(args) {\n  v := 1\n}\n// trailing comment line', "lib.f:3:8"),
+            ("module enum named args", 'enum args {\n  A,\n  B\n}\nfn(h()) { return 1 }\nexport(h)\n', "lib.f:1:6"),
+            ("module struct named cmd", 'struct(cmd) {\n  v := 1\n}\nfn(h()) { return 1 }\nexport(h)\n', "lib.f:1:8")):
+        d = Path(tempfile.mkdtemp(dir=work))
+        (d / "lib.f").write_text(lib)
+        (d / "main.f").write_text('print("before")\nimport("lib.f")\nprint(h())\n')
+        vm, rows = run([NIFT, "main.f", "a", "b"], d, None, home)
+        check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-binding)" in vm.stderr
+              and at + ":" in vm.stderr and "no exact position" not in vm.stderr
+              and not any(r.get("vm_executions") for r in rows),
+              label + ": refused before any effect at the name's own position " + at,
+              repr((vm.returncode, vm.stdout, vm.stderr[:240])))
+        shutil.rmtree(d)
     # The module's own code is the control here: legacy cannot see `args` at a
     # module's top level (its error), a module function sees the caller's.
     (work / "lib.f").write_text('w := args.size()\nexport(w)\n')

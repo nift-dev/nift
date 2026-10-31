@@ -224,9 +224,17 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
         for (std::string_view name : entry_names) {
             if (!units[m].top.count(name)) continue;
             std::uint32_t first = UINT32_MAX;  // its first mention in the module
+            const Ast& ast = *units[m].ast;
             for (NodeId id : units[m].uses)
-                if (units[m].ast->text(units[m].ast->at(id)) == name)
-                    first = std::min<std::uint32_t>(first, units[m].ast->at(id).begin);
+                if (ast.text(ast.at(id)) == name) first = std::min<std::uint32_t>(first, ast.at(id).begin);
+            // A struct or enum *name* is declared but is not a use: its name's
+            // own offset (otherwise the only mention had no position).
+            for (NodeId id = 0; id < ast.size(); ++id) {
+                const Node& n = ast.at(id);
+                if ((n.kind == NodeKind::StructDecl || n.kind == NodeKind::EnumDecl) && n.a != kNoNode &&
+                    ast.at(n.a).kind == NodeKind::Ident && ast.text(ast.at(n.a)) == name)
+                    first = std::min<std::uint32_t>(first, ast.at(n.a).begin);
+            }
             // Positioned only at a recorded mention; none found (UINT32_MAX): no position.
             refuse(m, first, "import-scope:invocation-binding", first != UINT32_MAX);
             return out;
