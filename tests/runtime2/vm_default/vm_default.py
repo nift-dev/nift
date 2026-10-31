@@ -793,6 +793,47 @@ def main():
                   f"{label} on a tty: interrupted at the earliest refusal (3:18); s1 ran once, s3 never",
                   f"status={status} out={out!r}")
 
+        # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
+        # a plain `-` stdin program; `$[...]` in a redirected and in a background
+        # (`&`) segment; NIFT_VM=1 sessions stop like the default.
+        d = work / "matrix"
+        d.mkdir()
+        proc, rows = run(nift, d, ["-"], {}, stdin='touch("t.txt")\nr := run("echo", "hi")\n')
+        problems = diagnostic_problems(proc.stderr, "<stdin>:2:6", "-")
+        check(proc.returncode == 1 and proc.stdout == "" and not (d / "t.txt").exists() and not problems and
+              [r.get("outcome") for r in rows] == ["require-error"],
+              "`-` stdin program: refused as a whole before effects, exit 1", f"rc={proc.returncode} {problems}")
+        for label, line, never in (("redirect", '/bin/echo $[run("x")] > red.txt; touch after.txt',
+                                    ["red.txt", "after.txt"]),
+                                   ("background `&`", '/usr/bin/touch bg.txt $[run("x")] &', ["bg.txt"])):
+            for name in never + ["later.txt", "typed.txt"]:
+                if (d / name).exists():
+                    (d / name).unlink()
+            proc, rows = run(nift, d, [], {}, stdin=line + '\ntouch("later.txt")\n')
+            time.sleep(0.2)
+            present = [n for n in never + ["later.txt"] if (d / n).exists()]
+            check(proc.returncode == 1 and not present and "NIFT_VM session refused" in proc.stderr,
+                  f"$[...] refusal in a {label} segment (piped): nothing on the line ran, session stopped",
+                  f"rc={proc.returncode} files={present} err={proc.stderr!r}")
+            for name in never + ["later.txt", "typed.txt"]:
+                if (d / name).exists():
+                    (d / name).unlink()
+            status, out = run_tty(nift, d, [], {}, [line, 'touch("typed.txt")', "exit"])
+            time.sleep(0.2)
+            present = [n for n in never if (d / n).exists()]
+            check(status == 0 and not present and (d / "typed.txt").exists(),
+                  f"$[...] refusal in a {label} segment (tty): nothing on the line ran, usable prompt",
+                  f"status={status} files={present} out={out!r}")
+        for name in ("early.txt", "late.txt"):
+            if (d / name).exists():
+                (d / name).unlink()
+        proc, rows = run(nift, d, [], {"NIFT_VM": "1"},
+                         stdin='touch("early.txt")\nr := run("echo", "hi")\ntouch("late.txt")\n')
+        check(proc.returncode == 1 and (d / "early.txt").exists() and not (d / "late.txt").exists() and
+              "the session stopped here" in proc.stderr and all(r.get("legacy_executions", 0) == 0 for r in rows),
+              "NIFT_VM=1 piped session: VM-owned, stops at the refusal like the default (no legacy fallback)",
+              f"rc={proc.returncode} err={proc.stderr!r} rows={rows}")
+
         # Negative controls: the predicates reject the old default and a fallback environment.
         for label, extra in (("old default (NIFT_VM=0)", {"NIFT_VM": "0"}), ("fallback (NIFT_VM=1)",
                                                                              {"NIFT_VM": "1"})):

@@ -2574,6 +2574,11 @@ static int execute_shell_command(Parser& parser,
     int exit_code = 0;
     int last = 0;
     for (auto& segment : plan.segments) {
+        // Owner invariant, the one propagation point for every dispatch path
+        // (interpolation, shell builtins, shell-form Nift calls, externals,
+        // pipelines, redirections, `&`): once a VM refusal has been reported
+        // while this logical command line runs, no later segment executes.
+        if (session_refusal_reported) return 2;
         const bool should = segment.connector.empty() ||
             (segment.connector == "&&" ? last == 0 :
              segment.connector == "||" ? last != 0 : true);
@@ -2606,9 +2611,6 @@ static int execute_shell_command(Parser& parser,
             if (!command_token_interpolate_word(parser, word, error, session, &terminal)) {
                 if (print_errors) console::error(error);
                 if (terminal) return 70;
-                // A refused `$[...]` abandons the whole command line: no later
-                // segment, `;`/`&&`/`||` branch or pipeline stage runs.
-                if (session_refusal_reported) return 2;
                 interpolation_failed = true;
                 last = 2;
                 break;
@@ -2687,10 +2689,6 @@ static int execute_shell_command(Parser& parser,
                 break;
         }
         if (session && last == 70 && segment.first.kind != nift::shell::CommandKind::External) return 70;
-        // A refusal reported while running this segment (a shell-form call of a
-        // user function or builtin, `cd`, ...) abandons the whole logical line,
-        // as a refused `$[...]` does: no later `;`/`&&`/`||` segment runs.
-        if (session_refusal_reported) return 2;
         if (exit_requested) break;
     }
     if (exit_requested_out) *exit_requested_out = exit_requested;
