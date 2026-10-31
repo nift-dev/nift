@@ -350,7 +350,7 @@ REFUSED = [
      'alias-argument'),
     # CP12b modules: the unit compiles linked, here refused for its missing module
     # (a path rooted at an imported binding: vm_modules.py path-arg-imported).
-    ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'import-missing'),
+    ('path-import', 'fn(f(s)) {\n  return s\n}\nimport("nope.f")\no := {"k": 1}\nprint(f(o.k))\n', 'import-error:missing'),
     ('path-export', 'fn(f(s)) {\n  return s\n}\no := {"k": 1}\nprint(f(o.k))\nexport(o)\n', 'statement:Export'),
     ('path-member-on-int', 'fn(f(s)) {\n  return s\n}\no := {"a": 1}\nprint(f(o.a.b))\n', 'path-in-call-argument'),
     ('path-index-on-string', 'fn(f(s)) {\n  return s\n}\ns := "abc"\nprint(f(s[1]))\n', 'path-in-call-argument'),

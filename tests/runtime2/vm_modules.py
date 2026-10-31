@@ -75,20 +75,20 @@ SHAPES.update({
     "name-clash": ({"m.nft": 'tmp := 1\nfn(mf()) {\n  return tmp\n}\nexport(mf)\n',
                     "main.f": 'tmp := 2\nimport("m.nft")\nprint(mf() + tmp)\n'}, "import-name-clash"),
     # Refused: a module's bare top-level return ends only the module in legacy.
-    "module-bare-return": ({"m.nft": 'print("a")\nreturn\n', "main.f": 'import("m.nft")\nprint("b")\n'}, "module-return"),
+    "module-bare-return": ({"m.nft": 'print("a")\nreturn\n', "main.f": 'import("m.nft")\nprint("b")\n'}, "module-bare-return"),
 })
 
 # Expected outcomes of the legacy probes and fixtures (directory -> outcome).
 PROBES = {
-    "cycle": "import-cycle", "diamond": "import-reinitialised", "dynamic_path": "import-dynamic",
-    "export_collision": "import-collision", "export_copy": "binding-name-reserved", "export_missing": "export-missing",
-    "in_block": "import-nested", "in_function": "import-nested", "missing": "import-missing",
-    "module_bare_return": "module-return", "module_error": "type:-", "module_free_unbound": "free-name",
+    "cycle": "import-error:cycle", "diamond": "import-reinitialised", "dynamic_path": "import-dynamic",
+    "export_collision": "import-collision", "export_copy": "binding-name-reserved", "export_missing": "module-error:export-missing",
+    "in_block": "import-nested", "in_function": "import-nested", "missing": "import-error:missing",
+    "module_bare_return": "module-bare-return", "module_error": "type:-", "module_free_unbound": "free-name",
     # module_private: the importer declares `hidden` too (refused: names stay apart).
-    "module_private": "import-name-clash", "module_private_late": "vm", "module_return": "module-return",
+    "module_private": "import-name-clash", "module_private_late": "vm", "module_return": "module-error:return-value",
     "module_vs_caller_local": "import-scope", "nested_relative": "vm", "not_reexported": "import-scope",
-    "package_missing": "import-package", "repeated": "import-reinitialised",
-    "same_file_two_spellings": "import-reinitialised", "self_cycle": "import-cycle", "side_effect_order": "vm",
+    "package_missing": "import-error:package", "repeated": "import-reinitialised",
+    "same_file_two_spellings": "import-reinitialised", "self_cycle": "import-error:cycle", "side_effect_order": "vm",
     "struct_export": "export-struct", "template_import": "binding-name-reserved",
 }
 
@@ -272,7 +272,7 @@ def main():
 
 
 # Expected outcomes of the agreeing D-041 fixtures that are not on the VM.
-FIXTURES = {"export_clash": "import-collision", "circular": "import-cycle", "self_cycle": "import-cycle",
+FIXTURES = {"export_clash": "import-collision", "circular": "import-error:cycle", "self_cycle": "import-error:cycle",
             "doc_try_import": "import-nested", "doc_math": "vm", "import_path_print": "vm",
             "import_path_read": "path-in-call-argument", "import_path_write": "alias-argument",
             "nested_chain": "import-scope"}

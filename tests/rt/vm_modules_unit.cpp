@@ -103,7 +103,8 @@ Planned plan(const fs::path& entry, InitPolicy policy, const fs::path& project_r
     return p;
 }
 
-std::string verdict(const ModuleGraph& g) { return g.ok ? "ok" : g.reason; }
+// A program error (D-NEXT-packages) reports its id; a feature refusal its reason.
+std::string verdict(const ModuleGraph& g) { return g.ok ? "ok" : g.program_error ? g.error.id : g.reason; }
 
 struct Expect {
     const char* probe;
@@ -114,28 +115,28 @@ struct Expect {
 // Graph-level verdicts; "ok" units may still be refused later by the
 // compiler (free names, struct construction, ...).
 const Expect kExpect[] = {
-    {"cycle", "import-cycle", "import-cycle"},
+    {"cycle", "import-error:cycle", "import-error:cycle"},
     {"diamond", "ok", "import-reinitialised"},
     {"dynamic_path", "import-dynamic", "import-dynamic"},
     {"export_collision", "import-collision", "import-collision"},
     {"export_copy", "ok", "ok"},
-    {"export_missing", "export-missing", "export-missing"},
+    {"export_missing", "module-error:export-missing", "module-error:export-missing"},
     {"in_block", "import-nested", "import-nested"},
     {"in_function", "import-nested", "import-nested"},
-    {"missing", "import-missing", "import-missing"},
+    {"missing", "import-error:missing", "import-error:missing"},
     {"module_bare_return", "ok", "ok"},
     {"module_error", "ok", "ok"},  // a run-time error inside the module
     {"module_free_unbound", "ok", "ok"},
     {"module_private", "ok", "ok"},
     {"module_private_late", "ok", "ok"},
-    {"module_return", "module-return", "module-return"},
+    {"module_return", "module-error:return-value", "module-error:return-value"},
     {"module_vs_caller_local", "ok", "ok"},
     {"nested_relative", "ok", "ok"},
     {"not_reexported", "ok", "ok"},
-    {"package_missing", "import-package", "import-package"},
+    {"package_missing", "import-error:package", "import-error:package"},
     {"repeated", "ok", "import-reinitialised"}  /* a rebind */,
     {"same_file_two_spellings", "ok", "import-reinitialised"},
-    {"self_cycle", "import-cycle", "import-cycle"},
+    {"self_cycle", "import-error:cycle", "import-error:cycle"},
     {"side_effect_order", "ok", "ok"},
     {"struct_export", "export-struct", "export-struct"},
     {"template_import", "ok", "ok"},
@@ -168,7 +169,7 @@ void check_d041_fixtures() {
     } expect[] = {
         {"repeated", "ok"}, {"repeated_two_spellings", "ok"}, {"export_clash", "import-collision"},
         {"diamond", "ok"}, {"diamond_stateful", "ok"}, {"nested_chain", "ok"}, {"nested_shared", "ok"},
-        {"circular", "import-cycle"}, {"self_cycle", "import-cycle"}, {"stateful_export_binding", "ok"},
+        {"circular", "import-error:cycle"}, {"self_cycle", "import-error:cycle"}, {"stateful_export_binding", "ok"},
         {"stateful_array_binding", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
         {"repeated_binding", "ok"}, {"reexport_binding", "ok"}, {"module_fn_lexical", "ok"},
         {"doc_math", "ok"}, {"doc_try_import", "import-nested"},
@@ -238,9 +239,11 @@ void check_details() {
         CHECK(p.graph.modules.size() == 2 && p.graph.modules[1]->legacy_initialisations == 2);
     }
     {
-        // Refusals inside a module name that module.
+        // `return <value>` in a module (a program error): reported at the
+        // import in its importer, as legacy, with the `return` in the module.
         const Planned p = plan(probe("module_return"), InitPolicy::RefuseReinitialisation);
-        CHECK(p.graph.where == 1 && name_of(p.graph.modules[1]->path) == "ret.nft");
+        CHECK(p.graph.error.where == 0 && p.graph.error.return_note && p.graph.error.return_where == 1 &&
+              name_of(p.graph.modules[1]->path) == "ret.nft");
     }
     {
         // The project root (builds): a probe's own directory admits it, a
@@ -255,24 +258,25 @@ void check_details() {
 
 // Absent modules, hermetically: each import target is checked absent (or of
 // the intended kind) before planning; the graph records it as absent, never
-// as a dependency, refused at the import with `import-missing`.
+// as a dependency, rejected at the import with the program error `import-error:missing`.
 void check_absent_modules() {
     const TempRoot root;
     const std::string main = "print(\"before\")\nimport(\"nope.nft\")\nprint(\"after\")\n";
     root.write("plain/main.f", main);
     CHECK(absent(root.path() / "plain" / "nope.nft"));
     const Planned p = plan(root.path() / "plain" / "main.f", InitPolicy::OncePerContext);
-    CHECK(verdict(p.graph) == "import-missing");
+    CHECK(verdict(p.graph) == "import-error:missing");
     CHECK(p.graph.dependencies.empty() && p.graph.absent.size() == 1);
     CHECK(!p.graph.absent.empty() && p.graph.absent[0] == root.path() / "plain" / "nope.nft");
-    CHECK(p.graph.where == 0 && p.graph.offset == p.source.find("import(\"nope"));
+    CHECK(p.graph.error.where == 0 && p.graph.error.offset == p.source.find("import(\"nope") &&
+          p.graph.error.positioned);
     // Nested: a module's missing import is resolved against that module's
     // directory, recorded absent, and the reading module is a dependency.
     root.write("nested/main.f", "import(\"sub/a.nft\")\n");
     root.write("nested/sub/a.nft", "import(\"gone.nft\")\n");
     CHECK(absent(root.path() / "nested" / "sub" / "gone.nft"));
     const Planned n = plan(root.path() / "nested" / "main.f", InitPolicy::OncePerContext);
-    CHECK(verdict(n.graph) == "import-missing" && n.graph.where == 1);
+    CHECK(verdict(n.graph) == "import-error:missing" && n.graph.error.where == 1);
     CHECK(n.graph.dependencies.size() == 1 && n.graph.absent.size() == 1);
     CHECK(!n.graph.absent.empty() && n.graph.absent[0] == root.path() / "nested" / "sub" / "gone.nft");
 }

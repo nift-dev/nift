@@ -13,11 +13,17 @@
 //     function names, of different units are disjoint, and a unit uses
 //     another unit's such name only where it imports it (legacy isolates
 //     module scopes; module functions resolve names lexically, D-046 #4);
-//   - a module has no top-level `return` (legacy ends only the module).
-// Otherwise the unit is refused with a reason (legacy runs it).
+//   - a module has no top-level `return` (legacy ends only the module);
+//   - a module's private `args`/`cmd` (rt/module_invocation.h) is renamed
+//     internally, so it never meets the entry's invocation binding; messages
+//     map the generated name back (display()).
+// Otherwise the unit is refused with a reason (legacy runs it), or, for an
+// invalid program found by the graph, rejected with its program error
+// (`program_error`, GraphError).
 // Positions in the linked text map back to (module, offset) for
 // diagnostics: errors raised while a module initialises carry legacy's
-// `import: ` prefix once per active import level.
+// prefix once per active import level, in each import's own spelling
+// (`import: ` or `@import: `), outermost first (prefix).
 #include "rt/ast.h"
 #include "rt/module_graph.h"
 
@@ -26,6 +32,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace nift::rt {
@@ -35,6 +42,7 @@ struct LinkSegment {
     std::size_t end = 0;
     std::size_t module = 0;      // index into graph.modules (0: the entry)
     std::size_t source_begin = 0;  // offset of `begin` in that module's own text
+    bool atom = false;             // a renamed identifier: every offset maps to source_begin
 };
 
 struct LinkedUnit {
@@ -44,10 +52,17 @@ struct LinkedUnit {
     std::size_t where = 0;     // module of the refused construct
     std::uint32_t offset = 0;  // its offset in that module's text
     bool positioned = false;   // `offset` is a recorded position (each refusal site says so)
+    bool program_error = false;  // the graph found an invalid program: graph.error
+    // import-scope:invocation-init through a function: the initialising mention.
+    bool note = false;
+    std::size_t note_where = 0;
+    std::uint32_t note_offset = 0;
     ModuleGraph graph;
     std::string text;          // the linked program (when linked && ok)
     std::vector<LinkSegment> segments;
     std::vector<int> depth;    // per module: import nesting (entry 0)
+    std::vector<std::string> prefix;  // per module: legacy's frame prefixes for errors while it initialises
+    std::vector<std::pair<std::string, std::string>> renames;  // generated name, original name
     std::vector<std::string_view> module_names;  // declared outside functions in imported modules
 
     struct Location {
@@ -56,14 +71,13 @@ struct LinkedUnit {
     };
     // The module position of a linked-text offset.
     Location locate(std::size_t offset) const;
+    // `text` with every generated name replaced by the original it renames.
+    std::string display(std::string text) const;
 };
 
 // `entry_source` is the text `entry` was parsed from. `entry_names`: names
 // the entry unit has besides its own declarations (the script invocation
-// bindings `cmd`/`args`). Legacy binds them in the entry script's scope only:
-// a module's top-level code cannot see them, and a module function sees them
-// only through a caller's scope (dynamic resolution), so a module naming one
-// is refused (`import-scope`), as for any other binding of the entry.
+// bindings `cmd`/`args`). How modules may name them: rt/module_invocation.h.
 LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source,
                      const std::filesystem::path& entry_path,
                      const std::vector<std::string_view>& entry_names = {});

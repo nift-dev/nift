@@ -9,6 +9,7 @@
 #include "rt/compiler_coro_admit.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
+#include "rt/link_diagnostic.h"
 #include "rt/module_host_op.h"
 #include "rt/module_link.h"
 #include "rt/native.h"
@@ -82,7 +83,9 @@ bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, 
     const std::string where = stats.positioned
         ? path.generic_string() + ':' + std::to_string(stats.line) + ':' + std::to_string(stats.column)
         : path.generic_string() + " (the VM gave no exact position)";
-    std::cerr << vm_refusal_diagnostic(where, stats.reason, path.generic_string()) << std::flush;
+    if (!stats.program_message.empty())  // an invalid program, not a missing feature
+        std::cerr << "error: " << where << ": " << stats.program_message << '\n' << stats.program_note << std::flush;
+    else std::cerr << vm_refusal_diagnostic(where, stats.reason, path.generic_string()) << std::flush;
     exit_code = 1;
     return true;
 }
@@ -237,9 +240,8 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
     if (result.reason == StopReason::Error) {
         // A program error, in legacy's format, at the failing expression;
         // while a module initialises, legacy prefixes `import: ` per level.
-        std::string message = result.message;
-        if (link.linked)
-            for (int k = link.depth[link.locate(result.main_offset).module]; k > 0; --k) message = "import: " + message;
+        std::string message = link.display(result.message);
+        if (link.linked) message = link.prefix[link.locate(result.main_offset).module] + message;
         stats.outcome = "vm-error";
         stats.reason = message;
         stats.code = result.code;
@@ -291,10 +293,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
                     static_cast<std::uint32_t>(at.offset));
     };
     if (link.linked && !link.ok) {
-        stats.reason = link.reason;
-        report_path = link.where == 0 ? source_path : link.graph.modules[link.where]->path;
-        locate_into(stats, link.where == 0 ? source : link.graph.modules[link.where]->source, link.offset);
-        stats.positioned = link.positioned;  // set by the link/graph site that recorded the offset
+        describe_link_refusal(link, source_path, source, stats, report_path);
         return not_compiled(stats, mode, report_path, exit_code);
     }
     Ast linked_ast(link.linked ? std::string_view(link.text) : std::string_view());
@@ -319,7 +318,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.compile_us = micros(t1, t2);
     if (invocation) invocation->clear();  // the program holds what it uses; the rest is not live heap
     if (!compiled.program) {
-        stats.reason = compiled.reason;
+        stats.reason = link.display(compiled.reason);
         locate_linked(compiled.offset, compiled.positioned);
         return not_compiled(stats, mode, report_path, exit_code);
     }

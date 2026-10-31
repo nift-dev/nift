@@ -9,21 +9,33 @@
 // unreadable ones are recorded as absent. What this cannot describe exactly
 // is refused with a reason, before execution (legacy then runs the unit):
 //   import-dynamic          the argument is not a plain string literal
-//   import-package          a package name (no `/` or `\`, no extension)
 //   import-nested           an import anywhere but the top level of a unit
 //   import-outside-project  outside the enforced project root (builds)
-//   import-missing          the module cannot be read
-//   import-cycle            a module imports itself through the active chain
 //   import-parse-error      the module does not parse
 //   import-opaque:<class>   the module holds an Opaque node
 //   import-reinitialised    temporary policy only (InitPolicy, D-041 #2)
 //   import-collision        an export clashes with a different binding of the
 //                           importer (the same declaration again is a rebind)
-//   export-missing          `export(x)` names no earlier top-level binding,
-//                           function or import of the module
-//   export-duplicate / export-nested / export-struct (structs: B4)
-//   module-return           `return <value>` outside functions in a module
+//   export-nested / export-struct (structs: B4)
 //   import-limit            more than kMaxModules modules or kMaxModuleDepth
+// Packages (`import("name")`: no `/` or `\`, no extension) resolve with
+// legacy's rules (rt/package_resolve.h) under one read lock held for the build.
+//
+// Program errors (D-NEXT-packages, checkpoints/weekend-packages.md §4.2, §4.3)
+// are not refusals: the program is invalid, legacy fails on it too, and the
+// unit is rejected before anything runs with legacy's text (GraphError):
+//   import-error:package       a package resolution step (name, store, manifest, lock, revision)
+//   import-error:package-lock  the package read lock cannot be acquired
+//   import-error:missing       the module cannot be read
+//   import-error:cycle         a module imports itself through the active chain
+//   import-error:package-escape a package-relative import leaves its package
+//   module-error:return-value  `return <value>` outside functions in a module
+//   module-error:export-missing / export-duplicate / export-name
+// Order (determinism rule): the first program error in legacy's execution
+// order (depth first, statement order; a construct inside a block counts at
+// its top-level statement), never hash or directory order. A program error
+// wins over any feature refusal: the walk records the first refusal and goes on
+// through every unit it can parse.
 #include "rt/ast.h"
 
 #include <cstddef>
@@ -63,6 +75,7 @@ struct ModuleImport {
 
 struct Module {
     std::filesystem::path path;      // absolute, normalised (the import base is its directory)
+    std::filesystem::path package_root;  // non-empty: loaded from (or below) a package (legacy's ModuleEnv)
     std::filesystem::path identity;  // module_identity(path)
     std::string source;              // owned; `ast` views it
     std::unique_ptr<Ast> ast;
@@ -71,10 +84,30 @@ struct Module {
     std::vector<std::string_view> exports;  // in `export` order
     std::vector<std::size_t> export_origins; // per export: the module declaring it (re-exports keep theirs)
     std::size_t legacy_initialisations = 0; // how often legacy runs it per program run
+    std::vector<std::string> generated_names;  // the linker's names for its private args/cmd (module_link)
+};
+
+// A program error found while building the graph (see the header comment).
+struct GraphError {
+    std::string id;            // stable reason id
+    std::string message;       // legacy's text with its frame prefixes (`import: `, `@import: `)
+    std::size_t where = 0;     // module of the reported position
+    std::uint32_t offset = 0;
+    bool positioned = false;   // set by every error site
+    // `module-error:return-value`: the `return` itself (legacy reports at the import).
+    bool return_note = false;
+    std::size_t return_where = 0;
+    std::uint32_t return_offset = 0;
+    // A top-level `return` earlier on the active chain: legacy stops there first.
+    bool early_return = false;
+    std::size_t early_where = 0;
+    std::uint32_t early_offset = 0;
 };
 
 struct ModuleGraph {
     bool ok = true;
+    bool program_error = false;  // `error` holds it (then `reason` is unused)
+    GraphError error;
     std::string reason;
     std::size_t where = 0;     // module of the refused construct (0: the entry unit)
     std::uint32_t offset = 0;  // source offset in that module

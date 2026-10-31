@@ -36,6 +36,9 @@ struct Stats {
     std::string inventory_json;  // NIFT_VM=classify-all: ,"reasons":[...] etc.
     std::string coro_json;  // accepted CP22 coroutine statistics
     std::size_t heap_bytes = 0;  // live VM heap when the outcome is reported
+    // A program error rejected before running (D-NEXT-packages): legacy's text,
+    // shown instead of the feature-refusal text, and its notes (each line ends in \n).
+    std::string program_message, program_note;
 };
 
 std::string json_escape(const std::string& text);

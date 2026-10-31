@@ -120,6 +120,9 @@ def parity(label, argv, cwd, home, stdin="", expect=None, extra=None, session=Fa
     return vm
 
 
+PROGRAM_ERRORS = {"import-scope:invocation-init"}
+
+
 def refused(label, src, cwd, home, reason, argv_tail=(), effect="side.txt", files=None):
     work = Path(tempfile.mkdtemp(dir=cwd))
     for name, text in (files or {}).items():
@@ -135,6 +138,11 @@ def refused(label, src, cwd, home, reason, argv_tail=(), effect="side.txt", file
               vm.stderr)
         check("not supported" not in vm.stderr and "not compiled for the VM" not in vm.stderr and
               "report unsupported" not in vm.stderr, label + ": not worded as a missing VM feature", vm.stderr)
+    elif reason in PROGRAM_ERRORS:
+        # D-NEXT-packages: a program error (legacy fails on it too), not a missing VM feature.
+        check(any(r.get("reason") == reason for r in rows) and "no part of it ran" in vm.stderr and
+              "not supported" not in vm.stderr and "not compiled for the VM" not in vm.stderr,
+              label + ": program error " + reason, repr((vm.stderr, rows)))
     else:
         check("(" + reason + ")" in vm.stderr and "no part of it ran" in vm.stderr,
               label + ": diagnostic names " + reason, vm.stderr)
@@ -269,16 +277,19 @@ def suite(root):
             "fn-name-reserved")
     refused("struct method reading args", 'struct(P) { fn(m()) { return args.size() } }\n' + touch +
             'p := P()\nprint(p.m())\n', work, home, "free-name")
+    # Modules (D-NEXT-packages #4, superseding D-062 #1): the full contract is
+    # tests/runtime2/packages/packages.py; here the args/cmd side of it.
     refused("module top level naming args", touch + 'import("lib.f")\nprint(w)\n', work, home,
-            "import-scope:invocation-binding",
+            "import-scope:invocation-init",
             files={"lib.f": 'w := args.size()\nexport(w)\n'})
-    refused("module function naming cmd", touch + 'import("lib.f")\nprint(g())\n', work, home,
-            "import-scope:invocation-binding",
-            files={"lib.f": 'fn(g()) { return cmd }\nexport(g)\n'})
-    # A module that declares `args`/`cmd` at its top level, exported or not, whether or not the entry names it
-    # (review of 8d0b7d74: the linked-unit scan took a module's `args :=` for the entry's replacement). The
-    # effect is output, not a host operation: a program with imports refuses host operations by itself
-    # (module-host-op), which would mask the defect.
+    d = Path(tempfile.mkdtemp(dir=work))
+    (d / "lib.f").write_text('fn(g()) { return cmd + ":" + args.join(",") }\nexport(g)\n')
+    (d / "main.f").write_text('import("lib.f")\nprint(g())\n')
+    parity("module function reading the entry's cmd and args", [NIFT, "main.f", "a", "b"], d, home,
+           expect=["main.f:a,b\n"])
+    shutil.rmtree(d)
+    # A module that declares `args`/`cmd` at its top level has its own private
+    # binding (supported, as legacy); exporting it is not proved and is refused.
     for name, value in (("args", '["m1", "m2"]'), ("cmd", '"modcmd"')):
         for exported in (True, False):
             for entry_names_it in (True, False):
@@ -291,14 +302,14 @@ def suite(root):
                 (d / "main.f").write_text('print("before")\nimport("lib.f")\n' +
                                           ('print(%s)\n' % (name + '.join(",")' if name == "args" else name)
                                            if entry_names_it else 'print("main")\n'))
-                vm, rows = run([NIFT, "main.f", "a"], d, None, home)
-                check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-binding)" in vm.stderr
-                      and "lib.f:1:1" in vm.stderr and not any(r.get("vm_executions") for r in rows),
-                      label + ": refused before any effect, import-scope:invocation-binding at the declaration",
-                      repr((vm.returncode, vm.stdout, vm.stderr[:240])))
-                legacy, _ = run([NIFT, "main.f", "a"], d, "0", home)
-                check(legacy.stdout.startswith("before\n"), label + ": control: legacy prints before",
-                      repr((legacy.returncode, legacy.stdout, legacy.stderr[:160])))
+                if exported:
+                    vm, rows = run([NIFT, "main.f", "a"], d, None, home)
+                    check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-ambiguous)" in vm.stderr
+                          and "lib.f:2:1" in vm.stderr and not any(r.get("vm_executions") for r in rows),
+                          label + ": refused before any effect at the export",
+                          repr((vm.returncode, vm.stdout, vm.stderr[:240])))
+                else:
+                    parity(label + ": the module's own binding, as legacy", [NIFT, "main.f", "a"], d, home)
                 shutil.rmtree(d)
     # A module whose only mention of `args`/`cmd` is a struct or enum *name*
     # (review of de6e6dde, MEDIUM): refused at that name's real position, never
@@ -312,7 +323,7 @@ def suite(root):
         (d / "lib.f").write_text(lib)
         (d / "main.f").write_text('print("before")\nimport("lib.f")\nprint(h())\n')
         vm, rows = run([NIFT, "main.f", "a", "b"], d, None, home)
-        check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-binding)" in vm.stderr
+        check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-ambiguous)" in vm.stderr
               and at + ":" in vm.stderr and "no exact position" not in vm.stderr
               and not any(r.get("vm_executions") for r in rows),
               label + ": refused before any effect at the name's own position " + at,

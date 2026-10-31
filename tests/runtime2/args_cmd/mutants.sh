@@ -6,13 +6,12 @@
 #   1 script_runner.cpp       scripts get no invocation bindings (binding removed)
 #   2 session_invocation.cpp  `args` loses its last argument (wrong value; scripts and sessions)
 #   3 compiler_call.cpp       `cmd(...)` calls the `cmd` string (the VM-session runtime bug)
-#   4 module_link.cpp         modules see the entry's bindings
 #   5 compiler_invocation.cpp the bindings are writable (no readonly/const array)
 #   6 compiler_invocation.cpp no top-level shadowing (`args := []` refused again)
-#   7 module_link.cpp         no refusal of a module declaring `args`/`cmd` (the compiler still refuses it,
-#                             with another reason)
-#   8 module_link.cpp + session_invocation.cpp  the review defect back: the linked-unit scan takes a module's
-#                             top-level `args :=` for the entry's replacement (and the linker check is off)
+# Mutants 4, 7 and 8 (module rules) were retired with D-NEXT-packages #4: modules
+# now see the entry's bindings where resolution proves it, and a module's own
+# `args :=` is renamed internally (8's linked-unit scan can no longer see it).
+# The module rules' mutation controls are tests/runtime2/packages/mutants.sh.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
@@ -24,8 +23,7 @@ if make -s -n nift | grep -qE -- " -o nift$"; then
 fi
 fail=0
 for spec in 1:src/rt/script_runner.cpp 2:src/rt/session_invocation.cpp 3:src/rt/compiler_call.cpp \
-            4:src/rt/module_link.cpp 5:src/rt/compiler_invocation.cpp 6:src/rt/compiler_invocation.cpp \
-            7:src/rt/module_link.cpp 8:src/rt/module_link.cpp+src/rt/session_invocation.cpp; do
+            5:src/rt/compiler_invocation.cpp 6:src/rt/compiler_invocation.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

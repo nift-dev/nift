@@ -210,7 +210,7 @@ RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.in
 # CP16 host built-ins: VM natives call HostCall, and the shared helpers they
 # reuse live outside src/rt. Added here so every RT unit that links the native
 # table has the same symbols as nift itself.
-RT_VALUE_SOURCES += $(sort $(wildcard src/rt/host/*.cpp) $(wildcard src/rt/handles/*.cpp)) src/ParserHelpers.cpp src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp
+RT_VALUE_SOURCES += $(sort $(wildcard src/rt/host/*.cpp) $(wildcard src/rt/handles/*.cpp)) src/ParserHelpers.cpp src/ParserHostHelpers.cpp src/Process.cpp src/FileSystem.cpp src/PackageTransaction.cpp src/JsonFile.cpp
 RT_VALUE_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp src/RuntimeValue.h
 RT_VALUE_UNIT := $(TEST_DIR)/rt/value-unit$(EXEEXT)
 RT_VALUE_PROPERTY := $(TEST_DIR)/rt/value-property$(EXEEXT)
@@ -4582,3 +4582,15 @@ test-runtime2-args-cmd: $(TARGET)
 test-runtime2-args-cmd-mutants: $(TARGET)
 	bash tests/runtime2/args_cmd/mutants.sh
 test-rt-vm: test-runtime2-args-cmd
+# Package imports and import-time program errors on the VM (D-NEXT-packages;
+# docs/runtime-2/checkpoints/weekend-packages.md). The legacy lane runs the
+# legacy package tests under NIFT_VM=0: the shared package code is unchanged.
+.PHONY: test-runtime2-packages test-runtime2-packages-mutants test-runtime2-packages-legacy
+test-runtime2-packages: $(TARGET)
+	$(PYTHON) tests/runtime2/packages/packages.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-packages-mutants: $(TARGET)
+	bash tests/runtime2/packages/mutants.sh
+test-runtime2-packages-legacy: $(TARGET)
+	NIFT_VM=0 $(MAKE) --no-print-directory test-v44-packages
+	$(PYTHON) tests/runtime2/packages/packages.py --nift "$(CURDIR)/$(TARGET)" --only l
+test-rt-vm: test-runtime2-packages

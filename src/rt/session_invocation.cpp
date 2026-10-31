@@ -42,11 +42,7 @@ void locate_invocation_shadows(std::vector<InvocationBinding>& bindings, const A
             const Node& st = ast.at(items[k]);
             if (st.kind == NodeKind::Declare && st.a != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
                 ast.text(ast.at(st.a)) == binding.symbol.name &&
-#if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 8  // test-only: the linked-unit scan (mutants.sh)
-                (in_entry(st.begin) || true))
-#else
                 in_entry(st.begin))
-#endif
                 binding.shadow = st.a;
         }
     }
