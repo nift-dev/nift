@@ -86,7 +86,11 @@ private:
                 if (n.binding_type < 0 || n.binding_type > static_cast<std::int64_t>(CollectionKind::Stack)) {
                     fail(TransferStatus::InvalidGraph, "invalid collection kind", error); return false;
                 }
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 9
+                value = Value::adopt(new CollectionObject(CollectionKind::Stack)); break;  // M9: kind lost
+#else
                 value = Value::adopt(new CollectionObject(static_cast<CollectionKind>(n.binding_type))); break;
+#endif
             case WireKind::Object: value = Value::adopt(new ObjectObject()); break;
             case WireKind::Struct: value = Value::adopt(new StructObject(atom(n.name))); break;
             case WireKind::Cell: {

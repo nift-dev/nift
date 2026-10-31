@@ -21,7 +21,7 @@ void Inference::for_statement(const Node& n) {
     if (normal) {
         value = keyed ? element_of(source, nullptr, false)
                       : pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
-        if (source->kinds == kKindSet) value = kinds_ty(kKindBool | kKindNumber | kKindString);
+        if (source->kinds == kKindSet) value = set_members(source);
         if (!value || value->kinds == 0) value = kinds_ty(kKindUnknown);
         result_.elements[iterable] |= value->kinds;
     }
@@ -33,7 +33,7 @@ void Inference::for_statement(const Node& n) {
     scopes_.emplace_back();
     if (pair && header.count >= 2) {
         declare(ast_.text(ast_.at(names[0])), names[0],
-                kinds_ty(source->kinds == kKindMap ? kKindBool | kKindNumber | kKindString : kKindString));
+                source->kinds == kKindMap ? map_keys(source) : kinds_ty(kKindString));
         declare(ast_.text(ast_.at(names[1])), names[1], value);
     } else if (!pair && header.count >= 1) {
         declare(ast_.text(ast_.at(names[0])), names[0], value);

@@ -1,0 +1,7 @@
+map([["k",2],["n",3]])
+map([["k",2],["n",3]])
+set([1,2])
+stack([])
+stack([])
+--- stderr
+--- exit 0

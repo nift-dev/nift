@@ -394,7 +394,9 @@ void map_set(Value& map, Value key, Value value) {
     c.items.push_back(static_cast<Value&&>(key));
     c.items.push_back(static_cast<Value&&>(value));
     index_appended(c);
-    heap_retally(map.heap());
+#if !(defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 5)
+    heap_retally(map.heap());  // M5 drops this: the map's growth is never counted
+#endif
 }
 
 void set_add(Value& set, Value member) {

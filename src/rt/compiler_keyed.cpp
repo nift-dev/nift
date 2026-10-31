@@ -83,6 +83,9 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     }
     if (const int m = keyed_mutator(k, name); m >= 0) return keyed_mutation(node, dst, m) ? 1 : 0;
     if (const int m = keyed_read(k, name); m >= 0) return keyed_mutation(node, dst, m) ? 1 : 0;
+    if (k == kKindMap && name == "contains" && node.count == 1 &&
+        (kinds(ast_.list(node)[0]) & (kKindObject | kKindHandle | kKindShared | kKindTask)))
+        return fail(ast_.at(ast_.list(node)[0]), "collection-identity-key") ? 1 : 0;
     const natives::BuiltinSpec* spec = natives::find_builtin(keyed_receiver(k), name);
     if (!spec && presentation)
         spec = natives::find_builtin(natives::Receiver::Any, name);
@@ -90,11 +93,29 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     return builtin_call(node, *spec, callee.a, dst) ? 1 : 0;
 }
 
+// A key or member argument legacy accepts as a tagged string with identity
+// (a struct, a host or shared handle, a task) is not compiled: this VM
+// compares structs as values and holds handles as typed values. Keys of
+// other kinds behave alike (bool/number/string, collections structurally,
+// callables by identity; anything else is legacy's run-time error).
+bool UnitCompiler::keyed_key_ok(const Node& node, int id) {
+    using K = KeyedMethod;
+    const auto m = static_cast<K>(id);
+    const bool key = m == K::MapSet || m == K::MapRemove || m == K::SetAdd || m == K::SetRemove ||
+                     m == K::MapGet || m == K::SetContains;
+    if (!key || node.count == 0) return true;
+    const NodeId arg = ast_.list(node)[0];
+    if (kinds(arg) & (kKindObject | kKindHandle | kKindShared | kKindTask))
+        return fail(ast_.at(arg), "collection-identity-key");
+    return true;
+}
+
 // A fallible read: the receiver is evaluated as a value (a copy), then the
 // argument; KeyedMutate reads and nothing is put back.
 bool UnitCompiler::keyed_read_call(const Node& node, std::uint16_t dst, int id) {
     using namespace collection_slot;
     const NodeId* args = ast_.list(node);
+    if (!keyed_key_ok(node, id)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k)
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
     const std::uint16_t mark = fb_->top(), state = mark;
@@ -135,6 +156,7 @@ bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
         return fail(node, "collection-loop-binding");
     if (node.count != keyed_arity[id]) return fail(node, "builtin-arity:" + name);  // checked by the caller
     const NodeId* args = ast_.list(node);
+    if (!keyed_key_ok(node, id)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k)
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
     const std::uint16_t mark = fb_->top(), state = mark;

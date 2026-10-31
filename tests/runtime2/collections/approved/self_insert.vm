@@ -1,0 +1,7 @@
+map([[1,"one"],["me",map([[1,"one"]])]])
+map([[1,"one"],["me",map([[1,"one"]])],[2,"two"]])
+stack([1,stack([1])])
+stack([1,stack([1]),2])
+2
+--- stderr
+--- exit 0

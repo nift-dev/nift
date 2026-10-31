@@ -69,7 +69,11 @@ std::uint64_t hash_number(const Value& number) {
             break;
         case Kind::Double: {
             const double d = number.as_double();
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 8
+            if (false)  // M8: 1.0 no longer hashes like 1 (index lookups miss)
+#else
             if (std::isfinite(d) && std::trunc(d) == d && std::fabs(d) <= static_cast<double>(kExact))
+#endif
                 return mix(2, static_cast<std::uint64_t>(static_cast<std::int64_t>(d)));
             break;
         }
@@ -178,7 +182,12 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
                 b = &collection_items(*top.right)[top.next];
             } else {  // map: the entry with an equal key, then the values
                 a = &items[top.next * 2 + 1];
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 6
+                const std::ptrdiff_t at = equal(collection_items(*top.right)[top.next * 2], items[top.next * 2])
+                                              ? static_cast<std::ptrdiff_t>(top.next) : -1;  // M6: by position
+#else
                 const std::ptrdiff_t at = collection_find(*top.right, items[top.next * 2]);
+#endif
                 b = at < 0 ? nullptr : &collection_items(*top.right)[static_cast<std::size_t>(at) * 2 + 1];
             }
         } else if (array) {

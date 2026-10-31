@@ -22,7 +22,8 @@ Status coll_top(const Context&, const Value* args, std::uint32_t argc, Value& ou
 Status coll_front(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status fn_same(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 
-// Legacy's key rule for map keys and set members: bool, number or string.
+// Legacy's key rule for map keys and set members: bool, number or string
+// (and its tagged strings: collections and callables).
 bool collection_key_ok(const Value& key) noexcept;
 
 } // namespace nift::rt::natives

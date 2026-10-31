@@ -4567,6 +4567,21 @@ certify-targets: test-cp23-certify
 # interpreter; NIFT_VM=1 still falls back; any other value, empty included, is
 # a configuration error). Website builds stay legacy.
 .PHONY: test-runtime2-vm-default
+# Weekend collections (D-063): map/set/stack values on the VM.
+.PHONY: test-runtime2-collections test-runtime2-collections-mutants
+test-runtime2-collections: $(TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-collections-mutants: $(TARGET) $(LIBFFI_A)
+	COLLECTIONS_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/collections/mutants.sh "$(CURDIR)/$(TARGET)"
+# Certification lanes (workers): ASan+UBSan and TSan builds over the whole
+# suite (thread transfer of collections included).
+.PHONY: test-runtime2-collections-sanitize test-runtime2-collections-tsan
+test-runtime2-collections-sanitize: $(SAN_TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-collections-tsan: $(TSAN_TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm: test-runtime2-collections test-runtime2-collections-mutants
+test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collections-tsan
 test-runtime2-vm-default: $(TARGET)
 	$(PYTHON) tests/runtime2/vm_default/vm_default.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-vm-default

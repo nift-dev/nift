@@ -94,21 +94,33 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
 // binding's element type (map values, stack elements); with value semantics
 // (copies never share) the per-binding element type is sound. Set members are
 // scalars by legacy's rule (any other value is a run-time error).
+// The members of a set / the keys of a map: what was stored (any kind when
+// the collection's contents are unknown).
+TyRef Inference::set_members(const TyRef& set) const {
+    if (set->any) return (set->kinds & kKindUnknown) ? any_ty() : top_ty();
+    return set->elem ? set->elem : empty_ty();
+}
+TyRef Inference::map_keys(const TyRef& map) const {
+    if (map->any) return (map->kinds & kKindUnknown) ? any_ty() : top_ty();
+    return map->key ? map->key : empty_ty();
+}
 TyRef Inference::keyed_result(const Node& n,const TyRef& recv,const std::vector<TyRef>& values,
                               std::string_view name) {
     const NodeId receiver=ast_.at(n.a).a;
     const auto element=[&]{TyRef e=element_of(recv,nullptr,false);
-        if(recv->kinds==kKindSet)return kinds_ty(kKindBool|kKindNumber|kKindString);
+
         return e;};
     if(name=="stringify"||name=="prettify"||name=="highlight")return kinds_ty(kKindString);
     if(name=="size")return kinds_ty(kKindInt);
     if(name=="empty"||name=="contains")return kinds_ty(kKindBool);
     if(name=="clear")return kinds_ty(kKindNull);
     if(recv->kinds==kKindMap) {
-        if(name=="set"){if(values.size()==2){add_element(receiver,values[1]);return values[1];}return any_ty();}
+        if(name=="set"){if(values.size()==2){add_element(receiver,values[0],true);add_element(receiver,values[1]);
+            return values[1];}return any_ty();}
         if(name=="get"||name=="remove")return element();
     } else if(recv->kinds==kKindSet) {
-        if((name=="add"||name=="remove")&&values.size()==1)return values[0];
+        if(name=="add"&&values.size()==1){add_element(receiver,values[0]);return values[0];}
+        if(name=="remove"&&values.size()==1)return values[0];
     } else if(recv->kinds==kKindStack) {
         if(name=="push"){if(values.size()==1){add_element(receiver,values[0]);return values[0];}return any_ty();}
         if(name=="pop"||name=="top"||name=="front")return element();

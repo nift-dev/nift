@@ -32,8 +32,17 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto*) 
     if (grow + clone) {
         natives::Context context;
         context.heap_limit = heap_limit_;
-        if (!natives::reserve_result(context, grow + clone)) return internal(fault, "memory budget exceeded");
+        // The VM's budget stop (as memory_exceeded), before any storage grows.
+        if (!natives::reserve_result(context, grow + clone))
+            return raise(fault, StopReason::Internal, "memory budget exceeded");
     }
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 2
+    // M2: a collection held by exactly one other binding (an assignment or
+    // argument copy) is mutated in place: the copies alias.
+    HeapObject* const aliased = c.refcount() == 2 ? c.heap() : nullptr;
+    if (aliased) aliased->refcount = 1;
+    struct Restore { HeapObject* h; ~Restore() { if (h) h->refcount = 2; } } restore{aliased};
+#endif
     switch (m) {
         case K::MapSet:
             if (!natives::collection_key_ok(s[Item])) return fail("map: key must be bool, number, or string");

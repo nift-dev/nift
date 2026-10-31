@@ -81,7 +81,7 @@ void Inference::statements(const Node& b) {
     for (std::uint32_t k = 0; k < b.count; ++k) statement(list[k]);
 }
 
-void Inference::add_element(NodeId receiver_id, const TyRef& value) {
+void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
     const auto& receiver = ast_.at(receiver_id);
     if (session_) {
         const auto root = session_mutation_root(ast_, receiver_id);
@@ -99,7 +99,8 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value) {
     TyRef* var = find(ast_.text(receiver));
     if (!var || (*var)->any) return;
     auto updated = std::make_shared<Ty>(**var);
-    updated->elem = unite(updated->elem, value);
+    if (key) updated->key = unite(updated->key, value);
+    else updated->elem = unite(updated->elem, value);
     updated->tuple = false;
     updated->items.clear();
     TyRef next = unite(TyRef(updated), TyRef(updated));

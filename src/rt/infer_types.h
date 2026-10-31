@@ -22,7 +22,8 @@ struct Ty {
     bool collection_array = false;  // CP14B array result provenance
     bool collection_object = false;  // CP14B result-container provenance
     bool any = false;  // every kind at every depth
-    TyRef elem;        // arrays: the elements
+    TyRef elem;        // arrays: the elements (D-063: map values, set members, stack elements)
+    TyRef key;         // D-063: map keys
     // Arrays that are all literals of one length never changed in place:
     // the type of each position (an index written as an integer literal).
     bool tuple = false;

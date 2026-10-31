@@ -116,7 +116,9 @@ private:
 
     void statements(const Node& b);
 
-    void add_element(NodeId receiver, const TyRef& value);
+    void add_element(NodeId receiver, const TyRef& value, bool key = false);  // key: a map key (D-063)
+    TyRef set_members(const TyRef& set) const;
+    TyRef map_keys(const TyRef& map) const;
     void propagate_session_alias(std::size_t slot);
 
     void statement(NodeId id);

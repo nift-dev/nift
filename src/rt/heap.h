@@ -116,7 +116,8 @@ struct StructObject : HeapObject {
 // first when it is shared. `items` holds, for a map, key/value pairs flattened
 // (key at 2i, value at 2i + 1, insertion order); for a set its members
 // (insertion order); for a stack its elements bottom to top. Map keys and set
-// members are bool, number or string (legacy's rule). From kIndexThreshold
+// members are bool, number, string, collection or callable (legacy's rule:
+// its collections and callables are tagged strings). From kIndexThreshold
 // entries an open-addressing index (rt::hash of the key -> entry + 1) is kept.
 enum class CollectionKind : std::uint8_t { Map, Set, Stack };
 struct CollectionObject : HeapObject {

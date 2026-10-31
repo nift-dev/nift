@@ -69,6 +69,7 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
                            (!(b->kinds & kKindObject) || b->collection_object);
     t->struct_id = a->struct_id == b->struct_id ? a->struct_id : -2;
     if (a->elem || b->elem) t->elem = unite(a->elem, b->elem, depth + 1);
+    if (a->key || b->key) t->key = unite(a->key, b->key, depth + 1);
     if (a->tuple && b->tuple && a->items.size() == b->items.size()) {
         t->tuple = true;
         for (std::size_t k = 0; k < a->items.size(); ++k)
@@ -90,8 +91,8 @@ bool same(const TyRef& a, const TyRef& b) {
     if (a.get() == b.get()) return true;
     if(a&&b&&(a->collection_array!=b->collection_array||a->collection_object!=b->collection_object||
               a->legacy_text_number!=b->legacy_text_number))return false;
-    const bool a_empty = !a || (a->kinds == 0 && !a->elem && a->fields.empty() && !a->any);
-    const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
+    const bool a_empty = !a || (a->kinds == 0 && !a->elem && !a->key && a->fields.empty() && !a->any);
+    const bool b_empty = !b || (b->kinds == 0 && !b->elem && !b->key && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
     if (a->historical_callable != b->historical_callable ||
         a->untracked_callable != b->untracked_callable) return false;
@@ -101,6 +102,7 @@ bool same(const TyRef& a, const TyRef& b) {
     for (std::size_t k = 0; k < a->items.size(); ++k)
         if (!same(a->items[k], b->items[k])) return false;
     if (!same(a->elem, b->elem)) return false;
+    if (!same(a->key, b->key)) return false;
     for (const auto& [key, ty] : a->fields) {
         auto it = b->fields.find(key);
         if (it == b->fields.end() || !same(ty, it->second)) return false;

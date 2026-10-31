@@ -1,0 +1,3 @@
+--- stderr
+error: mutual_insert.f:4:1: set would create a cyclic reference
+--- exit 1

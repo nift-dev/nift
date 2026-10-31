@@ -29,8 +29,14 @@ const Value* receiver(const Value* args, std::uint32_t argc) {
 
 } // namespace
 
+// Legacy accepts bool, number and string keys; its collections and
+// callables are tagged strings, so they are accepted too (a collection key
+// compares structurally in legacy, a callable by identity: rt::equal does
+// the same). Structs and handles are also tagged strings in legacy: the
+// compiler refuses them as keys (struct equality is a value comparison here).
 bool collection_key_ok(const Value& key) noexcept {
-    return key.is(Kind::Bool) || key.is_number() || key.is(Kind::String);
+    return key.is(Kind::Bool) || key.is_number() || key.is(Kind::String) || key.is(Kind::Collection) ||
+           key.is(Kind::Function);
 }
 
 Status fn_map(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
@@ -116,6 +122,12 @@ Status coll_front(const Context&, const Value* args, std::uint32_t argc, Value& 
 // objects, structs, collections) is legacy's fatal error text.
 Status fn_same(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return fail(error, "same: expected two values");
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 10
+    if (args[0].is(Kind::Collection) && args[1].is(Kind::Collection)) {  // M10: storage identity exposed
+        out = Value::boolean(args[0].heap() == args[1].heap());
+        return Status::Ok;
+    }
+#endif
     switch (same(args[0], args[1])) {
         case Sameness::Same: out = Value::boolean(true); return Status::Ok;
         case Sameness::Different: out = Value::boolean(false); return Status::Ok;
