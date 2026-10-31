@@ -48,6 +48,10 @@ An owner-authorised exception to the Review 8 REJECT for local weekend integrati
 not a retrospective independent acceptance. The strict VM default is functionally
 ready to build on.
 
+Review 8 correction (reviewer, after its report): the typed tty REPL path with a
+`limit:too many registers` line was not exercised directly (a 200 KB pty line timed
+out); persistent tty sessions are covered by vm_default.py §18g.
+
 Open obligations, **release-blocking** for public Runtime 2.0 (not blocking weekend
 integration or feature work):
 
@@ -76,3 +80,17 @@ focused independent review before integration.
   the VM-default suite.
 - Known limits recorded in `REFUSAL_MATRIX.md` (column drift after quotes in `$[...]`,
   cautious non-tty wording, bare expressions refused, piped `exit` reason ids differ).
+
+## Closure of the Review 8 obligations (2026-11-01)
+
+Obligations 1–4 closed by `cand/diag-positions` `7558346e`, integrated into
+`weekend/r2` as merge `8127a515` (independent review ACCEPT; Linode certification:
+every gate and full test-rt-vm exit 0; evidence on the NUC under
+`.claude-review/linode-jobs/diagpos-7558346e/`). Item 5 (trailing comment in the quoted
+startup statement) deferred: needs a quote-aware scanner; recorded in REFUSAL_MATRIX.md.
+
+Tracked from that review (not release-blocking unless noted):
+- MEDIUM: `NIFT_VM_STATS` / classify-all rows record 1:1 for positionless refusals (no
+  has-position field). Pre-existing; telemetry, not the user diagnostic.
+- LOW: several declarations of a clashing name in one module report the last, not the first.
+- LOW: whole-line flake checks would miss a leak glued to other output on one line.
