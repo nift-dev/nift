@@ -295,13 +295,13 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.parse_us = micros(t0, t1);
     if (!parsed.ok) {
         stats.reason = "parse-error";  // legacy reports the identical diagnostic (CP10)
-        locate_into(stats, source, parsed.error.offset);
+        locate_into(stats, source, parsed.error.offset); stats.positioned = true;
         return not_compiled(stats, mode, source_path, exit_code);
     }
     const NodeId opaque = first_opaque_node(ast, parsed.root);
     if (opaque != kNoNode) {
         stats.reason = std::string("opaque:") + opaque_reason_name(ast.at(opaque).reason);
-        locate_into(stats, source, ast.at(opaque).begin);
+        locate_into(stats, source, ast.at(opaque).begin); stats.positioned = true;
         return not_compiled(stats, mode, source_path, exit_code);
     }
     // CP12b modules: a unit with imports compiles as its linked text
@@ -319,6 +319,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         stats.reason = link.reason;
         report_path = link.where == 0 ? source_path : link.graph.modules[link.where]->path;
         locate_into(stats, link.where == 0 ? source : link.graph.modules[link.where]->source, link.offset);
+        stats.positioned = link.positioned;  // set by the link/graph site that recorded the offset
         return not_compiled(stats, mode, report_path, exit_code);
     }
     Ast linked_ast(link.linked ? std::string_view(link.text) : std::string_view());
@@ -340,7 +341,11 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
         stats.reason = compiled.reason;
-        locate_linked(compiled.offset); stats.positioned = compiled.positioned;
+        // A refusal without a recorded position is the whole program's: it is
+        // reported for the entry, never at the module an unrecorded offset maps to.
+        if (compiled.positioned) locate_linked(compiled.offset);
+        else { locate_into(stats, source, 0); report_path = source_path; }
+        stats.positioned = compiled.positioned;
         return not_compiled(stats, mode, report_path, exit_code);
     }
     // R1 (owner, 2026-10-21): linking reads all modules before execution.
@@ -350,9 +355,12 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     if (link.linked) {
         std::string host_reason;
         std::uint32_t host_offset = 0;
-        if (first_module_host_op(*compiled.program, host_reason, host_offset)) {
+        bool host_positioned = false;
+        if (first_module_host_op(*compiled.program, host_reason, host_offset, &host_positioned)) {
             stats.reason = host_reason;
-            locate_linked(host_offset);
+            if (host_positioned) locate_linked(host_offset);  // the host op's recorded instruction offset
+            else { locate_into(stats, source, 0); report_path = source_path; }
+            stats.positioned = host_positioned;
             return not_compiled(stats, mode, report_path, exit_code);
         }
     }

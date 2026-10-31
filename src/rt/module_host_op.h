@@ -17,7 +17,9 @@ namespace nift::rt {
 
 // The first CallNative of a host built-in, in proto order then code order.
 // Returns false (and leaves the outputs untouched) when there is none.
-inline bool first_module_host_op(const Program& program, std::string& reason, std::uint32_t& offset) {
+// `positioned` (optional): whether `offset` is the instruction's recorded offset.
+inline bool first_module_host_op(const Program& program, std::string& reason, std::uint32_t& offset,
+                                 bool* positioned = nullptr) {
     for (const auto& proto : program.protos)
         for (std::size_t pc = 0; pc < proto->code.size(); ++pc) {
             const Instr& in = proto->code[pc];
@@ -26,6 +28,7 @@ inline bool first_module_host_op(const Program& program, std::string& reason, st
             if (!natives::host_builtin(id)) continue;
             reason = "module-host-op:" + std::string(natives::builtin_spec(id).name);
             offset = pc < proto->offsets.size() ? proto->offsets[pc] : 0;
+            if (positioned) *positioned = pc < proto->offsets.size();
             return true;
         }
     return false;

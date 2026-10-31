@@ -42,6 +42,12 @@ diagnostic says "(the VM gave no exact position)" - for a session input or a
 startup-file statement with the start line of the refused input, labelled as
 such (§18d, §18e). A genuine refusal at line 1, column 1 is still reported
 as the exact `:1:1` (§18g: file, `-e`, tty `-i` file, persistent tty session).
+Linked units (§18h, Review 8): `coro-module` is a whole-program refusal with
+no position; `import-name-clash` is reported at the later unit's clashing
+declaration; the import depth limit at the import statement that goes beyond
+it (file, `-e`, `-`; genuine `:1:1` kept). The quoted statement keeps a
+trailing comment (`exit // bye`): a shell-form statement's text carries no
+comment boundary in the parser, so stripping it needs a new scan (left).
 The interrupted-statement note quotes a short one-line statement, e.g.
 "interrupted at line 3 (`exit`)".
 
@@ -67,7 +73,9 @@ The interrupted-statement note quotes a short one-line statement, e.g.
   refuses it before it runs; on a terminal the file is interrupted there (the
   note names it: "interrupted at line L (`exit`)"), earlier effects are kept
   and the session continues at the prompt; without a terminal the file is
-  refused and the exit status is 1, as in legacy (§18c). Piped, the reason id differs between the two files:
+  refused as a whole (none of its statements runs) and the exit status is 1
+  (§18c). Only the exit status matches legacy: piped legacy runs the
+  statements before the `exit` and then fails on it. Piped, the reason id differs between the two files:
   `unresolved-name` for ~/.niftrc (compiled with the REPL's tail inspection,
   as before) and `expression-statement` for `-i file`; aligning them would
   change how a piped ~/.niftrc is compiled, so it is left as is.

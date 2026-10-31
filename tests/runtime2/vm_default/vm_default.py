@@ -61,6 +61,20 @@ def check(ok, label, detail=""):
         FAILS.append(label)
 
 
+# Output with every path under the random temporary work directory removed
+# (its name, e.g. vm-default-pugdqe2f, can contain any short token a check
+# looks for: "e2", "b2", "s5", ...). Checks that a short program output is
+# absent, or counted, run on this text (zero-flakiness policy).
+WORK_ROOTS = []
+
+
+def program_output(out):
+    import re
+    for root in sorted(WORK_ROOTS, key=len, reverse=True):
+        out = re.sub(re.escape(root) + r"[^\s:'\"`()]*", "<path>", out)
+    return out
+
+
 def base_env(extra):
     env = {k: v for k, v in os.environ.items() if not k.startswith("NIFT_")}
     env.update(extra)
@@ -244,7 +258,22 @@ def main():
     args = ap.parse_args()
     nift = str(Path(args.nift).resolve())
     with tempfile.TemporaryDirectory(prefix="vm-default-") as work:
+        WORK_ROOTS[:] = sorted({work, os.path.realpath(work), Path(work).resolve().as_posix()})
         work = Path(work)
+
+        # 0. The path-insensitive output checks: a temporary directory whose
+        # name contains the token never matches, a real leaked line always does.
+        saved = WORK_ROOTS[:]
+        WORK_ROOTS[:] = ["/tmp/vm-default-pugdqe2f"]
+        in_path = "e1\nerror: /tmp/vm-default-pugdqe2f/s5-b2/init.f:3:1: refused\nPROMPT\n"
+        check("e2" not in program_output(in_path) and "b2" not in program_output(in_path) and "s5" not in program_output(in_path) and
+              program_output(in_path).count("e1") == 1,
+              "control: a token inside the temporary directory's path is not program output")
+        for token in ("e2", "b2", "s5", "p2", "inside"):
+            check(token in program_output(in_path.replace("PROMPT\n", token + "\nPROMPT\n")) and
+                  token in program_output(in_path + token) and token in program_output(token + "\n" + in_path),
+                  f"control: a real leaked {token!r} line is still caught next to the path")
+        WORK_ROOTS[:] = saved
 
         # 1. Default runs a supported script on the VM (stats prove the engine).
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
@@ -830,10 +859,10 @@ def main():
             diag = (f"error: {path}:4:19: NIFT_VM session refused: type:length: ")
             note = (f"note: initialisation from {path} was interrupted at line 7 (`g(3)`); later statements in it "
                     "were not run\nnote: the session continues at the prompt\n")
-            check(status == 0 and out.startswith("s1\ns3\n") and out.count("s1") == 1 and
+            check(status == 0 and out.startswith("s1\ns3\n") and program_output(out).count("s1") == 1 and
                   out.count("s3\n") == 1 and (d / "s3.txt").exists(),
                   f"{label} on a tty: statements before the refused one ran, each exactly once", f"out={out!r}")
-            check("s5" not in out and not (d / "s5.txt").exists(),
+            check("s5" not in program_output(out) and not (d / "s5.txt").exists(),
                   f"{label} on a tty: the refused statement and everything after it never ran", f"out={out!r}")
             check(diag in out and note in out and out.count("NIFT_VM session refused") == 1,
                   f"{label} on a tty: the refused position (in g) and the interrupted statement (line 7) reported",
@@ -864,7 +893,7 @@ def main():
             status, out = run_tty(nift, d, args, {}, ['greet("b")', "exit"])
             head = f"error: {path}:9:6: NIFT_VM session refused: callable:run"
             # No value echo: only what the statements print.
-            check(status == 0 and out.startswith("block\nhi a\nerror: ") and out.count("block") == 1 and
+            check(status == 0 and out.startswith("block\nhi a\nerror: ") and program_output(out).count("block") == 1 and
                   out.count("hi a") == 1 and head in out and "\nlater\n" not in out and
                   f"initialisation from {path} was interrupted at line 9" in out and
                   "hi b\n" in out.split(head, 1)[-1],
@@ -937,7 +966,7 @@ def main():
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
             check(status == 0 and out.startswith("b1\nerror: ") and
-                  f"error: {path}:2:1: NIFT_VM session refused: expression-statement" in out and "b2" not in out and
+                  f"error: {path}:2:1: NIFT_VM session refused: expression-statement" in out and "b2" not in program_output(out) and
                   "command not found" not in out and "was interrupted at line 2" in out and "PROMPT\n" in out,
                   f"{where_label} on a tty: a bare expression is a refused Nift statement (as in a script file)",
                   f"status={status} out={out!r}")
@@ -954,7 +983,7 @@ def main():
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', 'touch("typed.txt")', "exit"])
             check(status == 0 and out.startswith("e1\nerror: ") and f"error: {path}:3:1: NIFT_VM session refused" in out
                   and f"initialisation from {path} was interrupted at line 3 (`exit`); later statements in it were "
-                  "not run" in out and "e2" not in out and not (d / "e2.txt").exists() and (d / "e1.txt").exists() and
+                  "not run" in out and "e2" not in program_output(out) and not (d / "e2.txt").exists() and (d / "e1.txt").exists() and
                   "PROMPT\n" in out and (d / "typed.txt").exists(),
                   f"{where_label} on a tty: `exit` refused (named in the note), the earlier effect kept, nothing later "
                   "ran, prompt usable (D-061)", f"status={status} out={out!r}")
@@ -963,7 +992,7 @@ def main():
                     (d / f).unlink()
             status, out = run_tty(nift, d, args, {"NIFT_VM": "0"}, ['print("PROMPT")', "exit"])
             check(status == 1 and out.startswith("e1\n") and "unknown value or malformed expression: exit" in out and
-                  "e2" not in out, f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error (exit 1)",
+                  "e2" not in program_output(out), f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error (exit 1)",
                   f"status={status} out={out!r}")
             for f in ("e1.txt", "e2.txt"):
                 if (d / f).exists():
@@ -980,8 +1009,8 @@ def main():
                                   'print(f(3))\nprint("after")\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
-            check(status == 0 and out.startswith("before\nmiddle\nerror: ") and out.count("before") == 1 and
-                  out.count("middle") == 1 and f"error: {path}:3:10: NIFT_VM session refused: type:length" in out and
+            check(status == 0 and out.startswith("before\nmiddle\nerror: ") and program_output(out).count("before") == 1 and
+                  program_output(out).count("middle") == 1 and f"error: {path}:3:10: NIFT_VM session refused: type:length" in out and
                   "interrupted at line 6" in out and "\nafter" not in out and "PROMPT\n" in out,
                   f"{where_label} on a tty: definition admitted on its own; the call refused at f's size() "
                   "(3:10), interrupted at line 6; `after` never runs", f"status={status} out={out!r}")
@@ -1005,7 +1034,7 @@ def main():
             path = (dd / name).resolve().as_posix()
             status, out = run_tty(nift, dd, args, {}, ['print("PROMPT")', "exit"])
             check(f"error: {path}:5:3: NIFT_VM session refused: session:opaque" in out and f"{path}:1:1" not in out
-                  and "interrupted at line 5" in out and "p2" not in out,
+                  and "interrupted at line 5" in out and "p2" not in program_output(out),
                   f"{where_label} on a tty: an Opaque statement at 5:3 is located there (not 1:1)", f"out={out!r}")
             proc, rows = run(nift, dd, args, {"HOME": str(dd)}, stdin="")
             check(proc.returncode == 1 and f"{path}:1:1" not in proc.stderr,
@@ -1050,7 +1079,7 @@ def main():
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
             check(status == 0 and out.startswith("s0\nerror: ") and f"error: {path}:5:" in out and
-                  "was interrupted at line 2;" in out and not (d / "IN").exists() and "inside" not in out and
+                  "was interrupted at line 2;" in out and not (d / "IN").exists() and "inside" not in program_output(out) and
                   "PROMPT\n" in out,
                   f"{where_label} on a tty: syntax error at 5:x interrupts at its statement's start (line 2)",
                   f"status={status} out={out!r}")
@@ -1086,6 +1115,87 @@ def main():
               "session refused: session:coroutine" in out and "<stdin>:4:1" not in out and "PROMPT\n" in out,
               "has_position in a persistent tty session: exact 1:1, a recorded position inside an earlier unit, and "
               "an unpositioned limit labelled", f"out={out[:1200]!r}")
+
+        # 18h. Whole-program refusals of linked units (Review 8, release
+        # obligations 1-3): a refusal with no recorded position says so; one
+        # with a real position names it - never an invented `:1:1`. Each
+        # entry point that links modules (a file, -e, `-`), and the genuine
+        # 1:1 of each path is still reported exactly.
+        nopos = "(the VM gave no exact position)"
+
+        def refused(proc, where, reason, label, rows=None):
+            ok = (proc.returncode == 1 and proc.stdout == "" and
+                  proc.stderr.startswith(f"error: {where}: not compiled for the VM ({reason}): "))
+            if rows is not None:
+                ok = ok and [(r.get("outcome"), r.get("reason"), r.get("vm_executions")) for r in rows] == \
+                    [("require-error", reason, 0)]
+            check(ok, label, f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr[:400]!r} rows={rows}")
+
+        d = work / "positions-coro-module"
+        d.mkdir()
+        (d / "lib.f").write_text("x := 1\n")
+        coro = 'fn[async](g()) { return 6 }\nf := g()\nprint(await f)\n'
+        for name, text in (("main.f", '// header\n\nimport("lib.f")\n' + coro), ("first.f", 'import("lib.f")\n' + coro)):
+            (d / name).write_text(text)
+            path = (d / name).resolve().as_posix()
+            proc, rows = run(nift, d, [name], {})
+            refused(proc, f"{path} {nopos}", "coro-module", f"coro-module ({name}): no exact position claimed", rows)
+            check(":1:1" not in proc.stderr and f"{path}:" not in proc.stderr,
+                  f"coro-module ({name}): no invented position", f"err={proc.stderr!r}")
+            proc, rows = run(nift, d, ["-e", text], {})
+            refused(proc, f"<command-line> {nopos}", "coro-module", f"coro-module ({name} as -e): no exact position")
+            proc, rows = run(nift, d, ["-"], {}, stdin=text)
+            refused(proc, f"<stdin> {nopos}", "coro-module", f"coro-module ({name} as `-`): no exact position")
+        # The genuine 1:1 of a coroutine refusal (an async function's value at 1:1).
+        (d / "genuine.f").write_text('g\n' + coro)
+        proc, rows = run(nift, d, ["genuine.f"], {})
+        refused(proc, f"{(d / 'genuine.f').resolve().as_posix()}:1:1", "coro-async-value",
+                "coroutine refusal at a genuine 1:1 is reported exactly as :1:1", rows)
+        check(nopos not in proc.stderr, "coroutine refusal at a genuine 1:1: no 'no exact position' label")
+        proc, rows = run(nift, d, ["-e", 'g\n' + coro], {})
+        refused(proc, "<command-line>:1:1", "coro-async-value", "coroutine refusal at a genuine 1:1 (-e): exact :1:1")
+
+        d = work / "positions-name-clash"
+        d.mkdir()
+        (d / "lib.f").write_text("// a comment\n\nfn(f()) { return 1 }\n")
+        (d / "main.f").write_text('console("hi")\nimport("lib.f")\nfn(f()) { return 2 }\n')
+        lib = (d / "lib.f").resolve().as_posix()
+        for args, stdin, label in ((["main.f"], None, "file"),
+                                   (["-e", (d / "main.f").read_text()], None, "-e"),
+                                   (["-"], (d / "main.f").read_text(), "`-`")):
+            proc, rows = run(nift, d, args, {}, stdin=stdin)
+            refused(proc, f"{lib}:3:4", "import-name-clash",
+                    f"import-name-clash ({label}): the clashing definition's real position (lib.f:3:4)",
+                    rows if label == "file" else None)
+            check(f"{lib}:1:1" not in proc.stderr and "hi" not in proc.stdout,
+                  f"import-name-clash ({label}): no invented lib.f:1:1, nothing ran", f"err={proc.stderr!r}")
+        (d / "lib1.f").write_text("f := 1\n")
+        (d / "one.f").write_text('import("lib1.f")\nf := 2\n')
+        proc, rows = run(nift, d, ["one.f"], {})
+        refused(proc, f"{(d / 'lib1.f').resolve().as_posix()}:1:1", "import-name-clash",
+                "import-name-clash at a genuine 1:1 (the definition opens the module) is reported exactly", rows)
+        check(nopos not in proc.stderr, "import-name-clash at a genuine 1:1: no 'no exact position' label")
+
+        d = work / "positions-import-depth"
+        d.mkdir()
+        for k in range(71):
+            (d / f"m{k}.f").write_text(f'y{k} := 1\n  import("m{k + 1}.f")\n')
+            (d / f"n{k}.f").write_text(f'import("n{k + 1}.f")\nz{k} := 1\n')
+        (d / "m71.f").write_text("y71 := 1\n")
+        (d / "n71.f").write_text("z71 := 1\n")
+        # (An -e or `-` entry that imports m0.f is itself one level: m62.f's import is beyond the limit.)
+        for args, stdin, label, at in ((["m0.f"], None, "file", "m63.f"), (["-e", 'import("m0.f")'], None, "-e", "m62.f"),
+                                       (["-"], 'import("m0.f")\n', "`-`", "m62.f")):
+            proc, rows = run(nift, d, args, {}, stdin=stdin)
+            refused(proc, f"{(d / at).resolve().as_posix()}:2:3", "import-limit",
+                    f"import depth limit ({label}): the import beyond the limit at its real position ({at}:2:3)",
+                    rows if label == "file" else None)
+            check(":1:1" not in proc.stderr, f"import depth limit ({label}): no invented :1:1",
+                  f"err={proc.stderr!r}")
+        proc, rows = run(nift, d, ["n0.f"], {})
+        refused(proc, f"{(d / 'n63.f').resolve().as_posix()}:1:1", "import-limit",
+                "import depth limit at a genuine 1:1 (the import opens the module) is reported exactly", rows)
+        check(nopos not in proc.stderr, "import depth limit at a genuine 1:1: no 'no exact position' label")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background

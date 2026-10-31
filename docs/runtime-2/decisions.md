@@ -1451,8 +1451,12 @@ Controls: `tests/runtime2/vm_policy_negative.py`.
    statements are kept, and the session continues at a usable prompt.
 2. Legacy fails on it at startup ("unknown value or malformed expression:
    exit") and ends the session with status 1. This departure is approved
-   explicitly. Without a terminal nothing changes: the file is refused as a
-   whole and the exit status is 1, as in legacy.
+   explicitly. Without a terminal the VM refuses the file as a whole: none
+   of its statements runs, not even those before the `exit`, and the exit
+   status is 1. Only the exit status matches legacy: piped legacy runs the
+   statements before the `exit` (their output and effects happen) and then
+   fails on it. (Correction after Review 8: this point previously said
+   "as in legacy".)
 3. Migration note: a startup file that relied on `exit` ending the session
    no longer does so on a terminal; remove the line (or end the session from
    the prompt). Recorded in `compatibility.md` (Approved breaks) and

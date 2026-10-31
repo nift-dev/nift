@@ -341,10 +341,8 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         return result;
     }
     // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
-    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset)) {
-        result.positioned = true;
-        return result;
-    }
+    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset, result.positioned))
+        return result;  // positioned only where the check recorded a node's offset (not coro-module)
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
     compiler.set_session(limits.session);
@@ -372,10 +370,13 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
         program->has_coroutines = true;
-        result.positioned = true;  // both checks record an instruction's source offset
-        if (!check_coroutine_program(*program, result.reason, result.offset, limits.parallel_tasks)) return result;
+        // Both checks report whether the refused instruction has a recorded source offset.
+        if (!check_coroutine_program(*program, result.reason, result.offset, result.positioned,
+                                     limits.parallel_tasks))
+            return result;
         if (!limits.parallel_tasks &&
-            !check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
+            !check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset,
+                                         result.positioned))
             return result;
         result.positioned = false;
     }

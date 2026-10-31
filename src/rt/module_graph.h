@@ -78,6 +78,7 @@ struct ModuleGraph {
     std::string reason;
     std::size_t where = 0;     // module of the refused construct (0: the entry unit)
     std::uint32_t offset = 0;  // source offset in that module
+    bool positioned = false;   // the refusal's offset is a recorded position (set by every refusal site)
     // modules[0] is the entry unit: path/identity only (its Ast is the caller's).
     std::vector<std::unique_ptr<Module>> modules;
     // Every module read, in first-read order: deterministic, legacy's read

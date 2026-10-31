@@ -30,8 +30,9 @@ namespace nift::rt {
 // and, when task code calls through a value (CallValue, CallValueAny, which
 // includes a callable read from an object field), every proto that is ever a
 // function value (LoadFunction or Closure anywhere in the program).
+// `positioned`: on a refusal, whether `offset` is a recorded source offset.
 bool check_cooperative_admission(const Program& program, bool observe, std::string& reason,
-                                 std::uint32_t& offset);
+                                 std::uint32_t& offset, bool& positioned);
 
 // The two non-contractual test switches (record §12), off by default:
 // NIFT_VM_COOPERATIVE_THREADS=1 (thread() as a cooperative task) and
