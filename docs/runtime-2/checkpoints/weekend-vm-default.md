@@ -94,3 +94,21 @@ Tracked from that review (not release-blocking unless noted):
   has-position field). Pre-existing; telemetry, not the user diagnostic.
 - LOW: several declarations of a clashing name in one module report the last, not the first.
 - LOW: whole-line flake checks would miss a leak glued to other output on one line.
+
+## args/cmd integration (2026-11-01)
+
+`cand/args-cmd` `de6e6dde` (independent re-review ACCEPT; two earlier REJECTs fixed) integrated
+via `integ/args-cmd`: merge `cbb3de00` (conflicts in `module_link.cpp`/`script_runner.cpp`
+resolved; `loop_jump` moved verbatim to `compiler_loops.cpp` for rt-lint), follow-up `9e2f7c84`
+(struct/enum-only mention refused at the name: closes the MEDIUM invented-position finding),
+`89a4e5dd` (vm-corpus EXPECT: `fallback_args.f` now runs on the VM), `2dbcde8e` (vm_subset
+unresolved-name probes use a genuinely unbound name). `weekend/r2` fast-forwarded to `2dbcde8e`.
+- Merge-resolution review: ACCEPT (args/cmd behaviour = `de6e6dde`; diag-positions behaviour =
+  `8bd59d9f`; flag discipline; byte-identical move; EXPECT legitimate).
+- Linode on `2dbcde8e`: make nift, args-cmd, vm-default, full test-rt-vm exit 0 (4177 s), no OOM.
+  The earlier `89a4e5dd` run failed only the stale vm_subset probe; every other gate passed there.
+- Static audit of stale negative fixtures using args/cmd: none remaining.
+- Open (LOW, docs): stale `compiler.cpp` line numbers in four `classification.tsv` rows; stale
+  implementation notes in `weekend-args-cmd.md`; write-before-shadow generic wording;
+  a module with several `args` mentions may report a later one (real position; fixed by the
+  packages ordering rule).

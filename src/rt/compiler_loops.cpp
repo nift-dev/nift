@@ -5,6 +5,8 @@
 // CP12C slice 2: the default `for` (owner decisions A-D, 2026-10-22).
 // This file is the orchestration, the source/header setup and the loop
 // epilogue; the per-iteration/body passes are in compiler_loops_step.cpp.
+// `break`/`continue` (loop_jump, every loop kind) is at the end: moved
+// unchanged from compiler.cpp, which reached rt-lint's 400-line limit.
 
 namespace nift::rt::detail {
 
@@ -164,6 +166,17 @@ bool UnitCompiler::for_finish(ForState& state) {
     textual_statement_ = state.saved_textual;
     update_flags();
     if (!statement_preparable(node)) return fail(node, "prepared-unpreparable");
+    return builder_ok();
+}
+
+bool UnitCompiler::loop_jump(const Node& node) {
+    if (loops_.empty()) return fail(node, "jump-outside-loop");
+    fb_->set_offset(node.begin);
+    const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
+    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
+    const std::size_t at = fb_->emit(OpCode::Jmp);
+    if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
+    else loops_.back().continues.push_back(at);
     return builder_ok();
 }
 

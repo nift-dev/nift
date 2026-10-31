@@ -168,7 +168,8 @@ LinkedUnit::Location LinkedUnit::locate(std::size_t offset) const {
     return out;
 }
 
-LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source, const fs::path& entry_path) {
+LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source, const fs::path& entry_path,
+                     const std::vector<std::string_view>& entry_names) {
     LinkedUnit out;
     bool imports = false;
     std::vector<NodeId> stack{root};
@@ -212,6 +213,33 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             return out;
         }
     }
+    // A module never declares the entry's invocation bindings (`args := …`
+    // outside functions, exported or not): legacy's import of such an export
+    // collides with the entry's binding; the module-private case is refused too
+    // (strict policy, D-062 #1). Refused at the declared name, which `collect`
+    // records as a use. (A module function or local named so is refused by the
+    // compiler: fn-name-reserved, binding-name-reserved.)
+#if !(defined(NIFT_ARGSCMD_MUTANT) && (NIFT_ARGSCMD_MUTANT == 7 || NIFT_ARGSCMD_MUTANT == 8))  // test-only (mutants.sh)
+    for (std::size_t m = 1; m < count; ++m)
+        for (std::string_view name : entry_names) {
+            if (!units[m].top.count(name)) continue;
+            std::uint32_t first = UINT32_MAX;  // its first mention in the module
+            const Ast& ast = *units[m].ast;
+            for (NodeId id : units[m].uses)
+                if (ast.text(ast.at(id)) == name) first = std::min<std::uint32_t>(first, ast.at(id).begin);
+            // A struct or enum *name* is declared but is not a use: its name's
+            // own offset (otherwise the only mention had no position).
+            for (NodeId id = 0; id < ast.size(); ++id) {
+                const Node& n = ast.at(id);
+                if ((n.kind == NodeKind::StructDecl || n.kind == NodeKind::EnumDecl) && n.a != kNoNode &&
+                    ast.at(n.a).kind == NodeKind::Ident && ast.text(ast.at(n.a)) == name)
+                    first = std::min<std::uint32_t>(first, ast.at(n.a).begin);
+            }
+            // Positioned only at a recorded mention; none found (UINT32_MAX): no position.
+            refuse(m, first, "import-scope:invocation-binding", first != UINT32_MAX);
+            return out;
+        }
+#endif
     // Names declared outside functions, and function names, are the unit's
     // own: no other unit declares them.
     // A clash is refused at unit m's own declaration of the name (Review 8:
@@ -239,6 +267,13 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             }
         if (clash) { refuse(m, at, "import-name-clash", positioned); return out; }
     }
+    // The entry's invocation bindings are the entry's (a module cannot declare
+    // them: reserved names, refused by the compiler); `invocation` keeps those
+    // the entry does not replace by its own top-level declaration.
+    Names invocation;
+#if !(defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 4)  // test-only control (args_cmd/mutants.sh)
+    for (std::string_view name : entry_names) if (owner.emplace(name, 0).second) invocation.insert(name);
+#endif
     // A unit names another unit's binding or function only where it
     // imports it (legacy isolates module scopes).
     for (std::size_t m = 0; m < count; ++m) {
@@ -249,7 +284,11 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             const std::string_view name = units[m].ast->text(units[m].ast->at(id));
             const auto o = owner.find(name);
             if (o == owner.end() || o->second == m || imported.count(name)) continue;
-            { refuse(m, units[m].ast->at(id).begin, "import-scope", true); return out; }  // the use
+            // A TEMPORARY limitation for the invocation bindings (owner, 2026-10-31):
+            // legacy lets a module function called from the entry see them.
+            refuse(m, units[m].ast->at(id).begin,
+                   invocation.count(name) ? "import-scope:invocation-binding" : "import-scope", true);  // the use
+            return out;
         }
     }
     for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),

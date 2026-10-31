@@ -125,8 +125,9 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         case NodeKind::Coalesce: return coalesce(node, dst);
         case NodeKind::Ternary: return ternary(node, dst);
         case NodeKind::Unary: return unary(node, dst);
-        case NodeKind::Assign: case NodeKind::CompoundAssign: return assignment_expr(node, dst);
-        case NodeKind::IncDec: return inc_dec_expr(node, dst);
+        case NodeKind::Assign: case NodeKind::CompoundAssign:
+            return !invocation_write(id) && assignment_expr(node, dst);
+        case NodeKind::IncDec: return !invocation_write(id) && inc_dec_expr(node, dst);
         case NodeKind::Call: return call(node, dst);
         case NodeKind::Await: return await_expr(node, dst);  // CP22 (compiler_coro.cpp)
         case NodeKind::Member: return member(node, dst);

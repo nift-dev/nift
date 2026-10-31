@@ -1466,6 +1466,40 @@ Witness: `tests/runtime2/vm_default/vm_default.py` §18c (`.niftrc` and
 `-i file` on a pty: earlier effect kept, nothing later runs, the prompt then
 works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
 
+## D-062 — Script `args`/`cmd` on the VM: modules and assignment (owner, 2026-10-31; weekend args/cmd)
+
+Context: `checkpoints/weekend-args-cmd.md` (the six real-run fallback units of
+the G03 study, all supported on the VM).
+
+1. **Modules: a TEMPORARY limitation, not a language rule.** A module that names
+   `args` or `cmd` is refused before any effect, with the stable reason
+   `import-scope:invocation-binding`. This must not become established
+   behaviour: legacy lets an imported function called from the entry script see
+   the entry's bindings, and that is worth preserving. Obligation: the packages
+   checkpoint tests module top-level evaluation against an imported function
+   called from the entry script, and lifts or rules on this refusal.
+2. **Assignment: an approved semantic change (not legacy parity).** A write to
+   the injected bindings (`args = …`, `cmd = …`, an element of `args`, a compound
+   assignment or increment) is a program error rejected before execution, with
+   the reason `invocation-assign:<name>`: nothing of the program runs, the
+   statements before it included. Legacy fails fatally at the statement, after
+   the earlier statements ran; that timing is not reproduced. The diagnostic is
+   worded as a program error ("cannot assign to `args`: the script invocation
+   bindings `args` and `cmd` are read-only"), never as missing VM functionality
+   ("not supported by the Runtime 2.0 VM yet"), with no legacy instruction and
+   no request to report it. The same reason is used in VM sessions.
+3. A top-level `args := …` / `cmd := …` in the entry script still replaces the
+   binding (legacy's `is_script_invocation` exception); it is not a write.
+4. Scope: only the injected bindings. General assignment semantics (const,
+   immut, catch bindings) are unchanged. `args.push(…)` and the other mutating
+   methods keep legacy's runtime error ("cannot mutate const array: args").
+   Migration: declare a new binding (`my_args := args`) or replace the binding
+   with a top-level declaration before any use. Recorded in `compatibility.md`
+   (Approved breaks).
+
+Witness: `tests/runtime2/args_cmd/args_cmd.py` §3 (writes, with an earlier file
+effect and output that must not happen; module refusals) and §4 (session).
+
 ## D-NEXT-packages — Package imports and import-time program errors on the VM (owner, 2026-11-01; number assigned at integration)
 
 Context: `checkpoints/weekend-packages.md` (phase 1 contract, owner rulings Q1–Q6).

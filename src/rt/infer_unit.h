@@ -23,7 +23,8 @@ struct SessionLocationInference;
 class Inference {
 public:
     Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
-              const SessionCompileContext* session = nullptr);
+              const SessionCompileContext* session = nullptr,
+              const std::vector<InvocationBinding>* invocation = nullptr);
 
     // Monotone unions over a finite (depth-capped) lattice. Worklist over the call graph (review D1): a unit
     // is re-walked only when its bindings, a parameter or a callee's return grew; its last walk sees its final
@@ -130,6 +131,7 @@ private:
     const UnitPlan& plan_;
     GlobalSlots globals_;
     const SessionCompileContext* session_ = nullptr;
+    const std::vector<InvocationBinding>* invocation_ = nullptr;
     std::shared_ptr<SessionLocationInference> session_locations_;
     std::unordered_map<std::string_view, std::size_t> external_;
     UnitKinds result_;
