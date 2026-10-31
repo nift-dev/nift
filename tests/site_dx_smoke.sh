@@ -18,6 +18,18 @@ expect_contains() { # haystack needle label
 expect_absent() {
   if grep -qF -- "$2" <<<"$1"; then fail "$3 (unexpected: $2)"; printf '%s\n' "$1" | head -20 >&2; else pass "$3"; fi
 }
+# The script checks below pin the legacy interpreter's diagnostics and run()/cmd()
+# behaviour (feature-site-dx predates the VM default). Since an unset NIFT_VM now
+# requires the VM, they select the legacy oracle explicitly, as the other lanes
+# do (84ff6d44). Website builds are not affected by NIFT_VM. The default-mode
+# contract for these programs (refused before any effect) is checked once here.
+default_out=$(cd "$work" && env -u NIFT_VM "$NIFT" -e 'print("EFF" + "ECT"); r := "true".run()' 2>&1); default_rc=$?
+if [ $default_rc -eq 1 ] && ! grep -qx EFFECT <<<"$default_out" && grep -qF 'no part of it ran' <<<"$default_out"; then
+  pass "default VM: a run() script is refused before any effect"
+else
+  fail "default VM refusal: rc=$default_rc out=$default_out"
+fi
+export NIFT_VM=0
 new_project() { # dir
   mkdir -p "$1" && (cd "$1" && "$NIFT" init >/dev/null 2>&1) || { fail "init $1"; return 1; }
 }
