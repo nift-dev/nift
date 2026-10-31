@@ -105,9 +105,25 @@ MUTANTS = {
     25: ("coro-async-value skips an object literal's value", {
         "refuse/r_async_value_object.f": {"stdout": b"9\n", "exit": 0, "outcome": "vm"},
         "refuse/r_async_value_object_alias.f": {"stdout": b"9\n", "exit": 0, "outcome": "vm"}}),
-    13: ("scheduling observations admitted", {"refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0,
-                                                                              "outcome": "vm"}}),
+    # A5 is a cooperative-model rule: CP23's parallel default skips cooperative
+    # admission, so it admits these `_default` fixtures on the oracle too
+    # (tests/runtime2/cp23/CP22-CLASSIFICATION.tsv: vm, legacy-golden) and M13
+    # is invisible there. The witnesses therefore run, on the oracle and on the
+    # mutant alike, under the cooperative model with A5 on (`env`:
+    # NIFT_VM_COOPERATIVE_THREADS=1 without NIFT_VM_COOPERATIVE_OBSERVE), where
+    # the oracle still refuses each for its coro-observe reason and M13 runs it.
+    13: ("scheduling observations admitted", {
+        "refuse/r_obs_print_default.f": {"stdout": b"task 1\n2\n", "exit": 0, "outcome": "vm", "env": "A5_ON"},
+        "refuse/r_obs_epoch_default.f": {"stdout": b"true\n2\n", "exit": 0, "outcome": "vm", "env": "A5_ON"},
+        "refuse/r_obs_done_default.f": {"stdout": b"true\n2\n", "exit": 0, "outcome": "vm", "env": "A5_ON"},
+        "refuse/r_obs_status_default.f": {"stdout": b"done\n", "exit": 0, "outcome": "vm", "env": "A5_ON"},
+        "refuse/r_obs_task_epoch_default.f": {"stdout": b"true\n", "exit": 0, "outcome": "vm", "env": "A5_ON"}}),
 }
+# Named witness run conditions (a signature's `env`), replacing the corpus
+# switches for that witness on both the oracle and the mutant.
+#   A5_ON  the cooperative model (thread() as a cooperative task, the CP22
+#          admission rules) with A5 on: scheduling observations refused
+WITNESS_ENV = {"A5_ON": {"NIFT_VM_COOPERATIVE_THREADS": "1"}}
 
 
 def table(path):
@@ -309,11 +325,11 @@ def policy_ok(policy, legacy, vm):
     return lmsg == vm_m.group(4) and lm.group(2) == vm_m.group(2) and int(vm_m.group(3)) > int(lm.group(3))
 
 
-def check_refuse(nift, name, reason):
+def check_refuse(nift, name, reason, env=None):
     want = golden(REFUSE, name)
     if want is None:
         return [f"missing golden for {name}"]
-    result, st = run(nift, REFUSE, name, "1")
+    result, st = run(nift, REFUSE, name, "1", extra=env, switches=env is None)
     bad = harness_problem(result, st, executed=False)
     if bad:
         return [bad]
@@ -400,10 +416,17 @@ def mutant(args):
     print(f"ok   mutant {n} provenance: changed objects {changed}")
     failures, detected = 0, []
     for key, sig in witnesses.items():
+        env = None
+        if "env" in sig:
+            if sig["env"] not in WITNESS_ENV or not key.startswith("refuse/"):
+                failures += 1
+                print(f"FAIL mutant {n} {key}: harness: unknown or misplaced witness env {sig['env']!r}")
+                continue
+            env = WITNESS_ENV[sig["env"]]
         if key.startswith("refuse/"):  # a refusal witness: the mutant runs what the oracle refuses
             folder, name = REFUSE, key.split("/", 1)[1]
             reasons = {r[0]: r[1] for r in table(HERE / "REFUSE.tsv")}
-            base = check_refuse(args.oracle, name, reasons.get(name, ""))
+            base = check_refuse(args.oracle, name, reasons.get(name, ""), env)
         else:
             folder, name = (VM_ONLY, key.split("/", 1)[1]) if key.startswith("vm-only/") else (CASES, key)
             base = check_vm_only(args.oracle, name) if folder is VM_ONLY else check_vm(args.oracle, name, None)
@@ -411,7 +434,7 @@ def mutant(args):
             failures += 1
             print(f"FAIL mutant {n} {key}: oracle build fails its own gate: {base}")
             continue
-        result, st = run(args.nift, folder, name, "require")
+        result, st = run(args.nift, folder, name, "require", extra=env, switches=env is None)
         bad = harness_problem(result, st)
         if bad:
             failures += 1
