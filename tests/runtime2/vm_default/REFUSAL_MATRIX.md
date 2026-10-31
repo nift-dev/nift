@@ -40,7 +40,10 @@ Positions: a refusal is shown at `file:line:column` only when the compiler
 or parser recorded that position (CompileResult::positioned); otherwise the
 diagnostic says "(the VM gave no exact position)" - for a session input or a
 startup-file statement with the start line of the refused input, labelled as
-such (§18d, §18e).
+such (§18d, §18e). A genuine refusal at line 1, column 1 is still reported
+as the exact `:1:1` (§18g: file, `-e`, tty `-i` file, persistent tty session).
+The interrupted-statement note quotes a short one-line statement, e.g.
+"interrupted at line 3 (`exit`)".
 
 ## Known limits (tracked, not changed)
 
@@ -58,13 +61,13 @@ such (§18d, §18e).
   `printf 'x := 1\nr := run("a")\n' > ~/.niftrc; echo | nift` (stdin not a
   terminal). Expected wording: "no part of it ran". The statement is "may",
   never a false claim that something ran.
-- **`exit` in a startup file - explicit deviation from legacy, awaiting owner
-  confirmation.** Legacy fails on it at startup ("unknown value or malformed
-  expression: exit") and ends the session with status 1. The VM refuses it
-  before it runs; on a terminal the file is therefore interrupted there and
-  the session continues at the prompt (the owner's tty refusal rule); without
-  a terminal the file is refused and the exit status is 1, as in legacy
-  (§18c). Piped, the reason id differs between the two files:
+- **`exit` in a startup file - departure from legacy, approved by the owner,
+  2026-10-31 (D-061).** Legacy fails on it at startup ("unknown value or
+  malformed expression: exit") and ends the session with status 1. The VM
+  refuses it before it runs; on a terminal the file is interrupted there (the
+  note names it: "interrupted at line L (`exit`)"), earlier effects are kept
+  and the session continues at the prompt; without a terminal the file is
+  refused and the exit status is 1, as in legacy (§18c). Piped, the reason id differs between the two files:
   `unresolved-name` for ~/.niftrc (compiled with the REPL's tail inspection,
   as before) and `expression-statement` for `-i file`; aligning them would
   change how a piped ~/.niftrc is compiled, so it is left as is.

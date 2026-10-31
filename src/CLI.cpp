@@ -1836,7 +1836,11 @@ static int run_vm_startup_file(nift::rt::VmSession& session, const std::string& 
         unit.append(at.column - 1, ' ');
         unit += source.substr(begin, end - begin);
         startup_file_running = &path;
-        startup_statement_at = "line " + std::to_string(at.line);
+        // The interrupted statement is quoted when it is short and on one line
+        // (e.g. `exit`), so the note names what stopped the file.
+        const std::string text = source.substr(begin, node.end - begin);
+        startup_statement_at = "line " + std::to_string(at.line) +
+            (text.size() <= 60 && text.find('\n') == std::string::npos ? " (`" + text + "`)" : std::string());
         startup_statement_line = at.line;
         // inspect=false for both files: the same path as a script statement,
         // never a REPL value echo.

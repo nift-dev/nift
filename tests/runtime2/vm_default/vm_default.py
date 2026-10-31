@@ -690,8 +690,8 @@ def main():
             status, out = run_tty(nift, d, args, {}, typed)
             diag = (f"error: {path}:5:6: NIFT_VM session refused: {REASON}: {RUN_FEATURE} is not supported by the "
                     "Runtime 2.0 VM yet\n" + STATEMENT_NOTE +
-                    f"note: initialisation from {path} was interrupted at line 5; later statements in it were not "
-                    "run\n"
+                    f"note: initialisation from {path} was interrupted at line 5 (`r := run(\"echo\", \"x\")`); later "
+                    "statements in it were not run\n"
                     "note: the session continues at the prompt\n"
                     f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{' -i init.f' if args else ''}\n"
                     f"note: please report unsupported programs at {ISSUES}\n")
@@ -828,8 +828,8 @@ def main():
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ["print(n)", "print(7)", "exit"])
             diag = (f"error: {path}:4:19: NIFT_VM session refused: type:length: ")
-            note = (f"note: initialisation from {path} was interrupted at line 7; later statements in it were not "
-                    "run\nnote: the session continues at the prompt\n")
+            note = (f"note: initialisation from {path} was interrupted at line 7 (`g(3)`); later statements in it "
+                    "were not run\nnote: the session continues at the prompt\n")
             check(status == 0 and out.startswith("s1\ns3\n") and out.count("s1") == 1 and
                   out.count("s3\n") == 1 and (d / "s3.txt").exists(),
                   f"{label} on a tty: statements before the refused one ran, each exactly once", f"out={out!r}")
@@ -944,20 +944,30 @@ def main():
         # `exit` in a startup file is a Nift statement, never the shell's exit:
         # legacy fails on it at startup (unknown value, exit 1); the VM refuses
         # it before it runs, so on a tty the file is interrupted there and the
-        # session continues; piped, the file is refused (exit 1) as in legacy.
+        # session continues (approved by the owner, 2026-10-31, D-061); piped,
+        # the file is refused (exit 1) as in legacy.
         for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
             d = work / f"exit-{name.strip('.').replace('.', '-')}"
             d.mkdir()
-            (d / name).write_text('print("e1")\nexit\nprint("e2")\n')
-            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
-            check(status == 0 and out.startswith("e1\nerror: ") and "e2" not in out and "PROMPT\n" in out and
-                  "was interrupted at line 2" in out,
-                  f"{where_label} on a tty: `exit` is a refused Nift statement, not the shell's exit; prompt usable",
-                  f"status={status} out={out!r}")
+            (d / name).write_text('print("e1")\ntouch("e1.txt")\nexit\nprint("e2")\ntouch("e2.txt")\n')
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', 'touch("typed.txt")', "exit"])
+            check(status == 0 and out.startswith("e1\nerror: ") and f"error: {path}:3:1: NIFT_VM session refused" in out
+                  and f"initialisation from {path} was interrupted at line 3 (`exit`); later statements in it were "
+                  "not run" in out and "e2" not in out and not (d / "e2.txt").exists() and (d / "e1.txt").exists() and
+                  "PROMPT\n" in out and (d / "typed.txt").exists(),
+                  f"{where_label} on a tty: `exit` refused (named in the note), the earlier effect kept, nothing later "
+                  "ran, prompt usable (D-061)", f"status={status} out={out!r}")
+            for f in ("e1.txt", "e2.txt", "typed.txt"):
+                if (d / f).exists():
+                    (d / f).unlink()
             status, out = run_tty(nift, d, args, {"NIFT_VM": "0"}, ['print("PROMPT")', "exit"])
             check(status == 1 and out.startswith("e1\n") and "unknown value or malformed expression: exit" in out and
-                  "e2" not in out, f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error",
+                  "e2" not in out, f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error (exit 1)",
                   f"status={status} out={out!r}")
+            for f in ("e1.txt", "e2.txt"):
+                if (d / f).exists():
+                    (d / f).unlink()
             proc, rows = run(nift, d, args, {"HOME": str(d)}, stdin='print("PROMPT")\n')
             check(proc.returncode == 1 and proc.stdout == "", f"{where_label} piped: `exit` file refused, exit 1",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
@@ -1044,6 +1054,38 @@ def main():
                   "PROMPT\n" in out,
                   f"{where_label} on a tty: syntax error at 5:x interrupts at its statement's start (line 2)",
                   f"status={status} out={out!r}")
+
+        # 18g. has_position both ways (owner): a genuine refusal at line 1,
+        # column 1 is reported as the exact `:1:1`; one with no recorded
+        # position says so - for a file, an -e program, a tty `-i` file and a
+        # persistent tty session (a refusal inside a function defined earlier
+        # keeps its recorded position across units).
+        d = work / "has-position"
+        d.mkdir()
+        (d / "first.f").write_text('run("x")\nprint("after")\n')
+        first = (d / "first.f").resolve().as_posix()
+        proc, rows = run(nift, d, ["first.f"], {})
+        check(proc.returncode == 1 and proc.stderr.startswith(f"error: {first}:1:1: not compiled for the VM "
+                                                              "(callable:run)") and "no exact position" not in
+              proc.stderr and rows and (rows[0].get("line"), rows[0].get("column")) == (1, 1),
+              "has_position: a genuine 1:1 refusal of a file is reported exactly as :1:1", f"err={proc.stderr!r}")
+        proc, rows = run(nift, d, ["-e", 'run("x")'], {})
+        check(proc.returncode == 1 and proc.stderr.startswith("error: <command-line>:1:1: not compiled for the VM") and
+              "no exact position" not in proc.stderr,
+              "has_position: a genuine 1:1 refusal of an -e program is reported exactly as :1:1", f"err={proc.stderr!r}")
+        status, out = run_tty(nift, d, ["-i", "first.f"], {}, ['print("PROMPT")', "exit"])
+        check(f"error: {first}:1:1: NIFT_VM session refused: callable:run" in out and "no exact position" not in out
+              and "PROMPT\n" in out and "\nafter" not in out,
+              "has_position: a genuine 1:1 refusal in a tty -i file is reported exactly as :1:1", f"out={out!r}")
+        # (session:coroutine is a whole-unit refusal: no recorded position.)
+        status, out = run_tty(nift, d, [], {}, ['run("x")', 'fn(f(a)) { return a.size() }', "f(3)",
+                                                "fn[async](g()){return 6}", 'print("PROMPT")', "exit"])
+        check("error: <stdin>:1:1: NIFT_VM session refused: callable:run" in out and
+              "<stdin>: in earlier input, at line 1, column 19 of the unit that defined it" in out and
+              "error: <stdin>:4 (the start line of the refused input; the VM gave no exact position): NIFT_VM "
+              "session refused: session:coroutine" in out and "<stdin>:4:1" not in out and "PROMPT\n" in out,
+              "has_position in a persistent tty session: exact 1:1, a recorded position inside an earlier unit, and "
+              "an unpositioned limit labelled", f"out={out[:1200]!r}")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background
