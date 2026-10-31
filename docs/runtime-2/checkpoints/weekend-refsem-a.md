@@ -320,25 +320,35 @@ changes (0 of 608).
 
 ## 12. Local runs
 
-Run on commit `f09c7137` (tree `61edaf2b`), through the host's heavy-job
-gate; the only later commit adds this section (documentation only).
+Review round 1, through the host's heavy-job gate. The full set ran on
+`828d3484` (tree `5cabd8e4`); the next commit, `49f60534` (tree `164c3260`),
+changed only tests and records (no source), and every gate it touched was
+rerun there (marked *). The commit after it adds this section only.
 
 | Gate | Exit |
 | --- | --- |
-| `make nift` | 0 |
-| `make test-rt-lint` (0 problems) | 0 |
-| `tests/runtime2/refsem_a.py` (190 checks) | 0 |
-| `tests/runtime2/weekend_collections.py` (273 checks) | 0 |
-| `tests/runtime2/refsem/mutants.sh` (15 of 15 caught) | 0 |
-| `tests/runtime2/collections/mutants.sh` (all caught) | 0 |
-| `make test-runtime2-vm-default` | 0 |
-| `make test-runtime2-closures-s1-stress` | 0 |
-| `make test-runtime2-cp22` | 0 |
-| `make test-runtime2-cp23` | 0 |
+| `make nift`*, `make test-rt-lint`* (0 problems) | 0, 0 |
+| `refsem_a.py`* (256 checks), `weekend_collections.py` (273 checks) | 0, 0 |
+| `refsem/mutants.sh` (R1-R18, 18 of 18 caught), `collections/mutants.sh` | 0, 0 |
+| `test-runtime2-vm-default`, `-closures-s1` (54 cases), `-closures-s1-stress` | 0, 0, 0 |
+| `test-runtime2-for-s2` (59 cases), `-for-s2-mutants` (M1-M7) | 0, 0 |
+| `test-runtime2-cp22`, `-cp23` | 0, 0 |
+| `test-runtime2-capture-origins` (82 cases), `-cp12c-probes` | 0, 0 |
+| `test-runtime2-cp14b`*, `-cp14b-witnesses`* | 0, 0 (2 on `828d3484`: const_admission, fixed in `49f60534`) |
+| `test-cp25r`, `test-runtime2-d040-witnesses`, `-vm-corpus-complete` | 0, 0, 0 |
+| `vm_parity.py --gen 300 --rt-diff`, `vm_adversarial.py --count 600`, `vm_subset.py`, `vm_subset_gen.py --count 500` | 0, 0, 0, 0 |
+| `vm_builtins.py`*, `vm_inventory.py`* | 0, 0 (1, 1 on `828d3484`, fixed in `49f60534`) |
+| `vm_known_refused.py`, `vm_engine_selection.py`, `vm_former_replay.py --sample 600`, `vm_review_cp12.py`, `vm_golden.py` | 0, 0, 0, 0, 0 |
+| `vm_modules.py --gen 100`, `vm_structs.py --gen 100`, `vm_globals.py --gen 200`, `semantics_modules.py` (both dirs) | 0, 0, 0, 0 |
+| earlier in the round: `test-runtime2-cp16-n1`, `-kind-bits`, `-cp12c-mutant-controls`, `-closures-s1-mutants`, `-cp13b` | 0 each |
 
-The CP25-R inventory (section 11) was taken on `a43472ed`; the later guard
-refinement (`7c1fc2b4`) only admits more programs, and was not re-inventoried.
-The full `test-rt-vm`, rt-diff and the sanitizer lanes are not run locally.
+ASan+UBSan value-layer drivers (local, `-O1`, a subset of the value sources;
+section 8): `value_round2` passes; all twelve stale-reference controls abort
+with heap-use-after-free; the R19 and relocation-off builds miss the five
+large controls; 200,000-element stress as in section 8. Not run locally: the
+full `test-rt-vm` and sanitizer lanes (Linode), and the rt-diff selftest,
+whose timeout and interleave checks fail on this host for the base binary
+too (its module-reproducer check needs `gen/m1`, fixed in section 7).
 
 ## 13. Review round 1 (review of `ad9d842f`)
 
