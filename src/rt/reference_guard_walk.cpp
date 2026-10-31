@@ -84,6 +84,9 @@ void Guard::retain(NodeId id, int owner) {
         return;
     }
     if (r.decl == kNoNode) return;  // `this` or a fresh value
+    // A new outer container built from the binding's parts (map, filter,
+    // slice, ...) shares those parts only when they may be arrays or objects.
+    if (!r.whole && at(id).kind == NodeKind::Call && fresh(id, false) && !nested(id)) return;
     Facts& f = facts(r.decl);
     (r.whole ? f.retained_top : f.retained_sub).push_back(id);
 }
@@ -295,11 +298,18 @@ void Guard::call(NodeId id, bool keep, int owner) {
             // A built-in whose result may hold aggregates may hold the
             // argument's parts (copy, merge, ...); a callable value's
             // parameters may escape anywhere.
-            const bool part = !isolate && !deep && !value_call && shared(id);
+            // A built-in returning one of its arguments (validate, min, max:
+            // Selected) keeps the whole value; one whose result may hold
+            // aggregates below its top may hold the argument's parts.
+            const natives::BuiltinSpec* spec = value_call ? nullptr : bind_function(name);
+            const bool whole = spec != nullptr && spec->rule == natives::ResultRule::Selected && name != "copy" &&
+                               name != "deepcopy";
+            const bool part = !isolate && !deep && !value_call && shared(id) && (whole || nested(id));
             walk(args[k], value_call && !isolate, owner);
             if (part && shared(args[k])) {
                 const Root r = root_of(args[k], owner);
-                if (r.known && r.decl != kNoNode) facts(r.decl).retained_sub.push_back(args[k]);
+                if (r.known && r.decl != kNoNode)
+                    (whole && r.whole ? facts(r.decl).retained_top : facts(r.decl).retained_sub).push_back(args[k]);
                 else if (!r.known && at(args[k]).kind == NodeKind::Ident) unknown_.push_back(args[k]);
             }
         }
@@ -340,7 +350,7 @@ void Guard::call(NodeId id, bool keep, int owner) {
     // receiver's parts (handled by retain above) or an argument's.
     for (std::uint32_t k = 0; k < n.count; ++k) {
         walk(args[k], false, owner);
-        if (shared(id) && shared(args[k])) {
+        if (shared(id) && shared(args[k]) && (nested(id) || !fresh(id, false))) {
             const Root r = root_of(args[k], owner);
             if (r.known && r.decl != kNoNode) facts(r.decl).retained_sub.push_back(args[k]);
         }

@@ -14,6 +14,9 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
                 the legacy witness NAME.legacy, and the two differ.
   refuse/*.f    refused before any effect: exit 1, no stdout (every fixture
                 prints first), "no part of it ran", the reason in NAME.reason.
+  sessions      piped sessions (SESSIONS below): a copied array is refused
+                before it runs; ordinary array use matches legacy; map bindings stay
+                refused by the existing session shape contract.
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
                 execution give the same transcript, NAME.vm, both on the VM (D7).
   heap          a refused cycle leaks nothing (4 and 40 refused attempts end
@@ -54,6 +57,27 @@ def run(nift, path, mode, work, budget=None, extra=None):
             st = None
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
     return norm(p.stdout), norm(p.stderr), p.returncode, st
+
+
+def run_session(nift, stdin, work, mode="require"):
+    d = tempfile.mkdtemp(dir=work)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
+           "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode}
+    p = subprocess.run(["timeout", "120", nift], cwd=d, env=env, input=stdin.encode(), capture_output=True)
+    return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
+
+
+# Piped sessions (D-NEXT-refsem #9: a later statement may mutate any binding,
+# so a copied array is refused; ordinary array use runs).
+SESSIONS = [
+    ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
+    ("session_array_map", 'xs := [3, 1, 2]\nys := xs.map((v) => v * 2)\nprint(ys.length())\n', ("parity",)),
+    ("session_array_push", 'a := [1, 2]\na.push(3)\nprint(a.length())\n', ("parity",)),
+    # Unchanged from the base (18720d14): a map-typed session binding was already
+    # refused by the session shape contract; Phase A does not widen sessions.
+    ("session_map_alias", 'm := map()\nb := m\nx := b.set(1, 2)\nprint(m.size())\n',
+     ("refuse", "", "session:binding-shape-contract")),
+]
 
 
 def transcript(out, err, rc):
@@ -130,6 +154,15 @@ def main():
             check(par == coop, "equiv %s: parallel\n%s\ncooperative\n%s" % (name, par, coop))
             want = open(base + ".vm").read() if os.path.exists(base + ".vm") else None
             check(par == want, "equiv %s: output\n%s\nexpected\n%s" % (name, par, want))
+        for name, stdin, want in SESSIONS:
+            vo, ve, vr = run_session(nift, stdin, work)
+            if want[0] == "parity":
+                lo, le, lr = run_session(nift, stdin, work, mode="0")
+                check((vo, ve, vr) == (lo, le, lr) and "refused" not in ve,
+                      "session %s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo, le, lr, vo, ve, vr))
+            else:
+                check(vr == 1 and vo == want[1] and want[2] in ve,
+                      "session %s: expected %s, got %d %r %r" % (name, want[2], vr, vo, ve[:200]))
         if args.update:
             print("updated goldens")
             return 0
