@@ -1,0 +1,5 @@
+print("pre")
+import("sm.f")
+m.lock()
+print(m.get())
+m.unlock()

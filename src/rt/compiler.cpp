@@ -330,6 +330,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         result.offset = ast.at(root).begin;
         return result;
     }
+    if (!check_coroutine_modules(ast, root, plan, kinds, limits, result)) return result;  // imports + tasks
     // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
     if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset, result.positioned))
         return result;  // positioned only where the check recorded a node's offset (not coro-module)

@@ -21,6 +21,7 @@
 
 namespace nift::rt {
 namespace infer_detail { struct Ty; }
+struct LinkedUnit;
 
 struct CompileResult {
     std::unique_ptr<Program> program;  // null when the unit must fall back
@@ -95,7 +96,12 @@ struct CompileLimits {
     // imported modules. A user-call argument path rooted at one is refused
     // (`path-in-call-argument:imported`; records20k's stage 4 lift).
     std::vector<std::string_view> module_names;
-    bool linked = false;  // CP22: the unit is a linked module graph (coroutine units refuse it)
+    // CP22 `coro-module`: refuse every coroutine unit outright. Set by
+    // cooperative_switches for a linked unit under the cooperative model only;
+    // under the parallel model `link` admits linked coroutine units
+    // (rt/compiler_coro_module.h: `coro-module-init-task`, `coro-module-capture`).
+    bool linked = false;
+    const LinkedUnit* link = nullptr;  // the unit's module link (rt/module_link.h), when it has one
     // CP22: compile `thread(f, …)` as a cooperative VM task. Off by default:
     // legacy threads execute in parallel, and until the owner decides the
     // execution model a unit calling thread() is refused (`callable:thread`).

@@ -2,6 +2,11 @@
 # fixture	CP22 reason	CP23 outcome	CP23 reason	policy
 r_capture.f	coro-capture	vm	-	legacy-golden
 r_async_value.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_alias.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_nested.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_arg.f	coro-async-value	require-error	coro-async-value	preserved-refusal
+r_async_value_object_unused.f	coro-async-value	require-error	coro-async-value	preserved-refusal
 r_flow_print.f	coro-future-flow:Call	require-error	coro-future-flow:Call	preserved-refusal
 r_flow_concat.f	coro-future-flow:Binary	require-error	coro-future-flow:Binary	preserved-refusal
 r_flow_stringify.f	coro-future-flow:Member	require-error	coro-future-flow:Member	preserved-refusal
@@ -13,7 +18,9 @@ r_main_cell.f	coro-main-cell	vm	-	legacy-golden
 r_at_fn_async.f	fn-flags	vm	-	legacy-golden
 r_await_plain.f	await-outside-coroutine-unit	require-error	await-outside-coroutine-unit	preserved-refusal
 r_return_top.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
-r_module.f	coro-module	require-error	coro-module	preserved-refusal
+# r_module.f: weekend coro-module admits the coroutine unit with imports (no task touches module state);
+# the unit now stops at an unrelated pre-existing refusal: its module binds `mv`, a built-in name.
+r_module.f	coro-module	require-error	binding-name-reserved	preserved-refusal
 r_future_result.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
 # CP25-R (D-057): a statically certain arity mismatch now raises legacy's fatal Error on the VM when reached.
 err_arity.f	static-error:arity	vm-error	callable argument count mismatch: f	legacy-golden

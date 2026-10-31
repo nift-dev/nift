@@ -4260,7 +4260,7 @@ $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJEC
 		$(addprefix $(CP22_MUTANT_DIR)/$*/,$(notdir $(CP22_CORO_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
 test-runtime2-cp22-mutants: $(TARGET)
 	set -e; normal=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
-	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do \
+	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do \
 	  $(MAKE) "$(CP22_MUTANT_DIR)/nift-$$n" >/dev/null; \
 	  sha=$$(sha256sum "$(CP22_MUTANT_DIR)/nift-$$n" | cut -d' ' -f1); \
 	  objs=""; for f in $(CP22_CORO_SOURCES); do o=$$(basename $$f .cpp).o; \
@@ -4274,6 +4274,42 @@ test-rt-vm: test-runtime2-cp22
 test-rt-vm-sanitize: test-runtime2-cp22-sanitize
 test-rt-vm-sanitize: test-runtime2-cp22-tsan
 certify-targets: test-runtime2-cp22-mutants
+# Weekend candidate coro-module: coroutines and async functions in programs
+# that import modules (docs/runtime-2/checkpoints/weekend-coro-module.md).
+# Mutants: the module-admission objects compiled -DNIFT_CORO_MODULE_MUTANT=n,
+# linked with the normal objects; each must fail its named witness.
+.PHONY: test-runtime2-coro-module test-runtime2-coro-module-mutants
+test-runtime2-coro-module: $(TARGET)
+	$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-coro-module
+# The same suite on the ASan/UBSan and TSan builds (parallel tasks running
+# module code; the linked unit's shared SourceMap; worker Error reporting).
+.PHONY: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
+test-runtime2-coro-module-sanitize: $(SAN_TARGET)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-coro-module-tsan: $(TSAN_TARGET)
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm-sanitize: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
+# compiler_coro.cpp (the base coro-async-value check) is built with CP22's
+# mutant 25 (an object literal's value skipped) for mutants 16-18: 16 is that
+# base hole alone; 17 and 18 reopen the module rules' own through-value
+# checks on top of it, so their witnesses run (review 2 B1).
+CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_module_effects.cpp \
+	src/rt/compiler_coro_admit.cpp src/rt/compiler_coro.cpp
+CORO_MODULE_MUTANT_DIR := $(TEST_DIR)/coro-module-mutants
+$(CORO_MODULE_MUTANT_DIR)/nift-%: $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CORO_MODULE_SOURCES) \
+		$(RT_VALUE_HEADERS) $(LIBFFI_A)
+	mkdir -p "$(CORO_MODULE_MUTANT_DIR)/$*"
+	set -e; for f in $(CORO_MODULE_SOURCES); do \
+	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MODULE_MUTANT=$* -DNIFT_CORO_MUTANT=$(if $(filter 16 17 18,$*),25,0) \
+	    -c $$f -o "$(CORO_MODULE_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) \
+		$(addprefix $(CORO_MODULE_MUTANT_DIR)/$*/,$(notdir $(CORO_MODULE_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
+test-runtime2-coro-module-mutants: $(TARGET)
+	MAKE="$(MAKE)" bash tests/runtime2/coro_module/mutants.sh "$(CURDIR)/$(TARGET)" "$(CORO_MODULE_MUTANT_DIR)"
+certify-targets: test-runtime2-coro-module-mutants
 
 # CP18 compiled-program interface: separate from legacy Engine execution.
 CP18_C_TEST := $(TEST_DIR)/cp18/program$(EXEEXT)
