@@ -1,0 +1,3 @@
+--- stderr
+error: cycle_catchable.f:4:5: set would create a cyclic reference
+--- exit 1

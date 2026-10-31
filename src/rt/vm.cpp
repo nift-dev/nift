@@ -327,13 +327,13 @@ VmResult Vm::run(std::string& output) {
     OP(ObjectLookupValue) OP(IterMissing) {
         if (!op_iter(*pc, R, proto, fault)) FAIL();
         NEXT(); }
-    OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER }
-    OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
+    OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER } OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(SessionNumeric) { if (!session_numeric(RK(pc->b), RK(pc->c), fault)) FAIL(); NEXT(); }
     OP(SessionRender) { if (!op_session_render(*pc, R, result, fault, proto)) FAIL(); NEXT(); }
     OP(TopReturn) { if (!op_top_return(*pc, R, result, fault, proto)) FAIL(); CORO_END }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); CORO_END }
-    OP(ArrayMutate) OP(KeyedMutate) OP(CollectionSort) OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
+    OP(ArrayMutate) OP(KeyedMutate) OP(CollectionSort)
+    OP(CollectionStep) { if (!collection(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CollectionCall) { if (!op_collection_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(TryBegin) { if (!op_try_begin(*pc, base, proto, pc, fault)) FAIL(); NEXT(); }
     OP(TryEnd) { if (!op_try_end(*pc, fault)) FAIL(); NEXT(); }
@@ -341,7 +341,7 @@ VmResult Vm::run(std::string& output) {
     OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
     OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
-    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(SlotOf) OP(NewStruct)
+    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NewStruct)
     OP(StructAdd) OP(FieldGet) OP(FieldSet) OP(CheckField) {
         if (!cold(*pc, proto, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();

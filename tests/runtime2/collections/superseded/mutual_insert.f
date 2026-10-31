@@ -1,0 +1,6 @@
+m := map()
+n := map()
+m.set(1, n)
+n.set(2, m)
+print(m.stringify())
+print(n.stringify())

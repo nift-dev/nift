@@ -5,7 +5,9 @@
 # CP12 D-018: one meaning in every context; differences only through the named policies of
 # tests/runtime2/vm_policies.py, and context-dependent legacy behaviour refused (`context:*`).
 arith.f vm 
-arrays.f vm 
+# D-NEXT-refsem #9: `b = a` then pushes through both (5/4 by copies) would print 5/5 once arrays are
+# references (predicted by the reference-semantics assessment): refused before execution (was: vm).
+arrays.f fallback reference-guard:shared
 control.f vm 
 fallback_args.f fallback unresolved-name
 # CP22: async functions and `await` run on the VM (tests/runtime2/cp22).
@@ -40,7 +42,9 @@ logic.f vm
 # CP25-R: print of an unknown-kind value now renders at run time (legacy succeeds); the next refusal is aliasing.
 objects.f fallback aliasing
 # CP14B D-040: exact independent-copy result is pinned by corpus(), without a general alias policy.
-replay_alias.f vm
+# D-NEXT-refsem #9 (Phase A forward-compatibility guard): the former D-040 witness `b := a; b.push(3)`
+# would change meaning when arrays become references; refused before execution (was: vm, approved copy).
+replay_alias.f fallback reference-guard:inflow
 # CP25-R: the arity mismatch raises legacy's fatal Error when reached, after "x" is printed.
 replay_arity.f vm-error callable argument count mismatch: f
 replay_bad_index.f vm-error JSON array index 2 is out of range

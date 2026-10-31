@@ -1,6 +1,8 @@
 #include "rt/vm_coro_ops.h"
 
 #include "HostTrace.h"
+#include "rt/aggregate.h"
+#include "rt/copy_graph.h"
 #include "rt/error.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
@@ -11,6 +13,7 @@
 #include <chrono>
 #include <limits>
 #include <utility>
+#include <vector>
 
 // rt-lint: cold-file coroutine opcodes: spawn, await, sleep, safepoints (off the arithmetic hot path)
 
@@ -35,6 +38,31 @@ bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& 
         return spawn_parallel(vm, in, callee, function, R, fault, thread);
     Coro& coro = *vm.coro_;
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
+    const auto index = coro.proto_index.find(callee);
+    if (index == coro.proto_index.end()) return internal(fault, "spawn proto");
+    // D-NEXT-refsem #5 (D7): the task receives the arguments and the globals
+    // it reads as ONE alias-preserving graph copy made here, at creation (the
+    // parallel path's seed: arguments aliased before the call alias one copy
+    // in the task, and nothing the task holds is reachable from the caller).
+    // Made before any task state exists: a budget stop or a failed
+    // allocation leaves the scheduler unchanged. Callables and handles keep
+    // their identity (the existing handle restrictions stay in force).
+    std::vector<Value> seeds;
+    const std::vector<std::uint16_t>& globals = coro.snapshot[index->second];
+    seeds.reserve(argc + globals.size());
+    for (std::uint16_t k = 0; k < argc; ++k) seeds.push_back(R[in.a + k]);
+    for (std::uint16_t slot : globals) seeds.push_back(slot < vm.stack_.size() ? vm.stack_[slot] : Value());
+    bool shared = false;
+    for (const Value& seed : seeds) shared = shared || may_contain_identity(seed);
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 12
+    shared = false;  // R12: cooperative tasks share the caller's references (no copy at spawn)
+#endif
+    if (shared) {
+        std::vector<Value> copies(seeds.size());
+        if (deep_copy_tuple(seeds.data(), seeds.size(), copies.data(), vm.heap_limit_) != CopyStatus::Ok)
+            return raise(fault, StopReason::Internal, "memory budget exceeded");
+        seeds.swap(copies);
+    }
     std::uint32_t id = 0;
     if (!coro.free_ids.empty()) {
         id = coro.free_ids.back();
@@ -47,13 +75,15 @@ bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& 
     const std::size_t g = coro.globals;
     task.stack.assign(g + callee->nregs + 1u, Value());
     task.ready.assign(vm.global_ready_.size(), 0);
-    const auto index = coro.proto_index.find(callee);
-    if (index == coro.proto_index.end()) return internal(fault, "spawn proto");
-    for (std::uint16_t slot : coro.snapshot[index->second]) {
-        if (slot < vm.stack_.size()) task.stack[slot] = vm.stack_[slot];
+    for (std::size_t k = 0; k < globals.size(); ++k) {
+        const std::uint16_t slot = globals[k];
+        if (slot < vm.stack_.size()) task.stack[slot] = std::move(seeds[argc + k]);
         if (slot < vm.global_ready_.size()) task.ready[slot] = vm.global_ready_[slot];
     }
-    for (std::uint16_t k = 0; k < argc; ++k) task.stack[g + k] = std::move(R[in.a + k]);
+    for (std::uint16_t k = 0; k < argc; ++k) {
+        task.stack[g + k] = std::move(seeds[k]);
+        R[in.a + k] = Value();
+    }
     task.frames.assign(1, Frame{&coro.trampoline.code[1], g, &coro.trampoline, nullptr, false});
     task.handlers.clear();
     task.function = function;

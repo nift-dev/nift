@@ -1,0 +1,3 @@
+--- stderr
+error: cycle_struct_catchable.f:5:5: assignment would create a cyclic reference: next
+--- exit 1

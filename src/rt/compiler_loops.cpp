@@ -182,4 +182,60 @@ bool UnitCompiler::for_finish(ForState& state) {
     return builder_ok();
 }
 
+// `while` (moved from compiler.cpp: rt-lint file length, D-NEXT-refsem D9).
+bool UnitCompiler::while_loop(const Node& node) {
+    // A `while` always runs on legacy's prepared evaluator (its condition and
+    // body), wherever it is; its condition must be one that evaluator accepts.
+    ++loop_depth_;
+    const bool saved_textual = textual_statement_;
+    textual_statement_ = false;
+    update_flags();
+    Loop loop;
+    loop.start = fb_->here();
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
+    loop.try_depth = try_scopes_.size();
+    loops_.push_back(loop);
+    std::vector<std::size_t> exits;
+    bool ok = false_jump(node.a, exits);
+    BlockRegs body_regs;
+    if (ok) {
+        scopes_.push();
+        const std::uint16_t mark = fb_->top();
+        body_regs = block_begin(node.b);
+        ok = statements(ast_.at(node.b));
+        block_end(body_regs);
+        fb_->release_to(mark);
+        scopes_.pop();
+    }
+    if (ok) {
+        // CP17 unwind release: clear the body at each iteration end (`continue` too) and at the exit.
+        fb_->set_offset(node.begin);
+        const std::size_t iteration_end = fb_->here();
+        block_clear(body_regs);
+        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);
+        const std::size_t back = fb_->emit(OpCode::Jmp);
+        fb_->patch(back, loops_.back().start);
+        for (std::size_t at : exits) fb_->patch(at, fb_->here());
+        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
+        block_clear(body_regs);
+    }
+    loops_.pop_back();
+    if (ok && !statement_preparable(node)) ok = fail(node, "prepared-unpreparable");
+    --loop_depth_;
+    textual_statement_ = saved_textual;
+    update_flags();
+    return ok && builder_ok();
+}
+
+bool UnitCompiler::loop_jump(const Node& node) {
+    if (loops_.empty()) return fail(node, "jump-outside-loop");
+    fb_->set_offset(node.begin);
+    const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
+    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
+    const std::size_t at = fb_->emit(OpCode::Jmp);
+    if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
+    else loops_.back().continues.push_back(at);
+    return builder_ok();
+}
+
 } // namespace nift::rt::detail

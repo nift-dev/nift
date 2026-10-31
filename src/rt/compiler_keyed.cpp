@@ -1,10 +1,11 @@
+#include "rt/compiler_keyed.h"
+
 #include "rt/compiler_expr.h"
 #include "rt/builtin_bind.h"
 #include "rt/collection.h"
 #include "rt/keyed.h"
 // rt-lint: cold-file compile-time map/set/stack method lowering (D-063)
 namespace nift::rt::detail {
-namespace {
 // The mutator of `name` on a receiver of exactly `kinds`, or -1.
 int keyed_mutator(KindSet kinds, std::string_view name) {
     using K = KeyedMethod;
@@ -40,7 +41,10 @@ int keyed_arity_of(KindSet kinds, std::string_view name, std::string& message) {
         return 0;
     }
     if (map && name == "set") { message = "set: expected key and value"; return 2; }
-    if (map && (name == "get" || name == "contains" || name == "remove")) { message = n + ": expected one key"; return 1; }
+    if (map && (name == "get" || name == "contains" || name == "remove")) {
+        message = n + ": expected one key";
+        return 1;
+    }
     if ((set && (name == "add" || name == "contains" || name == "remove")) || (stack && name == "contains")) {
         message = n + ": expected one value";
         return 1;
@@ -52,7 +56,6 @@ natives::Receiver keyed_receiver(KindSet kinds) {
     return kinds == kKindMap ? natives::Receiver::Map : kinds == kKindSet ? natives::Receiver::Set
                                                                           : natives::Receiver::Stack;
 }
-} // namespace
 
 // D-063: is `node` a call of a map/set/stack mutator (`m.set(k, v)`,
 // `s.add(v)`, `st.push(v)`, `.remove`, `.pop`, `.clear`)?
@@ -93,9 +96,8 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     }
     if (const int m = keyed_mutator(k, name); m >= 0) return keyed_mutation(node, dst, m) ? 1 : 0;
     if (const int m = keyed_read(k, name); m >= 0) return keyed_mutation(node, dst, m) ? 1 : 0;
-    if (k == kKindMap && name == "contains" && node.count == 1 &&
-        (kinds(ast_.list(node)[0]) & (kKindObject | kKindHandle | kKindShared | kKindTask)))
-        return fail(ast_.at(ast_.list(node)[0]), "collection-identity-key") ? 1 : 0;
+    if (k == kKindMap && name == "contains" && node.count == 1 && !key_kinds_ok(ast_.list(node)[0]))
+        return 0;
     const natives::BuiltinSpec* spec = natives::find_builtin(keyed_receiver(k), name);
     if (!spec && presentation)
         spec = natives::find_builtin(natives::Receiver::Any, name);
@@ -104,20 +106,31 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
 }
 
 // A key or member argument legacy accepts as a tagged string with identity
-// (a struct, a host or shared handle, a task) is not compiled: this VM
-// compares structs as values and holds handles as typed values. Keys of
-// other kinds behave alike (bool/number/string, collections structurally,
-// callables by identity; anything else is legacy's run-time error).
+// (a struct, a host or shared handle, a task) is not compiled: struct identity
+// keys are not established on the VM (D-NEXT-refsem #6 keeps the D-063
+// refusal) and handles are typed values here. D-NEXT-refsem #6: a mutable
+// collection (a shared reference whose contents may change after insertion,
+// which a hash index cannot follow) is refused as a key or member before any
+// effect, for lookups too; JavaScript-style identity keys are a future
+// design question. Ordinary keys (bool, number, string) and callables (by
+// identity) are unaffected; anything else is legacy's run-time error.
+bool UnitCompiler::key_kinds_ok(NodeId arg) {
+    const KindSet k = kinds(arg);
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 11)
+    if (k & kKindCollection) return fail(ast_.at(arg), "collection-mutable-key");
+#endif
+    if (k & (kKindObject | kKindStruct | kKindHandle | kKindShared | kKindTask))
+        return fail(ast_.at(arg), "collection-identity-key");
+    return true;
+}
+
 bool UnitCompiler::keyed_key_ok(const Node& node, int id) {
     using K = KeyedMethod;
     const auto m = static_cast<K>(id);
     const bool key = m == K::MapSet || m == K::MapRemove || m == K::SetAdd || m == K::SetRemove ||
                      m == K::MapGet || m == K::SetContains;
     if (!key || node.count == 0) return true;
-    const NodeId arg = ast_.list(node)[0];
-    if (kinds(arg) & (kKindObject | kKindHandle | kKindShared | kKindTask))
-        return fail(ast_.at(arg), "collection-identity-key");
-    return true;
+    return key_kinds_ok(ast_.list(node)[0]);
 }
 
 // A fallible read: the receiver is evaluated as a value (a copy), then the
@@ -144,26 +157,23 @@ bool UnitCompiler::keyed_read_call(const Node& node, std::uint16_t dst, int id) 
     return builder_ok();
 }
 
-// Same take / mutate / put lowering as UnitCompiler::array_mutation: the
-// arguments are evaluated first (so `m.set(1, m)` stores the receiver's value
-// before the write: a snapshot, never a cycle), then the collection is moved
-// out of its binding (an unshared collection is mutated in place; a shared
-// one is cloned by the value layer), mutated, and put back.
+// D-NEXT-refsem #1: the arguments are evaluated first, then the receiver
+// binding is read (a reference to the shared collection; nothing is taken
+// out of the binding, so a catchable error such as a refused reference cycle
+// leaves every binding as it was), and KeyedMutate changes the collection in
+// place, visibly through every alias.
 bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
     using namespace collection_slot;
-    const auto method = static_cast<KeyedMethod>(id);
     const std::string name(keyed_names[id]);
     const Node& receiver = ast_.at(ast_.at(node.a).a);
     if (receiver.kind != NodeKind::Ident) return fail(node, "method:" + name);  // legacy: bare bindings only
-    if (method >= kFirstKeyedRead) return keyed_read_call(node, dst, id);
+    if (static_cast<KeyedMethod>(id) >= kFirstKeyedRead) return keyed_read_call(node, dst, id);
     const Binding* found = find_binding(text(receiver));
     if (!found) return fail(node, "method:" + name);
-    const Binding binding = *found;
-    // Bounded subset: const collections and loop/selector bindings are refused
-    // (legacy's const check order and loop locations are not modelled).
-    if (binding.const_array || binding.const_scalar || binding.readonly) return fail(node, "collection-const");
-    if (binding.selector || binding.loop_binding || binding.lazy_for || binding.lazy_pair)
-        return fail(node, "collection-loop-binding");
+    // Bounded subset: const collections are refused (legacy's const check
+    // order is not modelled). A loop binding is the iterated element itself
+    // (legacy aliases it too), so its mutation reaches the container.
+    if (found->const_array || found->const_scalar || found->readonly) return fail(node, "collection-const");
     if (node.count != keyed_arity[id]) return fail(node, "builtin-arity:" + name);  // checked by the caller
     const NodeId* args = ast_.list(node);
     if (!keyed_key_ok(node, id)) return false;
@@ -175,45 +185,11 @@ bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
         if (!temp(reg)) return false;
         fb_->emit(OpCode::LoadNull, reg);
     }
-    auto read = [&]() -> bool {
-        std::uint16_t value = 0;
-        if (binding.global && !binding.cell) {
-            if (!global_take(binding, value, text(receiver))) return false;
-        } else if (binding.cell || binding.upvalue) {
-            if (!indexed_binding(binding, value)) return false;
-            std::uint16_t cell = 0;
-            if (!binding_cell(binding, cell)) return false;
-            fb_->emit(OpCode::CellTake, value, cell);
-        } else {
-            value = binding.reg;
-        }
-        fb_->emit(OpCode::Move, state + Source, value);
-        fb_->emit(OpCode::LoadNull, value);
-        return true;
-    };
-    auto put = [&]() -> bool {
-        if (binding.global) global_put(binding, state + Source);
-        else if (binding.cell || binding.upvalue) {
-            if (!store_indexed_binding(binding, state + Source)) return false;
-        } else fb_->emit(OpCode::Move, binding.reg, state + Source);
-        fb_->emit(OpCode::LoadNull, state + Source);
-        return true;
-    };
-#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 3
-    if (!read()) return false;  // M3: the binding is taken before the arguments run (no snapshot)
-#endif
     if (node.count > 0 && !expr_to(args[0], state + Item)) return false;
     if (node.count > 1 && !expr_to(args[1], state + Returned)) return false;
-#if !(defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 3)
-    if (!read()) return false;
-#endif
+    if (!expr_to(ast_.at(node.a).a, state + Source)) return false;
     fb_->set_offset(collection_offset(node));
     fb_->emit(OpCode::KeyedMutate, state, static_cast<std::uint16_t>(id), 0);
-#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 4
-    fb_->emit(OpCode::LoadNull, state + Source);  // M4: the mutated value is never put back
-#endif
-    if (!put()) return false;
-    static_cast<void>(method);
     fb_->emit(OpCode::Move, dst, state + Result);
     for (std::uint16_t k = 0; k < Count; ++k) fb_->emit(OpCode::LoadNull, state + k);
     fb_->release_to(mark);

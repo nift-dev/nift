@@ -1,0 +1,3 @@
+--- stderr
+error: thread_alias.f:4:6: thread: argument contains a non-transferable resource
+--- exit 1

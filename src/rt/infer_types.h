@@ -35,6 +35,11 @@ struct Ty {
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none;
     // -2: instances of different structs, or an instance and other values).
     int struct_id = -1;
+    // D-NEXT-refsem: for a map/set/stack, the allocation sites (the node of a
+    // `map()`/`set()`/`stack()` call or a struct field initialiser) the
+    // collection may come from, sorted. Empty for a collection of unknown
+    // origin. Contents are tracked per site (Inference::contents).
+    std::vector<std::uint32_t> sites;
 };
 
 const TyRef& empty_ty();
@@ -43,6 +48,8 @@ const TyRef& top_ty();
 // The value of something the compiler refuses anyway (kKindUnknown).
 const TyRef& any_ty();
 TyRef kinds_ty(KindSet kinds);
+// D-NEXT-refsem: a new map/set/stack (`kinds`) from allocation site `site`.
+TyRef collection_ty(KindSet kinds, std::uint32_t site);
 TyRef with_text_number(const TyRef&,bool maybe);
 TyRef unite(const TyRef& a, const TyRef& b, int depth = 0);
 bool same(const TyRef& a, const TyRef& b);
@@ -74,5 +81,8 @@ bool holds_future(const TyRef& t, int depth = 0);
 // D-063: whether `t` is or may contain a map, set or stack at any depth (top
 // and struct instances included: their fields are not tracked here).
 bool holds_collection(const TyRef& t, int depth = 0);
+// D-NEXT-refsem: whether an element, item or member of `t` may be an array or
+// object (or anything).
+bool holds_aggregate_below(const TyRef& t);
 
 } // namespace nift::rt::infer_detail

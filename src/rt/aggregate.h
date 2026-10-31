@@ -1,7 +1,10 @@
 #pragma once
-// Copy-on-write aggregates (CP09; D-040): arrays, insertion-ordered objects
-// and struct instances, all with value semantics.
+// Aggregates (CP09; D-040; D-NEXT-refsem): copy-on-write arrays and
+// insertion-ordered objects with value semantics, and struct instances, which
+// are identity-bearing references mutated in place (D-NEXT-refsem #1, Phase A).
+// Map/set/stack collections, also references, are in rt/aggregate_collection.h.
 //
+// Arrays and objects:
 // Reading never copies. Mutation goes through array_mut/object_mut (or the
 // helpers below), which first make the aggregate unshared: if another Value
 // holds the same object, the receiver gets a shallow clone (children are
@@ -54,9 +57,13 @@ const Value* object_get(const Value& object, Atom key);
 void object_set(Value& object, Atom key, Value value);
 bool object_remove(Value& object, Atom key);
 
-// Struct instances (D-040 V9): fields in declaration order (private ones
-// included). struct_add_field is for construction; struct_set replaces an
-// existing field and returns false when the struct has no such field.
+// Struct instances (D-NEXT-refsem #1): fields in declaration order (private
+// ones included). Every Value holding an instance refers to the same object:
+// struct_set and struct_slot_mut mutate it in place, visibly through every
+// alias (never cloned). struct_add_field is for construction; struct_set
+// replaces an existing field and returns false when the struct has no such
+// field. A store that would make the instance reachable from itself must be
+// refused by the caller before it is made (rt/value_cycle.h).
 Value make_struct(Atom type_name, std::size_t reserve = 0);
 Atom struct_type(const Value& instance);
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
@@ -76,47 +83,26 @@ Value* array_slot_mut(Value& array, std::size_t index);
 Value* object_slot_mut(Value& object, Atom key);
 Value* struct_slot_mut(Value& instance, Atom field);
 
-// Weekend collections (D-063): map(), set() and stack() values. Same
-// copy-on-write and reference contract as arrays: every mutator below unshares
-// first (a shared collection is cloned shallowly; nested values stay shared
-// until they are mutated themselves), so copies are deep in effect and never
-// observably share. Map keys and set members must be bool, number or string
-// (the caller checks; legacy's error texts). Keys compare with rt::equal
-// (1 == 1.0, "1" != 1, true != 1, NaN never matches, so each NaN is new).
-Value make_collection(CollectionKind kind);
-CollectionKind collection_kind(const Value& collection);
-// Entries for a map, members/elements otherwise.
-std::size_t collection_size(const Value& collection);
-const std::vector<Value>& collection_items(const Value& collection);
-// Map/set: the entry (map) or member (set) position of `key`, or -1.
-std::ptrdiff_t collection_find(const Value& collection, const Value& key);
-// Map: insert at the end or replace the value in place (position kept).
-void map_set(Value& map, Value key, Value value);
-// Set: append `member` unless an equal member is present.
-void set_add(Value& set, Value member);
-// Map/set: erase entry/member `position` (order of the others kept).
-void collection_erase(Value& collection, std::size_t position);
-void stack_push(Value& stack, Value item);
-void stack_pop(Value& stack);
-void collection_clear(Value& collection);
-const char* collection_kind_name(CollectionKind kind);
-// Rebuilds the key index from `items` (decoders that fill items directly).
-void rebuild_collection_index(CollectionObject& collection);
-
-// Makes `value` (Array, Object, Struct or Collection) uniquely owned; returns
-// true if it cloned. The clone keeps the identity summary bit.
+// Makes an Array or Object `value` uniquely owned; returns true if it cloned.
+// The clone keeps the identity summary bit. Structs and collections are
+// references and are never unshared (returns false).
 bool unshare(Value& value);
 
-// O(1): a callable, a handle, or an aggregate whose identity summary bit is
-// set. False means the value certainly contains no callable or handle, so
-// storing it can never close a cycle (D-040 V16).
+// O(1): an identity-bearing value (a callable, a handle, a cell, a future, a
+// struct instance or a collection: D-NEXT-refsem makes the last two shared
+// references), or an array/object whose identity summary bit is set. False
+// means the value certainly is and contains no identity-bearing value, so
+// storing it can never close a cycle (D-040 V16, D-NEXT-refsem #4).
 inline bool may_contain_identity(const Value& value) noexcept {
     switch (value.kind()) {
-        case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: return true;
-        case Kind::Array: case Kind::Object: case Kind::Struct: case Kind::Collection:
-            return may_hold_identity(value.heap());
+        case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: case Kind::Struct:
+        case Kind::Collection:
+            return true;
+        case Kind::Array: case Kind::Object: return may_hold_identity(value.heap());
         default: return false;
     }
 }
 
 } // namespace nift::rt
+
+#include "rt/aggregate_collection.h"  // IWYU pragma: export

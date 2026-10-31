@@ -4,6 +4,7 @@
 #include "rt/session_shape.h"
 
 #include "rt/compiler_coro.h"
+#include "rt/reference_guard.h"
 #include "rt/compiler_coro_admit.h"
 #include "rt/compiler_handles.h"
 
@@ -193,50 +194,6 @@ bool UnitCompiler::if_chain(const Node& node) {
     return other_ok && builder_ok();
 }
 
-bool UnitCompiler::while_loop(const Node& node) {
-    // A `while` always runs on legacy's prepared evaluator (its condition and
-    // body), wherever it is; its condition must be one that evaluator accepts.
-    ++loop_depth_;
-    const bool saved_textual = textual_statement_;
-    textual_statement_ = false;
-    update_flags();
-    Loop loop;
-    loop.start = fb_->here();
-    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
-    loop.try_depth = try_scopes_.size();
-    loops_.push_back(loop);
-    std::vector<std::size_t> exits;
-    bool ok = false_jump(node.a, exits);
-    BlockRegs body_regs;
-    if (ok) {
-        scopes_.push();
-        const std::uint16_t mark = fb_->top();
-        body_regs = block_begin(node.b);
-        ok = statements(ast_.at(node.b));
-        block_end(body_regs);
-        fb_->release_to(mark);
-        scopes_.pop();
-    }
-    if (ok) {
-        // CP17 unwind release: clear the body at each iteration end (`continue` too) and at the exit.
-        fb_->set_offset(node.begin);
-        const std::size_t iteration_end = fb_->here();
-        block_clear(body_regs);
-        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);
-        const std::size_t back = fb_->emit(OpCode::Jmp);
-        fb_->patch(back, loops_.back().start);
-        for (std::size_t at : exits) fb_->patch(at, fb_->here());
-        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
-        block_clear(body_regs);
-    }
-    loops_.pop_back();
-    if (ok && !statement_preparable(node)) ok = fail(node, "prepared-unpreparable");
-    --loop_depth_;
-    textual_statement_ = saved_textual;
-    update_flags();
-    return ok && builder_ok();
-}
-
 bool UnitCompiler::return_statement(const Node& node) {
     fb_->session_returns |= node.a == kNoNode ? kKindNull : kinds(node.a);
     const auto end_tries = [this, &node] {
@@ -254,7 +211,7 @@ bool UnitCompiler::return_statement(const Node& node) {
     // anything runs (M14 drops it).
 #if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 14
     if (expression_result_ && !in_function_ && unit_makes_collections() &&
-        ((kinds(node.a) & kKindCollection) || kinds_.collection_holders.count(node.a)))
+        ((kinds(node.a) & kKindTagged) || kinds_.collection_holders.count(node.a)))
         return fail(ast_.at(node.a), session_ ? "session:collection-result" : "eval:collection-result");
 #endif
     if ((!expression_result_ || in_function_) && !no_alias(node.a, node)) return false;
@@ -280,17 +237,6 @@ bool UnitCompiler::return_statement(const Node& node) {
     fb_->set_offset(node.begin);
     fb_->emit(in_function_ ? OpCode::Return : OpCode::TopReturn, value);
     return true;
-}
-
-bool UnitCompiler::loop_jump(const Node& node) {
-    if (loops_.empty()) return fail(node, "jump-outside-loop");
-    fb_->set_offset(node.begin);
-    const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
-    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
-    const std::size_t at = fb_->emit(OpCode::Jmp);
-    if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
-    else loops_.back().continues.push_back(at);
-    return builder_ok();
 }
 
 } // namespace detail
@@ -377,6 +323,12 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
                 result.offset = probe.offset(); result.positioned = probe.positioned();
             }
         }
+        return result;
+    }
+    // D-NEXT-refsem: the Phase A forward-compatibility guard (reference_guard.h),
+    // on a unit the compiler otherwise admits (earlier refusals keep their reason).
+    if (!check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset)) {
+        result.positioned = true;
         return result;
     }
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks

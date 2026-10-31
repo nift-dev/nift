@@ -59,7 +59,7 @@ bool UnitCompiler::declare(const Node& node) {
                           : plan_.struct_index.end();
     if (made != plan_.struct_index.end()) {
         binding.struct_id = static_cast<int>(made->second);
-        if (!struct_construct(node, binding.struct_id, reg)) return false;
+        if (!struct_construct(ast_.at(node.b), binding.struct_id, reg)) return false;
     } else if (!no_alias(node.b, node) || !expr_to(node.b, reg)) {
         return false;
     }
@@ -148,6 +148,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         const StructFieldInfo* field = nullptr;
         if (s >= 0) return field_access_ok(target, s, text(ast_.at(target.b)), is_this, field) &&
                            field_assign(node, target.a, *field);
+        if (kinds(target.a) & kKindStruct) return fail(target, "struct-value");  // D-NEXT-refsem: unproved struct
         return fail(node, "static-error:member-assign");  // plain objects reject it
     }
     if (target.kind == NodeKind::Index) {

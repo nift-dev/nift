@@ -8,7 +8,8 @@
 //       mutation is a deterministic use-after-free.
 //
 //   value_round2            run the checks
-//   value_round2 stale-array | stale-object | stale-string
+//   value_round2 stale-array | stale-object | stale-string | stale-map | stale-set |
+//                stale-stack | stale-struct | stale-large-array
 //                           deliberately use a stale reference; under
 //                           AddressSanitizer this must abort (the sanitizer
 //                           target expects a failure exit)
@@ -161,6 +162,38 @@ int stale(const std::string& what) {
         const Value* held = object_get(o, atom("k"));
         object_set(o, atom("k"), I(2));
         std::printf("%lld\n", static_cast<long long>(held->as_int()));
+    } else if (what == "stale-map") {  // D-NEXT-refsem: collections are mutated in place, still relocated
+        Value m = make_collection(CollectionKind::Map);
+        map_set(m, I(1), make_string("a value long enough for the heap"));
+        const Value& held = collection_items(m)[1];
+        map_set(m, I(2), I(2));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-set") {
+        Value s = make_collection(CollectionKind::Set);
+        set_add(s, make_string("a member long enough for the heap"));
+        const Value& held = collection_items(s)[0];
+        set_add(s, I(2));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-stack") {
+        Value k = make_collection(CollectionKind::Stack);
+        stack_push(k, make_string("an element long enough for the heap"));
+        const Value& held = collection_items(k)[0];
+        stack_push(k, I(2));
+        std::printf("%zu\n", string_view_of(held).size());
+    } else if (what == "stale-struct") {  // an instance is mutated in place (a reference), still relocated
+        Value p = make_struct(atom("P"));
+        struct_add_field(p, atom("v"), make_string("a field long enough for the heap"));
+        Value alias = p;
+        const Value* held = struct_get(p, atom("v"));
+        struct_set(alias, atom("v"), I(2));
+        std::printf("%zu\n", string_view_of(*held).size());
+    } else if (what == "stale-large-array") {  // D9 amortised schedule: within size / 256 + 1 mutations
+        Value a = make_array();
+        array_push(a, make_string("an element long enough for the heap"));
+        for (int k = 1; k < 1000; ++k) array_push(a, I(k));
+        const Value& held = array_items(a)[0];
+        for (int k = 0; k < 8; ++k) array_push(a, I(k));
+        std::printf("%zu\n", string_view_of(held).size());
     } else if (what == "stale-string") {
         Value s = make_string(std::string(40, 's'));
         const std::string_view held = string_view_of(s);

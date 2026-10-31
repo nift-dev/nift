@@ -21,7 +21,10 @@ void cut(Value& v) noexcept {
         case Kind::Array: v.heap_as<ArrayObject>()->items.clear(); break;
         case Kind::Object: v.heap_as<ObjectObject>()->entries.clear(); break;
         case Kind::Struct: v.heap_as<StructObject>()->fields.clear(); break;
-        case Kind::Collection: v.heap_as<CollectionObject>()->items.clear(); v.heap_as<CollectionObject>()->index.clear(); break;
+        case Kind::Collection:
+            v.heap_as<CollectionObject>()->items.clear();
+            v.heap_as<CollectionObject>()->index.clear();
+            break;
         case Kind::Function: v.heap_as<FunctionObject>()->upvalues.clear(); break;
         case Kind::Cell: v.heap_as<CellObject>()->value = Value(); break;
         case Kind::Error: v.heap_as<ErrorObject>()->cause = Value(); break;

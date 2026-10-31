@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Weekend collections (D-063): map/set/stack values on the VM.
+"""Weekend collections (D-063): map/set/stack on the VM. Reference semantics
+(D-NEXT-refsem) superseded the value-semantics parts; their evidence is kept in
+collections/superseded/ (INDEX.tsv), never run.
 
   weekend_collections.py --nift ./nift            # the suite (make test-runtime2-collections)
   weekend_collections.py --nift ./nift --update   # rewrite the approved/*.vm and *.legacy goldens
@@ -21,9 +23,10 @@ Contract: docs/runtime-2/checkpoints/weekend-collections.md.
                 statement runs no part of itself (earlier statements' output
                 stays, nothing later runs, exit 1, reason and position), and
                 admitted collection units match legacy.
-  heap          budget stops before growth (map, set, stack, and the clone of a
-                shared collection), exact peak accounting, and the live heap at
-                stop back to an identical program's that never filled them.
+  heap          budget stops before growth (map, set, stack; a shared map is
+                mutated in place, D-NEXT-refsem), exact peak accounting, and the
+                live heap at stop back to an identical program's that never
+                filled them.
 
 Exit 0 when every check passes. A mutant binary must make it fail (mutants.sh).
 """
@@ -190,15 +193,18 @@ def main():
         # ---- heap accounting ----
         heap = os.path.join(HERE, "heap")
         for fname, budget in (("budget_map.f", 2_000_000), ("budget_set.f", 2_000_000),
-                              ("budget_stack.f", 2_000_000), ("budget_clone.f", 2_750_000)):
+                              ("budget_stack.f", 2_000_000)):
             vo, ve, vr, st = run(nift, os.path.join(heap, fname), "require", work, budget=budget)
             check(vr == 70 and "memory budget exceeded" in ve and "done" not in vo,
                   "heap %s: expected the budget stop (exit 70), got exit %d %r %r" % (fname, vr, vo, ve[:200]))
             vo, ve, vr, st = run(nift, os.path.join(heap, fname), "require", work)
             check(vr == 0 and vo.endswith("done\n"), "heap %s: unbounded run failed: %d %r" % (fname, vr, ve[:200]))
-        # The same map without the copy fits the budget: the stop above is the clone's.
-        vo, ve, vr, st = run(nift, os.path.join(heap, "budget_noclone.f"), "require", work, budget=2_750_000)
-        check(vr == 0 and vo == "done\n", "heap budget_noclone.f: expected to fit the budget: %d %r" % (vr, ve[:200]))
+        # D-NEXT-refsem #1 (superseding the D-063 clone stop): a shared map is
+        # mutated in place, so `b := a; b.set(...)` fits the budget of the
+        # same map without the copy (budget_noclone.f): no clone is ever made.
+        for fname in ("budget_clone.f", "budget_noclone.f"):
+            vo, ve, vr, st = run(nift, os.path.join(heap, fname), "require", work, budget=2_750_000)
+            check(vr == 0 and vo == "done\n", "heap %s: expected to fit the budget: %d %r" % (fname, vr, ve[:200]))
         vo, ve, vr, st = run(nift, os.path.join(heap, "peak_map.f"), "require", work)
         peak = st.get("heap_peak", 0) if st else 0
         # 20000 entries: two 16-byte Values each, at least 640000 bytes of item storage.

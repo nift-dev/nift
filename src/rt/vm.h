@@ -261,6 +261,13 @@ private:
     bool origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
     bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
     bool op_keyed_mutate(const Instr&, Value*, Fault&, const Proto*);  // D-063 (vm_keyed.cpp)
+    bool reserve_snapshot(std::size_t n, Fault& fault);  // D5 loop snapshots (vm_iter.cpp)
+    // D-NEXT-refsem #4 (vm_keyed.cpp): true (and nothing stored) when storing
+    // `stored` into the struct instance or collection `receiver` would close a
+    // reference cycle; raises the catchable runtime.reference_cycle Error with
+    // `legacy_text` when legacy refuses the same store, else the generic text.
+    bool refuse_reference_cycle(Fault& fault, const Proto* proto, const Instr& in, const HeapObject* receiver,
+                                const Value& stored, const std::string& legacy_text);
     bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,
                           Fault& fault);
     bool collection(const Instr&,Value*,Fault&,const Proto*);
@@ -285,8 +292,8 @@ private:
     bool op_iter(const Instr& in, Value* R, const Proto* proto, Fault& fault);
     bool native(const Instr& in, const Proto* proto, Value* R, std::string& output, Fault& fault);
     bool builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault);  // CP14 built-ins
-    Value* struct_location(std::int64_t);
-    bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault);  // vm_struct.cpp
+    bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault,
+                   const Proto* proto);  // vm_struct.cpp
     void flush_if_needed(std::string& output);
     void drain_parallel_output(std::string& output);
     void finish_run(VmResult& result, std::string& output);

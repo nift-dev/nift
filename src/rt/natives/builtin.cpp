@@ -36,7 +36,7 @@ constexpr NativeFn kFunctions[] = {
     fn_is_object, fn_is_struct, fn_is_function, fn_is_collection, fn_is_enum,
     num_to_int, num_abs, num_floor, num_ceil, num_round,
     fn_bytes, str_encode, bytes_length, bytes_size, bytes_empty, bytes_slice, bytes_decode, fn_sha256,
-    fn_validate, fn_copy, fn_copy,
+    fn_validate, fn_copy, fn_deepcopy,
     host_open, host_open_bytes, host_cat, host_sha256_file,
     host_exists, host_is_file, host_is_dir, host_stat,
     host_ls, host_pwd, host_cd, host_touch, host_mkdir, host_mkdir, host_remove, host_remove,
@@ -140,6 +140,8 @@ bool is_recoverable_code(std::string_view code) {
     if (code == "runtime.cancelled" || code == "runtime.channel_closed" ||
         code == "runtime.atomic_overflow" || code == "runtime.invalid_argument")
         return true;
+    // D-NEXT-refsem #4: a refused reference cycle (the receiver is unchanged).
+    if (code == "runtime.reference_cycle") return true;
     // CP17 handle statuses classed Recoverable (D-035 runtime.handle_closed).
     if (handle_code_recoverable(code)) return true;
     for (std::uint16_t i = 0; i < static_cast<std::uint16_t>(BuiltinId::Count); ++i)

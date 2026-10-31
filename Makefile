@@ -540,7 +540,7 @@ test-rt-value-sanitize:
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-round2"
 	# Reference safety is enforced: a reference held across a mutation must abort.
-	for m in stale-array stale-object stale-string; do \
+	for m in stale-array stale-object stale-string stale-map stale-set stale-stack stale-struct stale-large-array; do \
 		if ASAN_OPTIONS=detect_leaks=0 "$(TEST_DIR)/rt-san/value-round2" $$m 2>"$(TEST_DIR)/rt-san/$$m.log"; then \
 			echo "FAIL: stale reference ($$m) not detected"; exit 1; fi; \
 		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
@@ -592,7 +592,7 @@ $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
 $(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
 
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
@@ -617,7 +617,7 @@ test-rt-handles-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
 		-o "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-box-unit"
@@ -3277,7 +3277,7 @@ test: test-call-semantics
 # ASan+UBSan build. Linked against the CP09 value model only (not the CP12
 # compiler/VM). RT_BUILTINS_LEGACY: the legacy nift binary used as oracle.
 RT_BUILTINS_LEGACY ?= $(CURDIR)/$(TARGET)
-RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp compare.cpp \
+RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp compare.cpp \
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
@@ -3344,7 +3344,7 @@ bench-rt-case-conversion: $(RT_CASE_BENCH)
 # natives with the CP09 value model WITHOUT RuntimeValue.cpp, legacy_bridge.cpp
 # and render.cpp (a call into them fails the link), and the sources must not
 # include their headers.
-RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp \
+RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp \
 	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp $(RT_BUILTINS_HOST)
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
@@ -4562,7 +4562,7 @@ test-cp23-certify: test-runtime2-cp23-tsan
 endif
 CERTIFY_RUNTIME2_GATES += test-cp23-certify
 certify-targets: test-cp23-certify
-# Weekend collections (D-063): map/set/stack values on the VM.
+# Weekend collections (D-063; reference semantics since D-NEXT-refsem): map/set/stack on the VM.
 .PHONY: test-runtime2-collections test-runtime2-collections-mutants
 test-runtime2-collections: $(TARGET)
 	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TARGET)"
@@ -4577,6 +4577,19 @@ test-runtime2-collections-tsan: $(TSAN_TARGET)
 	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm: test-runtime2-collections test-runtime2-collections-mutants
 test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collections-tsan
+# Reference semantics, Phase A (D-NEXT-refsem): maps, sets, stacks and struct
+# instances are references; cycles refused; copy/deepcopy; the Phase B guard.
+.PHONY: test-runtime2-refsem test-runtime2-refsem-mutants test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+test-runtime2-refsem: $(TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-refsem-mutants: $(TARGET) $(LIBFFI_A)
+	REFSEM_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/refsem/mutants.sh "$(CURDIR)/$(TARGET)"
+test-runtime2-refsem-sanitize: $(SAN_TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-refsem-tsan: $(TSAN_TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm: test-runtime2-refsem test-runtime2-refsem-mutants
+test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
 # VM-default policy: the VM is the default scripting engine with no silent
 # legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
 # interpreter; NIFT_VM=1 still falls back; any other value, empty included, is

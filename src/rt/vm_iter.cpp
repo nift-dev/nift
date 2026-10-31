@@ -2,6 +2,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/atom.h"
+#include "rt/natives/support.h"
 #include "rt/string.h"
 
 // Default `for` iterator opcodes (CP12C slice 2). The iterator itself lives in
@@ -19,6 +20,16 @@ const Note* note_at(const Proto* proto, const Instr* pc) {
 }
 } // namespace
 
+// D5 snapshots (D-NEXT-refsem): the budget for `n` copied Values (and a
+// map's index) before the copy is made, so a budget stop leaves nothing half
+// built (the VM's ordinary budget stop text).
+bool Vm::reserve_snapshot(std::size_t n, Fault& fault) {
+    natives::Context context;
+    context.heap_limit = heap_limit_;
+    if (natives::reserve_result(context, n * (2 * sizeof(Value) + sizeof(std::uint32_t)) + 128)) return true;
+    return raise(fault, StopReason::Internal, "memory budget exceeded");
+}
+
 bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
     Value& source = R[in.a];
     // D-063: the loop's snapshot of a set or stack becomes the array legacy
@@ -27,7 +38,17 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
     if (source.is(Kind::Collection)) {
         const CollectionKind kind = collection_kind(source);
         if (kind == CollectionKind::Map) {
-            if (in.b == 1) return true;
+            if (in.b == 1) {
+                // D5 (D-NEXT-refsem #6): the loop iterates the entries at loop
+                // entry. The map is a shared reference that the body may
+                // mutate in place, so the snapshot is an explicit shallow copy
+                // (O(n), budget-checked), never the live object.
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 8)
+                if (!reserve_snapshot(collection_items(source).size(), fault)) return false;
+                source = collection_shallow_clone(source);  // R[a] is the loop's own snapshot register
+#endif
+                return memory_ok(fault);
+            }
             if (in.b == 0 || in.b == 5)
                 return raise(fault, StopReason::Error, "map @for syntax is @for((key, val) : map){...}");
             return internal(fault, "for mode over a map");
@@ -35,6 +56,7 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
         if (in.b != 0)  // the pair form (or its forced error): legacy's array message, nothing converted
             return raise(fault, StopReason::Error, "array @for syntax is @for(item : array){...}");
         const auto& items = collection_items(source);
+        if (!reserve_snapshot(items.size(), fault)) return false;
         Value array = make_array(items.size());
 #if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 7
         const bool reverse = false;  // M7: a stack iterated bottom first

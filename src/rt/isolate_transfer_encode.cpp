@@ -57,7 +57,12 @@ private:
         if (!value.is_heap()) return add_inline(value, id, error);
         const HeapObject* object = value.heap();
         const auto found = seen_.find(object);
-        if (found != seen_.end()) { id = found->second; return TransferStatus::Ok; }
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 15
+        const bool alias = found != seen_.end() && !value.is(Kind::Collection) && !value.is(Kind::Struct);  // R15
+#else
+        const bool alias = found != seen_.end();
+#endif
+        if (alias) { id = found->second; return TransferStatus::Ok; }
         Node node;
         switch (value.kind()) {
             case Kind::Decimal:

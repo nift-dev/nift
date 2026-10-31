@@ -19,9 +19,8 @@ void Inference::for_statement(const Node& n) {
                         ((pair && object) || (!pair && array));
     TyRef value = kinds_ty(kKindScalar);
     if (normal) {
-        value = keyed ? element_of(source, nullptr, false)
+        value = keyed ? contents(source, false)  // D-NEXT-refsem: per-kind contents
                       : pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
-        if (source->kinds == kKindSet) value = set_members(source);
         if (!value || value->kinds == 0) value = kinds_ty(kKindUnknown);
         result_.elements[iterable] |= value->kinds;
     }

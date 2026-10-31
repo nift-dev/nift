@@ -31,11 +31,9 @@ public:
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
     std::uint32_t offset() const { return offset_; } bool positioned() const { return positioned_; }
-    // kKindUnknown (something the compiler refuses anyway) is never treated
-    // as acceptable (review CP12 round 1, D1). A unit whose refusal involved
-    // it is compiled a second time in probe mode, where Unknown defers as
-    // before, only to report the underlying refusal reason; the probe's
-    // program is discarded even if it compiles (compiler.cpp).
+    // kKindUnknown (something the compiler refuses anyway) is never treated as acceptable (review CP12 round 1, D1).
+    // A unit whose refusal involved it is compiled a second time in probe mode, where Unknown defers as before, only
+    // to report the underlying refusal reason; the probe's program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
     void set_session(SessionCompileContext* session);
@@ -107,15 +105,16 @@ private:
     bool keyed_mutation(const Node& node, std::uint16_t dst, int method);
     bool keyed_read_call(const Node& node, std::uint16_t dst, int method);
     bool keyed_key_ok(const Node& node, int method);
+    bool key_kinds_ok(NodeId key);  // D-NEXT-refsem #6
     bool keyed_mutator_call(const Node& node);
-    bool unit_makes_collections() const { return plan_.collections; }  // D-063 (resolver.h)
+    // D-063 (resolver.h), D-NEXT-refsem: the unit may hold a legacy-tagged value.
+    bool unit_makes_collections() const { return plan_.collections || !plan_.structs.empty(); }
     bool collection_inspection_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver);
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);
     bool error_member_access(const Node& node, std::uint16_t dst, NodeId receiver);
-    // CP22 coroutine units (compiler_coro.cpp): Call or Spawn for function f;
-    // `type(future)` and `sleep(ms)` (-1: not handled, 0 refused, 1 compiled);
-    // `.done()`/`.status()` on a future (same convention); `await e`.
+    // CP22 coroutine units (compiler_coro.cpp): Call or Spawn for function f; `type(future)` and `sleep(ms)` (-1: not
+    // handled, 0 refused, 1 compiled); `.done()`/`.status()` on a future (same convention); `await e`.
     OpCode call_opcode(std::size_t f) const;
     int coro_call(const Node& node, std::string_view name, const natives::BuiltinSpec* builtin, std::uint16_t dst);
     int future_method(const Node& node, std::uint16_t dst);
@@ -166,16 +165,14 @@ private:
     // CP15B: lower an interpolated String node (children: StringPart/literal
     // text and expressions) into existing string operations.
     bool interpolation(const Node& node, std::uint16_t dst);
-    // Conservative local scalar proof for interpolation parts. The unit kind
-    // inference does not visit String children (infer*.cpp is not ours), so
-    // this uses bindings, literals, operators, native result rules and simple
+    // Conservative local scalar proof for interpolation parts. The unit kind inference does not visit String children
+    // (infer*.cpp is not ours), so this uses bindings, literals, operators, native result rules and simple
     // user-function returns. kKindUnknown means "not proven".
     KindSet interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
                                          bool literal_only) const;
     KindSet interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
-    // Literal/operator-only kinds for a callee return expression: never
-    // resolves an identifier through the caller's scopes and never follows a
-    // call. Used only by interpolation_function_kind (F1).
+    // Literal/operator-only kinds for a callee return expression: never resolves an identifier through the caller's
+    // scopes and never follows a call. Used only by interpolation_function_kind (F1).
     KindSet interpolation_literal_kind(NodeId id) const;
     KindSet interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
@@ -227,10 +224,9 @@ private:
     bool text_type_of(const TextType& type, const Node& at, std::uint16_t& operand);
     bool text_type_operand(NodeId value, std::uint16_t& operand);
     bool pass_param_types(std::size_t f, std::uint32_t argc, const NodeId* args, std::uint16_t base);
-    // compiler_rules.cpp: legacy contexts and kind checks (CP12, D-018)
-    // Code legacy runs on its prepared evaluator: a loop region of this
-    // function (except statements legacy runs textually), or anywhere in a
-    // function called from such code.
+    // compiler_rules.cpp: legacy contexts and kind checks (CP12, D-018) Code legacy runs on its prepared evaluator: a
+    // loop region of this function (except statements legacy runs textually), or anywhere in a function called from
+    // such code.
     bool loop_region() const { return loop_depth_ > 0 && !textual_statement_; }
     bool loop_reachable() const {  // CP12b: struct methods count as called from loops (conservative)
         return loop_region() || (!in_lambda_ && in_function_ &&
@@ -241,10 +237,9 @@ private:
     // the value (kinds) in scope `scope` (functions 0..n-1, main n).
     bool may_double(const TextType& type, std::size_t scope) const;
     bool type_mismatch_possible(const TextType& type, KindSet kinds, std::size_t scope) const;
-    // Can the binding-type check of an assignment of a value of kinds
-    // `value` to binding `b` fail? Legacy words that error differently in
-    // loop code (D-018c), so such loop code is refused
-    // (context:assignment-error, review round 2).
+    // Can the binding-type check of an assignment of a value of kinds `value` to binding `b` fail? Legacy words that
+    // error differently in loop code (D-018c), so such loop code is refused (context:assignment-error, review round
+    // 2).
     bool binding_error_possible(const Binding& b, KindSet value) const;
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
     // Where an error raised by `node` is reported: its own start (D-018c).
@@ -280,9 +275,8 @@ private:
     bool temp(std::uint16_t& reg);
     bool operand_window(std::uint16_t base, std::uint32_t count);
     bool window_value(NodeId value, std::uint16_t dst);
-    // CP12b globals (compiler_globals.cpp): the binding of `name` in the code
-    // being compiled: a local, or (in a function) the top-level binding a
-    // resolved free name denotes (Binding::global); nullptr otherwise.
+    // CP12b globals (compiler_globals.cpp): the binding of `name` in the code being compiled: a local, or (in a
+    // function) the top-level binding a resolved free name denotes (Binding::global); nullptr otherwise.
     const Binding* find_binding(std::string_view name) const;
     const Binding* find_lambda_binding(std::string_view name) const;
     void note_global_declaration(const Node& node, const Binding& binding);
@@ -297,20 +291,19 @@ private:
     bool global_take(const Binding& b, std::uint16_t& reg, std::string_view name = {});
     void global_put(const Binding& b, std::uint16_t reg);
     std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
-    // CP12b structs (compiler_structs.cpp): instances live in bindings and are
-    // used only as receivers of their fields and methods (no copies, so
-    // legacy's references and the VM's values never differ).
-    // Legacy's loop evaluator fails on struct field access (L42) in loop
-    // bodies and in functions called from loops; a method's own body is
+    // CP12b structs (compiler_structs.cpp): instances live in bindings and are used only as receivers of their fields
+    // and methods (no copies, so legacy's references and the VM's values never differ). Legacy's loop evaluator fails
+    // on struct field access (L42) in loop bodies and in functions called from loops; a method's own body is
     // canonical unless it has a loop of its own.
-    bool field_in_loop_code() const {
-        return loop_region() || (in_function_ && !plan_.is_method(function_) && loop_called_[function_]);
+    bool field_in_loop_code() const {  // a lambda's index is past loop_called_ (as in loop_reachable)
+        return loop_region() || (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]);
     }
     int current_struct() const { return in_function_ && plan_.is_method(function_) ? plan_.method_of[function_] : -1; }
     const StructFieldInfo* own_field(std::string_view name) const;
     int struct_of_receiver(NodeId object, bool& is_this) const;
-    bool receiver_slot(NodeId object, std::uint16_t dst);
-    bool struct_construct(const Node& decl, int s, std::uint16_t reg);
+    int inferred_struct(NodeId id) const;
+    bool receiver_value(NodeId object, std::uint16_t dst);
+    bool struct_construct(const Node& call, int s, std::uint16_t reg);
     bool struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver, int receiver_reg,
                      std::uint16_t dst);
     bool struct_member(const Node& node, int s, bool is_this, std::uint16_t dst);
@@ -326,7 +319,7 @@ private:
     // `p.x`), checked (field_access_ok; a refusal sets reason_); nullptr otherwise.
     const StructFieldInfo* struct_target(const Node& target);
     NodeId target_receiver(const Node& target) const { return target.kind == NodeKind::Member ? target.a : kNoNode; }
-    std::uint16_t this_reg_ = 0;  // a method's register holding its instance's stack slot
+    std::uint16_t this_reg_ = 0;  // a method's register holding its instance (D-NEXT-refsem: a reference)
     bool fail(const Node& node, std::string reason);
     bool legacy_fatal(const Node& at, std::string message, std::uint16_t dst);  // CP25 (compiler_rules.cpp)
     bool const_write(const Node& node, const Node* value, const std::uint16_t* result, const Binding& b, bool update);
@@ -353,9 +346,8 @@ private:
     std::unique_ptr<FunctionBuilder> fb_;
     NodeId root_ = kNoNode;
     const std::vector<bool>& loop_called_;  // functions called from loop code (rt/prepared.h)
-    // Parameters whose binding type is observable in the body (assigned, or
-    // named in a text whose type legacy infers): every call passes their
-    // text-derived types (legacy bind_call_param, the canonical P5 rule).
+    // Parameters whose binding type is observable in the body (assigned, or named in a text whose type legacy
+    // infers): every call passes their text-derived types (legacy bind_call_param, the canonical P5 rule).
     std::vector<std::vector<bool>> observable_;
     // Per scope (functions, then main): names whose binding type may be
     // double, so that the binding can hold a value of another type.
@@ -382,11 +374,10 @@ private:
     std::unordered_set<std::string_view> assigned_;
     std::vector<Loop> loops_;
     std::vector<int> try_scopes_;  // CP13B: loop depth at each active try entry
-    // CP17 unwind release (owner decision, 2026-10-28): a block left normally
-    // clears the registers it allocated, so a managed file it abandoned is
-    // dropped (and reported) when the block ends, never kept alive by a stale
-    // register until a later Error unwinds it silently. Only blocks that can
-    // hold a handle (kKindHandle anywhere in them) emit the clears.
+    // CP17 unwind release (owner decision, 2026-10-28): a block left normally clears the registers it allocated, so a
+    // managed file it abandoned is dropped (and reported) when the block ends, never kept alive by a stale register
+    // until a later Error unwinds it silently. Only blocks that can hold a handle (kKindHandle anywhere in them) emit
+    // the clears.
     struct BlockRegs {
         std::uint16_t mark = 0, high = 0, outer_high = 0;
         bool clear = false;

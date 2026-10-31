@@ -1,0 +1,6 @@
+reference cycle: the stored value would contain itself
+0
+reference cycle: the stored value would contain itself
+0
+--- stderr
+--- exit 0

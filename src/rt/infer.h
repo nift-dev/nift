@@ -95,6 +95,14 @@ inline constexpr KindSet kKindMap = 1u << 20;
 inline constexpr KindSet kKindSet = 1u << 21;
 inline constexpr KindSet kKindStack = 1u << 22;
 inline constexpr KindSet kKindCollection = kKindMap | kKindSet | kKindStack;
+// D-NEXT-refsem: a struct instance (an identity-bearing reference; formerly
+// typed as an object). Outside kKindAll like the collection bits: no generic
+// value operation admits one; the struct rules (compiler_structs.cpp) and the
+// identity built-ins do. UnitKinds::struct_ids names the struct.
+inline constexpr KindSet kKindStruct = 1u << 23;
+// Values legacy represents as tagged strings with identity (its collections
+// and struct instances): the tag-observing refusals (D-063 section 3) apply.
+inline constexpr KindSet kKindTagged = kKindCollection | kKindStruct;
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -111,6 +119,7 @@ static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
 static_assert(kKindMutex == (1u << 16) && kKindAtomicInt == (1u << 17) &&
               kKindAtomicBool == (1u << 18) && kKindChannel == (1u << 19));
 static_assert((kKindAll & kKindShared) == 0 && (kKindUnknown & kKindShared) == 0);
+static_assert((kKindAll & kKindStruct) == 0 && (kKindStruct & (kKindCollection | kKindShared | kKindTask)) == 0);
 static_assert((kKindAll & kKindCollection) == 0 && (kKindShared & kKindCollection) == 0 &&
               (kKindCollection & (kKindHandle | kKindFile | kKindStream | kKindTask | kKindUnknown)) == 0);
 
@@ -158,6 +167,16 @@ struct UnitKinds {
     std::unordered_set<NodeId> collection_holders;
     std::unordered_set<NodeId> collection_inspections;
     std::unordered_set<NodeId> collection_text_numbers;
+    // D-NEXT-refsem: for an expression that may be a struct instance, the
+    // struct (an index of UnitPlan::structs; -2: several structs or other
+    // values too). The compiler admits field access and method calls on a
+    // bare-name receiver whose kinds are exactly kKindStruct and whose struct
+    // is known here.
+    std::unordered_map<NodeId, int> struct_ids;
+    // D-NEXT-refsem: expressions whose array/object value may hold an array or
+    // object below its top level (the forward-compatibility guard's deep
+    // freshness, rt/reference_guard.h).
+    std::unordered_set<NodeId> nested_aggregates;
     // CP22: expressions whose value is, or may contain at any depth, a future.
     std::unordered_set<NodeId> future_holders;
     bool converged = false;

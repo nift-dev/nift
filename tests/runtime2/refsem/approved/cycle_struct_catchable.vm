@@ -1,0 +1,5 @@
+runtime.reference_cycle
+assignment would create a cyclic reference: next
+true
+--- stderr
+--- exit 0

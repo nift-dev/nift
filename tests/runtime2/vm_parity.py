@@ -265,7 +265,8 @@ def rt_diff(args, work):
     cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", legacy, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
-           "--policy", "tools/rt-diff/policies/d040-vm.json",
+           # d040-vm.json is retired by D-NEXT-refsem #9 (its witnesses are refused before execution
+           # now; an unused policy fails rt-diff). The file stays as the historical record.
            "--policy", "tools/rt-diff/policies/d009-const-vm.json",
            "--policy", "tools/rt-diff/policies/cp23-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",

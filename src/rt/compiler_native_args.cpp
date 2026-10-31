@@ -71,7 +71,7 @@ bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::Bui
                           spec.receiver == natives::Receiver::Stack;
     if (value_ok) return true;
     for (std::uint32_t k = 0; k < node.count; ++k)
-        if ((kinds(args[k]) & kKindCollection) && !(kinds(args[k]) & kKindUnknown))
+        if ((kinds(args[k]) & kKindTagged) && !(kinds(args[k]) & kKindUnknown))
             return fail(ast_.at(args[k]), "collection-argument:" + std::string(spec.name));
 #if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 12
     // Only the operations whose legacy meaning sees the tag (audited against

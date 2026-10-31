@@ -2,15 +2,17 @@
 //
 //   value_d040 [seed] [scale]
 //
-// 1. structs are copy-on-write values: copies, nested place writes,
-//    structural equality and hash (type and every field), struct vs object
+// 1. structs and collections are references (D-NEXT-refsem, superseding the
+//    copy-on-write struct values of D-040 V9): shared writes, identity
+//    equality and hash, self-stores found by the cycle checker
 // 2. nested copy-on-write against a deep-copy model: random copies, deep
 //    place writes through array/object/struct slot chains, pushes and
 //    self-stores over several slots; after every step each slot equals its
 //    model and no value contains itself (acyclic, V16)
 // 2b. self-insertion: arrays, objects and structs, two levels deep and
 //    repeated; the stored value is the pre-write snapshot (no cycle)
-// 3. same(): identity only for callables and handles, NotIdentity otherwise
+// 3. same(): identity for callables, handles, instances and collections
+//    (D-NEXT-refsem #2), NotIdentity otherwise
 // 4. the identity summary bit: sound (an aggregate with a callable, a handle
 //    or a marked child below it is marked), precise for API stores of plain
 //    data, conservative for raw array_mut
@@ -21,7 +23,8 @@
 //    hash, rendering, serialization, legacy conversion, footprint, cloning and
 //    destruction match the unmarked value
 // 5. the cycle checker against brute-force reachability on random graphs of
-//    captured cells, closures, handles and payloads; plain stores never walk
+//    captured cells, closures, handles and payloads; plain stores never walk;
+//    stores into instances and collections (D-NEXT-refsem #4, aggregate targets)
 #include "rt/aggregate.h"
 #include "rt/compare.h"
 #include "rt/heap.h"
@@ -51,7 +54,11 @@ std::mt19937_64 rng;
 std::uint64_t below(std::uint64_t n) { return std::uniform_int_distribution<std::uint64_t>(0, n - 1)(rng); }
 Value I(std::int64_t i) { return Value::integer(i); }
 
-// ---- 1. structs -------------------------------------------------------------
+// ---- 1. structs and collections are references (D-NEXT-refsem #1, #2, #4) ----
+// Superseding D-040 V9 (copy-on-write struct values, structural equality):
+// every holder of an instance or a collection shares it, writes are in place,
+// equality and hash of instances are identity, and a self-store is a cycle the
+// caller must refuse (the checker finds it; the value layer never clones).
 void structs() {
     Value q = make_struct(atom("Q"));
     struct_add_field(q, atom("v"), I(1));
@@ -60,32 +67,48 @@ void structs() {
     struct_add_field(p, atom("s"), I(2));  // a private field takes part like any other
     struct_add_field(p, atom("q"), q);
     Value copy = p;
-    CHECK(copy.heap() == p.heap());  // shared until written
     Value* inner = struct_slot_mut(copy, atom("q"));
     CHECK(inner && struct_set(*inner, atom("v"), I(7)));
-    CHECK(struct_get(*struct_get(p, atom("q")), atom("v"))->as_int() == 1);
-    CHECK(struct_get(*struct_get(copy, atom("q")), atom("v"))->as_int() == 7);
-    CHECK(!equal(p, copy));
-    CHECK(struct_set(*struct_slot_mut(copy, atom("q")), atom("v"), I(1)) && equal(p, copy) && hash(p) == hash(copy));
+    CHECK(copy.heap() == p.heap() && struct_get(*struct_get(p, atom("q")), atom("v"))->as_int() == 7);
+    CHECK(struct_get(q, atom("v"))->as_int() == 7);  // the nested instance itself
+    CHECK(equal(p, copy) && hash(p) == hash(copy));
     CHECK(!struct_set(copy, atom("nope"), I(1)) && !struct_slot_mut(copy, atom("nope")));
-    Value r = make_struct(atom("R"));  // same fields, other type
-    struct_add_field(r, atom("x"), I(1));
-    struct_add_field(r, atom("s"), I(2));
-    struct_add_field(r, atom("q"), q);
-    CHECK(!equal(p, r));
+    Value twin = make_struct(atom("P"));  // same type and fields: another instance
+    struct_add_field(twin, atom("x"), I(1));
+    struct_add_field(twin, atom("s"), I(2));
+    struct_add_field(twin, atom("q"), q);
+    CHECK(!equal(p, twin) && !equal(twin, p));
     Value o = make_object();
     object_set(o, atom("x"), I(1));
     Value px = make_struct(atom("P"));
     struct_add_field(px, atom("x"), I(1));
     CHECK(!equal(px, o) && !equal(o, px));
-    Value priv = p;
-    CHECK(struct_set(priv, atom("s"), I(3)) && !equal(p, priv));  // private fields count
-    // A struct stored into its own field stores its previous value (V16).
+    CHECK(!unshare(copy) && copy.heap() == p.heap());  // never cloned
+    // A self-store is a cycle: found by the checker before anything is stored.
+    CycleGraph graph;
     Value self = make_struct(atom("N"));
     struct_add_field(self, atom("next"), Value());
-    CHECK(struct_set(self, atom("next"), self));
-    const Value* next = struct_get(self, atom("next"));
-    CHECK(next->is(Kind::Struct) && next->heap() != self.heap() && struct_get(*next, atom("next"))->is_null());
+    CHECK(would_close_cycle(CycleTarget::aggregate(self.heap()), self, graph));
+    CHECK(legacy_reference_cycle(self.heap(), self));
+    Value holder = make_collection(CollectionKind::Map);
+    map_set(holder, I(1), self);
+    CHECK(would_close_cycle(CycleTarget::aggregate(self.heap()), holder, graph));
+    CHECK(legacy_reference_cycle(self.heap(), holder));
+    Value arr = make_array();
+    array_push(arr, self);
+    CHECK(would_close_cycle(CycleTarget::aggregate(self.heap()), arr, graph));
+    CHECK(!legacy_reference_cycle(self.heap(), arr));  // legacy accepts it (arrays are copies there)
+    CHECK(struct_get(self, atom("next"))->is_null());
+    Value other = make_struct(atom("N"));
+    CHECK(!would_close_cycle(CycleTarget::aggregate(self.heap()), other, graph));
+    // Collections share the same way; a shallow clone is a new outer object.
+    Value m = make_collection(CollectionKind::Map);
+    Value alias = m;
+    map_set(alias, I(1), I(2));
+    CHECK(collection_size(m) == 1 && alias.heap() == m.heap() && !unshare(alias));
+    Value clone = collection_shallow_clone(m);
+    map_set(clone, I(3), I(4));
+    CHECK(collection_size(m) == 1 && collection_size(clone) == 2 && clone.heap() != m.heap());
 }
 
 // ---- 2. nested copy-on-write vs a deep-copy model ---------------------------
@@ -150,10 +173,11 @@ Value base_doc(Model& m) {
         mo.kv.push_back({"tags", mt});
         mi.items.push_back(mo);
     }
-    Value meta = make_struct(atom("Meta"));
-    struct_add_field(meta, atom("n"), I(3));
-    Model mm = mk(Model::K::Str);
-    mm.type = "Meta";
+    // D-NEXT-refsem #1: an instance is a shared reference, so the value model
+    // holds an object here (instances are covered by section 1 and the suite).
+    Value meta = make_object();
+    object_set(meta, atom("n"), I(3));
+    Model mm = mk(Model::K::Obj);
     mm.kv.push_back({"n", mint(3)});
     Value doc = make_object();
     object_set(doc, atom("items"), items);
@@ -209,8 +233,8 @@ void nested_cow(long sequences) {
                     mi[item % mi.size()].kv[1].second.items.push_back(mint(x));
                     break;
                 }
-                case 3: {  // struct field through a path: doc.meta.n = x
-                    CHECK(struct_set(*object_slot_mut(slot[a], atom("meta")), atom("n"), I(x)));
+                case 3: {  // a member through a path: doc.meta.n = x
+                    object_set(*object_slot_mut(slot[a], atom("meta")), atom("n"), I(x));
                     model[a].kv[1].second.kv[0].second = mint(x);
                     break;
                 }
@@ -324,18 +348,17 @@ void self_insertion() {
     CHECK(show(o) == "{k:{m:[1,{k:{m:[1]}}]},self:{k:{m:[1,{k:{m:[1]}}]}}}" && acyclic_value(o));
     array_push(*object_slot_mut(*object_slot_mut(o, atom("k")), atom("m")), I(5));
     CHECK(show(*object_get(o, atom("self"))) == "{k:{m:[1,{k:{m:[1]}}]}}");
-    // Structs, two levels: s.inner.list.push(s) and s.next = s.
+    // Structs (D-NEXT-refsem #4, superseding the V16 snapshot for them): a
+    // store of an instance into itself, directly or two levels down, is a
+    // cycle the checker finds before the caller stores anything.
     Value s = make_struct(atom("S"));
     { Value inner = make_struct(atom("In")); struct_add_field(inner, atom("list"), make_array());
       struct_add_field(s, atom("inner"), inner); struct_add_field(s, atom("next"), Value()); }
-    const Value s0 = s;
-    array_push(*struct_slot_mut(*struct_slot_mut(s, atom("inner")), atom("list")), s0);
-    CHECK(struct_set(s, atom("next"), s));
-    CHECK(show(s) == "S{inner:In{list:[S{inner:In{list:[]},next:?}]},next:S{inner:In{list:[S{inner:In{list:[]},next:?}]},next:?}}");
-    CHECK(acyclic_value(s));
-    CHECK(struct_set(*struct_slot_mut(s, atom("next")), atom("next"), I(3)));
-    CHECK(show(*struct_get(s, atom("next"))) == "S{inner:In{list:[S{inner:In{list:[]},next:?}]},next:3}");
-    CHECK(struct_get(s, atom("next"))->heap() != s.heap());
+    CycleGraph graph;
+    const HeapObject* list_owner = struct_get(s, atom("inner"))->heap();
+    CHECK(would_close_cycle(CycleTarget::aggregate(s.heap()), s, graph));
+    CHECK(would_close_cycle(CycleTarget::aggregate(list_owner), s, graph));
+    CHECK(show(s) == "S{inner:In{list:[]},next:?}" && acyclic_value(s));
     // Self-insertion through a copy-on-write share that another slot still holds.
     Value x = make_array();
     array_push(x, I(1));
@@ -361,15 +384,22 @@ void sameness() {
     CHECK(same(h, h2) == Sameness::Same && same(h2, h) == Sameness::Same && same(h, h3) == Sameness::Different);
     CHECK(same(f, h) == Sameness::Different);
     Value a = make_array();
-    Value b = a;  // storage sharing is never exposed
-    Value st = make_struct(atom("P"));
+    Value b = a;  // storage sharing is never exposed (arrays are values until Phase B)
     Value m = make_object();
-    for (const Value* ordinary : {&a, &b, &st, &m}) {
+    for (const Value* ordinary : {&a, &b, &m}) {
         CHECK(same(*ordinary, *ordinary) == Sameness::NotIdentity);
         CHECK(same(*ordinary, f) == Sameness::NotIdentity && same(f, *ordinary) == Sameness::NotIdentity);
     }
     CHECK(same(I(1), I(1)) == Sameness::NotIdentity && same(make_string("x"), h) == Sameness::NotIdentity);
-    CHECK(identity_bearing(f) && identity_bearing(h) && !identity_bearing(a) && !identity_bearing(st));
+    // D-NEXT-refsem #2: struct instances and collections are identities.
+    Value st = make_struct(atom("P"));
+    Value st2 = st;
+    Value other = make_struct(atom("P"));
+    Value c = make_collection(CollectionKind::Set);
+    CHECK(same(st, st2) == Sameness::Same && same(st, other) == Sameness::Different);
+    CHECK(same(c, c) == Sameness::Same && same(c, st) == Sameness::Different);
+    CHECK(identity_bearing(f) && identity_bearing(h) && !identity_bearing(a) && identity_bearing(st) &&
+          identity_bearing(c));
 }
 
 // ---- 4. the identity summary bit -----------------------------------------------
@@ -383,7 +413,9 @@ bool contains_identity(const Value& v) {
 
 void summary_bit(long rounds) {
     for (long r = 0; r < rounds; ++r) {
-        std::vector<Value> pool = {make_array(), make_object(), make_struct(atom("S"))};
+        // Arrays and objects (copy-on-write values); instances are references
+        // whose self-stores would be cycles (D-NEXT-refsem #4): section 1.
+        std::vector<Value> pool = {make_array(), make_object()};
         for (int step = 0; step < 30; ++step) {
             Value item;
             switch (below(6)) {
@@ -394,8 +426,7 @@ void summary_bit(long rounds) {
             }
             Value& target = pool[below(pool.size())];
             if (target.is(Kind::Array)) array_push(target, item);
-            else if (target.is(Kind::Object)) object_set(target, atom("k" + std::to_string(below(4))), item);
-            else struct_add_field(target, atom("f" + std::to_string(step)), item);
+            else object_set(target, atom("k" + std::to_string(below(4))), item);
             if (below(4) == 0) pool.push_back(target);  // a shared copy
         }
         for (const Value& v : pool) CHECK(!contains_identity(v) || may_contain_identity(v));  // sound
@@ -408,7 +439,8 @@ void summary_bit(long rounds) {
     Value st = make_struct(atom("S"));
     struct_add_field(st, atom("o"), obj);
     array_set(plain, 0, I(5));
-    CHECK(!may_contain_identity(plain) && !may_contain_identity(obj) && !may_contain_identity(st));
+    CHECK(!may_contain_identity(plain) && !may_contain_identity(obj));
+    CHECK(may_contain_identity(st) && !may_hold_identity(st.heap()));  // an identity itself, plain contents
     array_mut(plain)[1] = I(6);
     CHECK(may_contain_identity(plain));  // raw access: marked conservatively
     Value copy = plain;
@@ -442,6 +474,7 @@ public:
 
 // Brute force: every value reachable from `v`, ignoring summary bits.
 bool reaches(const TestGraph& g, const Value& v, const CycleTarget& t, std::set<const void*>& seen) {
+    if (t.kind == CycleTarget::Kind::Aggregate && v.is_heap() && v.heap() == t.cell) return true;  // D-NEXT-refsem
     switch (v.kind()) {
         case Kind::Function: {
             const auto* f = v.heap_as<FunctionObject>();
@@ -468,10 +501,79 @@ bool reaches(const TestGraph& g, const Value& v, const CycleTarget& t, std::set<
             for (const auto& e : object_entries(v)) if (reaches(g, e.second, t, seen)) return true;
             return false;
         case Kind::Struct:
+            if (!seen.insert(v.heap()).second) return false;
             for (const auto& f : struct_fields(v)) if (reaches(g, f.second, t, seen)) return true;
+            return false;
+        case Kind::Collection:
+            if (!seen.insert(v.heap()).second) return false;
+            for (const Value& c : collection_items(v)) if (reaches(g, c, t, seen)) return true;
             return false;
         default: return false;
     }
+}
+
+// D-NEXT-refsem #4: stores into instances and collections (the reference
+// kinds) against brute-force reachability, through arrays, objects, other
+// instances and collections, and closures whose captured cells hold them.
+// A store the checker allows is made, so later graphs are deeper; a refused
+// one leaves everything as it was.
+void aggregate_cycles(long rounds) {
+    long refused = 0, allowed = 0;
+    for (long r = 0; r < rounds; ++r) {
+        TestGraph g;
+        g.cells.assign(4, Value());
+        std::vector<Value> refs;
+        for (int k = 0; k < 3; ++k) refs.push_back(make_collection(CollectionKind::Map));
+        refs.push_back(make_collection(CollectionKind::Stack));
+        for (int k = 0; k < 2; ++k) {
+            Value st = make_struct(atom("N"));
+            struct_add_field(st, atom("next"), Value());
+            refs.push_back(st);
+        }
+        std::vector<Value> closures;
+        for (int c = 0; c < 4; ++c) {
+            Value f = Value::adopt(new FunctionObject());
+            g.captures[f.heap_as<FunctionObject>()].push_back(static_cast<std::size_t>(c));
+            closures.push_back(f);
+        }
+        for (int step = 0; step < 30; ++step) {
+            const Value& pick = refs[below(refs.size())];
+            Value stored;
+            switch (below(5)) {
+                case 0: stored = pick; break;
+                case 1: stored = make_array(); array_push(stored, I(1)); array_push(stored, pick); break;
+                case 2: stored = make_object(); object_set(stored, atom("k"), pick); break;
+                case 3: stored = closures[below(closures.size())]; break;
+                default: stored = I(static_cast<std::int64_t>(below(9))); break;
+            }
+            if (below(4) == 0) {  // a captured variable takes a reference (cells are not checked here)
+                g.cells[below(g.cells.size())] = refs[below(refs.size())];
+                continue;
+            }
+            Value& target = refs[below(refs.size())];
+            const CycleTarget t = CycleTarget::aggregate(target.heap());
+            std::set<const void*> seen;
+            const bool expected = reaches(g, stored, t, seen);
+            const std::size_t before = target.is(Kind::Struct) ? 1 : collection_size(target);
+            const bool got = would_close_cycle(t, stored, g);
+            CHECK(got == expected);
+            if (got) {
+                ++refused;
+                CHECK((target.is(Kind::Struct) ? 1 : collection_size(target)) == before);
+                continue;
+            }
+            ++allowed;
+            if (target.is(Kind::Struct)) struct_set(target, atom("next"), stored);
+            else if (collection_kind(target) == CollectionKind::Stack) stack_push(target, stored);
+            else map_set(target, I(static_cast<std::int64_t>(below(4))), stored);
+        }
+        // Break every reference so the round's graph is freed (acyclic by the checks).
+        for (Value& c : g.cells) c = Value();
+        for (Value& v : refs)
+            if (v.is(Kind::Struct)) struct_set(v, atom("next"), Value()); else collection_clear(v);
+    }
+    CHECK(refused > 0 && allowed > 0);
+    std::printf("aggregate cycle checker: %ld stores refused, %ld allowed\n", refused, allowed);
 }
 
 Value random_stored(TestGraph& g, std::vector<Value>& closures) {
@@ -695,7 +797,10 @@ void tag_masking() {
     for (auto& [name, make] : makers) {
         Value plain = make(), marked = with_bit(make());
         CHECK(marked.kind() == plain.kind() && marked.heap()->kind() == plain.kind());
-        CHECK(equal(plain, marked) && equal(marked, plain) && hash(plain) == hash(marked));
+        if (std::string(name) == "struct")  // D-NEXT-refsem #2: two instances are never equal; each is itself
+            CHECK(!equal(plain, marked) && equal(marked, marked) && hash(marked) == hash(marked));
+        else
+            CHECK(equal(plain, marked) && equal(marked, plain) && hash(plain) == hash(marked));
         CHECK(truthy(plain) == truthy(marked));
         std::string a, b;
         CHECK(append_rendered(plain, a) == append_rendered(marked, b) && a == b);
@@ -709,7 +814,11 @@ void tag_masking() {
         Value clone = marked;
         if (clone.is(Kind::Array)) array_push(clone, I(9));
         if (clone.is(Kind::Object)) object_set(clone, atom("z"), I(9));
-        if (clone.is(Kind::Struct)) struct_add_field(clone, atom("z"), I(9));
+        if (clone.is(Kind::Struct)) {  // D-NEXT-refsem #1: a reference, written in place, never cloned
+            struct_add_field(clone, atom("z"), I(9));
+            CHECK(clone.heap() == share.heap() && may_hold_identity(clone.heap()));
+            continue;
+        }
         CHECK(clone.heap() != share.heap() && clone.kind() == plain.kind() && clone.heap()->kind() == plain.kind());
         CHECK(may_hold_identity(clone.heap()) && equal(share, plain));
     }
@@ -740,6 +849,7 @@ int main(int argc, char** argv) {
     sameness();
     summary_bit(300 * scale);
     cycle_checker(400 * scale);
+    aggregate_cycles(300 * scale);
     plain_stores_never_walk();
     if (large) large_accounting();
     else std::printf("large_accounting skipped (no-large)\n");

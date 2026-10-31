@@ -10,17 +10,15 @@ cd "$ROOT" || exit 2
 OUT=.build/collections-mutants
 mkdir -p "$OUT"
 # mutant -> source file : what it breaks
+# M1-M4 and M10 (value-semantics controls) are retired by D-NEXT-refsem: the
+# aliasing they planted is now the contract and their code no longer exists
+# (collections/superseded/INDEX.tsv); refsem/mutants.sh holds their successors.
 declare -A FILE=(
-  [1]=src/rt/aggregate.cpp            # a shared collection is mutated without a clone (observable COW)
-  [2]=src/rt/vm_keyed.cpp             # an assignment/argument copy aliases (refcount 2 mutated in place)
-  [3]=src/rt/compiler_keyed.cpp       # the binding is taken before the arguments run (no self-snapshot)
-  [4]=src/rt/compiler_keyed.cpp       # the mutated collection is never put back
-  [5]=src/rt/aggregate.cpp            # a map insert is never counted on the heap
+  [5]=src/rt/aggregate_collection.cpp # a map insert is never counted on the heap
   [6]=src/rt/compare.cpp              # map equality depends on entry order
   [7]=src/rt/vm_iter.cpp              # a stack is iterated bottom first
   [8]=src/rt/compare.cpp              # 1.0 does not hash like 1 (indexed lookups miss)
   [9]=src/rt/isolate_transfer_decode.cpp  # a transferred collection loses its kind
-  [10]=src/rt/natives/collection_methods.cpp  # same() exposes storage identity of collections
   [11]=src/rt/compiler_native_args.cpp       # same() admits non-name arguments ("f", calls)
   [12]=src/rt/compiler_native_args.cpp       # built-ins no longer check arguments/receivers holding collections
   [13]=src/rt/compiler_collection.cpp        # key/comparator callbacks may return collections
@@ -28,7 +26,7 @@ declare -A FILE=(
   [15]=src/rt/compiler_loops.cpp             # a map loop iterates the live map, not its snapshot
   [16]=src/rt/compiler_native_args.cpp       # mutex(v) accepts a value holding a collection
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(5 6 7 8 9 11 12 13 14 15 16)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

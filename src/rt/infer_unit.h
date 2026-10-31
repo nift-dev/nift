@@ -9,7 +9,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <set>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -119,6 +121,18 @@ private:
     void add_element(NodeId receiver, const TyRef& value, bool key = false);  // key: a map key (D-063)
     TyRef set_members(const TyRef& set) const;
     TyRef map_keys(const TyRef& map) const;
+    // D-NEXT-refsem: collections are shared references, so what one alias
+    // stores every alias may read. Contents are therefore tracked per
+    // allocation site (Ty::sites; every alias of an object carries its site),
+    // never per binding: sound under any aliasing, like the per-type struct
+    // field slots. Growth re-walks every unit.
+    // `name`: a map value stored or read under a string-literal key (a
+    // record-like map keeps one type per such key), or null.
+    TyRef contents(const TyRef& collection, bool keys, const std::string* name = nullptr) const;
+    void add_contents(const TyRef& collection, const TyRef& value, bool keys, const std::string* name = nullptr);
+    const std::string* literal_key(const Node& call, std::string& storage) const;
+    TyRef constructed(const Node& call, const TyRef& result) const;
+    bool tagged() const { return plan_.collections || !plan_.structs.empty(); }
     void propagate_session_alias(std::size_t slot);
 
     void statement(NodeId id);
@@ -156,6 +170,15 @@ private:
     std::vector<bool> queued_;
     int current_ = -1;
     bool self_changed_ = false;
+    // D-NEXT-refsem: per allocation site, the map keys, the map values / set
+    // members / stack elements; `contents_unknown_`: something was stored into
+    // a collection of unknown origin, so any collection may hold anything.
+    struct SiteContents {
+        TyRef keys, values;                                    // values: under any other key
+        std::map<std::string, TyRef, std::less<>> named;        // map values under string-literal keys
+    };
+    std::map<std::uint32_t, SiteContents> contents_;
+    bool contents_unknown_ = false;
 };
 
 } // namespace nift::rt::infer_detail

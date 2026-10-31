@@ -19,12 +19,17 @@ TyRef Inference::record(NodeId id, TyRef t) {
     else result_.collection_objects.erase(id);
     if(plan_.coroutines&&holds_future(t))result_.future_holders.insert(id);  // CP22
     else result_.future_holders.erase(id);
-    if(plan_.collections&&holds_collection(t))result_.collection_holders.insert(id);  // D-063
+    const bool tagged = plan_.collections || !plan_.structs.empty();  // D-063, D-NEXT-refsem
+    if(tagged&&holds_collection(t))result_.collection_holders.insert(id);
     else result_.collection_holders.erase(id);
-    if(plan_.collections&&(t->kinds&(kKindArray|kKindObject))&&
-       ((element_of(t,nullptr,false)->kinds|element_of(t,nullptr,true)->kinds)&kKindCollection))
+    if(tagged&&(t->kinds&(kKindArray|kKindObject))&&
+       ((element_of(t,nullptr,false)->kinds|element_of(t,nullptr,true)->kinds)&kKindTagged))
         result_.collection_elements_of.insert(id);
     else result_.collection_elements_of.erase(id);
+    if (t->kinds & kKindStruct) result_.struct_ids[id] = t->any ? -2 : t->struct_id;  // D-NEXT-refsem
+    else result_.struct_ids.erase(id);
+    if ((t->kinds & (kKindArray | kKindObject)) && holds_aggregate_below(t)) result_.nested_aggregates.insert(id);
+    else result_.nested_aggregates.erase(id);
     auto& targets = result_.callable_targets[id];
     targets.clear();
     result_.callable_unknown[id] = t->any || (t->kinds & kKindUnknown) || t->untracked_callable;

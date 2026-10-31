@@ -170,7 +170,8 @@ UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::st
         if (n.kind != NodeKind::Call || n.count != 0 || n.a == kNoNode || ast.at(n.a).kind != NodeKind::Ident)
             continue;
         const std::string_view name = ast.text(ast.at(n.a));
-        plan.collections = name == "map" || name == "set" || name == "stack";  // rt-lint: allow-string-compare compile time
+        // rt-lint: allow-string-compare compile time
+        plan.collections = name == "map" || name == "set" || name == "stack";  // rt-lint: allow-string-compare
     }
     plan.method_of.assign(plan.functions.size(), -1);
     if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions

@@ -34,9 +34,11 @@ const Value* receiver(const Value* args, std::uint32_t argc) {
 // compares structurally in legacy, a callable by identity: rt::equal does
 // the same). Structs and handles are also tagged strings in legacy: the
 // compiler refuses them as keys (struct equality is a value comparison here).
+// D-NEXT-refsem #6: a mutable collection is never a key or member (the
+// compiler refuses it before any effect; reaching here with one is legacy's
+// key error, never a stale-hash lookup). Callables keep their identity keys.
 bool collection_key_ok(const Value& key) noexcept {
-    return key.is(Kind::Bool) || key.is_number() || key.is(Kind::String) || key.is(Kind::Collection) ||
-           key.is(Kind::Function);
+    return key.is(Kind::Bool) || key.is_number() || key.is(Kind::String) || key.is(Kind::Function);
 }
 
 Status fn_map(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
@@ -116,17 +118,18 @@ Status coll_front(const Context&, const Value* args, std::uint32_t argc, Value& 
     return Status::Ok;
 }
 
-// same(a, b) (D-040 #4, D-063): identity of identity-bearing values:
-// callables and file/stream handles (legacy-equal), and mutex, atomic,
-// channel, future and thread (owner ruling 2026-11-01; legacy errors) by
-// their stable handle or task record (rt::same). The compiler admits plain
-// names only. Any other operand (ordinary values: arrays, objects, structs,
-// collections) is legacy's fatal error text.
+// same(a, b) (D-040 #4, D-063, D-NEXT-refsem #2): identity of identity-
+// bearing values: callables, file/stream handles, struct instances and
+// map/set/stack collections (legacy-equal: its tagged references), and
+// mutex, atomic, channel, future and thread (owner ruling 2026-11-01; legacy
+// errors) by their stable handle or task record (rt::same). The compiler
+// admits plain names only. Any other operand (arrays and objects, values
+// until Phase B) is legacy's fatal error text.
 Status fn_same(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return fail(error, "same: expected two values");
-#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 10
-    if (args[0].is(Kind::Collection) && args[1].is(Kind::Collection)) {  // M10: storage identity exposed
-        out = Value::boolean(args[0].heap() == args[1].heap());
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 4
+    if (args[0].is(Kind::Collection) || args[0].is(Kind::Struct)) {  // R4: identity lost (structural answer)
+        out = Value::boolean(equal(args[0], args[1]));
         return Status::Ok;
     }
 #endif

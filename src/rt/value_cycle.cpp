@@ -132,13 +132,18 @@ private:
 
     void visit_aggregate(const Value& v) {
         HeapObject* object = v.heap();
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 1)
+        // D-NEXT-refsem: the target itself, before the summary shortcut (a
+        // collection or instance holding only plain data may still be it).
+        if (target_.kind == CycleTarget::Kind::Aggregate && target_.cell == object) { found_ = true; return; }
+#endif
         if (!may_hold_identity(object) || !b_.seen.insert(address_key(object))) return;
         bool any = false;
         if (v.is(Kind::Array)) {
             for (const Value& child : array_items(v)) consider(child, any);
         } else if (v.is(Kind::Object)) {
             for (const auto& entry : object_entries(v)) consider(entry.second, any);
-        } else if (v.is(Kind::Collection)) {  // D-063
+        } else if (v.is(Kind::Collection)) {  // D-063: keys, values, members, elements
             for (const Value& child : collection_items(v)) consider(child, any);
         } else {
             for (const auto& field : struct_fields(v)) consider(field.second, any);
@@ -156,6 +161,29 @@ private:
 };
 
 } // namespace
+
+bool legacy_reference_cycle(const HeapObject* receiver, const Value& stored) {
+    const auto reference = [](const Value& v) { return v.is(Kind::Struct) || v.is(Kind::Collection); };
+    if (!reference(stored)) return false;
+    std::vector<const HeapObject*> work{stored.heap()}, seen;
+    while (!work.empty()) {
+        const HeapObject* object = work.back();
+        work.pop_back();
+        if (object == receiver) return true;
+        if (std::find(seen.begin(), seen.end(), object) != seen.end()) continue;
+        seen.push_back(object);
+        if (object->kind() == Kind::Struct) {
+            for (const auto& field : static_cast<const StructObject*>(object)->fields)
+                if (reference(field.second)) work.push_back(field.second.heap());
+            continue;
+        }
+        const auto* c = static_cast<const CollectionObject*>(object);
+        const std::size_t stride = c->sub == CollectionKind::Map ? 2 : 1;  // map keys are not followed (legacy)
+        for (std::size_t k = stride - 1; k < c->items.size(); k += stride)
+            if (reference(c->items[k])) work.push_back(c->items[k].heap());
+    }
+    return false;
+}
 
 bool would_close_cycle_walk(const CycleTarget& target, const Value& stored, const CycleGraph& graph) {
     ++cycle_check_stats().checks;

@@ -1,0 +1,198 @@
+#include "rt/copy_graph.h"
+
+#include "rt/aggregate.h"
+#include "rt/heap.h"
+#include "rt/heap_account.h"
+
+#include <unordered_map>
+#include <vector>
+
+// rt-lint: cold-file copy()/deepcopy() graph copies (D-NEXT-refsem #3)
+
+namespace nift::rt {
+
+namespace {
+
+bool copied(const Value& v) {
+    return v.is(Kind::Array) || v.is(Kind::Object) || v.is(Kind::Struct) || v.is(Kind::Collection);
+}
+
+// An upper bound of the bytes a copy of `object` is counted with (the object,
+// its storage, an index; granule rounding), before it exists.
+std::size_t estimate(const HeapObject* object) {
+    return heap_footprint(object) + 2 * kHeapGranule;
+}
+
+bool fits(std::size_t bytes, std::size_t heap_limit) {
+    if (heap_limit == kNoCopyLimit) return true;
+    const std::size_t live = live_heap_bytes();
+    return live <= heap_limit && bytes <= heap_limit - live;
+}
+
+template <class F> void each_child(const Value& v, F&& f) {
+    if (v.is(Kind::Array)) {
+        for (const Value& item : array_items(v)) f(item);
+    } else if (v.is(Kind::Object)) {
+        for (const auto& entry : object_entries(v)) f(entry.second);
+    } else if (v.is(Kind::Struct)) {
+        for (const auto& field : struct_fields(v)) f(field.second);
+    } else if (v.is(Kind::Collection)) {
+        for (const Value& item : collection_items(v)) f(item);
+    }
+}
+
+// A new empty object of the source's kind (the shell, linked in phase 2).
+Value shell(const Value& v) {
+    if (v.is(Kind::Array)) return make_array(array_size(v));
+    if (v.is(Kind::Object)) return make_object();
+    if (v.is(Kind::Struct)) return make_struct(struct_type(v), struct_fields(v).size());
+    return make_collection(collection_kind(v));
+}
+
+class GraphCopy {
+public:
+    // Phase 1: every reachable object once (iterative; no recursion depth),
+    // its copied children, and the budget for all of them before anything is
+    // allocated.
+    bool discover(const Value* roots, std::size_t count, std::size_t heap_limit) {
+        std::vector<std::size_t> work;
+        std::size_t bytes = 0;
+        const auto visit = [&](const Value* v) {
+            const auto found = index_.find(v->heap());
+            if (found != index_.end()) return found->second;
+            const std::size_t at = sources_.size();
+            index_.emplace(v->heap(), at);
+            sources_.push_back(v);
+            children_.emplace_back();
+            bytes += estimate(v->heap());
+            work.push_back(at);
+            return at;
+        };
+        for (std::size_t k = 0; k < count; ++k)
+            if (copied(roots[k])) visit(&roots[k]);
+        while (!work.empty()) {
+            const std::size_t at = work.back();
+            work.pop_back();
+            each_child(*sources_[at], [&](const Value& child) {
+                if (!copied(child)) return;
+                const std::size_t c = visit(&child);
+                children_[at].push_back(c);
+            });
+        }
+        return fits(bytes, heap_limit);
+    }
+
+    // Phase 2: the shells (each owned by a Value: a failed allocation frees
+    // every one made so far), then each shell's contents, mapped, children
+    // before parents: an array or object copy is a copy-on-write value, so
+    // it is complete before any parent holds it (a later push into a shell a
+    // parent already holds would clone it away from the parent). The graph
+    // is acyclic (reference cycles are refused), so the post-order exists.
+    void link() {
+        copies_.reserve(sources_.size());
+        for (const Value* source : sources_) copies_.push_back(shell(*source));
+        std::vector<std::uint8_t> state(sources_.size(), 0);  // 0 new, 1 open, 2 filled
+        std::vector<std::pair<std::size_t, std::size_t>> stack;  // (node, next child)
+        for (std::size_t start = 0; start < sources_.size(); ++start) {
+            if (state[start]) continue;
+            state[start] = 1;
+            stack.push_back({start, 0});
+            while (!stack.empty()) {
+                const std::size_t node = stack.back().first;
+                if (stack.back().second < children_[node].size()) {
+                    const std::size_t child = children_[node][stack.back().second++];
+                    if (state[child] == 0) {
+                        state[child] = 1;
+                        stack.push_back({child, 0});
+                    }
+                    continue;
+                }
+                fill(*sources_[node], copies_[node]);
+                state[node] = 2;
+                stack.pop_back();
+            }
+        }
+    }
+
+    Value mapped(const Value& v) const {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 9
+        // R9: aliasing lost (every reference gets its own copy; one level only)
+        if (copied(v)) { Value fresh = shell(v); fill_shallow(v, fresh); return fresh; }
+#endif
+        return copied(v) ? copies_[index_.at(v.heap())] : v;
+    }
+
+private:
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 9
+    static void fill_shallow(const Value& source, Value& copy) {
+        if (source.is(Kind::Collection)) { copy = collection_shallow_clone(source); return; }
+        if (source.is(Kind::Struct)) {
+            for (const auto& f : struct_fields(source)) struct_add_field(copy, f.first, f.second);
+            return;
+        }
+        copy = source;
+    }
+#endif
+    void fill(const Value& source, Value& copy) const {
+        if (source.is(Kind::Array)) {
+            for (const Value& item : array_items(source)) array_push(copy, mapped(item));
+        } else if (source.is(Kind::Object)) {
+            for (const auto& entry : object_entries(source)) object_set(copy, entry.first, mapped(entry.second));
+        } else if (source.is(Kind::Struct)) {
+            for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, mapped(field.second));
+        } else {
+            const auto& items = collection_items(source);
+            const CollectionKind kind = collection_kind(source);
+            // Keys and set members are scalars or callables (never copied):
+            // inserted in order, the index is rebuilt as the source's.
+            if (kind == CollectionKind::Map) {
+                for (std::size_t k = 0; k + 1 < items.size(); k += 2) map_set(copy, items[k], mapped(items[k + 1]));
+            } else if (kind == CollectionKind::Set) {
+                for (const Value& member : items) set_add(copy, mapped(member));
+            } else {
+                for (const Value& item : items) stack_push(copy, mapped(item));
+            }
+        }
+    }
+
+    std::vector<const Value*> sources_;
+    std::vector<std::vector<std::size_t>> children_;
+    std::unordered_map<const HeapObject*, std::size_t> index_;
+    std::vector<Value> copies_;
+};
+
+} // namespace
+
+CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 10
+    return deep_copy(source, out, heap_limit);  // R10: copy() is deep (the v4.4 rule)
+#endif
+    if (source.is(Kind::Collection)) {
+        if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
+        out = collection_shallow_clone(source);
+        return CopyStatus::Ok;
+    }
+    if (source.is(Kind::Struct)) {
+        if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
+        Value copy = make_struct(struct_type(source), struct_fields(source).size());
+        for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, field.second);
+        out = std::move(copy);
+        return CopyStatus::Ok;
+    }
+    out = source;  // scalars, strings, identities; arrays and objects: values (copy-on-write)
+    return CopyStatus::Ok;
+}
+
+CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit) {
+    GraphCopy graph;
+    if (!graph.discover(values, count, heap_limit)) return CopyStatus::Budget;
+    graph.link();
+    for (std::size_t k = 0; k < count; ++k) out[k] = graph.mapped(values[k]);
+    return CopyStatus::Ok;
+}
+
+CopyStatus deep_copy(const Value& source, Value& out, std::size_t heap_limit) {
+    return deep_copy_tuple(&source, 1, &out, heap_limit);
+}
+
+} // namespace nift::rt

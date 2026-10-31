@@ -31,11 +31,10 @@ void UnitCompiler::set_session(SessionCompileContext* session) {
 bool UnitCompiler::session_render(NodeId id) {
     const auto& node = ast_.at(id);
     const auto expression = node.a;
-    // D-063: legacy shows a map/set/stack statement value (or one inside an
-    // array/object) with its stringify form or tag; the session cannot show
-    // a collection value: refused before the statement runs.
+    // D-063: legacy shows a map/set/stack statement value (or one inside an array/object) with its stringify form or
+    // tag; the session cannot show a collection value: refused before the statement runs.
     if (unit_makes_collections() &&
-        ((kinds(expression) & kKindCollection) || kinds_.collection_holders.count(expression)))
+        ((kinds(expression) & kKindTagged) || kinds_.collection_holders.count(expression)))
         return fail(ast_.at(expression), "session:collection-result");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(expression, value)) return false;
@@ -226,9 +225,8 @@ bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint
             const auto argument = ast_.list(node)[k];
             if (!symbol.params[k] || (kinds(argument) & ~symbol.params[k]))
                 return fail(ast_.at(argument), "session:call-kind-contract");
-            // Existing parameter alias admission cannot be weakened across a
-            // unit boundary. Places stay refused until their escape summary
-            // is carried along with the compiled callable's signature.
+            // Existing parameter alias admission cannot be weakened across a unit boundary. Places stay refused until
+            // their escape summary is carried along with the compiled callable's signature.
             if (ast_.at(argument).kind == NodeKind::Index || ast_.at(argument).kind == NodeKind::Member)
                 return fail(ast_.at(argument), "session:call-alias-contract");
         }
@@ -248,9 +246,8 @@ bool UnitCompiler::session_call_types(const Node& node, NodeId callee, std::uint
         }
         return true;
     }
-    // Cross-unit structural shapes intentionally carry no old AST callable
-    // targets. Never execute an uninstantiated parameter body through an
-    // object field or other dynamic flow merely because it has Function kind.
+    // Cross-unit structural shapes intentionally carry no old AST callable targets. Never execute an uninstantiated
+    // parameter body through an object field or other dynamic flow merely because it has Function kind.
     const auto targets = kinds_.callable_targets.find(callee);
     if (node.count && (targets == kinds_.callable_targets.end() || targets->second.empty()))
         return fail(node, "session:callable-flow");

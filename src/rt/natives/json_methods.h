@@ -29,5 +29,7 @@ Status json_parse(const Context& context, std::string_view text, Value& out, std
 
 Status fn_validate(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status fn_copy(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+Status fn_deepcopy(const Context&, const Value* args, std::uint32_t argc, Value& out,
+                   std::string& error);
 
 } // namespace nift::rt::natives

@@ -38,7 +38,9 @@ void Inference::seed_struct_fields() {
     for (const StructInfo& s : plan_.structs)
         for (const StructFieldInfo& f : s.fields) {
             TyRef& var = vars_[field_slot(f)];
-            var = unite(var, kinds_ty(session_ && f.type == 3 ? kKindNumber : value_kinds(f.value)));
+            const KindSet k = session_ && f.type == 3 ? kKindNumber : value_kinds(f.value);
+            // D-NEXT-refsem: a map()/set()/stack() initialiser is the allocation site of every instance's own one.
+            var = unite(var, (k & kKindCollection) ? collection_ty(k, f.node) : kinds_ty(k));
         }
 }
 
@@ -209,8 +211,10 @@ void Inference::statement(NodeId id) {
                 const NodeId* args = ast_.list(e);
                 TyRef v = empty_ty();
                 for (std::uint32_t k = 0; k < e.count; ++k) v = expr(args[k]);
-                expr(ast_.at(e.a).a);
-                if (e.count == 1) add_element(ast_.at(e.a).a, v);
+                const TyRef receiver = expr(ast_.at(e.a).a);
+                // D-NEXT-refsem: a stack's elements are its allocation sites' contents.
+                if (e.count == 1 && (receiver->kinds & kKindCollection)) add_contents(receiver, v, false);
+                else if (e.count == 1) add_element(ast_.at(e.a).a, v);
                 expr(ast_.at(e.a).a);
                 break;
             }

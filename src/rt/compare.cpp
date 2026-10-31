@@ -107,11 +107,13 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
         case Kind::Object:
             if (identity && left.heap() == right.heap()) return Shallow::Equal;
             return object_size(left) == object_size(right) ? Shallow::Descend : Shallow::Unequal;
-        case Kind::Struct:
-            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+        case Kind::Struct:  // D-NEXT-refsem #2: instances compare by identity (legacy's `==`)
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 3
             return struct_type(left) == struct_type(right) && struct_fields(left).size() == struct_fields(right).size()
-                       ? Shallow::Descend
-                       : Shallow::Unequal;
+                       ? Shallow::Descend : Shallow::Unequal;  // R3: structural struct equality (the old D-040 rule)
+#else
+            return left.heap() == right.heap() ? Shallow::Equal : Shallow::Unequal;
+#endif
         case Kind::Collection: {  // D-063, legacy's per-kind rules (ParserExpression.cpp structural_equal)
             if (identity && left.heap() == right.heap()) return Shallow::Equal;
             const CollectionKind k = collection_kind(left);
@@ -299,7 +301,13 @@ std::uint64_t combine(const Value& parent, std::size_t i, std::uint64_t h, std::
     return h + mix(hash_text(atom_text(object_entries(parent)[i].first)), child);
 }
 
-bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Object) || v.is(Kind::Struct); }
+// Struct instances hash by identity (leaf_hash), consistent with `==`.
+bool is_aggregate(const Value& v) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 3
+    if (v.is(Kind::Struct)) return true;
+#endif
+    return v.is(Kind::Array) || v.is(Kind::Object);
+}
 
 std::uint64_t seed_of(const Value& v) {
     if (v.is(Kind::Array)) return 8u;
@@ -335,13 +343,18 @@ std::uint64_t hash(const Value& value) {
     }
 }
 
+// D-NEXT-refsem #2: struct instances and collections are references; their
+// identity is the heap object (both operands are live while compared).
 bool identity_bearing(const Value& value) noexcept {
-    return value.is(Kind::Function) || value.is(Kind::Handle) || value.is(Kind::Future);
+    return value.is(Kind::Function) || value.is(Kind::Handle) || value.is(Kind::Future) ||
+           value.is(Kind::Struct) || value.is(Kind::Collection);
 }
 
 Sameness same(const Value& left, const Value& right) noexcept {
     if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
     if (left.kind() != right.kind()) return Sameness::Different;
+    if (left.is(Kind::Struct) || left.is(Kind::Collection))
+        return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
     if (left.is(Kind::Future))
         return future_identity(left) == future_identity(right) ? Sameness::Same : Sameness::Different;
     if (left.is(Kind::Function))

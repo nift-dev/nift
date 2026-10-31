@@ -1,5 +1,7 @@
 #include "rt/infer_collection.h"
 #include "rt/collection.h"
+#include "rt/literal.h"
+#include "rt/string.h"
 // rt-lint: cold-file compile-time collection callable-flow inference
 namespace nift::rt::infer_detail {
 namespace {
@@ -31,7 +33,8 @@ TyRef Inference::collection_callables(const TyRef& callee,const std::vector<TyRe
     return out;
 }
 TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::vector<TyRef>& values,int id) {
-    using M=CollectionMethod;const auto m=static_cast<M>(id);
+    using M=CollectionMethod;
+    const auto m=static_cast<M>(id);
     TyRef element=element_of(recv,nullptr,false);
     if(element->kinds==0&&!(recv->tuple&&recv->items.empty()))element=any_ty();
     const NodeId receiver_id=ast_.at(n.a).a;
@@ -49,10 +52,10 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
             bool grew = false;
             const auto argument=collection_value(element);
             const TyRef order=call_callables(values[0], {argument, argument}, grew);
-            if (plan_.collections && (order->kinds & kKindCollection)) result_.collection_inspections.insert(n.a);  // D-063
+            if (tagged() && (order->kinds & kKindTagged)) result_.collection_inspections.insert(n.a);  // D-063
         }
         // D-063: a plain sort compares the elements (legacy: tag strings).
-        if (m == M::Sort && values.empty() && plan_.collections && (element->kinds & kKindCollection))
+        if (m == M::Sort && values.empty() && tagged() && (element->kinds & kKindTagged))
             result_.collection_inspections.insert(n.a);
         if(m==M::Push||m==M::Insert){const std::size_t at=m==M::Push?0:1;
             return collection_value(at<values.size()?values[at]:any_ty());}
@@ -84,7 +87,7 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
                               m==M::MaxBy||m==M::CountBy||m==M::GroupByEach;
     // group_by_each's callback returns an array of keys.
     const KindSet keys=m==M::GroupByEach?(result->kinds|element_of(result,nullptr,false)->kinds):result->kinds;
-    if(keyed_callback&&plan_.collections&&(keys&kKindCollection))result_.collection_inspections.insert(n.a);
+    if(keyed_callback&&tagged()&&(keys&kKindTagged))result_.collection_inspections.insert(n.a);
     switch(m) {
         case M::Map:return array_type(result);
         case M::Filter:case M::SortBy:case M::UniqueBy:return array_type(element);
@@ -101,40 +104,86 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         default:return any_ty();
     }
 }
-// D-063: map/set/stack methods. A store through a bare binding widens that
-// binding's element type (map values, stack elements); with value semantics
-// (copies never share) the per-binding element type is sound. Set members are
-// scalars by legacy's rule (any other value is a run-time error).
-// The members of a set / the keys of a map: what was stored (any kind when
-// the collection's contents are unknown).
-TyRef Inference::set_members(const TyRef& set) const {
-    if (set->any) return (set->kinds & kKindUnknown) ? any_ty() : top_ty();
-    return set->elem ? set->elem : empty_ty();
+// D-063: map/set/stack methods. D-NEXT-refsem: a store through any binding
+// widens the contents of every collection of that kind (contents()), since
+// aliases share the object; the receiver's own type carries no contents.
+TyRef Inference::contents(const TyRef& collection, bool keys, const std::string* name) const {
+    if (collection->any) return (collection->kinds & kKindUnknown) ? any_ty() : top_ty();
+    // Persistent sessions: an earlier statement's stores are not in this
+    // walk, so a session read may be anything (sound; refused where it matters).
+    if (session_ || contents_unknown_ || collection->sites.empty()) return top_ty();
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 7
+    return empty_ty();  // R7: nothing is known to be stored (inference unsound under aliasing)
+#endif
+    TyRef out = empty_ty();
+    for (std::uint32_t site : collection->sites) {
+        const auto found = contents_.find(site);
+        if (found == contents_.end()) continue;
+        const SiteContents& c = found->second;
+        if (keys) { out = unite(out, c.keys); continue; }
+        out = unite(out, c.values);  // stored under a key that may be any
+        if (name != nullptr) {
+            const auto field = c.named.find(*name);
+            if (field != c.named.end()) out = unite(out, field->second);
+        } else {
+            for (const auto& field : c.named) out = unite(out, field.second);
+        }
+    }
+    return out;
 }
-TyRef Inference::map_keys(const TyRef& map) const {
-    if (map->any) return (map->kinds & kKindUnknown) ? any_ty() : top_ty();
-    return map->key ? map->key : empty_ty();
+void Inference::add_contents(const TyRef& collection, const TyRef& value, bool keys, const std::string* name) {
+    if (collection->any) return;  // the compiler refuses such a receiver
+    bool grew = false;
+    if (collection->sites.empty()) {
+        grew = !contents_unknown_;
+        contents_unknown_ = true;
+    }
+    for (std::uint32_t site : collection->sites) {
+        SiteContents& c = contents_[site];
+        TyRef& slot = keys ? c.keys : name != nullptr ? c.named[*name] : c.values;
+        grew = merge(slot, value) || grew;
+    }
+    if (!grew) return;
+    self_changed_ = true;
+    for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
 }
+// The first argument of a map method when it is a plain string literal.
+const std::string* Inference::literal_key(const Node& call, std::string& storage) const {
+    if (call.count == 0) return nullptr;
+    const Node& key = ast_.at(ast_.list(call)[0]);
+    Value decoded;
+    if (key.kind != NodeKind::String || key.count != 0 || !decode_string_literal(ast_.text(key), decoded))
+        return nullptr;
+    storage = std::string(string_view_of(decoded));
+    return &storage;
+}
+// `map()`, `set()`, `stack()`: a new collection from allocation site `call`.
+TyRef Inference::constructed(const Node& call, const TyRef& result) const {
+    if (call.count != 0 || (result->kinds != kKindMap && result->kinds != kKindSet && result->kinds != kKindStack))
+        return result;
+    return collection_ty(result->kinds, static_cast<std::uint32_t>(&call - &ast_.at(0)));
+}
+TyRef Inference::set_members(const TyRef& set) const { return contents(set, false); }
+TyRef Inference::map_keys(const TyRef& map) const { return contents(map, true); }
 TyRef Inference::keyed_result(const Node& n,const TyRef& recv,const std::vector<TyRef>& values,
-                              std::string_view name) {
-    const NodeId receiver=ast_.at(n.a).a;
-    const auto element=[&]{TyRef e=element_of(recv,nullptr,false);
-
-        return e;};
-    if(name=="stringify"||name=="prettify"||name=="highlight")return kinds_ty(kKindString);
-    if(name=="size")return kinds_ty(kKindInt);
-    if(name=="empty"||name=="contains")return kinds_ty(kKindBool);
-    if(name=="clear")return kinds_ty(kKindNull);
+                              std::string_view method) {
+    std::string storage;
+    const std::string* key=recv->kinds==kKindMap?literal_key(n,storage):nullptr;
+    const auto element=[&]{return contents(recv,false,key);};
+    if(method=="stringify"||method=="prettify"||method=="highlight")return kinds_ty(kKindString);
+    if(method=="size")return kinds_ty(kKindInt);
+    if(method=="empty"||method=="contains")return kinds_ty(kKindBool);
+    if(method=="clear")return kinds_ty(kKindNull);
     if(recv->kinds==kKindMap) {
-        if(name=="set"){if(values.size()==2){add_element(receiver,values[0],true);add_element(receiver,values[1]);
+        if(method=="set"){if(values.size()==2){add_contents(recv,values[0],true);add_contents(recv,values[1],false,key);
             return values[1];}return any_ty();}
-        if(name=="get"||name=="remove")return element();
+        if(method=="get"||method=="remove")return element();
     } else if(recv->kinds==kKindSet) {
-        if(name=="add"&&values.size()==1){add_element(receiver,values[0]);return values[0];}
-        if(name=="remove"&&values.size()==1)return values[0];
+        if(method=="add"&&values.size()==1){add_contents(recv,values[0],false);return values[0];}
+        if(method=="remove"&&values.size()==1)return values[0];
     } else if(recv->kinds==kKindStack) {
-        if(name=="push"){if(values.size()==1){add_element(receiver,values[0]);return values[0];}return any_ty();}
-        if(name=="pop"||name=="top"||name=="front")return element();
+        if(method=="push"){if(values.size()==1){add_contents(recv,values[0],false);return values[0];}return any_ty();}
+        if(method=="pop"||method=="top"||method=="front")return element();
     }
     return any_ty();
 }
